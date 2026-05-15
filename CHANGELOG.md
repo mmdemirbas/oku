@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.0 — 2026-05-15
+
+- `html-doc serve` — start a local HTTP server at the project root (the dir
+  containing `docs/_kit/`), print HTTP URLs for every HTML, open the first
+  in the default browser. Resolves the `file://` browser-restriction problem
+  where symlinked kit assets fail to load silently.
+
 ## v1.0.0 — 2026-05-15
 
 Initial release. Extracted from inline chrome used in early karar HTML docs

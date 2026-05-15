@@ -5,16 +5,21 @@ html-doc · CLI for the shared HTML chrome kit.
 Commands:
   html-doc init    — create docs/_kit symlink to the kit repo in the current project
   html-doc build   — build all HTMLs in current dir into dist/standalone/ + dist/site/
+  html-doc serve   — start a local HTTP server in the project root so symlinked
+                     kit assets load (file:// has browser-specific restrictions)
 
-Both commands take zero flags. Output paths are printed with file:// prefix
-for click-to-open.
+All commands take zero flags. Output paths are printed with file:// or http://
+prefix for click-to-open.
 """
 
 import argparse
+import http.server
 import os
 import re
 import shutil
+import socketserver
 import sys
+import webbrowser
 from pathlib import Path
 
 KIT_ROOT = Path(__file__).resolve().parent.parent
@@ -133,21 +138,76 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------- serve ----------
+def find_project_root(start: Path) -> Path:
+    """Walk up to find the directory containing docs/_kit; fallback to start."""
+    cur = start.resolve()
+    for ancestor in [cur, *cur.parents]:
+        if (ancestor / 'docs' / '_kit').exists():
+            return ancestor
+    return start
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    """Start an HTTP server at the project root and print HTTP URLs for every HTML.
+
+    Why: file:// has browser-specific restrictions (symlink resolution, CORS-like
+    rules, cross-directory script loading). Serving via HTTP makes all references
+    resolve reliably across Chrome, Safari, Firefox.
+    """
+    cwd = Path.cwd()
+    root = find_project_root(cwd)
+    port = 9876
+    while True:
+        try:
+            httpd = socketserver.TCPServer(('', port), http.server.SimpleHTTPRequestHandler)
+            break
+        except OSError:
+            port += 1
+            if port > 9900:
+                print('✗ Could not find a free port in 9876–9900', file=sys.stderr)
+                return 1
+
+    os.chdir(root)
+    htmls = sorted(p for p in root.rglob('*.html') if 'dist' not in p.parts and 'node_modules' not in p.parts)
+
+    print(f'✓ Serving {root} on http://localhost:{port}')
+    print(f'  Stop with Ctrl-C.')
+    print()
+    if htmls:
+        print('  HTML files:')
+        for h in htmls:
+            rel = h.relative_to(root)
+            print(f'    http://localhost:{port}/{rel}')
+        # Open the first one
+        webbrowser.open(f'http://localhost:{port}/{htmls[0].relative_to(root)}')
+    print()
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print('\n✓ Stopped.')
+        httpd.shutdown()
+    return 0
+
+
 # ---------- main ----------
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog='html-doc',
-        description='Shared HTML chrome kit. Init projects, build artifacts.',
+        description='Shared HTML chrome kit. Init projects, build artifacts, serve locally.',
     )
     sub = parser.add_subparsers(dest='cmd')
     sub.add_parser('init', help='create docs/_kit symlink in the current project')
     sub.add_parser('build', help='build dist/standalone/ + dist/site/ from current dir')
+    sub.add_parser('serve', help='start local HTTP server so kit assets resolve correctly')
 
     args = parser.parse_args()
     if args.cmd == 'init':
         return cmd_init(args)
     if args.cmd == 'build':
         return cmd_build(args)
+    if args.cmd == 'serve':
+        return cmd_serve(args)
     parser.print_help()
     return 0
 

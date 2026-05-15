@@ -75,6 +75,23 @@ dist/
 
 Pick whichever fits the share scenario at hand.
 
+## Local preview (recommended over file://)
+
+```bash
+html-doc serve
+```
+
+Walks up from the current dir to find `docs/_kit/`, starts an HTTP server
+there on the first free port from 9876, and opens the first HTML in the
+default browser. Press Ctrl-C to stop.
+
+**Why HTTP, not `file://`:** browsers apply different rules to local files
+than to HTTP — symlink resolution, cross-directory script loading, and
+some `<script>` features can fail silently on `file://`. A local HTTP
+server makes all references resolve reliably across Chrome, Safari, and
+Firefox. The `standalone/` build is the right choice when sharing as a
+single file; for everyday previewing, `serve`.
+
 ## Per-page accent override
 
 Default accent is indigo. Override in a small `<style>` block on the page:
