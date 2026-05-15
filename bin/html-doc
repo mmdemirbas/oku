@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""
+html-doc · CLI for the shared HTML chrome kit.
+
+Commands:
+  html-doc init    — create docs/_kit symlink to the kit repo in the current project
+  html-doc build   — build all HTMLs in current dir into dist/standalone/ + dist/site/
+
+Both commands take zero flags. Output paths are printed with file:// prefix
+for click-to-open.
+"""
+
+import argparse
+import os
+import re
+import shutil
+import sys
+from pathlib import Path
+
+KIT_ROOT = Path(__file__).resolve().parent.parent
+KIT_FILES = ['chrome.css', 'chrome.js', 'chrome-boot.js']
+
+
+# ---------- file:// printer ----------
+def file_url(p: Path) -> str:
+    return f'file://{p.resolve()}'
+
+
+def report(label: str, path: Path) -> None:
+    print(f'  {label:<14} {file_url(path)}')
+
+
+# ---------- init ----------
+def cmd_init(args: argparse.Namespace) -> int:
+    """Create docs/_kit -> KIT_ROOT symlink in the current project."""
+    project = Path.cwd()
+    docs = project / 'docs'
+    docs.mkdir(exist_ok=True)
+    target = docs / '_kit'
+
+    if target.exists() or target.is_symlink():
+        if target.is_symlink() and Path(os.readlink(target)) == KIT_ROOT:
+            print(f'✓ Already linked: {target} -> {KIT_ROOT}')
+            print(f'  Open kit:     {file_url(KIT_ROOT)}')
+            return 0
+        print(f'✗ Path exists and is not the expected symlink: {target}', file=sys.stderr)
+        print(f'  Current target: {os.readlink(target) if target.is_symlink() else "(not a symlink)"}', file=sys.stderr)
+        return 1
+
+    target.symlink_to(KIT_ROOT)
+    print(f'✓ Linked {target} -> {KIT_ROOT}')
+    print()
+    print('  Reference the kit in your HTML <head>:')
+    print('    <script src="_kit/chrome-boot.js"></script>')
+    print('    <link rel="stylesheet" href="_kit/chrome.css">')
+    print('    <script src="_kit/chrome.js" defer></script>')
+    print()
+    print('  Then run `html-doc build` to produce dist/standalone/ + dist/site/.')
+    return 0
+
+
+# ---------- build ----------
+KIT_REF_RE = re.compile(r'(_kit/(chrome-boot\.js|chrome\.css|chrome\.js))')
+LINK_TO_KIT_CSS = re.compile(r'<link\s+rel="stylesheet"\s+href="_kit/chrome\.css"\s*/?>', re.I)
+SCRIPT_TO_KIT_BOOT = re.compile(r'<script\s+src="_kit/chrome-boot\.js"\s*></script>', re.I)
+SCRIPT_TO_KIT_MAIN = re.compile(r'<script\s+src="_kit/chrome\.js"\s+defer\s*></script>', re.I)
+
+
+def find_html_files(root: Path):
+    """Find HTML files at root level (non-recursive by default)."""
+    return sorted([p for p in root.glob('*.html') if p.is_file() and 'dist' not in p.parts])
+
+
+def build_site(srcs, out_dir: Path) -> None:
+    """Copy HTMLs to out_dir/, copy kit assets to out_dir/assets/, rewrite refs."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    assets = out_dir / 'assets'
+    assets.mkdir(exist_ok=True)
+    for f in KIT_FILES:
+        shutil.copy(KIT_ROOT / f, assets / f)
+
+    for src in srcs:
+        html = src.read_text(encoding='utf-8')
+        html = KIT_REF_RE.sub(r'assets/\2', html)
+        (out_dir / src.name).write_text(html, encoding='utf-8')
+
+
+def build_standalone(srcs, out_dir: Path) -> None:
+    """Inline kit CSS/JS into each HTML; produce single self-contained files."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    css = (KIT_ROOT / 'chrome.css').read_text(encoding='utf-8')
+    boot = (KIT_ROOT / 'chrome-boot.js').read_text(encoding='utf-8')
+    main = (KIT_ROOT / 'chrome.js').read_text(encoding='utf-8')
+
+    for src in srcs:
+        html = src.read_text(encoding='utf-8')
+        html = LINK_TO_KIT_CSS.sub(f'<style>\n{css}\n</style>', html, count=1)
+        html = SCRIPT_TO_KIT_BOOT.sub(f'<script>\n{boot}\n</script>', html, count=1)
+        html = SCRIPT_TO_KIT_MAIN.sub(f'<script>\n{main}\n</script>', html, count=1)
+        (out_dir / src.name).write_text(html, encoding='utf-8')
+
+
+def cmd_build(args: argparse.Namespace) -> int:
+    root = Path.cwd()
+    srcs = find_html_files(root)
+    if not srcs:
+        print(f'✗ No .html files found in {root}', file=sys.stderr)
+        return 1
+
+    dist = root / 'dist'
+    standalone = dist / 'standalone'
+    site = dist / 'site'
+
+    # Clean previous outputs to avoid stale files
+    if standalone.exists():
+        shutil.rmtree(standalone)
+    if site.exists():
+        shutil.rmtree(site)
+
+    build_standalone(srcs, standalone)
+    build_site(srcs, site)
+
+    print(f'✓ Built {len(srcs)} HTML file(s):')
+    print()
+    print('  standalone (inline, send-as-file):')
+    for src in srcs:
+        report('', standalone / src.name)
+    print()
+    print('  site (shared assets, multi-page):')
+    report('site root:', site)
+    for src in srcs:
+        report('', site / src.name)
+    return 0
+
+
+# ---------- main ----------
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        prog='html-doc',
+        description='Shared HTML chrome kit. Init projects, build artifacts.',
+    )
+    sub = parser.add_subparsers(dest='cmd')
+    sub.add_parser('init', help='create docs/_kit symlink in the current project')
+    sub.add_parser('build', help='build dist/standalone/ + dist/site/ from current dir')
+
+    args = parser.parse_args()
+    if args.cmd == 'init':
+        return cmd_init(args)
+    if args.cmd == 'build':
+        return cmd_build(args)
+    parser.print_help()
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ TITLE }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="_kit/chrome-boot.js"></script>
+<link rel="stylesheet" href="_kit/chrome.css">
+<script src="_kit/chrome.js" defer></script>
+<!--
+  Per-page accent override goes here (optional). Default is indigo (#6366f1 / #a5b4fc).
+  Example for amber:
+    <style>
+      :root { --accent: #b45309; --accent-soft: #fef3c7; --accent-strong: #b45309; }
+      :root[data-theme="dark"] { --accent: #fbbf24; --accent-soft: #422006; --accent-strong: #fcd34d; }
+    </style>
+-->
+</head>
+<body>
+
+<page-chrome
+  skip-label="Skip to content"
+  toc-label="Toggle contents"
+  theme-label="Cycle theme (system / light / dark)"
+  top-label="Back to top"></page-chrome>
+
+<div class="layout">
+
+<page-toc title="Contents"></page-toc>
+
+<main id="main-content">
+
+<header class="cover">
+  <div class="eyebrow">{{ EYEBROW }}</div>
+  <h1>{{ TITLE }}</h1>
+  <p class="subtitle">{{ SUBTITLE }}</p>
+  <div class="meta">{{ DATE }} · {{ AUDIENCE }} · {{ READ_TIME }}</div>
+</header>
+
+<section id="tldr">
+  <div class="tldr">
+    <span class="tldr-label">TL;DR</span>
+    <h2>{{ TLDR_TITLE }}</h2>
+    <p class="one-line">{{ ONE_LINE_SUMMARY }}</p>
+    <ul>
+      <li>{{ KEY_POINT_1 }}</li>
+      <li>{{ KEY_POINT_2 }}</li>
+      <li>{{ KEY_POINT_3 }}</li>
+    </ul>
+  </div>
+</section>
+
+<section id="overview">
+  <h2><span class="num">§1</span>{{ SECTION_1_TITLE }}</h2>
+  <p class="section-lead">{{ SECTION_1_LEAD }}</p>
+  <p>{{ PROSE }}</p>
+</section>
+
+<!-- Add more <section> blocks here. Each needs id + h2 for TOC. -->
+
+<footer>
+  <p><strong>{{ ARTIFACT_NAME }}</strong> · {{ DATE }}</p>
+  <p>{{ FOOTER_NOTE }}</p>
+</footer>
+
+</main>
+</div>
+
+</body>
+</html>
