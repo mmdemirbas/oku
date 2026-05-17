@@ -3,6 +3,45 @@
  * Loaded with defer; chrome-boot.js handles pre-paint state.
  */
 
+/* ──────────────────────────────────────────────────────────────────
+ * html-doc · chrome.js
+ *
+ *   Web Components, theme cycler, TOC builder, scroll-spy, tooltips,
+ *   site nav, charts, diagrams, snippets, warnings, search.
+ *
+ *   Loaded via `defer`; chrome-boot.js handles pre-paint state.
+ *   Pairs with renderer.js (JSON → Custom-Element DOM walker).
+ *
+ *   Section map — line numbers in the source listing of this file:
+ *     SVG icons                                ~6
+ *     Theme cycler                            ~13
+ *     TOC toggle (legacy v1)                  ~46
+ *     <page-chrome>                           ~61
+ *     <page-toc>                              ~91
+ *     TOC builder + scroll-spy               ~130
+ *     Reading aids (progress, copy buttons)  ~258
+ *     Docs-root discovery                    ~341
+ *     escapeHTML helper                      ~360
+ *     Visual Viewport pinch-zoom tracker     ~369
+ *     Tooltip controller                     ~388
+ *     kit.json + glossary loader             ~513
+ *     <glossary-term>                        ~685
+ *     <ext-ref>                              ~725
+ *     <html-doc-chart>                       ~756
+ *     <html-doc-diagram> (Mermaid)           ~874
+ *     <html-doc-snippet>                     ~971
+ *     <page-nav>                            ~1013
+ *     Forward-compat warning indicator      ~1187
+ *     Pagefind search                       ~1275
+ *     Event hookups (theme, render, warn)   ~1455
+ *
+ *   Conventions:
+ *     - Custom Element classes:  class FooBar extends HTMLElement { ... }
+ *     - Shared controllers:      var __htmldocFoo = (function () { ... })();
+ *     - Public helpers:          plain top-level function
+ *     - Internal helpers:        nested inside their controller IIFE
+ * ────────────────────────────────────────────────────────────────── */
+
 /* ============ SVG icon set ============ */
 const ICON_MENU = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>';
 const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.5" y1="4.5" x2="6.6" y2="6.6"/><line x1="17.4" y1="17.4" x2="19.5" y2="19.5"/><line x1="4.5" y1="19.5" x2="6.6" y2="17.4"/><line x1="17.4" y1="6.6" x2="19.5" y2="4.5"/></svg>';
@@ -874,12 +913,25 @@ function fmtNum(n) {
 /* ============ <html-doc-diagram> — Mermaid (lazy-loaded) ============ */
 var __mermaidLoader = (function () {
   var loadPromise = null;
+  // SUPPLY-CHAIN NOTE: this loads Mermaid from a CDN at runtime. The
+  // @10 pin allows any 10.x update from jsDelivr — acceptable for a
+  // personal tool, exposed for any hosted deployment. For strict
+  // integrity, pin to a fully-qualified version and add an integrity
+  // attribute. Procedure:
+  //   1. Pick a version, e.g. mermaid@10.9.4
+  //   2. Visit https://www.srihash.org/ — paste the jsDelivr URL,
+  //      copy the sha384 hash
+  //   3. Replace script.src below with the pinned URL
+  //   4. Set script.integrity = 'sha384-...' (from step 2)
+  //   5. Set script.crossOrigin = 'anonymous'  (required for SRI to work)
   function load() {
     if (loadPromise) return loadPromise;
     loadPromise = new Promise(function (resolve, reject) {
       var script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
       script.async = true;
+      // To enable SRI: set script.integrity = 'sha384-...';
+      //                set script.crossOrigin = 'anonymous';
       script.onload = function () {
         try {
           window.mermaid.initialize({
