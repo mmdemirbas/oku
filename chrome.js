@@ -246,26 +246,46 @@ function buildTOC(tocList) {
 }
 
 /* ============ Reading aids: progress, back-to-top, copy-btn, glossary ============ */
-function initReadingAids() {
-  /* Progress bar + back-to-top */
-  (function () {
-    var bar = document.getElementById('progress-bar');
-    var btt = document.querySelector('.back-to-top');
-    var ticking = false;
-    function update() {
-      var h = document.documentElement;
-      var max = h.scrollHeight - h.clientHeight;
-      if (bar) bar.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
-      if (btt) btt.classList.toggle('visible', h.scrollTop > 600);
-      ticking = false;
-    }
-    window.addEventListener('scroll', function () {
-      if (!ticking) { window.requestAnimationFrame(update); ticking = true; }
-    }, { passive: true });
-    update();
-  })();
+// The once-only globals (scroll + keydown listeners) are registered the
+// first time initReadingAids runs; subsequent calls only re-scan the DOM
+// for new <pre> blocks needing copy buttons. Without this guard, every
+// renderer-rendered event would attach a duplicate scroll + keydown
+// closure that can't be removed.
+var __htmldocAidsInited = false;
 
-  /* Copy-to-clipboard on every <pre> block */
+function initReadingAids() {
+  if (!__htmldocAidsInited) {
+    __htmldocAidsInited = true;
+
+    /* Progress bar + back-to-top */
+    (function () {
+      var bar = document.getElementById('progress-bar');
+      var btt = document.querySelector('.back-to-top');
+      var ticking = false;
+      function update() {
+        var h = document.documentElement;
+        var max = h.scrollHeight - h.clientHeight;
+        if (bar) bar.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+        if (btt) btt.classList.toggle('visible', h.scrollTop > 600);
+        ticking = false;
+      }
+      window.addEventListener('scroll', function () {
+        if (!ticking) { window.requestAnimationFrame(update); ticking = true; }
+      }, { passive: true });
+      update();
+    })();
+
+    /* Escape closes mobile TOC */
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        var nav = document.querySelector('page-toc, nav.toc');
+        if (nav) nav.classList.remove('open');
+      }
+    });
+  }
+
+  /* Copy-to-clipboard on every <pre> block — re-runs safely; already
+     guarded by `if (pre.querySelector('.copy-btn')) return`. */
   (function () {
     if (!navigator.clipboard) return;
     document.querySelectorAll('pre').forEach(function (pre) {
@@ -291,8 +311,13 @@ function initReadingAids() {
     });
   })();
 
-  /* Glossary tooltip — mobile tap support */
+  /* Glossary tooltip — legacy v1 .g-wrap mobile tap support. The new
+     tooltip controller attaches its own listeners; this remains for
+     hand-authored HTML using the legacy class. Per-element handler
+     reattachment is harmless on re-run. */
   document.querySelectorAll('.g-wrap').forEach(function (el) {
+    if (el.dataset.gwrapBound) return;
+    el.dataset.gwrapBound = '1';
     el.addEventListener('click', function (e) {
       if (window.matchMedia('(hover: none)').matches) {
         e.preventDefault();
@@ -301,14 +326,15 @@ function initReadingAids() {
       }
     });
   });
+}
 
-  /* Escape closes mobile TOC */
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') {
-      var nav = document.querySelector('page-toc, nav.toc');
-      if (nav) nav.classList.remove('open');
-    }
-  });
+/* ============ HTML-escape helper (module scope) ============ */
+function escapeHTML(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 /* ============ Visual Viewport API — pinch-zoom stability ============ *
@@ -485,18 +511,21 @@ var __htmldocKit = (function () {
               })
           ];
         });
-        // Project-level additions / overrides
-        if (data && data.glossary) {
-          Object.keys(data.glossary).forEach(function (d) {
-            kit.glossary[d] = Object.assign({}, kit.glossary[d] || {}, data.glossary[d]);
-          });
-        }
-        if (data && data.extrefs) {
-          Object.keys(data.extrefs).forEach(function (d) {
-            kit.extrefs[d] = Object.assign({}, kit.extrefs[d] || {}, data.extrefs[d]);
-          });
-        }
         return Promise.all(promises).then(function () {
+          // Apply project-level overrides AFTER central domain files
+          // have loaded — otherwise the per-domain fetch .then runs
+          // last and wholesale-replaces kit.glossary[d], wiping the
+          // override entries.
+          if (data && data.glossary) {
+            Object.keys(data.glossary).forEach(function (d) {
+              kit.glossary[d] = Object.assign({}, kit.glossary[d] || {}, data.glossary[d]);
+            });
+          }
+          if (data && data.extrefs) {
+            Object.keys(data.extrefs).forEach(function (d) {
+              kit.extrefs[d] = Object.assign({}, kit.extrefs[d] || {}, data.extrefs[d]);
+            });
+          }
           loaded = true;
           waiters.forEach(function (w) { w(kit); });
           waiters = [];
@@ -583,6 +612,13 @@ var __htmldocKit = (function () {
 })();
 
 /* ============ <glossary-term> Custom Element ============ */
+// Standalone builds inline the page but not the glossary; in that mode
+// we render the term inline without a tooltip rather than mark every
+// term as "unknown". Detected via the inline page-data script.
+var __htmldocStandalone = function () {
+  return !!document.getElementById('__htmldoc_page__');
+};
+
 class GlossaryTerm extends HTMLElement {
   connectedCallback() {
     var self = this;
@@ -598,14 +634,18 @@ class GlossaryTerm extends HTMLElement {
         if (r.lang !== (opts.lang || __htmldocKit.state().lang)) {
           self.setAttribute('data-lang-shown', 'lang: ' + r.lang);
         }
+        __htmldocTooltip.attach(self);
+      } else if (__htmldocStandalone()) {
+        // Standalone mode without inline glossary data — render text only.
+        self.classList.remove('html-doc-gloss');
       } else {
         self.setAttribute('data-def', '<em>Unknown term:</em> ' + term);
         self.classList.add('unknown');
         window.dispatchEvent(new CustomEvent('html-doc:warnings', {
           detail: [{ code: 'unknown-glossary-term', msg: 'No entry for "' + term + '"', level: 'warn' }]
         }));
+        __htmldocTooltip.attach(self);
       }
-      __htmldocTooltip.attach(self);
     });
   }
 }
@@ -626,14 +666,17 @@ class ExtRef extends HTMLElement {
         if (r.hit.summary) body += '<br>' + r.hit.summary;
         self.setAttribute('data-def', body);
         if (r.hit.link) self.setAttribute('data-link', r.hit.link);
+        __htmldocTooltip.attach(self);
+      } else if (__htmldocStandalone()) {
+        self.classList.remove('html-doc-extref');
       } else {
         self.setAttribute('data-def', '<em>Unknown reference:</em> ' + name);
         self.classList.add('unknown');
         window.dispatchEvent(new CustomEvent('html-doc:warnings', {
           detail: [{ code: 'unknown-ext-ref', msg: 'No entry for "' + name + '"', level: 'warn' }]
         }));
+        __htmldocTooltip.attach(self);
       }
-      __htmldocTooltip.attach(self);
     });
   }
 }
@@ -1112,10 +1155,6 @@ var __htmldocWarnings = (function () {
     });
   }
 
-  function escapeHTML(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
   function refresh() {
     if (dismissed || list.length === 0) {
       hide();
@@ -1219,6 +1258,27 @@ var __htmldocSearch = (function () {
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && modal.classList.contains('open')) hide();
     });
+
+    // Focus trap — keep Tab / Shift-Tab inside the panel while the modal
+    // is open. Keyboard-only and screen-reader users otherwise tab into
+    // the document behind the backdrop.
+    modal.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' || !modal.classList.contains('open')) return;
+      var focusables = modal.querySelectorAll(
+        'input, button, a[href], [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusables.length === 0) return;
+      var first = focusables[0];
+      var last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+
     return modal;
   }
 
@@ -1242,10 +1302,15 @@ var __htmldocSearch = (function () {
             datas.forEach(function (d) {
               var li = document.createElement('li');
               li.className = 'search-result';
+              var url = escapeHTML(d.url || '');
+              var title = escapeHTML((d.meta && d.meta.title) ? d.meta.title : (d.url || ''));
+              // d.excerpt intentionally raw — Pagefind injects <mark> tags
+              // for match highlighting. Source is the index we just built.
+              var excerpt = d.excerpt || '';
               li.innerHTML =
-                '<a href="' + d.url + '">' +
-                  '<div class="search-result-title">' + (d.meta && d.meta.title ? d.meta.title : d.url) + '</div>' +
-                  '<div class="search-result-excerpt">' + (d.excerpt || '') + '</div>' +
+                '<a href="' + url + '">' +
+                  '<div class="search-result-title">' + title + '</div>' +
+                  '<div class="search-result-excerpt">' + excerpt + '</div>' +
                 '</a>';
               resultsEl.appendChild(li);
             });
@@ -1261,7 +1326,9 @@ var __htmldocSearch = (function () {
       });
   }
 
+  var _focusBeforeOpen = null;
   function show() {
+    _focusBeforeOpen = document.activeElement;
     var m = ensureModal();
     m.classList.add('open');
     var input = m.querySelector('.search-input');
@@ -1269,6 +1336,10 @@ var __htmldocSearch = (function () {
   }
   function hide() {
     if (modal) modal.classList.remove('open');
+    if (_focusBeforeOpen && typeof _focusBeforeOpen.focus === 'function') {
+      _focusBeforeOpen.focus();
+      _focusBeforeOpen = null;
+    }
   }
 
   function addButton() {

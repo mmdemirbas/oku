@@ -362,11 +362,14 @@ code:not(pre code) {
   margin: 22px 0; padding: 18px 22px; border-radius: 10px;
   border-left: 5px solid var(--accent); background: var(--accent-soft);
 }
+/* Note: schema accepts "warn"; ".warning" kept as alias for legacy HTML. */
+.callout.warn,
 .callout.warning { border-left-color: var(--warning); background: var(--warning-soft); }
 .callout.danger  { border-left-color: var(--danger);  background: var(--danger-soft); }
 .callout.success { border-left-color: var(--success); background: var(--success-soft); }
 .callout.neutral { border-left-color: var(--text-soft); background: var(--surface-2); }
 .callout h4 { margin: 0 0 8px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--accent-strong); }
+.callout.warn h4,
 .callout.warning h4 { color: var(--warning); }
 .callout.danger h4 { color: var(--danger); }
 .callout.success h4 { color: var(--success); }
