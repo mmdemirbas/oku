@@ -167,7 +167,10 @@ body.toc-collapsed page-toc {
   transition: background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .12s ease, opacity .2s ease;
 }
 .ctrl-btn:hover { background: var(--ctrl-bg-hover); border-color: var(--line-strong); }
-.ctrl-btn:active { transform: scale(0.96); }
+/* Pinch-zoom stability: each fixed-position chrome button follows the
+   visual viewport via CSS variables that chrome.js syncs. */
+.ctrl-btn { transform: translate(var(--vv-left, 0), var(--vv-top, 0)); }
+.ctrl-btn:active { transform: translate(var(--vv-left, 0), var(--vv-top, 0)) scale(0.96); }
 .ctrl-btn svg { width: 20px; height: 20px; display: block; }
 .toc-toggle { top: 16px; left: 16px; }
 .theme-toggle { top: 16px; right: 16px; }
@@ -470,3 +473,104 @@ footer {
   details > *:not(summary) { display: block !important; }
   details summary::after { content: " (expanded)"; font-size: 9pt; color: #888; }
 }
+
+/* ============================================================
+   <glossary-term>, <ext-ref>, and the tooltip popup
+   (v2 interactive learning primitives)
+   ============================================================ */
+.html-doc-gloss,
+.html-doc-extref {
+  border-bottom: 1px dotted var(--accent-strong);
+  cursor: help;
+  color: var(--text);
+  font-weight: 500;
+  padding: 0 2px;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.html-doc-gloss:hover,
+.html-doc-gloss:focus-visible,
+.html-doc-extref:hover,
+.html-doc-extref:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+.html-doc-gloss:focus-visible,
+.html-doc-extref:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.html-doc-gloss.unknown,
+.html-doc-extref.unknown {
+  border-bottom: 1px dotted var(--warning);
+  color: var(--warning);
+}
+
+.html-doc-tooltip {
+  position: absolute;
+  max-width: 340px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+  box-shadow: 0 8px 24px var(--shadow-strong);
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0;
+  z-index: 300;
+  pointer-events: auto;
+  animation: hdt-in 0.18s ease;
+}
+@keyframes hdt-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.html-doc-tooltip.pinned {
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px var(--shadow-strong), 0 0 0 2px var(--accent-soft);
+}
+.html-doc-tooltip .hdt-body { margin: 0; }
+.html-doc-tooltip .hdt-body p { margin: 0 0 8px 0; }
+.html-doc-tooltip .hdt-body p:last-child { margin-bottom: 0; }
+.html-doc-tooltip .hdt-body code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: var(--surface-2); padding: 1px 4px; border-radius: 3px; }
+.html-doc-tooltip .hdt-link {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.html-doc-tooltip .hdt-link a {
+  color: var(--accent-strong);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent);
+}
+.html-doc-tooltip .hdt-link a:hover { background: var(--accent-soft); }
+.html-doc-tooltip .hdt-lang {
+  display: inline-block;
+  font-size: 10.5px;
+  color: var(--warning);
+  background: var(--warning-soft);
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-top: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.html-doc-tooltip .hdt-pin-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-soft);
+  font-style: italic;
+}
+.html-doc-tooltip.pinned .hdt-pin-hint {
+  color: var(--accent-strong);
+  font-style: normal;
+  font-weight: 600;
+}
+.html-doc-tooltip.pinned .hdt-pin-hint::before { content: '📌  '; font-style: normal; }
+.html-doc-tooltip:not(.pinned) .hdt-pin-hint::before { content: '↳ '; }

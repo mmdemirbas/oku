@@ -1,0 +1,42 @@
+{
+  "$schema": "https://html-doc.dev/schema/extrefs-v1.json",
+  "domain": "doc-tooling",
+  "version": 1,
+  "entries": {
+    "Astro Starlight": {
+      "en": {
+        "name": "Astro Starlight",
+        "summary": "Astro-based documentation theme. MDX content, auto-generated sidebar, built-in Pagefind search. Closest competitor in the field comparison.",
+        "link": "https://starlight.astro.build"
+      }
+    },
+    "Pagefind": {
+      "en": {
+        "name": "Pagefind",
+        "summary": "Static, dependency-free full-text search for static sites. Build-time indexer + self-contained JS+WASM widget.",
+        "link": "https://pagefind.app"
+      }
+    },
+    "Mermaid": {
+      "en": {
+        "name": "Mermaid",
+        "summary": "Diagram-as-code rendering library. Sequence, flow, gantt, state diagrams from text. Used in v1 for the <diagram> primitive.",
+        "link": "https://mermaid.js.org"
+      }
+    },
+    "MkDocs Material": {
+      "en": {
+        "name": "MkDocs Material",
+        "summary": "Python-based static site generator with the de-facto Material theme. Excellent chrome, content tabs, admonitions, instant page loading.",
+        "link": "https://squidfunk.github.io/mkdocs-material/"
+      }
+    },
+    "VitePress": {
+      "en": {
+        "name": "VitePress",
+        "summary": "Vite + Vue static site generator aimed at technical documentation.",
+        "link": "https://vitepress.dev"
+      }
+    }
+  }
+}

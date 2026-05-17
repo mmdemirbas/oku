@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://html-doc.dev/schema/page-v1.json",
+  "title": "html-doc page",
+  "description": "Source of truth for one renderable page. Authored as JSON; the kit's renderer maps the tree to Custom-Element DOM at load time.",
+  "type": "object",
+  "required": ["kind", "title", "blocks"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "description": "Optional schema URL for editor autocomplete." },
+    "schema_version": { "type": "integer", "default": 1, "description": "Reader uses this to detect forward-compat issues." },
+    "kind": { "const": "page" },
+    "title": { "type": "string", "description": "Becomes the document <title> and the page cover's <h1>." },
+    "meta": { "$ref": "#/$defs/meta" },
+    "accent": {
+      "type": "string",
+      "description": "Per-page accent token. Either a kit-known name (teal, amber, indigo, ...) or a CSS color value."
+    },
+    "blocks": {
+      "type": "array",
+      "description": "Top-level content sequence: cover-level elements (tldr) then sections.",
+      "items": { "$ref": "#/$defs/topBlock" }
+    }
+  },
+  "$defs": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "eyebrow": { "type": "string", "description": "Small label above the title, e.g. 'Implementation plan'." },
+        "subtitle": { "type": "string" },
+        "audience": { "type": "string" },
+        "date": { "type": "string", "description": "ISO date or human string." },
+        "read_time": { "type": "string", "description": "Like '~10 min read'." },
+        "lang": { "type": "string", "description": "Per-page language override; otherwise project default applies." },
+        "summary": { "type": "string", "description": "One-line summary, surfaced in nav tooltips and llms.txt." }
+      }
+    },
+
+    "topBlock": {
+      "oneOf": [
+        { "$ref": "#/$defs/section" },
+        { "$ref": "#/$defs/tldr" },
+        { "$ref": "#/$defs/kpi-grid" }
+      ]
+    },
+
+    "section": {
+      "type": "object",
+      "required": ["kind", "id", "title", "blocks"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "section" },
+        "id": { "type": "string", "description": "Anchor + TOC key. Should be unique within the page." },
+        "title": { "type": "string" },
+        "lead": { "type": "string", "description": "Optional one-paragraph lead under the heading." },
+        "blocks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentBlock" }
+        }
+      }
+    },
+
+    "tldr": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "tldr" },
+        "title": { "type": "string", "default": "TL;DR" },
+        "summary": { "type": "string", "description": "Single-line headline." },
+        "bullets": { "type": "array", "items": { "$ref": "#/$defs/richString" } }
+      }
+    },
+
+    "kpi-grid": {
+      "type": "object",
+      "required": ["kind", "tiles"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "kpi-grid" },
+        "tiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["num", "label"],
+            "additionalProperties": false,
+            "properties": {
+              "num": { "type": ["string", "number"] },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "contentBlock": {
+      "oneOf": [
+        { "$ref": "#/$defs/paragraph" },
+        { "$ref": "#/$defs/heading" },
+        { "$ref": "#/$defs/callout" },
+        { "$ref": "#/$defs/insight" },
+        { "$ref": "#/$defs/info-tip" },
+        { "$ref": "#/$defs/list" },
+        { "$ref": "#/$defs/code" },
+        { "$ref": "#/$defs/kpi-grid" },
+        { "$ref": "#/$defs/bar-chart" },
+        { "$ref": "#/$defs/step-flow" },
+        { "$ref": "#/$defs/compare-grid" },
+        { "$ref": "#/$defs/scope-grid" }
+      ]
+    },
+
+    "paragraph": {
+      "type": "object",
+      "required": ["kind", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "paragraph" },
+        "content": { "$ref": "#/$defs/richString" }
+      }
+    },
+
+    "heading": {
+      "type": "object",
+      "required": ["kind", "level", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "heading" },
+        "level": { "type": "integer", "minimum": 3, "maximum": 4 },
+        "title": { "type": "string" },
+        "id": { "type": "string" }
+      }
+    },
+
+    "callout": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "callout" },
+        "type": { "enum": ["warn", "danger", "success", "neutral"], "default": "neutral" },
+        "title": { "type": "string" },
+        "content": { "$ref": "#/$defs/richString" }
+      }
+    },
+
+    "insight": {
+      "type": "object",
+      "required": ["kind", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "insight" },
+        "content": { "$ref": "#/$defs/richString" }
+      }
+    },
+
+    "info-tip": {
+      "type": "object",
+      "required": ["kind", "summary", "content"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "info-tip" },
+        "summary": { "type": "string", "description": "The collapsed label." },
+        "content": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contentBlock" }
+        }
+      }
+    },
+
+    "list": {
+      "type": "object",
+      "required": ["kind", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "list" },
+        "style": { "enum": ["bullet", "numbered"], "default": "bullet" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/richString" }
+        }
+      }
+    },
+
+    "code": {
+      "type": "object",
+      "required": ["kind", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "code" },
+        "language": { "type": "string" },
+        "source": { "type": "string" }
+      }
+    },
+
+    "bar-chart": {
+      "type": "object",
+      "required": ["kind", "rows"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "bar-chart" },
+        "max": { "type": "number", "description": "Bar full-width value; defaults to max(rows.value)." },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "value": { "type": "number" },
+              "display": { "type": "string", "description": "Override the right-hand readout." },
+              "color": { "enum": ["accent", "warn", "danger", "success"], "default": "accent" }
+            }
+          }
+        }
+      }
+    },
+
+    "step-flow": {
+      "type": "object",
+      "required": ["kind", "steps"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "step-flow" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["title"],
+            "additionalProperties": false,
+            "properties": {
+              "num": { "type": ["string", "number"] },
+              "title": { "type": "string" },
+              "meta": { "type": "string", "description": "Small meta line (estimate, files, risk)." },
+              "content": { "$ref": "#/$defs/richString" }
+            }
+          }
+        }
+      }
+    },
+
+    "compare-grid": {
+      "type": "object",
+      "required": ["kind", "cards"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "compare-grid" },
+        "cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["title"],
+            "additionalProperties": false,
+            "properties": {
+              "verdict": { "enum": ["good", "bad", "neutral"], "default": "neutral" },
+              "title": { "type": "string" },
+              "content": { "$ref": "#/$defs/richString" }
+            }
+          }
+        }
+      }
+    },
+
+    "scope-grid": {
+      "type": "object",
+      "required": ["kind", "columns"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "scope-grid" },
+        "columns": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["status", "title", "items"],
+            "additionalProperties": false,
+            "properties": {
+              "status": { "enum": ["in", "out"] },
+              "title": { "type": "string" },
+              "items": { "type": "array", "items": { "$ref": "#/$defs/richString" } }
+            }
+          }
+        }
+      }
+    },
+
+    "richString": {
+      "description": "Either a plain string or an array mixing strings with inline nodes.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              { "$ref": "#/$defs/inlineNode" }
+            ]
+          }
+        }
+      ]
+    },
+
+    "inlineNode": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "glossary-term" },
+            "term": { "type": "string" },
+            "in": { "type": "string", "description": "Disambiguating domain." },
+            "lang": { "type": "string", "description": "Override the project language for this instance." },
+            "text": { "type": "string", "description": "Visible text; defaults to term." }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "ext-ref" },
+            "name": { "type": "string" },
+            "in": { "type": "string" },
+            "lang": { "type": "string" },
+            "text": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["code", "em", "strong"] },
+            "text": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "text", "href"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "link" },
+            "text": { "type": "string" },
+            "href": { "type": "string" }
+          }
+        }
+      ]
+    }
+  }
+}

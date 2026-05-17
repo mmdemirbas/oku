@@ -1,0 +1,66 @@
+{
+  "$schema": "https://html-doc.dev/schema/glossary-v1.json",
+  "domain": "web",
+  "version": 1,
+  "entries": {
+    "Custom Elements": {
+      "en": {
+        "def": "HTML5 standard for defining new HTML tags with their own behavior, registered via <code>customElements.define()</code>. Browsers parse them as ordinary DOM nodes.",
+        "link": "https://developer.mozilla.org/en-US/docs/Web/Web_Components/Using_custom_elements"
+      }
+    },
+    "Shadow DOM": {
+      "en": {
+        "def": "Encapsulated DOM subtree attached to a host element. Styles and IDs inside don't leak out; styles outside don't leak in.",
+        "link": "https://developer.mozilla.org/en-US/docs/Web/Web_Components/Using_shadow_DOM"
+      }
+    },
+    "FOUC": {
+      "en": {
+        "def": "<strong>Flash of Unstyled Content.</strong> Brief moment when a page renders before its CSS or component styling applies. Mitigated by inlining critical CSS or pre-paint scripts."
+      }
+    },
+    "Viewport": {
+      "en": {
+        "def": "The user-visible region of a web page. Distinct from the layout viewport (which is the document size) and the visual viewport (which moves under pinch-zoom).",
+        "link": "https://developer.mozilla.org/en-US/docs/Web/CSS/Viewport_concepts"
+      }
+    },
+    "Visual Viewport": {
+      "en": {
+        "def": "Browser API exposing the user-visible viewport during pinch-zoom. <code>window.visualViewport.offsetLeft</code>/<code>offsetTop</code> give the visual viewport's offset relative to the layout viewport.",
+        "link": "https://developer.mozilla.org/en-US/docs/Web/API/VisualViewport"
+      }
+    },
+    "prefers-color-scheme": {
+      "en": {
+        "def": "CSS media query that reflects the user's OS theme preference (light or dark). Updates live when the OS theme changes.",
+        "link": "https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-color-scheme"
+      }
+    },
+    "localStorage": {
+      "en": {
+        "def": "Browser-side key/value persistence scoped to origin. ~5 MB per origin. Synchronous API; persists across sessions.",
+        "link": "https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage"
+      }
+    },
+    "History API": {
+      "en": {
+        "def": "<code>pushState</code> / <code>replaceState</code> / <code>popstate</code> for client-side URL changes without page reload. Enables clean-URL routing in SPAs.",
+        "link": "https://developer.mozilla.org/en-US/docs/Web/API/History_API"
+      }
+    },
+    "IntersectionObserver": {
+      "en": {
+        "def": "API for observing when elements enter or leave the viewport. Replaces hand-rolled <code>scroll</code>-listener gymnastics for visibility detection.",
+        "link": "https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API"
+      }
+    },
+    "CSS variable": {
+      "en": {
+        "def": "Custom property declared with <code>--name: value</code> and read with <code>var(--name)</code>. Cascades like any property; can be updated at runtime via <code>style.setProperty</code>.",
+        "link": "https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_custom_properties"
+      }
+    }
+  }
+}

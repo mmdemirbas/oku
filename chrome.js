@@ -290,3 +290,332 @@ function initReadingAids() {
     }
   });
 }
+
+/* ============ Visual Viewport API — pinch-zoom stability ============ *
+ * Position: fixed anchors to the layout viewport. On Safari (and Chrome
+ * with touch trackpad), pinch-zoom moves the visual viewport
+ * independently — fixed elements appear to drift out of the corner the
+ * user sees. We translate the chrome buttons by the visual viewport's
+ * offset so they stay anchored to where the user looks.
+ * --------------------------------------------------------------------- */
+(function () {
+  var vv = window.visualViewport;
+  if (!vv) return;
+  function sync() {
+    document.documentElement.style.setProperty('--vv-left', vv.offsetLeft + 'px');
+    document.documentElement.style.setProperty('--vv-top',  vv.offsetTop  + 'px');
+  }
+  vv.addEventListener('scroll', sync);
+  vv.addEventListener('resize', sync);
+  sync();
+})();
+
+/* ============ Tooltip controller (used by <glossary-term> + <ext-ref>) ============ */
+var __htmldocTooltip = (function () {
+  var HIDE_DELAY = 300;
+  var SHOW_DELAY = 120;
+  var isTouch = window.matchMedia('(hover: none)').matches;
+  var active = null; // { trigger, tooltip, pinned }
+  var hideTimer = null;
+  var showTimer = null;
+
+  function clearTimers() {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    if (showTimer) { clearTimeout(showTimer); showTimer = null; }
+  }
+
+  function hideImmediate() {
+    clearTimers();
+    if (active) { active.tooltip.remove(); active = null; }
+  }
+
+  function scheduleHide() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(hideImmediate, HIDE_DELAY);
+  }
+
+  function position(tooltip, trigger) {
+    var r = trigger.getBoundingClientRect();
+    tooltip.style.position = 'absolute';
+    tooltip.style.top = '0px';
+    tooltip.style.left = '0px';
+    var tipH = tooltip.offsetHeight || 100;
+    var tipW = tooltip.offsetWidth || 320;
+    var top = r.top + window.scrollY - tipH - 10;
+    if (top < window.scrollY + 8) top = r.bottom + window.scrollY + 10;
+    var left = r.left + window.scrollX;
+    if (left + tipW > window.innerWidth + window.scrollX - 12) {
+      left = window.innerWidth + window.scrollX - tipW - 12;
+    }
+    if (left < 8) left = 8;
+    tooltip.style.top  = top + 'px';
+    tooltip.style.left = left + 'px';
+  }
+
+  function build(trigger) {
+    var body = trigger.getAttribute('data-def') || trigger.getAttribute('data-summary') || trigger.textContent;
+    var link = trigger.getAttribute('data-link');
+    var lang = trigger.getAttribute('data-lang-shown');
+    var t = document.createElement('div');
+    t.className = 'html-doc-tooltip';
+    var html = '<div class="hdt-body">' + body + '</div>';
+    if (lang) html += '<span class="hdt-lang">' + lang + '</span>';
+    if (link) html += '<div class="hdt-link"><a href="' + link + '" target="_blank" rel="noopener">Learn more →</a></div>';
+    html += '<span class="hdt-pin-hint">click to pin</span>';
+    t.innerHTML = html;
+    return t;
+  }
+
+  function show(trigger, pinned) {
+    clearTimers();
+    if (active && active.trigger === trigger) {
+      if (pinned) { active.pinned = true; active.tooltip.classList.add('pinned'); }
+      return;
+    }
+    hideImmediate();
+    var tip = build(trigger);
+    document.body.appendChild(tip);
+    position(tip, trigger);
+    if (pinned) tip.classList.add('pinned');
+
+    tip.addEventListener('mouseenter', clearTimers);
+    tip.addEventListener('mouseleave', function () {
+      if (!active || !active.pinned) scheduleHide();
+    });
+
+    active = { trigger: trigger, tooltip: tip, pinned: !!pinned };
+  }
+
+  function attach(trigger) {
+    if (!trigger.hasAttribute('tabindex')) trigger.setAttribute('tabindex', '0');
+    if (!isTouch) {
+      trigger.addEventListener('mouseenter', function () {
+        clearTimers();
+        showTimer = setTimeout(function () { show(trigger, false); }, SHOW_DELAY);
+      });
+      trigger.addEventListener('mouseleave', function () {
+        if (showTimer) { clearTimeout(showTimer); showTimer = null; }
+        if (active && active.trigger === trigger && active.pinned) return;
+        scheduleHide();
+      });
+      trigger.addEventListener('focus', function () { show(trigger, false); });
+      trigger.addEventListener('blur', function () {
+        if (!active || !active.pinned) scheduleHide();
+      });
+    }
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (active && active.trigger === trigger && active.pinned) {
+        hideImmediate();
+      } else {
+        show(trigger, true);
+      }
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.html-doc-tooltip, [data-html-doc-tooltip-trigger]')) hideImmediate();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && active && active.pinned) hideImmediate();
+  });
+
+  return { attach: attach, hide: hideImmediate };
+})();
+
+/* ============ kit.json loader (multi-domain glossary + ext-refs) ============ */
+var __htmldocKit = (function () {
+  var kit = { glossary: {}, extrefs: {}, lang: 'en', lang_fallback: ['en'], domains: [] };
+  var loaded = false;
+  var waiters = [];
+
+  function load() {
+    if (loaded) return Promise.resolve(kit);
+    // Project config lives next to the page; domain files live in _kit/.
+    return fetch('kit.json', { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (data) {
+        if (data) {
+          if (data.lang) kit.lang = data.lang;
+          if (data.lang_fallback) kit.lang_fallback = data.lang_fallback;
+          if (data.domains) kit.domains = data.domains;
+        }
+        // Load each domain file in parallel
+        var promises = kit.domains.flatMap(function (d) {
+          return [
+            fetch('_kit/glossary/' + d + '.json', { cache: 'no-cache' })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .catch(function () { return null; })
+              .then(function (j) {
+                if (j && j.entries) kit.glossary[d] = j.entries;
+              }),
+            fetch('_kit/extrefs/' + d + '.json', { cache: 'no-cache' })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .catch(function () { return null; })
+              .then(function (j) {
+                if (j && j.entries) kit.extrefs[d] = j.entries;
+              })
+          ];
+        });
+        // Project-level additions / overrides
+        if (data && data.glossary) {
+          Object.keys(data.glossary).forEach(function (d) {
+            kit.glossary[d] = Object.assign({}, kit.glossary[d] || {}, data.glossary[d]);
+          });
+        }
+        if (data && data.extrefs) {
+          Object.keys(data.extrefs).forEach(function (d) {
+            kit.extrefs[d] = Object.assign({}, kit.extrefs[d] || {}, data.extrefs[d]);
+          });
+        }
+        return Promise.all(promises).then(function () {
+          loaded = true;
+          waiters.forEach(function (w) { w(kit); });
+          waiters = [];
+          return kit;
+        });
+      });
+  }
+
+  function resolveGlossary(term, opts) {
+    opts = opts || {};
+    var inDomain = opts.in;
+    var lang = opts.lang || kit.lang;
+    var domains = inDomain ? [inDomain] : kit.domains;
+    for (var i = 0; i < domains.length; i++) {
+      var d = domains[i];
+      var entry = (kit.glossary[d] || {})[term];
+      if (entry) {
+        var hit = entry[lang];
+        var shownLang = lang;
+        if (!hit) {
+          for (var j = 0; j < kit.lang_fallback.length; j++) {
+            hit = entry[kit.lang_fallback[j]];
+            if (hit) { shownLang = kit.lang_fallback[j]; break; }
+          }
+        }
+        if (!hit) {
+          var any = Object.keys(entry)[0];
+          if (any) { hit = entry[any]; shownLang = any; }
+        }
+        if (hit) return { hit: hit, domain: d, lang: shownLang };
+      }
+    }
+    return null;
+  }
+
+  function resolveExtRef(name, opts) {
+    opts = opts || {};
+    var inDomain = opts.in;
+    var lang = opts.lang || kit.lang;
+    var domains = inDomain ? [inDomain] : kit.domains;
+    for (var i = 0; i < domains.length; i++) {
+      var d = domains[i];
+      var entry = (kit.extrefs[d] || {})[name];
+      if (entry) {
+        var hit = entry[lang];
+        var shownLang = lang;
+        if (!hit) {
+          for (var j = 0; j < kit.lang_fallback.length; j++) {
+            hit = entry[kit.lang_fallback[j]];
+            if (hit) { shownLang = kit.lang_fallback[j]; break; }
+          }
+        }
+        if (!hit) {
+          var any = Object.keys(entry)[0];
+          if (any) { hit = entry[any]; shownLang = any; }
+        }
+        if (hit) return { hit: hit, domain: d, lang: shownLang };
+      }
+    }
+    return null;
+  }
+
+  function whenReady() {
+    if (loaded) return Promise.resolve(kit);
+    return new Promise(function (resolve) { waiters.push(resolve); });
+  }
+
+  load();
+
+  return {
+    load: load,
+    whenReady: whenReady,
+    resolveGlossary: resolveGlossary,
+    resolveExtRef: resolveExtRef,
+    state: function () { return kit; }
+  };
+})();
+
+/* ============ <glossary-term> Custom Element ============ */
+class GlossaryTerm extends HTMLElement {
+  connectedCallback() {
+    var self = this;
+    this.setAttribute('data-html-doc-tooltip-trigger', '');
+    this.classList.add('html-doc-gloss');
+    __htmldocKit.whenReady().then(function () {
+      var term = self.getAttribute('term') || self.textContent;
+      var opts = { in: self.getAttribute('in') || undefined, lang: self.getAttribute('lang') || undefined };
+      var r = __htmldocKit.resolveGlossary(term, opts);
+      if (r) {
+        self.setAttribute('data-def', r.hit.def || '');
+        if (r.hit.link) self.setAttribute('data-link', r.hit.link);
+        if (r.lang !== (opts.lang || __htmldocKit.state().lang)) {
+          self.setAttribute('data-lang-shown', 'lang: ' + r.lang);
+        }
+      } else {
+        self.setAttribute('data-def', '<em>Unknown term:</em> ' + term);
+        self.classList.add('unknown');
+        window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+          detail: [{ code: 'unknown-glossary-term', msg: 'No entry for "' + term + '"', level: 'warn' }]
+        }));
+      }
+      __htmldocTooltip.attach(self);
+    });
+  }
+}
+if (!customElements.get('glossary-term')) customElements.define('glossary-term', GlossaryTerm);
+
+/* ============ <ext-ref> Custom Element ============ */
+class ExtRef extends HTMLElement {
+  connectedCallback() {
+    var self = this;
+    this.setAttribute('data-html-doc-tooltip-trigger', '');
+    this.classList.add('html-doc-extref');
+    __htmldocKit.whenReady().then(function () {
+      var name = self.getAttribute('name') || self.textContent;
+      var opts = { in: self.getAttribute('in') || undefined, lang: self.getAttribute('lang') || undefined };
+      var r = __htmldocKit.resolveExtRef(name, opts);
+      if (r) {
+        var body = '<strong>' + (r.hit.name || name) + '</strong>';
+        if (r.hit.summary) body += '<br>' + r.hit.summary;
+        self.setAttribute('data-def', body);
+        if (r.hit.link) self.setAttribute('data-link', r.hit.link);
+      } else {
+        self.setAttribute('data-def', '<em>Unknown reference:</em> ' + name);
+        self.classList.add('unknown');
+        window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+          detail: [{ code: 'unknown-ext-ref', msg: 'No entry for "' + name + '"', level: 'warn' }]
+        }));
+      }
+      __htmldocTooltip.attach(self);
+    });
+  }
+}
+if (!customElements.get('ext-ref')) customElements.define('ext-ref', ExtRef);
+
+/* ============ Rebuild TOC after JSON renderer completes ============ */
+window.addEventListener('html-doc:rendered', function () {
+  var tocList = document.querySelector('page-toc .toc-list');
+  if (tocList) buildTOC(tocList);
+  initReadingAids();
+});
+window.addEventListener('html-doc:warnings', function (e) {
+  // Placeholder hook for the forward-compat warning indicator. The
+  // indicator UI lands in a later build step; for now warnings are in
+  // the console.
+  if (e && e.detail) {
+    e.detail.forEach(function (w) { console.warn('[html-doc warning]', w); });
+  }
+});

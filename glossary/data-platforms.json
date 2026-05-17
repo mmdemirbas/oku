@@ -1,0 +1,67 @@
+{
+  "$schema": "https://html-doc.dev/schema/glossary-v1.json",
+  "domain": "data-platforms",
+  "version": 1,
+  "entries": {
+    "ACID": {
+      "en": {
+        "def": "A set of database transaction guarantees: <strong>atomicity</strong>, <strong>consistency</strong>, <strong>isolation</strong>, <strong>durability</strong>. Iceberg provides ACID semantics over commodity object stores.",
+        "link": "https://en.wikipedia.org/wiki/ACID"
+      },
+      "tr": {
+        "def": "Veritabanı işlemlerinde dört garanti: atomiklik, tutarlılık, izolasyon, dayanıklılık. Iceberg bu garantileri nesne depolama üzerinde sunar."
+      }
+    },
+    "MVCC": {
+      "en": {
+        "def": "<strong>Multi-Version Concurrency Control.</strong> Readers see a consistent snapshot while writers create new versions; no read locks. Iceberg snapshots are the multi-version mechanism.",
+        "link": "https://en.wikipedia.org/wiki/Multiversion_concurrency_control"
+      }
+    },
+    "Iceberg": {
+      "en": {
+        "def": "Open table format for huge analytic datasets. Snapshot-based, schema-evolution-safe, engine-agnostic.",
+        "link": "https://iceberg.apache.org"
+      }
+    },
+    "Spark": {
+      "en": {
+        "def": "Apache Spark — distributed compute engine for large-scale data processing. Reads and writes Iceberg natively.",
+        "link": "https://spark.apache.org"
+      }
+    },
+    "Flink": {
+      "en": {
+        "def": "Apache Flink — stream-first distributed processing engine. Iceberg integration via Flink connector.",
+        "link": "https://flink.apache.org"
+      }
+    },
+    "Paimon": {
+      "en": {
+        "def": "Apache Paimon — streaming lakehouse format. Designed for low-latency stream-table convergence.",
+        "link": "https://paimon.apache.org"
+      }
+    },
+    "Catalog": {
+      "en": {
+        "def": "A metadata store that maps table names to current Iceberg metadata files. REST, Hive, Glue, Nessie are common implementations.",
+        "link": "https://iceberg.apache.org/concepts/catalog/"
+      }
+    },
+    "Snapshot": {
+      "en": {
+        "def": "An immutable, point-in-time view of an Iceberg table. Every write creates a new snapshot. Time travel is just reading an older snapshot."
+      }
+    },
+    "Compaction": {
+      "en": {
+        "def": "Merging many small data files into fewer larger ones. Reduces read overhead and metadata size; tunable in Iceberg via maintenance procedures."
+      }
+    },
+    "Time travel": {
+      "en": {
+        "def": "Querying a table as it existed at a past snapshot or timestamp. Reads are still cheap because Iceberg metadata makes the lookup an O(log) hop, not a scan."
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://html-doc.dev/schema/extrefs-v1.json",
+  "domain": "data-platforms",
+  "version": 1,
+  "entries": {
+    "Apache Iceberg": {
+      "en": {
+        "name": "Apache Iceberg",
+        "summary": "Open table format for huge analytic datasets. Snapshot-based, schema-evolution-safe, engine-agnostic.",
+        "link": "https://iceberg.apache.org"
+      }
+    },
+    "Apache Spark": {
+      "en": {
+        "name": "Apache Spark",
+        "summary": "Distributed compute engine for large-scale data processing. Most mature Iceberg integration.",
+        "link": "https://spark.apache.org"
+      }
+    },
+    "Apache Flink": {
+      "en": {
+        "name": "Apache Flink",
+        "summary": "Stream-first distributed processing engine. Iceberg integration via Flink connector.",
+        "link": "https://flink.apache.org"
+      }
+    },
+    "Apache Paimon": {
+      "en": {
+        "name": "Apache Paimon",
+        "summary": "Streaming lakehouse format. Designed for low-latency stream-table convergence.",
+        "link": "https://paimon.apache.org"
+      }
+    }
+  }
+}

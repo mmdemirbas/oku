@@ -1,0 +1,58 @@
+{
+  "$schema": "https://html-doc.dev/schema/glossary-v1.json",
+  "domain": "ai-llm",
+  "version": 1,
+  "entries": {
+    "RAG": {
+      "en": {
+        "def": "<strong>Retrieval-Augmented Generation.</strong> Fetch relevant documents at query time and stuff them into the model's prompt before generation. Reduces hallucination at the cost of latency and prompt-budget complexity.",
+        "link": "https://en.wikipedia.org/wiki/Retrieval-augmented_generation"
+      }
+    },
+    "Tokenization": {
+      "en": {
+        "def": "Splitting text into discrete units (tokens) that the model processes. Typical tokens are subword fragments — a token is roughly 3–4 characters in English."
+      }
+    },
+    "Prompt cache": {
+      "en": {
+        "def": "Server-side reuse of compute for a prompt prefix. Sending the same prefix in multiple requests within a TTL reuses the cached KV state, dropping latency and cost. Anthropic's cache TTL is 5 minutes by default."
+      }
+    },
+    "Context window": {
+      "en": {
+        "def": "Maximum number of tokens the model can consider at once. Includes both input and output."
+      }
+    },
+    "Embedding": {
+      "en": {
+        "def": "Fixed-dimensional vector representation of text such that semantically similar text has similar vectors. Used for retrieval, clustering, similarity search."
+      }
+    },
+    "Vector DB": {
+      "en": {
+        "def": "Database optimized for nearest-neighbour search over high-dimensional vectors. Pinecone, Weaviate, pgvector, Qdrant are common."
+      }
+    },
+    "Function calling": {
+      "en": {
+        "def": "Model emits a structured tool invocation that the host runtime executes; the result feeds back into the model's context. The basis for agent loops."
+      }
+    },
+    "Hallucination": {
+      "en": {
+        "def": "Plausible-sounding output that's factually wrong. The model has no built-in distinction between recalled fact and confident fabrication."
+      }
+    },
+    "Few-shot": {
+      "en": {
+        "def": "Including a small number of input/output examples in the prompt to demonstrate the desired pattern. Cheap form of in-context learning."
+      }
+    },
+    "Top-k / Top-p": {
+      "en": {
+        "def": "Sampling parameters. Top-k = sample from the k most likely next tokens. Top-p (nucleus) = sample from the smallest token set whose cumulative probability ≥ p."
+      }
+    }
+  }
+}
