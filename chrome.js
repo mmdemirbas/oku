@@ -88,10 +88,30 @@ customElements.define('page-chrome', PageChrome);
 class PageToc extends HTMLElement {
   connectedCallback() {
     var title = this.getAttribute('title') || 'Contents';
+    var inV2Layout = !!this.closest('.layout page-nav, .layout:has(page-nav)');
+    // Edge-tab toggle on the LEFT inner edge (proximity — facing main content).
+    // Only render the tab when in v2 3-column layout; in legacy 2-column the
+    // top-left ctrl-btn handles toggling.
     this.innerHTML =
-      '<div class="toc-header"><h2>' + title + '</h2></div>' +
-      '<ol class="toc-list"></ol>';
+      (inV2Layout ? '<button class="page-toc-tab" type="button" aria-label="Toggle on-this-page">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg>' +
+      '</button>' : '') +
+      '<div class="page-toc-panel">' +
+        '<div class="toc-header"><h2>' + title + '</h2></div>' +
+        '<ol class="toc-list"></ol>' +
+      '</div>';
     var self = this;
+    var tab = this.querySelector('.page-toc-tab');
+    if (tab) {
+      tab.addEventListener('click', function () {
+        if (window.innerWidth <= 1024) {
+          self.classList.toggle('open');
+        } else {
+          document.body.classList.toggle('toc-collapsed');
+          try { localStorage.setItem('tocCollapsed', document.body.classList.contains('toc-collapsed') ? '1' : '0'); } catch (e) {}
+        }
+      });
+    }
     requestAnimationFrame(function () { buildTOC(self.querySelector('.toc-list')); });
   }
 }
@@ -604,6 +624,252 @@ class ExtRef extends HTMLElement {
   }
 }
 if (!customElements.get('ext-ref')) customElements.define('ext-ref', ExtRef);
+
+/* ============ <html-doc-chart> Custom Element ============ *
+ * Generic data-driven SVG chart. Scatter and line types.
+ * Series data lives in a child <script type="application/json">.
+ * For row-per-item horizontal bars, use the bar-chart block instead
+ * (handled directly by the renderer for layout-stability reasons).
+ * --------------------------------------------------------------- */
+class HtmlDocChart extends HTMLElement {
+  connectedCallback() {
+    var dataNode = this.querySelector('script[type="application/json"]');
+    var series = [];
+    if (dataNode) {
+      try { series = JSON.parse(dataNode.textContent || '[]'); } catch (e) { series = []; }
+    }
+    var type = this.getAttribute('type') || 'scatter';
+    var title = this.getAttribute('title') || '';
+    var xLabel = this.getAttribute('x-label') || '';
+    var yLabel = this.getAttribute('y-label') || '';
+
+    this.innerHTML = '';
+    if (dataNode) this.appendChild(dataNode);
+
+    // Compute bounds
+    var allPoints = [];
+    series.forEach(function (s) { (s.data || []).forEach(function (p) { allPoints.push(p); }); });
+    if (allPoints.length === 0) {
+      this.appendChild(document.createTextNode(''));
+      return;
+    }
+    var xs = allPoints.map(function (p) { return p.x; });
+    var ys = allPoints.map(function (p) { return p.y; });
+    var xMin = Math.min.apply(null, xs), xMax = Math.max.apply(null, xs);
+    var yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
+    if (xMin === xMax) { xMin -= 1; xMax += 1; }
+    if (yMin === yMax) { yMin -= 1; yMax += 1; }
+    // Pad 5%
+    var xPad = (xMax - xMin) * 0.05;
+    var yPad = (yMax - yMin) * 0.05;
+    xMin -= xPad; xMax += xPad;
+    yMin -= yPad; yMax += yPad;
+
+    var W = 640, H = 360;
+    var pad = { top: title ? 32 : 16, right: 24, bottom: xLabel ? 50 : 32, left: yLabel ? 56 : 40 };
+    var plotW = W - pad.left - pad.right;
+    var plotH = H - pad.top - pad.bottom;
+
+    function sx(x) { return pad.left + ((x - xMin) / (xMax - xMin)) * plotW; }
+    function sy(y) { return pad.top + plotH - ((y - yMin) / (yMax - yMin)) * plotH; }
+
+    var palette = {
+      accent:  'var(--accent)',
+      warn:    'var(--warning)',
+      danger:  'var(--danger)',
+      success: 'var(--success)',
+      muted:   'var(--text-soft)'
+    };
+
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + (title || (type + ' chart')) + '" class="hdc-svg">');
+    if (title) {
+      parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(title) + '</text>');
+    }
+    // Axes
+    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
+    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
+    // Axis labels
+    if (xLabel) parts.push('<text x="' + (pad.left + plotW / 2) + '" y="' + (H - 14) + '" text-anchor="middle" class="hdc-axis-label">' + escapeXml(xLabel) + '</text>');
+    if (yLabel) parts.push('<text x="' + 14 + '" y="' + (pad.top + plotH / 2) + '" text-anchor="middle" class="hdc-axis-label" transform="rotate(-90 14,' + (pad.top + plotH / 2) + ')">' + escapeXml(yLabel) + '</text>');
+    // Ticks (3 per axis)
+    for (var t = 0; t <= 4; t++) {
+      var xTickVal = xMin + (t / 4) * (xMax - xMin);
+      var xTickPos = sx(xTickVal);
+      parts.push('<line x1="' + xTickPos + '" y1="' + (pad.top + plotH) + '" x2="' + xTickPos + '" y2="' + (pad.top + plotH + 4) + '" class="hdc-axis"/>');
+      parts.push('<text x="' + xTickPos + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + fmtNum(xTickVal) + '</text>');
+      var yTickVal = yMin + (t / 4) * (yMax - yMin);
+      var yTickPos = sy(yTickVal);
+      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + yTickPos + '" x2="' + pad.left + '" y2="' + yTickPos + '" class="hdc-axis"/>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (yTickPos + 4) + '" text-anchor="end" class="hdc-tick">' + fmtNum(yTickVal) + '</text>');
+    }
+    // Series
+    series.forEach(function (s, i) {
+      var color = palette[s.color] || palette.accent;
+      if (type === 'line') {
+        var d = (s.data || []).map(function (p, idx) {
+          return (idx === 0 ? 'M ' : 'L ') + sx(p.x) + ' ' + sy(p.y);
+        }).join(' ');
+        parts.push('<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" class="hdc-line"/>');
+      }
+      (s.data || []).forEach(function (p) {
+        parts.push('<circle cx="' + sx(p.x) + '" cy="' + sy(p.y) + '" r="4" fill="' + color + '" class="hdc-dot"/>');
+        if (p.label) {
+          parts.push('<text x="' + (sx(p.x) + 8) + '" y="' + (sy(p.y) + 4) + '" class="hdc-point-label">' + escapeXml(p.label) + '</text>');
+        }
+      });
+      if (s.label) {
+        var lx = W - pad.right - 12;
+        var ly = pad.top + 14 + i * 18;
+        parts.push('<rect x="' + (lx - 110) + '" y="' + (ly - 9) + '" width="14" height="14" rx="2" fill="' + color + '"/>');
+        parts.push('<text x="' + (lx - 92) + '" y="' + (ly + 2) + '" class="hdc-legend">' + escapeXml(s.label) + '</text>');
+      }
+    });
+    parts.push('</svg>');
+    this.insertAdjacentHTML('beforeend', parts.join(''));
+  }
+}
+if (!customElements.get('html-doc-chart')) customElements.define('html-doc-chart', HtmlDocChart);
+
+function escapeXml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function fmtNum(n) {
+  if (n === undefined || n === null) return '';
+  var abs = Math.abs(n);
+  if (abs >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  if (abs >= 10) return n.toFixed(0);
+  if (abs >= 1) return n.toFixed(1).replace(/\.0$/, '');
+  return n.toFixed(2);
+}
+
+/* ============ <html-doc-diagram> — Mermaid (lazy-loaded) ============ */
+var __mermaidLoader = (function () {
+  var loadPromise = null;
+  function load() {
+    if (loadPromise) return loadPromise;
+    loadPromise = new Promise(function (resolve, reject) {
+      var script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+      script.async = true;
+      script.onload = function () {
+        try {
+          window.mermaid.initialize({
+            startOnLoad: false,
+            theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+            fontFamily: 'Inter, sans-serif'
+          });
+          resolve(window.mermaid);
+        } catch (e) { reject(e); }
+      };
+      script.onerror = function () { reject(new Error('Mermaid CDN load failed')); };
+      document.head.appendChild(script);
+    });
+    return loadPromise;
+  }
+  // Re-initialize Mermaid on theme toggle so diagrams pick up dark/light tokens.
+  function reset() {
+    if (!loadPromise || !window.mermaid) return;
+    window.mermaid.initialize({
+      startOnLoad: false,
+      theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
+      fontFamily: 'Inter, sans-serif'
+    });
+  }
+  return { load: load, reset: reset };
+})();
+
+class HtmlDocDiagram extends HTMLElement {
+  connectedCallback() {
+    var srcNode = this.querySelector('script[type="text/x-mermaid"]');
+    var src = srcNode ? srcNode.textContent.trim() : '';
+    var caption = this.getAttribute('caption') || '';
+    this.classList.add('hdd-wrap');
+    this.innerHTML =
+      '<div class="hdd-render" aria-label="Diagram loading">Rendering…</div>' +
+      (caption ? '<figcaption class="hdd-caption">' + escapeXml(caption) + '</figcaption>' : '');
+    var renderHost = this.querySelector('.hdd-render');
+    var self = this;
+    this._src = src;
+    __mermaidLoader.load()
+      .then(function (mermaid) {
+        var id = 'hdd-' + Math.random().toString(36).slice(2, 9);
+        return mermaid.render(id, src).then(function (out) {
+          renderHost.innerHTML = out.svg;
+          self._rendered = true;
+        });
+      })
+      .catch(function (err) {
+        renderHost.innerHTML = '<pre class="hdd-fallback">' + escapeXml(src) + '</pre>';
+        window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+          detail: [{ code: 'mermaid-render-failed', msg: String(err.message || err), level: 'warn' }]
+        }));
+      });
+  }
+  rerender() {
+    if (!this._src) return;
+    var renderHost = this.querySelector('.hdd-render');
+    __mermaidLoader.reset();
+    __mermaidLoader.load().then(function (mermaid) {
+      var id = 'hdd-' + Math.random().toString(36).slice(2, 9);
+      return mermaid.render(id, this._src).then(function (out) {
+        renderHost.innerHTML = out.svg;
+      });
+    }.bind(this)).catch(function () { /* swallow */ });
+  }
+}
+if (!customElements.get('html-doc-diagram')) customElements.define('html-doc-diagram', HtmlDocDiagram);
+
+// Re-render every diagram on theme toggle so colors track the theme.
+var __htmldocOrigCycleTheme = cycleTheme;
+cycleTheme = function () {
+  __htmldocOrigCycleTheme();
+  document.querySelectorAll('html-doc-diagram').forEach(function (d) {
+    if (typeof d.rerender === 'function') d.rerender();
+  });
+};
+
+/* ============ <html-doc-snippet> — editable HTML/CSS/JS playground ============ */
+class HtmlDocSnippet extends HTMLElement {
+  connectedCallback() {
+    var srcNode = this.querySelector('script[type="text/plain"]');
+    var source = srcNode ? srcNode.textContent : '';
+    // Trim a single leading newline if present (common in JSON-encoded multi-line strings)
+    source = source.replace(/^\n/, '');
+    var label = this.getAttribute('label') || 'Editable code · live preview';
+
+    this.classList.add('hds-wrap');
+    this.innerHTML =
+      '<div class="hds-header">' +
+        '<span class="hds-label">' + escapeXml(label) + '</span>' +
+        '<button type="button" class="hds-reset" aria-label="Reset to original">Reset</button>' +
+      '</div>' +
+      '<div class="hds-body">' +
+        '<textarea class="hds-editor" spellcheck="false" aria-label="Code"></textarea>' +
+        '<iframe class="hds-preview" sandbox="allow-scripts" aria-label="Preview"></iframe>' +
+      '</div>';
+    var editor = this.querySelector('.hds-editor');
+    var preview = this.querySelector('.hds-preview');
+    var reset = this.querySelector('.hds-reset');
+    var original = source;
+    editor.value = source;
+
+    var t = null;
+    function render() {
+      preview.srcdoc = editor.value;
+    }
+    editor.addEventListener('input', function () {
+      if (t) clearTimeout(t);
+      t = setTimeout(render, 220);
+    });
+    reset.addEventListener('click', function () {
+      editor.value = original;
+      render();
+    });
+    render();
+  }
+}
+if (!customElements.get('html-doc-snippet')) customElements.define('html-doc-snippet', HtmlDocSnippet);
 
 /* ============ <page-nav> Custom Element ============ *
  * Loads site-manifest.json from the docs root (adjacent to the page)

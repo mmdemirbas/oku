@@ -221,8 +221,48 @@
         case 'step-flow':    return this._renderStepFlow(block);
         case 'compare-grid': return this._renderCompareGrid(block);
         case 'scope-grid':   return this._renderScopeGrid(block);
+        case 'chart':        return this._renderChart(block);
+        case 'diagram':      return this._renderDiagram(block);
+        case 'live-snippet': return this._renderLiveSnippet(block);
         default:             return this._unknown(block);
       }
+    }
+
+    _renderChart(block) {
+      const el = document.createElement('html-doc-chart');
+      el.setAttribute('type', block.type || 'scatter');
+      if (block.title) el.setAttribute('title', block.title);
+      if (block.x_label) el.setAttribute('x-label', block.x_label);
+      if (block.y_label) el.setAttribute('y-label', block.y_label);
+      // Stash data as a JSON script tag inside the element; the
+      // Custom Element parses it. Avoids encoding/quoting issues in
+      // attributes for complex data.
+      const data = document.createElement('script');
+      data.type = 'application/json';
+      data.textContent = JSON.stringify(block.series || []);
+      el.appendChild(data);
+      return el;
+    }
+
+    _renderDiagram(block) {
+      const el = document.createElement('html-doc-diagram');
+      if (block.caption) el.setAttribute('caption', block.caption);
+      const src = document.createElement('script');
+      src.type = 'text/x-mermaid';
+      src.textContent = block.source || '';
+      el.appendChild(src);
+      return el;
+    }
+
+    _renderLiveSnippet(block) {
+      const el = document.createElement('html-doc-snippet');
+      if (block.label) el.setAttribute('label', block.label);
+      el.setAttribute('language', block.language || 'html-css-js');
+      const src = document.createElement('script');
+      src.type = 'text/plain';
+      src.textContent = block.source || '';
+      el.appendChild(src);
+      return el;
     }
 
     _renderParagraph(block) {

@@ -138,6 +138,54 @@ def build_manifest(root: Path) -> Path:
     return out
 
 
+def build_llms_txt(root: Path) -> Path:
+    """Emit llms.txt — sitemap for LLM consumers (llmstxt.org convention).
+
+    One line per page: link + summary. No body copy (HTML is the source
+    of truth — LLM consumers fetch the HTML if they need more).
+    """
+    pages = find_json_pages(root)
+    project_name = root.name
+    description = ''
+    kit_json = root / 'kit.json'
+    if kit_json.exists():
+        try:
+            kit_data = json.loads(kit_json.read_text(encoding='utf-8'))
+            project_name = kit_data.get('name', project_name)
+            description = kit_data.get('description', '')
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    lines = ['# ' + project_name, '']
+    if description:
+        lines += ['> ' + description, '']
+    lines += ['## Pages', '']
+    # Sort by parent (folder), then order, then title.
+    entries = []
+    for p, data in pages:
+        rel = p.relative_to(root)
+        nav_path = rel.with_suffix('.html').as_posix()
+        meta = data.get('meta') or {}
+        entries.append({
+            'path': nav_path,
+            'title': data.get('title') or p.stem,
+            'parent': rel.parent.as_posix() if rel.parent != Path('.') else '',
+            'order': meta.get('order', 1000),
+            'summary': meta.get('summary', ''),
+        })
+    entries.sort(key=lambda e: (e['parent'], e['order'], e['title'].lower()))
+    for e in entries:
+        line = '- [' + e['title'] + '](' + e['path'] + ')'
+        if e['summary']:
+            line += ': ' + e['summary']
+        lines.append(line)
+    lines.append('')
+
+    out = root / 'llms.txt'
+    out.write_text('\n'.join(lines), encoding='utf-8')
+    return out
+
+
 def build_site(srcs, out_dir: Path) -> None:
     """Copy HTMLs to out_dir/, copy kit assets to out_dir/assets/, rewrite refs."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -175,9 +223,11 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f'✗ No .html or page-JSON files found in {root}', file=sys.stderr)
         return 1
 
-    # Always regenerate the manifest so <page-nav> sees fresh content.
+    # Always regenerate manifest + llms.txt so <page-nav> + AI consumers see fresh state.
     manifest_path = build_manifest(root)
+    llms_path = build_llms_txt(root)
     print(f'✓ Wrote {manifest_path.relative_to(root)} ({len(json_pages)} JSON page(s))')
+    print(f'✓ Wrote {llms_path.relative_to(root)} (sitemap for LLM consumers)')
 
     if not srcs:
         return 0
@@ -239,12 +289,14 @@ def cmd_serve(args: argparse.Namespace) -> int:
                 return 1
 
     os.chdir(root)
-    # Refresh the manifest on serve start so <page-nav> reflects current state.
+    # Refresh manifest + llms.txt on serve start so they reflect current state.
     try:
         manifest_path = build_manifest(root)
+        llms_path = build_llms_txt(root)
         print(f'✓ Refreshed site-manifest: {manifest_path.relative_to(root)}')
+        print(f'✓ Refreshed llms.txt:       {llms_path.relative_to(root)}')
     except OSError as e:
-        print(f'! Could not write manifest: {e}', file=sys.stderr)
+        print(f'! Could not write manifest/llms.txt: {e}', file=sys.stderr)
     htmls = sorted(p for p in root.rglob('*.html') if 'dist' not in p.parts and 'node_modules' not in p.parts)
 
     print(f'✓ Serving {root} on http://localhost:{port}')

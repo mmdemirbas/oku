@@ -107,7 +107,10 @@
         { "$ref": "#/$defs/bar-chart" },
         { "$ref": "#/$defs/step-flow" },
         { "$ref": "#/$defs/compare-grid" },
-        { "$ref": "#/$defs/scope-grid" }
+        { "$ref": "#/$defs/scope-grid" },
+        { "$ref": "#/$defs/chart" },
+        { "$ref": "#/$defs/diagram" },
+        { "$ref": "#/$defs/live-snippet" }
       ]
     },
 
@@ -260,6 +263,67 @@
             }
           }
         }
+      }
+    },
+
+    "chart": {
+      "type": "object",
+      "required": ["kind", "type", "series"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "chart" },
+        "type": { "enum": ["scatter", "line"], "description": "For row-per-item bars use 'bar-chart' instead." },
+        "title": { "type": "string" },
+        "x_label": { "type": "string" },
+        "y_label": { "type": "string" },
+        "series": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["data"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" },
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["x", "y"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "x": { "type": "number" },
+                    "y": { "type": "number" },
+                    "label": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "diagram": {
+      "type": "object",
+      "required": ["kind", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "diagram" },
+        "caption": { "type": "string" },
+        "source": { "type": "string", "description": "Mermaid source. Sequence / flow / state / gantt / class supported." }
+      }
+    },
+
+    "live-snippet": {
+      "type": "object",
+      "required": ["kind", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "live-snippet" },
+        "language": { "enum": ["html-css-js"], "default": "html-css-js" },
+        "label": { "type": "string" },
+        "source": { "type": "string" }
       }
     },
 
