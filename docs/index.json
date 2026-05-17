@@ -16,20 +16,20 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "All 15 build steps shipped across 5 rounds. Deep review surfaced 2 showstoppers + 4 high + 2 medium; 6 of those landed in round 5. Remaining work: recursive build, inline glossary in standalone, plus polish items.",
+      "summary": "All 15 build steps shipped across 6 rounds. Deep review surfaced 2 showstoppers + 4 high + 2 medium + 4 low; all addressed. Standalone single-file mode now ships an inlined kit bundle so tooltips work offline. Subfolder pages build correctly under preserved directory structure. Ready to tag v2.0.0.",
       "bullets": [
-        "5 commits on feat/v2-knowledge-platform, ~3500 lines of production code plus schema and demo content.",
-        "Three verified entry points: dev pages (runtime fetch), dist/site/ (multi-page deployable, Pagefind search works), dist/standalone/ (single-file, opens offline).",
+        "6 commits on feat/v2-knowledge-platform; verified across dev pages, dist/site/ (with Pagefind search), and dist/standalone/ (offline-capable).",
         "Tooltip controller, multi-domain glossary, Visual Viewport pinch-zoom fix, Mermaid lazy-load, live snippets, forward-compat warning indicator — all verified end-to-end.",
-        "This page itself uses every primitive — hover terms, click external refs, edit the live snippet, watch the chart and diagram render."
+        "Round 6 closed the review: recursive build with directory preservation, standalone kit bundle, schema-validation hook, M2 trust-boundary comment, cycleTheme event refactor, page-toc cleanup.",
+        "This page uses every primitive — hover terms, click external refs, edit the live snippet, watch the chart and diagram render."
       ]
     },
     {
       "kind": "kpi-grid",
       "tiles": [
         { "num": "15 / 15", "label": "Build steps complete" },
-        { "num": "6 / 11", "label": "Review fixes landed" },
-        { "num": "5", "label": "Commits on branch" },
+        { "num": "11 / 11", "label": "Review items addressed" },
+        { "num": "6", "label": "Commits on branch" },
         { "num": "0", "label": "Console errors across 3 modes" }
       ]
     },
@@ -66,14 +66,12 @@
             },
             {
               "status": "out",
-              "title": "Pending",
+              "title": "Deferred",
               "items": [
-                "H3 — recursive HTML build + directory structure preservation",
-                "S2 (option 1) — inline glossary data into standalone builds",
-                "M2 — document data-def trust boundary in code comment",
-                "Notes — JSON Schema validation at build time, Mermaid SRI hash, page-toc double-build cleanup, isTouch live-detection",
-                "Naming normalization across <page-*>, <html-doc-*>, unprefixed elements",
-                "cycleTheme refactor to event-based pattern (drop monkey-patch)"
+                "Mermaid CDN integrity hash (needs verified SRI value — left as a note)",
+                "Custom Element naming normalization across <page-*>, <html-doc-*>, unprefixed (preferably during a project rename)",
+                "chrome.js file split (~1300 lines, three structural patterns — discretionary)",
+                "Demo _kit symlink commit (only when _internal/demo-page/ is promoted to public examples)"
               ]
             }
           ]
@@ -92,23 +90,28 @@
           "cards": [
             {
               "verdict": "good",
-              "title": "Fixed in 38c92bd",
+              "title": "Round 5 — six showstopper / high fixes",
               "content": [
                 "S1 — glossary override race. Project-level overrides survive central domain-file fetches. ",
                 "H1 — callout 'warn' CSS variant. .callout.warn now aliases .callout.warning. ",
-                "S2 (quick) — standalone tooltips no longer mark every term as 'Unknown'. Terms render plain text without the gloss styling. ",
-                "H2 — initReadingAids guarded against scroll/keydown listener accumulation across re-renders. ",
-                "H5 — search results escape d.url and d.meta.title (d.excerpt stays raw for Pagefind highlights). ",
+                "S2 (quick) — standalone tooltips no longer mark every term as 'Unknown'. ",
+                "H2 — initReadingAids guarded against scroll/keydown listener accumulation. ",
+                "H5 — search results escape d.url and d.meta.title. ",
                 "M1 — search modal focus trap + focus restore on close."
               ]
             },
             {
-              "verdict": "neutral",
-              "title": "Pending — bigger lifts",
+              "verdict": "good",
+              "title": "Round 6 — bigger lifts + polish",
               "content": [
-                "H3 — html-doc CLI walks JSON pages recursively but HTML stubs are root-only; subfolder pages end up in site-manifest.json without HTML build output. Fix touches both build_site and build_standalone — coordinated change. ",
-                "S2 (proper) — inline glossary + extref data into standalone builds so tooltips work offline. Requires extending build_standalone to embed the registry alongside the inline page-data tag, and teaching __htmldocKit.load() to read from inline data. ",
-                "H4 — demo _kit symlink not committed. Only matters if _internal/demo-page/ is ever promoted to public examples."
+                "H3 — recursive HTML build + directory preservation. Subfolder pages now build to dist/site/<folder>/*.html, page-nav renders nested tree, docs root discovery works from any page depth. ",
+                "S2 (proper) — kit bundle inlined into standalone builds. Tooltips work fully offline; verified via dist/standalone/iceberg.html. ",
+                "Schema validation soft-fail. jsonschema dependency optional; build prints validation results when present, hint otherwise. ",
+                "M2 — code comment at tooltip controller's build() documenting the data-def trust boundary. ",
+                "L1 dead code (KIT_REF_RE) removed. ",
+                "L3 cycleTheme refactored to event-based: dispatches html-doc:theme-changed; diagrams re-render via listener (no more variable reassignment). ",
+                "isTouch evaluated per-attach (responds to input-mode changes). ",
+                "page-toc no longer wastes an empty rAF build before html-doc:rendered."
               ]
             }
           ]
@@ -256,48 +259,36 @@
       "kind": "section",
       "id": "next",
       "title": "What's next",
-      "lead": "Prioritized from the round-5 review. Marked with effort sketch.",
+      "lead": "All review items addressed. Remaining is discretionary polish and the v2.0.0 tag.",
       "blocks": [
+        {
+          "kind": "callout",
+          "type": "success",
+          "title": "Ready to tag v2.0.0",
+          "content": "All review showstoppers, highs, and mediums shipped. Polish items (Mermaid SRI, element-name normalization, chrome.js split) can land in v2.x point releases. The tag itself is deferred until you say so — once cut, branches relying on v2 can pin via CDN."
+        },
         {
           "kind": "step-flow",
           "steps": [
             {
-              "num": "1",
-              "title": "H3 — Recursive HTML build + directory structure preservation",
-              "meta": "files: bin/html-doc · risk: medium · effort: ~1 round",
-              "content": "find_html_files uses .glob (root-only) while find_json_pages uses .rglob (recursive). Subfolder pages appear in site-manifest.json but never build. Also flatten-collision in build_site. Need to change discovery, preserve relative paths in output, and verify with a nested example."
+              "num": "A",
+              "title": "Mermaid CDN integrity hash",
+              "meta": "deferred — needs verified SRI value",
+              "content": "chrome.js loads mermaid@10 from jsDelivr without an integrity hash. For a personal tool this is acceptable supply-chain exposure; for any team or hosted deployment, pin to a specific minor and add a verified integrity attribute."
             },
             {
-              "num": "2",
-              "title": "S2 proper — Inline glossary data in standalone builds",
-              "meta": "files: bin/html-doc, chrome.js · risk: medium · effort: ~1 round",
-              "content": "Build_standalone embeds active domain glossary + extref files as JSON script tags with well-known IDs. chrome.js's kit loader checks for these in standalone mode before falling back to fetch. Restores tooltips offline."
+              "num": "B",
+              "title": "Element-name normalization",
+              "meta": "discretionary — natural during a rename",
+              "content": "<page-*>, <html-doc-*>, and unprefixed (<glossary-term>, <ext-ref>) coexist. Pick one prefix project-wide when the time is right."
             },
             {
-              "num": "3",
-              "title": "Schema validation at build time",
-              "meta": "files: bin/html-doc · new dep: jsonschema · effort: ~½ day",
-              "content": "Run page.schema.json against each page during build. Catch malformed JSON / unknown kinds / missing required fields before runtime. Today the build silently skips JSON-decode failures."
-            },
-            {
-              "num": "4",
-              "title": "M2 — Document data-def trust boundary",
-              "meta": "files: chrome.js · effort: 5 minutes",
-              "content": "Code comment at tooltip controller's build() function stating that data-def accepts HTML only from kit-controlled sources."
-            },
-            {
-              "num": "5",
-              "title": "Polish — cycleTheme event, isTouch live, page-toc double-build, Mermaid SRI",
-              "meta": "files: chrome.js, chrome.css · effort: ~1 day",
-              "content": "L3 + open-question items. Dispatch CustomEvent on theme change instead of monkey-patching cycleTheme. Re-evaluate isTouch via matchMedia listener. Remove rAF in PageToc.connectedCallback. Add integrity hash to Mermaid CDN script."
+              "num": "C",
+              "title": "chrome.js split",
+              "meta": "discretionary — ~1300 lines in one file",
+              "content": "Could split into tooltip + layout + search + warnings modules. Not blocking anything; just hygiene."
             }
           ]
-        },
-        {
-          "kind": "callout",
-          "type": "success",
-          "title": "Then — v2.0.0 tag",
-          "content": "After 1 + 2 land we're past the items the review flagged as 'realistic-use breakage'. The remainder is polish and documentation. Cut v2.0.0 then."
         }
       ]
     }

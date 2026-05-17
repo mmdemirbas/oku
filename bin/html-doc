@@ -29,6 +29,12 @@ KIT_ROOT = Path(__file__).resolve().parent.parent
 KIT_FILES = ['chrome.css', 'chrome.js', 'chrome-boot.js', 'renderer.js']
 SKIP_DIRS = {'dist', '_kit', 'node_modules', '.git', 'venv', '.venv', '__pycache__'}
 
+try:
+    import jsonschema as _jsonschema  # type: ignore
+    _HAS_JSONSCHEMA = True
+except ImportError:
+    _HAS_JSONSCHEMA = False
+
 
 # ---------- file:// printer ----------
 def file_url(p: Path) -> str:
@@ -69,7 +75,6 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 
 # ---------- build ----------
-KIT_REF_RE = re.compile(r'(_kit/(chrome-boot\.js|chrome\.css|chrome\.js))')
 LINK_TO_KIT_CSS = re.compile(r'<link\s+rel="stylesheet"\s+href="_kit/chrome\.css"\s*/?>', re.I)
 SCRIPT_TO_KIT_BOOT = re.compile(r'<script\s+src="_kit/chrome-boot\.js"\s*></script>', re.I)
 SCRIPT_TO_KIT_MAIN = re.compile(r'<script\s+src="_kit/chrome\.js"\s+defer\s*></script>', re.I)
@@ -77,8 +82,14 @@ SCRIPT_TO_KIT_RENDERER = re.compile(r'<script\s+src="_kit/renderer\.js"\s+defer\
 
 
 def find_html_files(root: Path):
-    """Find HTML files at root level (non-recursive by default)."""
-    return sorted([p for p in root.glob('*.html') if p.is_file() and 'dist' not in p.parts])
+    """Find HTML files recursively under root, skipping generated dirs."""
+    out = []
+    for p in root.rglob('*.html'):
+        if any(part in SKIP_DIRS for part in p.parts):
+            continue
+        if p.is_file():
+            out.append(p)
+    return sorted(out, key=lambda x: str(x).lower())
 
 
 # ---------- JSON pages + site manifest ----------
@@ -100,6 +111,51 @@ def find_json_pages(root: Path):
         if isinstance(data, dict) and data.get('kind') == 'page':
             pages.append((p, data))
     return sorted(pages, key=lambda x: str(x[0]).lower())
+
+
+_schema_cache = None
+
+
+def _load_schema():
+    """Lazy-load and cache the page schema."""
+    global _schema_cache
+    if _schema_cache is not None:
+        return _schema_cache
+    schema_path = KIT_ROOT / 'schema' / 'page.schema.json'
+    if schema_path.exists():
+        try:
+            _schema_cache = json.loads(schema_path.read_text(encoding='utf-8'))
+        except (json.JSONDecodeError, OSError):
+            _schema_cache = {}
+    else:
+        _schema_cache = {}
+    return _schema_cache
+
+
+def validate_pages(pages) -> list:
+    """Validate each parsed page against the schema. Returns a list of
+    (path, error_message) tuples. Empty list = clean.
+
+    Soft-fails: if jsonschema isn't installed, returns [] without error.
+    Hint printed once at module import time.
+    """
+    if not _HAS_JSONSCHEMA:
+        return []
+    schema = _load_schema()
+    if not schema:
+        return []
+    errors = []
+    for p, data in pages:
+        try:
+            _jsonschema.validate(data, schema)
+        except _jsonschema.ValidationError as e:
+            # Trim long paths; report deepest field
+            field = '.'.join(str(x) for x in e.absolute_path) or '(root)'
+            errors.append((p, f'{field}: {e.message}'))
+        except _jsonschema.SchemaError:
+            # Schema itself bad — abort validation entirely
+            return []
+    return errors
 
 
 def build_manifest(root: Path) -> Path:
@@ -335,12 +391,19 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
         if sp.exists():
             shutil.copy(sp, out_dir / f)
 
-    # Page sources (HTML stubs + JSON content)
+    # Page sources (HTML stubs + JSON content) — preserve directory structure.
     for src in srcs:
         html = src.read_text(encoding='utf-8')
+        rel = src.relative_to(src_root)
+        dest_html = out_dir / rel
+        dest_html.parent.mkdir(parents=True, exist_ok=True)
+
         json_sibling = src.with_suffix('.json')
         if json_sibling.exists():
-            shutil.copy(json_sibling, out_dir / json_sibling.name)
+            json_rel = json_sibling.relative_to(src_root)
+            dest_json = out_dir / json_rel
+            dest_json.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(json_sibling, dest_json)
             try:
                 data = json.loads(json_sibling.read_text(encoding='utf-8'))
                 if isinstance(data, dict) and data.get('kind') == 'page':
@@ -349,15 +412,60 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
                     html = inject_pagefind_body(html, text, title)
             except (json.JSONDecodeError, OSError):
                 pass
-        (out_dir / src.name).write_text(html, encoding='utf-8')
+        dest_html.write_text(html, encoding='utf-8')
 
 
-def build_standalone(srcs, out_dir: Path) -> None:
+def build_kit_bundle(src_root: Path) -> str | None:
+    """Assemble the project's kit.json + active domain glossary/extref files
+    into one JSON blob for inlining into standalone builds. Returns None
+    if no kit.json is present (no glossary to inline).
+    """
+    kit_json_path = src_root / 'kit.json'
+    if not kit_json_path.exists():
+        return None
+    try:
+        kit_data = json.loads(kit_json_path.read_text(encoding='utf-8'))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+    domains = kit_data.get('domains') or []
+    glossary = {}
+    extrefs = {}
+
+    for domain in domains:
+        g_path = KIT_ROOT / 'glossary' / f'{domain}.json'
+        if g_path.exists():
+            try:
+                g_data = json.loads(g_path.read_text(encoding='utf-8'))
+                if g_data.get('entries'):
+                    glossary[domain] = g_data['entries']
+            except (json.JSONDecodeError, OSError):
+                pass
+        e_path = KIT_ROOT / 'extrefs' / f'{domain}.json'
+        if e_path.exists():
+            try:
+                e_data = json.loads(e_path.read_text(encoding='utf-8'))
+                if e_data.get('entries'):
+                    extrefs[domain] = e_data['entries']
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    bundle = {
+        'kit': kit_data,
+        'glossary': glossary,
+        'extrefs': extrefs,
+    }
+    return json.dumps(bundle, ensure_ascii=False)
+
+
+def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
     """Inline kit CSS/JS + the page's JSON content into each HTML.
 
     Produces single self-contained files that render offline, with no
     network fetches beyond Google Fonts (and Mermaid if a <diagram>
     block is present). autoBoot picks up the inline JSON automatically.
+
+    Output preserves the source's directory structure under out_dir.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     def _safe_js(s: str) -> str:
@@ -369,6 +477,7 @@ def build_standalone(srcs, out_dir: Path) -> None:
     boot = _safe_js((KIT_ROOT / 'chrome-boot.js').read_text(encoding='utf-8'))
     main = _safe_js((KIT_ROOT / 'chrome.js').read_text(encoding='utf-8'))
     renderer = _safe_js((KIT_ROOT / 'renderer.js').read_text(encoding='utf-8'))
+    kit_bundle = build_kit_bundle(src_root)  # may be None
 
     for src in srcs:
         html = src.read_text(encoding='utf-8')
@@ -384,11 +493,20 @@ def build_standalone(srcs, out_dir: Path) -> None:
             # Escape </script in the JSON to be safe inside an inline script.
             safe = data_text.replace('</script', '<\\/script')
             inline = f'<script type="application/json" id="__htmldoc_page__">{safe}</script>'
+            # Inline the kit bundle (project kit.json + active domain
+            # glossary/extref entries) so tooltips work offline.
+            if kit_bundle:
+                safe_bundle = kit_bundle.replace('</script', '<\\/script')
+                inline += f'\n<script type="application/json" id="__htmldoc_kit_bundle__">{safe_bundle}</script>'
             # Lambda replacement avoids re.sub interpreting \n in the JSON
             # content as a backslash escape and turning it into a newline.
             html = _BODY_CLOSE_RE.sub(lambda m: inline + '\n</body>', html, count=1)
 
-        (out_dir / src.name).write_text(html, encoding='utf-8')
+        # Preserve directory structure relative to src_root.
+        rel = src.relative_to(src_root)
+        dest = out_dir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(html, encoding='utf-8')
 
 
 def cmd_build(args: argparse.Namespace) -> int:
@@ -405,6 +523,18 @@ def cmd_build(args: argparse.Namespace) -> int:
     print(f'✓ Wrote {manifest_path.relative_to(root)} ({len(json_pages)} JSON page(s))')
     print(f'✓ Wrote {llms_path.relative_to(root)} (sitemap for LLM consumers)')
 
+    # Schema validation — soft-fails without jsonschema.
+    if _HAS_JSONSCHEMA:
+        schema_errors = validate_pages(json_pages)
+        if schema_errors:
+            print(f'! Schema validation: {len(schema_errors)} issue(s):')
+            for p, msg in schema_errors:
+                print(f'    {p.relative_to(root)} — {msg}')
+        else:
+            print(f'✓ Schema validation: {len(json_pages)} page(s) clean')
+    elif json_pages:
+        print('  (schema validation skipped — `pip install jsonschema` to enable)')
+
     if not srcs:
         return 0
 
@@ -418,7 +548,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     if site.exists():
         shutil.rmtree(site)
 
-    build_standalone(srcs, standalone)
+    build_standalone(srcs, standalone, root)
     build_site(srcs, site, root)
 
     # Pagefind search index — soft-fail if pagefind isn't installed.

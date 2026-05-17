@@ -31,6 +31,10 @@ function cycleTheme() {
   var current = getThemeMode();
   var next = current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system';
   applyTheme(next, true);
+  // Notify subscribers (e.g., <html-doc-diagram> rerenders Mermaid).
+  window.dispatchEvent(new CustomEvent('html-doc:theme-changed', {
+    detail: { mode: next, theme: document.documentElement.getAttribute('data-theme') }
+  }));
 }
 /* Follow OS changes while in system mode */
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
@@ -112,7 +116,13 @@ class PageToc extends HTMLElement {
         }
       });
     }
-    requestAnimationFrame(function () { buildTOC(self.querySelector('.toc-list')); });
+    // If <main> already has section content (pre-rendered HTML), build
+    // the TOC now. For renderer-driven pages, html-doc:rendered will
+    // trigger the build later — avoid the wasted empty first pass.
+    if (document.querySelector('main > section')) {
+      var list = self.querySelector('.toc-list');
+      if (list) buildTOC(list);
+    }
   }
 }
 customElements.define('page-toc', PageToc);
@@ -328,6 +338,25 @@ function initReadingAids() {
   });
 }
 
+/* ============ Docs-root discovery ============ *
+ * Finds the project root by locating any kit reference in the document
+ * and stripping the trailing path back to (and including) the directory
+ * containing _kit/. Lets pages at any directory depth fetch kit.json
+ * and site-manifest.json from the same place rather than guessing
+ * based on the page's own path.
+ * ---------------------------------------------------------------- */
+var __htmldocDocsRoot = (function () {
+  var refs = document.querySelectorAll('link[href*="_kit/"], script[src*="_kit/"]');
+  for (var i = 0; i < refs.length; i++) {
+    var url = refs[i].href || refs[i].src || '';
+    var idx = url.indexOf('/_kit/');
+    if (idx >= 0) return url.slice(0, idx + 1); // includes trailing slash
+  }
+  // No kit reference found (probably standalone with everything inlined,
+  // or an unusual layout). Fall back to page directory.
+  return new URL('.', window.location.href).href;
+})();
+
 /* ============ HTML-escape helper (module scope) ============ */
 function escapeHTML(s) {
   return String(s)
@@ -360,7 +389,11 @@ function escapeHTML(s) {
 var __htmldocTooltip = (function () {
   var HIDE_DELAY = 300;
   var SHOW_DELAY = 120;
-  var isTouch = window.matchMedia('(hover: none)').matches;
+  // Re-evaluate on every attach so input-mode changes (e.g., user
+  // attaches a mouse to a tablet) take effect on subsequently-rendered
+  // elements. Existing attachments keep the wiring they had — acceptable
+  // tradeoff vs. listening for matchMedia changes and re-binding.
+  function isTouch() { return window.matchMedia('(hover: none)').matches; }
   var active = null; // { trigger, tooltip, pinned }
   var hideTimer = null;
   var showTimer = null;
@@ -398,6 +431,14 @@ var __htmldocTooltip = (function () {
     tooltip.style.left = left + 'px';
   }
 
+  // SECURITY: data-def is injected via innerHTML to render rich markup
+  // (<strong>, <em>, <br>, inline <a>) inside tooltips. The trust
+  // boundary is: data-def must only ever be set by code that reads from
+  // kit-controlled sources — _kit/glossary/<domain>.json and
+  // _kit/extrefs/<domain>.json. The GlossaryTerm and ExtRef
+  // connectedCallback handlers are the only setters; both pull from the
+  // kit resolver. Do NOT use this controller to render tooltips with
+  // arbitrary author input.
   function build(trigger) {
     var body = trigger.getAttribute('data-def') || trigger.getAttribute('data-summary') || trigger.textContent;
     var link = trigger.getAttribute('data-link');
@@ -434,7 +475,7 @@ var __htmldocTooltip = (function () {
 
   function attach(trigger) {
     if (!trigger.hasAttribute('tabindex')) trigger.setAttribute('tabindex', '0');
-    if (!isTouch) {
+    if (!isTouch()) {
       trigger.addEventListener('mouseenter', function () {
         clearTimers();
         showTimer = setTimeout(function () { show(trigger, false); }, SHOW_DELAY);
@@ -477,15 +518,45 @@ var __htmldocKit = (function () {
 
   function load() {
     if (loaded) return Promise.resolve(kit);
-    // Standalone build: no project kit.json on disk — degrade silently.
+    // Standalone build — if the build inlined a kit bundle, hydrate from it.
+    var bundleTag = document.getElementById('__htmldoc_kit_bundle__');
+    if (bundleTag) {
+      try {
+        var bundle = JSON.parse(bundleTag.textContent || '{}');
+        var bk = bundle.kit || {};
+        if (bk.lang) kit.lang = bk.lang;
+        if (bk.lang_fallback) kit.lang_fallback = bk.lang_fallback;
+        if (bk.domains) kit.domains = bk.domains;
+        if (bundle.glossary) kit.glossary = bundle.glossary;
+        if (bundle.extrefs) kit.extrefs = bundle.extrefs;
+        // Project-local overrides from kit.json still apply on top.
+        if (bk.glossary) {
+          Object.keys(bk.glossary).forEach(function (d) {
+            kit.glossary[d] = Object.assign({}, kit.glossary[d] || {}, bk.glossary[d]);
+          });
+        }
+        if (bk.extrefs) {
+          Object.keys(bk.extrefs).forEach(function (d) {
+            kit.extrefs[d] = Object.assign({}, kit.extrefs[d] || {}, bk.extrefs[d]);
+          });
+        }
+      } catch (e) {
+        // Malformed bundle — fall through to empty kit.
+      }
+      loaded = true;
+      waiters.forEach(function (w) { w(kit); });
+      waiters = [];
+      return Promise.resolve(kit);
+    }
+    // Standalone without a kit bundle: degrade silently.
     if (document.getElementById('__htmldoc_page__')) {
       loaded = true;
       waiters.forEach(function (w) { w(kit); });
       waiters = [];
       return Promise.resolve(kit);
     }
-    // Project config lives next to the page; domain files live in _kit/.
-    return fetch('kit.json', { cache: 'no-cache' })
+    // Project config lives at the docs root; domain files live in _kit/.
+    return fetch(__htmldocDocsRoot + 'kit.json', { cache: 'no-cache' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; })
       .then(function (data) {
@@ -497,13 +568,13 @@ var __htmldocKit = (function () {
         // Load each domain file in parallel
         var promises = kit.domains.flatMap(function (d) {
           return [
-            fetch('_kit/glossary/' + d + '.json', { cache: 'no-cache' })
+            fetch(__htmldocDocsRoot + '_kit/glossary/' + d + '.json', { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
                 if (j && j.entries) kit.glossary[d] = j.entries;
               }),
-            fetch('_kit/extrefs/' + d + '.json', { cache: 'no-cache' })
+            fetch(__htmldocDocsRoot + '_kit/extrefs/' + d + '.json', { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
@@ -878,13 +949,11 @@ class HtmlDocDiagram extends HTMLElement {
 if (!customElements.get('html-doc-diagram')) customElements.define('html-doc-diagram', HtmlDocDiagram);
 
 // Re-render every diagram on theme toggle so colors track the theme.
-var __htmldocOrigCycleTheme = cycleTheme;
-cycleTheme = function () {
-  __htmldocOrigCycleTheme();
+window.addEventListener('html-doc:theme-changed', function () {
   document.querySelectorAll('html-doc-diagram').forEach(function (d) {
     if (typeof d.rerender === 'function') d.rerender();
   });
-};
+});
 
 /* ============ <html-doc-snippet> — editable HTML/CSS/JS playground ============ */
 class HtmlDocSnippet extends HTMLElement {
@@ -975,7 +1044,7 @@ class PageNav extends HTMLElement {
         self.style.display = 'none';
         return;
       }
-      fetch('site-manifest.json', { cache: 'no-cache' })
+      fetch(__htmldocDocsRoot + 'site-manifest.json', { cache: 'no-cache' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .catch(function () { return null; })
         .then(function (manifest) {
@@ -1207,10 +1276,13 @@ var __htmldocSearch = (function () {
     // the standalone-build layout (where pagefind sits next to the HTML)
     // and a custom override.
     // ES dynamic import needs a relative-resolved URL ('./...') or absolute.
-    var candidates = ['./pagefind/pagefind.js', './_kit/pagefind/pagefind.js'];
-    pagefindPromise = candidates.reduce(function (acc, rel) {
+    // Pagefind index lives at the docs root (next to kit.json + site-manifest.json).
+    var candidates = [
+      __htmldocDocsRoot + 'pagefind/pagefind.js',
+      __htmldocDocsRoot + '_kit/pagefind/pagefind.js'
+    ];
+    pagefindPromise = candidates.reduce(function (acc, abs) {
       return acc.catch(function () {
-        var abs = new URL(rel, window.location.href).href;
         return import(/* @vite-ignore */ abs).then(function (mod) {
           if (mod && mod.search) return mod;
           throw new Error('pagefind module shape unexpected');
