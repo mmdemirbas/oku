@@ -357,6 +357,31 @@
           "language": "json",
           "source": "{\n  \"kind\": \"scope-grid\",\n  \"columns\": [\n    { \"status\": \"in\",  \"title\": \"v1\",     \"items\": [\"...\"] },\n    { \"status\": \"out\", \"title\": \"Future\", \"items\": [\"...\"] }\n  ]\n}"
         },
+        {
+          "kind": "scope-grid",
+          "columns": [
+            {
+              "status": "in",
+              "title": "v2 ships",
+              "items": [
+                "JSON-source runtime rendering",
+                "Multi-domain glossary with EN/TR",
+                "Visual Viewport pinch-zoom fix",
+                "Pagefind search on built sites"
+              ]
+            },
+            {
+              "status": "out",
+              "title": "Out of scope",
+              "items": [
+                "Markdown authoring path",
+                "Server-side rendering",
+                "Per-user authentication",
+                "Inline glossary editing UI"
+              ]
+            }
+          ]
+        },
 
         {
           "kind": "heading", "level": 3, "id": "step-flow", "title": "step-flow"
@@ -369,6 +394,29 @@
           "kind": "code",
           "language": "json",
           "source": "{\n  \"kind\": \"step-flow\",\n  \"steps\": [\n    { \"num\": \"1\", \"title\": \"Init\",  \"meta\": \"~1 min\", \"content\": \"html-doc init\" },\n    { \"num\": \"2\", \"title\": \"Author\", \"content\": \"Write the JSON page.\" }\n  ]\n}"
+        },
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "Init",
+              "meta": "~1 min · one-time per project",
+              "content": "html-doc init creates docs/_kit symlink."
+            },
+            {
+              "num": "2",
+              "title": "Author",
+              "meta": "iterative",
+              "content": "Write a JSON page and an HTML stub side by side; the renderer fetches the JSON at load time."
+            },
+            {
+              "num": "3",
+              "title": "Build",
+              "meta": "before deploy or before sharing standalone",
+              "content": "html-doc build → manifest, llms.txt, dist/site/, dist/standalone/, Pagefind index (if pagefind on PATH)."
+            }
+          ]
         }
       ]
     },

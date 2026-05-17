@@ -140,11 +140,13 @@
       label.className = 'tldr-label';
       label.textContent = 'TL;DR';
       tldr.appendChild(label);
-      if (block.title) {
-        const h2 = document.createElement('h2');
-        h2.textContent = block.title;
-        tldr.appendChild(h2);
-      }
+      // Always emit an h2 so the TOC has an entry; default to "TL;DR".
+      // Without it the buildTOC pass would still find the h2 inside .tldr
+      // (descendant search) but it would be empty — and an empty TOC
+      // entry takes up the "1." slot and shifts everything else.
+      const h2 = document.createElement('h2');
+      h2.textContent = block.title || 'TL;DR';
+      tldr.appendChild(h2);
       if (block.summary) {
         const p = document.createElement('p');
         p.className = 'one-line';

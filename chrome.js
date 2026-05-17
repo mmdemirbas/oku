@@ -189,15 +189,23 @@ function buildTOC(tocList) {
   if (sections.length === 0) return;
   tocList.innerHTML = '';
 
+  // Count TOC-eligible sections separately so the numbering doesn't
+  // jump when buildable sections precede in DOM order.
+  var tocIndex = 0;
   sections.forEach(function (sec, i) {
     var h2 = sec.querySelector('h2');
     if (!h2) return;
+    var headingText = h2.cloneNode(true);
+    var pre = headingText.querySelector('.num'); if (pre) pre.remove();
+    var pl0 = headingText.querySelector('.permalink'); if (pl0) pl0.remove();
+    if (!headingText.textContent.trim()) return;
     if (!sec.id) sec.id = 'sec-' + i;
 
     appendPermalink(h2, sec.id);
 
+    tocIndex++;
     var numEl = h2.querySelector('.num');
-    var num = numEl ? numEl.textContent.trim() : (i + 1);
+    var num = numEl ? numEl.textContent.trim() : tocIndex;
     var titleClone = h2.cloneNode(true);
     var n = titleClone.querySelector('.num'); if (n) n.remove();
     var pl = titleClone.querySelector('.permalink'); if (pl) pl.remove();
