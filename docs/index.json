@@ -36,6 +36,65 @@
 
     {
       "kind": "section",
+      "id": "docs",
+      "title": "Documentation",
+      "lead": "Five reference pages cover everything you need to use and extend the kit. Each is itself a v2 JSON page rendered by the system — you can read the source as a working example.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "Authoring guide",
+              "meta": "~8 min · start here",
+              "content": [
+                "How to write a page in JSON — project setup, page anatomy, rich text, per-page metadata, build outputs. ",
+                { "kind": "link", "text": "Open authoring.html", "href": "authoring.html" }
+              ]
+            },
+            {
+              "num": "2",
+              "title": "Primitives reference",
+              "meta": "~12 min · every element with live examples",
+              "content": [
+                "Every Custom Element shipped with v2 — JSON shape, attributes, live example. The catalog you reach for while authoring. ",
+                { "kind": "link", "text": "Open primitives.html", "href": "primitives.html" }
+              ]
+            },
+            {
+              "num": "3",
+              "title": "Glossary & ext-refs",
+              "meta": "~6 min · how the multi-domain registry works",
+              "content": [
+                "File layout, multi-language entries, project overrides, disambiguation syntax, resolution algorithm. Adding new entries — local first, then central. ",
+                { "kind": "link", "text": "Open glossary.html", "href": "glossary.html" }
+              ]
+            },
+            {
+              "num": "4",
+              "title": "Architecture",
+              "meta": "~7 min · internals",
+              "content": [
+                "How the kit fits together at runtime. The render flow, tooltip controller, Visual Viewport API, kit loader, build pipeline, standalone bundle. ",
+                { "kind": "link", "text": "Open architecture.html", "href": "architecture.html" }
+              ]
+            },
+            {
+              "num": "5",
+              "title": "CLI reference",
+              "meta": "~4 min · init, build, serve",
+              "content": [
+                "Three commands, zero flags. What each does, what output to expect, the optional pagefind and jsonschema dependencies. ",
+                { "kind": "link", "text": "Open cli.html", "href": "cli.html" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
       "id": "roadmap",
       "title": "Roadmap",
       "lead": "Build sequence as committed across rounds. Status reflects the actual repo state, not the plan.",

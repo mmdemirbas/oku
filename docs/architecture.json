@@ -1,0 +1,224 @@
+{
+  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Architecture",
+  "accent": "teal",
+  "meta": {
+    "eyebrow": "Internals",
+    "subtitle": "How the kit fits together at runtime. Useful when something doesn't behave as expected, or when you want to extend a primitive.",
+    "audience": "Maintainer",
+    "date": "2026-05-18",
+    "read_time": "~7 min read",
+    "order": 40,
+    "summary": "Runtime mental model + build pipeline."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "JSON pages are walked by renderer.js at load time and turned into Custom-Element DOM. chrome.js owns the behavior of those Custom Elements plus the page-level chrome (TOC, search, theme, warnings, viewport tracking). The whole kit lives in three JS files + one CSS file + JSON registry files.",
+      "bullets": [
+        "Format: JSON tree → renderer.js walks it → Custom Element DOM → chrome.js attaches behavior.",
+        "kit.json + per-domain glossary/extref JSON files are the registry; loaded once at page start, resolved per element.",
+        "Visual Viewport API keeps fixed-position chrome buttons anchored during pinch-zoom on Safari.",
+        "Build pipeline (html-doc CLI) produces 4 artifacts: site-manifest.json, llms.txt, dist/site/, dist/standalone/."
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "files",
+      "title": "Files in the kit",
+      "lead": "The kit repo contains all the runtime plus the registry data plus the CLI.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "html-doc/\n├── bin/html-doc            # Python CLI — init, build, serve\n├── chrome.css              # styles + design tokens\n├── chrome-boot.js          # synchronous pre-paint theme + TOC state\n├── chrome.js               # behavior — Custom Elements, tooltip, search, etc.\n├── renderer.js             # JSON → Custom Element DOM walker\n├── schema/page.schema.json # authoring contract\n├── glossary/<domain>.json  # central glossary by domain\n├── extrefs/<domain>.json   # central ext-refs by domain\n├── templates/              # starter page pair\n└── README.md, CHANGELOG.md, SPEC.md"
+        },
+        {
+          "kind": "info-tip",
+          "summary": "Single-file split rationale",
+          "content": [
+            {
+              "kind": "paragraph",
+              "content": [
+                "chrome.js is 1300+ lines in one file. Splitting it would mean either more script tags in every stub (worse onboarding) or a build step (more complexity). The current bet: one file with a clear table of contents at the top (see the section banner there). If it grows past 2000 lines, revisit."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "render-flow",
+      "title": "Runtime — when a page loads",
+      "lead": "From the moment the browser receives the HTML stub to the moment the page is interactive.",
+      "blocks": [
+        {
+          "kind": "diagram",
+          "caption": "Lifecycle of a page load.",
+          "source": "sequenceDiagram\n    autonumber\n    participant B as Browser\n    participant H as HTML stub\n    participant Boot as chrome-boot.js\n    participant C as chrome.js\n    participant R as renderer.js\n    participant K as kit.json + glossary/*\n\n    B->>H: GET page.html\n    H-->>B: 1KB stub\n    B->>Boot: synchronous — set data-theme pre-paint\n    Note over B: paint cover + chrome buttons (no FOUC)\n    B->>C: defer-load chrome.js\n    B->>R: defer-load renderer.js\n    C->>K: fetch kit.json (DOMContentLoaded)\n    K-->>C: domains, lang, overrides\n    C->>K: fetch glossary/<domain>.json (parallel)\n    K-->>C: domain entries\n    H->>R: autoBoot()\n    R->>B: fetch page.json\n    B-->>R: page tree\n    R->>B: emit Custom Element DOM\n    R->>C: dispatch html-doc:rendered\n    C->>B: build TOC + init reading aids\n    B->>C: each <glossary-term>.connectedCallback resolves data-def\n    Note over B: tooltips ready, search button visible"
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "renderer",
+      "title": "The renderer",
+      "lead": "renderer.js is a tree walker. It maps each JSON node's kind to a Custom Element instantiation (for interactive primitives) or directly to a styled DOM subtree (for prose primitives). The renderer is ~500 lines of straightforward code.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            [{ "kind": "code", "text": "render(page)" }, " — sets document.title, picks up accent override, renders cover, walks blocks."],
+            [{ "kind": "code", "text": "_renderTopBlock" }, " / ", { "kind": "code", "text": "_renderContentBlock" }, " — switch on kind; each kind has a small _renderX function."],
+            [{ "kind": "code", "text": "_renderRich" }, " — walks paragraph.content arrays mixing strings (textContent) with inline nodes (createElement)."],
+            ["For complex primitives (chart, diagram, snippet), the renderer creates the Custom Element with attributes and a JSON-payload script child. The Custom Element's connectedCallback parses the payload and renders its own DOM."]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "Why JSON-payload-as-script-child for complex primitives",
+          "content": "Attribute values can't safely encode multi-line strings or nested objects. A child <script type=\"application/json\"> sidesteps the encoding problem entirely — the Custom Element does JSON.parse on its textContent."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "tooltip",
+      "title": "Tooltip controller",
+      "lead": "Single global controller, attached to both glossary-term and ext-ref elements. ~150 lines.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            { "num": "1", "title": "Hover detection", "content": "matchMedia('(hover: none)') gates the hover path — touch devices skip it and use click only. Re-evaluated per attach so input-mode changes mid-session take effect on later elements." },
+            { "num": "2", "title": "Show with delay", "content": "120ms delay on mouseenter before showing — prevents flicker when brushing past." },
+            { "num": "3", "title": "Bridge-hover", "content": "On mouseleave, start a 300ms hide timer. If the mouse enters the tooltip DOM during that window, the timer cancels — the tooltip stays so the user can select text or click links." },
+            { "num": "4", "title": "Click to pin", "content": "Clicking the term pins the tooltip — it stays open until clicked again or another term is opened. Visible 2px accent ring marks pinned." },
+            { "num": "5", "title": "Click outside / Esc", "content": "Click anywhere outside .gloss or .tooltip-popup unpins. Escape key also unpins. Touch devices have click-only — no hover path, so click toggles pinned." }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "viewport",
+      "title": "Visual Viewport API — pinch-zoom",
+      "lead": "Fixed-position chrome anchored to the user-visible viewport rather than the layout viewport. Without this, pinch-zoom on Safari moves the visual viewport and the chrome buttons drift off-screen.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "js",
+          "source": "// chrome.js — runs at module init\nvar vv = window.visualViewport;\nfunction sync() {\n  document.documentElement.style.setProperty('--vv-left', vv.offsetLeft + 'px');\n  document.documentElement.style.setProperty('--vv-top',  vv.offsetTop  + 'px');\n}\nvv.addEventListener('scroll', sync);\nvv.addEventListener('resize', sync);\n\n// chrome.css\n.ctrl-btn { transform: translate(var(--vv-left,0), var(--vv-top,0)); }"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Two CSS variables, one event handler. ",
+            { "kind": "code", "text": "?." },
+            " optional chaining gates the whole thing on Visual Viewport API support — graceful degrade on browsers without it (buttons stay at layout-viewport corners, same as v1)."
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "kit-loader",
+      "title": "kit.json + glossary loader",
+      "lead": "Loads kit.json (project config) and per-domain glossary/extref files. Promise-based; returns a promise that resolves to the populated kit when all fetches complete.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            { "num": "1", "title": "Defer", "content": "Initial load deferred to DOMContentLoaded — gives the standalone build a chance to inline the kit bundle before fetch tries to run." },
+            { "num": "2", "title": "Standalone check", "content": "If the page has an inline __htmldoc_kit_bundle__ script (set by build_standalone), hydrate from it synchronously and skip all fetches." },
+            { "num": "3", "title": "Standalone-but-no-bundle", "content": "If __htmldoc_page__ is present but no bundle (i.e., handwritten standalone), resolve with an empty kit — tooltips degrade to plain text rather than showing 'Unknown term' for everything." },
+            { "num": "4", "title": "Dev / dist/site/ path", "content": "Fetch kit.json + each domain's glossary/extref file in parallel. After Promise.all resolves, apply project-local overrides on top. Then resolve and unblock any waiters." }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "docs-root",
+      "title": "Docs-root discovery",
+      "lead": "kit.json and site-manifest.json live at the project root, not the page directory. The kit needs to find the root from any page depth.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "js",
+          "source": "// chrome.js — runs once at module init\nvar __htmldocDocsRoot = (function () {\n  var refs = document.querySelectorAll('link[href*=\"_kit/\"], script[src*=\"_kit/\"]');\n  for (var i = 0; i < refs.length; i++) {\n    var url = refs[i].href || refs[i].src;\n    var idx = url.indexOf('/_kit/');\n    if (idx >= 0) return url.slice(0, idx + 1);  // ends with /\n  }\n  return new URL('.', window.location.href).href;  // fallback\n})();"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Any element referencing ",
+            { "kind": "code", "text": "_kit/" },
+            " gives us a URL with the docs root as its prefix — strip everything from ",
+            { "kind": "code", "text": "/_kit/" },
+            " onward. ",
+            "All kit.json, site-manifest.json, glossary/*.json, and pagefind/ fetches use this base, so subfolder pages work without per-page configuration."
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "build",
+      "title": "Build pipeline",
+      "lead": "bin/html-doc build walks the project, produces four output artifacts. Soft-fails on optional dependencies (Pagefind, jsonschema) so the kit doesn't acquire hard requirements.",
+      "blocks": [
+        {
+          "kind": "diagram",
+          "caption": "Build inputs and outputs.",
+          "source": "flowchart LR\n    subgraph IN[Project source]\n      P[*.json pages]\n      H[*.html stubs]\n      KJ[kit.json]\n    end\n    subgraph K[Kit — symlinked _kit/]\n      KIT[chrome.css/js, renderer.js]\n      G[glossary/*.json]\n      E[extrefs/*.json]\n    end\n    BUILD[html-doc build]\n    P --> BUILD\n    H --> BUILD\n    KJ --> BUILD\n    G --> BUILD\n    E --> BUILD\n    KIT --> BUILD\n    BUILD --> M[site-manifest.json]\n    BUILD --> L[llms.txt]\n    BUILD --> S[dist/site/]\n    BUILD --> D[dist/standalone/]\n    BUILD --> PF[dist/site/pagefind/]\n    PF -.-> |if pagefind on PATH| BUILD"
+        },
+        {
+          "kind": "list",
+          "style": "numbered",
+          "items": [
+            ["walk the project recursively for JSON pages with ", { "kind": "code", "text": "kind: \"page\"" }, " — gather their meta."],
+            ["write site-manifest.json with one entry per page (path, title, parent, order, summary)."],
+            ["write llms.txt with one Markdown link per page — for AI consumers."],
+            ["if jsonschema is installed, validate every page against schema/page.schema.json; print errors with field paths."],
+            ["build_site: copy every HTML stub + sibling JSON into dist/site/<rel-path>; copy _kit/ as dist/site/_kit/ for self-contained deployable; embed extracted text via hidden data-pagefind-body div for indexing."],
+            ["build_standalone: for each page, inline chrome.css + chrome.js + renderer.js + page JSON + kit bundle into a single self-contained file."],
+            ["if pagefind is on PATH, index dist/site/ to dist/site/pagefind/."]
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "standalone-bundle",
+      "title": "Standalone kit bundle",
+      "lead": "build_standalone embeds the project's kit.json + active domain glossary + extref entries as one JSON script tag. The kit loader hydrates from it synchronously when present.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "html",
+          "source": "<!-- dist/standalone/page.html — near the closing </body> -->\n<script type=\"application/json\" id=\"__htmldoc_page__\">{ ... page tree ... }</script>\n<script type=\"application/json\" id=\"__htmldoc_kit_bundle__\">{\n  \"kit\": { \"domains\": [\"data-platforms\", ...], \"lang\": \"en\", ... },\n  \"glossary\": { \"data-platforms\": { \"ACID\": { ... } }, ... },\n  \"extrefs\":  { \"data-platforms\": { ... }, ... }\n}</script>"
+        },
+        {
+          "kind": "callout",
+          "type": "success",
+          "title": "Result — single-file offline tooltips",
+          "content": "A single HTML file you can email or archive. All Custom Elements work, tooltips resolve, the page renders. Network requirements: Google Fonts (graceful fallback if blocked) and Mermaid CDN (only if the page has a <diagram>). Everything else inlined."
+        }
+      ]
+    }
+  ]
+}

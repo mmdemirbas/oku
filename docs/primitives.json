@@ -1,0 +1,554 @@
+{
+  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Primitives reference",
+  "accent": "teal",
+  "meta": {
+    "eyebrow": "Reference",
+    "subtitle": "Every Custom Element shipped with v2. Each entry: what it does, the JSON shape, every attribute, and a live example you can interact with.",
+    "audience": "Author",
+    "date": "2026-05-18",
+    "read_time": "~12 min read",
+    "order": 20,
+    "summary": "Every primitive with JSON shape + live example."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "17 primitives in v1. Inline kinds compose inside rich-text content arrays. Block kinds stand alone inside sections. Layout kinds wrap the page structurally.",
+      "bullets": [
+        "Inline (8): glossary-term, ext-ref, code, em, strong, link — and string literals which are also valid.",
+        "Block (12): paragraph, heading, list, code, callout, insight, info-tip, kpi-grid, compare-grid, scope-grid, bar-chart, step-flow.",
+        "Visual primitives (3): chart, diagram, live-snippet. SVG and JS-backed.",
+        "Layout (4): page-chrome, page-nav, page-toc, page-cover. Set by your HTML stub, not the JSON."
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "inline",
+      "title": "Inline kinds",
+      "lead": "Used inside any richString — paragraph.content, list.items[*], callout.content, etc. Mix strings with these objects in an array.",
+      "blocks": [
+        {
+          "kind": "heading", "level": 3, "id": "glossary-term", "title": "glossary-term"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Hover for a tooltip with the definition; click to pin. Resolves the ",
+            { "kind": "code", "text": "term" },
+            " attribute against the active glossary domains in priority order. ",
+            { "kind": "code", "text": "in" },
+            " disambiguates when two domains use the same term. ",
+            { "kind": "code", "text": "lang" },
+            " overrides the project language for that instance."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"text\": \"ACID\" }\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"in\": \"chemistry\" }\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"lang\": \"tr\" }"
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "Live",
+          "content": [
+            "Hover this term: ",
+            { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
+            ". Then click it to pin. Move the mouse toward the tooltip — bridge-hover keeps it open so you can select the text or click the link."
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "ext-ref", "title": "ext-ref"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Like glossary-term but for external entities (tools, papers, people). Same hover-bridge-pin behavior. Reads from ",
+            { "kind": "code", "text": "_kit/extrefs/<domain>.json" },
+            " (or project kit.json overrides). Each entry has a ",
+            { "kind": "code", "text": "summary" },
+            " and a ",
+            { "kind": "code", "text": "link" },
+            "; the tooltip shows the name + summary, with a Learn more button to the link."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{ \"kind\": \"ext-ref\", \"name\": \"Pagefind\", \"text\": \"Pagefind\" }"
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "Live",
+          "content": [
+            "Click this reference: ",
+            { "kind": "ext-ref", "name": "Pagefind", "text": "Pagefind" },
+            "."
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "code-em-strong-link", "title": "code, em, strong, link"
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{ \"kind\": \"code\",   \"text\": \"build_manifest()\" }\n{ \"kind\": \"em\",     \"text\": \"italic\" }\n{ \"kind\": \"strong\", \"text\": \"bold\" }\n{ \"kind\": \"link\",   \"text\": \"jsDelivr\", \"href\": \"https://cdn.jsdelivr.net\" }"
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "Live",
+          "content": [
+            "Inline code: ",
+            { "kind": "code", "text": "build_manifest()" },
+            ". Italic ",
+            { "kind": "em", "text": "for emphasis" },
+            ". Bold ",
+            { "kind": "strong", "text": "for impact" },
+            ". External link: ",
+            { "kind": "link", "text": "jsDelivr", "href": "https://cdn.jsdelivr.net" },
+            " — opens in a new tab with noopener."
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "prose",
+      "title": "Prose primitives",
+      "lead": "paragraph, heading, list, code — the four building blocks of any prose section. Used together they cover ~80% of typical content.",
+      "blocks": [
+        {
+          "kind": "heading", "level": 3, "id": "paragraph", "title": "paragraph"
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{ \"kind\": \"paragraph\", \"content\": \"A plain string works for unadorned prose.\" }\n{ \"kind\": \"paragraph\", \"content\": [\n  \"Or an array mixing \",\n  { \"kind\": \"strong\", \"text\": \"inline nodes\" },\n  \" with strings.\"\n] }"
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "heading", "title": "heading"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Sub-headings inside a section. ",
+            { "kind": "code", "text": "level" },
+            " is 3 or 4 (h1 = page title, h2 = section title — both produced automatically). Optional ",
+            { "kind": "code", "text": "id" },
+            " for permalinks; auto-slugified if absent."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{ \"kind\": \"heading\", \"level\": 3, \"title\": \"Sub-heading\", \"id\": \"sub\" }\n{ \"kind\": \"heading\", \"level\": 4, \"title\": \"Sub-sub-heading\" }"
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "list", "title": "list"
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{ \"kind\": \"list\", \"style\": \"bullet\", \"items\": [\n  \"Plain string item.\",\n  [\"Or an array with \", { \"kind\": \"code\", \"text\": \"inline\" }, \" nodes.\"]\n] }\n{ \"kind\": \"list\", \"style\": \"numbered\", \"items\": [\"step 1\", \"step 2\"] }"
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "code", "title": "code"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Code blocks. ",
+            { "kind": "code", "text": "language" },
+            " is informational — the kit doesn't ship syntax highlighting in v1 — but the renderer puts it on a ",
+            { "kind": "code", "text": "language-*" },
+            " class so Prism or Highlight.js plug in via a separate ",
+            { "kind": "code", "text": "<script>" },
+            "."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"code\",\n  \"language\": \"python\",\n  \"source\": \"def hello():\\n    print('world')\"\n}"
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "emphasis",
+      "title": "Emphasis primitives",
+      "lead": "callout, insight, info-tip — three ways to highlight content with different weight. Match weight to reader signal.",
+      "blocks": [
+        {
+          "kind": "heading", "level": 3, "id": "callout", "title": "callout"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Block-level themed note. ",
+            { "kind": "code", "text": "type" },
+            " is ",
+            { "kind": "code", "text": "warn" },
+            ", ",
+            { "kind": "code", "text": "danger" },
+            ", ",
+            { "kind": "code", "text": "success" },
+            ", or ",
+            { "kind": "code", "text": "neutral" },
+            " (default). Optional title. Content is richString."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"warn\",\n  \"title\": \"Watch the lock\",\n  \"content\": \"Compaction holds a metadata lock; long jobs block writers.\"\n}"
+        },
+        { "kind": "callout", "type": "warn",    "title": "warn",    "content": "Yellow-bordered, used for caveats." },
+        { "kind": "callout", "type": "danger",  "title": "danger",  "content": "Red-bordered, used for breaking changes or risks." },
+        { "kind": "callout", "type": "success", "title": "success", "content": "Green-bordered, used for confirmations." },
+        { "kind": "callout", "type": "neutral", "title": "neutral", "content": "Gray-bordered, used for general notes." },
+
+        {
+          "kind": "heading", "level": 3, "id": "insight", "title": "insight"
+        },
+        {
+          "kind": "paragraph",
+          "content": "A pull-quote for a key takeaway. Larger and more visually distinct than a paragraph — used to mark the one sentence per section worth slowing down for."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{ \"kind\": \"insight\", \"content\": \"The catalog is the locking primitive. Snapshots are the multi-version mechanism.\" }"
+        },
+        { "kind": "insight", "content": "The catalog is the locking primitive. Snapshots are the multi-version mechanism." },
+
+        {
+          "kind": "heading", "level": 3, "id": "info-tip", "title": "info-tip"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Native ",
+            { "kind": "code", "text": "<details>" },
+            " in disguise — collapsed by default, expand on click. Use to defer optional depth without disrupting the skim path. ",
+            { "kind": "code", "text": "content" },
+            " accepts an array of content blocks (paragraphs, code, callouts, ..)."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"info-tip\",\n  \"summary\": \"How the lock actually works\",\n  \"content\": [\n    { \"kind\": \"paragraph\", \"content\": \"Two writers race ...\" }\n  ]\n}"
+        },
+        {
+          "kind": "info-tip",
+          "summary": "Click to expand a live info-tip",
+          "content": [
+            { "kind": "paragraph", "content": "info-tip is the right primitive when the curious 5% of readers want the full story but the other 95% need to keep moving." }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "layout",
+      "title": "Structured-layout primitives",
+      "lead": "tldr, kpi-grid, compare-grid, scope-grid, step-flow — when prose isn't the right shape.",
+      "blocks": [
+        {
+          "kind": "heading", "level": 3, "id": "tldr", "title": "tldr"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Top-level only. Highlighted opener box with optional ",
+            { "kind": "code", "text": "title" },
+            ", a ",
+            { "kind": "code", "text": "summary" },
+            " line, and ",
+            { "kind": "code", "text": "bullets" },
+            " — each bullet is rich-text."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"tldr\",\n  \"summary\": \"One-sentence essence.\",\n  \"bullets\": [\n    \"Three to five concrete points.\",\n    [\"Each can include \", { \"kind\": \"glossary-term\", \"term\": \"ACID\" }, \" terms.\"]\n  ]\n}"
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "kpi-grid", "title": "kpi-grid"
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"kpi-grid\",\n  \"tiles\": [\n    { \"num\": \"15 / 15\", \"label\": \"Steps complete\" },\n    { \"num\": \"6\",       \"label\": \"Commits\" }\n  ]\n}"
+        },
+        {
+          "kind": "kpi-grid",
+          "tiles": [
+            { "num": "17", "label": "Primitives" },
+            { "num": "JSON", "label": "Source" },
+            { "num": "0", "label": "Build steps for content" }
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "compare-grid", "title": "compare-grid"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Side-by-side cards. ",
+            { "kind": "code", "text": "verdict" },
+            " is ",
+            { "kind": "code", "text": "good" },
+            ", ",
+            { "kind": "code", "text": "bad" },
+            ", or ",
+            { "kind": "code", "text": "neutral" },
+            " — sets the top-border color."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"compare-grid\",\n  \"cards\": [\n    { \"verdict\": \"bad\",  \"title\": \"Before\", \"content\": \"...\" },\n    { \"verdict\": \"good\", \"title\": \"After\",  \"content\": \"...\" }\n  ]\n}"
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            { "verdict": "bad", "title": "Authored HTML (v1)", "content": "Hand-written tags. Tree-edits via string ops. AI tooling brittle." },
+            { "verdict": "good", "title": "Authored JSON (v2)", "content": "Structured tree. Atomic edits. JSON.parse is the contract." }
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "scope-grid", "title": "scope-grid"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Two columns with semantic borders. ",
+            { "kind": "code", "text": "status" },
+            " is ",
+            { "kind": "code", "text": "in" },
+            " (green top border) or ",
+            { "kind": "code", "text": "out" },
+            " (gray)."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"scope-grid\",\n  \"columns\": [\n    { \"status\": \"in\",  \"title\": \"v1\",     \"items\": [\"...\"] },\n    { \"status\": \"out\", \"title\": \"Future\", \"items\": [\"...\"] }\n  ]\n}"
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "step-flow", "title": "step-flow"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Numbered cards for ordered actions, build steps, or migration paths."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"step-flow\",\n  \"steps\": [\n    { \"num\": \"1\", \"title\": \"Init\",  \"meta\": \"~1 min\", \"content\": \"html-doc init\" },\n    { \"num\": \"2\", \"title\": \"Author\", \"content\": \"Write the JSON page.\" }\n  ]\n}"
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "visual",
+      "title": "Visual primitives",
+      "lead": "bar-chart, chart, diagram, live-snippet — the rich content primitives that justify the JSON-source choice over Markdown.",
+      "blocks": [
+        {
+          "kind": "heading", "level": 3, "id": "bar-chart", "title": "bar-chart"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Row-per-item horizontal bars. Layout-safe by structure (no label collision). ",
+            { "kind": "code", "text": "value" },
+            " on each row; ",
+            { "kind": "code", "text": "max" },
+            " optional (defaults to ",
+            { "kind": "code", "text": "max(rows.value)" },
+            "); ",
+            { "kind": "code", "text": "display" },
+            " optional override for the readout text; ",
+            { "kind": "code", "text": "color" },
+            " is one of accent / warn / danger / success."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"bar-chart\",\n  \"rows\": [\n    { \"label\": \"Spark\",  \"value\": 95, \"display\": \"95 / 100\" },\n    { \"label\": \"Flink\",  \"value\": 80 },\n    { \"label\": \"Trino\",  \"value\": 75 }\n  ]\n}"
+        },
+        {
+          "kind": "bar-chart",
+          "rows": [
+            { "label": "Spark",  "value": 95, "display": "95 / 100" },
+            { "label": "Flink",  "value": 80, "display": "80 / 100" },
+            { "label": "Trino",  "value": 75, "display": "75 / 100" }
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "chart", "title": "chart"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Generic SVG chart. ",
+            { "kind": "code", "text": "type" },
+            " is ",
+            { "kind": "code", "text": "scatter" },
+            " or ",
+            { "kind": "code", "text": "line" },
+            ". Series of points with optional per-point labels and per-series colors. Auto-scaled axes with 5 ticks each."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"scatter\",\n  \"title\": \"Cost vs. impact\",\n  \"x_label\": \"Engineering cost\",\n  \"y_label\": \"User impact\",\n  \"series\": [\n    { \"label\": \"Round 6\", \"color\": \"accent\", \"data\": [\n      { \"x\": 4, \"y\": 9, \"label\": \"H3\" },\n      { \"x\": 6, \"y\": 8, \"label\": \"S2-inline\" }\n    ]}\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "scatter",
+          "title": "Round 6 work — cost vs. impact",
+          "x_label": "Engineering cost",
+          "y_label": "User impact",
+          "series": [
+            {
+              "label": "Showstoppers + High",
+              "color": "accent",
+              "data": [
+                { "x": 4, "y": 9, "label": "H3" },
+                { "x": 6, "y": 8, "label": "S2-inline" },
+                { "x": 2, "y": 5, "label": "schema-validate" }
+              ]
+            },
+            {
+              "label": "Polish",
+              "color": "warn",
+              "data": [
+                { "x": 1, "y": 2, "label": "L1" },
+                { "x": 1, "y": 3, "label": "L3" },
+                { "x": 1, "y": 2, "label": "isTouch" }
+              ]
+            }
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "diagram", "title": "diagram"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Mermaid-rendered. Lazy-loads Mermaid 10 from the CDN on first ",
+            { "kind": "code", "text": "<diagram>" },
+            " encountered on the page. ",
+            { "kind": "code", "text": "source" },
+            " is any Mermaid syntax (flowchart, sequence, gantt, state, class). Re-renders on theme toggle so colors track light/dark."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"diagram\",\n  \"caption\": \"Optional caption below the diagram.\",\n  \"source\": \"flowchart LR\\n  A[JSON page] --> B(renderer)\\n  B --> C[DOM]\"\n}"
+        },
+        {
+          "kind": "diagram",
+          "caption": "Build pipeline at a glance.",
+          "source": "flowchart LR\n    JSON[*.json pages] --> RJ[renderer.js]\n    RJ --> DOM[Custom Element DOM]\n    KIT[kit.json + glossary] --> CJ[chrome.js]\n    CJ --> DOM"
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "live-snippet", "title": "live-snippet"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Editable HTML/CSS/JS with sandboxed iframe preview. 220ms debounce on input. ",
+            { "kind": "code", "text": "language" },
+            " is currently ",
+            { "kind": "code", "text": "html-css-js" },
+            " (the only v1 mode). The Reset button restores the original ",
+            { "kind": "code", "text": "source" },
+            "."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"live-snippet\",\n  \"label\": \"Edit the gradient and message\",\n  \"source\": \"<style>...</style>\\n<div>...</div>\"\n}"
+        },
+        {
+          "kind": "live-snippet",
+          "label": "Edit the markup — preview updates live",
+          "source": "<style>\n  body { margin:0; height:100vh; display:grid; place-items:center;\n         background: linear-gradient(135deg, #115e59, #2dd4bf);\n         font-family: system-ui; }\n  .box { background:white; padding:20px 28px; border-radius:12px;\n         box-shadow:0 8px 24px rgba(0,0,0,0.15); }\n  h1 { margin:0 0 6px; color:#0f766e; font-size:20px; }\n  p  { margin:0; color:#475569; font-size:14px; }\n</style>\n<div class=\"box\">\n  <h1>Try the snippet</h1>\n  <p>Edit the source on the left.</p>\n</div>"
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "layout-chrome",
+      "title": "Layout / chrome — not in the page JSON",
+      "lead": "page-chrome, page-nav, page-toc are set in the HTML stub, not the page JSON. The stub copy-pastes from templates/starter.html and you usually don't touch it.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "html",
+          "source": "<page-chrome></page-chrome>\n\n<div class=\"layout\">\n  <page-nav title=\"Pages\"></page-nav>\n  <main id=\"main-content\"></main>\n  <page-toc title=\"On this page\"></page-toc>\n</div>\n\n<script>\n  window.addEventListener('DOMContentLoaded', function () {\n    HtmlDocRenderer.autoBoot();\n  });\n</script>"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            [{ "kind": "code", "text": "<page-chrome>" }, " — system cluster top-right (search, warning, theme cycler). Edge tabs for sidebars. Visual Viewport pinch-zoom tracker."],
+            [{ "kind": "code", "text": "<page-nav>" }, " — left site-tree sidebar. Reads site-manifest.json. Mark active page; edge-tab toggle."],
+            [{ "kind": "code", "text": "<page-toc>" }, " — right section-TOC sidebar. Built from main > section > h2/h3 after the renderer fires html-doc:rendered."]
+          ]
+        },
+        {
+          "kind": "info-tip",
+          "summary": "Customizing the layout",
+          "content": [
+            {
+              "kind": "paragraph",
+              "content": [
+                "The kit defaults work for ~all KB pages. For one-off pages (a single-page artifact, no nav), drop the ",
+                { "kind": "code", "text": "<page-nav>" },
+                " element from the stub. Without it the layout falls back to two-column (TOC on left, like v1). The renderer doesn't care; it only owns ",
+                { "kind": "code", "text": "<main>" },
+                "."
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

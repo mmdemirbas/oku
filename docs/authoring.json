@@ -1,0 +1,299 @@
+{
+  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Authoring guide",
+  "accent": "teal",
+  "meta": {
+    "eyebrow": "Guide",
+    "subtitle": "How to write a v2 page. Project setup, JSON page structure, rich text, per-page metadata, build outputs. Every section has a real example.",
+    "audience": "Author",
+    "date": "2026-05-18",
+    "read_time": "~8 min read",
+    "order": 10,
+    "summary": "Project setup and page structure — start here."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "A v2 page is one JSON file. Authoring it is filling in a tree of kind-tagged blocks. The HTML stub next to it bootstraps the renderer; you do not edit the HTML.",
+      "bullets": [
+        "Start a new project with html-doc init. Two files per page: name.json (content) and name.html (one-time stub).",
+        "The schema is at schema/page.schema.json — VS Code and Cursor autocomplete every node kind.",
+        "Rich text inside a paragraph is an array: plain strings interleaved with inline nodes (glossary-term, ext-ref, code, em, strong, link).",
+        "Per-page metadata picks accent color, page order in the nav, and the one-line summary that appears in nav tooltips and llms.txt."
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "setup",
+      "title": "Project setup",
+      "lead": "One-time per project. Links the kit so pages can reference _kit/chrome.js and friends without copying anything.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "bash",
+          "source": "cd ~/path/to/your-project\nhtml-doc init     # creates docs/_kit -> kit symlink\n\n# Optional: copy the starter pair for a blank page\ncp ~/dev/mmdemirbas/html-doc/templates/starter.html docs/my-page.html\ncp ~/dev/mmdemirbas/html-doc/templates/starter.json docs/my-page.json\n\nhtml-doc serve    # opens in the browser"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "After init, your project has a ",
+            { "kind": "code", "text": "docs/_kit/" },
+            " symlink pointing at the kit repo. Every page references the kit via ",
+            { "kind": "code", "text": "<script src=\"_kit/chrome.js\">" },
+            " and ",
+            { "kind": "code", "text": "<link href=\"_kit/chrome.css\">" },
+            " — no copies, no version drift. Update the kit in one place and every project picks it up."
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "kit.json — declare your project",
+          "content": "Each project's docs/kit.json picks which glossary domains to activate, the preferred language, and any project-local glossary or ext-ref overrides. The kit ships starter domains (data-platforms, web, ai-llm) — pick whichever fit. The glossary page covers domain selection in detail."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "anatomy",
+      "title": "Anatomy of a page",
+      "lead": "Every JSON page is rooted at kind:\"page\" and has three pieces: title, meta, blocks.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"$schema\": \"https://html-doc.dev/schema/page-v1.json\",\n  \"kind\": \"page\",\n  \"schema_version\": 1,\n  \"title\": \"My note\",\n  \"accent\": \"teal\",\n  \"meta\": {\n    \"eyebrow\": \"Notes\",\n    \"subtitle\": \"One-line subtitle below the H1.\",\n    \"date\": \"2026-05-18\",\n    \"order\": 10,\n    \"summary\": \"One-line summary for nav tooltips and llms.txt.\"\n  },\n  \"blocks\": [\n    { \"kind\": \"tldr\", \"summary\": \"...\", \"bullets\": [\"...\"] },\n    { \"kind\": \"section\", \"id\": \"overview\", \"title\": \"Overview\", \"blocks\": [\n      { \"kind\": \"paragraph\", \"content\": \"Plain prose works as a string.\" }\n    ]}\n  ]\n}"
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "top-level",
+          "title": "Top-level fields"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            [{ "kind": "code", "text": "kind" }, " — must be ", { "kind": "code", "text": "\"page\"" }, ". The renderer rejects anything else."],
+            [{ "kind": "code", "text": "title" }, " — required. Becomes the ", { "kind": "code", "text": "<title>" }, " and the H1 in the cover."],
+            [{ "kind": "code", "text": "accent" }, " — optional. Either a named token (", { "kind": "code", "text": "teal" }, ", ", { "kind": "code", "text": "amber" }, ", ", { "kind": "code", "text": "indigo" }, ") or a CSS color value. Overrides the kit default per page."],
+            [{ "kind": "code", "text": "meta" }, " — optional object. eyebrow, subtitle, audience, date, read_time, order, summary, lang. Each is optional individually."],
+            [{ "kind": "code", "text": "blocks" }, " — the content tree. Array of top-level blocks (tldr, kpi-grid, section)."]
+          ]
+        },
+        {
+          "kind": "info-tip",
+          "summary": "Why summary matters",
+          "content": [
+            {
+              "kind": "paragraph",
+              "content": "meta.summary is surfaced in three places: the page-nav tooltip on hover, the llms.txt sitemap line for AI consumers, and (when present) the Pagefind search excerpt. Keep it one tight sentence focused on what the page contains — not a teaser."
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "blocks",
+      "title": "Block kinds",
+      "lead": "Each block in the tree has a kind tag the renderer matches to a renderer function (or, for the visual primitives, a Custom Element). The primitives reference page lists every kind with a live example.",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": [
+            "Two levels: ",
+            { "kind": "strong", "text": "top-level blocks" },
+            " allowed only at the page root (tldr, kpi-grid, section), and ",
+            { "kind": "strong", "text": "content blocks" },
+            " allowed inside section.blocks (paragraph, heading, callout, insight, info-tip, list, code, plus all the visual primitives)."
+          ]
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "neutral",
+              "title": "Top-level only",
+              "content": [
+                "tldr — the highlighted opener box (label, summary, bullets). ",
+                "kpi-grid — headline-number tiles. ",
+                "section — every chunk of real content lives in a section so the TOC builds from it."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "Inside section.blocks",
+              "content": [
+                "paragraph, heading, list, code — prose primitives. ",
+                "callout, insight, info-tip — emphasis primitives. ",
+                "kpi-grid, compare-grid, scope-grid — structured layout primitives. ",
+                "bar-chart, step-flow, chart, diagram, live-snippet — visual primitives."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "warn",
+          "title": "Section IDs are required",
+          "content": "Every section needs an id. The TOC, scroll-spy, and section permalinks all key off it. Use kebab-case; the kit doesn't sanitize."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "rich-text",
+      "title": "Rich text — strings or arrays",
+      "lead": "Anywhere the schema accepts text (paragraph content, callout content, list items, etc.), you can pass a string for plain prose or an array to mix inline nodes.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "// Plain string\n{ \"kind\": \"paragraph\", \"content\": \"Just prose, nothing fancy.\" }\n\n// Array — mix strings and inline nodes\n{ \"kind\": \"paragraph\", \"content\": [\n  \"The Iceberg format gives \",\n  { \"kind\": \"glossary-term\", \"term\": \"ACID\", \"text\": \"ACID\" },\n  \" transactions, see also \",\n  { \"kind\": \"ext-ref\", \"name\": \"Apache Iceberg\", \"text\": \"the project home\" },\n  \" — runs on \",\n  { \"kind\": \"code\", \"text\": \"S3\" },\n  \", HDFS, or any object store.\"\n] }"
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "inline-nodes",
+          "title": "Inline node kinds"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            [{ "kind": "code", "text": "glossary-term" }, " — { kind, term, text?, in?, lang? }. Resolves against the active glossary domains."],
+            [{ "kind": "code", "text": "ext-ref" }, " — { kind, name, text?, in?, lang? }. Like glossary-term but for external entities."],
+            [{ "kind": "code", "text": "code" }, " — { kind, text }. Inline ", { "kind": "code", "text": "<code>" }, " element."],
+            [{ "kind": "code", "text": "em" }, " — { kind, text }. Italic emphasis."],
+            [{ "kind": "code", "text": "strong" }, " — { kind, text }. Bold emphasis."],
+            [{ "kind": "code", "text": "link" }, " — { kind, text, href }. External links get target=_blank automatically."]
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Inline nodes can appear in any place the schema marks as ",
+            { "kind": "code", "text": "richString" },
+            " — paragraph.content, list.items[*], callout.content, insight.content, info-tip nested paragraphs, compare-card.content, scope-col.items[*], step-card.content, and tldr.bullets[*]."
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "metadata",
+      "title": "Per-page metadata",
+      "lead": "meta drives nav placement, the cover header, the llms.txt sitemap, and search excerpts.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "neutral",
+              "title": "Display fields",
+              "content": [
+                "eyebrow — small label above the H1 (\"Architecture\", \"Notes\"). ",
+                "subtitle — one-paragraph description under the H1. ",
+                "audience — \"Spark+Iceberg team\", \"Personal\", etc. ",
+                "date — ISO date or human string. Shown in cover meta. ",
+                "read_time — like \"~5 min read\". Shown in cover meta."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "Behavior fields",
+              "content": [
+                "order — sort key in the site-tree nav. Lower = earlier. ",
+                "summary — one line. Used in nav tooltips, llms.txt, search. ",
+                "lang — \"en\" or \"tr\" (or any code the kit knows). Overrides the project default. ",
+                "accent (top-level, not under meta) — named token or CSS color."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "info-tip",
+          "summary": "Date conventions",
+          "content": [
+            {
+              "kind": "paragraph",
+              "content": "The kit doesn't parse the date — it's a display string. Use whatever convention you've adopted (ISO 8601, locale date). For consistency across a project, pick one and stick. Sort order in the nav uses meta.order, not the date."
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "build",
+      "title": "Build outputs",
+      "lead": "html-doc build produces four artifacts. Authors don't need to run it during dev — the runtime renderer fetches JSON directly — but build is required for search, the standalone single-file mode, and the llms.txt sitemap.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "site-manifest.json",
+              "meta": "<page-nav> reads this",
+              "content": "Page tree consumed by the site-tree sidebar at runtime. Generated from every *.json file in the project."
+            },
+            {
+              "num": "2",
+              "title": "llms.txt",
+              "meta": "AI-consumer sitemap",
+              "content": "One line per page: URL + title + summary. Convention from llmstxt.org. Drop into LLM context to give the model an overview."
+            },
+            {
+              "num": "3",
+              "title": "dist/site/",
+              "meta": "deployable multi-page site",
+              "content": "Every HTML + JSON copied with directory structure preserved. Kit assets bundled at dist/site/_kit/. Drop on any static host."
+            },
+            {
+              "num": "4",
+              "title": "dist/standalone/",
+              "meta": "single-file artifacts",
+              "content": "Every HTML inlined: kit JS, CSS, page JSON, glossary bundle. One self-contained file per page that opens offline — email-as-attachment ready."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "success",
+          "title": "Pagefind search — optional dependency",
+          "content": "If pagefind is on PATH (brew install pagefind, or npx pagefind), build also indexes dist/site/ into dist/site/pagefind/. Soft-fails without it. The search button in the chrome only works on built sites."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "next",
+      "title": "Where to go from here",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": [
+            "Browse the ",
+            { "kind": "link", "text": "primitives reference", "href": "primitives.html" },
+            " for every block kind with a live example. The ",
+            { "kind": "link", "text": "glossary guide", "href": "glossary.html" },
+            " explains the multi-domain registry. The ",
+            { "kind": "link", "text": "architecture page", "href": "architecture.html" },
+            " covers the runtime — useful when something doesn't behave as expected."
+          ]
+        }
+      ]
+    }
+  ]
+}

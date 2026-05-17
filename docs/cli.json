@@ -1,0 +1,194 @@
+{
+  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "CLI reference",
+  "accent": "teal",
+  "meta": {
+    "eyebrow": "Reference",
+    "subtitle": "Three commands: html-doc init, html-doc build, html-doc serve. Zero flags. Designed so you mostly forget the CLI exists.",
+    "audience": "Author",
+    "date": "2026-05-18",
+    "read_time": "~4 min read",
+    "order": 50,
+    "summary": "html-doc init / build / serve — what each does."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "init creates the docs/_kit symlink in your project. build produces site-manifest.json, llms.txt, dist/site/, dist/standalone/, plus Pagefind if installed. serve walks up to find the project, refreshes the manifest, opens a local HTTP server.",
+      "bullets": [
+        "All three commands take zero flags — defaults always.",
+        "build is idempotent; safe to re-run. dist/ is wiped each time.",
+        "serve regenerates the manifest on startup so <page-nav> reflects current state.",
+        "Optional deps: pagefind (search index), jsonschema (page validation). Both soft-fail."
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "init",
+      "title": "html-doc init",
+      "lead": "One-time per project. Creates the docs/_kit symlink so pages can reference _kit/chrome.js etc.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "bash",
+          "source": "cd ~/path/to/your-project\nhtml-doc init\n\n# ✓ Linked /path/to/your-project/docs/_kit -> /path/to/html-doc\n#\n#   Reference the kit in your HTML <head>:\n#     <script src=\"_kit/chrome-boot.js\"></script>\n#     <link rel=\"stylesheet\" href=\"_kit/chrome.css\">\n#     <script src=\"_kit/chrome.js\" defer></script>\n#\n#   Then run `html-doc build` to produce dist/standalone/ + dist/site/."
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "If docs/_kit already exists",
+          "content": "Re-running init is safe — if the symlink already points at the kit, it prints \"already linked\" and exits 0. If it exists but points somewhere else, it errors and tells you what's there so you can decide."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "build",
+      "title": "html-doc build",
+      "lead": "Walks the current directory, produces all the build artifacts. Run before deploying to dist/site/, before sharing dist/standalone/ files, and any time you add or rename a page (so site-manifest.json refreshes).",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "bash",
+          "source": "cd ~/path/to/your-project/docs\nhtml-doc build\n\n# ✓ Wrote site-manifest.json (6 JSON page(s))\n# ✓ Wrote llms.txt (sitemap for LLM consumers)\n# ✓ Schema validation: 6 page(s) clean\n# ✓ Pagefind index built: dist/site/pagefind/\n# ✓ Built 6 HTML file(s):\n#\n#   standalone (inline, send-as-file):\n#                file:///.../dist/standalone/index.html\n#                ...\n#\n#   site (shared assets, multi-page):\n#   site root:   file:///.../dist/site\n#                ..."
+        },
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "Walk *.json pages recursively",
+              "content": "Skips dist/, _kit/, node_modules/, .git/, venv/, __pycache__/. Treats files with kind:\"page\" as pages."
+            },
+            {
+              "num": "2",
+              "title": "Write site-manifest.json + llms.txt",
+              "content": "At the project root. Manifest drives <page-nav>; llms.txt is the AI-consumer sitemap."
+            },
+            {
+              "num": "3",
+              "title": "Schema validation (optional)",
+              "content": "If jsonschema is installed (pip install jsonschema), every page is checked against schema/page.schema.json. Errors print with field paths. Without jsonschema, prints a one-line hint and skips."
+            },
+            {
+              "num": "4",
+              "title": "build_standalone — single-file per page",
+              "content": "For each *.html stub, inline chrome.css, chrome.js, renderer.js, the page JSON, and the kit bundle. Output to dist/standalone/ with directory structure preserved."
+            },
+            {
+              "num": "5",
+              "title": "build_site — multi-page deployable",
+              "content": "Copy every *.html + *.json to dist/site/ with directory structure preserved. Copy _kit/ to dist/site/_kit/. Inject extracted text into hidden data-pagefind-body for indexing."
+            },
+            {
+              "num": "6",
+              "title": "Pagefind index (optional)",
+              "content": "If pagefind is on PATH (brew install pagefind, or npx pagefind), run it over dist/site/. Output to dist/site/pagefind/. Soft-fails with install hint if absent."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "warn",
+          "title": "build wipes dist/",
+          "content": "build removes dist/standalone/ and dist/site/ before rebuilding so stale files don't accumulate. If you have anything else under dist/ you care about, move it out first. (You shouldn't.)"
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "serve",
+      "title": "html-doc serve",
+      "lead": "Local HTTP server in the project root. Refreshes site-manifest.json + llms.txt on startup, picks the first free port from 9876, opens the first HTML page in the browser.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "bash",
+          "source": "html-doc serve\n\n# ✓ Refreshed site-manifest: site-manifest.json\n# ✓ Refreshed llms.txt:       llms.txt\n# ✓ Serving /path/to/your-project on http://localhost:9876\n#   Stop with Ctrl-C.\n#\n#   HTML files:\n#     http://localhost:9876/docs/index.html\n#     http://localhost:9876/docs/authoring.html\n#     ..."
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            ["Walks up from cwd to find the directory containing docs/_kit; serves from there. Run from anywhere inside the project."],
+            ["First free port from 9876–9900. Caps at 9900 (if all taken, errors out)."],
+            ["Refreshes site-manifest.json + llms.txt — but not the Pagefind index. Search only works on a built site (run html-doc build first if you need search)."],
+            ["Opens the first HTML it finds in the default browser. Ctrl-C to stop."]
+          ]
+        },
+        {
+          "kind": "info-tip",
+          "summary": "Why HTTP, not file://",
+          "content": [
+            {
+              "kind": "paragraph",
+              "content": "Browsers apply different rules to local files than HTTP — symlink resolution, fetch, and ES module imports fail silently or behave inconsistently on file://. The local HTTP server sidesteps that. On macOS, opening a file:// URL also disables some same-origin policies that matter for the iframe sandbox in <live-snippet>. Always serve."
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "optional-deps",
+      "title": "Optional dependencies",
+      "lead": "Two external tools the kit will use if present. Both soft-fail — install when you want the feature, skip when you don't.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "neutral",
+              "title": "Pagefind — search index",
+              "content": [
+                "Install: ",
+                { "kind": "code", "text": "brew install pagefind" },
+                ", or available via ",
+                { "kind": "code", "text": "npx pagefind" },
+                ". ",
+                "Without it: search button still appears but says \"Search index not found\" when clicked. ",
+                "With it: build adds a ~50–100 KB pagefind/ directory to dist/site/; the search button works on the built site."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "jsonschema — page validation",
+              "content": [
+                "Install: ",
+                { "kind": "code", "text": "pip install jsonschema" },
+                ". ",
+                "Without it: build prints a hint and skips validation. ",
+                "With it: every JSON page validates against schema/page.schema.json on build; errors print field path + message. Catches malformed JSON earlier than the runtime."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "future",
+      "title": "Future commands",
+      "lead": "Not in v2. Worth noting because they're frequently asked.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            [{ "kind": "code", "text": "html-doc new <path>" }, " — scaffold a new page from the starter template. Currently a manual cp. Likely in v2.1."],
+            [{ "kind": "code", "text": "html-doc check" }, " — link checker, glossary-coverage checker, dead-page checker. Possibly in v2.1."],
+            [{ "kind": "code", "text": "html-doc watch" }, " — auto-rebuild on file change. The serve command already refreshes the manifest at startup, but doesn't watch. Maybe v2.x."],
+            ["Deploy commands (publish to GitHub Pages, S3, etc.) — explicitly out of scope. dist/site/ is portable; use whatever you already use."]
+          ]
+        }
+      ]
+    }
+  ]
+}
