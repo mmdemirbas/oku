@@ -1,0 +1,305 @@
+{
+  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "html-doc v2",
+  "accent": "teal",
+  "meta": {
+    "eyebrow": "Project status · 2026-05-17",
+    "subtitle": "Interactive knowledge platform for AI-emitted documentation, learning notes, and reviews. This page is the live status board and primitives reference, authored in the v2 JSON format itself.",
+    "audience": "Author",
+    "date": "2026-05-17",
+    "read_time": "~10 min read",
+    "order": 1,
+    "summary": "v2 status, build progress, live primitives tour, architecture, what's next."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "All 15 build steps shipped across 5 rounds. Deep review surfaced 2 showstoppers + 4 high + 2 medium; 6 of those landed in round 5. Remaining work: recursive build, inline glossary in standalone, plus polish items.",
+      "bullets": [
+        "5 commits on feat/v2-knowledge-platform, ~3500 lines of production code plus schema and demo content.",
+        "Three verified entry points: dev pages (runtime fetch), dist/site/ (multi-page deployable, Pagefind search works), dist/standalone/ (single-file, opens offline).",
+        "Tooltip controller, multi-domain glossary, Visual Viewport pinch-zoom fix, Mermaid lazy-load, live snippets, forward-compat warning indicator — all verified end-to-end.",
+        "This page itself uses every primitive — hover terms, click external refs, edit the live snippet, watch the chart and diagram render."
+      ]
+    },
+    {
+      "kind": "kpi-grid",
+      "tiles": [
+        { "num": "15 / 15", "label": "Build steps complete" },
+        { "num": "6 / 11", "label": "Review fixes landed" },
+        { "num": "5", "label": "Commits on branch" },
+        { "num": "0", "label": "Console errors across 3 modes" }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "roadmap",
+      "title": "Roadmap",
+      "lead": "Build sequence as committed across rounds. Status reflects the actual repo state, not the plan.",
+      "blocks": [
+        {
+          "kind": "scope-grid",
+          "columns": [
+            {
+              "status": "in",
+              "title": "Shipped",
+              "items": [
+                "JSON page schema (schema/page.schema.json) — 14 block kinds, inline rich-text union",
+                "Client-side renderer (renderer.js) — JSON → Custom Element DOM at load time",
+                "<page-chrome> + Visual Viewport pinch-zoom stability",
+                "<page-nav> site-tree sidebar with right-edge tab toggle",
+                "<page-toc> section-TOC with left-edge tab toggle (v2 layout)",
+                "Three-column CSS grid + mobile drawers",
+                "kit.json loader + multi-domain, multi-language registry",
+                "Tooltip controller: hover, bridge, click-pin, touch-only-click, Esc",
+                "<glossary-term> and <ext-ref> elements",
+                "Content primitives: <callout>, <insight>, <info-tip>, <kpi-grid>, <compare-grid>, <scope-grid>, <bar-chart>, <step-flow>",
+                "Diagram + chart: <html-doc-chart> (scatter/line SVG), <html-doc-diagram> (Mermaid)",
+                "<html-doc-snippet> editable HTML/CSS/JS with iframe preview",
+                "Build pipeline: site-manifest.json, llms.txt, Pagefind index over dist/site/",
+                "Forward-compat warning indicator with per-session dismiss",
+                "Standalone single-file output with autoBoot (inline page JSON)"
+              ]
+            },
+            {
+              "status": "out",
+              "title": "Pending",
+              "items": [
+                "H3 — recursive HTML build + directory structure preservation",
+                "S2 (option 1) — inline glossary data into standalone builds",
+                "M2 — document data-def trust boundary in code comment",
+                "Notes — JSON Schema validation at build time, Mermaid SRI hash, page-toc double-build cleanup, isTouch live-detection",
+                "Naming normalization across <page-*>, <html-doc-*>, unprefixed elements",
+                "cycleTheme refactor to event-based pattern (drop monkey-patch)"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "review-fixes",
+      "title": "Review-fix status",
+      "lead": "Independent reviewer agent ran a 12-lens pass on the v2 branch. The full report sits at _internal/REVIEW-2026-05-17.md. Round 5 landed 6 of the highest-impact findings.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Fixed in 38c92bd",
+              "content": [
+                "S1 — glossary override race. Project-level overrides survive central domain-file fetches. ",
+                "H1 — callout 'warn' CSS variant. .callout.warn now aliases .callout.warning. ",
+                "S2 (quick) — standalone tooltips no longer mark every term as 'Unknown'. Terms render plain text without the gloss styling. ",
+                "H2 — initReadingAids guarded against scroll/keydown listener accumulation across re-renders. ",
+                "H5 — search results escape d.url and d.meta.title (d.excerpt stays raw for Pagefind highlights). ",
+                "M1 — search modal focus trap + focus restore on close."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "Pending — bigger lifts",
+              "content": [
+                "H3 — html-doc CLI walks JSON pages recursively but HTML stubs are root-only; subfolder pages end up in site-manifest.json without HTML build output. Fix touches both build_site and build_standalone — coordinated change. ",
+                "S2 (proper) — inline glossary + extref data into standalone builds so tooltips work offline. Requires extending build_standalone to embed the registry alongside the inline page-data tag, and teaching __htmldocKit.load() to read from inline data. ",
+                "H4 — demo _kit symlink not committed. Only matters if _internal/demo-page/ is ever promoted to public examples."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "primitives",
+      "title": "Live primitives tour",
+      "lead": "Every primitive on the page below is real, not a screenshot. Hover terms, click external references, edit the snippet — they work because this page is rendered by the same renderer.js you'd use for any other page.",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": [
+            "The visible vocabulary: ",
+            { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
+            " from data-platforms, ",
+            { "kind": "glossary-term", "term": "Custom Elements", "text": "Custom Elements" },
+            " from web, and ",
+            { "kind": "glossary-term", "term": "Prompt cache", "text": "prompt caching" },
+            " from ai-llm — three domains active, all resolved from kit.json. Click any underlined term to pin its tooltip. Reference tools live in extrefs: ",
+            { "kind": "ext-ref", "name": "Pagefind", "text": "Pagefind" },
+            " powers search, ",
+            { "kind": "ext-ref", "name": "Mermaid", "text": "Mermaid" },
+            " powers diagrams."
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "Tooltip behavior to test",
+          "content": "Hover a term — tooltip appears after 120ms. Move the mouse toward the tooltip — it stays visible (bridge-hover). Select text inside — it works because the tooltip is a real DOM node. Click the term — pinned (accent ring). Click again or click another term — unpinned."
+        },
+        {
+          "kind": "info-tip",
+          "summary": "How the tooltip controller works",
+          "content": [
+            {
+              "kind": "paragraph",
+              "content": "A single global controller manages one active tooltip. Mouseenter triggers a 120ms show delay; mouseleave triggers a 300ms hide. If the mouse enters the tooltip during the hide window, the timer cancels. Click toggles pinned state (visible accent ring). Touch devices (matchMedia '(hover: none)') get click-only behavior. Esc closes pinned. Click anywhere outside .gloss or .tooltip-popup closes pinned."
+            }
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart",
+          "title": "Chart — round-by-round commit size"
+        },
+        {
+          "kind": "chart",
+          "type": "line",
+          "title": "Code added per round (lines)",
+          "x_label": "Round",
+          "y_label": "Insertions",
+          "series": [
+            {
+              "label": "Lines added",
+              "color": "accent",
+              "data": [
+                { "x": 1, "y": 1616, "label": "foundation" },
+                { "x": 2, "y": 569,  "label": "page-nav" },
+                { "x": 3, "y": 612,  "label": "primitives" },
+                { "x": 4, "y": 886,  "label": "search" },
+                { "x": 5, "y": 120,  "label": "fixes" }
+              ]
+            }
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "diagram",
+          "title": "Diagram — request flow"
+        },
+        {
+          "kind": "diagram",
+          "caption": "End-to-end when this page loaded — the same pipeline applies to every v2 page.",
+          "source": "sequenceDiagram\n    autonumber\n    participant B as Browser\n    participant H as HTML stub\n    participant R as renderer.js\n    participant C as chrome.js\n    participant K as kit.json + glossary/*\n\n    B->>H: GET index.html\n    H-->>B: stub + chrome.css\n    B->>C: load chrome.js + renderer.js\n    C->>K: fetch kit.json\n    K-->>C: domains, lang, overrides\n    C->>K: fetch glossary/<domain>.json (xN)\n    Note over C,K: Promise.all then apply overrides\n    H->>R: autoBoot()\n    R->>B: fetch index.json\n    B-->>R: page tree\n    R->>B: emit Custom Element DOM\n    C->>B: build TOC, init reading aids\n    Note over B: glossary-term, ext-ref attach tooltip controller"
+        },
+
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "snippet",
+          "title": "Live snippet — playable example"
+        },
+        {
+          "kind": "live-snippet",
+          "label": "Edit the gradient and message — preview updates as you type",
+          "source": "<style>\n  body {\n    margin: 0;\n    height: 100vh;\n    display: grid;\n    place-items: center;\n    background: linear-gradient(135deg, #0f766e, #2dd4bf);\n    font-family: system-ui, sans-serif;\n  }\n  .card {\n    background: white;\n    border-radius: 16px;\n    padding: 24px 32px;\n    box-shadow: 0 12px 36px rgba(0,0,0,0.2);\n    text-align: center;\n  }\n  .card h1 { margin: 0 0 8px; color: #115e59; font-size: 22px; }\n  .card p  { margin: 0; color: #475569; font-size: 14px; }\n</style>\n<div class=\"card\">\n  <h1>Hello, learner.</h1>\n  <p>Edit the source on the left — this preview updates live.</p>\n</div>"
+        },
+
+        {
+          "kind": "callout",
+          "type": "warn",
+          "title": "Try the warn callout type",
+          "content": "This callout uses type=\"warn\" — fixed in round 5 (H1). Before that fix it rendered as a default accent callout because the CSS only had .callout.warning. Now .callout.warn aliases the same styling."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "architecture",
+      "title": "Architecture",
+      "lead": "Anatomy of a v2 project and how the runtime fits together.",
+      "blocks": [
+        {
+          "kind": "diagram",
+          "caption": "Files in a v2 project. Solid arrows are runtime; dashed are build-time.",
+          "source": "flowchart LR\n    subgraph SRC[Project source]\n      P[*.json pages]\n      H[*.html stubs]\n      KJ[kit.json]\n    end\n    subgraph KIT[Kit — symlinked _kit/]\n      CC[chrome.css]\n      CJ[chrome.js]\n      RJ[renderer.js]\n      G[glossary/*.json]\n      E[extrefs/*.json]\n    end\n    subgraph BUILD[html-doc build]\n      MFG[site-manifest.json]\n      LLM[llms.txt]\n      PF[pagefind/]\n      DS[dist/standalone/]\n      DT[dist/site/]\n    end\n    H -.-> DS\n    H -.-> DT\n    P -.-> DS\n    P -.-> DT\n    P -.-> MFG\n    P -.-> LLM\n    DT -.-> PF\n    P --> RJ\n    KJ --> CJ\n    G --> CJ\n    E --> CJ\n    RJ --> DOM[Custom Element DOM]\n    CJ --> DOM"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Each page is a JSON file under the project root. The companion HTML stub (",
+            { "kind": "code", "text": "templates/starter.html" },
+            ") calls ",
+            { "kind": "code", "text": "HtmlDocRenderer.autoBoot()" },
+            " — which fetches the sibling JSON in dev mode, or reads an inline ",
+            { "kind": "code", "text": "<script type=\"application/json\" id=\"__htmldoc_page__\">" },
+            " tag in standalone mode. The renderer walks the tree and emits Custom Elements; chrome.js handles tooltips, search, theme, and the warning indicator."
+          ]
+        },
+        {
+          "kind": "info-tip",
+          "summary": "Page JSON anatomy — minimal example",
+          "content": [
+            {
+              "kind": "code",
+              "language": "json",
+              "source": "{\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"accent\": \"teal\",\n  \"meta\": {\n    \"eyebrow\": \"Notes\",\n    \"date\": \"2026-05-17\",\n    \"order\": 10,\n    \"summary\": \"One-line summary for nav and llms.txt.\"\n  },\n  \"blocks\": [\n    { \"kind\": \"tldr\", \"summary\": \"...\", \"bullets\": [\"...\"] },\n    { \"kind\": \"section\", \"id\": \"overview\", \"title\": \"Overview\", \"blocks\": [\n      { \"kind\": \"paragraph\", \"content\": [\n        \"Plain text and \",\n        { \"kind\": \"glossary-term\", \"term\": \"ACID\", \"text\": \"ACID\" },\n        \" inline.\"\n      ]}\n    ]}\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "next",
+      "title": "What's next",
+      "lead": "Prioritized from the round-5 review. Marked with effort sketch.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "H3 — Recursive HTML build + directory structure preservation",
+              "meta": "files: bin/html-doc · risk: medium · effort: ~1 round",
+              "content": "find_html_files uses .glob (root-only) while find_json_pages uses .rglob (recursive). Subfolder pages appear in site-manifest.json but never build. Also flatten-collision in build_site. Need to change discovery, preserve relative paths in output, and verify with a nested example."
+            },
+            {
+              "num": "2",
+              "title": "S2 proper — Inline glossary data in standalone builds",
+              "meta": "files: bin/html-doc, chrome.js · risk: medium · effort: ~1 round",
+              "content": "Build_standalone embeds active domain glossary + extref files as JSON script tags with well-known IDs. chrome.js's kit loader checks for these in standalone mode before falling back to fetch. Restores tooltips offline."
+            },
+            {
+              "num": "3",
+              "title": "Schema validation at build time",
+              "meta": "files: bin/html-doc · new dep: jsonschema · effort: ~½ day",
+              "content": "Run page.schema.json against each page during build. Catch malformed JSON / unknown kinds / missing required fields before runtime. Today the build silently skips JSON-decode failures."
+            },
+            {
+              "num": "4",
+              "title": "M2 — Document data-def trust boundary",
+              "meta": "files: chrome.js · effort: 5 minutes",
+              "content": "Code comment at tooltip controller's build() function stating that data-def accepts HTML only from kit-controlled sources."
+            },
+            {
+              "num": "5",
+              "title": "Polish — cycleTheme event, isTouch live, page-toc double-build, Mermaid SRI",
+              "meta": "files: chrome.js, chrome.css · effort: ~1 day",
+              "content": "L3 + open-question items. Dispatch CustomEvent on theme change instead of monkey-patching cycleTheme. Re-evaluate isTouch via matchMedia listener. Remove rAF in PageToc.connectedCallback. Add integrity hash to Mermaid CDN script."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "success",
+          "title": "Then — v2.0.0 tag",
+          "content": "After 1 + 2 land we're past the items the review flagged as 'realistic-use breakage'. The remainder is polish and documentation. Cut v2.0.0 then."
+        }
+      ]
+    }
+  ]
+}

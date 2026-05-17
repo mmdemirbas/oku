@@ -1,0 +1,8 @@
+{
+  "$schema": "https://html-doc.dev/schema/project-kit-v1.json",
+  "name": "html-doc v2",
+  "description": "Interactive knowledge platform for AI-emitted documentation, learning notes, and reviews.",
+  "domains": ["data-platforms", "web", "ai-llm"],
+  "lang": "en",
+  "lang_fallback": ["en"]
+}
