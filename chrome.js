@@ -605,17 +605,261 @@ class ExtRef extends HTMLElement {
 }
 if (!customElements.get('ext-ref')) customElements.define('ext-ref', ExtRef);
 
+/* ============ <page-nav> Custom Element ============ *
+ * Loads site-manifest.json from the docs root (adjacent to the page)
+ * and renders a collapsible tree of pages. Active page highlighted
+ * based on location.pathname. Carries its own edge-tab toggle on the
+ * right inner edge (proximity rule).
+ * ----------------------------------------------------------------- */
+class PageNav extends HTMLElement {
+  connectedCallback() {
+    var title = this.getAttribute('title') || 'Pages';
+    this.innerHTML =
+      '<div class="page-nav-panel">' +
+        '<div class="page-nav-header"><h2>' + title + '</h2></div>' +
+        '<ol class="page-nav-tree"><li class="page-nav-loading">Loading…</li></ol>' +
+      '</div>' +
+      '<button class="page-nav-tab" type="button" aria-label="Toggle pages">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 6 9 12 15 18"/></svg>' +
+      '</button>';
+    var self = this;
+    this.querySelector('.page-nav-tab').addEventListener('click', function () {
+      var layout = self.closest('.layout');
+      if (window.innerWidth <= 1024) {
+        self.classList.toggle('open');
+      } else if (layout) {
+        layout.classList.toggle('nav-collapsed');
+        try { localStorage.setItem('pageNavCollapsed', layout.classList.contains('nav-collapsed') ? '1' : '0'); } catch (e) {}
+      }
+    });
+    // Restore desktop collapsed state
+    var layout = this.closest('.layout');
+    if (layout) {
+      try {
+        if (localStorage.getItem('pageNavCollapsed') === '1') layout.classList.add('nav-collapsed');
+      } catch (e) {}
+    }
+    // Close mobile drawer on Esc
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') self.classList.remove('open');
+    });
+
+    fetch('site-manifest.json', { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (manifest) {
+        self._renderTree(manifest);
+      });
+  }
+
+  _renderTree(manifest) {
+    var tree = this.querySelector('.page-nav-tree');
+    if (!tree) return;
+    tree.innerHTML = '';
+    if (!manifest || !Array.isArray(manifest.pages)) {
+      tree.innerHTML = '<li class="page-nav-empty">No site-manifest.json found. Run <code>html-doc build</code>.</li>';
+      window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+        detail: [{ code: 'manifest-missing', msg: 'site-manifest.json not loaded', level: 'warn' }]
+      }));
+      return;
+    }
+    if (manifest.schema_version && manifest.schema_version > 1) {
+      window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+        detail: [{ code: 'manifest-schema-future', msg: 'site-manifest.schema_version=' + manifest.schema_version + ' newer than this kit (1)', level: 'warn' }]
+      }));
+    }
+
+    var pages = manifest.pages.slice();
+    pages.sort(function (a, b) {
+      var oa = a.order !== undefined ? a.order : 1000;
+      var ob = b.order !== undefined ? b.order : 1000;
+      if (oa !== ob) return oa - ob;
+      return (a.title || a.path).localeCompare(b.title || b.path);
+    });
+
+    // Group by parent folder, build a folder→pages map.
+    var byParent = {};
+    pages.forEach(function (p) {
+      var key = p.parent || '';
+      if (!byParent[key]) byParent[key] = [];
+      byParent[key].push(p);
+    });
+
+    var here = window.location.pathname;
+    function isActive(page) {
+      // page.path is project-relative (e.g., "iceberg.html"); the URL
+      // path may include a longer prefix. Endswith catches the common case.
+      return here.endsWith('/' + page.path);
+    }
+
+    function renderLevel(parentKey, depth) {
+      var ol = document.createElement('ol');
+      ol.className = 'page-nav-level depth-' + depth;
+      var items = byParent[parentKey] || [];
+      items.forEach(function (page) {
+        var li = document.createElement('li');
+        li.className = 'page-nav-item';
+        var anchor = document.createElement('a');
+        anchor.href = relativizeHref(here, page.path);
+        anchor.textContent = page.title || page.path;
+        if (page.summary) anchor.title = page.summary;
+        if (isActive(page)) {
+          li.classList.add('active');
+          anchor.setAttribute('aria-current', 'page');
+        }
+        li.appendChild(anchor);
+        // Children are pages whose parent is the path-without-extension OR a folder ancestor.
+        // We treat sub-folders: build a key based on this page's folder if any pages declare it.
+        var childFolder = page.path.replace(/\.[^/]+$/, '');
+        if (byParent[childFolder] && byParent[childFolder].length) {
+          li.appendChild(renderLevel(childFolder, depth + 1));
+        }
+        ol.appendChild(li);
+      });
+      // Folders that have no own page but have children
+      Object.keys(byParent).forEach(function (folder) {
+        if (folder === parentKey || folder === '' || folder.indexOf(parentKey === '' ? '' : parentKey + '/') !== 0) return;
+        // Direct child folder of parentKey
+        var rest = parentKey === '' ? folder : folder.slice(parentKey.length + 1);
+        if (rest.indexOf('/') !== -1) return; // not a direct child
+        // Skip if already rendered as a page above
+        if (byParent[parentKey].some(function (p) { return p.path.replace(/\.[^/]+$/, '') === folder; })) return;
+        var li = document.createElement('li');
+        li.className = 'page-nav-item folder';
+        var label = document.createElement('div');
+        label.className = 'page-nav-folder';
+        label.textContent = rest;
+        li.appendChild(label);
+        li.appendChild(renderLevel(folder, depth + 1));
+        ol.appendChild(li);
+      });
+      return ol;
+    }
+
+    var root = renderLevel('', 0);
+    tree.appendChild(root);
+  }
+}
+if (!customElements.get('page-nav')) customElements.define('page-nav', PageNav);
+
+function relativizeHref(fromUrl, toPath) {
+  // fromUrl is location.pathname like /a/b/c.html; toPath is the manifest entry like "spark.html" or "storage/iceberg.html".
+  // Compute relative href from the directory of fromUrl to toPath.
+  var fromDir = fromUrl.replace(/[^/]*$/, ''); // ends in '/'
+  // Strip leading slash from fromDir for relative computation.
+  // Use URL constructor for correctness:
+  try {
+    var base = new URL(fromDir, window.location.origin);
+    var target = new URL(toPath, base);
+    // Compute relative from base.pathname to target.pathname
+    var fromParts = base.pathname.split('/');
+    var toParts = target.pathname.split('/');
+    fromParts.pop(); // last is empty
+    var i = 0;
+    while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) i++;
+    var up = fromParts.length - i;
+    var rest = toParts.slice(i).join('/');
+    return (up > 0 ? '../'.repeat(up) : './') + rest;
+  } catch (e) {
+    return toPath;
+  }
+}
+
+/* ============ Forward-compat warning indicator ============ *
+ * One indicator regardless of error count. Sits in the top-right
+ * system cluster. Click reveals a panel listing entries with code +
+ * message. Per-session dismiss; reappears on next load if errors
+ * persist.
+ * ----------------------------------------------------------------- */
+var __htmldocWarnings = (function () {
+  var list = [];
+  var dismissed = false;
+  var btn = null;
+  var panel = null;
+
+  function ensureBtn() {
+    if (btn) return btn;
+    btn = document.createElement('button');
+    btn.className = 'ctrl-btn warning-indicator';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'View warnings');
+    btn.title = 'View warnings';
+    btn.style.display = 'none';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+    document.body.appendChild(btn);
+    btn.addEventListener('click', function () {
+      if (panel && panel.parentNode) {
+        panel.parentNode.removeChild(panel);
+        panel = null;
+      } else {
+        renderPanel();
+      }
+    });
+    return btn;
+  }
+
+  function renderPanel() {
+    panel = document.createElement('div');
+    panel.className = 'warning-panel';
+    var html = '<header><strong>' + list.length + ' warning' + (list.length === 1 ? '' : 's') + '</strong>' +
+               '<button type="button" class="warning-panel-dismiss" aria-label="Dismiss for this session">Dismiss</button></header>';
+    html += '<ul>';
+    list.forEach(function (w) {
+      var levelClass = (w.level === 'error') ? 'level-error' : 'level-warn';
+      html += '<li class="' + levelClass + '"><code>' + (w.code || 'warn') + '</code> ' + escapeHTML(w.msg || '') + '</li>';
+    });
+    html += '</ul>';
+    panel.innerHTML = html;
+    document.body.appendChild(panel);
+    panel.querySelector('.warning-panel-dismiss').addEventListener('click', function () {
+      dismissed = true;
+      hide();
+      if (panel && panel.parentNode) { panel.parentNode.removeChild(panel); panel = null; }
+    });
+  }
+
+  function escapeHTML(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function refresh() {
+    if (dismissed || list.length === 0) {
+      hide();
+      return;
+    }
+    ensureBtn();
+    btn.style.display = 'flex';
+    btn.setAttribute('data-count', String(list.length));
+  }
+
+  function hide() {
+    if (btn) btn.style.display = 'none';
+    if (panel && panel.parentNode) { panel.parentNode.removeChild(panel); panel = null; }
+  }
+
+  function push(entries) {
+    entries.forEach(function (w) { list.push(w); });
+    refresh();
+  }
+
+  // Capture standard error channels too
+  window.addEventListener('error', function (e) {
+    push([{ code: 'window-error', msg: (e.message || 'unknown') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || 0), level: 'error' }]);
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    push([{ code: 'unhandled-rejection', msg: String((e && e.reason && e.reason.message) || e.reason || 'unknown'), level: 'error' }]);
+  });
+
+  return { push: push };
+})();
+
+window.addEventListener('html-doc:warnings', function (e) {
+  if (e && e.detail) __htmldocWarnings.push(e.detail);
+});
+
 /* ============ Rebuild TOC after JSON renderer completes ============ */
 window.addEventListener('html-doc:rendered', function () {
   var tocList = document.querySelector('page-toc .toc-list');
   if (tocList) buildTOC(tocList);
   initReadingAids();
-});
-window.addEventListener('html-doc:warnings', function (e) {
-  // Placeholder hook for the forward-compat warning indicator. The
-  // indicator UI lands in a later build step; for now warnings are in
-  // the console.
-  if (e && e.detail) {
-    e.detail.forEach(function (w) { console.warn('[html-doc warning]', w); });
-  }
 });

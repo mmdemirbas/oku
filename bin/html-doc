@@ -13,7 +13,9 @@ prefix for click-to-open.
 """
 
 import argparse
+import datetime
 import http.server
+import json
 import os
 import re
 import shutil
@@ -23,7 +25,8 @@ import webbrowser
 from pathlib import Path
 
 KIT_ROOT = Path(__file__).resolve().parent.parent
-KIT_FILES = ['chrome.css', 'chrome.js', 'chrome-boot.js']
+KIT_FILES = ['chrome.css', 'chrome.js', 'chrome-boot.js', 'renderer.js']
+SKIP_DIRS = {'dist', '_kit', 'node_modules', '.git', 'venv', '.venv', '__pycache__'}
 
 
 # ---------- file:// printer ----------
@@ -76,6 +79,65 @@ def find_html_files(root: Path):
     return sorted([p for p in root.glob('*.html') if p.is_file() and 'dist' not in p.parts])
 
 
+# ---------- JSON pages + site manifest ----------
+def find_json_pages(root: Path):
+    """Recursively find *.json files where the root object has kind == 'page'.
+
+    Returns list of (path, parsed-data) tuples sorted by path.
+    """
+    pages = []
+    for p in root.rglob('*.json'):
+        if any(part in SKIP_DIRS for part in p.parts):
+            continue
+        if p.name in ('kit.json', 'site-manifest.json', 'package.json', 'tsconfig.json'):
+            continue
+        try:
+            data = json.loads(p.read_text(encoding='utf-8'))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if isinstance(data, dict) and data.get('kind') == 'page':
+            pages.append((p, data))
+    return sorted(pages, key=lambda x: str(x[0]).lower())
+
+
+def build_manifest(root: Path) -> Path:
+    """Walk JSON pages under root, emit site-manifest.json at root.
+
+    Manifest entries: { path, title, parent, order?, summary? }. Folder
+    hierarchy is implicit in the path; the runtime tree-builder groups
+    siblings under their common ancestor path.
+    """
+    pages = find_json_pages(root)
+    entries = []
+    for p, data in pages:
+        rel = p.relative_to(root)
+        # The navigable URL is the sibling HTML stub: page.json → page.html.
+        nav_path = rel.with_suffix('.html').as_posix()
+        # Parent = directory part, or null if at root.
+        parent = rel.parent.as_posix() if rel.parent != Path('.') else None
+        meta = data.get('meta') or {}
+        entry = {
+            'path': nav_path,
+            'source': rel.as_posix(),
+            'title': data.get('title') or p.stem,
+            'parent': parent,
+        }
+        if 'order' in meta:
+            entry['order'] = meta['order']
+        if 'summary' in meta:
+            entry['summary'] = meta['summary']
+        entries.append(entry)
+    manifest = {
+        'schema_version': 1,
+        'generated_at': datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z'),
+        'root': '.',
+        'pages': entries,
+    }
+    out = root / 'site-manifest.json'
+    out.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+    return out
+
+
 def build_site(srcs, out_dir: Path) -> None:
     """Copy HTMLs to out_dir/, copy kit assets to out_dir/assets/, rewrite refs."""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -108,9 +170,17 @@ def build_standalone(srcs, out_dir: Path) -> None:
 def cmd_build(args: argparse.Namespace) -> int:
     root = Path.cwd()
     srcs = find_html_files(root)
-    if not srcs:
-        print(f'✗ No .html files found in {root}', file=sys.stderr)
+    json_pages = find_json_pages(root)
+    if not srcs and not json_pages:
+        print(f'✗ No .html or page-JSON files found in {root}', file=sys.stderr)
         return 1
+
+    # Always regenerate the manifest so <page-nav> sees fresh content.
+    manifest_path = build_manifest(root)
+    print(f'✓ Wrote {manifest_path.relative_to(root)} ({len(json_pages)} JSON page(s))')
+
+    if not srcs:
+        return 0
 
     dist = root / 'dist'
     standalone = dist / 'standalone'
@@ -169,6 +239,12 @@ def cmd_serve(args: argparse.Namespace) -> int:
                 return 1
 
     os.chdir(root)
+    # Refresh the manifest on serve start so <page-nav> reflects current state.
+    try:
+        manifest_path = build_manifest(root)
+        print(f'✓ Refreshed site-manifest: {manifest_path.relative_to(root)}')
+    except OSError as e:
+        print(f'! Could not write manifest: {e}', file=sys.stderr)
     htmls = sorted(p for p in root.rglob('*.html') if 'dist' not in p.parts and 'node_modules' not in p.parts)
 
     print(f'✓ Serving {root} on http://localhost:{port}')
