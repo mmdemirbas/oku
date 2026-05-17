@@ -20,6 +20,7 @@ import os
 import re
 import shutil
 import socketserver
+import subprocess
 import sys
 import webbrowser
 from pathlib import Path
@@ -72,6 +73,7 @@ KIT_REF_RE = re.compile(r'(_kit/(chrome-boot\.js|chrome\.css|chrome\.js))')
 LINK_TO_KIT_CSS = re.compile(r'<link\s+rel="stylesheet"\s+href="_kit/chrome\.css"\s*/?>', re.I)
 SCRIPT_TO_KIT_BOOT = re.compile(r'<script\s+src="_kit/chrome-boot\.js"\s*></script>', re.I)
 SCRIPT_TO_KIT_MAIN = re.compile(r'<script\s+src="_kit/chrome\.js"\s+defer\s*></script>', re.I)
+SCRIPT_TO_KIT_RENDERER = re.compile(r'<script\s+src="_kit/renderer\.js"\s+defer\s*></script>', re.I)
 
 
 def find_html_files(root: Path):
@@ -186,32 +188,206 @@ def build_llms_txt(root: Path) -> Path:
     return out
 
 
-def build_site(srcs, out_dir: Path) -> None:
-    """Copy HTMLs to out_dir/, copy kit assets to out_dir/assets/, rewrite refs."""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    assets = out_dir / 'assets'
-    assets.mkdir(exist_ok=True)
-    for f in KIT_FILES:
-        shutil.copy(KIT_ROOT / f, assets / f)
+# ---------- Pagefind search index ----------
+def pagefind_index(site_dir: Path) -> bool:
+    """Run Pagefind over an HTML site directory.
 
+    Returns True if pagefind ran successfully, False if absent or failed.
+    Pagefind is treated as an optional dependency — search degrades
+    gracefully if it's not installed.
+    """
+    if not site_dir.exists():
+        return False
+    if not shutil.which('pagefind'):
+        # Try npx as a fallback so the binary doesn't have to be installed globally.
+        if shutil.which('npx'):
+            cmd = ['npx', '--yes', 'pagefind', '--site', str(site_dir)]
+        else:
+            print('! pagefind not on PATH; skipping search index.')
+            print('  Install: brew install pagefind  OR  npm i -g pagefind')
+            return False
+    else:
+        cmd = ['pagefind', '--site', str(site_dir)]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0:
+            return True
+        print(f'! pagefind failed (exit {result.returncode})')
+        if result.stderr.strip():
+            print('  stderr:', result.stderr.strip().splitlines()[0])
+        return False
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f'! pagefind exec error: {e}')
+        return False
+
+
+_PAGE_TEXT_KEYS = ('title', 'summary', 'lead', 'caption', 'content', 'def', 'label', 'name', 'text')
+_PAGE_TEXT_LISTS = ('bullets', 'blocks', 'items', 'rows', 'steps', 'tiles', 'columns', 'cards', 'series', 'data')
+
+
+def extract_page_text(page_json: dict) -> str:
+    """Walk a JSON page tree and return concatenated plain text for indexing.
+
+    Includes paragraph content, glossary-term / ext-ref labels, callout
+    titles and bodies, etc. Skips structural-only fields. Strips inline
+    HTML tags that might appear in def/summary strings.
+    """
+    parts = []
+
+    if isinstance(page_json.get('title'), str):
+        parts.append(page_json['title'])
+    meta = page_json.get('meta') or {}
+    for k in ('subtitle', 'summary', 'eyebrow'):
+        if isinstance(meta.get(k), str):
+            parts.append(meta[k])
+
+    def walk(node):
+        if isinstance(node, str):
+            parts.append(node)
+        elif isinstance(node, list):
+            for n in node:
+                walk(n)
+        elif isinstance(node, dict):
+            for k in _PAGE_TEXT_KEYS:
+                if k in node and not isinstance(node[k], (list, dict)):
+                    walk(node[k])
+            for k in _PAGE_TEXT_KEYS:
+                if k in node and isinstance(node[k], list):
+                    walk(node[k])
+            for k in _PAGE_TEXT_LISTS:
+                if k in node:
+                    walk(node[k])
+
+    walk(page_json.get('blocks', []))
+    # Strip inline HTML that may live in glossary defs etc.
+    raw = ' '.join(parts)
+    text = re.sub(r'<[^>]+>', ' ', raw)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+_BODY_CLOSE_RE = re.compile(r'</body>', re.I)
+
+
+def inject_pagefind_body(html: str, text: str, title: str) -> str:
+    """Embed plain-text content in a hidden element for Pagefind to index.
+
+    data-pagefind-body restricts indexing to the marked element; everything
+    else is ignored. data-pagefind-meta carries the title.
+    """
+    # Escape just enough for safety; full HTML escape is fine since this
+    # element is hidden from users.
+    safe_text = (text
+                 .replace('&', '&amp;')
+                 .replace('<', '&lt;')
+                 .replace('>', '&gt;'))
+    safe_title = (title
+                  .replace('&', '&amp;')
+                  .replace('<', '&lt;')
+                  .replace('>', '&gt;'))
+    block = (
+        '<div hidden data-pagefind-body>'
+        f'<h1 data-pagefind-meta="title">{safe_title}</h1>'
+        f'<p>{safe_text}</p>'
+        '</div>'
+    )
+    if _BODY_CLOSE_RE.search(html):
+        return _BODY_CLOSE_RE.sub(lambda m: block + '\n</body>', html, count=1)
+    return html + block
+
+
+def build_site(srcs, out_dir: Path, src_root: Path) -> None:
+    """Build a self-contained multi-page site at out_dir/.
+
+    Layout:
+      dist/site/
+        _kit/              ← chrome.css, chrome.js, chrome-boot.js, renderer.js,
+                              glossary/, extrefs/
+        kit.json           ← copied from src_root if present
+        site-manifest.json ← copied from src_root
+        llms.txt           ← copied from src_root if present
+        *.html             ← each source HTML, kept as-is (refs stay '_kit/...')
+        *.json             ← page JSON for the runtime renderer to fetch
+
+    For each HTML, if a sibling page-JSON exists, inject its extracted
+    text into a hidden data-pagefind-body element so the static
+    Pagefind index has real content to chew on.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    kit_out = out_dir / '_kit'
+    kit_out.mkdir(exist_ok=True)
+
+    # Kit chrome files
+    for f in KIT_FILES:
+        shutil.copy(KIT_ROOT / f, kit_out / f)
+    # Kit registry directories
+    for d in ('glossary', 'extrefs', 'schema'):
+        src_dir = KIT_ROOT / d
+        if src_dir.exists():
+            dst_dir = kit_out / d
+            if dst_dir.exists():
+                shutil.rmtree(dst_dir)
+            shutil.copytree(src_dir, dst_dir)
+
+    # Project-level files that pages depend on at runtime
+    for f in ('kit.json', 'site-manifest.json', 'llms.txt'):
+        sp = src_root / f
+        if sp.exists():
+            shutil.copy(sp, out_dir / f)
+
+    # Page sources (HTML stubs + JSON content)
     for src in srcs:
         html = src.read_text(encoding='utf-8')
-        html = KIT_REF_RE.sub(r'assets/\2', html)
+        json_sibling = src.with_suffix('.json')
+        if json_sibling.exists():
+            shutil.copy(json_sibling, out_dir / json_sibling.name)
+            try:
+                data = json.loads(json_sibling.read_text(encoding='utf-8'))
+                if isinstance(data, dict) and data.get('kind') == 'page':
+                    text = extract_page_text(data)
+                    title = data.get('title') or src.stem
+                    html = inject_pagefind_body(html, text, title)
+            except (json.JSONDecodeError, OSError):
+                pass
         (out_dir / src.name).write_text(html, encoding='utf-8')
 
 
 def build_standalone(srcs, out_dir: Path) -> None:
-    """Inline kit CSS/JS into each HTML; produce single self-contained files."""
+    """Inline kit CSS/JS + the page's JSON content into each HTML.
+
+    Produces single self-contained files that render offline, with no
+    network fetches beyond Google Fonts (and Mermaid if a <diagram>
+    block is present). autoBoot picks up the inline JSON automatically.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
+    def _safe_js(s: str) -> str:
+        # Prevent </script> in code (e.g. inside regexes or strings) from
+        # closing the inline <script> early.
+        return s.replace('</script', '<\\/script')
+
     css = (KIT_ROOT / 'chrome.css').read_text(encoding='utf-8')
-    boot = (KIT_ROOT / 'chrome-boot.js').read_text(encoding='utf-8')
-    main = (KIT_ROOT / 'chrome.js').read_text(encoding='utf-8')
+    boot = _safe_js((KIT_ROOT / 'chrome-boot.js').read_text(encoding='utf-8'))
+    main = _safe_js((KIT_ROOT / 'chrome.js').read_text(encoding='utf-8'))
+    renderer = _safe_js((KIT_ROOT / 'renderer.js').read_text(encoding='utf-8'))
 
     for src in srcs:
         html = src.read_text(encoding='utf-8')
-        html = LINK_TO_KIT_CSS.sub(f'<style>\n{css}\n</style>', html, count=1)
-        html = SCRIPT_TO_KIT_BOOT.sub(f'<script>\n{boot}\n</script>', html, count=1)
-        html = SCRIPT_TO_KIT_MAIN.sub(f'<script>\n{main}\n</script>', html, count=1)
+        html = LINK_TO_KIT_CSS.sub(lambda m: f'<style>\n{css}\n</style>', html, count=1)
+        html = SCRIPT_TO_KIT_BOOT.sub(lambda m: f'<script>\n{boot}\n</script>', html, count=1)
+        html = SCRIPT_TO_KIT_MAIN.sub(lambda m: f'<script>\n{main}\n</script>', html, count=1)
+        html = SCRIPT_TO_KIT_RENDERER.sub(lambda m: f'<script>\n{renderer}\n</script>', html, count=1)
+
+        # Inline the JSON page content so autoBoot finds it offline.
+        json_sibling = src.with_suffix('.json')
+        if json_sibling.exists():
+            data_text = json_sibling.read_text(encoding='utf-8')
+            # Escape </script in the JSON to be safe inside an inline script.
+            safe = data_text.replace('</script', '<\\/script')
+            inline = f'<script type="application/json" id="__htmldoc_page__">{safe}</script>'
+            # Lambda replacement avoids re.sub interpreting \n in the JSON
+            # content as a backslash escape and turning it into a newline.
+            html = _BODY_CLOSE_RE.sub(lambda m: inline + '\n</body>', html, count=1)
+
         (out_dir / src.name).write_text(html, encoding='utf-8')
 
 
@@ -243,7 +419,11 @@ def cmd_build(args: argparse.Namespace) -> int:
         shutil.rmtree(site)
 
     build_standalone(srcs, standalone)
-    build_site(srcs, site)
+    build_site(srcs, site, root)
+
+    # Pagefind search index — soft-fail if pagefind isn't installed.
+    if pagefind_index(site):
+        print(f'✓ Pagefind index built: dist/site/pagefind/')
 
     print(f'✓ Built {len(srcs)} HTML file(s):')
     print()

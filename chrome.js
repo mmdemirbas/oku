@@ -451,6 +451,13 @@ var __htmldocKit = (function () {
 
   function load() {
     if (loaded) return Promise.resolve(kit);
+    // Standalone build: no project kit.json on disk — degrade silently.
+    if (document.getElementById('__htmldoc_page__')) {
+      loaded = true;
+      waiters.forEach(function (w) { w(kit); });
+      waiters = [];
+      return Promise.resolve(kit);
+    }
     // Project config lives next to the page; domain files live in _kit/.
     return fetch('kit.json', { cache: 'no-cache' })
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -557,7 +564,14 @@ var __htmldocKit = (function () {
     return new Promise(function (resolve) { waiters.push(resolve); });
   }
 
-  load();
+  // Defer the initial load until the document is parsed so the standalone
+  // detection (looking for the inline page-data script) can see the tag
+  // that gets parsed later in body.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', load);
+  } else {
+    load();
+  }
 
   return {
     load: load,
@@ -910,12 +924,26 @@ class PageNav extends HTMLElement {
       if (e.key === 'Escape') self.classList.remove('open');
     });
 
-    fetch('site-manifest.json', { cache: 'no-cache' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .catch(function () { return null; })
-      .then(function (manifest) {
-        self._renderTree(manifest);
-      });
+    // Defer until the document is fully parsed so we can reliably detect
+    // the standalone-build inline page-data script (which sits at the
+    // end of body, after <page-nav>).
+    function start() {
+      if (document.getElementById('__htmldoc_page__')) {
+        self.style.display = 'none';
+        return;
+      }
+      fetch('site-manifest.json', { cache: 'no-cache' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; })
+        .then(function (manifest) {
+          self._renderTree(manifest);
+        });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', start);
+    } else {
+      start();
+    }
   }
 
   _renderTree(manifest) {
@@ -1122,6 +1150,151 @@ var __htmldocWarnings = (function () {
 window.addEventListener('html-doc:warnings', function (e) {
   if (e && e.detail) __htmldocWarnings.push(e.detail);
 });
+
+/* ============ Pagefind search ============ *
+ * Search button in the top-right system cluster opens a modal with
+ * an input + result list. Pagefind is loaded lazily on first invoke;
+ * if the bundle is absent (e.g., dev mode without a build) the modal
+ * shows a graceful message.
+ * ----------------------------------------------------------------- */
+var __htmldocSearch = (function () {
+  var pagefindPromise = null;
+  var modal = null;
+  var btn = null;
+
+  function loadPagefind() {
+    if (pagefindPromise) return pagefindPromise;
+    // Resolve pagefind relative to the kit. _kit/../pagefind covers both
+    // the standalone-build layout (where pagefind sits next to the HTML)
+    // and a custom override.
+    // ES dynamic import needs a relative-resolved URL ('./...') or absolute.
+    var candidates = ['./pagefind/pagefind.js', './_kit/pagefind/pagefind.js'];
+    pagefindPromise = candidates.reduce(function (acc, rel) {
+      return acc.catch(function () {
+        var abs = new URL(rel, window.location.href).href;
+        return import(/* @vite-ignore */ abs).then(function (mod) {
+          if (mod && mod.search) return mod;
+          throw new Error('pagefind module shape unexpected');
+        });
+      });
+    }, Promise.reject(new Error('init')));
+    return pagefindPromise;
+  }
+
+  function ensureModal() {
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.className = 'search-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Search');
+    modal.innerHTML =
+      '<div class="search-backdrop"></div>' +
+      '<div class="search-panel">' +
+        '<header class="search-header">' +
+          '<input type="search" class="search-input" placeholder="Search the site…" aria-label="Search query" autocomplete="off">' +
+          '<button type="button" class="search-close" aria-label="Close">Esc</button>' +
+        '</header>' +
+        '<div class="search-status"></div>' +
+        '<ul class="search-results"></ul>' +
+      '</div>';
+    document.body.appendChild(modal);
+    var input = modal.querySelector('.search-input');
+    var status = modal.querySelector('.search-status');
+    var resultsEl = modal.querySelector('.search-results');
+
+    var t = null;
+    input.addEventListener('input', function () {
+      if (t) clearTimeout(t);
+      var query = input.value.trim();
+      if (!query) {
+        resultsEl.innerHTML = '';
+        status.textContent = '';
+        return;
+      }
+      t = setTimeout(function () { runSearch(query, status, resultsEl); }, 180);
+    });
+    modal.querySelector('.search-backdrop').addEventListener('click', hide);
+    modal.querySelector('.search-close').addEventListener('click', hide);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal.classList.contains('open')) hide();
+    });
+    return modal;
+  }
+
+  function runSearch(query, status, resultsEl) {
+    status.textContent = 'Searching…';
+    resultsEl.innerHTML = '';
+    loadPagefind()
+      .then(function (pagefind) {
+        return pagefind.search(query);
+      })
+      .then(function (search) {
+        if (!search.results.length) {
+          status.textContent = 'No results.';
+          return;
+        }
+        status.textContent = search.results.length + ' result' + (search.results.length === 1 ? '' : 's');
+        // Resolve top 10 results' data
+        return Promise.all(search.results.slice(0, 10).map(function (r) { return r.data(); }))
+          .then(function (datas) {
+            resultsEl.innerHTML = '';
+            datas.forEach(function (d) {
+              var li = document.createElement('li');
+              li.className = 'search-result';
+              li.innerHTML =
+                '<a href="' + d.url + '">' +
+                  '<div class="search-result-title">' + (d.meta && d.meta.title ? d.meta.title : d.url) + '</div>' +
+                  '<div class="search-result-excerpt">' + (d.excerpt || '') + '</div>' +
+                '</a>';
+              resultsEl.appendChild(li);
+            });
+          });
+      })
+      .catch(function (err) {
+        var msg = String((err && err.message) || err);
+        if (/pagefind|404|404|Not Found|fetch/i.test(msg)) {
+          status.innerHTML = 'Search index not found. Run <code>html-doc build</code> and view from <code>dist/site/</code>.';
+        } else {
+          status.textContent = 'Search error: ' + msg;
+        }
+      });
+  }
+
+  function show() {
+    var m = ensureModal();
+    m.classList.add('open');
+    var input = m.querySelector('.search-input');
+    setTimeout(function () { input.focus(); }, 20);
+  }
+  function hide() {
+    if (modal) modal.classList.remove('open');
+  }
+
+  function addButton() {
+    if (btn) return;
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ctrl-btn search-toggle';
+    btn.setAttribute('aria-label', 'Search (Cmd/Ctrl+K)');
+    btn.title = 'Search (⌘K)';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>';
+    document.body.appendChild(btn);
+    btn.addEventListener('click', show);
+  }
+
+  document.addEventListener('keydown', function (e) {
+    var k = (e.key || '').toLowerCase();
+    if ((e.metaKey || e.ctrlKey) && k === 'k') {
+      e.preventDefault();
+      show();
+    }
+  });
+
+  return { addButton: addButton, show: show };
+})();
+
+document.addEventListener('DOMContentLoaded', function () { __htmldocSearch.addButton(); });
 
 /* ============ Rebuild TOC after JSON renderer completes ============ */
 window.addEventListener('html-doc:rendered', function () {

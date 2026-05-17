@@ -991,3 +991,127 @@ html-doc-snippet .hds-preview {
   html-doc-snippet .hds-body { grid-template-columns: 1fr; }
   html-doc-snippet .hds-editor { border-right: 0; border-bottom: 1px solid var(--border); }
 }
+
+/* ============================================================
+   Pagefind search — button + modal
+   ============================================================ */
+.ctrl-btn.search-toggle {
+  /* Top-right system cluster, sits between the (optional) warning
+     indicator and the theme cycler. */
+  position: fixed;
+  top: 16px;
+  right: 136px; /* 16 (theme right) + 44 (theme width) + 16 (gap) + 44 (warn width) + 16 (gap) */
+  z-index: 210;
+}
+/* When the warning indicator is hidden, search slots in at the warning's spot. */
+body:has(.warning-indicator[style*="display: none"]) .ctrl-btn.search-toggle,
+body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
+  right: 76px;
+}
+
+.search-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8vh;
+}
+.search-modal.open { display: flex; }
+.search-modal .search-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+}
+.search-modal .search-panel {
+  position: relative;
+  width: 92%;
+  max-width: 620px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+  overflow: hidden;
+  animation: search-in 0.15s ease;
+}
+@keyframes search-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.search-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.search-input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font: 500 16px 'Inter', sans-serif;
+  color: var(--text);
+  outline: none;
+  padding: 4px 0;
+}
+.search-input::placeholder { color: var(--text-faint); }
+.search-close {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font: 600 11px 'JetBrains Mono', monospace;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.search-close:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.search-status {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-soft);
+  border-bottom: 1px solid var(--border);
+}
+.search-status:empty { display: none; }
+.search-status code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--text);
+}
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+.search-result a {
+  display: block;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text);
+  text-decoration: none;
+}
+.search-result a:hover { background: var(--surface-2); }
+.search-result-title {
+  font-weight: 600;
+  color: var(--accent-strong);
+  margin-bottom: 4px;
+}
+.search-result-excerpt {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+.search-result mark {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  padding: 0 2px;
+  border-radius: 2px;
+}

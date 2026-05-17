@@ -566,5 +566,32 @@
     }
   }
 
+  /**
+   * Auto-boot: pick up inline JSON if present, else fetch by URL.
+   *
+   *   <script type="application/json" id="__htmldoc_page__">
+   *     { "kind": "page", "title": "...", ... }
+   *   </script>
+   *
+   * Standalone builds (html-doc build → dist/standalone/) inline the
+   * JSON via that tag so the page renders without a network fetch.
+   * Dev pages and the dist/site/ build fall through to fetching the
+   * sibling *.json file derived from the current URL.
+   */
+  HtmlDocRenderer.autoBoot = function (opts) {
+    const inline = document.getElementById('__htmldoc_page__');
+    if (inline) {
+      try {
+        const data = JSON.parse(inline.textContent);
+        return new HtmlDocRenderer(opts || {}).render(data);
+      } catch (e) {
+        console.error('[html-doc] inline page parse failed', e);
+      }
+    }
+    const last = window.location.pathname.split('/').pop() || '';
+    const jsonName = last.replace(/\.html$/, '.json') || 'index.json';
+    return new HtmlDocRenderer(opts || {}).renderFromUrl(jsonName);
+  };
+
   window.HtmlDocRenderer = HtmlDocRenderer;
 })();

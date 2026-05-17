@@ -1,0 +1,39 @@
+{
+  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "{{ TITLE }}",
+  "accent": "teal",
+  "meta": {
+    "eyebrow": "{{ EYEBROW }}",
+    "subtitle": "{{ SUBTITLE }}",
+    "audience": "{{ AUDIENCE }}",
+    "date": "{{ DATE }}",
+    "read_time": "{{ READ_TIME }}",
+    "order": 10,
+    "summary": "{{ ONE_LINE_SUMMARY }}"
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "{{ ONE_LINE_SUMMARY }}",
+      "bullets": [
+        "{{ KEY_POINT_1 }}",
+        "{{ KEY_POINT_2 }}",
+        "{{ KEY_POINT_3 }}"
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "overview",
+      "title": "{{ SECTION_1_TITLE }}",
+      "lead": "{{ SECTION_1_LEAD }}",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": "{{ PROSE }}"
+        }
+      ]
+    }
+  ]
+}
