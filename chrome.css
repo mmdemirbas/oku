@@ -389,6 +389,140 @@ code:not(pre code) {
   color: var(--accent-strong);
 }
 
+/* ============ Wide tables — scroll wrap + view selector + expand ============ *
+ * chrome.js wraps every <table> in .hdt-table-wrap with:
+ *   .hdt-table-controls  → top-right view buttons + expand
+ *   .hdt-table-scroll    → horizontal-scroll viewport for the original table
+ *   .hdt-table-cards     → row-per-card grid (auto-generated if <thead>)
+ *   .hdt-table-list      → definition-list per row (auto-generated)
+ * Edge-fade shadows on the scroll viewport hint at overflow; the expand
+ * button breaks the table out of <main>'s max-width via negative margins. */
+.hdt-table-wrap {
+  position: relative;
+  margin: 24px 0;
+  transition: margin 0.2s ease;
+}
+.hdt-table-wrap.expanded {
+  /* Stretch into the empty gutter on either side of <main>. The amount
+     of overflow caps at half the viewport minus half the main width;
+     the 24px breathing-room keeps the table from kissing the panes. */
+  margin-left:  calc(-1 * max(0px, (100vw - var(--max-width)) / 2 - 24px));
+  margin-right: calc(-1 * max(0px, (100vw - var(--max-width)) / 2 - 24px));
+}
+.hdt-table-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+  opacity: 0.45;
+  transition: opacity 0.18s ease;
+}
+.hdt-table-wrap:hover .hdt-table-controls,
+.hdt-table-wrap:focus-within .hdt-table-controls,
+.hdt-table-wrap.expanded .hdt-table-controls { opacity: 1; }
+.hdt-table-controls button {
+  font: 600 11px 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+  background: var(--surface);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.hdt-table-controls button[data-expand] { padding: 4px 6px; }
+.hdt-table-controls button[data-expand] svg { width: 14px; height: 14px; }
+.hdt-table-controls button.active,
+.hdt-table-controls button:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  border-color: var(--accent);
+}
+.hdt-table-controls button:active { transform: scale(0.95); }
+.hdt-table-controls button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.hdt-ctrl-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+}
+.hdt-table-scroll {
+  overflow-x: auto;
+  border-radius: 8px;
+  /* Edge fade shadows hint at horizontal overflow. */
+  background:
+    linear-gradient(to right, var(--surface) 30%, transparent),
+    linear-gradient(to right, transparent, var(--surface) 70%) 100% 0,
+    radial-gradient(farthest-side at 0   50%, var(--shadow-strong), transparent),
+    radial-gradient(farthest-side at 100% 50%, var(--shadow-strong), transparent) 100% 0;
+  background-repeat: no-repeat;
+  background-color: var(--surface);
+  background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+.hdt-table-scroll > table {
+  margin: 0;
+  min-width: 100%;
+  width: max-content;
+}
+
+/* Cards view — auto-fit grid, key/value stack per cell */
+.hdt-table-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.hdt-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.hdt-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.hdt-card-row { margin-bottom: 10px; }
+.hdt-card-row:last-child { margin-bottom: 0; }
+.hdt-card-key {
+  display: block;
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-soft);
+  margin-bottom: 2px;
+}
+.hdt-card-val { display: block; font-size: 13.5px; color: var(--text); line-height: 1.45; }
+
+/* List view — dl per row, separated lines between rows */
+.hdt-table-list dl { margin: 0; }
+.hdt-table-list dl.hdt-list-sep {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 14px;
+  margin-top: 14px;
+}
+.hdt-table-list dt {
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-soft);
+  margin-top: 10px;
+}
+.hdt-table-list dt:first-child { margin-top: 0; }
+.hdt-table-list dd {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
 /* ============ Prism syntax tokens (themed via chrome vars) ============ *
  * Prism is lazy-loaded from a CDN by chrome.js when at least one
  * <code class="language-..."> block exists. Tokens derive from the same

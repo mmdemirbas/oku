@@ -390,6 +390,115 @@ function initReadingAids() {
     __prismLoader.highlightAll();
   }
 
+  /* Wide-table support: every plain <table> gets a scrollable wrapper,
+     a "Table | Cards | List" view toggle, and a full-width expand button.
+     Wrapper is idempotent — re-running initReadingAids leaves bound tables
+     alone. Tables inside tooltips, callouts or chart/diagram elements
+     are skipped. Cards and List views are only generated when the table
+     has a <thead> to source keys from. */
+  document.querySelectorAll('table:not([data-hdt-bound])').forEach(function (table) {
+    if (table.closest('.hdt-table-scroll, .html-doc-tooltip, html-doc-chart, html-doc-diagram')) return;
+    table.setAttribute('data-hdt-bound', '1');
+
+    var headers = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) { return th.innerHTML; });
+    var rowEls  = table.querySelectorAll('tbody tr');
+    if (!rowEls.length) {
+      rowEls = table.querySelectorAll('tr');
+    }
+    var rows = Array.prototype.map.call(rowEls, function (tr) {
+      return Array.prototype.map.call(tr.querySelectorAll('td'), function (td) { return td.innerHTML; });
+    }).filter(function (r) { return r.length; });
+
+    var canPivot = headers.length > 0 && rows.length > 0;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'hdt-table-wrap';
+
+    var ctrl = document.createElement('div');
+    ctrl.className = 'hdt-table-controls';
+    var viewBtns = canPivot ? (
+      '<button data-view="table" type="button" class="active" aria-pressed="true">Table</button>' +
+      '<button data-view="cards" type="button" aria-pressed="false">Cards</button>' +
+      '<button data-view="list"  type="button" aria-pressed="false">List</button>' +
+      '<span class="hdt-ctrl-sep" aria-hidden="true"></span>'
+    ) : '';
+    ctrl.innerHTML =
+      viewBtns +
+      '<button data-expand type="button" aria-pressed="false" title="Toggle full-width">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
+      '</button>';
+
+    var scroll = document.createElement('div');
+    scroll.className = 'hdt-table-scroll';
+
+    table.parentNode.insertBefore(wrap, table);
+    scroll.appendChild(table);
+    wrap.appendChild(ctrl);
+    wrap.appendChild(scroll);
+
+    if (canPivot) {
+      // Cards: each row as a stacked key:value card.
+      var cards = document.createElement('div');
+      cards.className = 'hdt-table-cards';
+      cards.hidden = true;
+      rows.forEach(function (row) {
+        var card = document.createElement('div');
+        card.className = 'hdt-card';
+        row.forEach(function (cell, i) {
+          if (!headers[i]) return;
+          var r = document.createElement('div');
+          r.className = 'hdt-card-row';
+          r.innerHTML =
+            '<span class="hdt-card-key">' + headers[i] + '</span>' +
+            '<span class="hdt-card-val">' + cell + '</span>';
+          card.appendChild(r);
+        });
+        cards.appendChild(card);
+      });
+      wrap.appendChild(cards);
+
+      // List: each row as a definition list.
+      var list = document.createElement('div');
+      list.className = 'hdt-table-list';
+      list.hidden = true;
+      rows.forEach(function (row, rIdx) {
+        var dl = document.createElement('dl');
+        if (rIdx > 0) dl.classList.add('hdt-list-sep');
+        row.forEach(function (cell, i) {
+          if (!headers[i]) return;
+          var dt = document.createElement('dt'); dt.innerHTML = headers[i];
+          var dd = document.createElement('dd'); dd.innerHTML = cell;
+          dl.appendChild(dt); dl.appendChild(dd);
+        });
+        list.appendChild(dl);
+      });
+      wrap.appendChild(list);
+
+      // View-toggle handler
+      ctrl.querySelectorAll('[data-view]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var view = btn.getAttribute('data-view');
+          ctrl.querySelectorAll('[data-view]').forEach(function (b) {
+            var active = b === btn;
+            b.classList.toggle('active', active);
+            b.setAttribute('aria-pressed', active ? 'true' : 'false');
+          });
+          scroll.hidden = view !== 'table';
+          cards.hidden  = view !== 'cards';
+          list.hidden   = view !== 'list';
+        });
+      });
+    }
+
+    // Full-width toggle
+    var expBtn = ctrl.querySelector('[data-expand]');
+    expBtn.addEventListener('click', function () {
+      var expanded = wrap.classList.toggle('expanded');
+      expBtn.classList.toggle('active', expanded);
+      expBtn.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+    });
+  });
+
   /* Glossary tooltip — legacy v1 .g-wrap mobile tap support. The new
      tooltip controller attaches its own listeners; this remains for
      hand-authored HTML using the legacy class. Per-element handler
