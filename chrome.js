@@ -48,6 +48,11 @@ const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
 const ICON_SYSTEM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
 const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+const ICON_CLIPBOARD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>';
+const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+const ICON_CROSS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
+const ICON_BRACES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2"/><path d="M16 3a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2"/></svg>';
+const ICON_CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
 
 /* ============ Three-mode theme cycler (system → light → dark → system) ============ */
 function getThemeMode() {
@@ -342,7 +347,8 @@ function initReadingAids() {
   }
 
   /* Copy-to-clipboard on every <pre> block — re-runs safely; already
-     guarded by `if (pre.querySelector('.copy-btn')) return`. */
+     guarded by `if (pre.querySelector('.copy-btn')) return`. Icon-only
+     (clipboard → checkmark on success → cross on failure). */
   (function () {
     if (!navigator.clipboard) return;
     document.querySelectorAll('pre').forEach(function (pre) {
@@ -350,19 +356,27 @@ function initReadingAids() {
       var btn = document.createElement('button');
       btn.className = 'copy-btn';
       btn.type = 'button';
-      btn.textContent = 'Copy';
+      btn.innerHTML = ICON_CLIPBOARD;
+      btn.title = 'Copy code to clipboard';
       btn.setAttribute('aria-label', 'Copy code to clipboard');
       pre.appendChild(btn);
       btn.addEventListener('click', function () {
         var code = pre.querySelector('code');
-        var text = code ? code.textContent : pre.textContent.replace(/Copy$/, '').trim();
+        var text = code ? code.textContent : pre.textContent;
         navigator.clipboard.writeText(text).then(function () {
-          btn.textContent = 'Copied';
-          btn.classList.add('copied');
-          setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+          btn.innerHTML = ICON_CHECK;
+          btn.classList.add('copied'); btn.classList.remove('error');
+          setTimeout(function () {
+            btn.innerHTML = ICON_CLIPBOARD;
+            btn.classList.remove('copied');
+          }, 1500);
         }).catch(function () {
-          btn.textContent = 'Error';
-          setTimeout(function () { btn.textContent = 'Copy'; }, 1500);
+          btn.innerHTML = ICON_CROSS;
+          btn.classList.add('error'); btn.classList.remove('copied');
+          setTimeout(function () {
+            btn.innerHTML = ICON_CLIPBOARD;
+            btn.classList.remove('error');
+          }, 1500);
         });
       });
     });
@@ -905,6 +919,21 @@ class HtmlDocChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.insertAdjacentHTML('beforeend', parts.join(''));
+
+    var self = this;
+    var chartTitle = title || (type + '-chart');
+    __htmldocVisualTools.makeToolbar(this, [
+      {
+        title: 'Download as PNG',
+        icon: ICON_CAMERA,
+        run: function (btn) {
+          var svg = self.querySelector('.hdc-svg');
+          __htmldocVisualTools.svgToPng(svg, chartTitle)
+            .then(function () { __htmldocVisualTools.flash(btn, 'ok', ICON_CAMERA); })
+            .catch(function () { __htmldocVisualTools.flash(btn, 'fail', ICON_CAMERA); });
+        }
+      }
+    ]);
   }
 }
 if (!customElements.get('html-doc-chart')) customElements.define('html-doc-chart', HtmlDocChart);
@@ -920,6 +949,151 @@ function fmtNum(n) {
   if (abs >= 1) return n.toFixed(1).replace(/\.0$/, '');
   return n.toFixed(2);
 }
+
+/* ============ Visual-tools toolbar (diagrams + charts) ============ *
+ * Shared helpers for icon-only Copy / Screenshot buttons on charts and
+ * diagrams. Toolbar reveals on hover/focus-within; buttons flash green
+ * (success) or red (failure) for 1.5s.
+ * -------------------------------------------------------------------- */
+var __htmldocVisualTools = (function () {
+  function flash(btn, kind, restoreIcon) {
+    var icon = kind === 'ok' ? ICON_CHECK : ICON_CROSS;
+    var cls  = kind === 'ok' ? 'flash-ok' : 'flash-fail';
+    btn.innerHTML = icon;
+    btn.classList.add(cls);
+    setTimeout(function () {
+      btn.classList.remove(cls);
+      btn.innerHTML = restoreIcon;
+    }, 1500);
+  }
+
+  function copyText(btn, text, restoreIcon) {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(text)
+      .then(function () { flash(btn, 'ok', restoreIcon); })
+      .catch(function () { flash(btn, 'fail', restoreIcon); });
+  }
+
+  function slugifyFilename(s) {
+    return String(s || 'diagram')
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 60) || 'diagram';
+  }
+
+  /* Render an SVG element to PNG and trigger a download.
+     CSS variables don't survive serialization (they resolve against
+     the document, not the cloned SVG), so we inline currentColor and
+     a fixed --bg fallback. 2× DPR for crisp output. */
+  function svgToPng(svgEl, filename) {
+    if (!svgEl) { return Promise.reject(new Error('no svg')); }
+    return new Promise(function (resolve, reject) {
+      try {
+        var bbox = svgEl.getBoundingClientRect();
+        var w = bbox.width || (svgEl.viewBox && svgEl.viewBox.baseVal && svgEl.viewBox.baseVal.width)  || 800;
+        var h = bbox.height || (svgEl.viewBox && svgEl.viewBox.baseVal && svgEl.viewBox.baseVal.height) || 600;
+
+        // Clone so we don't mutate the live diagram.
+        var clone = svgEl.cloneNode(true);
+        if (!clone.getAttribute('xmlns')) {
+          clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        }
+        if (!clone.getAttribute('width'))  clone.setAttribute('width',  w);
+        if (!clone.getAttribute('height')) clone.setAttribute('height', h);
+        // Inline computed CSS so var(--token) usages resolve through the
+        // browser before serialization.
+        inlineComputedStyles(svgEl, clone);
+
+        var xml = new XMLSerializer().serializeToString(clone);
+        var bg  = getComputedStyle(document.body).backgroundColor || '#ffffff';
+        var blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var img = new Image();
+        img.onload = function () {
+          var scale = Math.max(window.devicePixelRatio || 1, 2);
+          var canvas = document.createElement('canvas');
+          canvas.width  = Math.round(w * scale);
+          canvas.height = Math.round(h * scale);
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.setTransform(scale, 0, 0, scale, 0, 0);
+          ctx.drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          canvas.toBlob(function (pngBlob) {
+            if (!pngBlob) { reject(new Error('toBlob failed')); return; }
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(pngBlob);
+            a.download = slugifyFilename(filename) + '.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 100);
+            resolve();
+          }, 'image/png');
+        };
+        img.onerror = function (e) { URL.revokeObjectURL(url); reject(e); };
+        img.src = url;
+      } catch (e) { reject(e); }
+    });
+  }
+
+  /* Inline computed styles from a live element tree onto a clone so
+     CSS-variable-driven colors survive serialization. Walks both trees
+     in lockstep. Property list kept short; pulling all of getComputedStyle
+     bloats the SVG and slows large diagrams. */
+  var STYLE_PROPS = ['fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'font-family', 'font-size', 'font-weight', 'text-anchor', 'color', 'opacity'];
+  function inlineComputedStyles(live, clone) {
+    if (!live || !clone) return;
+    if (live.nodeType === 1 && clone.nodeType === 1) {
+      var cs = getComputedStyle(live);
+      var s = '';
+      for (var i = 0; i < STYLE_PROPS.length; i++) {
+        var v = cs.getPropertyValue(STYLE_PROPS[i]);
+        if (v && v !== 'normal' && v !== 'none' && v !== '') {
+          s += STYLE_PROPS[i] + ':' + v + ';';
+        }
+      }
+      if (s) {
+        var existing = clone.getAttribute('style') || '';
+        clone.setAttribute('style', s + existing);
+      }
+    }
+    var lc = live.children, cc = clone.children;
+    if (!lc || !cc) return;
+    for (var j = 0; j < lc.length && j < cc.length; j++) {
+      inlineComputedStyles(lc[j], cc[j]);
+    }
+  }
+
+  function makeToolbar(host, actions) {
+    if (!host) return null;
+    var existing = host.querySelector(':scope > .hdt-bar');
+    if (existing) existing.remove();
+    host.classList.add('hdt-host');
+    var bar = document.createElement('div');
+    bar.className = 'hdt-bar';
+    actions.forEach(function (a) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.title = a.title;
+      btn.setAttribute('aria-label', a.title);
+      btn.innerHTML = a.icon;
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        try { a.run(btn); }
+        catch (err) { flash(btn, 'fail', a.icon); }
+      });
+      bar.appendChild(btn);
+    });
+    host.appendChild(bar);
+    return bar;
+  }
+
+  return { makeToolbar: makeToolbar, copyText: copyText, svgToPng: svgToPng, flash: flash };
+})();
 
 /* ============ <html-doc-diagram> — Mermaid (lazy-loaded) ============ */
 var __mermaidLoader = (function () {
@@ -988,6 +1162,7 @@ class HtmlDocDiagram extends HTMLElement {
         return mermaid.render(id, src).then(function (out) {
           renderHost.innerHTML = out.svg;
           self._rendered = true;
+          self._attachToolbar();
         });
       })
       .catch(function (err) {
@@ -997,16 +1172,51 @@ class HtmlDocDiagram extends HTMLElement {
         }));
       });
   }
+  _attachToolbar() {
+    var self = this;
+    var caption = this.getAttribute('caption') || 'diagram';
+    __htmldocVisualTools.makeToolbar(this, [
+      {
+        title: 'Copy diagram source',
+        icon: ICON_CLIPBOARD,
+        run: function (btn) {
+          __htmldocVisualTools.copyText(btn, self._src || '', ICON_CLIPBOARD);
+        }
+      },
+      {
+        title: 'Copy rendered SVG markup',
+        icon: ICON_BRACES,
+        run: function (btn) {
+          var svg = self.querySelector('.hdd-render svg');
+          if (!svg) { __htmldocVisualTools.flash(btn, 'fail', ICON_BRACES); return; }
+          var xml = new XMLSerializer().serializeToString(svg);
+          __htmldocVisualTools.copyText(btn, xml, ICON_BRACES);
+        }
+      },
+      {
+        title: 'Download as PNG',
+        icon: ICON_CAMERA,
+        run: function (btn) {
+          var svg = self.querySelector('.hdd-render svg');
+          __htmldocVisualTools.svgToPng(svg, caption || 'diagram')
+            .then(function () { __htmldocVisualTools.flash(btn, 'ok', ICON_CAMERA); })
+            .catch(function () { __htmldocVisualTools.flash(btn, 'fail', ICON_CAMERA); });
+        }
+      }
+    ]);
+  }
   rerender() {
     if (!this._src) return;
     var renderHost = this.querySelector('.hdd-render');
+    var self = this;
     __mermaidLoader.reset();
     __mermaidLoader.load().then(function (mermaid) {
       var id = 'hdd-' + Math.random().toString(36).slice(2, 9);
-      return mermaid.render(id, this._src).then(function (out) {
+      return mermaid.render(id, self._src).then(function (out) {
         renderHost.innerHTML = out.svg;
+        self._attachToolbar();
       });
-    }.bind(this)).catch(function () { /* swallow */ });
+    }).catch(function () { /* swallow */ });
   }
 }
 if (!customElements.get('html-doc-diagram')) customElements.define('html-doc-diagram', HtmlDocDiagram);
