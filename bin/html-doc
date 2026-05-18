@@ -17,11 +17,14 @@ import datetime
 import http.server
 import json
 import os
+import queue
 import re
 import shutil
 import socketserver
 import subprocess
 import sys
+import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -578,6 +581,135 @@ def find_project_root(start: Path) -> Path:
     return start
 
 
+# ---------- Live-reload (SSE + filesystem watcher) ----------
+_SSE_CLIENTS: list = []
+_SSE_LOCK = threading.Lock()
+
+
+def _sse_broadcast(msg: str = 'change') -> None:
+    """Push a message to every connected SSE client. Best-effort — slow or
+    disconnected clients are silently dropped on the next sweep when the
+    handler thread observes the broken socket."""
+    with _SSE_LOCK:
+        for q in list(_SSE_CLIENTS):
+            try:
+                q.put_nowait(msg)
+            except queue.Full:
+                pass
+
+
+_WATCH_SKIP = {'dist', '_kit', '.git', 'node_modules', '.venv', 'venv', '__pycache__', '.idea'}
+_WATCH_SKIP_SUFFIX = {'.pyc', '.swp', '.tmp'}
+_WATCH_SKIP_NAMES = {'.DS_Store', 'site-manifest.json', 'llms.txt'}  # avoid feedback loop
+
+
+def _snapshot_tree(root: Path) -> dict:
+    """Map every file under root → mtime, skipping generated / VCS dirs.
+    Excludes site-manifest.json + llms.txt to avoid the rebuild→change loop."""
+    state = {}
+    for p in root.rglob('*'):
+        if not p.is_file():
+            continue
+        parts = p.parts
+        if any(part in _WATCH_SKIP for part in parts):
+            continue
+        if p.suffix in _WATCH_SKIP_SUFFIX or p.name in _WATCH_SKIP_NAMES:
+            continue
+        try:
+            state[str(p)] = p.stat().st_mtime
+        except OSError:
+            continue
+    return state
+
+
+def _watcher_loop(root: Path, stop: threading.Event) -> None:
+    """Polling watcher (no external deps). Detects adds/deletes/modifies
+    every ~400ms, debounces bursts within 200ms, rebuilds site-manifest +
+    llms.txt, then broadcasts to SSE clients. Uses os.stat — light enough
+    for the kinds of repo sizes html-doc targets (≤ a few hundred files)."""
+    last = _snapshot_tree(root)
+    while not stop.is_set():
+        if stop.wait(0.4):
+            break
+        cur = _snapshot_tree(root)
+        if cur == last:
+            continue
+        # Debounce — pause briefly, re-sample to let an editor finish a
+        # multi-file save.
+        time.sleep(0.2)
+        cur = _snapshot_tree(root)
+        last = cur
+        try:
+            build_manifest(root)
+            build_llms_txt(root)
+        except OSError:
+            pass
+        _sse_broadcast('change')
+
+
+def _make_serve_handler(root: Path):
+    """Subclass SimpleHTTPRequestHandler with a /__reload SSE endpoint and
+    quiet logging for the keepalive ticks."""
+
+    class _Handler(http.server.SimpleHTTPRequestHandler):
+        # Serve from the captured root regardless of process cwd changes
+        # later in the lifetime.
+        def __init__(self, *a, **kw):
+            super().__init__(*a, directory=str(root), **kw)
+
+        def do_GET(self) -> None:  # noqa: N802 — base API
+            if self.path == '/__reload':
+                self._serve_reload_stream()
+                return
+            super().do_GET()
+
+        def _serve_reload_stream(self) -> None:
+            try:
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream')
+                self.send_header('Cache-Control', 'no-cache, no-transform')
+                self.send_header('Connection', 'keep-alive')
+                self.send_header('X-Accel-Buffering', 'no')
+                self.end_headers()
+            except (BrokenPipeError, ConnectionResetError):
+                return
+            q: queue.Queue = queue.Queue(maxsize=8)
+            with _SSE_LOCK:
+                _SSE_CLIENTS.append(q)
+            try:
+                self.wfile.write(b': hello\n\n')
+                self.wfile.flush()
+                while True:
+                    try:
+                        msg = q.get(timeout=25)
+                        self.wfile.write(f'data: {msg}\n\n'.encode('utf-8'))
+                        self.wfile.flush()
+                    except queue.Empty:
+                        # keepalive comment — many proxies drop idle SSE
+                        # connections after 30s; 25s is well inside that.
+                        self.wfile.write(b': keepalive\n\n')
+                        self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
+            finally:
+                with _SSE_LOCK:
+                    if q in _SSE_CLIENTS:
+                        _SSE_CLIENTS.remove(q)
+
+        def log_message(self, fmt: str, *args) -> None:  # noqa: N802
+            # Suppress the per-request log for /__reload — it spams once
+            # per second from the keepalive when a tab is open.
+            try:
+                first = args[0] if args else ''
+                if '/__reload' in str(first):
+                    return
+            except Exception:
+                pass
+            super().log_message(fmt, *args)
+
+    return _Handler
+
+
 def _pick_open_target(htmls: list[Path], user_cwd: Path, root: Path) -> Path | None:
     """Choose the page to auto-open. Preference order:
       1. <user_cwd>/index.html (the user ran serve from a docs dir).
@@ -616,22 +748,31 @@ def cmd_serve(args: argparse.Namespace) -> int:
     Why: file:// has browser-specific restrictions (symlink resolution, CORS-like
     rules, cross-directory script loading). Serving via HTTP makes all references
     resolve reliably across Chrome, Safari, Firefox.
+
+    By default, also starts a filesystem watcher and an SSE channel at
+    /__reload — chrome.js opens an EventSource to it and reloads the
+    tab when source changes. Disable with --no-watch.
     """
     cwd = Path.cwd()
     root = find_project_root(cwd)
     user_cwd = cwd  # capture before chdir so we can prefer pages near where the user was
+    os.chdir(root)
+    handler_cls = _make_serve_handler(root)
+
     port = 9876
+    httpd = None
     while True:
         try:
-            httpd = socketserver.TCPServer(('', port), http.server.SimpleHTTPRequestHandler)
+            httpd = http.server.ThreadingHTTPServer(('', port), handler_cls)
             break
         except OSError:
             port += 1
             if port > 9900:
                 print('✗ Could not find a free port in 9876–9900', file=sys.stderr)
                 return 1
+    assert httpd is not None
+    httpd.daemon_threads = True  # let Ctrl-C terminate hung SSE threads cleanly
 
-    os.chdir(root)
     # Refresh manifest + llms.txt on serve start so they reflect current state.
     try:
         manifest_path = build_manifest(root)
@@ -640,9 +781,24 @@ def cmd_serve(args: argparse.Namespace) -> int:
         print(f'✓ Refreshed llms.txt:       {llms_path.relative_to(root)}')
     except OSError as e:
         print(f'! Could not write manifest/llms.txt: {e}', file=sys.stderr)
+
     htmls = sorted(p for p in root.rglob('*.html') if 'dist' not in p.parts and 'node_modules' not in p.parts)
 
+    # Filesystem watcher → SSE broadcast → in-browser reload.
+    watch_enabled = not getattr(args, 'no_watch', False)
+    watcher_stop = threading.Event()
+    watcher_thread = None
+    if watch_enabled:
+        watcher_thread = threading.Thread(
+            target=_watcher_loop, args=(root, watcher_stop), name='html-doc-watcher', daemon=True,
+        )
+        watcher_thread.start()
+
     print(f'✓ Serving {root} on http://localhost:{port}')
+    if watch_enabled:
+        print(f'  Live reload: on  (SSE at /__reload — disable with --no-watch)')
+    else:
+        print(f'  Live reload: off')
     print(f'  Stop with Ctrl-C.')
     print()
     target = _pick_open_target(htmls, user_cwd, root)
@@ -659,7 +815,9 @@ def cmd_serve(args: argparse.Namespace) -> int:
         httpd.serve_forever()
     except KeyboardInterrupt:
         print('\n✓ Stopped.')
+        watcher_stop.set()
         httpd.shutdown()
+        httpd.server_close()
     return 0
 
 
@@ -672,7 +830,14 @@ def main() -> int:
     sub = parser.add_subparsers(dest='cmd')
     sub.add_parser('init', help='create docs/_kit symlink in the current project')
     sub.add_parser('build', help='build dist/standalone/ + dist/site/ from current dir')
-    sub.add_parser('serve', help='start local HTTP server so kit assets resolve correctly')
+    serve_parser = sub.add_parser(
+        'serve',
+        help='start local HTTP server so kit assets resolve correctly (live-reload by default)',
+    )
+    serve_parser.add_argument(
+        '--no-watch', action='store_true',
+        help='disable the filesystem watcher + auto-reload (serve static only)',
+    )
 
     args = parser.parse_args()
     if args.cmd == 'init':

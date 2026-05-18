@@ -455,6 +455,29 @@ function escapeHTML(s) {
   sync();
 })();
 
+/* ============ Live-reload (only when served via `html-doc serve`) ============ *
+ * Opens an EventSource against /__reload — a Server-Sent Events stream
+ * that the dev server pushes a message into whenever a watched file
+ * changes. On message, the tab reloads. Only attempted when the page is
+ * loaded from localhost/127.0.0.1 so production sites never try.
+ * --------------------------------------------------------------------------- */
+(function () {
+  if (typeof window === 'undefined') return;
+  var h = window.location && window.location.hostname;
+  if (h !== 'localhost' && h !== '127.0.0.1' && h !== '::1') return;
+  if (window.__htmldocReloadAttached) return;
+  window.__htmldocReloadAttached = true;
+  try {
+    var es = new EventSource('/__reload');
+    es.addEventListener('message', function () {
+      try { es.close(); } catch (e) {}
+      window.location.reload();
+    });
+    // Silently let the browser auto-reconnect on transient errors.
+    es.addEventListener('error', function () { /* swallow */ });
+  } catch (e) { /* SSE unsupported or blocked — no live reload */ }
+})();
+
 /* ============ Tooltip controller (used by <glossary-term> + <ext-ref>) ============ */
 var __htmldocTooltip = (function () {
   var HIDE_DELAY = 300;
