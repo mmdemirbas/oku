@@ -1256,7 +1256,8 @@ html-doc-chart .hdc-dot {
   transition: r 0.12s ease, stroke-width 0.12s ease, opacity 0.18s ease;
 }
 html-doc-chart .hdc-dot:hover,
-html-doc-chart .hdc-dot:focus {
+html-doc-chart .hdc-dot:focus,
+html-doc-chart .hdc-dot.hovered {
   r: 6;
   stroke-width: 2;
   outline: none;
@@ -1267,6 +1268,23 @@ html-doc-chart .hdc-dot:focus-visible {
 html-doc-chart .hdc-point-label {
   fill: var(--text-soft);
   font: 400 10.5px 'Inter', sans-serif;
+  cursor: pointer;
+  /* Paint a halo behind the text so labels stay readable when they brush
+     against dots or grid lines — paint-order draws stroke first, fill on
+     top, giving a clean outline. The halo color is the surface color so
+     it blends with the chart frame. */
+  paint-order: stroke fill;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  transition: fill 0.15s ease, font-weight 0.15s ease;
+}
+html-doc-chart .hdc-point-label:hover,
+html-doc-chart .hdc-point-label:focus,
+html-doc-chart .hdc-point-label.hovered {
+  fill: var(--accent-strong);
+  font-weight: 600;
+  outline: none;
 }
 
 /* Series dimming via legend toggle */

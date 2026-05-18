@@ -1003,6 +1003,7 @@ class HtmlDocChart extends HTMLElement {
     }
     // Series — each wrapped in a <g data-series-idx> so the legend can
     // toggle its `.dim` class to mute/unmute the series visually.
+    var plotMidX = pad.left + plotW / 2;
     series.forEach(function (s, i) {
       var color = palette[s.color] || palette.accent;
       parts.push('<g class="hdc-series" data-series-idx="' + i + '">');
@@ -1012,12 +1013,15 @@ class HtmlDocChart extends HTMLElement {
         }).join(' ');
         parts.push('<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" class="hdc-line"/>');
       }
-      (s.data || []).forEach(function (p) {
+      (s.data || []).forEach(function (p, j) {
+        var key = i + '-' + j;
         var dotLabel = escapeXml(String(p.label != null ? p.label : ''));
         var seriesLbl = escapeXml(String(s.label != null ? s.label : ''));
+        var px = sx(p.x), py = sy(p.y);
         parts.push(
-          '<circle cx="' + sx(p.x) + '" cy="' + sy(p.y) + '" r="4" fill="' + color +
+          '<circle cx="' + px + '" cy="' + py + '" r="4" fill="' + color +
           '" class="hdc-dot"' +
+          ' data-point-key="' + key + '"' +
           ' data-x="' + p.x + '" data-y="' + p.y +
           '" data-point-label="' + dotLabel +
           '" data-series-label="' + seriesLbl + '"' +
@@ -1027,7 +1031,20 @@ class HtmlDocChart extends HTMLElement {
           '"/>'
         );
         if (p.label) {
-          parts.push('<text x="' + (sx(p.x) + 8) + '" y="' + (sy(p.y) + 4) + '" class="hdc-point-label">' + escapeXml(p.label) + '</text>');
+          // Place label left or right of the dot based on which side has
+          // more room — keeps labels inside the plot area and reduces the
+          // chance of overlapping the next dot.
+          var goRight = px < plotMidX;
+          var lx = goRight ? (px + 8) : (px - 8);
+          var anchor = goRight ? 'start' : 'end';
+          parts.push(
+            '<text x="' + lx + '" y="' + (py + 4) +
+            '" text-anchor="' + anchor + '"' +
+            ' class="hdc-point-label"' +
+            ' data-point-key="' + key + '"' +
+            ' tabindex="0">' +
+            escapeXml(p.label) + '</text>'
+          );
         }
       });
       parts.push('</g>');
@@ -1102,11 +1119,37 @@ class HtmlDocChart extends HTMLElement {
       var tip = self.querySelector(':scope > .hdc-tooltip');
       if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
     }
+    /* Bidirectional hover/focus: a dot and its inline label share a
+       data-point-key. Either being hovered or focused adds .hovered to
+       both, so the user can hover the label and see the dot react (and
+       vice versa) — a small detail signaling we take UX seriously. */
+    function setHover(key, on) {
+      if (!key) return;
+      self.querySelectorAll('[data-point-key="' + key + '"]').forEach(function (el) {
+        el.classList.toggle('hovered', on);
+      });
+    }
     this.querySelectorAll('.hdc-dot').forEach(function (dot) {
-      dot.addEventListener('mouseenter', function () { showTip(dot); });
-      dot.addEventListener('mouseleave', hideTip);
-      dot.addEventListener('focus',      function () { showTip(dot); });
-      dot.addEventListener('blur',       hideTip);
+      var key = dot.getAttribute('data-point-key');
+      dot.addEventListener('mouseenter', function () { setHover(key, true);  showTip(dot); });
+      dot.addEventListener('mouseleave', function () { setHover(key, false); hideTip();   });
+      dot.addEventListener('focus',      function () { setHover(key, true);  showTip(dot); });
+      dot.addEventListener('blur',       function () { setHover(key, false); hideTip();   });
+    });
+    this.querySelectorAll('.hdc-point-label').forEach(function (label) {
+      var key = label.getAttribute('data-point-key');
+      label.addEventListener('mouseenter', function () {
+        setHover(key, true);
+        var dot = self.querySelector('.hdc-dot[data-point-key="' + key + '"]');
+        if (dot) showTip(dot);
+      });
+      label.addEventListener('mouseleave', function () { setHover(key, false); hideTip(); });
+      label.addEventListener('focus', function () {
+        setHover(key, true);
+        var dot = self.querySelector('.hdc-dot[data-point-key="' + key + '"]');
+        if (dot) showTip(dot);
+      });
+      label.addEventListener('blur', function () { setHover(key, false); hideTip(); });
     });
 
     /* Legend chip — click or Enter/Space toggles `.dim` on the matching
