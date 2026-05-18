@@ -11,7 +11,8 @@
     "date": "2026-05-18",
     "read_time": "~7 min read",
     "order": 40,
-    "summary": "Runtime mental model + build pipeline."
+    "summary": "Runtime mental model + build pipeline.",
+    "updated": "2026-05-18"
   },
   "blocks": [
     {
@@ -24,7 +25,6 @@
         "Build pipeline (html-doc CLI) produces 4 artifacts: site-manifest.json, llms.txt, dist/site/, dist/standalone/."
       ]
     },
-
     {
       "kind": "section",
       "id": "files",
@@ -50,7 +50,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "render-flow",
@@ -64,7 +63,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "renderer",
@@ -75,10 +73,35 @@
           "kind": "list",
           "style": "bullet",
           "items": [
-            [{ "kind": "code", "text": "render(page)" }, " — sets document.title, picks up accent override, renders cover, walks blocks."],
-            [{ "kind": "code", "text": "_renderTopBlock" }, " / ", { "kind": "code", "text": "_renderContentBlock" }, " — switch on kind; each kind has a small _renderX function."],
-            [{ "kind": "code", "text": "_renderRich" }, " — walks paragraph.content arrays mixing strings (textContent) with inline nodes (createElement)."],
-            ["For complex primitives (chart, diagram, snippet), the renderer creates the Custom Element with attributes and a JSON-payload script child. The Custom Element's connectedCallback parses the payload and renders its own DOM."]
+            [
+              {
+                "kind": "code",
+                "text": "render(page)"
+              },
+              " — sets document.title, picks up accent override, renders cover, walks blocks."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "_renderTopBlock"
+              },
+              " / ",
+              {
+                "kind": "code",
+                "text": "_renderContentBlock"
+              },
+              " — switch on kind; each kind has a small _renderX function."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "_renderRich"
+              },
+              " — walks paragraph.content arrays mixing strings (textContent) with inline nodes (createElement)."
+            ],
+            [
+              "For complex primitives (chart, diagram, snippet), the renderer creates the Custom Element with attributes and a JSON-payload script child. The Custom Element's connectedCallback parses the payload and renders its own DOM."
+            ]
           ]
         },
         {
@@ -89,7 +112,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "tooltip",
@@ -99,16 +121,35 @@
         {
           "kind": "step-flow",
           "steps": [
-            { "num": "1", "title": "Hover detection", "content": "matchMedia('(hover: none)') gates the hover path — touch devices skip it and use click only. Re-evaluated per attach so input-mode changes mid-session take effect on later elements." },
-            { "num": "2", "title": "Show with delay", "content": "120ms delay on mouseenter before showing — prevents flicker when brushing past." },
-            { "num": "3", "title": "Bridge-hover", "content": "On mouseleave, start a 300ms hide timer. If the mouse enters the tooltip DOM during that window, the timer cancels — the tooltip stays so the user can select text or click links." },
-            { "num": "4", "title": "Click to pin", "content": "Clicking the term pins the tooltip — it stays open until clicked again or another term is opened. Visible 2px accent ring marks pinned." },
-            { "num": "5", "title": "Click outside / Esc", "content": "Click anywhere outside .gloss or .tooltip-popup unpins. Escape key also unpins. Touch devices have click-only — no hover path, so click toggles pinned." }
+            {
+              "num": "1",
+              "title": "Hover detection",
+              "content": "matchMedia('(hover: none)') gates the hover path — touch devices skip it and use click only. Re-evaluated per attach so input-mode changes mid-session take effect on later elements."
+            },
+            {
+              "num": "2",
+              "title": "Show with delay",
+              "content": "120ms delay on mouseenter before showing — prevents flicker when brushing past."
+            },
+            {
+              "num": "3",
+              "title": "Bridge-hover",
+              "content": "On mouseleave, start a 300ms hide timer. If the mouse enters the tooltip DOM during that window, the timer cancels — the tooltip stays so the user can select text or click links."
+            },
+            {
+              "num": "4",
+              "title": "Click to pin",
+              "content": "Clicking the term pins the tooltip — it stays open until clicked again or another term is opened. Visible 2px accent ring marks pinned."
+            },
+            {
+              "num": "5",
+              "title": "Click outside / Esc",
+              "content": "Click anywhere outside .gloss or .tooltip-popup unpins. Escape key also unpins. Touch devices have click-only — no hover path, so click toggles pinned."
+            }
           ]
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "viewport",
@@ -124,13 +165,15 @@
           "kind": "paragraph",
           "content": [
             "Two CSS variables, one event handler. ",
-            { "kind": "code", "text": "?." },
+            {
+              "kind": "code",
+              "text": "?."
+            },
             " optional chaining gates the whole thing on Visual Viewport API support — graceful degrade on browsers without it (buttons stay at layout-viewport corners, same as v1)."
           ]
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "kit-loader",
@@ -140,15 +183,30 @@
         {
           "kind": "step-flow",
           "steps": [
-            { "num": "1", "title": "Defer", "content": "Initial load deferred to DOMContentLoaded — gives the standalone build a chance to inline the kit bundle before fetch tries to run." },
-            { "num": "2", "title": "Standalone check", "content": "If the page has an inline __htmldoc_kit_bundle__ script (set by build_standalone), hydrate from it synchronously and skip all fetches." },
-            { "num": "3", "title": "Standalone-but-no-bundle", "content": "If __htmldoc_page__ is present but no bundle (i.e., handwritten standalone), resolve with an empty kit — tooltips degrade to plain text rather than showing 'Unknown term' for everything." },
-            { "num": "4", "title": "Dev / dist/site/ path", "content": "Fetch kit.json + each domain's glossary/extref file in parallel. After Promise.all resolves, apply project-local overrides on top. Then resolve and unblock any waiters." }
+            {
+              "num": "1",
+              "title": "Defer",
+              "content": "Initial load deferred to DOMContentLoaded — gives the standalone build a chance to inline the kit bundle before fetch tries to run."
+            },
+            {
+              "num": "2",
+              "title": "Standalone check",
+              "content": "If the page has an inline __htmldoc_kit_bundle__ script (set by build_standalone), hydrate from it synchronously and skip all fetches."
+            },
+            {
+              "num": "3",
+              "title": "Standalone-but-no-bundle",
+              "content": "If __htmldoc_page__ is present but no bundle (i.e., handwritten standalone), resolve with an empty kit — tooltips degrade to plain text rather than showing 'Unknown term' for everything."
+            },
+            {
+              "num": "4",
+              "title": "Dev / dist/site/ path",
+              "content": "Fetch kit.json + each domain's glossary/extref file in parallel. After Promise.all resolves, apply project-local overrides on top. Then resolve and unblock any waiters."
+            }
           ]
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "docs-root",
@@ -164,16 +222,21 @@
           "kind": "paragraph",
           "content": [
             "Any element referencing ",
-            { "kind": "code", "text": "_kit/" },
+            {
+              "kind": "code",
+              "text": "_kit/"
+            },
             " gives us a URL with the docs root as its prefix — strip everything from ",
-            { "kind": "code", "text": "/_kit/" },
+            {
+              "kind": "code",
+              "text": "/_kit/"
+            },
             " onward. ",
             "All kit.json, site-manifest.json, glossary/*.json, and pagefind/ fetches use this base, so subfolder pages work without per-page configuration."
           ]
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "build",
@@ -189,18 +252,36 @@
           "kind": "list",
           "style": "numbered",
           "items": [
-            ["walk the project recursively for JSON pages with ", { "kind": "code", "text": "kind: \"page\"" }, " — gather their meta."],
-            ["write site-manifest.json with one entry per page (path, title, parent, order, summary)."],
-            ["write llms.txt with one Markdown link per page — for AI consumers."],
-            ["if jsonschema is installed, validate every page against schema/page.schema.json; print errors with field paths."],
-            ["build_site: copy every HTML stub + sibling JSON into dist/site/<rel-path>; copy _kit/ as dist/site/_kit/ for self-contained deployable; embed extracted text via hidden data-pagefind-body div for indexing."],
-            ["build_standalone: for each page, inline chrome.css + chrome.js + renderer.js + page JSON + kit bundle into a single self-contained file."],
-            ["if pagefind is on PATH, index dist/site/ to dist/site/pagefind/."]
+            [
+              "walk the project recursively for JSON pages with ",
+              {
+                "kind": "code",
+                "text": "kind: \"page\""
+              },
+              " — gather their meta."
+            ],
+            [
+              "write site-manifest.json with one entry per page (path, title, parent, order, summary)."
+            ],
+            [
+              "write llms.txt with one Markdown link per page — for AI consumers."
+            ],
+            [
+              "if jsonschema is installed, validate every page against schema/page.schema.json; print errors with field paths."
+            ],
+            [
+              "build_site: copy every HTML stub + sibling JSON into dist/site/<rel-path>; copy _kit/ as dist/site/_kit/ for self-contained deployable; embed extracted text via hidden data-pagefind-body div for indexing."
+            ],
+            [
+              "build_standalone: for each page, inline chrome.css + chrome.js + renderer.js + page JSON + kit bundle into a single self-contained file."
+            ],
+            [
+              "if pagefind is on PATH, index dist/site/ to dist/site/pagefind/."
+            ]
           ]
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "standalone-bundle",
@@ -219,6 +300,47 @@
           "content": "A single HTML file you can email or archive. All Custom Elements work, tooltips resolve, the page renders. Network requirements: Google Fonts (graceful fallback if blocked) and Mermaid CDN (only if the page has a <diagram>). Everything else inlined."
         }
       ]
+    },
+    {
+      "kind": "section",
+      "title": "Round-10 internal changes",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": "Internal architecture moved on five fronts in rounds 9 and 10. Worth knowing about if you're reading the kit code."
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Kit assets resolver",
+          "content": "Two valid asset layouts now: development (chrome.{css,js} at repo root) and installed (chrome.{css,js} inside <code>html_doc/assets/</code> in the wheel). <code>cli._kit_assets_dir()</code> picks whichever exists, so <code>html-doc init</code> works from a clone OR from <code>uv tool install .</code>. Hatchling <code>force-include</code> in pyproject packs the assets into the right place at wheel build time."
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Generated files at the docs root, not the project root",
+          "content": "<code>cmd_serve</code> r10 writes <code>site-manifest.json</code>, <code>site-manifest.js</code>, <code>llms.txt</code>, and <code>page.md</code> twins at the closest common parent of JSON pages — typically <code>docs/</code>. Earlier rounds wrote at the chdir'd project root, which produced a manifest at the wrong URL prefix and polluted git status. <code>_common_docs_dir(root, pages)</code> in cli.py picks the directory."
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Serve-time Pagefind",
+          "content": "<code>cmd_serve</code> spawns a background thread at startup that builds <code>dist/_search/site/</code> (just like <code>cmd_build</code>) and runs pagefind against it. Symlinks <code>&lt;docs-dir&gt;/pagefind</code> → that index so chrome.js's existing search-loader path resolves. Soft-fails if pagefind isn't installed. Opt out with <code>--no-search</code>."
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Boot stamp",
+          "content": "chrome.js console.info()s <code>[html-doc] kit boot · build=2026-05-18-r10 · docsRoot=... · authToken=yes/no</code> at startup. Bump <code>__htmldocKitBuild</code> whenever a compatibility-affecting change ships, so a stale-cache user can confirm from DevTools whether their browser/IDE is on the right chrome.js."
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "IntelliJ _ijt token propagation",
+          "content": "chrome-boot.js plucks <code>_ijt</code> from <code>window.location.search</code> and exposes <code>window.__htmldocWithAuth(url)</code> that appends it to internal asset URLs (same-origin only — CDN URLs stay untouched). chrome.js and renderer.js wrap every fetch and script-src load through it so IntelliJ's built-in server stops 404'ing sub-resource requests."
+        }
+      ],
+      "id": "round-10-internal-changes"
     }
   ]
 }

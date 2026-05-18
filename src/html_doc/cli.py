@@ -787,10 +787,13 @@ def cmd_build(args: argparse.Namespace) -> int:
         return 1
 
     # Always regenerate manifest + llms.txt + markdown twins so <page-nav>
-    # + AI consumers see fresh state.
-    manifest_path = build_manifest(root)
-    llms_path = build_llms_txt(root)
-    md_count = build_markdown_twins(root)
+    # + AI consumers see fresh state. Write them at the docs root (the
+    # closest common parent of JSON pages) so chrome.js's fetch URL —
+    # __htmldocDocsRoot + 'site-manifest.json' — resolves naturally.
+    docs_dir = _common_docs_dir(root, json_pages)
+    manifest_path = build_manifest(docs_dir)
+    llms_path = build_llms_txt(docs_dir)
+    md_count = build_markdown_twins(docs_dir)
     print(f'✓ Wrote {manifest_path.relative_to(root)} ({len(json_pages)} JSON page(s))')
     print(f'✓ Wrote {llms_path.relative_to(root)} (sitemap for LLM consumers)')
     if md_count:
@@ -979,8 +982,13 @@ def _watcher_loop(root: Path, stop: threading.Event) -> None:
         cur = _snapshot_tree(root)
         last = cur
         try:
-            build_manifest(root)
-            build_llms_txt(root)
+            # Write generated artifacts at the docs root (same logic as the
+            # one-shot path in cmd_serve), not at the project root.
+            pages_now = find_json_pages(root)
+            docs_dir = _common_docs_dir(root, pages_now)
+            build_manifest(docs_dir)
+            build_llms_txt(docs_dir)
+            build_markdown_twins(docs_dir)
         except OSError:
             pass
         _sse_broadcast('change')
@@ -1112,12 +1120,17 @@ def cmd_serve(args: argparse.Namespace) -> int:
     assert httpd is not None
     httpd.daemon_threads = True  # let Ctrl-C terminate hung SSE threads cleanly
 
-    # Refresh manifest + llms.txt + markdown twins on serve start so they
-    # reflect current state.
+    # Generated artifacts (site-manifest, llms.txt, page.md twins) belong
+    # at the docs root — the directory the runtime's __htmldocDocsRoot
+    # resolves to — not at the chdir'd project root. Writing at the
+    # project root would pollute git status and produce a manifest at the
+    # wrong URL prefix for chrome.js's fetch.
+    pages_for_root = find_json_pages(root)
+    docs_dir = _common_docs_dir(root, pages_for_root)
     try:
-        manifest_path = build_manifest(root)
-        llms_path = build_llms_txt(root)
-        md_count = build_markdown_twins(root)
+        manifest_path = build_manifest(docs_dir)
+        llms_path = build_llms_txt(docs_dir)
+        md_count = build_markdown_twins(docs_dir)
         print(f'✓ Refreshed site-manifest: {manifest_path.relative_to(root)}')
         print(f'✓ Refreshed llms.txt:       {llms_path.relative_to(root)}')
         if md_count:

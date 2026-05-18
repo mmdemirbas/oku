@@ -11,7 +11,8 @@
     "date": "2026-05-18",
     "read_time": "~4 min read",
     "order": 50,
-    "summary": "html-doc init / build / serve — what each does."
+    "summary": "html-doc init / build / serve — what each does.",
+    "updated": "2026-05-18"
   },
   "blocks": [
     {
@@ -24,7 +25,6 @@
         "Optional deps: pagefind (search index), jsonschema (page validation). Both soft-fail."
       ]
     },
-
     {
       "kind": "section",
       "id": "init",
@@ -44,7 +44,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "build",
@@ -99,7 +98,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "serve",
@@ -115,10 +113,18 @@
           "kind": "list",
           "style": "bullet",
           "items": [
-            ["Walks up from cwd to find the directory containing docs/_kit; serves from there. Run from anywhere inside the project."],
-            ["First free port from 9876–9900. Caps at 9900 (if all taken, errors out)."],
-            ["Refreshes site-manifest.json + llms.txt — but not the Pagefind index. Search only works on a built site (run html-doc build first if you need search)."],
-            ["Opens the first HTML it finds in the default browser. Ctrl-C to stop."]
+            [
+              "Walks up from cwd to find the directory containing docs/_kit; serves from there. Run from anywhere inside the project."
+            ],
+            [
+              "First free port from 9876–9900. Caps at 9900 (if all taken, errors out)."
+            ],
+            [
+              "Refreshes site-manifest.json + llms.txt — but not the Pagefind index. Search only works on a built site (run html-doc build first if you need search)."
+            ],
+            [
+              "Opens the first HTML it finds in the default browser. Ctrl-C to stop."
+            ]
           ]
         },
         {
@@ -130,10 +136,15 @@
               "content": "Browsers apply different rules to local files than HTTP — symlink resolution, fetch, and ES module imports fail silently or behave inconsistently on file://. The local HTTP server sidesteps that. On macOS, opening a file:// URL also disables some same-origin policies that matter for the iframe sandbox in <live-snippet>. Always serve."
             }
           ]
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Round-10 flags",
+          "content": "<strong>--no-watch</strong> disables the filesystem watcher + live-reload (serve static only).<br><strong>--no-search</strong> skips the background Pagefind index generation at startup. Both default to on so the dev loop is rich; opt out if you want a leaner serve."
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "optional-deps",
@@ -148,9 +159,15 @@
               "title": "Pagefind — search index",
               "content": [
                 "Install: ",
-                { "kind": "code", "text": "brew install pagefind" },
+                {
+                  "kind": "code",
+                  "text": "brew install pagefind"
+                },
                 ", or available via ",
-                { "kind": "code", "text": "npx pagefind" },
+                {
+                  "kind": "code",
+                  "text": "npx pagefind"
+                },
                 ". ",
                 "Without it: search button still appears but says \"Search index not found\" when clicked. ",
                 "With it: build adds a ~50–100 KB pagefind/ directory to dist/site/; the search button works on the built site."
@@ -161,7 +178,10 @@
               "title": "jsonschema — page validation",
               "content": [
                 "Install: ",
-                { "kind": "code", "text": "pip install jsonschema" },
+                {
+                  "kind": "code",
+                  "text": "pip install jsonschema"
+                },
                 ". ",
                 "Without it: build prints a hint and skips validation. ",
                 "With it: every JSON page validates against schema/page.schema.json on build; errors print field path + message. Catches malformed JSON earlier than the runtime."
@@ -171,22 +191,43 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "future",
-      "title": "Future commands",
+      "title": "Install + run",
       "lead": "Not in v2. Worth noting because they're frequently asked.",
       "blocks": [
         {
-          "kind": "list",
-          "style": "bullet",
-          "items": [
-            [{ "kind": "code", "text": "html-doc new <path>" }, " — scaffold a new page from the starter template. Currently a manual cp. Likely in v2.1."],
-            [{ "kind": "code", "text": "html-doc check" }, " — link checker, glossary-coverage checker, dead-page checker. Possibly in v2.1."],
-            [{ "kind": "code", "text": "html-doc watch" }, " — auto-rebuild on file change. The serve command already refreshes the manifest at startup, but doesn't watch. Maybe v2.x."],
-            ["Deploy commands (publish to GitHub Pages, S3, etc.) — explicitly out of scope. dist/site/ is portable; use whatever you already use."]
-          ]
+          "kind": "paragraph",
+          "content": "Two ways to invoke the CLI."
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "title": "Installed via uv"
+        },
+        {
+          "kind": "code",
+          "language": "bash",
+          "source": "uv tool install .\n# Now `html-doc` is on PATH globally:\nhtml-doc serve"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Installs html-doc as a console script. The wheel packs chrome.{css,js}, schema/, glossary/, extrefs/, templates/ inside html_doc/assets/ so init/build find the kit assets without a git layout."
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "title": "In-tree without install"
+        },
+        {
+          "kind": "code",
+          "language": "bash",
+          "source": "uv run bin/html-doc serve\n# Or plain python3 — both work:\npython3 bin/html-doc serve"
+        },
+        {
+          "kind": "paragraph",
+          "content": "<code>bin/html-doc</code> is a thin shim that adds <code>src/</code> to sys.path and runs <code>html_doc.cli.main()</code>. PEP 723 inline metadata pulls jsonschema into an ephemeral venv when invoked via uv."
         }
       ]
     }

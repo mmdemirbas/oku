@@ -11,7 +11,8 @@
     "date": "2026-05-17",
     "read_time": "~10 min read",
     "order": 1,
-    "summary": "v2 status, build progress, live primitives tour, architecture, what's next."
+    "summary": "v2 status, build progress, live primitives tour, architecture, what's next.",
+    "updated": "2026-05-18"
   },
   "blocks": [
     {
@@ -27,13 +28,24 @@
     {
       "kind": "kpi-grid",
       "tiles": [
-        { "num": "15 / 15", "label": "Build steps complete" },
-        { "num": "11 / 11", "label": "Review items addressed" },
-        { "num": "6", "label": "Commits on branch" },
-        { "num": "0", "label": "Console errors across 3 modes" }
+        {
+          "num": "15 / 15",
+          "label": "Build steps complete"
+        },
+        {
+          "num": "11 / 11",
+          "label": "Review items addressed"
+        },
+        {
+          "num": "6",
+          "label": "Commits on branch"
+        },
+        {
+          "num": "0",
+          "label": "Console errors across 3 modes"
+        }
       ]
     },
-
     {
       "kind": "section",
       "id": "docs",
@@ -49,7 +61,11 @@
               "meta": "~8 min · start here",
               "content": [
                 "How to write a page in JSON — project setup, page anatomy, rich text, per-page metadata, build outputs. ",
-                { "kind": "link", "text": "Open authoring.html", "href": "authoring.html" }
+                {
+                  "kind": "link",
+                  "text": "Open authoring.html",
+                  "href": "authoring.html"
+                }
               ]
             },
             {
@@ -58,7 +74,11 @@
               "meta": "~12 min · every element with live examples",
               "content": [
                 "Every Custom Element shipped with v2 — JSON shape, attributes, live example. The catalog you reach for while authoring. ",
-                { "kind": "link", "text": "Open primitives.html", "href": "primitives.html" }
+                {
+                  "kind": "link",
+                  "text": "Open primitives.html",
+                  "href": "primitives.html"
+                }
               ]
             },
             {
@@ -67,7 +87,11 @@
               "meta": "~6 min · how the multi-domain registry works",
               "content": [
                 "File layout, multi-language entries, project overrides, disambiguation syntax, resolution algorithm. Adding new entries — local first, then central. ",
-                { "kind": "link", "text": "Open glossary.html", "href": "glossary.html" }
+                {
+                  "kind": "link",
+                  "text": "Open glossary.html",
+                  "href": "glossary.html"
+                }
               ]
             },
             {
@@ -76,7 +100,11 @@
               "meta": "~7 min · internals",
               "content": [
                 "How the kit fits together at runtime. The render flow, tooltip controller, Visual Viewport API, kit loader, build pipeline, standalone bundle. ",
-                { "kind": "link", "text": "Open architecture.html", "href": "architecture.html" }
+                {
+                  "kind": "link",
+                  "text": "Open architecture.html",
+                  "href": "architecture.html"
+                }
               ]
             },
             {
@@ -85,14 +113,17 @@
               "meta": "~4 min · init, build, serve",
               "content": [
                 "Three commands, zero flags. What each does, what output to expect, the optional pagefind and jsonschema dependencies. ",
-                { "kind": "link", "text": "Open cli.html", "href": "cli.html" }
+                {
+                  "kind": "link",
+                  "text": "Open cli.html",
+                  "href": "cli.html"
+                }
               ]
             }
           ]
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "roadmap",
@@ -137,7 +168,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "review-fixes",
@@ -177,7 +207,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "primitives",
@@ -188,15 +217,35 @@
           "kind": "paragraph",
           "content": [
             "The visible vocabulary: ",
-            { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
+            {
+              "kind": "glossary-term",
+              "term": "ACID",
+              "text": "ACID"
+            },
             " from data-platforms, ",
-            { "kind": "glossary-term", "term": "Custom Elements", "text": "Custom Elements" },
+            {
+              "kind": "glossary-term",
+              "term": "Custom Elements",
+              "text": "Custom Elements"
+            },
             " from web, and ",
-            { "kind": "glossary-term", "term": "Prompt cache", "text": "prompt caching" },
+            {
+              "kind": "glossary-term",
+              "term": "Prompt cache",
+              "text": "prompt caching"
+            },
             " from ai-llm — three domains active, all resolved from kit.json. Click any underlined term to pin its tooltip. Reference tools live in extrefs: ",
-            { "kind": "ext-ref", "name": "Pagefind", "text": "Pagefind" },
+            {
+              "kind": "ext-ref",
+              "name": "Pagefind",
+              "text": "Pagefind"
+            },
             " powers search, ",
-            { "kind": "ext-ref", "name": "Mermaid", "text": "Mermaid" },
+            {
+              "kind": "ext-ref",
+              "name": "Mermaid",
+              "text": "Mermaid"
+            },
             " powers diagrams."
           ]
         },
@@ -216,7 +265,6 @@
             }
           ]
         },
-
         {
           "kind": "heading",
           "level": 3,
@@ -234,16 +282,35 @@
               "label": "Lines added",
               "color": "accent",
               "data": [
-                { "x": 1, "y": 1616, "label": "foundation" },
-                { "x": 2, "y": 569,  "label": "page-nav" },
-                { "x": 3, "y": 612,  "label": "primitives" },
-                { "x": 4, "y": 886,  "label": "search" },
-                { "x": 5, "y": 120,  "label": "fixes" }
+                {
+                  "x": 1,
+                  "y": 1616,
+                  "label": "foundation"
+                },
+                {
+                  "x": 2,
+                  "y": 569,
+                  "label": "page-nav"
+                },
+                {
+                  "x": 3,
+                  "y": 612,
+                  "label": "primitives"
+                },
+                {
+                  "x": 4,
+                  "y": 886,
+                  "label": "search"
+                },
+                {
+                  "x": 5,
+                  "y": 120,
+                  "label": "fixes"
+                }
               ]
             }
           ]
         },
-
         {
           "kind": "heading",
           "level": 3,
@@ -255,7 +322,6 @@
           "caption": "End-to-end when this page loaded — the same pipeline applies to every v2 page.",
           "source": "sequenceDiagram\n    autonumber\n    participant B as Browser\n    participant H as HTML stub\n    participant R as renderer.js\n    participant C as chrome.js\n    participant K as kit.json + glossary/*\n\n    B->>H: GET index.html\n    H-->>B: stub + chrome.css\n    B->>C: load chrome.js + renderer.js\n    C->>K: fetch kit.json\n    K-->>C: domains, lang, overrides\n    C->>K: fetch glossary/<domain>.json (xN)\n    Note over C,K: Promise.all then apply overrides\n    H->>R: autoBoot()\n    R->>B: fetch index.json\n    B-->>R: page tree\n    R->>B: emit Custom Element DOM\n    C->>B: build TOC, init reading aids\n    Note over B: glossary-term, ext-ref attach tooltip controller"
         },
-
         {
           "kind": "heading",
           "level": 3,
@@ -267,7 +333,6 @@
           "label": "Edit the gradient and message — preview updates as you type",
           "source": "<style>\n  body {\n    margin: 0;\n    height: 100vh;\n    display: grid;\n    place-items: center;\n    background: linear-gradient(135deg, #0f766e, #2dd4bf);\n    font-family: system-ui, sans-serif;\n  }\n  .card {\n    background: white;\n    border-radius: 16px;\n    padding: 24px 32px;\n    box-shadow: 0 12px 36px rgba(0,0,0,0.2);\n    text-align: center;\n  }\n  .card h1 { margin: 0 0 8px; color: #115e59; font-size: 22px; }\n  .card p  { margin: 0; color: #475569; font-size: 14px; }\n</style>\n<div class=\"card\">\n  <h1>Hello, learner.</h1>\n  <p>Edit the source on the left — this preview updates live.</p>\n</div>"
         },
-
         {
           "kind": "callout",
           "type": "warn",
@@ -276,7 +341,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "architecture",
@@ -292,11 +356,20 @@
           "kind": "paragraph",
           "content": [
             "Each page is a JSON file under the project root. The companion HTML stub (",
-            { "kind": "code", "text": "templates/starter.html" },
+            {
+              "kind": "code",
+              "text": "templates/starter.html"
+            },
             ") calls ",
-            { "kind": "code", "text": "HtmlDocRenderer.autoBoot()" },
+            {
+              "kind": "code",
+              "text": "HtmlDocRenderer.autoBoot()"
+            },
             " — which fetches the sibling JSON in dev mode, or reads an inline ",
-            { "kind": "code", "text": "<script type=\"application/json\" id=\"__htmldoc_page__\">" },
+            {
+              "kind": "code",
+              "text": "<script type=\"application/json\" id=\"__htmldoc_page__\">"
+            },
             " tag in standalone mode. The renderer walks the tree and emits Custom Elements; chrome.js handles tooltips, search, theme, and the warning indicator."
           ]
         },
@@ -313,7 +386,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "next",

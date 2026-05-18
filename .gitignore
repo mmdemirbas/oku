@@ -1,6 +1,36 @@
-.idea/
+# OS
 .DS_Store
-dist/
+
+# IDE / Editors
+.idea/
 *.swp
 *~
+
+# Build / Artifacts
+build/
+dist/
+*.egg-info/
+
+# Language: Python
 __pycache__/
+.venv/
+.ruff_cache/
+.pytest_cache/
+
+# html-doc: generated artifacts (regenerated on every serve/build)
+docs/site-manifest.json
+docs/site-manifest.js
+docs/llms.txt
+docs/pagefind/
+docs/*.md
+
+# html-doc: pollution from older serves that wrote at the project root
+# instead of the docs root. cmd_serve r10 writes at the docs root, but
+# ignore here to keep status clean if a stale run leaves them behind.
+/site-manifest.json
+/site-manifest.js
+/llms.txt
+
+# Personal / session working files
+SPEC.md
+_internal/

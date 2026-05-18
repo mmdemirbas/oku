@@ -11,7 +11,8 @@
     "date": "2026-05-18",
     "read_time": "~8 min read",
     "order": 10,
-    "summary": "Project setup and page structure — start here."
+    "summary": "Project setup and page structure — start here.",
+    "updated": "2026-05-18"
   },
   "blocks": [
     {
@@ -24,7 +25,6 @@
         "Per-page metadata picks accent color, page order in the nav, and the one-line summary that appears in nav tooltips and llms.txt."
       ]
     },
-
     {
       "kind": "section",
       "id": "setup",
@@ -40,11 +40,20 @@
           "kind": "paragraph",
           "content": [
             "After init, your project has a ",
-            { "kind": "code", "text": "docs/_kit/" },
+            {
+              "kind": "code",
+              "text": "docs/_kit/"
+            },
             " symlink pointing at the kit repo. Every page references the kit via ",
-            { "kind": "code", "text": "<script src=\"_kit/chrome.js\">" },
+            {
+              "kind": "code",
+              "text": "<script src=\"_kit/chrome.js\">"
+            },
             " and ",
-            { "kind": "code", "text": "<link href=\"_kit/chrome.css\">" },
+            {
+              "kind": "code",
+              "text": "<link href=\"_kit/chrome.css\">"
+            },
             " — no copies, no version drift. Update the kit in one place and every project picks it up."
           ]
         },
@@ -56,7 +65,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "anatomy",
@@ -78,11 +86,66 @@
           "kind": "list",
           "style": "bullet",
           "items": [
-            [{ "kind": "code", "text": "kind" }, " — must be ", { "kind": "code", "text": "\"page\"" }, ". The renderer rejects anything else."],
-            [{ "kind": "code", "text": "title" }, " — required. Becomes the ", { "kind": "code", "text": "<title>" }, " and the H1 in the cover."],
-            [{ "kind": "code", "text": "accent" }, " — optional. Either a named token (", { "kind": "code", "text": "teal" }, ", ", { "kind": "code", "text": "amber" }, ", ", { "kind": "code", "text": "indigo" }, ") or a CSS color value. Overrides the kit default per page."],
-            [{ "kind": "code", "text": "meta" }, " — optional object. eyebrow, subtitle, audience, date, read_time, order, summary, lang. Each is optional individually."],
-            [{ "kind": "code", "text": "blocks" }, " — the content tree. Array of top-level blocks (tldr, kpi-grid, section)."]
+            [
+              {
+                "kind": "code",
+                "text": "kind"
+              },
+              " — must be ",
+              {
+                "kind": "code",
+                "text": "\"page\""
+              },
+              ". The renderer rejects anything else."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "title"
+              },
+              " — required. Becomes the ",
+              {
+                "kind": "code",
+                "text": "<title>"
+              },
+              " and the H1 in the cover."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "accent"
+              },
+              " — optional. Either a named token (",
+              {
+                "kind": "code",
+                "text": "teal"
+              },
+              ", ",
+              {
+                "kind": "code",
+                "text": "amber"
+              },
+              ", ",
+              {
+                "kind": "code",
+                "text": "indigo"
+              },
+              ") or a CSS color value. Overrides the kit default per page."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "meta"
+              },
+              " — optional object. eyebrow, subtitle, audience, date, read_time, order, summary, lang. Each is optional individually."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "blocks"
+              },
+              " — the content tree. Array of top-level blocks (tldr, kpi-grid, section)."
+            ]
           ]
         },
         {
@@ -97,7 +160,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "blocks",
@@ -108,9 +170,15 @@
           "kind": "paragraph",
           "content": [
             "Two levels: ",
-            { "kind": "strong", "text": "top-level blocks" },
+            {
+              "kind": "strong",
+              "text": "top-level blocks"
+            },
             " allowed only at the page root (tldr, kpi-grid, section), and ",
-            { "kind": "strong", "text": "content blocks" },
+            {
+              "kind": "strong",
+              "text": "content blocks"
+            },
             " allowed inside section.blocks (paragraph, heading, callout, insight, info-tip, list, code, plus all the visual primitives)."
           ]
         },
@@ -146,7 +214,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "rich-text",
@@ -168,25 +235,68 @@
           "kind": "list",
           "style": "bullet",
           "items": [
-            [{ "kind": "code", "text": "glossary-term" }, " — { kind, term, text?, in?, lang? }. Resolves against the active glossary domains."],
-            [{ "kind": "code", "text": "ext-ref" }, " — { kind, name, text?, in?, lang? }. Like glossary-term but for external entities."],
-            [{ "kind": "code", "text": "code" }, " — { kind, text }. Inline ", { "kind": "code", "text": "<code>" }, " element."],
-            [{ "kind": "code", "text": "em" }, " — { kind, text }. Italic emphasis."],
-            [{ "kind": "code", "text": "strong" }, " — { kind, text }. Bold emphasis."],
-            [{ "kind": "code", "text": "link" }, " — { kind, text, href }. External links get target=_blank automatically."]
+            [
+              {
+                "kind": "code",
+                "text": "glossary-term"
+              },
+              " — { kind, term, text?, in?, lang? }. Resolves against the active glossary domains."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "ext-ref"
+              },
+              " — { kind, name, text?, in?, lang? }. Like glossary-term but for external entities."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "code"
+              },
+              " — { kind, text }. Inline ",
+              {
+                "kind": "code",
+                "text": "<code>"
+              },
+              " element."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "em"
+              },
+              " — { kind, text }. Italic emphasis."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "strong"
+              },
+              " — { kind, text }. Bold emphasis."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "link"
+              },
+              " — { kind, text, href }. External links get target=_blank automatically."
+            ]
           ]
         },
         {
           "kind": "paragraph",
           "content": [
             "Inline nodes can appear in any place the schema marks as ",
-            { "kind": "code", "text": "richString" },
+            {
+              "kind": "code",
+              "text": "richString"
+            },
             " — paragraph.content, list.items[*], callout.content, insight.content, info-tip nested paragraphs, compare-card.content, scope-col.items[*], step-card.content, and tldr.bullets[*]."
           ]
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "metadata",
@@ -231,7 +341,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "build",
@@ -275,7 +384,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "next",
@@ -285,15 +393,131 @@
           "kind": "paragraph",
           "content": [
             "Browse the ",
-            { "kind": "link", "text": "primitives reference", "href": "primitives.html" },
+            {
+              "kind": "link",
+              "text": "primitives reference",
+              "href": "primitives.html"
+            },
             " for every block kind with a live example. The ",
-            { "kind": "link", "text": "glossary guide", "href": "glossary.html" },
+            {
+              "kind": "link",
+              "text": "glossary guide",
+              "href": "glossary.html"
+            },
             " explains the multi-domain registry. The ",
-            { "kind": "link", "text": "architecture page", "href": "architecture.html" },
+            {
+              "kind": "link",
+              "text": "architecture page",
+              "href": "architecture.html"
+            },
             " covers the runtime — useful when something doesn't behave as expected."
           ]
         }
       ]
+    },
+    {
+      "kind": "section",
+      "title": "Round-10 additions for authors",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": "Five lifts shipped in round 10 that change how you author. Each is opt-in — old pages keep working."
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "title": "Admonition vocabulary"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Callout types align with the industry standard. Old names (warn/warning/danger/success/neutral) keep working; new aliases match what authors transferring from Docusaurus, MkDocs Material, or Mintlify expect."
+        },
+        {
+          "kind": "list",
+          "items": [
+            "<code>note</code> · informational accent",
+            "<code>tip</code> · positive guidance (alias of success)",
+            "<code>info</code> · informational (alias of note)",
+            "<code>caution</code> · alias of warning",
+            "<code>warning</code> · existing, unchanged",
+            "<code>danger</code> · existing, unchanged"
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "title": "Last-updated trust signal"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Add <code>meta.updated</code> to any page; renderer.js emits it as a quiet italic line under the cover. Pairs with the existing <code>meta.date</code> / <code>meta.audience</code> / <code>meta.read_time</code> row."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"title\": \"Authoring guide\",\n  \"meta\": {\n    \"updated\": \"2026-05-18\",\n    \"date\": \"2026-05-18\",\n    \"read_time\": \"~6 min read\"\n  },\n  \"blocks\": [ ... ]\n}"
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "title": "Code annotations"
+        },
+        {
+          "kind": "paragraph",
+          "content": "<code>{ kind: \"annotated-code\", language, source, annotations: [{id, content}] }</code>. (1) (2) markers in the code become circular accent chips; a numbered side panel renders the annotations below. Hover/click any chip lights up its annotation and vice versa."
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "title": "Citation cards"
+        },
+        {
+          "kind": "paragraph",
+          "content": "<code>&lt;ext-ref&gt;</code> auto-themes the citation card by source type. Add an explicit <code>type</code> in the extref entry (or override on the element) to pick: paper · rfc · release · blog · other. Inline cite text inherits the type's color on its dotted underline; the hover card shows a type-tinted icon tile, mono source-domain pill, optional author + date row."
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "title": "Synced hover pairs"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Any element with <code>data-bind=\"X\"</code> pairs with any other carrying the same key. Hover/focus one — both flash accent. JSON blocks accept <code>bind</code> on any kind; renderer.js propagates onto the emitted element. Use sparingly for prose↔code, step↔snippet, or claim↔citation pairs."
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "title": "Inline placeholder personalization"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Declare personalization keys in <code>kit.json</code>:"
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"personalization\": [\n    { \"key\": \"apiKey\",    \"label\": \"API Key\",    \"default\": \"sk_test_...\" },\n    { \"key\": \"projectId\", \"label\": \"Project ID\", \"type\": \"text\" }\n  ]\n}"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Snippets reference <code>{{apiKey}}</code> etc. — chrome.js swaps the value at runtime with a subtle accent highlight. A gear icon appears in the top-right chrome cluster; click to edit values. State persists in localStorage; no server."
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "title": "JSON-shaped tables"
+        },
+        {
+          "kind": "paragraph",
+          "content": "New <code>kind: \"table\"</code> block. Two valid shapes:"
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "// Flat\n{ \"kind\": \"table\",\n  \"headers\": [\"Engine\", \"Storage\", \"License\"],\n  \"rows\": [\n    [\"Iceberg\", \"S3 + manifests\", \"Apache 2.0\"],\n    [\"Delta\",   \"S3 + log\",       \"Apache 2.0\"]\n  ]\n}\n\n// Grouped — chrome.js renders titles as subhead rows across all views\n{ \"kind\": \"table\",\n  \"headers\": [\"Feature\", \"Status\"],\n  \"groups\": [\n    { \"title\": \"Storage\",  \"rows\": [[\"Iceberg\", \"GA\"], [\"Delta\", \"GA\"]] },\n    { \"title\": \"Catalog\",  \"rows\": [[\"Hive\", \"GA\"], [\"Polaris\", \"Beta\"]] }\n  ]\n}"
+        }
+      ],
+      "id": "round-10-additions-for-authors"
     }
   ]
 }
