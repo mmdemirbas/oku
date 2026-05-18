@@ -382,6 +382,12 @@ function initReadingAids() {
     });
   })();
 
+  /* Prism syntax highlight — lazy CDN load; only triggers if at least
+     one `<code class="language-...">` block exists on the page. */
+  if (typeof __prismLoader !== 'undefined') {
+    __prismLoader.highlightAll();
+  }
+
   /* Glossary tooltip — legacy v1 .g-wrap mobile tap support. The new
      tooltip controller attaches its own listeners; this remains for
      hand-authored HTML using the legacy class. Per-element handler
@@ -1093,6 +1099,71 @@ var __htmldocVisualTools = (function () {
   }
 
   return { makeToolbar: makeToolbar, copyText: copyText, svgToPng: svgToPng, flash: flash };
+})();
+
+/* ============ Prism syntax highlighter (lazy CDN) ============ *
+ * Loads Prism.js + autoloader on first call. Autoloader fetches
+ * per-language components on demand, so this page-level script
+ * stays small and Prism only pays for languages the page actually
+ * uses. Tokens themed via chrome.css custom properties — no second
+ * Prism theme stylesheet needed.
+ * --------------------------------------------------------------- */
+var __prismLoader = (function () {
+  var loadPromise = null;
+  var VERSION = '1.29.0';
+  var CDN = 'https://cdn.jsdelivr.net/npm/prismjs@' + VERSION + '/';
+
+  function ensureScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.crossOrigin = 'anonymous';
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error('failed to load ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function load() {
+    if (loadPromise) return loadPromise;
+    // Set the manual flag BEFORE prism.min.js runs so Prism doesn't
+    // auto-highlight on DOMContentLoaded — we control the timing.
+    window.Prism = window.Prism || {};
+    window.Prism.manual = true;
+
+    loadPromise = ensureScript(CDN + 'prism.min.js')
+      .then(function () {
+        return ensureScript(CDN + 'plugins/autoloader/prism-autoloader.min.js');
+      })
+      .then(function () {
+        if (window.Prism && window.Prism.plugins && window.Prism.plugins.autoloader) {
+          window.Prism.plugins.autoloader.languages_path = CDN + 'components/';
+        }
+        return window.Prism;
+      });
+    return loadPromise;
+  }
+
+  function highlightAll(root) {
+    // Skip if no language-tagged blocks exist on the page — saves the
+    // CDN round-trip for plain-text-only pages.
+    var ctx = root || document;
+    var blocks = ctx.querySelectorAll('code[class*="language-"]');
+    if (!blocks.length) return Promise.resolve();
+    return load().then(function (Prism) {
+      if (Prism && typeof Prism.highlightAllUnder === 'function') {
+        Prism.highlightAllUnder(ctx);
+      } else if (Prism && typeof Prism.highlightAll === 'function') {
+        Prism.highlightAll();
+      }
+    }).catch(function (e) {
+      window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+        detail: [{ code: 'prism-load-failed', msg: 'Could not load Prism: ' + (e.message || e), level: 'info' }]
+      }));
+    });
+  }
+  return { load: load, highlightAll: highlightAll };
 })();
 
 /* ============ <html-doc-diagram> — Mermaid (lazy-loaded) ============ */

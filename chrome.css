@@ -389,6 +389,52 @@ code:not(pre code) {
   color: var(--accent-strong);
 }
 
+/* ============ Prism syntax tokens (themed via chrome vars) ============ *
+ * Prism is lazy-loaded from a CDN by chrome.js when at least one
+ * <code class="language-..."> block exists. Tokens derive from the same
+ * --accent/--text-soft/etc. variables that drive the rest of the kit,
+ * so light/dark theme swaps without a second stylesheet.
+ * --------------------------------------------------------------------- */
+:not(pre) > code[class*="language-"],
+pre[class*="language-"] {
+  background: transparent;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  text-shadow: none;
+}
+.token.comment, .token.prolog, .token.doctype, .token.cdata {
+  color: var(--text-faint); font-style: italic;
+}
+.token.punctuation { color: var(--text-soft); }
+.token.namespace   { opacity: 0.7; }
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.property,
+.token.deleted     { color: var(--accent); }
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted    { color: var(--success); }
+.token.operator,
+.token.entity,
+.token.url         { color: var(--text-soft); }
+.token.atrule,
+.token.attr-value,
+.token.keyword     { color: var(--accent-strong); font-weight: 500; }
+.token.function,
+.token.class-name  { color: var(--warning); }
+.token.regex,
+.token.important,
+.token.variable    { color: var(--danger); }
+.token.important, .token.bold { font-weight: 700; }
+.token.italic      { font-style: italic; }
+.token.entity      { cursor: help; }
+
 /* ============ TL;DR block ============ */
 .tldr {
   margin: 0 0 40px 0; padding: 28px 32px;
