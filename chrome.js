@@ -924,9 +924,11 @@ class HtmlDocChart extends HTMLElement {
       parts.push('<line x1="' + (pad.left - 4) + '" y1="' + yTickPos + '" x2="' + pad.left + '" y2="' + yTickPos + '" class="hdc-axis"/>');
       parts.push('<text x="' + (pad.left - 6) + '" y="' + (yTickPos + 4) + '" text-anchor="end" class="hdc-tick">' + fmtNum(yTickVal) + '</text>');
     }
-    // Series
+    // Series — each wrapped in a <g data-series-idx> so the legend can
+    // toggle its `.dim` class to mute/unmute the series visually.
     series.forEach(function (s, i) {
       var color = palette[s.color] || palette.accent;
+      parts.push('<g class="hdc-series" data-series-idx="' + i + '">');
       if (type === 'line') {
         var d = (s.data || []).map(function (p, idx) {
           return (idx === 0 ? 'M ' : 'L ') + sx(p.x) + ' ' + sy(p.y);
@@ -934,20 +936,40 @@ class HtmlDocChart extends HTMLElement {
         parts.push('<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" class="hdc-line"/>');
       }
       (s.data || []).forEach(function (p) {
-        parts.push('<circle cx="' + sx(p.x) + '" cy="' + sy(p.y) + '" r="4" fill="' + color + '" class="hdc-dot"/>');
+        var dotLabel = escapeXml(String(p.label != null ? p.label : ''));
+        var seriesLbl = escapeXml(String(s.label != null ? s.label : ''));
+        parts.push(
+          '<circle cx="' + sx(p.x) + '" cy="' + sy(p.y) + '" r="4" fill="' + color +
+          '" class="hdc-dot"' +
+          ' data-x="' + p.x + '" data-y="' + p.y +
+          '" data-point-label="' + dotLabel +
+          '" data-series-label="' + seriesLbl + '"' +
+          ' tabindex="0" role="img" aria-label="' +
+            (seriesLbl ? seriesLbl + ': ' : '') + (dotLabel ? dotLabel + ' ' : '') +
+            '(' + fmtNum(p.x) + ', ' + fmtNum(p.y) + ')' +
+          '"/>'
+        );
         if (p.label) {
           parts.push('<text x="' + (sx(p.x) + 8) + '" y="' + (sy(p.y) + 4) + '" class="hdc-point-label">' + escapeXml(p.label) + '</text>');
         }
       });
+      parts.push('</g>');
       if (s.label) {
         var lx = W - pad.right - 12;
         var ly = pad.top + 14 + i * 18;
-        parts.push('<rect x="' + (lx - 110) + '" y="' + (ly - 9) + '" width="14" height="14" rx="2" fill="' + color + '"/>');
-        parts.push('<text x="' + (lx - 92) + '" y="' + (ly + 2) + '" class="hdc-legend">' + escapeXml(s.label) + '</text>');
+        parts.push(
+          '<g class="hdc-legend-chip" data-series-idx="' + i + '" tabindex="0" role="button" ' +
+          'aria-label="Toggle ' + escapeXml(s.label) + ' series">' +
+            '<rect x="' + (lx - 116) + '" y="' + (ly - 12) + '" width="120" height="20" rx="4" class="hdc-legend-bg"/>' +
+            '<rect x="' + (lx - 110) + '" y="' + (ly - 9) + '" width="14" height="14" rx="2" fill="' + color + '" class="hdc-legend-swatch"/>' +
+            '<text x="' + (lx - 92) + '" y="' + (ly + 2) + '" class="hdc-legend">' + escapeXml(s.label) + '</text>' +
+          '</g>'
+        );
       }
     });
     parts.push('</svg>');
     this.insertAdjacentHTML('beforeend', parts.join(''));
+    this._wireInteractivity();
 
     var self = this;
     var chartTitle = title || (type + '-chart');
@@ -963,6 +985,73 @@ class HtmlDocChart extends HTMLElement {
         }
       }
     ]);
+  }
+
+  _wireInteractivity() {
+    var self = this;
+
+    /* Hover tooltip — one shared element per chart, lazily created. */
+    function ensureTip() {
+      var t = self.querySelector(':scope > .hdc-tooltip');
+      if (t) return t;
+      t = document.createElement('div');
+      t.className = 'hdc-tooltip';
+      t.setAttribute('role', 'tooltip');
+      t.setAttribute('aria-hidden', 'true');
+      self.appendChild(t);
+      return t;
+    }
+    function showTip(dot) {
+      var tip = ensureTip();
+      var seriesLbl = dot.getAttribute('data-series-label') || '';
+      var pointLbl  = dot.getAttribute('data-point-label')  || '';
+      var x = dot.getAttribute('data-x');
+      var y = dot.getAttribute('data-y');
+      var html = '';
+      if (seriesLbl) html += '<div class="hdc-tt-series">' + escapeXml(seriesLbl) + '</div>';
+      if (pointLbl)  html += '<div class="hdc-tt-label">'  + escapeXml(pointLbl)  + '</div>';
+      html += '<div class="hdc-tt-coords">(' + fmtNum(parseFloat(x)) + ', ' + fmtNum(parseFloat(y)) + ')</div>';
+      tip.innerHTML = html;
+      tip.setAttribute('aria-hidden', 'false');
+      var hostRect = self.getBoundingClientRect();
+      var dotRect  = dot.getBoundingClientRect();
+      var left = (dotRect.left - hostRect.left) + dotRect.width / 2;
+      var top  = (dotRect.top  - hostRect.top)  - 8;
+      tip.style.left = left + 'px';
+      tip.style.top  = top  + 'px';
+      tip.classList.add('visible');
+    }
+    function hideTip() {
+      var tip = self.querySelector(':scope > .hdc-tooltip');
+      if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
+    }
+    this.querySelectorAll('.hdc-dot').forEach(function (dot) {
+      dot.addEventListener('mouseenter', function () { showTip(dot); });
+      dot.addEventListener('mouseleave', hideTip);
+      dot.addEventListener('focus',      function () { showTip(dot); });
+      dot.addEventListener('blur',       hideTip);
+    });
+
+    /* Legend chip — click or Enter/Space toggles `.dim` on the matching
+       <g class="hdc-series"> so the user can mute series visually. */
+    function toggleSeries(chip) {
+      var idx = chip.getAttribute('data-series-idx');
+      var series = self.querySelector('.hdc-series[data-series-idx="' + idx + '"]');
+      if (!series) return;
+      var on = series.classList.toggle('dim');
+      chip.classList.toggle('off', on);
+      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    this.querySelectorAll('.hdc-legend-chip').forEach(function (chip) {
+      chip.setAttribute('aria-pressed', 'false');
+      chip.addEventListener('click', function () { toggleSeries(chip); });
+      chip.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleSeries(chip);
+        }
+      });
+    });
   }
 }
 if (!customElements.get('html-doc-chart')) customElements.define('html-doc-chart', HtmlDocChart);

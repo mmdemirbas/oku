@@ -1166,10 +1166,83 @@ html-doc-chart .hdc-tick {
   font: 400 10.5px 'JetBrains Mono', monospace;
 }
 html-doc-chart .hdc-line { stroke-linejoin: round; stroke-linecap: round; }
-html-doc-chart .hdc-dot { stroke: var(--surface); stroke-width: 1.5; }
+html-doc-chart .hdc-dot {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+  cursor: pointer;
+  transition: r 0.12s ease, stroke-width 0.12s ease, opacity 0.18s ease;
+}
+html-doc-chart .hdc-dot:hover,
+html-doc-chart .hdc-dot:focus {
+  r: 6;
+  stroke-width: 2;
+  outline: none;
+}
+html-doc-chart .hdc-dot:focus-visible {
+  stroke: var(--accent-strong);
+}
 html-doc-chart .hdc-point-label {
   fill: var(--text-soft);
   font: 400 10.5px 'Inter', sans-serif;
+}
+
+/* Series dimming via legend toggle */
+html-doc-chart .hdc-series { transition: opacity 0.2s ease; }
+html-doc-chart .hdc-series.dim { opacity: 0.15; }
+
+/* Legend chips — clickable, focusable */
+html-doc-chart .hdc-legend-chip { cursor: pointer; }
+html-doc-chart .hdc-legend-bg {
+  fill: transparent;
+  transition: fill 0.12s ease;
+}
+html-doc-chart .hdc-legend-chip:hover .hdc-legend-bg,
+html-doc-chart .hdc-legend-chip:focus-visible .hdc-legend-bg {
+  fill: var(--accent-soft);
+}
+html-doc-chart .hdc-legend-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+html-doc-chart .hdc-legend-chip.off .hdc-legend-swatch { opacity: 0.25; }
+html-doc-chart .hdc-legend-chip.off .hdc-legend { fill: var(--text-faint); text-decoration: line-through; }
+
+/* Hover tooltip — chart-local; styling shares the kit's surface tokens
+   but doesn't reuse the glossary tooltip controller (no "pin" affordance,
+   no "Learn more" link — wrong shape for a data tooltip). */
+html-doc-chart .hdc-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  box-shadow: 0 6px 16px var(--shadow-strong);
+  white-space: nowrap;
+  z-index: 5;
+  max-width: 260px;
+}
+html-doc-chart .hdc-tooltip.visible { opacity: 1; }
+html-doc-chart .hdc-tooltip .hdc-tt-series {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-strong);
+  margin-bottom: 2px;
+}
+html-doc-chart .hdc-tooltip .hdc-tt-label { font-weight: 600; }
+html-doc-chart .hdc-tooltip .hdc-tt-coords {
+  color: var(--text-soft);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  margin-top: 2px;
 }
 html-doc-chart .hdc-legend {
   fill: var(--text);
