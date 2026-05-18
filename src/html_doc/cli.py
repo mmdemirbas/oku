@@ -851,6 +851,75 @@ def find_project_root(start: Path) -> Path:
     return start
 
 
+# ---------- Serve-time search index (best-effort) ----------
+def _common_docs_dir(root: Path, pages: list[tuple[Path, dict]]) -> Path:
+    """Find the closest common parent of all JSON pages — the natural
+    'docs root' for serving search and other per-project assets.
+
+    Most projects have all JSON pages in one directory (typically
+    ``docs/``); a few nest deeper. Returns the project root as a safe
+    fallback when pages live in scattered places.
+    """
+    if not pages:
+        return root
+    parents = [str(p.parent) for p, _ in pages]
+    common = Path(os.path.commonpath(parents))
+    try:
+        common.relative_to(root)
+    except ValueError:
+        return root
+    return common
+
+
+def _build_serve_search_index(root: Path) -> bool:
+    """Build a Pagefind index against the current docs and link it into
+    the docs root so chrome.js's existing search-loader picks it up
+    without needing a full ``html-doc build`` first.
+
+    Best-effort: returns False (silently) if pagefind isn't on PATH or
+    if any step fails. The user gets a notice; the rest of serve still
+    works.
+    """
+    pages = find_json_pages(root)
+    if not pages:
+        return False
+    has_bin = bool(shutil.which('pagefind') or shutil.which('npx'))
+    if not has_bin:
+        print('! Search disabled — install pagefind (brew install pagefind) '
+              'or pass --no-search to silence this notice.')
+        return False
+    docs_dir = _common_docs_dir(root, pages)
+    htmls = [p for p in find_html_files(docs_dir) if 'dist' not in p.parts]
+    if not htmls:
+        return False
+    target = root / 'dist' / '_search' / 'site'
+    if target.exists():
+        shutil.rmtree(target)
+    try:
+        build_site(htmls, target, docs_dir)
+    except OSError:
+        return False
+    if not pagefind_index(target):
+        return False
+    # Surface the index at <docs-dir>/pagefind/ via symlink so the
+    # runtime path __htmldocDocsRoot + 'pagefind/pagefind.js' resolves.
+    pf_src = target / 'pagefind'
+    pf_link = docs_dir / 'pagefind'
+    if pf_src.exists():
+        try:
+            if pf_link.is_symlink() or pf_link.exists():
+                if pf_link.is_symlink():
+                    pf_link.unlink()
+                elif pf_link.is_dir():
+                    shutil.rmtree(pf_link)
+            pf_link.symlink_to(pf_src.resolve())
+            print(f'✓ Search index ready: {pf_link.relative_to(root)} ({len(htmls)} page(s))')
+            return True
+        except OSError as e:
+            print(f'! Search index built but link failed: {e}')
+    return False
+
+
 # ---------- Live-reload (SSE + filesystem watcher) ----------
 _SSE_CLIENTS: list = []
 _SSE_LOCK = threading.Lock()
@@ -1058,6 +1127,13 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     htmls = sorted(p for p in root.rglob('*.html') if 'dist' not in p.parts and 'node_modules' not in p.parts)
 
+    # Serve-time Pagefind index (background, best-effort) so search works
+    # without requiring the user to run `html-doc build` first.
+    search_enabled = not getattr(args, 'no_search', False)
+    if search_enabled:
+        threading.Thread(target=_build_serve_search_index, args=(root,),
+                         name='html-doc-search', daemon=True).start()
+
     # Filesystem watcher → SSE broadcast → in-browser reload.
     watch_enabled = not getattr(args, 'no_watch', False)
     watcher_stop = threading.Event()
@@ -1111,6 +1187,10 @@ def main() -> int:
     serve_parser.add_argument(
         '--no-watch', action='store_true',
         help='disable the filesystem watcher + auto-reload (serve static only)',
+    )
+    serve_parser.add_argument(
+        '--no-search', action='store_true',
+        help='skip background Pagefind index generation at startup',
     )
 
     args = parser.parse_args()
