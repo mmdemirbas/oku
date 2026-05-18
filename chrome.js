@@ -141,8 +141,10 @@ class PageToc extends HTMLElement {
     // Only render the tab when in v2 3-column layout; in legacy 2-column the
     // top-left ctrl-btn handles toggling.
     this.innerHTML =
-      (inV2Layout ? '<button class="page-toc-tab" type="button" aria-label="Toggle on-this-page">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg>' +
+      (inV2Layout ? '<button class="page-toc-tab" type="button" aria-label="Toggle on-this-page" title="Toggle on-this-page (click anywhere on this edge)">' +
+        '<span class="page-toc-tab-thumb" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>' +
+        '</span>' +
       '</button>' : '') +
       '<div class="page-toc-panel">' +
         '<div class="toc-header"><h2>' + title + '</h2></div>' +
@@ -1542,8 +1544,10 @@ class PageNav extends HTMLElement {
         '<div class="page-nav-header"><h2>' + title + '</h2></div>' +
         '<ol class="page-nav-tree"><li class="page-nav-loading">Loading…</li></ol>' +
       '</div>' +
-      '<button class="page-nav-tab" type="button" aria-label="Toggle pages">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 6 9 12 15 18"/></svg>' +
+      '<button class="page-nav-tab" type="button" aria-label="Toggle pages" title="Toggle pages (click anywhere on this edge)">' +
+        '<span class="page-nav-tab-thumb" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg>' +
+        '</span>' +
       '</button>';
     var self = this;
     this.querySelector('.page-nav-tab').addEventListener('click', function () {

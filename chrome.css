@@ -920,9 +920,12 @@ page-nav .page-nav-empty {
   font-style: italic;
 }
 /* Pane edge tabs (page-nav left, page-toc right) are fixed-positioned
-   and follow each pane's inner edge via --nav-tab-left / --toc-tab-right
-   CSS variables that chrome.js syncs from the pane's bounding rect.
-   Decoupled from the grid track so:
+   FULL-HEIGHT rails — the entire inner edge of the panel is clickable.
+   The visible chevron sits in a centered thumb pill so the affordance
+   remains a familiar shape, but the click target spans the whole edge.
+   Position is fixed and tracks each pane's inner edge via
+   --nav-tab-left / --toc-tab-right (synced by chrome.js from
+   getBoundingClientRect), so:
    - horizontal scroll of overflowing main content doesn't move them,
    - one pane's collapse animates the tab with that pane only,
    - browser zoom and pinch-zoom (via --vv-*) keep them in place.
@@ -930,31 +933,69 @@ page-nav .page-nav-empty {
    to the viewport edges so they remain reachable when a drawer is shut. */
 page-nav .page-nav-tab {
   position: fixed;
-  top: 50%;
+  top: 0;
+  bottom: 0;
   left: var(--nav-tab-left, 248px);
   z-index: 50;
+  width: 22px;
+  height: 100vh;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease;
+  transform: translate(var(--vv-left, 0), var(--vv-top, 0));
+}
+page-nav .page-nav-tab::before {
+  /* Subtle accent stripe on the inner edge — reinforces "this whole
+     side is clickable" without screaming. Brightens to accent on hover. */
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 3px;
+  background: transparent;
+  transition: background 0.18s ease;
+  pointer-events: none;
+}
+page-nav .page-nav-tab:hover,
+page-nav .page-nav-tab:focus-visible {
+  background: linear-gradient(90deg, var(--accent-soft) 0%, transparent 80%);
+  outline: none;
+}
+page-nav .page-nav-tab:hover::before,
+page-nav .page-nav-tab:focus-visible::before { background: var(--accent); }
+.page-nav-tab-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 22px;
   height: 64px;
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-left: none;
   border-radius: 0 6px 6px 0;
-  cursor: pointer;
-  color: var(--text-soft);
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   box-shadow: 0 4px 12px var(--shadow-soft);
-  transition: background 0.15s, color 0.15s, transform 0.12s;
-  transform: translateY(-50%) translate(var(--vv-left, 0), var(--vv-top, 0));
+  color: var(--text-soft);
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+              transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
 }
-page-nav .page-nav-tab:hover { background: var(--accent-soft); color: var(--accent-strong); }
-page-nav .page-nav-tab:active {
-  transform: translateY(-50%) translate(var(--vv-left, 0), var(--vv-top, 0)) scale(0.96);
+page-nav .page-nav-tab:hover .page-nav-tab-thumb,
+page-nav .page-nav-tab:focus-visible .page-nav-tab-thumb {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  transform: translateX(2px) scaleX(1.3);
 }
-page-nav .page-nav-tab svg { width: 14px; height: 14px; transition: transform 0.2s; }
-.layout.nav-collapsed page-nav .page-nav-tab svg { transform: rotate(180deg); }
+page-nav .page-nav-tab:active .page-nav-tab-thumb {
+  transform: translateX(2px) scaleX(1.2) scale(0.96);
+  transition-duration: 0.08s;
+}
+.page-nav-tab-thumb svg { width: 14px; height: 14px; transition: transform 0.2s; }
+.layout.nav-collapsed .page-nav-tab-thumb svg { transform: rotate(180deg); }
 
 /* page-toc gets its own edge tab on the left side (the side facing main) */
 .layout:has(page-nav) page-toc {
@@ -979,31 +1020,67 @@ body.toc-collapsed .layout:has(page-nav) page-toc .page-toc-panel {
 }
 .layout:has(page-nav) page-toc .page-toc-tab {
   position: fixed;
-  top: 50%;
+  top: 0;
+  bottom: 0;
   right: var(--toc-tab-right, 228px);
   z-index: 50;
+  width: 22px;
+  height: 100vh;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease;
+  transform: translate(var(--vv-left, 0), var(--vv-top, 0));
+}
+.layout:has(page-nav) page-toc .page-toc-tab::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  width: 3px;
+  background: transparent;
+  transition: background 0.18s ease;
+  pointer-events: none;
+}
+.layout:has(page-nav) page-toc .page-toc-tab:hover,
+.layout:has(page-nav) page-toc .page-toc-tab:focus-visible {
+  background: linear-gradient(270deg, var(--accent-soft) 0%, transparent 80%);
+  outline: none;
+}
+.layout:has(page-nav) page-toc .page-toc-tab:hover::before,
+.layout:has(page-nav) page-toc .page-toc-tab:focus-visible::before { background: var(--accent); }
+.page-toc-tab-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 22px;
   height: 64px;
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-right: none;
   border-radius: 6px 0 0 6px;
-  cursor: pointer;
-  color: var(--text-soft);
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   box-shadow: 0 4px 12px var(--shadow-soft);
-  transition: background 0.15s, color 0.15s, transform 0.12s;
-  transform: translateY(-50%) translate(var(--vv-left, 0), var(--vv-top, 0));
+  color: var(--text-soft);
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+              transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
 }
-.layout:has(page-nav) page-toc .page-toc-tab:hover { background: var(--accent-soft); color: var(--accent-strong); }
-.layout:has(page-nav) page-toc .page-toc-tab:active {
-  transform: translateY(-50%) translate(var(--vv-left, 0), var(--vv-top, 0)) scale(0.96);
+.layout:has(page-nav) page-toc .page-toc-tab:hover .page-toc-tab-thumb,
+.layout:has(page-nav) page-toc .page-toc-tab:focus-visible .page-toc-tab-thumb {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  transform: translateX(-2px) scaleX(1.3);
 }
-.layout:has(page-nav) page-toc .page-toc-tab svg { width: 14px; height: 14px; transition: transform 0.2s; }
-body.toc-collapsed .layout:has(page-nav) page-toc .page-toc-tab svg { transform: rotate(180deg); }
+.layout:has(page-nav) page-toc .page-toc-tab:active .page-toc-tab-thumb {
+  transform: translateX(-2px) scaleX(1.2) scale(0.96);
+  transition-duration: 0.08s;
+}
+.page-toc-tab-thumb svg { width: 14px; height: 14px; transition: transform 0.2s; }
+body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
 
 /* In v2 layout, hide the top-left ctrl-btn .toc-toggle (its job is now done
    by the edge tabs that live on each sidebar). The theme toggle stays. */
