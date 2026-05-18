@@ -53,6 +53,7 @@ const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_CROSS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
 const ICON_BRACES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2"/><path d="M16 3a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2"/></svg>';
 const ICON_CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+const ICON_RESET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15A9 9 0 1 0 6 5.3L1 10"/></svg>';
 
 /* ============ Three-mode theme cycler (system → light → dark → system) ============ */
 function getThemeMode() {
@@ -1298,15 +1299,17 @@ class HtmlDocChart extends HTMLElement {
     if (dataNode) {
       try { series = JSON.parse(dataNode.textContent || '[]'); } catch (e) { series = []; }
     }
-    var type = this.getAttribute('type') || 'scatter';
-    var title = this.getAttribute('title') || '';
-    var xLabel = this.getAttribute('x-label') || '';
-    var yLabel = this.getAttribute('y-label') || '';
+    this._series  = series;
+    this._type    = this.getAttribute('type') || 'scatter';
+    this._title   = this.getAttribute('title') || '';
+    this._xLabel  = this.getAttribute('x-label') || '';
+    this._yLabel  = this.getAttribute('y-label') || '';
+    this._xScale  = (this.getAttribute('x-scale') || 'linear').toLowerCase();
+    this._yScale  = (this.getAttribute('y-scale') || 'linear').toLowerCase();
 
     this.innerHTML = '';
     if (dataNode) this.appendChild(dataNode);
 
-    // Compute bounds
     var allPoints = [];
     series.forEach(function (s) { (s.data || []).forEach(function (p) { allPoints.push(p); }); });
     if (allPoints.length === 0) {
@@ -1319,57 +1322,107 @@ class HtmlDocChart extends HTMLElement {
     var yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
     if (xMin === xMax) { xMin -= 1; xMax += 1; }
     if (yMin === yMax) { yMin -= 1; yMax += 1; }
-    // Pad 5%
     var xPad = (xMax - xMin) * 0.05;
     var yPad = (yMax - yMin) * 0.05;
-    xMin -= xPad; xMax += xPad;
-    yMin -= yPad; yMax += yPad;
+    if (this._xScale !== 'log') { xMin -= xPad; xMax += xPad; }
+    if (this._yScale !== 'log') { yMin -= yPad; yMax += yPad; }
+    // Log scale requires positive values; clamp lower bound.
+    if (this._xScale === 'log' && xMin <= 0) xMin = Math.max(1e-6, xs.filter(function (v) { return v > 0; })[0] || 1e-6);
+    if (this._yScale === 'log' && yMin <= 0) yMin = Math.max(1e-6, ys.filter(function (v) { return v > 0; })[0] || 1e-6);
 
-    var W = 640, H = 360;
-    var pad = { top: title ? 32 : 16, right: 24, bottom: xLabel ? 50 : 32, left: yLabel ? 56 : 40 };
-    var plotW = W - pad.left - pad.right;
-    var plotH = H - pad.top - pad.bottom;
+    this._W = 640; this._H = 360;
+    this._pad = { top: this._title ? 32 : 16, right: 24, bottom: this._xLabel ? 50 : 32, left: this._yLabel ? 56 : 40 };
+    this._plotW = this._W - this._pad.left - this._pad.right;
+    this._plotH = this._H - this._pad.top  - this._pad.bottom;
 
-    function sx(x) { return pad.left + ((x - xMin) / (xMax - xMin)) * plotW; }
-    function sy(y) { return pad.top + plotH - ((y - yMin) / (yMax - yMin)) * plotH; }
+    this._origView = { xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax };
+    this._view = Object.assign({}, this._origView);
 
-    var palette = {
-      accent:  'var(--accent)',
-      warn:    'var(--warning)',
-      danger:  'var(--danger)',
-      success: 'var(--success)',
-      muted:   'var(--text-soft)'
-    };
+    this._render();
+    this._attachToolbar();
+    this._attachPanZoom();
+  }
+
+  _render() {
+    var self = this;
+    var v = this._view;
+    var pad = this._pad, plotW = this._plotW, plotH = this._plotH;
+    var W = this._W, H = this._H;
+    var xLog = this._xScale === 'log', yLog = this._yScale === 'log';
+
+    function sx(x) {
+      if (xLog) {
+        if (x <= 0) x = v.xMin;
+        return pad.left + (Math.log(x / v.xMin) / Math.log(v.xMax / v.xMin)) * plotW;
+      }
+      return pad.left + ((x - v.xMin) / (v.xMax - v.xMin)) * plotW;
+    }
+    function sy(y) {
+      if (yLog) {
+        if (y <= 0) y = v.yMin;
+        return pad.top + plotH - (Math.log(y / v.yMin) / Math.log(v.yMax / v.yMin)) * plotH;
+      }
+      return pad.top + plotH - ((y - v.yMin) / (v.yMax - v.yMin)) * plotH;
+    }
+    // Cache the inverse mappings for the pan/zoom logic.
+    this._sx = sx; this._sy = sy;
+
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
 
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + (title || (type + ' chart')) + '" class="hdc-svg">');
-    if (title) {
-      parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(title) + '</text>');
-    }
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + (this._title || (this._type + ' chart')) + '" class="hdc-svg">');
+    // Clip rect so the plot doesn't bleed into the chrome when zoomed.
+    parts.push('<defs><clipPath id="hdc-clip"><rect x="' + pad.left + '" y="' + pad.top + '" width="' + plotW + '" height="' + plotH + '"/></clipPath></defs>');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
     // Axes
     parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
     parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
-    // Axis labels
-    if (xLabel) parts.push('<text x="' + (pad.left + plotW / 2) + '" y="' + (H - 14) + '" text-anchor="middle" class="hdc-axis-label">' + escapeXml(xLabel) + '</text>');
-    if (yLabel) parts.push('<text x="' + 14 + '" y="' + (pad.top + plotH / 2) + '" text-anchor="middle" class="hdc-axis-label" transform="rotate(-90 14,' + (pad.top + plotH / 2) + ')">' + escapeXml(yLabel) + '</text>');
-    // Ticks (3 per axis)
-    for (var t = 0; t <= 4; t++) {
-      var xTickVal = xMin + (t / 4) * (xMax - xMin);
-      var xTickPos = sx(xTickVal);
-      parts.push('<line x1="' + xTickPos + '" y1="' + (pad.top + plotH) + '" x2="' + xTickPos + '" y2="' + (pad.top + plotH + 4) + '" class="hdc-axis"/>');
-      parts.push('<text x="' + xTickPos + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + fmtNum(xTickVal) + '</text>');
-      var yTickVal = yMin + (t / 4) * (yMax - yMin);
-      var yTickPos = sy(yTickVal);
-      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + yTickPos + '" x2="' + pad.left + '" y2="' + yTickPos + '" class="hdc-axis"/>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (yTickPos + 4) + '" text-anchor="end" class="hdc-tick">' + fmtNum(yTickVal) + '</text>');
+    if (this._xLabel) parts.push('<text x="' + (pad.left + plotW / 2) + '" y="' + (H - 14) + '" text-anchor="middle" class="hdc-axis-label">' + escapeXml(this._xLabel) + (xLog ? ' (log)' : '') + '</text>');
+    if (this._yLabel) parts.push('<text x="' + 14 + '" y="' + (pad.top + plotH / 2) + '" text-anchor="middle" class="hdc-axis-label" transform="rotate(-90 14,' + (pad.top + plotH / 2) + ')">' + escapeXml(this._yLabel) + (yLog ? ' (log)' : '') + '</text>');
+    // Ticks — log uses powers; linear uses 5 evenly-spaced.
+    function logTicks(min, max) {
+      var ticks = [];
+      var lo = Math.floor(Math.log10(min));
+      var hi = Math.ceil(Math.log10(max));
+      for (var p = lo; p <= hi; p++) {
+        var v = Math.pow(10, p);
+        if (v >= min && v <= max) ticks.push(v);
+      }
+      // Add interior 2 / 5 / 10 multiples if the range is short.
+      if (ticks.length < 4) {
+        ticks = [];
+        for (var p2 = lo; p2 <= hi; p2++) {
+          [1, 2, 5].forEach(function (m) {
+            var v = m * Math.pow(10, p2);
+            if (v >= min && v <= max) ticks.push(v);
+          });
+        }
+      }
+      return ticks;
     }
-    // Series — each wrapped in a <g data-series-idx> so the legend can
-    // toggle its `.dim` class to mute/unmute the series visually.
+    var xTicks = xLog ? logTicks(v.xMin, v.xMax) :
+      (function () { var r = []; for (var i = 0; i <= 4; i++) r.push(v.xMin + (i / 4) * (v.xMax - v.xMin)); return r; })();
+    var yTicks = yLog ? logTicks(v.yMin, v.yMax) :
+      (function () { var r = []; for (var i = 0; i <= 4; i++) r.push(v.yMin + (i / 4) * (v.yMax - v.yMin)); return r; })();
+    xTicks.forEach(function (val) {
+      var pos = sx(val);
+      parts.push('<line x1="' + pos + '" y1="' + (pad.top + plotH) + '" x2="' + pos + '" y2="' + (pad.top + plotH + 4) + '" class="hdc-axis"/>');
+      parts.push('<text x="' + pos + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + fmtNum(val) + '</text>');
+    });
+    yTicks.forEach(function (val) {
+      var pos = sy(val);
+      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + pos + '" x2="' + pad.left + '" y2="' + pos + '" class="hdc-axis"/>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (pos + 4) + '" text-anchor="end" class="hdc-tick">' + fmtNum(val) + '</text>');
+    });
+
+    // Plot region (clipped). All series + their dots / labels live here so
+    // points that scroll past the axes don't leak.
+    parts.push('<g clip-path="url(#hdc-clip)">');
     var plotMidX = pad.left + plotW / 2;
-    series.forEach(function (s, i) {
+    this._series.forEach(function (s, i) {
       var color = palette[s.color] || palette.accent;
       parts.push('<g class="hdc-series" data-series-idx="' + i + '">');
-      if (type === 'line') {
+      if (self._type === 'line') {
         var d = (s.data || []).map(function (p, idx) {
           return (idx === 0 ? 'M ' : 'L ') + sx(p.x) + ' ' + sy(p.y);
         }).join(' ');
@@ -1383,53 +1436,60 @@ class HtmlDocChart extends HTMLElement {
         parts.push(
           '<circle cx="' + px + '" cy="' + py + '" r="4" fill="' + color +
           '" class="hdc-dot"' +
-          ' data-point-key="' + key + '"' +
-          ' data-x="' + p.x + '" data-y="' + p.y +
-          '" data-point-label="' + dotLabel +
-          '" data-series-label="' + seriesLbl + '"' +
+          ' data-point-key="' + key + '" data-x="' + p.x + '" data-y="' + p.y +
+          '" data-point-label="' + dotLabel + '" data-series-label="' + seriesLbl + '"' +
           ' tabindex="0" role="img" aria-label="' +
             (seriesLbl ? seriesLbl + ': ' : '') + (dotLabel ? dotLabel + ' ' : '') +
             '(' + fmtNum(p.x) + ', ' + fmtNum(p.y) + ')' +
           '"/>'
         );
         if (p.label) {
-          // Place label left or right of the dot based on which side has
-          // more room — keeps labels inside the plot area and reduces the
-          // chance of overlapping the next dot.
           var goRight = px < plotMidX;
           var lx = goRight ? (px + 8) : (px - 8);
           var anchor = goRight ? 'start' : 'end';
           parts.push(
             '<text x="' + lx + '" y="' + (py + 4) +
             '" text-anchor="' + anchor + '"' +
-            ' class="hdc-point-label"' +
-            ' data-point-key="' + key + '"' +
-            ' tabindex="0">' +
+            ' class="hdc-point-label" data-point-key="' + key + '" tabindex="0">' +
             escapeXml(p.label) + '</text>'
           );
         }
       });
       parts.push('</g>');
-      if (s.label) {
-        var lx = W - pad.right - 12;
-        var ly = pad.top + 14 + i * 18;
-        parts.push(
-          '<g class="hdc-legend-chip" data-series-idx="' + i + '" tabindex="0" role="button" ' +
-          'aria-label="Toggle ' + escapeXml(s.label) + ' series">' +
-            '<rect x="' + (lx - 116) + '" y="' + (ly - 12) + '" width="120" height="20" rx="4" class="hdc-legend-bg"/>' +
-            '<rect x="' + (lx - 110) + '" y="' + (ly - 9) + '" width="14" height="14" rx="2" fill="' + color + '" class="hdc-legend-swatch"/>' +
-            '<text x="' + (lx - 92) + '" y="' + (ly + 2) + '" class="hdc-legend">' + escapeXml(s.label) + '</text>' +
-          '</g>'
-        );
-      }
+    });
+    parts.push('</g>'); // /clip
+    // Legend chips sit OUTSIDE the clip so they're always visible.
+    this._series.forEach(function (s, i) {
+      var color = palette[s.color] || palette.accent;
+      if (!s.label) return;
+      var lx = W - pad.right - 12;
+      var ly = pad.top + 14 + i * 18;
+      parts.push(
+        '<g class="hdc-legend-chip" data-series-idx="' + i + '" tabindex="0" role="button" ' +
+        'aria-label="Toggle ' + escapeXml(s.label) + ' series">' +
+          '<rect x="' + (lx - 116) + '" y="' + (ly - 12) + '" width="120" height="20" rx="4" class="hdc-legend-bg"/>' +
+          '<rect x="' + (lx - 110) + '" y="' + (ly - 9) + '" width="14" height="14" rx="2" fill="' + color + '" class="hdc-legend-swatch"/>' +
+          '<text x="' + (lx - 92) + '" y="' + (ly + 2) + '" class="hdc-legend">' + escapeXml(s.label) + '</text>' +
+        '</g>'
+      );
     });
     parts.push('</svg>');
+
+    var oldSvg = this.querySelector(':scope > .hdc-svg');
+    if (oldSvg) oldSvg.remove();
     this.insertAdjacentHTML('beforeend', parts.join(''));
     this._wireInteractivity();
+  }
 
+  _attachToolbar() {
     var self = this;
-    var chartTitle = title || (type + '-chart');
+    var chartTitle = self._title || (self._type + '-chart');
     __htmldocVisualTools.makeToolbar(this, [
+      {
+        title: 'Reset zoom',
+        icon: ICON_RESET,
+        run: function (btn) { self.resetView(); __htmldocVisualTools.flash(btn, 'ok', ICON_RESET); }
+      },
       {
         title: 'Download as PNG',
         icon: ICON_CAMERA,
@@ -1441,6 +1501,173 @@ class HtmlDocChart extends HTMLElement {
         }
       }
     ]);
+  }
+
+  resetView() {
+    this._view = Object.assign({}, this._origView);
+    this._render();
+  }
+
+  _attachPanZoom() {
+    var self = this;
+    var drag = null;
+    var pinch = null;
+
+    function getSvg() { return self.querySelector(':scope > .hdc-svg'); }
+
+    // Map a clientX/Y to data coordinates via SVG viewBox.
+    function dataAtPointer(clientX, clientY) {
+      var svg = getSvg();
+      if (!svg) return null;
+      var rect = svg.getBoundingClientRect();
+      var sxPos = ((clientX - rect.left) / rect.width)  * self._W;
+      var syPos = ((clientY - rect.top)  / rect.height) * self._H;
+      var pad = self._pad, plotW = self._plotW, plotH = self._plotH, v = self._view;
+      // Clamp to plot area
+      sxPos = Math.max(pad.left, Math.min(pad.left + plotW, sxPos));
+      syPos = Math.max(pad.top,  Math.min(pad.top  + plotH, syPos));
+      var xLog = self._xScale === 'log', yLog = self._yScale === 'log';
+      var dx, dy;
+      if (xLog) {
+        var fx = (sxPos - pad.left) / plotW;
+        dx = v.xMin * Math.pow(v.xMax / v.xMin, fx);
+      } else {
+        dx = v.xMin + ((sxPos - pad.left) / plotW) * (v.xMax - v.xMin);
+      }
+      if (yLog) {
+        var fy = (pad.top + plotH - syPos) / plotH;
+        dy = v.yMin * Math.pow(v.yMax / v.yMin, fy);
+      } else {
+        dy = v.yMin + ((pad.top + plotH - syPos) / plotH) * (v.yMax - v.yMin);
+      }
+      return { dx: dx, dy: dy };
+    }
+
+    function zoomAround(pt, factor) {
+      if (!pt) return;
+      var v = self._view;
+      var xLog = self._xScale === 'log', yLog = self._yScale === 'log';
+      if (xLog) {
+        v.xMin = Math.exp(Math.log(pt.dx) - (Math.log(pt.dx) - Math.log(v.xMin)) * factor);
+        v.xMax = Math.exp(Math.log(pt.dx) + (Math.log(v.xMax) - Math.log(pt.dx)) * factor);
+      } else {
+        v.xMin = pt.dx - (pt.dx - v.xMin) * factor;
+        v.xMax = pt.dx + (v.xMax - pt.dx) * factor;
+      }
+      if (yLog) {
+        v.yMin = Math.exp(Math.log(pt.dy) - (Math.log(pt.dy) - Math.log(v.yMin)) * factor);
+        v.yMax = Math.exp(Math.log(pt.dy) + (Math.log(v.yMax) - Math.log(pt.dy)) * factor);
+      } else {
+        v.yMin = pt.dy - (pt.dy - v.yMin) * factor;
+        v.yMax = pt.dy + (v.yMax - pt.dy) * factor;
+      }
+      self._render();
+    }
+
+    // Wheel zoom — preventDefault to stop page scroll over the chart.
+    this.addEventListener('wheel', function (e) {
+      if (e.target.closest('.hdt-bar, .hdc-legend-chip')) return;
+      e.preventDefault();
+      var factor = e.deltaY > 0 ? 1.12 : (1 / 1.12);
+      zoomAround(dataAtPointer(e.clientX, e.clientY), factor);
+    }, { passive: false });
+
+    // Drag pan.
+    this.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      if (e.target.closest('.hdt-bar, .hdc-legend-chip, .hdc-dot, .hdc-point-label')) return;
+      var svg = getSvg(); if (!svg) return;
+      drag = {
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startView: Object.assign({}, self._view),
+        rect: svg.getBoundingClientRect(),
+      };
+      svg.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+    function onMove(e) {
+      if (!drag) return;
+      var dxPx = e.clientX - drag.startClientX;
+      var dyPx = e.clientY - drag.startClientY;
+      var v0 = drag.startView, v = self._view;
+      var xLog = self._xScale === 'log', yLog = self._yScale === 'log';
+      // Convert pixel delta to data delta using the original view range.
+      if (xLog) {
+        var fx = -dxPx / drag.rect.width;
+        var rx = Math.pow(v0.xMax / v0.xMin, fx);
+        v.xMin = v0.xMin * rx; v.xMax = v0.xMax * rx;
+      } else {
+        var dxData = (dxPx / drag.rect.width) * (v0.xMax - v0.xMin);
+        v.xMin = v0.xMin - dxData; v.xMax = v0.xMax - dxData;
+      }
+      if (yLog) {
+        var fy = dyPx / drag.rect.height;
+        var ry = Math.pow(v0.yMax / v0.yMin, fy);
+        v.yMin = v0.yMin * ry; v.yMax = v0.yMax * ry;
+      } else {
+        var dyData = (dyPx / drag.rect.height) * (v0.yMax - v0.yMin);
+        v.yMin = v0.yMin + dyData; v.yMax = v0.yMax + dyData;
+      }
+      self._render();
+    }
+    function onUp() {
+      if (drag) {
+        drag = null;
+        var svg = getSvg();
+        if (svg) svg.style.cursor = 'grab';
+      }
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+
+    // Touch — single finger pan, two finger pinch zoom.
+    this.addEventListener('touchstart', function (e) {
+      var svg = getSvg(); if (!svg) return;
+      if (e.touches.length === 1) {
+        drag = {
+          startClientX: e.touches[0].clientX,
+          startClientY: e.touches[0].clientY,
+          startView: Object.assign({}, self._view),
+          rect: svg.getBoundingClientRect(),
+        };
+      } else if (e.touches.length === 2) {
+        var t1 = e.touches[0], t2 = e.touches[1];
+        var midX = (t1.clientX + t2.clientX) / 2;
+        var midY = (t1.clientY + t2.clientY) / 2;
+        var dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
+        pinch = {
+          startDist: Math.sqrt(dx * dx + dy * dy),
+          mid: { clientX: midX, clientY: midY },
+          startView: Object.assign({}, self._view),
+        };
+        drag = null;
+      }
+    }, { passive: true });
+    this.addEventListener('touchmove', function (e) {
+      if (pinch && e.touches.length === 2) {
+        var t1 = e.touches[0], t2 = e.touches[1];
+        var dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var factor = pinch.startDist / dist;
+        self._view = Object.assign({}, pinch.startView);
+        zoomAround(dataAtPointer(pinch.mid.clientX, pinch.mid.clientY), factor);
+        e.preventDefault();
+      } else if (drag && e.touches.length === 1) {
+        onMove(e.touches[0]);
+        e.preventDefault();
+      }
+    }, { passive: false });
+    this.addEventListener('touchend', function () { drag = null; pinch = null; });
+
+    // Double-click resets.
+    this.addEventListener('dblclick', function (e) {
+      if (e.target.closest('.hdt-bar, .hdc-legend-chip')) return;
+      self.resetView();
+    });
+
+    var svg = getSvg();
+    if (svg) svg.style.cursor = 'grab';
   }
 
   _wireInteractivity() {
