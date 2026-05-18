@@ -1105,10 +1105,28 @@ class PageNav extends HTMLElement {
         return;
       }
       fetch(__htmldocDocsRoot + 'site-manifest.json', { cache: 'no-cache' })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .catch(function () { return null; })
+        .then(function (r) {
+          if (r.ok) return r.json();
+          // Differentiate "served but missing" from network error so the
+          // warning channel can offer a specific remediation hint.
+          var err = new Error('manifest http ' + r.status);
+          err.__htmldocManifestStatus = r.status;
+          throw err;
+        })
         .then(function (manifest) {
           self._renderTree(manifest);
+        })
+        .catch(function (e) {
+          self._renderTree(null);
+          window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+            detail: [{
+              code: 'manifest-fetch-failed',
+              msg: 'Could not load site-manifest.json' +
+                   (e && e.__htmldocManifestStatus ? ' (HTTP ' + e.__htmldocManifestStatus + ')' : '') +
+                   ' — run `html-doc build` to regenerate it.',
+              level: 'warn'
+            }]
+          }));
         });
     }
     if (document.readyState === 'loading') {
@@ -1122,10 +1140,16 @@ class PageNav extends HTMLElement {
     var tree = this.querySelector('.page-nav-tree');
     if (!tree) return;
     tree.innerHTML = '';
-    if (!manifest || !Array.isArray(manifest.pages)) {
+    if (!manifest) {
+      // Fetch failed — the catch handler in start() already dispatched a
+      // specific warning. Just show inline placeholder.
       tree.innerHTML = '<li class="page-nav-empty">No site-manifest.json found. Run <code>html-doc build</code>.</li>';
+      return;
+    }
+    if (!Array.isArray(manifest.pages)) {
+      tree.innerHTML = '<li class="page-nav-empty">site-manifest.json is malformed (no <code>pages</code> array). Run <code>html-doc build</code>.</li>';
       window.dispatchEvent(new CustomEvent('html-doc:warnings', {
-        detail: [{ code: 'manifest-missing', msg: 'site-manifest.json not loaded', level: 'warn' }]
+        detail: [{ code: 'manifest-malformed', msg: 'site-manifest.json missing pages[]', level: 'warn' }]
       }));
       return;
     }

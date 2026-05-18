@@ -578,6 +578,38 @@ def find_project_root(start: Path) -> Path:
     return start
 
 
+def _pick_open_target(htmls: list[Path], user_cwd: Path, root: Path) -> Path | None:
+    """Choose the page to auto-open. Preference order:
+      1. <user_cwd>/index.html (the user ran serve from a docs dir).
+      2. First index.html anywhere under user_cwd.
+      3. First HTML directly under user_cwd.
+      4. First HTML in the repo, ignoring internal/scaffolding dirs.
+      5. First HTML anywhere.
+    """
+    if not htmls:
+        return None
+    try:
+        rel_user = user_cwd.resolve().relative_to(root.resolve())
+    except ValueError:
+        rel_user = Path('.')
+    user_prefix = (root / rel_user).resolve()
+
+    direct = user_prefix / 'index.html'
+    if direct.exists():
+        return direct
+    under_user = [h for h in htmls if str(h.resolve()).startswith(str(user_prefix))]
+    for h in under_user:
+        if h.name == 'index.html':
+            return h
+    if under_user:
+        return under_user[0]
+    skipped = {'_internal', 'templates', 'examples'}
+    public = [h for h in htmls if not (set(h.relative_to(root).parts) & skipped)]
+    if public:
+        return public[0]
+    return htmls[0]
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     """Start an HTTP server at the project root and print HTTP URLs for every HTML.
 
@@ -587,6 +619,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
     """
     cwd = Path.cwd()
     root = find_project_root(cwd)
+    user_cwd = cwd  # capture before chdir so we can prefer pages near where the user was
     port = 9876
     while True:
         try:
@@ -612,13 +645,15 @@ def cmd_serve(args: argparse.Namespace) -> int:
     print(f'✓ Serving {root} on http://localhost:{port}')
     print(f'  Stop with Ctrl-C.')
     print()
+    target = _pick_open_target(htmls, user_cwd, root)
     if htmls:
         print('  HTML files:')
         for h in htmls:
             rel = h.relative_to(root)
-            print(f'    http://localhost:{port}/{rel}')
-        # Open the first one
-        webbrowser.open(f'http://localhost:{port}/{htmls[0].relative_to(root)}')
+            marker = '  ←' if target is not None and h == target else ''
+            print(f'    http://localhost:{port}/{rel}{marker}')
+        if target is not None:
+            webbrowser.open(f'http://localhost:{port}/{target.relative_to(root)}')
     print()
     try:
         httpd.serve_forever()
