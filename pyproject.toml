@@ -11,8 +11,7 @@ keywords = ["html", "docs", "static-site", "documentation"]
 # Runtime stays optional — the script tolerates a missing jsonschema
 # (validation is skipped, build still succeeds). uv-driven invocations
 # pull it in automatically via the PEP 723 inline metadata in
-# `bin/html-doc`; pip / system Python installs can opt in via
-# `pip install jsonschema`.
+# `bin/html-doc`; install-time users can opt in via the `schema` extra.
 dependencies = []
 
 [project.optional-dependencies]
@@ -25,14 +24,39 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/mmdemirbas/html-doc"
 
-[tool.uv]
-# Project-local cache + no pip-style dev shadowing.
-managed = true
+# `uv tool install .` (or `pip install .`) installs this as a console
+# script — `html-doc` becomes available on PATH globally.
+[project.scripts]
+html-doc = "html_doc.cli:main"
 
-# Tell uv where to find the script entrypoint when users opt into a
-# global install via `uv tool install .` (downstream of a future
-# packaging refactor — today bin/html-doc is invoked directly).
-[tool.uv.sources]
+# Hatchling is the modern PEP 517 build backend — smaller surface than
+# setuptools, no implicit globbing, fast wheel builds. Build-time only;
+# does not appear at runtime for end users.
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/html_doc"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/html_doc",
+    "bin/html-doc",
+    "chrome.css",
+    "chrome.js",
+    "chrome-boot.js",
+    "renderer.js",
+    "schema/",
+    "glossary/",
+    "extrefs/",
+    "templates/",
+    "README.md",
+    "CHANGELOG.md",
+]
+
+[tool.uv]
+managed = true
 
 [tool.ruff]
 line-length = 110
