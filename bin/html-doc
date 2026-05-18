@@ -307,6 +307,25 @@ def _md_block(block: dict, depth: int = 0) -> list[str]:
         out.append('```')
         return out
 
+    if kind == 'annotated-code':
+        lang = block.get('language') or ''
+        body = block.get('source') or ''
+        out.append('```' + lang)
+        out.append(body)
+        out.append('```')
+        annos = block.get('annotations') or []
+        if annos:
+            out.append('')
+            for a in annos:
+                if not isinstance(a, dict):
+                    continue
+                aid = a.get('id', '')
+                # Strip inline HTML for markdown — keep the structure but
+                # avoid raw <code> / <strong> tags in the .md.
+                content = re.sub(r'<[^>]+>', '', a.get('content', ''))
+                out.append(f'{aid}. {content}')
+        return out
+
     if kind == 'kpi-grid':
         for item in (block.get('tiles') or block.get('items') or []):
             num = item.get('num', '')

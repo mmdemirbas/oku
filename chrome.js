@@ -2120,6 +2120,144 @@ window.addEventListener('html-doc:theme-changed', function () {
   });
 });
 
+/* ============ <html-doc-annotated-code> — MkDocs-Material-style annotations ============ *
+ * Code block with numbered `(1)`, `(2)` markers that map to a side panel
+ * of annotations. Hovering a marker brightens its annotation and vice
+ * versa. Sources:
+ *   - <script type="text/x-code"> code body (preserves whitespace, no escaping)
+ *   - <script type="application/json"> [{ id: 1, content: "..." }, ...]
+ *     OR a child <ol class="hdc-anno-source"> with one <li> per annotation
+ *       (li index = id, content = li.innerHTML).
+ * Renders into:
+ *   <pre><code class="language-{lang}">...with .hdc-anno-marker chips...</code></pre>
+ *   <ol class="hdc-anno-list">...<li class="hdc-anno-item">...</li></ol>
+ * Prism highlights the code first; the marker replacement walks the
+ * highlighted text-nodes so `(1)` chips survive syntax coloring.
+ * --------------------------------------------------------------------- */
+class HtmlDocAnnotatedCode extends HTMLElement {
+  connectedCallback() {
+    var srcNode = this.querySelector('script[type="text/x-code"]');
+    var jsonNode = this.querySelector('script[type="application/json"]');
+    var code = srcNode ? srcNode.textContent.replace(/^\n/, '') : (this.textContent || '');
+    var annos = [];
+    if (jsonNode) {
+      try { annos = JSON.parse(jsonNode.textContent || '[]'); } catch (e) { annos = []; }
+    } else {
+      var ol = this.querySelector('ol.hdc-anno-source, ol.hdc-anno-list');
+      if (ol) {
+        annos = Array.prototype.map.call(ol.querySelectorAll(':scope > li'), function (li, i) {
+          return { id: i + 1, content: li.innerHTML };
+        });
+      }
+    }
+    var lang = this.getAttribute('language') || this.getAttribute('lang') || '';
+
+    this.innerHTML = '';
+    this.classList.add('hdc-anno-wrap');
+
+    var pre = document.createElement('pre');
+    var codeEl = document.createElement('code');
+    if (lang) codeEl.className = 'language-' + lang;
+    codeEl.textContent = code;
+    pre.appendChild(codeEl);
+    this.appendChild(pre);
+
+    if (annos.length) {
+      var list = document.createElement('ol');
+      list.className = 'hdc-anno-list';
+      annos.forEach(function (a) {
+        var li = document.createElement('li');
+        li.className = 'hdc-anno-item';
+        li.setAttribute('data-anno-id', String(a.id));
+        li.setAttribute('tabindex', '0');
+        var num = document.createElement('span');
+        num.className = 'hdc-anno-num';
+        num.textContent = String(a.id);
+        var body = document.createElement('div');
+        body.className = 'hdc-anno-body';
+        body.innerHTML = a.content || '';
+        li.appendChild(num);
+        li.appendChild(body);
+        list.appendChild(li);
+      });
+      this.appendChild(list);
+    }
+
+    var self = this;
+    var validIds = annos.reduce(function (acc, a) { acc[String(a.id)] = true; return acc; }, {});
+
+    function injectMarkers() {
+      var c = self.querySelector('pre code');
+      if (!c) return;
+      var pattern = /\((\d+)\)/g;
+      var textNodes = [];
+      var walker = document.createTreeWalker(c, NodeFilter.SHOW_TEXT, null);
+      var n;
+      while ((n = walker.nextNode())) textNodes.push(n);
+      textNodes.forEach(function (textNode) {
+        var text = textNode.nodeValue;
+        if (text.indexOf('(') === -1) return;
+        pattern.lastIndex = 0;
+        var hasMatch = false;
+        var test;
+        while ((test = pattern.exec(text)) !== null) {
+          if (validIds[test[1]]) { hasMatch = true; break; }
+        }
+        if (!hasMatch) return;
+        pattern.lastIndex = 0;
+        var frag = document.createDocumentFragment();
+        var last = 0;
+        var m;
+        while ((m = pattern.exec(text)) !== null) {
+          if (!validIds[m[1]]) continue;
+          if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+          var btn = document.createElement('button');
+          btn.className = 'hdc-anno-marker';
+          btn.type = 'button';
+          btn.setAttribute('data-anno-id', m[1]);
+          btn.setAttribute('aria-label', 'Annotation ' + m[1]);
+          btn.textContent = m[1];
+          frag.appendChild(btn);
+          last = m.index + m[0].length;
+        }
+        if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+        textNode.parentNode.replaceChild(frag, textNode);
+      });
+      bindSync();
+    }
+
+    function bindSync() {
+      function setHover(id, on) {
+        self.querySelectorAll('[data-anno-id="' + id + '"]').forEach(function (el) {
+          el.classList.toggle('hovered', on);
+        });
+      }
+      self.querySelectorAll('.hdc-anno-marker, .hdc-anno-item').forEach(function (el) {
+        var id = el.getAttribute('data-anno-id');
+        el.addEventListener('mouseenter', function () { setHover(id, true); });
+        el.addEventListener('mouseleave', function () { setHover(id, false); });
+        el.addEventListener('focus',      function () { setHover(id, true); });
+        el.addEventListener('blur',       function () { setHover(id, false); });
+        el.addEventListener('click', function () {
+          var partner = el.classList.contains('hdc-anno-marker')
+            ? self.querySelector('.hdc-anno-item[data-anno-id="' + id + '"]')
+            : self.querySelector('.hdc-anno-marker[data-anno-id="' + id + '"]');
+          if (partner) partner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      });
+    }
+
+    // Highlight via Prism if available + the code has a language; otherwise
+    // inject markers immediately on the plain-text code.
+    if (lang && typeof __prismLoader !== 'undefined') {
+      __prismLoader.highlightAll(this).then(function () { setTimeout(injectMarkers, 0); });
+    } else {
+      injectMarkers();
+    }
+  }
+}
+if (!customElements.get('html-doc-annotated-code')) customElements.define('html-doc-annotated-code', HtmlDocAnnotatedCode);
+
 /* ============ <html-doc-snippet> — editable HTML/CSS/JS playground ============ */
 class HtmlDocSnippet extends HTMLElement {
   connectedCallback() {

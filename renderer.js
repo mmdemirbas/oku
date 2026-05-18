@@ -227,6 +227,7 @@
         case 'info-tip':     return this._renderInfoTip(block);
         case 'list':         return this._renderList(block);
         case 'code':         return this._renderCode(block);
+        case 'annotated-code': return this._renderAnnotatedCode(block);
         case 'kpi-grid':     return this._renderKpiGrid(block);
         case 'bar-chart':    return this._renderBarChart(block);
         case 'step-flow':    return this._renderStepFlow(block);
@@ -344,6 +345,22 @@
       code.textContent = block.source || '';
       pre.appendChild(code);
       return pre;
+    }
+
+    _renderAnnotatedCode(block) {
+      const el = document.createElement('html-doc-annotated-code');
+      if (block.language) el.setAttribute('language', block.language);
+      const src = document.createElement('script');
+      src.setAttribute('type', 'text/x-code');
+      src.textContent = block.source || '';
+      el.appendChild(src);
+      if (Array.isArray(block.annotations) && block.annotations.length) {
+        const data = document.createElement('script');
+        data.setAttribute('type', 'application/json');
+        data.textContent = JSON.stringify(block.annotations);
+        el.appendChild(data);
+      }
+      return el;
     }
 
     _renderBarChart(block) {
