@@ -1319,7 +1319,72 @@ class GlossaryTerm extends HTMLElement {
 }
 if (!customElements.get('glossary-term')) customElements.define('glossary-term', GlossaryTerm);
 
-/* ============ <ext-ref> Custom Element ============ */
+/* ============ <ext-ref> Custom Element — Citation card ============ *
+ * Per the design audit ("bold move"): treat every external reference as a
+ * first-class citation card rather than a footnote-grade link. The element
+ * inherits the tooltip-controller hover/click affordance but renders a
+ * richer body: type-themed icon (paper / rfc / release / blog / other),
+ * source-domain pill, optional author+date row, summary, "View canonical"
+ * footer. The 4 source-type themes give visual context at a glance.
+ *
+ * Data shape (extrefs/<domain>.json entries):
+ *   { name, summary, link, type?, author?, published? }
+ * Inline overrides on the element take precedence:
+ *   <ext-ref name="..." type="paper" author="..." published="2024">
+ * --------------------------------------------------------------------- */
+
+var __htmldocCiteIcons = {
+  paper:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+  rfc:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
+  release: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
+  blog:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>',
+  other:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+};
+
+function __htmldocCiteDomain(link) {
+  if (!link) return '';
+  try {
+    var u = new URL(link, window.location.href);
+    return u.hostname.replace(/^www\./, '');
+  } catch (e) { return ''; }
+}
+
+function __htmldocCiteType(hit, element) {
+  var type = (element.getAttribute('type') || hit.type || '').toLowerCase();
+  if (__htmldocCiteIcons[type]) return type;
+  // Infer from the link domain if not declared.
+  var dom = __htmldocCiteDomain(hit.link || '');
+  if (/arxiv|doi\.org|acm\.org|springer|sciencedirect|nature\.com|ieee/.test(dom)) return 'paper';
+  if (/datatracker\.ietf|w3\.org|rfc-editor|tc39|whatwg/.test(dom))               return 'rfc';
+  if (/github\.com\/.+\/releases|releases\.|changelog/.test((hit.link || '')))    return 'release';
+  if (/blog|medium\.com|substack|dev\.to/.test(dom))                              return 'blog';
+  return 'other';
+}
+
+function __htmldocBuildCitationBody(hit, name, element) {
+  var type = __htmldocCiteType(hit, element);
+  var icon = __htmldocCiteIcons[type] || __htmldocCiteIcons.other;
+  var domain = __htmldocCiteDomain(hit.link || '');
+  var author = element.getAttribute('author') || hit.author || hit.authors || '';
+  var published = element.getAttribute('published') || hit.published || hit.date || '';
+
+  var html = '<div class="hdt-cite" data-cite-type="' + type + '">';
+  html +=   '<div class="hdt-cite-head">';
+  html +=     '<span class="hdt-cite-icon">' + icon + '</span>';
+  html +=     '<span class="hdt-cite-title">' + escapeXml(hit.name || name) + '</span>';
+  html +=   '</div>';
+  if (domain) html += '<div class="hdt-cite-domain">' + escapeXml(domain) + '</div>';
+  if (author || published) {
+    html += '<div class="hdt-cite-meta">';
+    if (author)    html += '<span class="hdt-cite-author">' + escapeXml(author) + '</span>';
+    if (published) html += '<span class="hdt-cite-date">' + escapeXml(published) + '</span>';
+    html += '</div>';
+  }
+  if (hit.summary) html += '<div class="hdt-cite-summary">' + hit.summary + '</div>';
+  html += '</div>';
+  return html;
+}
+
 class ExtRef extends HTMLElement {
   connectedCallback() {
     var self = this;
@@ -1330,9 +1395,11 @@ class ExtRef extends HTMLElement {
       var opts = { in: self.getAttribute('in') || undefined, lang: self.getAttribute('lang') || undefined };
       var r = __htmldocKit.resolveExtRef(name, opts);
       if (r) {
-        var body = '<strong>' + (r.hit.name || name) + '</strong>';
-        if (r.hit.summary) body += '<br>' + r.hit.summary;
-        self.setAttribute('data-def', body);
+        self.setAttribute('data-def', __htmldocBuildCitationBody(r.hit, name, self));
+        // Tag the element itself with the resolved type so authors can
+        // theme the inline cite-text (different underline per type).
+        var type = __htmldocCiteType(r.hit, self);
+        self.setAttribute('data-cite-type', type);
         if (r.hit.link) self.setAttribute('data-link', r.hit.link);
         __htmldocTooltip.attach(self);
       } else if (__htmldocStandalone()) {
@@ -1349,6 +1416,9 @@ class ExtRef extends HTMLElement {
   }
 }
 if (!customElements.get('ext-ref')) customElements.define('ext-ref', ExtRef);
+// "<cite>" alias — same behavior as <ext-ref> so authors can use the
+// semantically-correct HTML element when citing.
+if (!customElements.get('html-doc-cite')) customElements.define('html-doc-cite', class extends ExtRef {});
 
 /* ============ <html-doc-chart> Custom Element ============ *
  * Generic data-driven SVG chart. Scatter and line types.
