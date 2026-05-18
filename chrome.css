@@ -688,7 +688,17 @@ details.info-tip > *:not(summary) p:last-child { margin-bottom: 0; }
   border-radius: 12px;
   padding: 16px 18px;
   background: var(--surface);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
+.step-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px var(--shadow-soft);
+}
+.step-card:hover .step-num {
+  transform: scale(1.08);
+}
+.step-card .step-num { transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .step-card .step-num {
   display: flex;
   align-items: center;
@@ -769,6 +779,11 @@ table tr:hover td { background: var(--surface-2); }
 .pill {
   display: inline-block; padding: 3px 10px; border-radius: 14px;
   font-size: 12px; font-weight: 700; margin-right: 4px; white-space: nowrap;
+  transition: transform 0.15s ease, box-shadow 0.18s ease;
+}
+.pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px var(--shadow-soft);
 }
 .pill.ok    { background: var(--success-soft); color: var(--success); }
 .pill.warn  { background: var(--warning-soft); color: var(--warning); }
@@ -780,17 +795,36 @@ table tr:hover td { background: var(--surface-2); }
 .kpi {
   text-align: center; padding: 22px 14px;
   background: var(--surface); border-radius: 10px; border: 1px solid var(--border);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
-.kpi .num { font-size: 30px; font-weight: 800; color: var(--accent); line-height: 1.1; letter-spacing: -0.02em; }
+.kpi:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px var(--shadow-soft);
+}
+.kpi:hover .num { transform: scale(1.05); }
+.kpi .num {
+  font-size: 30px; font-weight: 800; color: var(--accent);
+  line-height: 1.1; letter-spacing: -0.02em;
+  display: inline-block;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 .kpi .label { font-size: 12.5px; color: var(--text-soft); margin-top: 6px; line-height: 1.4; }
 
 .compare-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin: 24px 0; }
 .compare-card {
   padding: 22px; border-radius: 10px;
   border: 1px solid var(--border); background: var(--surface);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.compare-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px var(--shadow-soft);
 }
 .compare-card.bad  { border-top: 4px solid var(--danger); }
+.compare-card.bad:hover  { border-color: var(--danger); }
 .compare-card.good { border-top: 4px solid var(--success); }
+.compare-card.good:hover { border-color: var(--success); }
 .compare-card h4 { margin: 0 0 12px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--text); }
 
 details.card {
@@ -1029,9 +1063,14 @@ page-nav .page-nav-item > a {
   text-decoration: none;
   border-radius: 4px;
   border-left: 2px solid transparent;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.18s ease, padding-left 0.15s ease;
 }
-page-nav .page-nav-item > a:hover { background: var(--surface-2); color: var(--accent); }
+page-nav .page-nav-item > a:hover {
+  background: var(--surface-2);
+  color: var(--accent);
+  border-left-color: var(--accent-soft);
+  padding-left: 12px;
+}
 page-nav .page-nav-item.active > a {
   color: var(--accent);
   font-weight: 600;
