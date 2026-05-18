@@ -219,25 +219,31 @@
 
     _renderContentBlock(block) {
       if (!block || !block.kind) return this._unknown(block);
+      let el;
       switch (block.kind) {
-        case 'paragraph':    return this._renderParagraph(block);
-        case 'heading':      return this._renderHeading(block);
-        case 'callout':      return this._renderCallout(block);
-        case 'insight':      return this._renderInsight(block);
-        case 'info-tip':     return this._renderInfoTip(block);
-        case 'list':         return this._renderList(block);
-        case 'code':         return this._renderCode(block);
-        case 'annotated-code': return this._renderAnnotatedCode(block);
-        case 'kpi-grid':     return this._renderKpiGrid(block);
-        case 'bar-chart':    return this._renderBarChart(block);
-        case 'step-flow':    return this._renderStepFlow(block);
-        case 'compare-grid': return this._renderCompareGrid(block);
-        case 'scope-grid':   return this._renderScopeGrid(block);
-        case 'chart':        return this._renderChart(block);
-        case 'diagram':      return this._renderDiagram(block);
-        case 'live-snippet': return this._renderLiveSnippet(block);
-        default:             return this._unknown(block);
+        case 'paragraph':    el = this._renderParagraph(block); break;
+        case 'heading':      el = this._renderHeading(block); break;
+        case 'callout':      el = this._renderCallout(block); break;
+        case 'insight':      el = this._renderInsight(block); break;
+        case 'info-tip':     el = this._renderInfoTip(block); break;
+        case 'list':         el = this._renderList(block); break;
+        case 'code':         el = this._renderCode(block); break;
+        case 'annotated-code': el = this._renderAnnotatedCode(block); break;
+        case 'kpi-grid':     el = this._renderKpiGrid(block); break;
+        case 'bar-chart':    el = this._renderBarChart(block); break;
+        case 'step-flow':    el = this._renderStepFlow(block); break;
+        case 'compare-grid': el = this._renderCompareGrid(block); break;
+        case 'scope-grid':   el = this._renderScopeGrid(block); break;
+        case 'chart':        el = this._renderChart(block); break;
+        case 'diagram':      el = this._renderDiagram(block); break;
+        case 'live-snippet': el = this._renderLiveSnippet(block); break;
+        default:             el = this._unknown(block); break;
       }
+      // Propagate `bind` so chrome.js's data-bind hover-sync pairs work
+      // for any block kind the author wants to pair (paragraph ↔ code
+      // ↔ callout ↔ chart, etc.).
+      if (el && block.bind) el.setAttribute('data-bind', block.bind);
+      return el;
     }
 
     _renderChart(block) {

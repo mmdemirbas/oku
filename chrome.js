@@ -894,6 +894,70 @@ function escapeHTML(s) {
   }
 })();
 
+/* ============ Synced highlight: [data-bind] hover/focus pairs ============ *
+ * Stripe-class micro-interaction: any element carrying data-bind="X"
+ * pairs with all other elements sharing the same key. Hover or focus
+ * any partner → all partners flash an accent highlight. Click any
+ * partner → the others scroll into view (only when offscreen).
+ *
+ * Lifted from the design audit: synced prose↔code is the most-praised
+ * dev-docs micro-interaction and the cheapest way to signal "this kit
+ * was designed, not generated." Reuses the .hovered pattern from
+ * UX2 (chart label↔dot) and UX6 / round-9 (annotation chip↔item).
+ *
+ * Global delegation: handlers attach to document so dynamically-
+ * rendered content (renderer.js, custom elements) gets picked up
+ * without re-binding.
+ * --------------------------------------------------------------------- */
+(function () {
+  if (typeof document === 'undefined') return;
+  if (document.__htmldocBindAttached) return;
+  document.__htmldocBindAttached = true;
+
+  function flash(key, on) {
+    if (!key) return;
+    document.querySelectorAll('[data-bind="' + key + '"]').forEach(function (el) {
+      el.classList.toggle('bind-active', on);
+    });
+  }
+  document.addEventListener('mouseover', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-bind]');
+    if (!t) return;
+    flash(t.getAttribute('data-bind'), true);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-bind]');
+    if (!t) return;
+    flash(t.getAttribute('data-bind'), false);
+  });
+  document.addEventListener('focusin', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-bind]');
+    if (!t) return;
+    flash(t.getAttribute('data-bind'), true);
+  });
+  document.addEventListener('focusout', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-bind]');
+    if (!t) return;
+    flash(t.getAttribute('data-bind'), false);
+  });
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-bind]');
+    if (!t) return;
+    var key = t.getAttribute('data-bind');
+    if (!key) return;
+    // Find a partner that is currently offscreen; scroll the first one in.
+    var partners = document.querySelectorAll('[data-bind="' + key + '"]');
+    for (var i = 0; i < partners.length; i++) {
+      if (partners[i] === t) continue;
+      var r = partners[i].getBoundingClientRect();
+      if (r.top < 0 || r.bottom > window.innerHeight) {
+        partners[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        break;
+      }
+    }
+  });
+})();
+
 /* ============ Live-reload (only when served via `html-doc serve`) ============ *
  * Opens an EventSource against /__reload — a Server-Sent Events stream
  * that the dev server pushes a message into whenever a watched file
