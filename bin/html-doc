@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "jsonschema>=4.0",
+# ]
+# ///
 """
 html-doc · CLI for the shared HTML chrome kit.
+
+This script carries inline PEP 723 metadata so it can be run via
+`uv run bin/html-doc <cmd>` — uv resolves jsonschema and any future
+dependency into a cached venv on the fly. Plain `python3 bin/html-doc`
+also works (jsonschema is soft-imported); uv is preferred when the
+optional schema validation matters.
 
 Commands:
   html-doc init    — create docs/_kit symlink to the kit repo in the current project

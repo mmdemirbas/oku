@@ -1,0 +1,39 @@
+[project]
+name = "html-doc"
+version = "0.2.0"
+description = "Shared HTML chrome kit + CLI. Standalone, theme-aware visual docs without a build step."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Muhammed" }]
+license = { text = "MIT" }
+keywords = ["html", "docs", "static-site", "documentation"]
+
+# Runtime stays optional — the script tolerates a missing jsonschema
+# (validation is skipped, build still succeeds). uv-driven invocations
+# pull it in automatically via the PEP 723 inline metadata in
+# `bin/html-doc`; pip / system Python installs can opt in via
+# `pip install jsonschema`.
+dependencies = []
+
+[project.optional-dependencies]
+schema = ["jsonschema>=4.0"]
+dev = [
+    "jsonschema>=4.0",
+    "ruff>=0.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/mmdemirbas/html-doc"
+
+[tool.uv]
+# Project-local cache + no pip-style dev shadowing.
+managed = true
+
+# Tell uv where to find the script entrypoint when users opt into a
+# global install via `uv tool install .` (downstream of a future
+# packaging refactor — today bin/html-doc is invoked directly).
+[tool.uv.sources]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
