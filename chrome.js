@@ -723,7 +723,8 @@ var __htmldocKit = (function () {
       return Promise.resolve(kit);
     }
     // Project config lives at the docs root; domain files live in _kit/.
-    return fetch(__htmldocDocsRoot + 'kit.json', { cache: 'no-cache' })
+    var wa = (window.__htmldocWithAuth || function (u) { return u; });
+    return fetch(wa(__htmldocDocsRoot + 'kit.json'), { cache: 'no-cache' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; })
       .then(function (data) {
@@ -735,13 +736,13 @@ var __htmldocKit = (function () {
         // Load each domain file in parallel
         var promises = kit.domains.flatMap(function (d) {
           return [
-            fetch(__htmldocDocsRoot + '_kit/glossary/' + d + '.json', { cache: 'no-cache' })
+            fetch(wa(__htmldocDocsRoot + '_kit/glossary/' + d + '.json'), { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
                 if (j && j.entries) kit.glossary[d] = j.entries;
               }),
-            fetch(__htmldocDocsRoot + '_kit/extrefs/' + d + '.json', { cache: 'no-cache' })
+            fetch(wa(__htmldocDocsRoot + '_kit/extrefs/' + d + '.json'), { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
@@ -1600,10 +1601,11 @@ class PageNav extends HTMLElement {
           emitted next to the .json by build_manifest() in bin/html-doc. */
     function loadManifest() {
       if (window.__htmldocManifest) return Promise.resolve(window.__htmldocManifest);
+      var wa = (window.__htmldocWithAuth || function (u) { return u; });
       var fileProto = (window.location && window.location.protocol === 'file:');
       var fetchAttempt = fileProto
         ? Promise.reject(new Error('file:// — skipping fetch'))
-        : fetch(__htmldocDocsRoot + 'site-manifest.json', { cache: 'no-cache' })
+        : fetch(wa(__htmldocDocsRoot + 'site-manifest.json'), { cache: 'no-cache' })
             .then(function (r) {
               if (r.ok) return r.json();
               var err = new Error('manifest http ' + r.status);
@@ -1620,9 +1622,10 @@ class PageNav extends HTMLElement {
 
     function loadManifestViaScript() {
       if (window.__htmldocManifest) return Promise.resolve(window.__htmldocManifest);
+      var wa = (window.__htmldocWithAuth || function (u) { return u; });
       return new Promise(function (resolve, reject) {
         var s = document.createElement('script');
-        s.src = __htmldocDocsRoot + 'site-manifest.js';
+        s.src = wa(__htmldocDocsRoot + 'site-manifest.js');
         s.async = true;
         s.onload = function () {
           if (window.__htmldocManifest) resolve(window.__htmldocManifest);

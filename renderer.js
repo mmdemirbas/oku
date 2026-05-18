@@ -27,8 +27,9 @@
     /** Fetch JSON, parse, and render into the host. */
     async renderFromUrl(url, host) {
       let page;
+      const wa = (window.__htmldocWithAuth || ((u) => u));
       try {
-        const res = await fetch(url, { cache: 'no-cache' });
+        const res = await fetch(wa(url), { cache: 'no-cache' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         page = await res.json();
       } catch (e) {
