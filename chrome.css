@@ -454,6 +454,61 @@ code:not(pre code) {
   background: var(--border);
   margin: 0 4px;
 }
+
+/* Filter input — left side of the controls bar; pushes the rest right. */
+.hdt-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-right: auto;
+  color: var(--text-soft);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.hdt-filter:focus-within {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--surface);
+}
+.hdt-filter svg { width: 14px; height: 14px; flex-shrink: 0; }
+.hdt-filter input {
+  border: none; background: transparent; outline: none;
+  font: 500 12px 'Inter', sans-serif;
+  color: var(--text);
+  min-width: 0;
+  width: 140px;
+}
+.hdt-filter input::placeholder { color: var(--text-faint); }
+
+/* Sort indicators on <thead th> when the cell is bound as sortable. */
+.hdt-sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  padding-right: 22px !important;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.hdt-sortable:hover { background: var(--accent-soft) !important; color: var(--accent-strong) !important; }
+.hdt-sortable::after {
+  content: '⇅';
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  opacity: 0.35;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.hdt-sortable:hover::after { opacity: 0.65; }
+.hdt-sortable.hdt-sort-asc::after  { content: '↑'; opacity: 1; color: var(--accent); }
+.hdt-sortable.hdt-sort-desc::after { content: '↓'; opacity: 1; color: var(--accent); }
+.hdt-sortable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 /* CSS-driven view switching — the wrapper's data-view attribute selects
    which container is visible. Avoids the [hidden]-attribute vs
    display:grid conflict where cards.hidden was overridden. */

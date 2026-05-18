@@ -429,7 +429,7 @@ function initReadingAids() {
                                 || (spans && (lone.tagName === 'TH' || lone.tagName === 'TD'));
       if (isGroup) {
         var title = lone ? lone.innerHTML : tr.innerHTML;
-        return { type: 'group', title: title, classes: classes };
+        return { type: 'group', title: title, classes: classes, el: tr };
       }
       var tdList = tr.querySelectorAll(':scope > td');
       if (!tdList.length) return null;
@@ -443,7 +443,10 @@ function initReadingAids() {
         classes: classes,
       };
       var cellHtml = Array.prototype.map.call(tdList, function (td) { return td.innerHTML; });
-      return { type: 'row', cells: cellHtml, iv: iv };
+      // Keep a reference to the live <tr> so renderTable can preserve
+      // author-attached event listeners and nested interactive content
+      // by re-attaching the element (instead of cloning innerHTML).
+      return { type: 'row', cells: cellHtml, iv: iv, el: tr };
     }
 
     var entries = rowEls.map(classify).filter(Boolean);
@@ -460,8 +463,14 @@ function initReadingAids() {
 
     var ctrl = document.createElement('div');
     ctrl.className = 'hdt-table-controls';
-    // View order: Table → List → Cards (per user request — list is the
-    // common alt-view; cards are the dense alt-view).
+    // Filter input on the left (pushes everything else right via margin-right:auto in CSS).
+    // View order: Table → List → Cards (per user request).
+    var filterInputHTML = canPivot ? (
+      '<label class="hdt-filter">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6"/></svg>' +
+        '<input type="search" placeholder="Filter rows…" aria-label="Filter table rows">' +
+      '</label>'
+    ) : '';
     var viewBtns = canPivot ? (
       '<button data-view="table" type="button" class="active" aria-pressed="true">Table</button>' +
       '<button data-view="list"  type="button" aria-pressed="false">List</button>' +
@@ -469,6 +478,7 @@ function initReadingAids() {
       '<span class="hdt-ctrl-sep" aria-hidden="true"></span>'
     ) : '';
     ctrl.innerHTML =
+      filterInputHTML +
       viewBtns +
       '<button data-expand type="button" class="active" aria-pressed="true" title="Toggle full-width / fit to column">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
@@ -484,8 +494,6 @@ function initReadingAids() {
 
     if (canPivot) {
       function applyRowInteractivity(el, iv) {
-        // Strip the "group" markers that snuck in via tr.className, but
-        // preserve everything else the author put there.
         if (iv.classes) {
           var keep = iv.classes
             .split(/\s+/)
@@ -496,81 +504,197 @@ function initReadingAids() {
         if (iv.tabindex != null)   el.setAttribute('tabindex', iv.tabindex);
         if (iv.onclick)            el.setAttribute('onclick', iv.onclick);
         if (iv.href) {
-          // Use a real <a> wrapper for the keyboard / context-menu story.
-          // Caller decides whether to swap el's tagName before calling.
           el.setAttribute('href', iv.href);
           if (iv.target) el.setAttribute('target', iv.target);
         }
       }
 
-      // Cards: groups become full-width subheaders; rows become cards.
+      function stripHtml(s) { return String(s).replace(/<[^>]+>/g, '').trim(); }
+
+      // Cards + List containers (rebuilt by render()).
       var cards = document.createElement('div');
       cards.className = 'hdt-table-cards';
-      entries.forEach(function (e) {
-        if (e.type === 'group') {
-          var h = document.createElement('div');
-          h.className = 'hdt-cards-group';
-          h.innerHTML = e.title;
-          cards.appendChild(h);
-          return;
-        }
-        var card = document.createElement(e.iv.href ? 'a' : 'div');
-        card.className = 'hdt-card';
-        applyRowInteractivity(card, e.iv);
-        e.cells.forEach(function (cell, i) {
-          if (!headers[i]) return;
-          var r = document.createElement('div');
-          r.className = 'hdt-card-row';
-          r.innerHTML =
-            '<span class="hdt-card-key">' + headers[i] + '</span>' +
-            '<span class="hdt-card-val">' + cell + '</span>';
-          card.appendChild(r);
-        });
-        cards.appendChild(card);
-      });
       wrap.appendChild(cards);
-
-      // List: groups become subheadings; rows become dl items (optionally
-      // wrapped in <a> if the row was clickable). Separator class is
-      // applied between rows but reset after each group header.
       var list = document.createElement('div');
       list.className = 'hdt-table-list';
-      var rowsSinceGroup = 0;
-      entries.forEach(function (e) {
-        if (e.type === 'group') {
-          var h = document.createElement('h4');
-          h.className = 'hdt-list-group';
-          h.innerHTML = e.title;
-          list.appendChild(h);
-          rowsSinceGroup = 0;
-          return;
-        }
-        var inner = document.createElement('dl');
-        if (rowsSinceGroup > 0) inner.classList.add('hdt-list-sep');
-        rowsSinceGroup += 1;
-        e.cells.forEach(function (cell, i) {
-          if (!headers[i]) return;
-          var dt = document.createElement('dt'); dt.innerHTML = headers[i];
-          var dd = document.createElement('dd'); dd.innerHTML = cell;
-          inner.appendChild(dt); inner.appendChild(dd);
-        });
-        if (e.iv.href) {
-          var a = document.createElement('a');
-          a.className = 'hdt-list-row';
-          applyRowInteractivity(a, e.iv);
-          a.appendChild(inner);
-          list.appendChild(a);
-        } else if (e.iv.onclick || e.iv.role === 'button') {
-          var btn = document.createElement('div');
-          btn.className = 'hdt-list-row';
-          applyRowInteractivity(btn, e.iv);
-          btn.appendChild(inner);
-          list.appendChild(btn);
-        } else {
-          list.appendChild(inner);
-        }
-      });
       wrap.appendChild(list);
+
+      // State
+      var sortCol = -1;
+      var sortDir = 0;       // 1 asc, -1 desc, 0 none
+      var filterText = '';
+      var tbody = table.querySelector('tbody') || table;
+
+      function entriesMatchingFilter() {
+        if (!filterText) return entries;
+        var needle = filterText.toLowerCase();
+        // Keep groups whose subsequent rows have at least one match.
+        var visible = entries.map(function (e) {
+          if (e.type === 'row') {
+            return e.cells.some(function (c) { return stripHtml(c).toLowerCase().indexOf(needle) !== -1; });
+          }
+          return null; // groups decided below
+        });
+        for (var i = 0; i < entries.length; i++) {
+          if (entries[i].type !== 'group') continue;
+          var has = false;
+          for (var j = i + 1; j < entries.length; j++) {
+            if (entries[j].type === 'group') break;
+            if (visible[j]) { has = true; break; }
+          }
+          visible[i] = has;
+        }
+        return entries.filter(function (_, i) { return visible[i]; });
+      }
+
+      function entriesSorted(visible) {
+        if (sortCol < 0 || sortDir === 0) return visible;
+        // Sort rows within each group block; preserve group order.
+        var out = [];
+        var bucket = [];
+        function flush() {
+          bucket.sort(function (a, b) {
+            var av = stripHtml(a.cells[sortCol] || '');
+            var bv = stripHtml(b.cells[sortCol] || '');
+            var nA = parseFloat(av), nB = parseFloat(bv);
+            var numeric = !isNaN(nA) && !isNaN(nB) &&
+                          /^-?\$?[\d.,%]+\s*$/.test(av) && /^-?\$?[\d.,%]+\s*$/.test(bv);
+            var cmp = numeric ? (nA - nB) : av.toLowerCase().localeCompare(bv.toLowerCase());
+            return sortDir * cmp;
+          });
+          bucket.forEach(function (r) { out.push(r); });
+          bucket = [];
+        }
+        visible.forEach(function (e) {
+          if (e.type === 'group') { flush(); out.push(e); }
+          else bucket.push(e);
+        });
+        flush();
+        return out;
+      }
+
+      function renderTable(visible) {
+        // Detach all existing rows from tbody; re-append in visible order.
+        Array.prototype.slice.call(tbody.querySelectorAll(':scope > tr')).forEach(function (tr) {
+          tr.parentNode.removeChild(tr);
+        });
+        visible.forEach(function (e) {
+          if (e.el) tbody.appendChild(e.el);
+        });
+      }
+
+      function renderCards(visible) {
+        cards.innerHTML = '';
+        visible.forEach(function (e) {
+          if (e.type === 'group') {
+            var h = document.createElement('div');
+            h.className = 'hdt-cards-group';
+            h.innerHTML = e.title;
+            cards.appendChild(h);
+            return;
+          }
+          var card = document.createElement(e.iv.href ? 'a' : 'div');
+          card.className = 'hdt-card';
+          applyRowInteractivity(card, e.iv);
+          e.cells.forEach(function (cell, i) {
+            if (!headers[i]) return;
+            var r = document.createElement('div');
+            r.className = 'hdt-card-row';
+            r.innerHTML =
+              '<span class="hdt-card-key">' + headers[i] + '</span>' +
+              '<span class="hdt-card-val">' + cell + '</span>';
+            card.appendChild(r);
+          });
+          cards.appendChild(card);
+        });
+      }
+
+      function renderList(visible) {
+        list.innerHTML = '';
+        var rowsSinceGroup = 0;
+        visible.forEach(function (e) {
+          if (e.type === 'group') {
+            var h = document.createElement('h4');
+            h.className = 'hdt-list-group';
+            h.innerHTML = e.title;
+            list.appendChild(h);
+            rowsSinceGroup = 0;
+            return;
+          }
+          var inner = document.createElement('dl');
+          if (rowsSinceGroup > 0) inner.classList.add('hdt-list-sep');
+          rowsSinceGroup += 1;
+          e.cells.forEach(function (cell, i) {
+            if (!headers[i]) return;
+            var dt = document.createElement('dt'); dt.innerHTML = headers[i];
+            var dd = document.createElement('dd'); dd.innerHTML = cell;
+            inner.appendChild(dt); inner.appendChild(dd);
+          });
+          if (e.iv.href) {
+            var a = document.createElement('a');
+            a.className = 'hdt-list-row';
+            applyRowInteractivity(a, e.iv);
+            a.appendChild(inner);
+            list.appendChild(a);
+          } else if (e.iv.onclick || e.iv.role === 'button') {
+            var btn = document.createElement('div');
+            btn.className = 'hdt-list-row';
+            applyRowInteractivity(btn, e.iv);
+            btn.appendChild(inner);
+            list.appendChild(btn);
+          } else {
+            list.appendChild(inner);
+          }
+        });
+      }
+
+      function updateSortIndicators() {
+        var ths = table.querySelectorAll('thead th');
+        for (var i = 0; i < ths.length; i++) {
+          var th = ths[i];
+          th.removeAttribute('aria-sort');
+          th.classList.remove('hdt-sort-asc', 'hdt-sort-desc');
+          if (i === sortCol) {
+            if (sortDir === 1)  { th.classList.add('hdt-sort-asc');  th.setAttribute('aria-sort', 'ascending'); }
+            if (sortDir === -1) { th.classList.add('hdt-sort-desc'); th.setAttribute('aria-sort', 'descending'); }
+          }
+        }
+      }
+
+      function render() {
+        var v = entriesSorted(entriesMatchingFilter());
+        renderTable(v);
+        renderCards(v);
+        renderList(v);
+        updateSortIndicators();
+      }
+
+      // Bind sort on every <th> in <thead>.
+      var ths = table.querySelectorAll('thead th');
+      Array.prototype.forEach.call(ths, function (th, idx) {
+        th.classList.add('hdt-sortable');
+        if (!th.hasAttribute('tabindex')) th.setAttribute('tabindex', '0');
+        if (!th.hasAttribute('role'))     th.setAttribute('role', 'button');
+        function toggleSort() {
+          if (sortCol !== idx) { sortCol = idx; sortDir = 1; }
+          else if (sortDir === 1) sortDir = -1;
+          else { sortCol = -1; sortDir = 0; }
+          render();
+        }
+        th.addEventListener('click', toggleSort);
+        th.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort(); }
+        });
+      });
+
+      // Bind filter input.
+      var filterInput = ctrl.querySelector('.hdt-filter input');
+      if (filterInput) {
+        filterInput.addEventListener('input', function () {
+          filterText = filterInput.value;
+          render();
+        });
+      }
 
       // View-toggle handler — CSS-driven via wrap.dataset.view.
       ctrl.querySelectorAll('[data-view]').forEach(function (btn) {
@@ -584,6 +708,8 @@ function initReadingAids() {
           });
         });
       });
+
+      render(); // initial: identity sort, no filter — preserves source order
     }
 
     // Full-width toggle — default-on; this button toggles back to
@@ -620,6 +746,13 @@ function initReadingAids() {
  * and site-manifest.json from the same place rather than guessing
  * based on the page's own path.
  * ---------------------------------------------------------------- */
+/* Build stamp for debugging. Bump KIT_BUILD any time chrome.js gains a
+   compatibility-affecting change so users can verify in DevTools that
+   their browser/IDE isn't serving a stale cached copy:
+       console look for: [html-doc] kit boot · build=...
+   The console.info emits once per page load; cheap insurance. */
+var __htmldocKitBuild = '2026-05-18-r9';
+
 var __htmldocDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
   // canonical docs/ tree (internal triage, examples, sandbox) but want
@@ -643,6 +776,17 @@ var __htmldocDocsRoot = (function () {
   // or an unusual layout). Fall back to page directory.
   return new URL('.', window.location.href).href;
 })();
+
+/* Boot stamp — emit once per page so a stale-cached chrome.js is obvious
+   in DevTools. Tells the user which build, which docs-root, and whether
+   _ijt token propagation is active. */
+try {
+  console.info(
+    '[html-doc] kit boot · build=' + __htmldocKitBuild +
+    ' · docsRoot=' + __htmldocDocsRoot +
+    ' · authToken=' + (window.__htmldocWithAuth && window.__htmldocWithAuth('x') !== 'x' ? 'yes' : 'no')
+  );
+} catch (e) { /* ignore */ }
 
 /* ============ HTML-escape helper (module scope) ============ */
 function escapeHTML(s) {
