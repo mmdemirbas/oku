@@ -454,8 +454,24 @@ code:not(pre code) {
   background: var(--border);
   margin: 0 4px;
 }
+/* CSS-driven view switching — the wrapper's data-view attribute selects
+   which container is visible. Avoids the [hidden]-attribute vs
+   display:grid conflict where cards.hidden was overridden. */
+.hdt-table-wrap[data-view="table"] .hdt-table-cards,
+.hdt-table-wrap[data-view="table"] .hdt-table-list,
+.hdt-table-wrap[data-view="list"]  .hdt-table-scroll,
+.hdt-table-wrap[data-view="list"]  .hdt-table-cards,
+.hdt-table-wrap[data-view="cards"] .hdt-table-scroll,
+.hdt-table-wrap[data-view="cards"] .hdt-table-list { display: none !important; }
+
 .hdt-table-scroll {
   overflow-x: auto;
+  /* Limit vertical height so sticky table headers have something to stick
+     within. Tall tables become scroll-y inside the wrapper; the rest of
+     the page stays calm. The cap is generous enough that most tables
+     never need it. */
+  max-height: 70vh;
+  overflow-y: auto;
   border-radius: 8px;
   /* Edge fade shadows hint at horizontal overflow. */
   background:
@@ -848,6 +864,13 @@ table th {
   text-align: left; background: var(--surface-2);
   padding: 12px 14px; border-bottom: 2px solid var(--border);
   font-weight: 700; color: var(--text); font-size: 13px;
+  /* Sticky column headers: when the scroll container has max-height
+     (.hdt-table-scroll above) and the user scrolls within it, the row
+     of <th>s pins to the top so the column meaning never leaves view.
+     z-index lifts above tbody cells so hover/border doesn't bleed. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 table td { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
 table tr:hover td { background: var(--surface-2); }

@@ -451,19 +451,26 @@ function initReadingAids() {
     var canPivot = headers.length > 0 && rowCount > 0;
 
     var wrap = document.createElement('div');
-    wrap.className = 'hdt-table-wrap';
+    // CSS-driven view switching: setting wrap.dataset.view to table/list/cards
+    // (re)flows the three view containers via attribute selectors in the CSS.
+    // Avoids the [hidden]-vs-display:grid conflict where the cards grid
+    // remained visible behind the table.
+    wrap.className = 'hdt-table-wrap expanded';
+    wrap.dataset.view = 'table';
 
     var ctrl = document.createElement('div');
     ctrl.className = 'hdt-table-controls';
+    // View order: Table → List → Cards (per user request — list is the
+    // common alt-view; cards are the dense alt-view).
     var viewBtns = canPivot ? (
       '<button data-view="table" type="button" class="active" aria-pressed="true">Table</button>' +
-      '<button data-view="cards" type="button" aria-pressed="false">Cards</button>' +
       '<button data-view="list"  type="button" aria-pressed="false">List</button>' +
+      '<button data-view="cards" type="button" aria-pressed="false">Cards</button>' +
       '<span class="hdt-ctrl-sep" aria-hidden="true"></span>'
     ) : '';
     ctrl.innerHTML =
       viewBtns +
-      '<button data-expand type="button" aria-pressed="false" title="Toggle full-width">' +
+      '<button data-expand type="button" class="active" aria-pressed="true" title="Toggle full-width / fit to column">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
       '</button>';
 
@@ -499,7 +506,6 @@ function initReadingAids() {
       // Cards: groups become full-width subheaders; rows become cards.
       var cards = document.createElement('div');
       cards.className = 'hdt-table-cards';
-      cards.hidden = true;
       entries.forEach(function (e) {
         if (e.type === 'group') {
           var h = document.createElement('div');
@@ -529,7 +535,6 @@ function initReadingAids() {
       // applied between rows but reset after each group header.
       var list = document.createElement('div');
       list.className = 'hdt-table-list';
-      list.hidden = true;
       var rowsSinceGroup = 0;
       entries.forEach(function (e) {
         if (e.type === 'group') {
@@ -567,23 +572,22 @@ function initReadingAids() {
       });
       wrap.appendChild(list);
 
-      // View-toggle handler
+      // View-toggle handler — CSS-driven via wrap.dataset.view.
       ctrl.querySelectorAll('[data-view]').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var view = btn.getAttribute('data-view');
+          wrap.dataset.view = view;
           ctrl.querySelectorAll('[data-view]').forEach(function (b) {
             var active = b === btn;
             b.classList.toggle('active', active);
             b.setAttribute('aria-pressed', active ? 'true' : 'false');
           });
-          scroll.hidden = view !== 'table';
-          cards.hidden  = view !== 'cards';
-          list.hidden   = view !== 'list';
         });
       });
     }
 
-    // Full-width toggle
+    // Full-width toggle — default-on; this button toggles back to
+    // column-width for tables that look better narrow.
     var expBtn = ctrl.querySelector('[data-expand]');
     expBtn.addEventListener('click', function () {
       var expanded = wrap.classList.toggle('expanded');
