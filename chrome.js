@@ -1574,18 +1574,8 @@ class PageNav extends HTMLElement {
         self.style.display = 'none';
         return;
       }
-      fetch(__htmldocDocsRoot + 'site-manifest.json', { cache: 'no-cache' })
-        .then(function (r) {
-          if (r.ok) return r.json();
-          // Differentiate "served but missing" from network error so the
-          // warning channel can offer a specific remediation hint.
-          var err = new Error('manifest http ' + r.status);
-          err.__htmldocManifestStatus = r.status;
-          throw err;
-        })
-        .then(function (manifest) {
-          self._renderTree(manifest);
-        })
+      loadManifest()
+        .then(function (manifest) { self._renderTree(manifest); })
         .catch(function (e) {
           self._renderTree(null);
           window.dispatchEvent(new CustomEvent('html-doc:warnings', {
@@ -1598,6 +1588,49 @@ class PageNav extends HTMLElement {
             }]
           }));
         });
+    }
+
+    /* Three-stage manifest loader.
+       1) standalone inline (window.__htmldocManifest pre-populated)
+       2) fetch JSON over HTTP (fast happy path; works whenever the page
+          is served by an HTTP server that allows same-origin GETs)
+       3) script-tag <site-manifest.js> fallback for environments where
+          fetch is blocked (file:// CORS) or refused (IntelliJ's built-in
+          server returns 404 for token-less GETs). The .js companion is
+          emitted next to the .json by build_manifest() in bin/html-doc. */
+    function loadManifest() {
+      if (window.__htmldocManifest) return Promise.resolve(window.__htmldocManifest);
+      var fileProto = (window.location && window.location.protocol === 'file:');
+      var fetchAttempt = fileProto
+        ? Promise.reject(new Error('file:// — skipping fetch'))
+        : fetch(__htmldocDocsRoot + 'site-manifest.json', { cache: 'no-cache' })
+            .then(function (r) {
+              if (r.ok) return r.json();
+              var err = new Error('manifest http ' + r.status);
+              err.__htmldocManifestStatus = r.status;
+              throw err;
+            });
+      return fetchAttempt.catch(function (fetchErr) {
+        return loadManifestViaScript().catch(function () {
+          // Surface the more informative original fetch error.
+          throw fetchErr;
+        });
+      });
+    }
+
+    function loadManifestViaScript() {
+      if (window.__htmldocManifest) return Promise.resolve(window.__htmldocManifest);
+      return new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = __htmldocDocsRoot + 'site-manifest.js';
+        s.async = true;
+        s.onload = function () {
+          if (window.__htmldocManifest) resolve(window.__htmldocManifest);
+          else reject(new Error('site-manifest.js loaded but did not set window.__htmldocManifest'));
+        };
+        s.onerror = function () { reject(new Error('site-manifest.js not reachable')); };
+        document.head.appendChild(s);
+      });
     }
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', start);
