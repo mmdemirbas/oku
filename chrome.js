@@ -429,6 +429,9 @@ function escapeHTML(s) {
   }
   vv.addEventListener('scroll', sync);
   vv.addEventListener('resize', sync);
+  // Browser zoom (Ctrl+/-) fires window.resize but not always
+  // visualViewport.resize. Subscribe to both so fixed chrome stays put.
+  window.addEventListener('resize', sync);
   sync();
 })();
 

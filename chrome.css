@@ -824,26 +824,38 @@ page-nav .page-nav-empty {
   color: var(--text-soft);
   font-style: italic;
 }
+/* Pane edge tabs (page-nav left, page-toc right) are viewport-anchored
+   fixed buttons. Decoupled from each pane's grid track so:
+   - horizontal scroll of overflowing main content doesn't move them,
+   - one pane's collapse doesn't shift the other's tab,
+   - browser zoom and pinch-zoom (via --vv-*) keep them in the corner.
+   Same shape is used at mobile widths — both panes become drawers but
+   the tabs stay where the eye expects them. */
 page-nav .page-nav-tab {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  z-index: 50;
   width: 22px;
-  align-self: center;
   height: 64px;
   background: var(--surface);
   border: 1px solid var(--line-strong);
-  border-right: none;
-  border-radius: 6px 0 0 6px;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
   cursor: pointer;
   color: var(--text-soft);
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: -12px;
-  position: relative;
-  z-index: 5;
-  transition: background 0.15s, color 0.15s;
+  box-shadow: 0 4px 12px var(--shadow-soft);
+  transition: background 0.15s, color 0.15s, transform 0.12s;
+  transform: translateY(-50%) translate(var(--vv-left, 0), var(--vv-top, 0));
 }
 page-nav .page-nav-tab:hover { background: var(--accent-soft); color: var(--accent-strong); }
+page-nav .page-nav-tab:active {
+  transform: translateY(-50%) translate(var(--vv-left, 0), var(--vv-top, 0)) scale(0.96);
+}
 page-nav .page-nav-tab svg { width: 14px; height: 14px; transition: transform 0.2s; }
 .layout.nav-collapsed page-nav .page-nav-tab svg { transform: rotate(180deg); }
 
@@ -869,25 +881,30 @@ body.toc-collapsed .layout:has(page-nav) page-toc .page-toc-panel {
   pointer-events: none;
 }
 .layout:has(page-nav) page-toc .page-toc-tab {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  z-index: 50;
   width: 22px;
-  align-self: center;
   height: 64px;
   background: var(--surface);
   border: 1px solid var(--line-strong);
-  border-left: none;
-  border-radius: 0 6px 6px 0;
+  border-right: none;
+  border-radius: 6px 0 0 6px;
   cursor: pointer;
   color: var(--text-soft);
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: -12px;
-  position: relative;
-  z-index: 5;
-  transition: background 0.15s, color 0.15s;
+  box-shadow: 0 4px 12px var(--shadow-soft);
+  transition: background 0.15s, color 0.15s, transform 0.12s;
+  transform: translateY(-50%) translate(var(--vv-left, 0), var(--vv-top, 0));
 }
 .layout:has(page-nav) page-toc .page-toc-tab:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.layout:has(page-nav) page-toc .page-toc-tab:active {
+  transform: translateY(-50%) translate(var(--vv-left, 0), var(--vv-top, 0)) scale(0.96);
+}
 .layout:has(page-nav) page-toc .page-toc-tab svg { width: 14px; height: 14px; transition: transform 0.2s; }
 body.toc-collapsed .layout:has(page-nav) page-toc .page-toc-tab svg { transform: rotate(180deg); }
 
@@ -896,7 +913,9 @@ body.toc-collapsed .layout:has(page-nav) page-toc .page-toc-tab svg { transform:
 .layout-has-v2 ~ .ctrl-btn.toc-toggle,
 body:has(.layout page-nav) .ctrl-btn.toc-toggle { display: none; }
 
-/* Mobile: page-nav becomes a left drawer */
+/* Narrow viewport: each pane becomes a drawer on its own edge. The
+   edge tabs are already viewport-anchored (above), so they remain
+   reachable in either drawer state. */
 @media (max-width: 1024px) {
   .layout:has(page-nav) {
     grid-template-columns: 1fr !important;
@@ -912,15 +931,27 @@ body:has(.layout page-nav) .ctrl-btn.toc-toggle { display: none; }
     box-shadow: 4px 0 24px rgba(0,0,0,0.15);
   }
   page-nav.open { transform: translateX(0); }
-  page-nav .page-nav-tab {
-    position: absolute;
-    right: -22px;
-    margin-right: 0;
-    border-radius: 0 6px 6px 0;
-    border: 1px solid var(--line-strong);
-    border-left: none;
-  }
   page-nav.open .page-nav-tab svg { transform: rotate(180deg); }
+
+  /* Mirror: page-toc becomes a right drawer */
+  .layout:has(page-nav) page-toc {
+    position: fixed;
+    top: 0; bottom: 0; right: 0;
+    width: 80vw; max-width: 320px;
+    height: 100vh;
+    z-index: 100;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+    display: block;
+    background: var(--surface);
+  }
+  .layout:has(page-nav) page-toc.open { transform: translateX(0); }
+  .layout:has(page-nav) page-toc.open .page-toc-tab svg { transform: rotate(180deg); }
+  .layout:has(page-nav) page-toc .page-toc-panel {
+    height: 100%;
+    overflow-y: auto;
+  }
 }
 
 /* ============================================================
