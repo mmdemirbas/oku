@@ -617,6 +617,18 @@ function initReadingAids() {
  * based on the page's own path.
  * ---------------------------------------------------------------- */
 var __htmldocDocsRoot = (function () {
+  // Explicit override wins. Use this for pages that live outside the
+  // canonical docs/ tree (internal triage, examples, sandbox) but want
+  // to share the same site-manifest / kit.json / glossary as the docs.
+  // Value is resolved against the page URL so relative paths work.
+  var metaOverride = document.querySelector('meta[name="html-doc-docs-root"]');
+  if (metaOverride && metaOverride.getAttribute('content')) {
+    try {
+      var resolved = new URL(metaOverride.getAttribute('content'), window.location.href).href;
+      if (resolved.charAt(resolved.length - 1) !== '/') resolved += '/';
+      return resolved;
+    } catch (e) { /* fall through */ }
+  }
   var refs = document.querySelectorAll('link[href*="_kit/"], script[src*="_kit/"]');
   for (var i = 0; i < refs.length; i++) {
     var url = refs[i].href || refs[i].src || '';
