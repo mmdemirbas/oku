@@ -455,6 +455,80 @@ function escapeHTML(s) {
   sync();
 })();
 
+/* ============ Edge-tab proximity sync ============ *
+ * Keeps each pane's edge tab glued to that pane's inner boundary as the
+ * layout shifts (responsive resize, .nav-collapsed toggle, .toc-collapsed
+ * toggle, max-width centering, browser zoom). Writes
+ * --nav-tab-left / --toc-tab-right CSS variables that chrome.css reads
+ * for the tab's `left` / `right`. Falls back to viewport edges at narrow
+ * widths (where panes become drawers — see the @media block in CSS).
+ *
+ * Proximity rule (~/.claude/rules/design-principles.md): a control that
+ * operates on a panel should live on or near that panel's edge — not at
+ * the absolute viewport edge with a wide gap of unrelated content between.
+ * ----------------------------------------------------------------------- */
+(function () {
+  // Tab is 22px wide; we want it to overlap the panel's inner edge by 11
+  // (half its width) so the tab visually attaches to the panel.
+  var OVERHANG = 11;
+  var NARROW = 1024;
+  var _ro = null;
+  function update() {
+    var nav = document.querySelector('page-nav');
+    var toc = document.querySelector('.layout:has(page-nav) page-toc');
+    var narrow = window.innerWidth <= NARROW;
+    var rootStyle = document.documentElement.style;
+    if (nav && !narrow) {
+      var r = nav.getBoundingClientRect();
+      rootStyle.setProperty('--nav-tab-left', Math.round(r.right - OVERHANG) + 'px');
+    } else {
+      rootStyle.setProperty('--nav-tab-left', '0px');
+    }
+    if (toc && !narrow) {
+      var r2 = toc.getBoundingClientRect();
+      rootStyle.setProperty('--toc-tab-right', Math.round(window.innerWidth - r2.left - OVERHANG) + 'px');
+    } else {
+      rootStyle.setProperty('--toc-tab-right', '0px');
+    }
+  }
+
+  function attach() {
+    update();
+    var nav = document.querySelector('page-nav');
+    var toc = document.querySelector('page-toc');
+    // ResizeObserver tracks the panes' size across CSS transitions
+    // (the 0.25s grid-template-columns animation when collapsing).
+    if (window.ResizeObserver && !_ro) {
+      _ro = new ResizeObserver(update);
+      if (nav) _ro.observe(nav);
+      if (toc) _ro.observe(toc);
+    }
+    // MutationObserver on the layout/body picks up state-class flips
+    // (.nav-collapsed on .layout, .toc-collapsed on body, .open on each pane).
+    var mo = new MutationObserver(update);
+    var layout = document.querySelector('.layout');
+    if (layout) mo.observe(layout, { attributes: true, attributeFilter: ['class'] });
+    mo.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    if (nav) mo.observe(nav, { attributes: true, attributeFilter: ['class'] });
+    if (toc) mo.observe(toc, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  // Resize / zoom / pinch
+  window.addEventListener('resize', update);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', update);
+    window.visualViewport.addEventListener('scroll', update);
+  }
+  // Renderer can swap layout mid-flight (JSON pages); rerun then.
+  window.addEventListener('html-doc:rendered', update);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attach);
+  } else {
+    attach();
+  }
+})();
+
 /* ============ Live-reload (only when served via `html-doc serve`) ============ *
  * Opens an EventSource against /__reload — a Server-Sent Events stream
  * that the dev server pushes a message into whenever a watched file

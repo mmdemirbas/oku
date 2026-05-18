@@ -919,17 +919,19 @@ page-nav .page-nav-empty {
   color: var(--text-soft);
   font-style: italic;
 }
-/* Pane edge tabs (page-nav left, page-toc right) are viewport-anchored
-   fixed buttons. Decoupled from each pane's grid track so:
+/* Pane edge tabs (page-nav left, page-toc right) are fixed-positioned
+   and follow each pane's inner edge via --nav-tab-left / --toc-tab-right
+   CSS variables that chrome.js syncs from the pane's bounding rect.
+   Decoupled from the grid track so:
    - horizontal scroll of overflowing main content doesn't move them,
-   - one pane's collapse doesn't shift the other's tab,
-   - browser zoom and pinch-zoom (via --vv-*) keep them in the corner.
-   Same shape is used at mobile widths — both panes become drawers but
-   the tabs stay where the eye expects them. */
+   - one pane's collapse animates the tab with that pane only,
+   - browser zoom and pinch-zoom (via --vv-*) keep them in place.
+   At narrow widths (drawer mode) the @media block below anchors them
+   to the viewport edges so they remain reachable when a drawer is shut. */
 page-nav .page-nav-tab {
   position: fixed;
   top: 50%;
-  left: 0;
+  left: var(--nav-tab-left, 248px);
   z-index: 50;
   width: 22px;
   height: 64px;
@@ -978,7 +980,7 @@ body.toc-collapsed .layout:has(page-nav) page-toc .page-toc-panel {
 .layout:has(page-nav) page-toc .page-toc-tab {
   position: fixed;
   top: 50%;
-  right: 0;
+  right: var(--toc-tab-right, 228px);
   z-index: 50;
   width: 22px;
   height: 64px;
@@ -1027,6 +1029,10 @@ body:has(.layout page-nav) .ctrl-btn.toc-toggle { display: none; }
   }
   page-nav.open { transform: translateX(0); }
   page-nav.open .page-nav-tab svg { transform: rotate(180deg); }
+  /* Drawer mode: ignore the JS-synced offset (drawer slides offscreen)
+     and anchor each tab to its viewport edge so it stays reachable. */
+  page-nav .page-nav-tab { left: 0 !important; }
+  .layout:has(page-nav) page-toc .page-toc-tab { right: 0 !important; }
 
   /* Mirror: page-toc becomes a right drawer */
   .layout:has(page-nav) page-toc {
