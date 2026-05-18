@@ -142,7 +142,7 @@
       "additionalProperties": false,
       "properties": {
         "kind": { "const": "callout" },
-        "type": { "enum": ["warn", "danger", "success", "neutral"], "default": "neutral" },
+        "type": { "enum": ["warn", "warning", "caution", "danger", "success", "tip", "neutral", "note", "info"], "default": "neutral" },
         "title": { "type": "string" },
         "content": { "$ref": "#/$defs/richString" }
       }
