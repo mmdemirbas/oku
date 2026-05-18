@@ -34,7 +34,37 @@ import time
 import webbrowser
 from pathlib import Path
 
-KIT_ROOT = Path(__file__).resolve().parent.parent
+def _kit_assets_dir() -> Path:
+    """Locate the kit's asset directory.
+
+    Two layouts are valid:
+
+    - **Installed** (uv tool install / pip install): hatchling's
+      force-include packs chrome.{css,js}, chrome-boot.js, renderer.js,
+      schema/, glossary/, extrefs/, templates/ into
+      ``<site-packages>/html_doc/assets/``. This is the canonical layout
+      once the package is on PATH.
+    - **Development** (cloned repo, no install): the assets live at the
+      repo root next to ``src/``. Walk up from ``cli.py`` until we find
+      a directory containing both ``chrome.css`` and ``schema/``.
+
+    The two-layout selector means ``html-doc init`` keeps working from
+    either invocation path. Returns the resolved directory; the caller
+    is responsible for handling missing files within it.
+    """
+    here = Path(__file__).resolve()
+    pkg_assets = here.parent / "assets"
+    if (pkg_assets / "chrome.css").exists():
+        return pkg_assets
+    # Walk upward looking for the dev layout (repo root marker).
+    for ancestor in [here.parent, *here.parents]:
+        if (ancestor / "chrome.css").exists() and (ancestor / "schema").exists():
+            return ancestor
+    # Fallback to the two-parents-up legacy assumption.
+    return here.parent.parent
+
+
+KIT_ROOT = _kit_assets_dir()
 KIT_FILES = ['chrome.css', 'chrome.js', 'chrome-boot.js', 'renderer.js']
 SKIP_DIRS = {'dist', '_kit', 'node_modules', '.git', 'venv', '.venv', '__pycache__'}
 

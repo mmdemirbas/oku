@@ -39,6 +39,20 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/html_doc"]
 
+# Pack the kit assets under html_doc/assets/ in the installed wheel so
+# cli._kit_assets_dir() finds them on PATH-installed deployments. The
+# dev layout (chrome.css at repo root) keeps working — the helper picks
+# whichever exists.
+[tool.hatch.build.targets.wheel.force-include]
+"chrome.css"      = "html_doc/assets/chrome.css"
+"chrome.js"       = "html_doc/assets/chrome.js"
+"chrome-boot.js"  = "html_doc/assets/chrome-boot.js"
+"renderer.js"     = "html_doc/assets/renderer.js"
+"schema"          = "html_doc/assets/schema"
+"glossary"        = "html_doc/assets/glossary"
+"extrefs"         = "html_doc/assets/extrefs"
+"templates"       = "html_doc/assets/templates"
+
 [tool.hatch.build.targets.sdist]
 include = [
     "src/html_doc",

@@ -753,7 +753,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [html-doc] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __htmldocKitBuild = '2026-05-18-r9';
+var __htmldocKitBuild = '2026-05-18-r10';
 
 var __htmldocDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
