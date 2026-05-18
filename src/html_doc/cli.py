@@ -350,6 +350,32 @@ def _md_block(block: dict, depth: int = 0) -> list[str]:
                 out.append(f'{aid}. {content}')
         return out
 
+    if kind == 'table':
+        headers = [_flatten_inline(h) for h in (block.get('headers') or [])]
+        if headers:
+            out.append('| ' + ' | '.join(headers) + ' |')
+            out.append('| ' + ' | '.join(['---'] * len(headers)) + ' |')
+        def emit_row(row):
+            cells = row.get('cells') if isinstance(row, dict) else row
+            md_cells = [_flatten_inline(c).replace('|', '\\|').replace('\n', ' ') for c in (cells or [])]
+            out.append('| ' + ' | '.join(md_cells) + ' |')
+        if block.get('groups'):
+            for g in block['groups']:
+                title = _flatten_inline(g.get('title') or '')
+                if title:
+                    out.append('')
+                    out.append('### ' + title)
+                    if headers:
+                        out.append('')
+                        out.append('| ' + ' | '.join(headers) + ' |')
+                        out.append('| ' + ' | '.join(['---'] * len(headers)) + ' |')
+                for row in (g.get('rows') or []):
+                    emit_row(row)
+        else:
+            for row in (block.get('rows') or []):
+                emit_row(row)
+        return out
+
     if kind == 'kpi-grid':
         for item in (block.get('tiles') or block.get('items') or []):
             num = item.get('num', '')

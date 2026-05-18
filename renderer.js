@@ -229,6 +229,7 @@
         case 'list':         el = this._renderList(block); break;
         case 'code':         el = this._renderCode(block); break;
         case 'annotated-code': el = this._renderAnnotatedCode(block); break;
+        case 'table':        el = this._renderTable(block); break;
         case 'kpi-grid':     el = this._renderKpiGrid(block); break;
         case 'bar-chart':    el = this._renderBarChart(block); break;
         case 'step-flow':    el = this._renderStepFlow(block); break;
@@ -351,6 +352,68 @@
       code.textContent = block.source || '';
       pre.appendChild(code);
       return pre;
+    }
+
+    _renderTable(block) {
+      // Two valid shapes:
+      //   { headers: [...], rows: [[c1, c2, ...], ...] }
+      //   { headers: [...], groups: [{title, rows: [[...], ...]}, ...] }
+      // The chrome.js post-processor (UX6) discovers groups by class /
+      // colspan markers, so we emit those even from the JSON path.
+      const table = document.createElement('table');
+      const headers = block.headers || [];
+      if (headers.length) {
+        const thead = document.createElement('thead');
+        const tr = document.createElement('tr');
+        for (const h of headers) {
+          const th = document.createElement('th');
+          th.appendChild(this._renderRich(h));
+          tr.appendChild(th);
+        }
+        thead.appendChild(tr);
+        table.appendChild(thead);
+      }
+      const tbody = document.createElement('tbody');
+      const cellCount = headers.length || 1;
+
+      const renderRow = (row, opts) => {
+        const tr = document.createElement('tr');
+        if (opts && opts.bind) tr.setAttribute('data-bind', opts.bind);
+        if (opts && opts.href) {
+          // tr's don't have an href attribute, but the click handler can
+          // read it from a data-href dataset.
+          tr.setAttribute('data-href', opts.href);
+          tr.style.cursor = 'pointer';
+          tr.addEventListener('click', () => { window.location.href = opts.href; });
+        }
+        for (const cell of (row.cells || row)) {
+          const td = document.createElement('td');
+          td.appendChild(this._renderRich(cell));
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      };
+
+      const renderGroupHeader = (title) => {
+        const tr = document.createElement('tr');
+        tr.className = 'group';
+        const th = document.createElement('th');
+        th.colSpan = cellCount;
+        th.appendChild(this._renderRich(title));
+        tr.appendChild(th);
+        tbody.appendChild(tr);
+      };
+
+      if (Array.isArray(block.groups) && block.groups.length) {
+        for (const g of block.groups) {
+          if (g.title) renderGroupHeader(g.title);
+          for (const row of (g.rows || [])) renderRow(row);
+        }
+      } else {
+        for (const row of (block.rows || [])) renderRow(row);
+      }
+      table.appendChild(tbody);
+      return table;
     }
 
     _renderAnnotatedCode(block) {

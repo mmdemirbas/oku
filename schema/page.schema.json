@@ -105,6 +105,7 @@
         { "$ref": "#/$defs/list" },
         { "$ref": "#/$defs/code" },
         { "$ref": "#/$defs/annotated-code" },
+        { "$ref": "#/$defs/table" },
         { "$ref": "#/$defs/kpi-grid" },
         { "$ref": "#/$defs/bar-chart" },
         { "$ref": "#/$defs/step-flow" },
@@ -196,6 +197,46 @@
         "kind": { "const": "code" },
         "language": { "type": "string" },
         "source": { "type": "string" }
+      }
+    },
+
+    "table": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind":    { "const": "table" },
+        "headers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/richString" }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/richString" }
+          },
+          "description": "Flat row form. Use either rows OR groups, not both."
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["rows"],
+            "additionalProperties": false,
+            "properties": {
+              "title": { "$ref": "#/$defs/richString" },
+              "rows":  {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/richString" }
+                }
+              }
+            }
+          },
+          "description": "Grouped row form — chrome.js renders each group title as a subhead row across the views."
+        }
       }
     },
 
