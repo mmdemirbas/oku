@@ -225,6 +225,177 @@ def build_manifest(root: Path) -> Path:
     return out
 
 
+# ---------- LLM-friendly markdown twin per JSON page ----------
+def _flatten_inline(content) -> str:
+    """Walk a rich-string (string / list / dict node) into plain markdown."""
+    if content is None:
+        return ''
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return ''.join(_flatten_inline(c) for c in content)
+    if isinstance(content, dict):
+        kind = content.get('kind') or content.get('type')
+        body = content.get('text') or content.get('content', '')
+        body = _flatten_inline(body)
+        href = content.get('href') or content.get('link', '')
+        if kind in ('em', 'i'):       return '*' + body + '*'
+        if kind in ('strong', 'b'):   return '**' + body + '**'
+        if kind == 'code':            return '`' + body + '`'
+        if kind == 'link':            return f'[{body}]({href})' if href else body
+        if kind == 'ext-ref':         return f'[{body}]({href})' if href else body
+        if kind == 'glossary-term':   return body
+        if kind == 'br':              return '\n'
+        return body
+    return str(content)
+
+
+def _md_block(block: dict, depth: int = 0) -> list[str]:
+    """Render a JSON content block as a list of markdown lines.
+
+    Best-effort — known kinds get semantic markdown; unknown / visually-
+    rich kinds (charts, diagrams) get a parenthetical placeholder so the
+    consuming LLM still sees the structure. Empty list means "skip"."""
+    if not isinstance(block, dict):
+        return []
+    kind = block.get('kind', '')
+    out: list[str] = []
+
+    if kind == 'section':
+        title = _flatten_inline(block.get('title') or '')
+        if title:
+            out.append('## ' + title)
+            out.append('')
+        for child in block.get('blocks', []):
+            out.extend(_md_block(child, depth + 1))
+            out.append('')
+        return out
+
+    if kind == 'heading':
+        level = max(2, int(block.get('level', 2)))
+        out.append('#' * level + ' ' + _flatten_inline(block.get('text', '')))
+        return out
+
+    if kind == 'paragraph':
+        out.append(_flatten_inline(block.get('content', '')))
+        return out
+
+    if kind in ('callout', 'tldr', 'insight', 'info-tip'):
+        type_label = (block.get('type') or kind).upper()
+        body = _flatten_inline(block.get('content') or block.get('lead', '') or block.get('body', ''))
+        title = _flatten_inline(block.get('title') or '')
+        header = f'> **{type_label}: {title}**' if title else f'> **{type_label}**'
+        out.append(header)
+        for line in body.split('\n'):
+            out.append('> ' + line if line else '>')
+        return out
+
+    if kind == 'list':
+        items = block.get('items') or block.get('bullets') or []
+        ordered = block.get('ordered') is True
+        for i, item in enumerate(items, 1):
+            text = _flatten_inline(item if not isinstance(item, dict) else (item.get('text') or item.get('content') or ''))
+            prefix = f'{i}. ' if ordered else '- '
+            out.append(prefix + text)
+        return out
+
+    if kind == 'code':
+        lang = block.get('language') or block.get('lang') or ''
+        body = block.get('source') or block.get('content') or block.get('code', '')
+        out.append('```' + lang)
+        out.append(body)
+        out.append('```')
+        return out
+
+    if kind == 'kpi-grid':
+        for item in (block.get('tiles') or block.get('items') or []):
+            num = item.get('num', '')
+            label = _flatten_inline(item.get('label', ''))
+            out.append(f'- **{num}** — {label}')
+        return out
+
+    if kind == 'bar-chart':
+        title = _flatten_inline(block.get('title') or 'Bar chart')
+        out.append('### ' + title)
+        for row in (block.get('rows') or block.get('data') or []):
+            label = _flatten_inline(row.get('label', ''))
+            value = row.get('value', '')
+            out.append(f'- {label}: {value}')
+        return out
+
+    if kind in ('compare-grid', 'scope-grid'):
+        for card in (block.get('cards') or block.get('cols') or block.get('items') or []):
+            t = _flatten_inline(card.get('title', ''))
+            body = _flatten_inline(card.get('content') or card.get('summary') or '')
+            if t:    out.append('### ' + t)
+            if body: out.append(body)
+        return out
+
+    if kind == 'step-flow':
+        for i, step in enumerate(block.get('steps') or [], 1):
+            t = _flatten_inline(step.get('title', ''))
+            body = _flatten_inline(step.get('content') or step.get('summary') or '')
+            out.append(f'{i}. **{t}**')
+            if body:
+                for line in body.split('\n'):
+                    out.append('   ' + line)
+        return out
+
+    if kind in ('chart', 'diagram'):
+        title = _flatten_inline(block.get('title') or block.get('caption') or kind)
+        out.append(f'_[{kind}: {title}]_')
+        return out
+
+    if kind == 'live-snippet':
+        out.append('_[interactive snippet]_')
+        return out
+
+    # Unknown — emit a placeholder so the structure isn't lost.
+    out.append(f'_[{kind or "block"}]_')
+    return out
+
+
+def render_page_markdown(page_json: dict) -> str:
+    """Render a JSON page as semantic markdown for the /page.md LLM twin."""
+    lines: list[str] = []
+    title = page_json.get('title') or ''
+    if title:
+        lines.append('# ' + title)
+        lines.append('')
+    meta = page_json.get('meta') or {}
+    subtitle = _flatten_inline(meta.get('subtitle') or '')
+    if subtitle:
+        lines.append('*' + subtitle + '*')
+        lines.append('')
+    bits: list[str] = []
+    for key in ('date', 'audience', 'read_time'):
+        if meta.get(key):
+            bits.append(str(meta[key]))
+    if meta.get('updated'):
+        bits.append('Updated: ' + str(meta['updated']))
+    if bits:
+        lines.append('> ' + ' · '.join(bits))
+        lines.append('')
+    for block in page_json.get('blocks', []):
+        lines.extend(_md_block(block))
+        lines.append('')
+    return '\n'.join(lines).rstrip() + '\n'
+
+
+def build_markdown_twins(root: Path) -> int:
+    """For each JSON page under root, emit a sibling <name>.md. Returns count."""
+    n = 0
+    for p, data in find_json_pages(root):
+        rel = p.relative_to(root)
+        out_path = root / rel.with_suffix('.md')
+        try:
+            out_path.write_text(render_page_markdown(data), encoding='utf-8')
+            n += 1
+        except OSError:
+            continue
+    return n
+
+
 def build_llms_txt(root: Path) -> Path:
     """Emit llms.txt — sitemap for LLM consumers (llmstxt.org convention).
 
@@ -546,11 +717,15 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f'✗ No .html or page-JSON files found in {root}', file=sys.stderr)
         return 1
 
-    # Always regenerate manifest + llms.txt so <page-nav> + AI consumers see fresh state.
+    # Always regenerate manifest + llms.txt + markdown twins so <page-nav>
+    # + AI consumers see fresh state.
     manifest_path = build_manifest(root)
     llms_path = build_llms_txt(root)
+    md_count = build_markdown_twins(root)
     print(f'✓ Wrote {manifest_path.relative_to(root)} ({len(json_pages)} JSON page(s))')
     print(f'✓ Wrote {llms_path.relative_to(root)} (sitemap for LLM consumers)')
+    if md_count:
+        print(f'✓ Wrote {md_count} page.md twin(s) (LLM-readable markdown per page)')
 
     # Schema validation — soft-fails without jsonschema.
     if _HAS_JSONSCHEMA:
@@ -799,12 +974,16 @@ def cmd_serve(args: argparse.Namespace) -> int:
     assert httpd is not None
     httpd.daemon_threads = True  # let Ctrl-C terminate hung SSE threads cleanly
 
-    # Refresh manifest + llms.txt on serve start so they reflect current state.
+    # Refresh manifest + llms.txt + markdown twins on serve start so they
+    # reflect current state.
     try:
         manifest_path = build_manifest(root)
         llms_path = build_llms_txt(root)
+        md_count = build_markdown_twins(root)
         print(f'✓ Refreshed site-manifest: {manifest_path.relative_to(root)}')
         print(f'✓ Refreshed llms.txt:       {llms_path.relative_to(root)}')
+        if md_count:
+            print(f'✓ Refreshed page.md twins: {md_count} file(s)')
     except OSError as e:
         print(f'! Could not write manifest/llms.txt: {e}', file=sys.stderr)
 

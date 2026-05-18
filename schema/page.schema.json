@@ -31,6 +31,7 @@
         "subtitle": { "type": "string" },
         "audience": { "type": "string" },
         "date": { "type": "string", "description": "ISO date or human string." },
+        "updated": { "type": "string", "description": "Last-updated date — quiet trust signal under the cover meta row." },
         "read_time": { "type": "string", "description": "Like '~10 min read'." },
         "lang": { "type": "string", "description": "Per-page language override; otherwise project default applies." },
         "summary": { "type": "string", "description": "One-line summary, surfaced in nav tooltips and llms.txt." }

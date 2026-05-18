@@ -115,6 +115,14 @@
         m.textContent = metaParts.join(' · ');
         cover.appendChild(m);
       }
+      // "Last updated" line — trust signal lifted from Vercel / VitePress /
+      // Stripe. Quietly rendered below the main meta row in faint type.
+      if (meta.updated) {
+        const u = document.createElement('div');
+        u.className = 'meta meta-updated';
+        u.textContent = 'Last updated ' + meta.updated;
+        cover.appendChild(u);
+      }
       return cover;
     }
 
