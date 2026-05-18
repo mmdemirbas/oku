@@ -401,15 +401,54 @@ function initReadingAids() {
     table.setAttribute('data-hdt-bound', '1');
 
     var headers = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) { return th.innerHTML; });
-    var rowEls  = table.querySelectorAll('tbody tr');
+    var colCount = headers.length || (function () {
+      var fr = table.querySelector('tr');
+      return fr ? fr.children.length : 0;
+    })();
+    var rowEls  = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
     if (!rowEls.length) {
-      rowEls = table.querySelectorAll('tr');
+      rowEls = Array.prototype.slice.call(table.querySelectorAll('tr'));
     }
-    var rows = Array.prototype.map.call(rowEls, function (tr) {
-      return Array.prototype.map.call(tr.querySelectorAll('td'), function (td) { return td.innerHTML; });
-    }).filter(function (r) { return r.length; });
 
-    var canPivot = headers.length > 0 && rows.length > 0;
+    /* Classify every <tr> as either a "group" header or a data "row".
+       Group detection:
+         - tr.classList contains 'group' / 'group-header' / 'subhead'
+         - tr contains a single <th colspan="N"> spanning the table width
+         - tr contains a single <td colspan="N"> spanning the table width
+       Data row inherits clickability from the <tr> level so Cards / List
+       views can re-create the same click/keyboard affordance:
+         - tr.onclick / tr.dataset.href / tr.role / tr.tabIndex
+         - or, if absent, the first <a href> inside the row */
+    function classify(tr) {
+      var classes = tr.className || '';
+      var isGroupCls = /(^|\s)(group|group-header|subhead|table-group)(\s|$)/.test(classes);
+      var cells = tr.children;
+      var lone = (cells.length === 1) ? cells[0] : null;
+      var spans = lone && lone.colSpan && lone.colSpan >= Math.max(1, colCount);
+      var isGroup = isGroupCls || (lone && lone.tagName === 'TH' && cells.length === 1)
+                                || (spans && (lone.tagName === 'TH' || lone.tagName === 'TD'));
+      if (isGroup) {
+        var title = lone ? lone.innerHTML : tr.innerHTML;
+        return { type: 'group', title: title, classes: classes };
+      }
+      var tdList = tr.querySelectorAll(':scope > td');
+      if (!tdList.length) return null;
+      var firstAnchor = tr.querySelector(':scope > td a[href]');
+      var iv = {
+        onclick: tr.getAttribute('onclick'),
+        href: tr.getAttribute('data-href') || (firstAnchor ? firstAnchor.getAttribute('href') : null),
+        role: tr.getAttribute('role'),
+        tabindex: tr.getAttribute('tabindex'),
+        target: tr.getAttribute('data-target') || (firstAnchor ? firstAnchor.getAttribute('target') : null),
+        classes: classes,
+      };
+      var cellHtml = Array.prototype.map.call(tdList, function (td) { return td.innerHTML; });
+      return { type: 'row', cells: cellHtml, iv: iv };
+    }
+
+    var entries = rowEls.map(classify).filter(Boolean);
+    var rowCount = entries.filter(function (e) { return e.type === 'row'; }).length;
+    var canPivot = headers.length > 0 && rowCount > 0;
 
     var wrap = document.createElement('div');
     wrap.className = 'hdt-table-wrap';
@@ -437,14 +476,42 @@ function initReadingAids() {
     wrap.appendChild(scroll);
 
     if (canPivot) {
-      // Cards: each row as a stacked key:value card.
+      function applyRowInteractivity(el, iv) {
+        // Strip the "group" markers that snuck in via tr.className, but
+        // preserve everything else the author put there.
+        if (iv.classes) {
+          var keep = iv.classes
+            .split(/\s+/)
+            .filter(function (c) { return c && !/^(group|group-header|subhead|table-group)$/.test(c); });
+          if (keep.length) el.className += ' ' + keep.join(' ');
+        }
+        if (iv.role)               el.setAttribute('role', iv.role);
+        if (iv.tabindex != null)   el.setAttribute('tabindex', iv.tabindex);
+        if (iv.onclick)            el.setAttribute('onclick', iv.onclick);
+        if (iv.href) {
+          // Use a real <a> wrapper for the keyboard / context-menu story.
+          // Caller decides whether to swap el's tagName before calling.
+          el.setAttribute('href', iv.href);
+          if (iv.target) el.setAttribute('target', iv.target);
+        }
+      }
+
+      // Cards: groups become full-width subheaders; rows become cards.
       var cards = document.createElement('div');
       cards.className = 'hdt-table-cards';
       cards.hidden = true;
-      rows.forEach(function (row) {
-        var card = document.createElement('div');
+      entries.forEach(function (e) {
+        if (e.type === 'group') {
+          var h = document.createElement('div');
+          h.className = 'hdt-cards-group';
+          h.innerHTML = e.title;
+          cards.appendChild(h);
+          return;
+        }
+        var card = document.createElement(e.iv.href ? 'a' : 'div');
         card.className = 'hdt-card';
-        row.forEach(function (cell, i) {
+        applyRowInteractivity(card, e.iv);
+        e.cells.forEach(function (cell, i) {
           if (!headers[i]) return;
           var r = document.createElement('div');
           r.className = 'hdt-card-row';
@@ -457,20 +524,46 @@ function initReadingAids() {
       });
       wrap.appendChild(cards);
 
-      // List: each row as a definition list.
+      // List: groups become subheadings; rows become dl items (optionally
+      // wrapped in <a> if the row was clickable). Separator class is
+      // applied between rows but reset after each group header.
       var list = document.createElement('div');
       list.className = 'hdt-table-list';
       list.hidden = true;
-      rows.forEach(function (row, rIdx) {
-        var dl = document.createElement('dl');
-        if (rIdx > 0) dl.classList.add('hdt-list-sep');
-        row.forEach(function (cell, i) {
+      var rowsSinceGroup = 0;
+      entries.forEach(function (e) {
+        if (e.type === 'group') {
+          var h = document.createElement('h4');
+          h.className = 'hdt-list-group';
+          h.innerHTML = e.title;
+          list.appendChild(h);
+          rowsSinceGroup = 0;
+          return;
+        }
+        var inner = document.createElement('dl');
+        if (rowsSinceGroup > 0) inner.classList.add('hdt-list-sep');
+        rowsSinceGroup += 1;
+        e.cells.forEach(function (cell, i) {
           if (!headers[i]) return;
           var dt = document.createElement('dt'); dt.innerHTML = headers[i];
           var dd = document.createElement('dd'); dd.innerHTML = cell;
-          dl.appendChild(dt); dl.appendChild(dd);
+          inner.appendChild(dt); inner.appendChild(dd);
         });
-        list.appendChild(dl);
+        if (e.iv.href) {
+          var a = document.createElement('a');
+          a.className = 'hdt-list-row';
+          applyRowInteractivity(a, e.iv);
+          a.appendChild(inner);
+          list.appendChild(a);
+        } else if (e.iv.onclick || e.iv.role === 'button') {
+          var btn = document.createElement('div');
+          btn.className = 'hdt-list-row';
+          applyRowInteractivity(btn, e.iv);
+          btn.appendChild(inner);
+          list.appendChild(btn);
+        } else {
+          list.appendChild(inner);
+        }
       });
       wrap.appendChild(list);
 
