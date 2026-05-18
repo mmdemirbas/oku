@@ -54,6 +54,7 @@ const ICON_CROSS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_BRACES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2"/><path d="M16 3a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2"/></svg>';
 const ICON_CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
 const ICON_RESET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15A9 9 0 1 0 6 5.3L1 10"/></svg>';
+const ICON_GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
 
 /* ============ Three-mode theme cycler (system → light → dark → system) ============ */
 function getThemeMode() {
@@ -1108,7 +1109,7 @@ var __htmldocTooltip = (function () {
 
 /* ============ kit.json loader (multi-domain glossary + ext-refs) ============ */
 var __htmldocKit = (function () {
-  var kit = { glossary: {}, extrefs: {}, lang: 'en', lang_fallback: ['en'], domains: [] };
+  var kit = { glossary: {}, extrefs: {}, lang: 'en', lang_fallback: ['en'], domains: [], personalization: [] };
   var loaded = false;
   var waiters = [];
 
@@ -1123,6 +1124,7 @@ var __htmldocKit = (function () {
         if (bk.lang) kit.lang = bk.lang;
         if (bk.lang_fallback) kit.lang_fallback = bk.lang_fallback;
         if (bk.domains) kit.domains = bk.domains;
+        if (bk.personalization) kit.personalization = bk.personalization;
         if (bundle.glossary) kit.glossary = bundle.glossary;
         if (bundle.extrefs) kit.extrefs = bundle.extrefs;
         // Project-local overrides from kit.json still apply on top.
@@ -1161,6 +1163,7 @@ var __htmldocKit = (function () {
           if (data.lang) kit.lang = data.lang;
           if (data.lang_fallback) kit.lang_fallback = data.lang_fallback;
           if (data.domains) kit.domains = data.domains;
+          if (data.personalization) kit.personalization = data.personalization;
         }
         // Load each domain file in parallel
         var promises = kit.domains.flatMap(function (d) {
@@ -1195,6 +1198,14 @@ var __htmldocKit = (function () {
             });
           }
           loaded = true;
+          // Personalization is a kit-level concept: kit.json declares the
+          // keys, chrome.js renders the gear button + swaps {{key}} at
+          // runtime. Hand-off to the personalization module so it can
+          // attach its UI once the kit data is settled.
+          if (typeof __htmldocPersonalization !== 'undefined') {
+            try { __htmldocPersonalization.init((data && data.personalization) || kit.personalization || []); }
+            catch (e) { /* ignore */ }
+          }
           waiters.forEach(function (w) { w(kit); });
           waiters = [];
           return kit;
@@ -1279,7 +1290,163 @@ var __htmldocKit = (function () {
   };
 })();
 
-/* ============ <glossary-term> Custom Element ============ */
+/* ============ Inline placeholder personalization (Mintlify lift) ============ *
+ * kit.json may declare:
+ *   "personalization": [
+ *     { "key": "apiKey",    "label": "API Key",    "default": "sk_test_..." },
+ *     { "key": "projectId", "label": "Project ID", "default": "proj_demo"   }
+ *   ]
+ *
+ * When present, chrome.js renders a gear icon in the top-right chrome
+ * cluster. Clicking opens a small panel with text inputs for each key.
+ * Values persist in localStorage under html-doc-personalization. Code
+ * blocks (and anywhere else the reader expects swap-in) get {{key}}
+ * substrings replaced at runtime with <span class="hdc-personalized">
+ * wrappers. Hovering a personalized span shows which key it came from.
+ *
+ * Why this matters: Mintlify pioneered "set apiKey once, every snippet
+ * on every page swaps to your values" — massively reduces tutorial
+ * copy-paste friction. html-doc's no-build constraint means we do this
+ * at runtime, not at build time; the localStorage-backed state is the
+ * full extent of personalization (no accounts, no server, no SaaS).
+ * --------------------------------------------------------------------- */
+var __htmldocPersonalization = (function () {
+  var STORAGE_KEY = 'html-doc-personalization';
+  var keys = [];       // [{ key, label, default, type? }]
+  var values = {};     // { key: currentValue }
+  var btn = null;
+  var panel = null;
+
+  function load() {
+    try { values = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch (e) { values = {}; }
+  }
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(values)); }
+    catch (e) { /* ignore */ }
+  }
+  function get(k) {
+    if (values[k] !== undefined && values[k] !== '') return values[k];
+    var spec = keys.filter(function (x) { return x.key === k; })[0];
+    return spec && spec.default !== undefined ? spec.default : '';
+  }
+  function set(k, v) {
+    values[k] = v;
+    save();
+    applyAll();
+  }
+
+  function applyAll() {
+    // Update spans already wrapped, then look for new {{key}} occurrences.
+    document.querySelectorAll('.hdc-personalized').forEach(function (span) {
+      var k = span.getAttribute('data-key');
+      span.textContent = get(k);
+    });
+    // Walk likely containers — code blocks, snippets, kbd, and a generic
+    // .hdc-personalize-target opt-in for prose passages.
+    var roots = document.querySelectorAll('pre, code, kbd, .hdc-personalize-target');
+    var pattern = /\{\{(\w+)\}\}/g;
+    roots.forEach(function (root) {
+      var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      var textNodes = [];
+      var n;
+      while ((n = w.nextNode())) textNodes.push(n);
+      textNodes.forEach(function (textNode) {
+        var text = textNode.nodeValue;
+        if (text.indexOf('{{') === -1) return;
+        pattern.lastIndex = 0;
+        var hasMatch = false;
+        var test;
+        while ((test = pattern.exec(text)) !== null) {
+          if (keys.some(function (x) { return x.key === test[1]; })) { hasMatch = true; break; }
+        }
+        if (!hasMatch) return;
+        pattern.lastIndex = 0;
+        var frag = document.createDocumentFragment();
+        var last = 0;
+        var m;
+        while ((m = pattern.exec(text)) !== null) {
+          if (!keys.some(function (x) { return x.key === m[1]; })) continue;
+          if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+          var span = document.createElement('span');
+          span.className = 'hdc-personalized';
+          span.setAttribute('data-key', m[1]);
+          span.title = 'Personalized: ' + m[1];
+          span.textContent = get(m[1]);
+          frag.appendChild(span);
+          last = m.index + m[0].length;
+        }
+        if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+        textNode.parentNode.replaceChild(frag, textNode);
+      });
+    });
+  }
+
+  function buildButton() {
+    var cluster = document.querySelector('page-chrome') || document.body;
+    btn = document.createElement('button');
+    btn.className = 'ctrl-btn personalize-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Personalize snippet placeholders');
+    btn.title = 'Personalize snippet placeholders';
+    btn.innerHTML = ICON_GEAR;
+    btn.addEventListener('click', togglePanel);
+    cluster.appendChild(btn);
+  }
+
+  function togglePanel() {
+    if (panel && panel.parentNode) {
+      panel.parentNode.removeChild(panel);
+      panel = null;
+      return;
+    }
+    panel = document.createElement('div');
+    panel.className = 'personalize-panel';
+    var html = '<header><strong>Personalize</strong>' +
+               '<button type="button" class="personalize-close" aria-label="Close">×</button>' +
+               '</header><p>Values you enter here swap into every <code>{{key}}</code> placeholder on the page. Stored only in your browser.</p>';
+    html += '<div class="personalize-fields">';
+    keys.forEach(function (k) {
+      var current = get(k.key);
+      html += '<label class="personalize-field">' +
+                '<span class="personalize-label">' + escapeXml(k.label || k.key) + '</span>' +
+                '<input type="' + (k.type === 'password' ? 'password' : 'text') +
+                  '" data-key="' + k.key + '"' +
+                  ' value="' + escapeXml(current) + '"' +
+                  ' placeholder="' + escapeXml(k.default || '') + '">' +
+              '</label>';
+    });
+    html += '</div>';
+    html += '<footer><button type="button" class="personalize-reset">Reset all</button></footer>';
+    panel.innerHTML = html;
+    document.body.appendChild(panel);
+    panel.querySelector('.personalize-close').addEventListener('click', togglePanel);
+    panel.querySelector('.personalize-reset').addEventListener('click', function () {
+      values = {};
+      save();
+      applyAll();
+      togglePanel();
+    });
+    panel.querySelectorAll('input[data-key]').forEach(function (input) {
+      input.addEventListener('input', function () { set(input.getAttribute('data-key'), input.value); });
+    });
+  }
+
+  function init(decl) {
+    keys = Array.isArray(decl) ? decl.filter(function (x) { return x && x.key; }) : [];
+    if (!keys.length) return;
+    load();
+    // Seed defaults
+    keys.forEach(function (k) {
+      if (values[k.key] === undefined && k.default !== undefined) values[k.key] = k.default;
+    });
+    if (!btn) buildButton();
+    applyAll();
+    window.addEventListener('html-doc:rendered', applyAll);
+  }
+
+  return { init: init, get: get, set: set, applyAll: applyAll };
+})();
 // Standalone builds inline the page but not the glossary; in that mode
 // we render the term inline without a tooltip rather than mark every
 // term as "unknown". Detected via the inline page-data script.
