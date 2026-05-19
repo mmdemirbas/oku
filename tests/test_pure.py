@@ -77,9 +77,7 @@ class TestMdBlock:
         assert out == ["### y"]
 
     def test_callout_emits_blockquote(self) -> None:
-        out = cli._md_block(
-            {"kind": "callout", "type": "note", "title": "T", "content": "body"}
-        )
+        out = cli._md_block({"kind": "callout", "type": "note", "title": "T", "content": "body"})
         assert out == ["> **NOTE: T**", "> body"]
 
     def test_callout_without_title(self) -> None:
@@ -95,9 +93,7 @@ class TestMdBlock:
         assert out == ["1. a", "2. b"]
 
     def test_code_block_uses_source(self) -> None:
-        out = cli._md_block(
-            {"kind": "code", "language": "python", "source": "print(1)"}
-        )
+        out = cli._md_block({"kind": "code", "language": "python", "source": "print(1)"})
         assert out == ["```python", "print(1)", "```"]
 
     def test_annotated_code_with_inline_html_stripped(self) -> None:
@@ -144,6 +140,35 @@ class TestMdBlock:
         assert "### G2" in joined
         assert "| x |" in joined
         assert "| y |" in joined
+
+    def test_table_chip_headers_use_label(self) -> None:
+        """Object-form headers `{label, filter, values}` collapse to the
+        bare label in the markdown twin; the chip metadata is discarded
+        because LLM consumers don't need the interactive layer."""
+        out = cli._md_block(
+            {
+                "kind": "table",
+                "headers": [
+                    "Engine",
+                    {"label": "Tags", "filter": "chips", "values": ["a", "b"]},
+                ],
+                "rows": [["Iceberg", {"values": ["a", "b"]}]],
+            }
+        )
+        assert out[0] == "| Engine | Tags |"
+        assert out[2] == "| Iceberg | a, b |"
+
+    def test_table_chip_cell_value_overrides_join(self) -> None:
+        """Object-form cells render their explicit `value` when present
+        rather than the auto-joined chip values."""
+        out = cli._md_block(
+            {
+                "kind": "table",
+                "headers": ["Engine", "Maturity"],
+                "rows": [["Paimon", {"value": "Incubating", "values": ["incubating"]}]],
+            }
+        )
+        assert "| Paimon | Incubating |" in out
 
     def test_chart_emits_placeholder(self) -> None:
         out = cli._md_block({"kind": "chart", "title": "T"})

@@ -22,6 +22,7 @@ DOC_FILES = [
     "glossary.json",
     "index.json",
     "primitives.json",
+    "table-demo.json",
 ]
 
 
@@ -42,3 +43,65 @@ def test_starter_template_validates(page_schema: dict, repo_root: Path) -> None:
     A starter that doesn't pass schema would mislead every new author."""
     data = json.loads((repo_root / "templates" / "starter.json").read_text(encoding="utf-8"))
     jsonschema.validate(data, page_schema)
+
+
+def test_table_chip_columns_validate(page_schema: dict) -> None:
+    """Object-form table headers and cells (chip filters, multi-valued
+    cells) are accepted by the schema. Locked here so a future schema
+    refactor that drops the alternatives is caught immediately."""
+    page = {
+        "kind": "page",
+        "title": "Chip table",
+        "blocks": [
+            {
+                "kind": "section",
+                "id": "s",
+                "title": "S",
+                "blocks": [
+                    {
+                        "kind": "table",
+                        "headers": [
+                            "Engine",
+                            {
+                                "label": "Tags",
+                                "filter": "chips",
+                                "values": ["a", "b"],
+                            },
+                        ],
+                        "rows": [
+                            ["Iceberg", {"value": "a, b", "values": ["a", "b"]}],
+                            ["Hudi", {"values": ["a"]}],
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    jsonschema.validate(page, page_schema)
+
+
+def test_table_chip_header_requires_values(page_schema: dict) -> None:
+    """A chip header without a values list is rejected — every chip
+    column must declare its enumeration up front."""
+    page = {
+        "kind": "page",
+        "title": "X",
+        "blocks": [
+            {
+                "kind": "section",
+                "id": "s",
+                "title": "S",
+                "blocks": [
+                    {
+                        "kind": "table",
+                        "headers": [
+                            {"label": "Tags", "filter": "chips"},
+                        ],
+                        "rows": [["x"]],
+                    }
+                ],
+            }
+        ],
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(page, page_schema)
