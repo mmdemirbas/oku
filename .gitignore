@@ -34,3 +34,6 @@ docs/*.md
 # Personal / session working files
 SPEC.md
 _internal/
+
+# Tooling: session-local working dirs (Playwright MCP screenshots/logs)
+.playwright-mcp/
