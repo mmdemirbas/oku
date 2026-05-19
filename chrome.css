@@ -2061,6 +2061,27 @@ html-doc-chart .hdc-point-label.hovered {
   font-weight: 600;
   outline: none;
 }
+/* Collision fallback: labels that survived the stagger pass keep their
+   y-shift; labels that couldn't fit anywhere are hidden until their
+   dot is hovered/focused. The existing setHover(key,on) toggles the
+   .hovered class on the matching label, which reveals it. */
+html-doc-chart .hdc-point-label.hdc-label-shifted {
+  /* Visual hint that the label has been moved off the line. */
+  fill: var(--text-faint);
+}
+html-doc-chart .hdc-point-label.hdc-label-shifted.hovered {
+  fill: var(--accent-strong);
+}
+html-doc-chart .hdc-point-label.hdc-label-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+html-doc-chart .hdc-point-label.hdc-label-hidden.hovered {
+  opacity: 1;
+  pointer-events: auto;
+  font-weight: 600;
+}
 
 /* Series dimming via legend toggle */
 html-doc-chart .hdc-series { transition: opacity 0.2s ease; }

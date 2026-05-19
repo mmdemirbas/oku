@@ -2135,6 +2135,78 @@ class HtmlDocChart extends HTMLElement {
     if (oldSvg) oldSvg.remove();
     this.insertAdjacentHTML('beforeend', parts.join(''));
     this._wireInteractivity();
+    // SVG must be in the DOM before getBBox() reports anything sane.
+    // Defer to next frame so layout has a chance to settle.
+    var self = this;
+    requestAnimationFrame(function () { self._deconflictLabels(); });
+  }
+
+  /* Push overlapping point labels onto staggered y-offsets so they don't
+     read as a single garbled run. If a label still has nowhere to go
+     (too many neighbors), hide it — the existing dot-hover sync brings
+     it back via the `.hovered` reveal rule in CSS. */
+  _deconflictLabels() {
+    var svg = this.querySelector(':scope > .hdc-svg');
+    if (!svg) return;
+    var labels = Array.prototype.slice.call(svg.querySelectorAll('.hdc-point-label'));
+    if (labels.length < 2) return;
+    // Reset any prior adjustments (re-render path: zoom/pan).
+    labels.forEach(function (l) {
+      l.classList.remove('hdc-label-hidden', 'hdc-label-shifted');
+      if (l.dataset.origY) l.setAttribute('y', l.dataset.origY);
+      else l.dataset.origY = l.getAttribute('y');
+    });
+    var boxes = [];
+    for (var i = 0; i < labels.length; i++) {
+      var bb;
+      try { bb = labels[i].getBBox(); } catch (e) { continue; }
+      if (!bb || !bb.width) continue;
+      boxes.push({
+        el: labels[i],
+        x1: bb.x, x2: bb.x + bb.width,
+        y1: bb.y, y2: bb.y + bb.height,
+        h: bb.height,
+      });
+    }
+    if (boxes.length < 2) return;
+    boxes.sort(function (a, b) { return a.x1 - b.x1; });
+    var lineH = boxes[0].h + 3;
+    // Treat labels within GAP_PX of each other as crowded — pure bbox
+    // overlap underestimates how cramped the chart reads, because two
+    // labels separated by a few pixels still look like one run.
+    // 16px ≈ one em at our 11px label font, which is the smallest
+    // separation a reader reliably parses as two labels rather than one.
+    var GAP_PX = 16;
+    function clash(a, b) {
+      return !(a.x2 + GAP_PX < b.x1 || b.x2 + GAP_PX < a.x1
+            || a.y2 + 1 < b.y1 || b.y2 + 1 < a.y1);
+    }
+    var offsets = [0, -lineH, lineH, -2 * lineH, 2 * lineH];
+    var placed = [];
+    boxes.forEach(function (box) {
+      var found = null;
+      for (var k = 0; k < offsets.length; k++) {
+        var oy = offsets[k];
+        var cand = { x1: box.x1, x2: box.x2, y1: box.y1 + oy, y2: box.y2 + oy };
+        var hit = false;
+        for (var p = 0; p < placed.length; p++) {
+          if (clash(placed[p], cand)) { hit = true; break; }
+        }
+        if (!hit) { found = oy; break; }
+      }
+      if (found !== null) {
+        if (found !== 0) {
+          var oy0 = parseFloat(box.el.dataset.origY) || parseFloat(box.el.getAttribute('y')) || 0;
+          box.el.setAttribute('y', oy0 + found);
+          box.el.classList.add('hdc-label-shifted');
+        }
+        placed.push({ x1: box.x1, x2: box.x2, y1: box.y1 + found, y2: box.y2 + found });
+      } else {
+        // Too crowded — hide. The existing dot-hover sync (.hovered)
+        // reveals it on demand via the CSS reveal rule.
+        box.el.classList.add('hdc-label-hidden');
+      }
+    });
   }
 
   _attachToolbar() {
