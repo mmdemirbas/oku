@@ -592,9 +592,25 @@ code:not(pre code) {
  * button breaks the table out of <main>'s max-width via negative margins. */
 .hdt-table-wrap {
   position: relative;
-  margin: 24px 0;
-  transition: margin 0.2s ease;
+  margin: 32px 0;
+  padding: 10px 12px 12px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: margin 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
+.hdt-table-wrap:hover,
+.hdt-table-wrap:focus-within {
+  border-color: var(--border);
+}
+/* Inner chrome reads as parts of a single card. */
+.hdt-table-wrap .hdt-table-controls { margin-bottom: 10px; }
+.hdt-table-wrap .hdt-chips {
+  margin: 0 0 12px 0;
+  background: var(--code-bg);
+  border-color: var(--border-soft);
+}
+.hdt-table-wrap .hdt-table-scroll { background: var(--bg); }
 .hdt-table-wrap.expanded {
   /* Stretch into the empty gutter on either side of <main>. The amount
      of overflow caps at half the viewport minus half the main width;
