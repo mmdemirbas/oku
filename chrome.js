@@ -392,6 +392,35 @@ function initReadingAids() {
     __prismLoader.highlightAll();
   }
 
+  /* Line-number gutter on every <pre><code>. The gutter is an absolute-
+     positioned sibling that lives inside the <pre> but BEFORE the
+     <code>, so Prism's token rewriting (which touches <code>.innerHTML
+     only) doesn't disturb it. user-select:none + pointer-events:none
+     keep numbers out of copy-paste and out of click flow. Idempotent
+     via data-hdt-numbered. */
+  document.querySelectorAll('pre:not([data-hdt-numbered])').forEach(function (pre) {
+    if (pre.closest('.html-doc-tooltip, html-doc-chart, html-doc-diagram, html-doc-live-snippet')) return;
+    var code = pre.querySelector(':scope > code');
+    if (!code) return;
+    var text = code.textContent || '';
+    // Trim trailing newline so the very last empty line doesn't get a number.
+    if (text.endsWith('\n')) text = text.slice(0, -1);
+    var lineCount = text.length ? text.split('\n').length : 1;
+    if (lineCount < 1) return;
+    pre.setAttribute('data-hdt-numbered', '1');
+    pre.classList.add('hdt-line-numbered');
+    var gutter = document.createElement('span');
+    gutter.className = 'hdt-code-gutter';
+    gutter.setAttribute('aria-hidden', 'true');
+    for (var i = 1; i <= lineCount; i++) {
+      var ln = document.createElement('span');
+      ln.className = 'hdt-code-ln';
+      ln.textContent = String(i);
+      gutter.appendChild(ln);
+    }
+    pre.insertBefore(gutter, code);
+  });
+
   /* Wide-table support: every plain <table> gets a scrollable wrapper,
      a "Table | Cards | List" view toggle, and a full-width expand button.
      Wrapper is idempotent — re-running initReadingAids leaves bound tables

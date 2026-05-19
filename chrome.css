@@ -342,6 +342,33 @@ pre {
   overflow-x: auto;
   margin: 16px 0;
 }
+/* Line-number gutter: gray, fixed-width, user-select:none so cmd+A
+   over the <pre> doesn't drag numbers into the clipboard. Numbers
+   align row-by-row with the code via shared line-height + display:
+   flex-column. Position is absolute so the gutter floats over the
+   left padding without contributing to the code's flow box. */
+pre.hdt-line-numbered { padding-left: 52px; }
+pre .hdt-code-gutter {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  width: 40px;
+  padding-right: 10px;
+  text-align: right;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+  color: var(--text-faint);
+  opacity: 0.55;
+  /* Inherit pre's monospace + size + line-height so numbers stay row-
+     aligned with the code regardless of how the theme tweaks them. */
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  display: flex;
+  flex-direction: column;
+}
+pre .hdt-code-ln { display: block; }
 /* Icon-only Copy on every <pre>. Same shape as the shared toolbar
    used on diagrams and charts (see .hdt-bar below) so the affordance
    is identical wherever copy/screenshot live. */
