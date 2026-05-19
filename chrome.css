@@ -483,41 +483,57 @@ pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
   }
 }
 
-/* ============ Cover header ============ */
+/* ============ Cover header ============ *
+ * Card-like cover with two stacked radial washes (top-right + bottom-
+ * left) that fade naturally into transparency, so the accent color
+ * never cuts off abruptly at a hard edge. Subtle border + 1px shadow
+ * give the cover its own elevation tier against the page bg. The old
+ * heavy 3px primary underline is replaced by the card border + extra
+ * margin so the visual seam between cover and content is quiet.
+ * --------------------------------------------------------------- */
 header.cover {
-  position: relative; overflow: hidden;
-  border-bottom: 3px solid var(--primary);
-  padding-bottom: 36px; margin-bottom: 36px;
-}
-header.cover::before {
-  content: '';
-  position: absolute;
-  width: 600px; height: 600px;
-  top: -300px; right: -200px;
-  background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
+  position: relative;
+  overflow: hidden;
+  margin: 0 0 48px 0;
+  padding: 44px 42px 48px 42px;
+  border-radius: 20px;
+  background:
+    radial-gradient(820px 460px at 108% -18%, var(--accent-soft) 0%, transparent 62%),
+    radial-gradient(560px 320px at -12% 118%, var(--accent-soft) 0%, transparent 70%),
+    var(--surface);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 1px 2px var(--shadow-soft);
 }
 header.cover > * { position: relative; z-index: 1; }
 header.cover .eyebrow {
-  font-size: 12px; text-transform: uppercase; letter-spacing: 0.2em;
-  color: var(--accent); font-weight: 700; margin-bottom: 12px;
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.18em;
+  color: var(--accent-strong); font-weight: 700; margin-bottom: 16px;
 }
 header.cover h1 {
-  font-size: 44px; line-height: 1.08; margin: 0 0 16px 0;
-  color: var(--primary); font-weight: 800; letter-spacing: -0.025em;
+  font-size: 44px; line-height: 1.08; margin: 0 0 14px 0;
+  color: var(--text); font-weight: 800; letter-spacing: -0.025em;
 }
 header.cover .subtitle {
-  font-size: 18px; color: var(--text-soft); margin: 0;
-  font-weight: 400; line-height: 1.6;
+  font-size: 17px; color: var(--text-soft); margin: 0;
+  font-weight: 400; line-height: 1.55;
+  max-width: 62ch;
 }
-header.cover .meta { margin-top: 22px; font-size: 13px; color: var(--text-faint); }
+header.cover .meta {
+  margin-top: 24px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+  letter-spacing: 0.02em;
+}
 header.cover .meta-updated {
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 4px;
+  font-size: 11.5px;
   color: var(--text-faint);
   font-style: italic;
   letter-spacing: 0.02em;
+}
+@media (max-width: 700px) {
+  header.cover { padding: 32px 24px 36px 24px; border-radius: 14px; }
+  header.cover h1 { font-size: 34px; }
 }
 
 /* ============ Section headings & text ============ */
