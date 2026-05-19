@@ -257,6 +257,36 @@ class TestChromeKitMarkers:
         css = (repo_root / "chrome.css").read_text(encoding="utf-8")
         assert ".hdt-code-lang" in css, "code-block language pill rule missing"
 
+    def test_sidebar_default_expanded_on_first_visit(self, repo_root: Path) -> None:
+        """First-time visitor must see the sidebar expanded.
+
+        Rule: absent `sidebarCollapsed` localStorage key &rArr; sidebar
+        renders expanded so the user discovers the site tree. The
+        collapsed class is only applied when the key is explicitly '1'.
+        Two conditions enforce this:
+
+        - chrome.js boot guards `sidebar-collapsed` behind a strict
+          `=== '1'` check (not a looser `!== null` or truthy check).
+        - chrome-boot.js does NOT add the `sidebar-collapsed` class
+          (its responsibility is theme + auth; nav state belongs to
+          chrome.js to keep the restore path single-source).
+        """
+        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        boot = (repo_root / "chrome-boot.js").read_text(encoding="utf-8")
+        assert (
+            "localStorage.getItem('sidebarCollapsed') === '1'" in js
+        ), (
+            "chrome.js must restore `sidebar-collapsed` only when the key "
+            "equals '1' — a looser check would surface the collapsed state "
+            "on first visit"
+        )
+        assert (
+            "sidebar-collapsed" not in boot
+        ), (
+            "chrome-boot.js must not touch the sidebar-collapsed class; "
+            "single-source restore lives in chrome.js"
+        )
+
     def test_page_nav_adopts_page_toc_with_document_fallback(self, repo_root: Path) -> None:
         """page-nav must adopt a page-toc found anywhere in the document.
 

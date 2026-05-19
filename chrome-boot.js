@@ -1,7 +1,11 @@
 /* html-doc · chrome-boot.js
- * Synchronous pre-paint init: sets theme + TOC state before body renders.
+ * Synchronous pre-paint init: sets theme before body renders.
  * Must be the FIRST script in <head>, loaded synchronously (no defer/async).
- * Reads localStorage: 'theme-pref' (light|dark|absent=system), 'tocCollapsed'.
+ * Reads localStorage: 'theme-pref' (light|dark|absent=system).
+ * Sidebar-collapsed state is restored later by chrome.js (key:
+ * 'sidebarCollapsed'). The first-visit default is EXPANDED so a new
+ * visitor sees the site tree — chrome.js only applies the collapsed
+ * class when the key is explicitly '1'.
  * Also exposes window.__htmldocWithAuth() so chrome.js + renderer.js can
  * propagate IntelliJ's _ijt token to internal asset URLs before either
  * deferred script executes.
@@ -42,11 +46,4 @@
     return url + sep + authParam;
   };
 
-  document.addEventListener('DOMContentLoaded', function () {
-    try {
-      if (localStorage.getItem('tocCollapsed') === '1' && window.innerWidth > 920) {
-        document.body.classList.add('toc-collapsed');
-      }
-    } catch (e) {}
-  });
 })();
