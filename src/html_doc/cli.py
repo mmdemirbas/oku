@@ -66,7 +66,15 @@ def _kit_assets_dir() -> Path:
 
 KIT_ROOT = _kit_assets_dir()
 KIT_FILES = ["chrome.css", "chrome.js", "chrome-boot.js", "renderer.js"]
-SKIP_DIRS = {"dist", "_kit", "node_modules", ".git", "venv", ".venv", "__pycache__"}
+SKIP_DIRS = {
+    "dist", "_kit", "node_modules", ".git", "venv", ".venv", "__pycache__",
+    # templates/ ships the starter for `html-doc init`; not a docs page.
+    # Walking it earlier produced a stray templates/starter.md every build.
+    "templates",
+    # _internal/ holds session / scratch docs the user explicitly keeps
+    # out of the published site.
+    "_internal",
+}
 
 try:
     import jsonschema as _jsonschema  # type: ignore
