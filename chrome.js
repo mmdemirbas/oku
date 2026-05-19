@@ -2657,6 +2657,96 @@ var __mermaidLoader = (function () {
   //   3. Replace script.src below with the pinned URL
   //   4. Set script.integrity = 'sha384-...' (from step 2)
   //   5. Set script.crossOrigin = 'anonymous'  (required for SRI to work)
+
+  /* Build the Mermaid initialize() payload from the page's resolved CSS
+     tokens. Using `theme: 'base'` gives us full control over node /
+     edge / actor colors so flowcharts and sequence diagrams pick up
+     the page's accent + surface palette in both light and dark modes.
+     Mermaid requires concrete hex/rgb values, not CSS var() refs, so
+     we resolve via getComputedStyle. */
+  function token(name, fallback) {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+  function buildConfig() {
+    var accent       = token('--accent',         '#0f766e');
+    var accentSoft   = token('--accent-soft',    '#ccfbf1');
+    var accentStrong = token('--accent-strong',  '#115e59');
+    var text         = token('--text',           '#1f1d2c');
+    var textSoft     = token('--text-soft',      '#605d80');
+    var textFaint    = token('--text-faint',     '#8b8aa0');
+    var surface      = token('--surface',        '#ffffff');
+    var surface2     = token('--surface-2',      '#f5f3ff');
+    var border       = token('--border',         '#e6e2ef');
+    var bg           = token('--bg',             '#fafaf9');
+    return {
+      startOnLoad: false,
+      theme: 'base',
+      fontFamily: 'Inter, -apple-system, sans-serif',
+      themeVariables: {
+        // Flowchart / generic
+        background:       bg,
+        primaryColor:     accentSoft,
+        primaryTextColor: text,
+        primaryBorderColor: accent,
+        secondaryColor:   surface2,
+        secondaryTextColor: text,
+        secondaryBorderColor: border,
+        tertiaryColor:    surface,
+        tertiaryTextColor: text,
+        tertiaryBorderColor: border,
+        mainBkg:          surface,
+        nodeBorder:       accent,
+        clusterBkg:       surface2,
+        clusterBorder:    border,
+        lineColor:        textSoft,
+        textColor:        text,
+        titleColor:       text,
+        edgeLabelBackground: bg,
+        // Sequence
+        actorBkg:         surface,
+        actorBorder:      accent,
+        actorTextColor:   text,
+        actorLineColor:   textFaint,
+        signalColor:      text,
+        signalTextColor:  text,
+        labelBoxBkgColor: accentSoft,
+        labelBoxBorderColor: accent,
+        labelTextColor:   accentStrong,
+        loopTextColor:    text,
+        noteBkgColor:     accentSoft,
+        noteBorderColor:  accent,
+        noteTextColor:    accentStrong,
+        activationBkgColor: accentSoft,
+        activationBorderColor: accent,
+        sequenceNumberColor: bg,
+        // State / class
+        stateBkg:         surface,
+        stateBorder:      accent,
+        altBackground:    surface2,
+        compositeBackground: surface2,
+        compositeBorder:  border,
+        compositeTitleBackground: bg,
+        innerEndBackground: textSoft,
+        // Gantt
+        gridColor:        border,
+        sectionBkgColor:  surface2,
+        sectionBkgColor2: surface,
+        taskBkgColor:     accentSoft,
+        taskTextColor:    text,
+        taskTextDarkColor: text,
+        taskTextLightColor: text,
+        taskTextOutsideColor: text,
+        taskTextClickableColor: accentStrong,
+        activeTaskBkgColor: accent,
+        activeTaskBorderColor: accentStrong,
+        doneTaskBkgColor: surface,
+        doneTaskBorderColor: textFaint,
+        critBkgColor:     '#fee2e2',
+        critBorderColor:  '#dc2626',
+      },
+    };
+  }
   function load() {
     if (loadPromise) return loadPromise;
     loadPromise = new Promise(function (resolve, reject) {
@@ -2667,11 +2757,7 @@ var __mermaidLoader = (function () {
       //                set script.crossOrigin = 'anonymous';
       script.onload = function () {
         try {
-          window.mermaid.initialize({
-            startOnLoad: false,
-            theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
-            fontFamily: 'Inter, sans-serif'
-          });
+          window.mermaid.initialize(buildConfig());
           resolve(window.mermaid);
         } catch (e) { reject(e); }
       };
@@ -2683,11 +2769,7 @@ var __mermaidLoader = (function () {
   // Re-initialize Mermaid on theme toggle so diagrams pick up dark/light tokens.
   function reset() {
     if (!loadPromise || !window.mermaid) return;
-    window.mermaid.initialize({
-      startOnLoad: false,
-      theme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default',
-      fontFamily: 'Inter, sans-serif'
-    });
+    window.mermaid.initialize(buildConfig());
   }
   return { load: load, reset: reset };
 })();
