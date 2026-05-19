@@ -222,6 +222,37 @@ class TestChromeKitMarkers:
             "max-height: 100vh" in css
         ), "sidebar must cap at viewport height so it can scroll on its own"
 
+    def test_page_nav_spans_full_viewport_height(self, repo_root: Path) -> None:
+        """page-nav must declare an explicit height, not just max-height.
+
+        Regression: a previous edit replaced `height: 100vh` with `max-height:
+        100vh` alone — without a height declaration the sidebar shrinks to its
+        content height (~633px on docs/index) and visually ends mid-page. The
+        UI rule is "the sidebar surface always spans the visible viewport".
+        Enforce by checking that the page-nav block declares height — both
+        100vh (desktop) and 100dvh (mobile-toolbar correctness) — alongside
+        the max-height cap.
+        """
+        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        # Find the base `page-nav { ... }` block (not body.sidebar-collapsed or
+        # any descendant rule). Locate the brace pair after the bare selector.
+        marker = "\npage-nav {"
+        start = css.find(marker)
+        assert start != -1, "base `page-nav { ... }` rule missing from chrome.css"
+        end = css.find("\n}", start)
+        assert end != -1, "page-nav rule has no closing brace"
+        block = css[start:end]
+        assert "height: 100vh" in block, (
+            "page-nav must declare `height: 100vh` so its surface spans the "
+            "visible viewport even when contents are shorter. `max-height` "
+            "alone is not enough — without `height` the element shrinks to "
+            "content."
+        )
+        assert "height: 100dvh" in block, (
+            "page-nav must also declare `height: 100dvh` so mobile browsers "
+            "(URL-bar collapse changes vh) render the sidebar correctly."
+        )
+
     def test_chrome_css_has_code_lang_pill(self, repo_root: Path) -> None:
         css = (repo_root / "chrome.css").read_text(encoding="utf-8")
         assert ".hdt-code-lang" in css, "code-block language pill rule missing"

@@ -1827,12 +1827,18 @@ page-nav {
   align-self: start;
   z-index: 60;
   display: block;
-  /* Stay pinned in view as main scrolls. If the sidebar's own contents
-     overflow the viewport, the sidebar gets its own scroll bar — main
-     scroll position is independent. */
+  /* Stay pinned in view as main scrolls. The surface ALWAYS spans the
+     visible viewport — height is set, not just capped — so the
+     background extends full-bleed even when the sidebar's contents
+     are shorter than the viewport. If contents overflow, the sidebar
+     gets its own scrollbar; main scroll stays independent.
+     100dvh handles mobile browsers whose URL bar resizes the viewport. */
   position: sticky;
   top: 0;
+  height: 100vh;
+  height: 100dvh;
   max-height: 100vh;
+  max-height: 100dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   background: var(--surface);
