@@ -309,6 +309,47 @@ class TestChromeKitMarkers:
             "single-source restore lives in chrome.js"
         )
 
+    def test_list_view_items_visually_separated(self, repo_root: Path) -> None:
+        """List-view items must have clear visual separation.
+
+        Regression: user reported "I cannot tell where the first list item
+        ends and second starts" when tables were in list view. The fix
+        triples the gap and swaps the outer border from --border-soft to
+        --line, with a box-shadow to lift each card off the page.
+
+        Enforce by checking the .hdt-table-list / .hdt-list-card block
+        carries (a) a meaningful gap (≥16px), (b) a non-soft outer border
+        token, and (c) a box-shadow declaration.
+        """
+        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        # Match the BASE list rule (the data-view variants are display:none
+        # and don't carry layout). Anchor on the unique `display: flex` shape.
+        list_rule = re.search(
+            r"\.hdt-table-list\s*\{[^}]*display:\s*flex[^}]*\}", css
+        )
+        card_rule = re.search(r"\.hdt-list-card\s*\{([^}]*)\}", css)
+        assert list_rule, ".hdt-table-list base rule (display:flex) missing"
+        assert card_rule, ".hdt-list-card rule missing"
+        list_block = list_rule.group(0)
+        card_block = card_rule.group(1)
+        # Gap >= 16px (was 10px; user couldn't tell items apart).
+        gap_match = re.search(r"gap:\s*(\d+)px", list_block)
+        assert gap_match, "list gap declaration missing"
+        gap_px = int(gap_match.group(1))
+        assert gap_px >= 16, (
+            f"list gap is {gap_px}px — items need ≥16px breathing room "
+            "to read as distinct cards"
+        )
+        # Stronger outer border (not the soft variant).
+        assert "border: 1px solid var(--line)" in card_block, (
+            "card outer border must use --line (stronger) so it stands out "
+            "from the inner row dividers using --border-soft"
+        )
+        # Shadow to lift the card off the page.
+        assert "box-shadow:" in card_block, (
+            "card needs a box-shadow to read as a lifted surface"
+        )
+
     def test_code_block_has_wrap_toggle(self, repo_root: Path) -> None:
         """Every <pre> gets a wrap toggle button next to copy.
 
