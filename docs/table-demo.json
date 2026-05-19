@@ -1,0 +1,124 @@
+{
+  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Table block demo",
+  "accent": "teal",
+  "meta": {
+    "eyebrow": "Internal · v2 demo",
+    "subtitle": "Smoke test for the table block: auto-fit overflow, stats line, list-card view, per-group counts, chip filters.",
+    "date": "2026-05-19",
+    "read_time": "~3 min"
+  },
+  "blocks": [
+    {
+      "kind": "section",
+      "id": "wide",
+      "title": "Wide table (auto-fit expands)",
+      "lead": "Many columns, long values — exceeds main column at default page width. Should start in expanded mode.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "Engine",
+            "Storage",
+            "License",
+            "Origin",
+            "First release",
+            "Maintainer",
+            "Primary workload"
+          ],
+          "rows": [
+            ["Apache Iceberg", "Object store (S3/GCS/HDFS)", "Apache 2.0", "Netflix", "2018", "Apache Software Foundation", "Lakehouse / analytics"],
+            ["Apache Hudi", "Object store / HDFS", "Apache 2.0", "Uber", "2017", "Apache Software Foundation", "CDC / streaming upserts"],
+            ["Delta Lake", "Object store / HDFS", "Apache 2.0", "Databricks", "2019", "Linux Foundation / Databricks", "Lakehouse on Spark"],
+            ["Apache Paimon", "Object store / HDFS", "Apache 2.0", "Alibaba", "2023", "Apache Software Foundation", "Streaming lakehouse with Flink"]
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "narrow",
+      "title": "Narrow table (auto-fit stays compact)",
+      "lead": "Three short columns, four rows — fits within the main column. Should NOT expand on load.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Stage", "Status", "Duration"],
+          "rows": [
+            ["Plan", "done", "1d"],
+            ["Build", "done", "3d"],
+            ["Test", "in-progress", "2d"],
+            ["Ship", "queued", "—"]
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "grouped",
+      "title": "Grouped table with per-group counts",
+      "lead": "Three groups, mixed row counts. Group headers show item counts. Counts update when the filter is active.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Engine", "Storage", "License", "Maintainer"],
+          "groups": [
+            {
+              "title": "Lakehouse table formats",
+              "rows": [
+                ["Apache Iceberg", "Object store", "Apache 2.0", "ASF"],
+                ["Apache Hudi", "Object store", "Apache 2.0", "ASF"],
+                ["Delta Lake", "Object store", "Apache 2.0", "Linux Foundation"],
+                ["Apache Paimon", "Object store", "Apache 2.0", "ASF"]
+              ]
+            },
+            {
+              "title": "Query engines",
+              "rows": [
+                ["Trino", "Pluggable", "Apache 2.0", "Trino Software Foundation"],
+                ["Presto", "Pluggable", "Apache 2.0", "Linux Foundation"]
+              ]
+            },
+            {
+              "title": "Streaming compute",
+              "rows": [
+                ["Apache Flink", "External", "Apache 2.0", "ASF"],
+                ["Apache Spark Structured Streaming", "External", "Apache 2.0", "ASF"],
+                ["Kafka Streams", "Kafka", "Apache 2.0", "ASF"]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "chips",
+      "title": "Chip filters with multi-valued cells",
+      "lead": "Headers declare chip values; cells may belong to multiple values. AND across columns, OR within each column. Combines with the text filter.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "Engine",
+            { "label": "Tags", "filter": "chips", "values": ["lakehouse", "streaming", "query", "metadata"] },
+            { "label": "Maturity", "filter": "chips", "values": ["incubating", "ga", "experimental"] },
+            "Notes"
+          ],
+          "rows": [
+            ["Apache Iceberg",   { "values": ["lakehouse", "metadata"] }, { "value": "GA",           "values": ["ga"] },           "Open table format, snapshot isolation."],
+            ["Apache Hudi",      { "values": ["lakehouse", "streaming"] }, { "value": "GA",           "values": ["ga"] },           "CDC and upsert focused."],
+            ["Delta Lake",       { "values": ["lakehouse"] },               { "value": "GA",           "values": ["ga"] },           "Spark-native, Databricks-managed."],
+            ["Apache Paimon",    { "values": ["lakehouse", "streaming"] }, { "value": "Incubating",   "values": ["incubating"] },   "Flink-first streaming lakehouse."],
+            ["Trino",            { "values": ["query"] },                   { "value": "GA",           "values": ["ga"] },           "Distributed SQL query engine."],
+            ["Presto",           { "values": ["query"] },                   { "value": "GA",           "values": ["ga"] },           "Trino's predecessor; still active."],
+            ["Apache Flink",     { "values": ["streaming"] },               { "value": "GA",           "values": ["ga"] },           "Stateful stream processing."],
+            ["Pulsar Functions", { "values": ["streaming", "metadata"] },  { "value": "Experimental", "values": ["experimental"] }, "Light-weight compute beside the broker."]
+          ]
+        }
+      ]
+    }
+  ]
+}
