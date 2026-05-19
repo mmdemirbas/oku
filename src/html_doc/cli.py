@@ -297,7 +297,10 @@ def _md_block(block: dict, depth: int = 0) -> list[str]:
 
     if kind == 'heading':
         level = max(2, int(block.get('level', 2)))
-        out.append('#' * level + ' ' + _flatten_inline(block.get('text', '')))
+        # Schema uses `title`; some legacy authored pages emit `text` —
+        # accept either so the twin stays useful across both.
+        text = block.get('title') or block.get('text', '')
+        out.append('#' * level + ' ' + _flatten_inline(text))
         return out
 
     if kind == 'paragraph':
