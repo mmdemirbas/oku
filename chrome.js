@@ -387,7 +387,11 @@ function initReadingAids() {
   })();
 
   /* Prism syntax highlight — lazy CDN load; only triggers if at least
-     one `<code class="language-...">` block exists on the page. */
+     one `<code class="language-...">` block exists on the page. The
+     per-block line-wrap + fold pass is registered as a Prism
+     `complete` hook (see __prismLoader.load) so it fires AFTER each
+     block's final highlight, not before — the autoloader replaces
+     innerHTML asynchronously and races a then() chain. */
   if (typeof __prismLoader !== 'undefined') {
     __prismLoader.highlightAll();
   }
@@ -420,6 +424,20 @@ function initReadingAids() {
     }
     pre.insertBefore(gutter, code);
   });
+  // Code blocks that have no language-* class (and so never trigger
+  // the Prism `complete` hook) still get line-wrapping so folds can
+  // match anything brace-shaped that lands in them. Defer to the next
+  // tick so the gutter pass above has finished attaching.
+  setTimeout(function () {
+    document.querySelectorAll('pre.hdt-line-numbered:not([data-hdt-lines-wrapped])').forEach(function (pre) {
+      var code = pre.querySelector(':scope > code');
+      if (!code) return;
+      // Skip blocks Prism is responsible for — the hook will handle them.
+      if (/language-[\w-]+/.test(code.className)) return;
+      pre.setAttribute('data-hdt-lines-wrapped', '1');
+      _hdtWrapCodeLines(code);
+    });
+  }, 0);
 
   /* Wide-table support: every plain <table> gets a scrollable wrapper,
      a "Table | Cards | List" view toggle, and a full-width expand button.
@@ -1214,6 +1232,191 @@ try {
     ' · authToken=' + (window.__htmldocWithAuth && window.__htmldocWithAuth('x') !== 'x' ? 'yes' : 'no')
   );
 } catch (e) { /* ignore */ }
+
+/* Prism `complete` hook target — fires after each block's FINAL
+   highlight. The autoloader can trigger MORE than one complete pass
+   per element (one before the language module arrives, one after) so
+   we re-wrap whenever the lineWrap is missing, rather than guarding
+   with a one-shot data attribute that the second pass would silently
+   leave behind. Re-detecting folds is cheap and keeps markers in sync. */
+function _hdtAfterPrismHighlight(env) {
+  if (!env || !env.element || env.element.tagName !== 'CODE') return;
+  var code = env.element;
+  var pre = code.parentElement;
+  if (!pre || pre.tagName !== 'PRE') return;
+  if (!pre.classList.contains('hdt-line-numbered')) return;
+  if (code.querySelector(':scope > .hdt-code-line')) return; // already wrapped, intact
+  _hdtWrapCodeLines(code);
+  pre.setAttribute('data-hdt-lines-wrapped', '1');
+  // Clear any stale fold markers so a fresh detection pass attaches
+  // handlers to the current line nodes.
+  var gutter = pre.querySelector('.hdt-code-gutter');
+  if (gutter) {
+    Array.prototype.forEach.call(gutter.children, function (ln) {
+      ln.classList.remove('hdt-foldable', 'hdt-folded');
+      ln.removeAttribute('role');
+      ln.removeAttribute('tabindex');
+      ln.removeAttribute('aria-expanded');
+    });
+  }
+  var lang = (code.className.match(/language-([\w-]+)/) || [0, ''])[1].toLowerCase();
+  if (/^(js|javascript|ts|typescript|jsx|tsx|json|json5|css|scss|less)$/.test(lang)) {
+    var folds = _hdtDetectBraceFolds(code);
+    if (folds.length) _hdtApplyFolds(pre, code, folds);
+  }
+}
+
+/* ============ Code-block line wrap + brace fold (module scope) ============ *
+ * After Prism highlights, we walk the <code>'s child tree and group
+ * everything by newlines into one <span class="hdt-code-line"> per
+ * source line. Each line includes its own trailing '\n' so collapsing
+ * a line via display:none also removes the blank gap it would leave
+ * behind. Prism's token spans survive: tokens entirely within a line
+ * are moved as-is; tokens that straddle newlines (multi-line strings,
+ * block comments) are split into per-line clones — same className
+ * preserves coloring across the split.
+ * ------------------------------------------------------------------- */
+function _hdtWrapCodeLines(code) {
+  var lines = [document.createElement('span')];
+  lines[0].className = 'hdt-code-line';
+  lines[0].setAttribute('data-line', '1');
+
+  function pushChar(s) { lines[lines.length - 1].appendChild(document.createTextNode(s)); }
+  function newline() {
+    // Trailing newline lives in the CURRENT line so display:none also
+    // hides the blank that would otherwise remain.
+    lines[lines.length - 1].appendChild(document.createTextNode('\n'));
+    var nl = document.createElement('span');
+    nl.className = 'hdt-code-line';
+    nl.setAttribute('data-line', String(lines.length + 1));
+    lines.push(nl);
+  }
+
+  function emit(node) {
+    if (node.nodeType === 3) { // Text
+      var t = node.textContent;
+      var i = 0;
+      while (i < t.length) {
+        var nl = t.indexOf('\n', i);
+        if (nl === -1) { pushChar(t.slice(i)); break; }
+        if (nl > i) pushChar(t.slice(i, nl));
+        newline();
+        i = nl + 1;
+      }
+    } else if (node.nodeType === 1) {
+      var full = node.textContent;
+      if (full.indexOf('\n') === -1) {
+        // Whole element fits one line — move it intact, preserving any
+        // descendant tokens Prism created.
+        lines[lines.length - 1].appendChild(node.cloneNode(true));
+      } else {
+        // Multi-line element — split into per-line clones at the same
+        // className. The descendants are reduced to plain text in each
+        // clone (sufficient for strings / comments; complex nested
+        // tokens across newlines are very rare).
+        var segs = full.split('\n');
+        for (var s = 0; s < segs.length; s++) {
+          if (s > 0) newline();
+          if (segs[s].length) {
+            var clone = node.cloneNode(false);
+            clone.textContent = segs[s];
+            lines[lines.length - 1].appendChild(clone);
+          }
+        }
+      }
+    }
+  }
+  Array.prototype.slice.call(code.childNodes).forEach(emit);
+  code.innerHTML = '';
+  lines.forEach(function (line) { code.appendChild(line); });
+}
+
+/* Find brace-delimited foldable regions: each line ending with '{',
+   '[', or '(' opens a fold; the matching closer at the same indent
+   ends it. Single-line bodies (`function f() {}` on one source line
+   already, or `{ foo: 1 }`) are skipped — folding them yields nothing.
+   Indent matching is enough for well-formatted code in the languages
+   we target (JS / TS / JSON / CSS) and avoids the cost of a full
+   tokeniser. */
+function _hdtDetectBraceFolds(code) {
+  var lines = code.querySelectorAll('.hdt-code-line');
+  if (lines.length < 3) return [];
+  var folds = [];
+  var stack = [];
+  for (var i = 0; i < lines.length; i++) {
+    var raw = lines[i].textContent.replace(/\n$/, '');
+    var trimmedRight = raw.replace(/\s+$/, '');
+    var lead = (raw.match(/^[ \t]*/) || [''])[0];
+    var indent = lead.length;
+    if (/[{(\[]\s*$/.test(trimmedRight)) {
+      stack.push({ openIdx: i, indent: indent });
+    } else if (/^\s*[)}\]]/.test(raw) && stack.length) {
+      var m = stack.length - 1;
+      while (m >= 0 && stack[m].indent !== indent) m--;
+      if (m >= 0) {
+        var open = stack.splice(m, 1)[0];
+        if (i - open.openIdx > 1) folds.push({ start: open.openIdx, end: i });
+        // Drop any orphan openers that never matched (mostly inside the
+        // current closer's outer block) — keeps the matcher honest.
+        stack.splice(m, stack.length - m);
+      }
+    }
+  }
+  return folds;
+}
+
+/* Wire fold toggles into the line-number gutter. Foldable markers
+   carry the fold range as data attrs (foldStart, foldEnd); a single
+   delegated listener on the gutter handles clicks. The delegated
+   pattern matters because Prism's autoloader can replace the <code>'s
+   innerHTML twice per block — first a language-less pass, then again
+   when the language module arrives — and per-marker handlers from the
+   first pass would survive the second wrap with stale closures over
+   detached line spans. The delegated handler always re-queries the
+   live line spans at click time. */
+function _hdtApplyFolds(pre, _code, folds) {
+  var gutter = pre.querySelector('.hdt-code-gutter');
+  if (!gutter) return;
+  var gutterLines = gutter.children;
+  folds.forEach(function (f) {
+    var marker = gutterLines[f.start];
+    if (!marker) return;
+    marker.classList.add('hdt-foldable');
+    marker.setAttribute('role', 'button');
+    marker.setAttribute('tabindex', '0');
+    marker.setAttribute('aria-expanded', 'true');
+    marker.dataset.foldStart = String(f.start);
+    marker.dataset.foldEnd = String(f.end);
+  });
+  if (pre.dataset.hdtFoldDelegated === '1') return;
+  pre.dataset.hdtFoldDelegated = '1';
+  function handle(target) {
+    if (!target.classList.contains('hdt-foldable')) return;
+    var start = +target.dataset.foldStart;
+    var end = +target.dataset.foldEnd;
+    if (!(end > start)) return;
+    var willCollapse = !target.classList.contains('hdt-folded');
+    target.classList.toggle('hdt-folded', willCollapse);
+    target.setAttribute('aria-expanded', willCollapse ? 'false' : 'true');
+    var liveCode = pre.querySelector(':scope > code');
+    var lines = liveCode ? liveCode.querySelectorAll(':scope > .hdt-code-line') : [];
+    var glines = gutter.children;
+    for (var i = start + 1; i < end; i++) {
+      if (lines[i]) lines[i].classList.toggle('hdt-line-hidden', willCollapse);
+      if (glines[i]) glines[i].classList.toggle('hdt-line-hidden', willCollapse);
+    }
+    pre.classList.toggle('hdt-has-folds', !!pre.querySelector('.hdt-foldable.hdt-folded'));
+  }
+  gutter.addEventListener('click', function (e) {
+    var t = e.target.closest('.hdt-foldable');
+    if (t) handle(t);
+  });
+  gutter.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var t = e.target.closest('.hdt-foldable');
+    if (t) { e.preventDefault(); handle(t); }
+  });
+}
 
 /* ============ HTML-escape helper (module scope) ============ */
 function escapeHTML(s) {
@@ -2758,6 +2961,16 @@ var __prismLoader = (function () {
       .then(function () {
         if (window.Prism && window.Prism.plugins && window.Prism.plugins.autoloader) {
           window.Prism.plugins.autoloader.languages_path = CDN + 'components/';
+        }
+        // Register the per-element post-process exactly once. The
+        // autoloader replaces innerHTML asynchronously per block as
+        // its language module arrives — wrapping in a .then() after
+        // highlightAll() is racy. The `complete` hook fires after each
+        // element's final highlight pass, which is the safe handoff.
+        if (window.Prism && window.Prism.hooks && typeof _hdtAfterPrismHighlight === 'function') {
+          window.Prism.hooks.add('complete', function (env) {
+            _hdtAfterPrismHighlight(env);
+          });
         }
         return window.Prism;
       });

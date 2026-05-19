@@ -373,6 +373,45 @@ pre .hdt-code-gutter {
   flex-direction: column;
 }
 pre .hdt-code-ln { display: block; }
+
+/* Code lines as block elements so display:none collapses them cleanly. */
+pre .hdt-code-line { display: block; }
+pre .hdt-code-line.hdt-line-hidden,
+pre .hdt-code-gutter .hdt-line-hidden { display: none; }
+
+/* Foldable gutter numbers — clickable, with a chevron next to the
+   number. Re-enable pointer-events for just these (the gutter as a
+   whole is pointer-events:none so it doesn't block code selection). */
+pre .hdt-code-ln.hdt-foldable {
+  pointer-events: auto;
+  cursor: pointer;
+  position: relative;
+  color: var(--accent);
+  opacity: 0.85;
+  padding-right: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+pre .hdt-code-ln.hdt-foldable:hover { opacity: 1; }
+pre .hdt-code-ln.hdt-foldable::after {
+  content: '▾';
+  margin-left: 4px;
+  font-size: 9px;
+  display: inline-block;
+  transition: transform 0.18s ease;
+  vertical-align: middle;
+}
+pre .hdt-code-ln.hdt-foldable.hdt-folded::after { transform: rotate(-90deg); }
+pre .hdt-code-ln.hdt-foldable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+/* When at least one fold is collapsed, hint at it with a slim accent
+   stroke on the opening row so the reader sees where work is hidden. */
+pre.hdt-has-folds .hdt-code-ln.hdt-foldable.hdt-folded {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
 /* Icon-only Copy on every <pre>. Same shape as the shared toolbar
    used on diagrams and charts (see .hdt-bar below) so the affordance
    is identical wherever copy/screenshot live. */
