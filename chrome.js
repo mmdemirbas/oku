@@ -588,6 +588,21 @@ function initReadingAids() {
       var filterText = '';
       var tbody = table.querySelector('tbody') || table;
 
+      /* Collapsed-group state. Keyed by stripped group title so the
+         same toggle state persists across all three views (table /
+         list / cards). Collapse hides rows visually but does NOT
+         affect the stats counter or the group's own count badge —
+         the group is "folded", not "filtered". */
+      var collapsedGroups = new Set();
+      function groupKey(e) { return stripHtml(e.title); }
+      function isGroupCollapsed(e) { return collapsedGroups.has(groupKey(e)); }
+      function toggleGroup(e) {
+        var k = groupKey(e);
+        if (collapsedGroups.has(k)) collapsedGroups.delete(k);
+        else collapsedGroups.add(k);
+        render();
+      }
+
       /* Chip state: per-column Set<value> of currently-active chips.
          A row passes a column iff the cell's value set intersects
          the active chip set (OR within column). Columns combine with
@@ -702,14 +717,35 @@ function initReadingAids() {
         return String(n);
       }
 
-      /* Inject (or update) a count badge on a group <tr>'s first cell
-         in the source table. Idempotent — re-uses an existing badge.
-         The badge is a trailing span so author content in the title
-         survives intact. */
-      function badgeOnGroupRow(tr, n) {
+      /* Build (or refresh) the chrome on a source-table group <tr>:
+         leading chevron toggle, trailing count badge. Idempotent so
+         re-runs from render() don't pile up extra spans. The chevron
+         carries the click target; the row itself is also clickable for
+         a generous hit target. */
+      function dressGroupRow(tr, e, n) {
         if (!tr) return;
         var cell = tr.querySelector(':scope > th, :scope > td');
         if (!cell) return;
+        var chev = cell.querySelector(':scope > .hdt-group-chevron');
+        if (!chev) {
+          chev = document.createElement('span');
+          chev.className = 'hdt-group-chevron';
+          chev.setAttribute('role', 'button');
+          chev.setAttribute('aria-label', 'Toggle group');
+          chev.setAttribute('tabindex', '0');
+          chev.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>';
+          cell.insertBefore(chev, cell.firstChild);
+          chev.addEventListener('click', function (ev) { ev.stopPropagation(); toggleGroup(e); });
+          chev.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleGroup(e); }
+          });
+          tr.classList.add('hdt-collapsible');
+          tr.addEventListener('click', function (ev) {
+            // Avoid double-fire when the chevron itself was the target.
+            if (ev.target.closest('.hdt-group-chevron')) return;
+            toggleGroup(e);
+          });
+        }
         var badge = cell.querySelector(':scope > .hdt-group-count');
         if (!badge) {
           badge = document.createElement('span');
@@ -717,6 +753,9 @@ function initReadingAids() {
           cell.appendChild(badge);
         }
         badge.textContent = fmtGroupCount(n);
+        var collapsed = isGroupCollapsed(e);
+        tr.classList.toggle('hdt-collapsed', collapsed);
+        chev.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
       }
 
       function renderTable(visible, counts) {
@@ -724,31 +763,60 @@ function initReadingAids() {
         Array.prototype.slice.call(tbody.querySelectorAll(':scope > tr')).forEach(function (tr) {
           tr.parentNode.removeChild(tr);
         });
+        var skip = false;
         visible.forEach(function (e) {
           if (e.type === 'group') {
-            badgeOnGroupRow(e.el, counts.perGroup.get(e) || 0);
+            dressGroupRow(e.el, e, counts.perGroup.get(e) || 0);
+            skip = isGroupCollapsed(e);
+            tbody.appendChild(e.el);
+          } else if (!skip && e.el) {
+            tbody.appendChild(e.el);
           }
-          if (e.el) tbody.appendChild(e.el);
         });
+      }
+
+      function makeGroupHeader(tag, cls, e, count) {
+        var h = document.createElement(tag);
+        h.className = cls + ' hdt-collapsible';
+        var chev = document.createElement('span');
+        chev.className = 'hdt-group-chevron';
+        chev.setAttribute('role', 'button');
+        chev.setAttribute('aria-label', 'Toggle group');
+        chev.setAttribute('tabindex', '0');
+        chev.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>';
+        var title = document.createElement('span');
+        title.className = 'hdt-group-title';
+        title.innerHTML = e.title;
+        var badge = document.createElement('span');
+        badge.className = 'hdt-group-count';
+        badge.textContent = fmtGroupCount(count);
+        h.appendChild(chev);
+        h.appendChild(title);
+        h.appendChild(badge);
+        var collapsed = isGroupCollapsed(e);
+        h.classList.toggle('hdt-collapsed', collapsed);
+        chev.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        chev.addEventListener('click', function (ev) { ev.stopPropagation(); toggleGroup(e); });
+        chev.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleGroup(e); }
+        });
+        h.addEventListener('click', function (ev) {
+          if (ev.target.closest('.hdt-group-chevron')) return;
+          toggleGroup(e);
+        });
+        return h;
       }
 
       function renderCards(visible, counts) {
         cards.innerHTML = '';
+        var skip = false;
         visible.forEach(function (e) {
           if (e.type === 'group') {
-            var h = document.createElement('div');
-            h.className = 'hdt-cards-group';
-            var title = document.createElement('span');
-            title.className = 'hdt-group-title';
-            title.innerHTML = e.title;
-            var badge = document.createElement('span');
-            badge.className = 'hdt-group-count';
-            badge.textContent = fmtGroupCount(counts.perGroup.get(e) || 0);
-            h.appendChild(title);
-            h.appendChild(badge);
-            cards.appendChild(h);
+            cards.appendChild(makeGroupHeader('div', 'hdt-cards-group', e, counts.perGroup.get(e) || 0));
+            skip = isGroupCollapsed(e);
             return;
           }
+          if (skip) return;
           var card = document.createElement(e.iv.href ? 'a' : 'div');
           card.className = 'hdt-card';
           applyRowInteractivity(card, e.iv);
@@ -767,21 +835,14 @@ function initReadingAids() {
 
       function renderList(visible, counts) {
         list.innerHTML = '';
+        var skip = false;
         visible.forEach(function (e) {
           if (e.type === 'group') {
-            var h = document.createElement('h4');
-            h.className = 'hdt-list-group';
-            var title = document.createElement('span');
-            title.className = 'hdt-group-title';
-            title.innerHTML = e.title;
-            var badge = document.createElement('span');
-            badge.className = 'hdt-group-count';
-            badge.textContent = fmtGroupCount(counts.perGroup.get(e) || 0);
-            h.appendChild(title);
-            h.appendChild(badge);
-            list.appendChild(h);
+            list.appendChild(makeGroupHeader('h4', 'hdt-list-group', e, counts.perGroup.get(e) || 0));
+            skip = isGroupCollapsed(e);
             return;
           }
+          if (skip) return;
           /* Each row becomes its own 2-col <table class="hdt-list-card">.
              First column = header (<th scope="row">), second column = cell
              value (<td>). Makes the list view literally tabular per item

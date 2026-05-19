@@ -916,6 +916,30 @@ a.hdt-card:focus-visible,
 .hdt-stats.hdt-stats-filtered { color: var(--accent-strong); }
 .hdt-stats.hdt-stats-empty { color: var(--text-soft); font-style: italic; }
 
+/* Collapsible group chevron — sits before the title in every view.
+   Rotates -90° (points right) when the group is collapsed; clicking
+   it (or the group header band) toggles. The badge keeps the live
+   row count for the group regardless of collapse state, so the
+   reader still sees "this group has N rows" while folded. */
+.hdt-group-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 4px;
+  border-radius: 4px;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.15s ease, color 0.15s ease;
+  vertical-align: middle;
+}
+.hdt-group-chevron svg { width: 12px; height: 12px; }
+.hdt-group-chevron:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.hdt-group-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hdt-collapsed .hdt-group-chevron { transform: rotate(-90deg); }
+.hdt-collapsible { cursor: pointer; }
+
 /* Group count badge — appended to a group row's first cell (table view)
    and inside .hdt-cards-group / .hdt-list-group (cards + list views).
    Same visual weight everywhere so the reader's eye learns it once. */
