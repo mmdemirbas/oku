@@ -417,11 +417,11 @@
     },
     {
       "kind": "section",
-      "title": "Round-10 additions for authors",
+      "title": "Optional author features",
       "blocks": [
         {
           "kind": "paragraph",
-          "content": "Five lifts shipped in round 10 that change how you author. Each is opt-in — old pages keep working."
+          "content": "Five opt-in features that change how you author. Old pages keep working unchanged."
         },
         {
           "kind": "heading",
@@ -517,7 +517,7 @@
           "source": "// Flat\n{ \"kind\": \"table\",\n  \"headers\": [\"Engine\", \"Storage\", \"License\"],\n  \"rows\": [\n    [\"Iceberg\", \"S3 + manifests\", \"Apache 2.0\"],\n    [\"Delta\",   \"S3 + log\",       \"Apache 2.0\"]\n  ]\n}\n\n// Grouped — chrome.js renders titles as subhead rows across all views\n{ \"kind\": \"table\",\n  \"headers\": [\"Feature\", \"Status\"],\n  \"groups\": [\n    { \"title\": \"Storage\",  \"rows\": [[\"Iceberg\", \"GA\"], [\"Delta\", \"GA\"]] },\n    { \"title\": \"Catalog\",  \"rows\": [[\"Hive\", \"GA\"], [\"Polaris\", \"Beta\"]] }\n  ]\n}"
         }
       ],
-      "id": "round-10-additions-for-authors"
+      "id": "optional-author-features"
     }
   ]
 }

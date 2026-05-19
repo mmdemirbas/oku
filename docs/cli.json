@@ -140,7 +140,7 @@
         {
           "kind": "callout",
           "type": "note",
-          "title": "Round-10 flags",
+          "title": "Optional flags",
           "content": "<strong>--no-watch</strong> disables the filesystem watcher + live-reload (serve static only).<br><strong>--no-search</strong> skips the background Pagefind index generation at startup. Both default to on so the dev loop is rich; opt out if you want a leaner serve."
         }
       ]

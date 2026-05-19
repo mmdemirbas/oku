@@ -106,6 +106,7 @@
         { "$ref": "#/$defs/code" },
         { "$ref": "#/$defs/annotated-code" },
         { "$ref": "#/$defs/table" },
+        { "$ref": "#/$defs/tldr" },
         { "$ref": "#/$defs/kpi-grid" },
         { "$ref": "#/$defs/bar-chart" },
         { "$ref": "#/$defs/step-flow" },

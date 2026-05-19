@@ -230,6 +230,7 @@
         case 'code':         el = this._renderCode(block); break;
         case 'annotated-code': el = this._renderAnnotatedCode(block); break;
         case 'table':        el = this._renderTable(block); break;
+        case 'tldr':         el = this._renderTldr(block); break;
         case 'kpi-grid':     el = this._renderKpiGrid(block); break;
         case 'bar-chart':    el = this._renderBarChart(block); break;
         case 'step-flow':    el = this._renderStepFlow(block); break;

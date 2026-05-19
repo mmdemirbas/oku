@@ -22,7 +22,6 @@ DOC_FILES = [
     "glossary.json",
     "index.json",
     "primitives.json",
-    "table-demo.json",
 ]
 
 

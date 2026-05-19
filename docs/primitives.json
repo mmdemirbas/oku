@@ -230,27 +230,42 @@
           "kind": "paragraph",
           "content": [
             "Code blocks. ",
-            {
-              "kind": "code",
-              "text": "language"
-            },
-            " is informational — the kit doesn't ship syntax highlighting in v1 — but the renderer puts it on a ",
-            {
-              "kind": "code",
-              "text": "language-*"
-            },
-            " class so Prism or Highlight.js plug in via a separate ",
-            {
-              "kind": "code",
-              "text": "<script>"
-            },
-            "."
+            { "kind": "code", "text": "language" },
+            " is informational; the renderer puts a ",
+            { "kind": "code", "text": "language-*" },
+            " class on the inner ",
+            { "kind": "code", "text": "<code>" },
+            " so Prism (loaded lazily from CDN) highlights on demand. The runtime then adds a gray gutter with line numbers and — for brace languages — a click target on each foldable region's opening line."
           ]
         },
         {
           "kind": "code",
           "language": "json",
           "source": "{\n  \"kind\": \"code\",\n  \"language\": \"python\",\n  \"source\": \"def hello():\\n    print('world')\"\n}"
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "annotated-code",
+          "title": "annotated-code"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Numbered code annotations. Markers like <code>(1)</code> / <code>(2)</code> inside the source become circular accent chips that pair with a numbered side panel. Hover or click any chip lights the matching row and vice versa. Prism highlights first so the chips survive the token tree."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"annotated-code\",\n  \"language\": \"javascript\",\n  \"source\": \"const x = 1; // (1)\\nfunction greet(name) { // (2)\\n  return `Hello, ${name}!`;\\n}\",\n  \"annotations\": [\n    { \"id\": 1, \"content\": \"<code>const</code> creates a block-scoped binding.\" },\n    { \"id\": 2, \"content\": \"Functions are first-class values.\" }\n  ]\n}"
+        },
+        {
+          "kind": "annotated-code",
+          "language": "javascript",
+          "source": "const x = 1; // (1)\nfunction greet(name) { // (2)\n  return `Hello, ${name}!`;\n}",
+          "annotations": [
+            { "id": 1, "content": "<code>const</code> creates a block-scoped binding." },
+            { "id": 2, "content": "Functions are first-class values." }
+          ]
         }
       ]
     },
@@ -420,7 +435,17 @@
         {
           "kind": "code",
           "language": "json",
-          "source": "{\n  \"kind\": \"tldr\",\n  \"summary\": \"One-sentence essence.\",\n  \"bullets\": [\n    \"Three to five concrete points.\",\n    [\"Each can include \", { \"kind\": \"glossary-term\", \"term\": \"ACID\" }, \" terms.\"]\n  ]\n}"
+          "source": "{\n  \"kind\": \"tldr\",\n  \"summary\": \"One-sentence essence.\",\n  \"bullets\": [\n    \"Three to five concrete points.\",\n    \"Each bullet may include inline kinds like glossary terms.\"\n  ]\n}"
+        },
+        {
+          "kind": "tldr",
+          "title": "TL;DR (example)",
+          "summary": "One-sentence essence. The summary line is bigger than bullets and reads first.",
+          "bullets": [
+            "Three to five concrete points.",
+            "Each bullet may include inline kinds like glossary terms or links.",
+            "Top-level placement is the canonical use; this one sits inline as a sample."
+          ]
         },
         {
           "kind": "heading",
@@ -431,23 +456,104 @@
         {
           "kind": "code",
           "language": "json",
-          "source": "{\n  \"kind\": \"kpi-grid\",\n  \"tiles\": [\n    { \"num\": \"15 / 15\", \"label\": \"Steps complete\" },\n    { \"num\": \"6\",       \"label\": \"Commits\" }\n  ]\n}"
+          "source": "{\n  \"kind\": \"kpi-grid\",\n  \"tiles\": [\n    { \"num\": \"17\",   \"label\": \"Primitives\" },\n    { \"num\": \"JSON\", \"label\": \"Source\" },\n    { \"num\": \"0\",    \"label\": \"Build steps for content\" }\n  ]\n}"
         },
         {
           "kind": "kpi-grid",
           "tiles": [
-            {
-              "num": "17",
-              "label": "Primitives"
+            { "num": "17",   "label": "Primitives" },
+            { "num": "JSON", "label": "Source" },
+            { "num": "0",    "label": "Build steps for content" }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "table",
+          "title": "table"
+        },
+        {
+          "kind": "paragraph",
+          "content": "First-class JSON table. Two shapes: flat <code>rows</code> or grouped <code>groups</code>. Renders into a real <code>&lt;table&gt;</code> plus a runtime control bar (filter input, stats counter, Table / List / Cards view toggle, sticky header, full-width auto-fit). Object-form headers and cells declare chip filters with multi-valued cells; groups are collapsible."
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "Flat rows"
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\"Stage\", \"Status\", \"Duration\"],\n  \"rows\": [\n    [\"Plan\",  \"done\",         \"1d\"],\n    [\"Build\", \"done\",         \"3d\"],\n    [\"Test\",  \"in-progress\",  \"2d\"],\n    [\"Ship\",  \"queued\",       \"—\"]\n  ]\n}"
+        },
+        {
+          "kind": "table",
+          "headers": ["Stage", "Status", "Duration"],
+          "rows": [
+            ["Plan",  "done",        "1d"],
+            ["Build", "done",        "3d"],
+            ["Test",  "in-progress", "2d"],
+            ["Ship",  "queued",      "—"]
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "Grouped rows with per-group counts"
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\"Engine\", \"Storage\", \"License\"],\n  \"groups\": [\n    { \"title\": \"Lakehouse formats\",\n      \"rows\": [\n        [\"Apache Iceberg\", \"Object store\", \"Apache 2.0\"],\n        [\"Delta Lake\",    \"Object store\", \"Apache 2.0\"]\n      ]\n    },\n    { \"title\": \"Query engines\",\n      \"rows\": [[\"Trino\", \"Pluggable\", \"Apache 2.0\"]]\n    }\n  ]\n}"
+        },
+        {
+          "kind": "table",
+          "headers": ["Engine", "Storage", "License"],
+          "groups": [
+            { "title": "Lakehouse formats",
+              "rows": [
+                ["Apache Iceberg", "Object store", "Apache 2.0"],
+                ["Apache Hudi",    "Object store", "Apache 2.0"],
+                ["Delta Lake",     "Object store", "Apache 2.0"]
+              ]
             },
-            {
-              "num": "JSON",
-              "label": "Source"
-            },
-            {
-              "num": "0",
-              "label": "Build steps for content"
+            { "title": "Query engines",
+              "rows": [
+                ["Trino",  "Pluggable", "Apache 2.0"],
+                ["Presto", "Pluggable", "Apache 2.0"]
+              ]
             }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "Chip filters + multi-valued cells"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Headers can declare a fixed chip set with <code>filter: \"chips\"</code>; cells use the object form <code>{ value, values }</code> to belong to one or more chip values. AND across columns, OR within a column. Combine with the text filter."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\n    \"Engine\",\n    { \"label\": \"Tags\", \"filter\": \"chips\",\n      \"values\": [\"lakehouse\", \"streaming\", \"query\"] },\n    { \"label\": \"Maturity\", \"filter\": \"chips\",\n      \"values\": [\"incubating\", \"ga\", \"experimental\"] }\n  ],\n  \"rows\": [\n    [\"Apache Iceberg\",\n      { \"values\": [\"lakehouse\"] },\n      { \"value\": \"GA\", \"values\": [\"ga\"] }],\n    [\"Apache Paimon\",\n      { \"values\": [\"lakehouse\", \"streaming\"] },\n      { \"value\": \"Incubating\", \"values\": [\"incubating\"] }],\n    [\"Trino\",\n      { \"values\": [\"query\"] },\n      { \"value\": \"GA\", \"values\": [\"ga\"] }]\n  ]\n}"
+        },
+        {
+          "kind": "table",
+          "headers": [
+            "Engine",
+            { "label": "Tags",     "filter": "chips", "values": ["lakehouse", "streaming", "query", "metadata"] },
+            { "label": "Maturity", "filter": "chips", "values": ["incubating", "ga", "experimental"] }
+          ],
+          "rows": [
+            ["Apache Iceberg",   { "values": ["lakehouse", "metadata"] },   { "value": "GA",           "values": ["ga"] }],
+            ["Apache Hudi",      { "values": ["lakehouse", "streaming"] },  { "value": "GA",           "values": ["ga"] }],
+            ["Delta Lake",       { "values": ["lakehouse"] },                { "value": "GA",           "values": ["ga"] }],
+            ["Apache Paimon",    { "values": ["lakehouse", "streaming"] },  { "value": "Incubating",   "values": ["incubating"] }],
+            ["Trino",            { "values": ["query"] },                    { "value": "GA",           "values": ["ga"] }],
+            ["Apache Flink",     { "values": ["streaming"] },                { "value": "GA",           "values": ["ga"] }],
+            ["Pulsar Functions", { "values": ["streaming", "metadata"] },   { "value": "Experimental", "values": ["experimental"] }]
           ]
         },
         {
@@ -697,12 +803,12 @@
         {
           "kind": "code",
           "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"scatter\",\n  \"title\": \"Cost vs. impact\",\n  \"x_label\": \"Engineering cost\",\n  \"y_label\": \"User impact\",\n  \"series\": [\n    { \"label\": \"Round 6\", \"color\": \"accent\", \"data\": [\n      { \"x\": 4, \"y\": 9, \"label\": \"H3\" },\n      { \"x\": 6, \"y\": 8, \"label\": \"S2-inline\" }\n    ]}\n  ]\n}"
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"scatter\",\n  \"title\": \"Cost vs. impact\",\n  \"x_label\": \"Engineering cost\",\n  \"y_label\": \"User impact\",\n  \"series\": [\n    { \"label\": \"Sample series\", \"color\": \"accent\", \"data\": [\n      { \"x\": 4, \"y\": 9, \"label\": \"H3\" },\n      { \"x\": 6, \"y\": 8, \"label\": \"S2-inline\" }\n    ]}\n  ]\n}"
         },
         {
           "kind": "chart",
           "type": "scatter",
-          "title": "Round 6 work — cost vs. impact",
+          "title": "Chart sample — cost vs. impact",
           "x_label": "Engineering cost",
           "y_label": "User impact",
           "series": [
@@ -885,73 +991,51 @@
     },
     {
       "kind": "section",
-      "title": "Round-10 primitives reference",
+      "id": "cross-cutting",
+      "title": "Cross-cutting features",
+      "lead": "Behaviors that don't introduce a new block kind but change how an existing one renders.",
       "blocks": [
         {
-          "kind": "paragraph",
-          "content": "Six primitives shipped in rounds 9 and 10. Each lifts a pattern from the design audit (Stripe, MkDocs Material, Mintlify, GitBook) and adapts it to the kit's no-build constraint."
-        },
-        {
           "kind": "heading",
           "level": 3,
-          "title": "annotated-code"
-        },
-        {
-          "kind": "paragraph",
-          "content": "MkDocs Material-style numbered code annotations. <code>(1)</code> <code>(2)</code> markers in the code become circular accent chips that pair with a numbered side panel below. Hover/click any chip lights the matching annotation row; vice versa. Prism syntax highlighting runs first so the chips survive the token tree."
-        },
-        {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"annotated-code\",\n  \"language\": \"javascript\",\n  \"source\": \"const x = 1; // (1)\\nfunction greet(name) { // (2)\\n  return `Hello, ${name}!`;\\n}\",\n  \"annotations\": [\n    { \"id\": 1, \"content\": \"<code>const</code> creates a block-scoped binding.\" },\n    { \"id\": 2, \"content\": \"Functions are first-class values.\" }\n  ]\n}"
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "title": "table"
-        },
-        {
-          "kind": "paragraph",
-          "content": "First-class JSON table block with flat (<code>rows</code>) or grouped (<code>groups</code>) shape. Renders into <code>&lt;table&gt;&lt;thead&gt;&lt;tbody&gt;</code>; the runtime view-selector (Table / List / Cards), sort, filter, and full-width toggle all bind automatically. See <a href=\"authoring.html#round-10-additions-for-authors\">authoring guide</a> for the schema."
-        },
-        {
-          "kind": "heading",
-          "level": 3,
+          "id": "ext-ref-cards",
           "title": "Citation cards via ext-ref"
         },
         {
           "kind": "paragraph",
-          "content": "Existing <code>&lt;ext-ref name=\"X\"&gt;</code> elements auto-promote to type-themed citation cards (paper / rfc / release / blog / other). Type is read from the extref entry or inferred from the link domain. Inline cite text inherits the type's color on its dotted underline; hover card has type-tinted icon, mono domain pill, optional author + date row, summary."
+          "content": "Existing <code>ext-ref</code> entries auto-promote to type-themed citation cards (paper / rfc / release / blog / other). Type is read from the extref entry or inferred from the link domain. Inline cite text inherits the type's color on its dotted underline; the hover card carries a type-tinted icon, a mono domain pill, optional author + date row, and a summary."
         },
         {
           "kind": "heading",
           "level": 3,
+          "id": "data-bind",
           "title": "Synced hover pairs · [data-bind]"
         },
         {
           "kind": "paragraph",
-          "content": "Add <code>bind: \"step-3\"</code> on any block (paragraph, code, callout, chart, anything) and any other block carrying the same key flashes when either is hovered or focused. Click one — the first offscreen partner scrolls into view. Stripe-class micro-interaction; one-line opt-in per pair."
+          "content": "Add <code>bind: \"step-3\"</code> to any two blocks and they flash together when either is hovered or focused. Click one — the offscreen partner scrolls into view. One-line opt-in per pair; no kind change required."
         },
         {
           "kind": "heading",
           "level": 3,
-          "title": "Last-updated meta line"
+          "id": "meta-updated",
+          "title": "Last-updated line"
         },
         {
           "kind": "paragraph",
-          "content": "<code>meta.updated</code> renders as a quiet italic line under the cover meta row. Pure trust signal."
+          "content": "<code>meta.updated</code> renders as a quiet italic line under the cover meta row. Pure trust signal — readers learn at a glance how fresh a page is."
         },
         {
           "kind": "heading",
           "level": 3,
-          "title": "Admonition vocab (note / tip / info / caution)"
+          "id": "admonition-aliases",
+          "title": "Admonition vocab aliases"
         },
         {
           "kind": "paragraph",
-          "content": "Callout types align with the industry standard. Old <code>warn / warning / danger / success / neutral</code> still work; new aliases let authors transferring from Docusaurus, MkDocs Material, or Mintlify use the names they already know."
+          "content": "Callout types accept the industry-standard names: <code>note</code>, <code>tip</code>, <code>info</code>, <code>caution</code>. The original <code>warn / warning / danger / success / neutral</code> still work; the aliases let authors transferring from Docusaurus / MkDocs Material / Mintlify use familiar names."
         }
-      ],
-      "id": "round-10-primitives-reference"
+      ]
     }
   ]
 }

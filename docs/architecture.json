@@ -303,11 +303,11 @@
     },
     {
       "kind": "section",
-      "title": "Round-10 internal changes",
+      "title": "Internal architecture notes",
       "blocks": [
         {
           "kind": "paragraph",
-          "content": "Internal architecture moved on five fronts in rounds 9 and 10. Worth knowing about if you're reading the kit code."
+          "content": "Five behaviors worth knowing about if you're reading the kit code."
         },
         {
           "kind": "callout",
@@ -340,7 +340,7 @@
           "content": "chrome-boot.js plucks <code>_ijt</code> from <code>window.location.search</code> and exposes <code>window.__htmldocWithAuth(url)</code> that appends it to internal asset URLs (same-origin only — CDN URLs stay untouched). chrome.js and renderer.js wrap every fetch and script-src load through it so IntelliJ's built-in server stops 404'ing sub-resource requests."
         }
       ],
-      "id": "round-10-internal-changes"
+      "id": "internal-architecture-notes"
     }
   ]
 }

@@ -17,12 +17,12 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "All 15 build steps shipped across 6 rounds. Deep review surfaced 2 showstoppers + 4 high + 2 medium + 4 low; all addressed. Standalone single-file mode now ships an inlined kit bundle so tooltips work offline. Subfolder pages build correctly under preserved directory structure. Ready to tag v2.0.0.",
+      "summary": "Interactive knowledge platform for AI-emitted documentation, learning notes, and reviews. Single-source JSON content, runtime renderer, no build step. Standalone-file mode for offline reading; multi-page site mode with full-text search. This page uses every primitive — hover terms, click external refs, edit the live snippet, watch the chart and diagram render.",
       "bullets": [
-        "6 commits on feat/v2-knowledge-platform; verified across dev pages, dist/site/ (with Pagefind search), and dist/standalone/ (offline-capable).",
-        "Tooltip controller, multi-domain glossary, Visual Viewport pinch-zoom fix, Mermaid lazy-load, live snippets, forward-compat warning indicator — all verified end-to-end.",
-        "Round 6 closed the review: recursive build with directory preservation, standalone kit bundle, schema-validation hook, M2 trust-boundary comment, cycleTheme event refactor, page-toc cleanup.",
-        "This page uses every primitive — hover terms, click external refs, edit the live snippet, watch the chart and diagram render."
+        "Authoring source = JSON. The single file you hand to an AI to read, modify, or extend.",
+        "Renderer = chrome.js + renderer.js running in the browser. Custom Elements provide behavior.",
+        "Tooltips, multi-domain glossary, pinch-zoom-stable chrome, Mermaid diagrams, live snippets, citation cards, charts, syntax highlight, code folding, full-text search.",
+        "Same vocabulary covers reviews, study docs, plan reviews, team briefs."
       ]
     },
     {
@@ -162,45 +162,6 @@
                 "Custom Element naming normalization across <page-*>, <html-doc-*>, unprefixed (preferably during a project rename)",
                 "chrome.js file split (~1300 lines, three structural patterns — discretionary)",
                 "Demo _kit symlink commit (only when _internal/demo-page/ is promoted to public examples)"
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "review-fixes",
-      "title": "Review-fix status",
-      "lead": "Independent reviewer agent ran a 12-lens pass on the v2 branch. The full report sits at _internal/REVIEW-2026-05-17.md. Round 5 landed 6 of the highest-impact findings.",
-      "blocks": [
-        {
-          "kind": "compare-grid",
-          "cards": [
-            {
-              "verdict": "good",
-              "title": "Round 5 — six showstopper / high fixes",
-              "content": [
-                "S1 — glossary override race. Project-level overrides survive central domain-file fetches. ",
-                "H1 — callout 'warn' CSS variant. .callout.warn now aliases .callout.warning. ",
-                "S2 (quick) — standalone tooltips no longer mark every term as 'Unknown'. ",
-                "H2 — initReadingAids guarded against scroll/keydown listener accumulation. ",
-                "H5 — search results escape d.url and d.meta.title. ",
-                "M1 — search modal focus trap + focus restore on close."
-              ]
-            },
-            {
-              "verdict": "good",
-              "title": "Round 6 — bigger lifts + polish",
-              "content": [
-                "H3 — recursive HTML build + directory preservation. Subfolder pages now build to dist/site/<folder>/*.html, page-nav renders nested tree, docs root discovery works from any page depth. ",
-                "S2 (proper) — kit bundle inlined into standalone builds. Tooltips work fully offline; verified via dist/standalone/iceberg.html. ",
-                "Schema validation soft-fail. jsonschema dependency optional; build prints validation results when present, hint otherwise. ",
-                "M2 — code comment at tooltip controller's build() documenting the data-def trust boundary. ",
-                "L1 dead code (KIT_REF_RE) removed. ",
-                "L3 cycleTheme refactored to event-based: dispatches html-doc:theme-changed; diagrams re-render via listener (no more variable reassignment). ",
-                "isTouch evaluated per-attach (responds to input-mode changes). ",
-                "page-toc no longer wastes an empty rAF build before html-doc:rendered."
               ]
             }
           ]
