@@ -17,12 +17,13 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "17 primitives in v1. Inline kinds compose inside rich-text content arrays. Block kinds stand alone inside sections. Layout kinds wrap the page structurally.",
+      "summary": "Every primitive in one page — JSON shape on the left, the rendered block right under it. Inline kinds nest inside rich-text content; block kinds stand alone in a section's blocks; visual primitives are SVG / JS-backed.",
       "bullets": [
-        "Inline (8): glossary-term, ext-ref, code, em, strong, link — and string literals which are also valid.",
-        "Block (12): paragraph, heading, list, code, callout, insight, info-tip, kpi-grid, compare-grid, scope-grid, bar-chart, step-flow.",
-        "Visual primitives (3): chart, diagram, live-snippet. SVG and JS-backed.",
-        "Layout (4): page-chrome, page-nav, page-toc, page-cover. Set by your HTML stub, not the JSON."
+        "Inline · glossary-term, ext-ref, code, em, strong, link",
+        "Prose · paragraph, heading, list, code, annotated-code",
+        "Emphasis · callout, insight, info-tip",
+        "Layout · tldr, kpi-grid, table, compare-grid, scope-grid, step-flow",
+        "Visual · bar-chart, chart, diagram, live-snippet"
       ]
     },
     {
@@ -64,17 +65,11 @@
           "source": "{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"text\": \"ACID\" }\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"in\": \"chemistry\" }\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"lang\": \"tr\" }"
         },
         {
-          "kind": "callout",
-          "type": "neutral",
-          "title": "Live",
+          "kind": "paragraph",
           "content": [
-            "Hover this term: ",
-            {
-              "kind": "glossary-term",
-              "term": "ACID",
-              "text": "ACID"
-            },
-            ". Then click it to pin. Move the mouse toward the tooltip — bridge-hover keeps it open so you can select the text or click the link."
+            "Example: hover ",
+            { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
+            " — click to pin; move toward the tooltip to keep it open."
           ]
         },
         {
@@ -110,17 +105,11 @@
           "source": "{ \"kind\": \"ext-ref\", \"name\": \"Pagefind\", \"text\": \"Pagefind\" }"
         },
         {
-          "kind": "callout",
-          "type": "neutral",
-          "title": "Live",
+          "kind": "paragraph",
           "content": [
-            "Click this reference: ",
-            {
-              "kind": "ext-ref",
-              "name": "Pagefind",
-              "text": "Pagefind"
-            },
-            "."
+            "Example: ",
+            { "kind": "ext-ref", "name": "Pagefind", "text": "Pagefind" },
+            " — hover for the card, click to pin."
           ]
         },
         {
@@ -135,32 +124,17 @@
           "source": "{ \"kind\": \"code\",   \"text\": \"build_manifest()\" }\n{ \"kind\": \"em\",     \"text\": \"italic\" }\n{ \"kind\": \"strong\", \"text\": \"bold\" }\n{ \"kind\": \"link\",   \"text\": \"jsDelivr\", \"href\": \"https://cdn.jsdelivr.net\" }"
         },
         {
-          "kind": "callout",
-          "type": "neutral",
-          "title": "Live",
+          "kind": "paragraph",
           "content": [
-            "Inline code: ",
-            {
-              "kind": "code",
-              "text": "build_manifest()"
-            },
-            ". Italic ",
-            {
-              "kind": "em",
-              "text": "for emphasis"
-            },
-            ". Bold ",
-            {
-              "kind": "strong",
-              "text": "for impact"
-            },
-            ". External link: ",
-            {
-              "kind": "link",
-              "text": "jsDelivr",
-              "href": "https://cdn.jsdelivr.net"
-            },
-            " — opens in a new tab with noopener."
+            "Example: inline ",
+            { "kind": "code", "text": "build_manifest()" },
+            ", ",
+            { "kind": "em", "text": "italic" },
+            ", ",
+            { "kind": "strong", "text": "bold" },
+            ", and a ",
+            { "kind": "link", "text": "jsDelivr", "href": "https://cdn.jsdelivr.net" },
+            " link (opens in a new tab)."
           ]
         }
       ]
