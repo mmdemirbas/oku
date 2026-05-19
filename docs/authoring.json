@@ -421,7 +421,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "content": "Five opt-in features that change how you author. Old pages keep working unchanged."
+          "content": "Opt-in features that extend what you can author. None are required — pages that don't use them keep working unchanged."
         },
         {
           "kind": "heading",
@@ -509,7 +509,7 @@
         },
         {
           "kind": "paragraph",
-          "content": "New <code>kind: \"table\"</code> block. Two valid shapes:"
+          "content": "<code>kind: \"table\"</code> block. Two valid shapes:"
         },
         {
           "kind": "code",

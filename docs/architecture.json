@@ -319,7 +319,7 @@
           "kind": "callout",
           "type": "note",
           "title": "Generated files at the docs root, not the project root",
-          "content": "<code>cmd_serve</code> r10 writes <code>site-manifest.json</code>, <code>site-manifest.js</code>, <code>llms.txt</code>, and <code>page.md</code> twins at the closest common parent of JSON pages — typically <code>docs/</code>. Earlier rounds wrote at the chdir'd project root, which produced a manifest at the wrong URL prefix and polluted git status. <code>_common_docs_dir(root, pages)</code> in cli.py picks the directory."
+          "content": "<code>cmd_serve</code> writes <code>site-manifest.json</code>, <code>site-manifest.js</code>, <code>llms.txt</code>, and <code>page.md</code> twins at the closest common parent of JSON pages — typically <code>docs/</code>. <code>_common_docs_dir(root, pages)</code> in cli.py picks the directory, so the manifest URL prefix matches the served tree and git status stays clean."
         },
         {
           "kind": "callout",
@@ -331,7 +331,7 @@
           "kind": "callout",
           "type": "note",
           "title": "Boot stamp",
-          "content": "chrome.js console.info()s <code>[html-doc] kit boot · build=2026-05-18-r10 · docsRoot=... · authToken=yes/no</code> at startup. Bump <code>__htmldocKitBuild</code> whenever a compatibility-affecting change ships, so a stale-cache user can confirm from DevTools whether their browser/IDE is on the right chrome.js."
+          "content": "chrome.js console.info()s <code>[html-doc] kit boot · build=&lt;date&gt; · docsRoot=… · authToken=yes/no</code> at startup. Bump <code>__htmldocKitBuild</code> whenever a compatibility-affecting change ships so a stale-cache user can confirm from DevTools whether their browser is on the right chrome.js."
         },
         {
           "kind": "callout",

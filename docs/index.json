@@ -128,7 +128,7 @@
       "kind": "section",
       "id": "roadmap",
       "title": "Roadmap",
-      "lead": "Build sequence as committed across rounds. Status reflects the actual repo state, not the plan.",
+      "lead": "What's in, what's deferred. Status reflects the actual repo state, not the plan.",
       "blocks": [
         {
           "kind": "scope-grid",
@@ -230,13 +230,13 @@
           "kind": "heading",
           "level": 3,
           "id": "chart",
-          "title": "Chart — round-by-round commit size"
+          "title": "Chart — line chart sample"
         },
         {
           "kind": "chart",
           "type": "line",
-          "title": "Code added per round (lines)",
-          "x_label": "Round",
+          "title": "Lines added per build step",
+          "x_label": "Step",
           "y_label": "Insertions",
           "series": [
             {
@@ -298,7 +298,7 @@
           "kind": "callout",
           "type": "warn",
           "title": "Try the warn callout type",
-          "content": "This callout uses type=\"warn\" — fixed in round 5 (H1). Before that fix it rendered as a default accent callout because the CSS only had .callout.warning. Now .callout.warn aliases the same styling."
+          "content": "This callout uses <code>type=\"warn\"</code>, which aliases the canonical <code>warning</code> styling. The kit accepts both names plus the industry-standard <code>note / tip / info / caution</code> aliases."
         }
       ]
     },
