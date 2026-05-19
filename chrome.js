@@ -1006,31 +1006,47 @@ function initReadingAids() {
     });
 
     /* Auto-fit: measure once collapsed; if the table's natural width
-       exceeds the column, expand. Re-measure on viewport resize until
-       the user pins manually. The measurement is double-rAF-deferred
-       so layout has settled (fonts, sticky headers, edge fades). */
+       exceeds the column, expand. Re-measure ONLY when the parent
+       column resizes — observing the scroll viewport would create a
+       feedback loop because the expand toggle changes its size, which
+       fires the observer, which re-measures, ...
+       Measurements are rAF-coalesced so a burst of column resizes
+       (e.g. font loading, TOC toggle, window resize) settles to one
+       call. The first call is double-rAF-deferred so initial layout
+       (fonts, sticky headers, edge fades) is in. */
+    var autoFitPending = false;
+    function scheduleAutoFit() {
+      if (autoFitPending) return;
+      autoFitPending = true;
+      requestAnimationFrame(function () {
+        autoFitPending = false;
+        autoFit();
+      });
+    }
     function autoFit() {
       if (wrap.dataset.fitPinned === '1') return;
       // Force collapsed for the measurement; if the scroll viewport
       // overflows in that state, we need the expanded mode.
       var wasExpanded = wrap.classList.contains('expanded');
       if (wasExpanded) wrap.classList.remove('expanded');
-      var overflowing = scroll.scrollWidth - scroll.clientWidth > 1;
-      applyExpanded(overflowing);
+      // 2px hysteresis margin — sub-pixel rounding shouldn't trip the
+      // toggle and re-fire the observer.
+      var overflowing = scroll.scrollWidth - scroll.clientWidth > 2;
+      if (overflowing !== wasExpanded) applyExpanded(overflowing);
+      else if (wasExpanded) wrap.classList.add('expanded');
     }
     if (typeof requestAnimationFrame === 'function') {
       requestAnimationFrame(function () { requestAnimationFrame(autoFit); });
     } else {
       setTimeout(autoFit, 0);
     }
-    if (window.ResizeObserver) {
-      var fitRO = new ResizeObserver(autoFit);
-      fitRO.observe(scroll);
-      // Also observe <main> (or the wrap's offsetParent) so column resizes
-      // — TOC toggle, window resize — trigger a re-measure.
-      if (wrap.parentElement) fitRO.observe(wrap.parentElement);
+    if (window.ResizeObserver && wrap.parentElement) {
+      var fitRO = new ResizeObserver(scheduleAutoFit);
+      // Only the column width matters; ignore the wrap's own size so
+      // the toggle's layout effect doesn't loop back into the observer.
+      fitRO.observe(wrap.parentElement);
     } else {
-      window.addEventListener('resize', autoFit);
+      window.addEventListener('resize', scheduleAutoFit);
     }
   });
 
