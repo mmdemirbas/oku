@@ -3572,20 +3572,30 @@ class PageNav extends HTMLElement {
         '<ol class="page-nav-tree"><li class="page-nav-loading">Loading…</li></ol>' +
       '</div>';
     var self = this;
-    // Adopt the sibling page-toc into the sidebar so both panels share
-    // a single column without DOM gymnastics. Deferred so the page-toc
-    // can finish its own connectedCallback (renders its inner DOM).
+    // Adopt the page-toc into the sidebar so both panels share a single
+    // column without DOM gymnastics. Deferred so the page-toc can finish
+    // its own connectedCallback (renders its inner DOM).
+    //
+    // Prefer a page-toc inside the same .layout (the documented authoring
+    // shape), but fall back to a document-level search so the kit stays
+    // robust when an author drops page-toc outside .layout (e.g. as a
+    // direct body child) — without this fallback that page-toc would
+    // render at the page bottom, breaking the single-left-sidebar rule.
     var layout = this.closest('.layout');
-    if (layout) {
-      var adopt = function () {
-        var siblingToc = layout.querySelector(':scope > page-toc, :scope > nav.toc');
-        if (siblingToc && siblingToc.parentElement !== self) self.appendChild(siblingToc);
-      };
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', adopt);
-      } else {
-        Promise.resolve().then(adopt);
+    var adopt = function () {
+      var siblingToc = null;
+      if (layout) {
+        siblingToc = layout.querySelector(':scope > page-toc, :scope > nav.toc');
       }
+      if (!siblingToc) {
+        siblingToc = document.querySelector('page-toc, nav.toc');
+      }
+      if (siblingToc && siblingToc.parentElement !== self) self.appendChild(siblingToc);
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', adopt);
+    } else {
+      Promise.resolve().then(adopt);
     }
     // Click-anywhere-on-the-rail to expand when collapsed. The whole
     // page-nav becomes the click target; the top-left chrome button

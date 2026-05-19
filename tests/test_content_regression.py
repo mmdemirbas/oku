@@ -256,3 +256,30 @@ class TestChromeKitMarkers:
     def test_chrome_css_has_code_lang_pill(self, repo_root: Path) -> None:
         css = (repo_root / "chrome.css").read_text(encoding="utf-8")
         assert ".hdt-code-lang" in css, "code-block language pill rule missing"
+
+    def test_page_nav_adopts_page_toc_with_document_fallback(self, repo_root: Path) -> None:
+        """page-nav must adopt a page-toc found anywhere in the document.
+
+        Regression: the prior adoption code only looked at `:scope > page-toc`
+        inside the same `.layout`. When a page authored page-toc outside the
+        layout container (e.g. as a direct body child, which is easy to do
+        without noticing), the adoption silently no-op'd and page-toc rendered
+        at the page bottom — breaking the single-LEFT-sidebar rule in
+        CLAUDE.md.
+
+        The fix is a document-level fallback. Enforce by checking the
+        connectedCallback contains both the layout-scoped query AND the
+        document-level fallback.
+        """
+        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        # The layout-scoped query (preserved as the primary lookup).
+        assert (
+            "layout.querySelector(':scope > page-toc, :scope > nav.toc')" in js
+        ), "layout-scoped page-toc adoption query missing"
+        # The document-level fallback that catches body-direct page-toc.
+        assert (
+            "document.querySelector('page-toc, nav.toc')" in js
+        ), (
+            "document-level page-toc adoption fallback missing — page-toc "
+            "authored outside .layout will render at page bottom"
+        )
