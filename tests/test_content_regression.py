@@ -320,6 +320,29 @@ class TestChromeKitMarkers:
             "single-source restore lives in chrome.js"
         )
 
+    def test_diagram_toolbar_has_copy_and_expand(self, repo_root: Path) -> None:
+        """Mermaid diagrams must expose both copy-source and expand actions.
+
+        User explicitly asked for these buttons on Mermaid blocks. Copy
+        was pre-existing in the diagram toolbar; expand was added in P12.
+        Lock both into the diagram custom element so a future refactor
+        can't quietly drop either.
+        """
+        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        # Find the diagram custom element's _attachToolbar block.
+        m = re.search(
+            r"class\s+HtmlDocDiagram[\s\S]*?_attachToolbar\(\)\s*\{[\s\S]*?makeToolbar\(this,\s*\[([\s\S]*?)\]\)",
+            js,
+        )
+        assert m, "HtmlDocDiagram._attachToolbar block not found"
+        toolbar = m.group(1)
+        assert "Copy diagram source" in toolbar, (
+            "Copy action missing from diagram toolbar"
+        )
+        assert "Expand to fullscreen" in toolbar, (
+            "Expand action missing from diagram toolbar"
+        )
+
     def test_lightbox_module_exists(self, repo_root: Path) -> None:
         """Shared lightbox overlay must exist + be wired to charts + diagrams.
 
