@@ -86,6 +86,11 @@ body {
   letter-spacing: 0.005em;
   color: var(--text); background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Inter's polished variants: ss01 (open digits), ss03 (lowercase l
+     with hook → clearer in long runs), cv11 (single-storey a). Tnum
+     keeps numerics monospaced inside tabular/data contexts. */
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
   /* Long URLs / unbroken tokens shouldn't push the page wider than the
      viewport — break inside the word if there's nowhere else to break. */
   overflow-wrap: break-word;
@@ -95,6 +100,17 @@ body {
 code, pre, .mono {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
+  /* JetBrains Mono ligatures (->, =>, !=, ===, etc.) make code read
+     closer to how it reasons. zero gives a slashed/dotted 0 so it's
+     distinct from O at small sizes. */
+  font-feature-settings: 'calt', 'zero';
+  font-variant-ligatures: contextual;
+}
+/* Tabular numerics across all table cells so numbers align column-wise
+   without depending on the cell padding. */
+table { font-variant-numeric: tabular-nums; }
+.hdt-stats, .hdt-group-count, .hdt-chip-count {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Layout — single left sidebar + main. page-nav adopts page-toc as a

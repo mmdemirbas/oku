@@ -1006,6 +1006,18 @@
           "content": "Existing <code>ext-ref</code> entries auto-promote to type-themed citation cards (paper / rfc / release / blog / other). Type is read from the extref entry or inferred from the link domain. Inline cite text inherits the type's color on its dotted underline; the hover card carries a type-tinted icon, a mono domain pill, optional author + date row, and a summary."
         },
         {
+          "kind": "paragraph",
+          "content": [
+            "Inline sample — hover any reference to see the card: see ",
+            { "kind": "ext-ref", "name": "Iceberg paper" },
+            " for the original snapshot-isolation argument, ",
+            { "kind": "ext-ref", "name": "RFC 9457" },
+            " for the HTTP problem-details format, and the ",
+            { "kind": "ext-ref", "name": "Iceberg 1.4 release" },
+            " for cross-engine sort orders."
+          ]
+        },
+        {
           "kind": "heading",
           "level": 3,
           "id": "data-bind",
@@ -1014,6 +1026,18 @@
         {
           "kind": "paragraph",
           "content": "Add <code>bind: \"step-3\"</code> to any two blocks and they flash together when either is hovered or focused. Click one — the offscreen partner scrolls into view. One-line opt-in per pair; no kind change required."
+        },
+        {
+          "kind": "paragraph",
+          "bind": "demo-bind",
+          "content": "Inline sample — hover or focus this paragraph and the callout below tints in sync. They share the same data-bind key."
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "bind": "demo-bind",
+          "title": "Paired callout",
+          "content": "Hovering the paragraph above lights this callout's border. Hovering this callout lights the paragraph. Same key, both directions."
         },
         {
           "kind": "heading",
@@ -1026,6 +1050,11 @@
           "content": "<code>meta.updated</code> renders as a quiet italic line under the cover meta row. Pure trust signal — readers learn at a glance how fresh a page is."
         },
         {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"meta\": {\n    \"date\": \"2026-05-10\",\n    \"updated\": \"2026-05-18\",\n    \"read_time\": \"~3 min\"\n  },\n  \"blocks\": [ ... ]\n}"
+        },
+        {
           "kind": "heading",
           "level": 3,
           "id": "admonition-aliases",
@@ -1033,7 +1062,31 @@
         },
         {
           "kind": "paragraph",
-          "content": "Callout types accept the industry-standard names: <code>note</code>, <code>tip</code>, <code>info</code>, <code>caution</code>. The original <code>warn / warning / danger / success / neutral</code> still work; the aliases let authors transferring from Docusaurus / MkDocs Material / Mintlify use familiar names."
+          "content": "Callout <code>type</code> accepts both the kit's original names (<code>warn / warning / danger / success / neutral</code>) and the industry-standard aliases (<code>note / tip / info / caution</code>). Each row below is the same canonical styling reached from two different vocabularies."
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "note · alias of neutral",
+          "content": "<code>type: \"note\"</code> reads the same as <code>type: \"neutral\"</code> — generic informational tint."
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "title": "tip · alias of success",
+          "content": "<code>type: \"tip\"</code> matches <code>type: \"success\"</code> — green guidance accent for positive advice."
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "info · alias of neutral with informational tint",
+          "content": "Same surface as neutral; reserved name keeps Docusaurus / Mintlify habits intact."
+        },
+        {
+          "kind": "callout",
+          "type": "caution",
+          "title": "caution · alias of warning",
+          "content": "Amber border + icon; same look as <code>type: \"warning\"</code> from earlier rounds."
         }
       ]
     }

@@ -124,7 +124,8 @@
       "additionalProperties": false,
       "properties": {
         "kind": { "const": "paragraph" },
-        "content": { "$ref": "#/$defs/richString" }
+        "content": { "$ref": "#/$defs/richString" },
+        "bind": { "type": "string", "description": "Shared key for the cross-block hover-sync feature. Any two blocks with the same bind key flash together when either is hovered or focused." }
       }
     },
 
@@ -136,7 +137,8 @@
         "kind": { "const": "heading" },
         "level": { "type": "integer", "minimum": 3, "maximum": 4 },
         "title": { "type": "string" },
-        "id": { "type": "string" }
+        "id": { "type": "string" },
+        "bind": { "type": "string" }
       }
     },
 
@@ -148,7 +150,8 @@
         "kind": { "const": "callout" },
         "type": { "enum": ["warn", "warning", "caution", "danger", "success", "tip", "neutral", "note", "info"], "default": "neutral" },
         "title": { "type": "string" },
-        "content": { "$ref": "#/$defs/richString" }
+        "content": { "$ref": "#/$defs/richString" },
+        "bind": { "type": "string" }
       }
     },
 

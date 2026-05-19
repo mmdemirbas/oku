@@ -2572,6 +2572,25 @@ class HtmlDocChart extends HTMLElement {
         run: function (btn) { self.resetView(); __htmldocVisualTools.flash(btn, 'ok', ICON_RESET); }
       },
       {
+        title: 'Copy data (TSV)',
+        icon: ICON_CLIPBOARD,
+        run: function (btn) {
+          // Emit one TSV row per data point. Series label first so a
+          // multi-series chart is still a single table; spreadsheet
+          // tools (Google Sheets, Numbers, Excel) all import TSV
+          // directly from clipboard.
+          var lines = ['series\tx\ty\tlabel'];
+          (self._series || []).forEach(function (s) {
+            var sLabel = s.label != null ? String(s.label) : '';
+            (s.data || []).forEach(function (p) {
+              var pLabel = p.label != null ? String(p.label).replace(/[\t\n\r]+/g, ' ') : '';
+              lines.push(sLabel + '\t' + p.x + '\t' + p.y + '\t' + pLabel);
+            });
+          });
+          __htmldocVisualTools.copyText(btn, lines.join('\n'), ICON_CLIPBOARD);
+        }
+      },
+      {
         title: 'Download as PNG',
         icon: ICON_CAMERA,
         run: function (btn) {
@@ -3215,8 +3234,13 @@ class HtmlDocDiagram extends HTMLElement {
     var src = srcNode ? srcNode.textContent.trim() : '';
     var caption = this.getAttribute('caption') || '';
     this.classList.add('hdd-wrap');
+    // Two stacked views: rendered SVG and the raw Mermaid source. The
+    // toolbar's first button toggles between them. Source is wrapped
+    // in a language-mermaid <code> so the existing Prism + line-number
+    // pipeline picks it up.
     this.innerHTML =
       '<div class="hdd-render" aria-label="Diagram loading">Rendering…</div>' +
+      '<pre class="hdd-source" hidden><code class="language-mermaid">' + escapeXml(src) + '</code></pre>' +
       (caption ? '<figcaption class="hdd-caption">' + escapeXml(caption) + '</figcaption>' : '');
     var renderHost = this.querySelector('.hdd-render');
     var self = this;
@@ -3242,20 +3266,24 @@ class HtmlDocDiagram extends HTMLElement {
     var caption = this.getAttribute('caption') || 'diagram';
     __htmldocVisualTools.makeToolbar(this, [
       {
+        title: 'Toggle source / render',
+        icon: ICON_BRACES,
+        run: function (btn) {
+          var showSource = !self.classList.contains('hdd-source-mode');
+          self.classList.toggle('hdd-source-mode', showSource);
+          var src = self.querySelector(':scope > .hdd-source');
+          var ren = self.querySelector(':scope > .hdd-render');
+          if (src) src.hidden = !showSource;
+          if (ren) ren.hidden = showSource;
+          btn.setAttribute('aria-pressed', showSource ? 'true' : 'false');
+          btn.title = showSource ? 'Show rendered diagram' : 'Show diagram source';
+        }
+      },
+      {
         title: 'Copy diagram source',
         icon: ICON_CLIPBOARD,
         run: function (btn) {
           __htmldocVisualTools.copyText(btn, self._src || '', ICON_CLIPBOARD);
-        }
-      },
-      {
-        title: 'Copy rendered SVG markup',
-        icon: ICON_BRACES,
-        run: function (btn) {
-          var svg = self.querySelector('.hdd-render svg');
-          if (!svg) { __htmldocVisualTools.flash(btn, 'fail', ICON_BRACES); return; }
-          var xml = new XMLSerializer().serializeToString(svg);
-          __htmldocVisualTools.copyText(btn, xml, ICON_BRACES);
         }
       },
       {
