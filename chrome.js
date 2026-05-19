@@ -2922,6 +2922,9 @@ class HtmlDocSnippet extends HTMLElement {
     // Trim a single leading newline if present (common in JSON-encoded multi-line strings)
     source = source.replace(/^\n/, '');
     var label = this.getAttribute('label') || 'Editable code · live preview';
+    var language = this.getAttribute('language') || 'html-css-js';
+    // Prism token: html-css-js → markup (handles <style>/<script> embedded).
+    var prismLang = language === 'html-css-js' ? 'markup' : language;
 
     this.classList.add('hds-wrap');
     this.innerHTML =
@@ -2930,27 +2933,61 @@ class HtmlDocSnippet extends HTMLElement {
         '<button type="button" class="hds-reset" aria-label="Reset to original">Reset</button>' +
       '</div>' +
       '<div class="hds-body">' +
-        '<textarea class="hds-editor" spellcheck="false" aria-label="Code"></textarea>' +
+        '<div class="hds-editor-wrap">' +
+          '<pre class="hds-editor-shadow" aria-hidden="true"><code class="language-' + prismLang + '"></code></pre>' +
+          '<textarea class="hds-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Code"></textarea>' +
+        '</div>' +
         '<iframe class="hds-preview" sandbox="allow-scripts" aria-label="Preview"></iframe>' +
       '</div>';
     var editor = this.querySelector('.hds-editor');
+    var shadow = this.querySelector('.hds-editor-shadow');
+    var shadowCode = shadow.querySelector('code');
     var preview = this.querySelector('.hds-preview');
     var reset = this.querySelector('.hds-reset');
     var original = source;
     editor.value = source;
+
+    function syncShadow() {
+      // Trailing newline + space so the cursor at the end of the last
+      // line has something to align over (otherwise Prism collapses).
+      var t = editor.value;
+      if (t.endsWith('\n')) t += ' ';
+      shadowCode.textContent = t;
+      if (typeof __prismLoader !== 'undefined') {
+        __prismLoader.load().then(function () {
+          if (window.Prism && typeof window.Prism.highlightElement === 'function') {
+            window.Prism.highlightElement(shadowCode);
+          }
+        });
+      }
+    }
+    function syncScroll() {
+      shadow.scrollTop = editor.scrollTop;
+      shadow.scrollLeft = editor.scrollLeft;
+    }
 
     var t = null;
     function render() {
       preview.srcdoc = editor.value;
     }
     editor.addEventListener('input', function () {
+      syncShadow();
+      syncScroll();
       if (t) clearTimeout(t);
       t = setTimeout(render, 220);
     });
+    editor.addEventListener('scroll', syncScroll);
+    // Resizing the textarea changes the wrap height; re-sync padding.
+    if (window.ResizeObserver) {
+      new ResizeObserver(syncScroll).observe(editor);
+    }
     reset.addEventListener('click', function () {
       editor.value = original;
+      syncShadow();
+      syncScroll();
       render();
     });
+    syncShadow();
     render();
   }
 }

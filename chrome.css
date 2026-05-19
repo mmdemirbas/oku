@@ -2199,20 +2199,65 @@ html-doc-snippet .hds-body {
   grid-template-columns: 1fr 1fr;
   min-height: 200px;
 }
-html-doc-snippet .hds-editor {
-  border: 0;
+/* Editor pane: a `<textarea>` overlaid on top of a Prism-highlighted
+   shadow `<pre><code>`. The textarea has transparent text + visible
+   caret; the shadow renders the colored tokens directly below. Both
+   share the exact same font/size/line-height/padding so glyphs align
+   per-pixel with what the user types. The textarea drives layout
+   (so resize: vertical works); the shadow is absolutely positioned
+   over the wrap and scroll-synced from the textarea. */
+html-doc-snippet .hds-editor-wrap {
+  position: relative;
   background: var(--surface);
-  color: var(--text);
-  font-family: 'JetBrains Mono', monospace;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+html-doc-snippet .hds-editor,
+html-doc-snippet .hds-editor-shadow {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12.5px;
   line-height: 1.55;
   padding: 12px 14px;
+  margin: 0;
+  border: 0;
+  letter-spacing: normal;
+  tab-size: 2;
+  white-space: pre;
+  word-spacing: normal;
+}
+html-doc-snippet .hds-editor {
+  display: block;
+  width: 100%;
+  min-height: 200px;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text);
   resize: vertical;
   outline: none;
-  border-right: 1px solid var(--border);
-  min-height: 200px;
+  position: relative;
+  z-index: 1;
+  /* Selection stays visible even with transparent text. */
+  -webkit-text-fill-color: transparent;
 }
-html-doc-snippet .hds-editor:focus { background: var(--surface-2); }
+html-doc-snippet .hds-editor::selection { background: var(--accent-soft); color: transparent; }
+html-doc-snippet .hds-editor-shadow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: auto;
+  /* Shadow gets the same scroll metrics as the textarea via JS sync. */
+  background: transparent;
+  color: var(--text);
+}
+html-doc-snippet .hds-editor-shadow code {
+  display: block;
+  background: transparent;
+  font: inherit;
+  padding: 0;
+  line-height: inherit;
+  white-space: pre;
+}
+html-doc-snippet .hds-editor-wrap:focus-within { background: var(--surface-2); }
 html-doc-snippet .hds-preview {
   background: white;
   border: 0;
@@ -2221,7 +2266,7 @@ html-doc-snippet .hds-preview {
 }
 @media (max-width: 700px) {
   html-doc-snippet .hds-body { grid-template-columns: 1fr; }
-  html-doc-snippet .hds-editor { border-right: 0; border-bottom: 1px solid var(--border); }
+  html-doc-snippet .hds-editor-wrap { border-right: 0; border-bottom: 1px solid var(--border); }
 }
 
 /* ============================================================
