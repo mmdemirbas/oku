@@ -58,6 +58,69 @@ const ICON_GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 /* Wrap toggle icon: horizontal line with a return arrow — visual cue
    that long lines wrap to the next line instead of scrolling. */
 const ICON_WRAP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 21 6"/><path d="M3 12h15a3 3 0 0 1 0 6h-4"/><polyline points="16 15 13 18 16 21"/><polyline points="3 18 10 18"/></svg>';
+/* Expand-to-fullscreen icon (Feather: maximize). Used by image / chart /
+   diagram / mermaid expand buttons — same affordance everywhere. */
+const ICON_EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+
+/* ============ Lightbox / fullscreen overlay ============ *
+ * A single shared overlay used by image, chart, diagram, and mermaid
+ * expand buttons. Open with __htmldocLightbox.open(content, { title })
+ * where `content` is an Element or HTML string. Returns immediately;
+ * the overlay traps focus until closed via Escape, the close button,
+ * or backdrop click. Same affordance everywhere — one mental model.
+ * ---------------------------------------------------------------- */
+var __htmldocLightbox = (function () {
+  var overlay = null;
+  var lastFocus = null;
+
+  function build() {
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.className = 'hdt-lightbox';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Expanded view');
+    overlay.innerHTML =
+      '<div class="hdt-lightbox-backdrop"></div>' +
+      '<div class="hdt-lightbox-frame">' +
+      '  <button type="button" class="hdt-lightbox-close" aria-label="Close" title="Close (Esc)">' + ICON_CROSS + '</button>' +
+      '  <div class="hdt-lightbox-content" tabindex="-1"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('.hdt-lightbox-backdrop').addEventListener('click', close);
+    overlay.querySelector('.hdt-lightbox-close').addEventListener('click', close);
+    document.addEventListener('keydown', function (e) {
+      if (!overlay.classList.contains('open')) return;
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+    });
+    return overlay;
+  }
+
+  function open(content, opts) {
+    var el = build();
+    var holder = el.querySelector('.hdt-lightbox-content');
+    holder.innerHTML = '';
+    if (content instanceof Node) holder.appendChild(content);
+    else holder.innerHTML = String(content || '');
+    if (opts && opts.title) el.setAttribute('aria-label', opts.title);
+    lastFocus = document.activeElement;
+    el.classList.add('open');
+    document.documentElement.classList.add('hdt-lightbox-open');
+    setTimeout(function () { holder.focus(); }, 0);
+  }
+
+  function close() {
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    document.documentElement.classList.remove('hdt-lightbox-open');
+    var holder = overlay.querySelector('.hdt-lightbox-content');
+    if (holder) holder.innerHTML = '';
+    if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+    lastFocus = null;
+  }
+
+  return { open: open, close: close };
+})();
 
 /* ============ Three-mode theme cycler (system → light → dark → system) ============ */
 function getThemeMode() {
@@ -383,6 +446,40 @@ function initReadingAids() {
             btn.classList.remove('error');
           }, 1500);
         });
+      });
+    });
+  })();
+
+  /* Expand affordance on content images. Hover reveals a small chip at
+     the image's top-right; click opens the image in the shared lightbox
+     overlay. Skip images inside hosts that own their own expand path
+     (charts, diagrams, tooltips, custom snippets). */
+  (function () {
+    if (!window.__htmldocLightbox) return;
+    var main = document.querySelector('#main-content') || document.body;
+    main.querySelectorAll('img').forEach(function (img) {
+      if (img.dataset.hdtExpandBound === '1') return;
+      if (img.closest('html-doc-chart, html-doc-diagram, html-doc-live-snippet, .html-doc-tooltip, .hdt-lightbox, page-chrome, page-nav, page-toc')) return;
+      if (img.width && img.width < 80) return;   // skip tiny inline glyphs
+      img.dataset.hdtExpandBound = '1';
+      // Wrap the image in a host so the chip can absolute-position over it.
+      var host = document.createElement('span');
+      host.className = 'hdt-img-host';
+      img.parentNode.insertBefore(host, img);
+      host.appendChild(img);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hdt-img-expand';
+      btn.innerHTML = ICON_EXPAND;
+      btn.title = 'Expand image';
+      btn.setAttribute('aria-label', 'Expand image');
+      host.appendChild(btn);
+      btn.addEventListener('click', function () {
+        var big = document.createElement('img');
+        big.src = img.currentSrc || img.src;
+        big.alt = img.alt || '';
+        big.className = 'hdt-lightbox-img';
+        __htmldocLightbox.open(big, { title: img.alt || 'Expanded image' });
       });
     });
   })();
@@ -2658,6 +2755,23 @@ class HtmlDocChart extends HTMLElement {
             .then(function () { __htmldocVisualTools.flash(btn, 'ok', ICON_CAMERA); })
             .catch(function () { __htmldocVisualTools.flash(btn, 'fail', ICON_CAMERA); });
         }
+      },
+      {
+        title: 'Expand to fullscreen',
+        icon: ICON_EXPAND,
+        run: function () {
+          var svg = self.querySelector('.hdc-svg');
+          if (!svg || !window.__htmldocLightbox) return;
+          var copy = svg.cloneNode(true);
+          // The cloned SVG has the chart's intrinsic dimensions; let the
+          // lightbox CSS scale it via max-width/max-height + viewBox so
+          // it fills the modal without overflowing.
+          copy.removeAttribute('width');
+          copy.removeAttribute('height');
+          copy.style.width = '100%';
+          copy.style.height = 'auto';
+          __htmldocLightbox.open(copy, { title: chartTitle });
+        }
       }
     ]);
   }
@@ -3353,6 +3467,20 @@ class HtmlDocDiagram extends HTMLElement {
           __htmldocVisualTools.svgToPng(svg, caption || 'diagram')
             .then(function () { __htmldocVisualTools.flash(btn, 'ok', ICON_CAMERA); })
             .catch(function () { __htmldocVisualTools.flash(btn, 'fail', ICON_CAMERA); });
+        }
+      },
+      {
+        title: 'Expand to fullscreen',
+        icon: ICON_EXPAND,
+        run: function () {
+          var svg = self.querySelector('.hdd-render svg');
+          if (!svg || !window.__htmldocLightbox) return;
+          var copy = svg.cloneNode(true);
+          copy.removeAttribute('width');
+          copy.removeAttribute('height');
+          copy.style.width = '100%';
+          copy.style.height = 'auto';
+          __htmldocLightbox.open(copy, { title: caption || 'Diagram' });
         }
       }
     ]);

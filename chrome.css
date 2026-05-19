@@ -554,6 +554,96 @@ pre.hdt-wrap > code .hdt-code-line {
   overflow-wrap: anywhere;
 }
 
+/* ============ Image expand affordance + shared lightbox ============ *
+ * Reveals a small chip on image hover; click opens the lightbox overlay.
+ * Same chip shape as .copy-btn / .hdt-wrap-btn so the affordance reads
+ * the same across code, image, chart, diagram. */
+.hdt-img-host {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+.hdt-img-host img { display: block; max-width: 100%; }
+.hdt-img-expand {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 30px; height: 30px;
+  background: var(--surface); color: var(--text-soft);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 0; cursor: pointer; opacity: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
+  backdrop-filter: blur(4px);
+}
+.hdt-img-expand svg { width: 14px; height: 14px; }
+.hdt-img-host:hover .hdt-img-expand,
+.hdt-img-host:focus-within .hdt-img-expand,
+.hdt-img-expand:focus-visible { opacity: 1; }
+.hdt-img-expand:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Lightbox overlay — full-viewport modal. Backdrop dims the page; the
+   frame centers content and provides a close button. Reused by image,
+   chart, diagram, and (future) mermaid expand actions. */
+.hdt-lightbox {
+  position: fixed; inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center; justify-content: center;
+}
+.hdt-lightbox.open { display: flex; }
+html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
+.hdt-lightbox-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(4px);
+  cursor: zoom-out;
+}
+.hdt-lightbox-frame {
+  position: relative;
+  max-width: 92vw; max-height: 92vh;
+  display: flex; flex-direction: column;
+  z-index: 1;
+}
+.hdt-lightbox-close {
+  position: absolute;
+  top: -44px; right: 0;
+  width: 36px; height: 36px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 0; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.hdt-lightbox-close:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.hdt-lightbox-close svg { width: 18px; height: 18px; }
+.hdt-lightbox-content {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 12px;
+  max-width: 92vw; max-height: 92vh;
+  outline: none;
+  overflow: auto;
+}
+.hdt-lightbox-content > img,
+.hdt-lightbox-content > svg,
+.hdt-lightbox-content > .hdt-lightbox-img {
+  display: block;
+  max-width: 100%;
+  max-height: 88vh;
+  width: auto; height: auto;
+  object-fit: contain;
+}
+
 /* Shared toolbar for diagrams + charts. Lives top-right of the host
    element; reveals on hover/focus-within. Each button is the same
    shape as .copy-btn for a single mental model. */

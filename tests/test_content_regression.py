@@ -320,6 +320,29 @@ class TestChromeKitMarkers:
             "single-source restore lives in chrome.js"
         )
 
+    def test_lightbox_module_exists(self, repo_root: Path) -> None:
+        """Shared lightbox overlay must exist + be wired to charts + diagrams.
+
+        Regression: user asked for a full-screen expand on images, charts,
+        diagrams (and later Mermaid). One shared overlay so the affordance
+        is identical everywhere.
+        """
+        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        assert "__htmldocLightbox" in js, "lightbox module missing"
+        assert ".hdt-lightbox" in css, "lightbox CSS missing"
+        assert "ICON_EXPAND" in js, "expand icon constant missing"
+        # Chart + diagram custom elements get the expand action in their
+        # toolbars; both call into __htmldocLightbox.open.
+        chart_expand = re.search(
+            r"makeToolbar\(this,\s*\[[\s\S]*?Expand to fullscreen[\s\S]*?\]\)",
+            js,
+        )
+        assert chart_expand, "Expand action missing from a custom element toolbar"
+        # Backdrop + Escape close paths.
+        assert "hdt-lightbox-backdrop" in js, "backdrop close target missing"
+        assert "e.key === 'Escape'" in js, "Escape close path missing"
+
     def test_annotated_code_markers_in_left_gutter(self, repo_root: Path) -> None:
         """Annotation markers must sit in a per-line LEFT gutter, not inline.
 
