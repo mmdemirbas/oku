@@ -412,6 +412,23 @@ function initReadingAids() {
       rowEls = Array.prototype.slice.call(table.querySelectorAll('tr'));
     }
 
+    /* Chip-filter columns are declared by the JSON renderer or by hand-
+       authored HTML as `<th data-filter="chips" data-values="a|b|c">`.
+       Cells in those columns may declare their own value set via
+       `<td data-values="security|perf">` (multi-valued) — chrome.js
+       reads both at init time so the chip rack and predicate use the
+       same source of truth as the rendered DOM. */
+    var chipCols = {};
+    var chipColLabels = {};
+    Array.prototype.forEach.call(table.querySelectorAll('thead th'), function (th, idx) {
+      if (th.getAttribute('data-filter') !== 'chips') return;
+      var raw = (th.getAttribute('data-values') || '').split('|').filter(Boolean);
+      if (!raw.length) return;
+      chipCols[idx] = { values: raw };
+      chipColLabels[idx] = (th.textContent || '').trim();
+    });
+    var hasChipCols = Object.keys(chipCols).length > 0;
+
     /* Classify every <tr> as either a "group" header or a data "row".
        Group detection:
          - tr.classList contains 'group' / 'group-header' / 'subhead'
@@ -445,10 +462,17 @@ function initReadingAids() {
         classes: classes,
       };
       var cellHtml = Array.prototype.map.call(tdList, function (td) { return td.innerHTML; });
+      // Per-cell chip values from `<td data-values="a|b">`. Null entries
+      // mean the cell did not declare a value set; the chip predicate
+      // falls back to the stripped cell text in that case.
+      var cellValues = Array.prototype.map.call(tdList, function (td) {
+        var dv = td.getAttribute('data-values');
+        return dv != null ? dv.split('|').filter(Boolean) : null;
+      });
       // Keep a reference to the live <tr> so renderTable can preserve
       // author-attached event listeners and nested interactive content
       // by re-attaching the element (instead of cloning innerHTML).
-      return { type: 'row', cells: cellHtml, iv: iv, el: tr };
+      return { type: 'row', cells: cellHtml, cellValues: cellValues, iv: iv, el: tr };
     }
 
     var entries = rowEls.map(classify).filter(Boolean);
@@ -460,7 +484,10 @@ function initReadingAids() {
     // (re)flows the three view containers via attribute selectors in the CSS.
     // Avoids the [hidden]-vs-display:grid conflict where the cards grid
     // remained visible behind the table.
-    wrap.className = 'hdt-table-wrap expanded';
+    // Start narrow — auto-fit logic below toggles `expanded` only when the
+    // table's natural width overflows the column. The first manual click
+    // on the expand button pins state and stops auto-toggling.
+    wrap.className = 'hdt-table-wrap';
     wrap.dataset.view = 'table';
 
     var ctrl = document.createElement('div');
@@ -479,12 +506,18 @@ function initReadingAids() {
       '<button data-view="cards" type="button" aria-pressed="false">Cards</button>' +
       '<span class="hdt-ctrl-sep" aria-hidden="true"></span>'
     ) : '';
+    // Stats span lives at the very right of the controls bar so the
+    // reader always knows how many rows they're looking at. Empty when
+    // canPivot is false (no headers → render() never runs, no count
+    // computation happens — markdown-style mini tables don't need it).
+    var statsHTML = canPivot ? '<span class="hdt-stats" aria-live="polite"></span>' : '';
     ctrl.innerHTML =
       filterInputHTML +
       viewBtns +
-      '<button data-expand type="button" class="active" aria-pressed="true" title="Toggle full-width / fit to column">' +
+      '<button data-expand type="button" aria-pressed="false" title="Toggle full-width / fit to column">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
-      '</button>';
+      '</button>' +
+      statsHTML;
 
     var scroll = document.createElement('div');
     scroll.className = 'hdt-table-scroll';
@@ -527,13 +560,54 @@ function initReadingAids() {
       var filterText = '';
       var tbody = table.querySelector('tbody') || table;
 
+      /* Chip state: per-column Set<value> of currently-active chips.
+         A row passes a column iff the cell's value set intersects
+         the active chip set (OR within column). Columns combine with
+         AND. Standard faceted-filter semantics. */
+      var chipsState = {};
+      Object.keys(chipCols).forEach(function (c) { chipsState[c] = new Set(); });
+
+      function hasActiveChips() {
+        for (var c in chipsState) {
+          if (chipsState[c] && chipsState[c].size > 0) return true;
+        }
+        return false;
+      }
+
+      function cellValuesFor(e, col) {
+        var declared = e.cellValues && e.cellValues[col];
+        if (declared) return declared;
+        // Fallback: treat the rendered cell text as a single value.
+        var txt = stripHtml(e.cells[col] || '').trim();
+        return txt ? [txt] : [];
+      }
+
+      function rowMatchesChips(e) {
+        for (var colS in chipsState) {
+          var st = chipsState[colS];
+          if (!st || st.size === 0) continue;
+          var vals = cellValuesFor(e, +colS);
+          var ok = false;
+          for (var i = 0; i < vals.length; i++) {
+            if (st.has(vals[i])) { ok = true; break; }
+          }
+          if (!ok) return false;
+        }
+        return true;
+      }
+
+      function rowMatchesText(e, needle) {
+        if (!needle) return true;
+        return e.cells.some(function (c) { return stripHtml(c).toLowerCase().indexOf(needle) !== -1; });
+      }
+
       function entriesMatchingFilter() {
-        if (!filterText) return entries;
-        var needle = filterText.toLowerCase();
+        if (!filterText && !hasActiveChips()) return entries;
+        var needle = filterText ? filterText.toLowerCase() : '';
         // Keep groups whose subsequent rows have at least one match.
         var visible = entries.map(function (e) {
           if (e.type === 'row') {
-            return e.cells.some(function (c) { return stripHtml(c).toLowerCase().indexOf(needle) !== -1; });
+            return rowMatchesText(e, needle) && rowMatchesChips(e);
           }
           return null; // groups decided below
         });
@@ -575,23 +649,73 @@ function initReadingAids() {
         return out;
       }
 
-      function renderTable(visible) {
+      /* Count rows that follow each group header within the visible
+         window. Returns { perGroup: Map<entry, number>, visibleRows }.
+         Computed once per render() so all three views agree. */
+      function entryCounts(visible) {
+        var perGroup = new Map();
+        var visibleRows = 0;
+        var cursor = null;
+        visible.forEach(function (e) {
+          if (e.type === 'group') {
+            cursor = e;
+            perGroup.set(e, 0);
+          } else {
+            visibleRows++;
+            if (cursor) perGroup.set(cursor, perGroup.get(cursor) + 1);
+          }
+        });
+        return { perGroup: perGroup, visibleRows: visibleRows };
+      }
+
+      function fmtGroupCount(n) {
+        return n === 1 ? '1 item' : (n + ' items');
+      }
+
+      /* Inject (or update) a count badge on a group <tr>'s first cell
+         in the source table. Idempotent — re-uses an existing badge.
+         The badge is a trailing span so author content in the title
+         survives intact. */
+      function badgeOnGroupRow(tr, n) {
+        if (!tr) return;
+        var cell = tr.querySelector(':scope > th, :scope > td');
+        if (!cell) return;
+        var badge = cell.querySelector(':scope > .hdt-group-count');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'hdt-group-count';
+          cell.appendChild(badge);
+        }
+        badge.textContent = fmtGroupCount(n);
+      }
+
+      function renderTable(visible, counts) {
         // Detach all existing rows from tbody; re-append in visible order.
         Array.prototype.slice.call(tbody.querySelectorAll(':scope > tr')).forEach(function (tr) {
           tr.parentNode.removeChild(tr);
         });
         visible.forEach(function (e) {
+          if (e.type === 'group') {
+            badgeOnGroupRow(e.el, counts.perGroup.get(e) || 0);
+          }
           if (e.el) tbody.appendChild(e.el);
         });
       }
 
-      function renderCards(visible) {
+      function renderCards(visible, counts) {
         cards.innerHTML = '';
         visible.forEach(function (e) {
           if (e.type === 'group') {
             var h = document.createElement('div');
             h.className = 'hdt-cards-group';
-            h.innerHTML = e.title;
+            var title = document.createElement('span');
+            title.className = 'hdt-group-title';
+            title.innerHTML = e.title;
+            var badge = document.createElement('span');
+            badge.className = 'hdt-group-count';
+            badge.textContent = fmtGroupCount(counts.perGroup.get(e) || 0);
+            h.appendChild(title);
+            h.appendChild(badge);
             cards.appendChild(h);
             return;
           }
@@ -611,27 +735,43 @@ function initReadingAids() {
         });
       }
 
-      function renderList(visible) {
+      function renderList(visible, counts) {
         list.innerHTML = '';
-        var rowsSinceGroup = 0;
         visible.forEach(function (e) {
           if (e.type === 'group') {
             var h = document.createElement('h4');
             h.className = 'hdt-list-group';
-            h.innerHTML = e.title;
+            var title = document.createElement('span');
+            title.className = 'hdt-group-title';
+            title.innerHTML = e.title;
+            var badge = document.createElement('span');
+            badge.className = 'hdt-group-count';
+            badge.textContent = fmtGroupCount(counts.perGroup.get(e) || 0);
+            h.appendChild(title);
+            h.appendChild(badge);
             list.appendChild(h);
-            rowsSinceGroup = 0;
             return;
           }
-          var inner = document.createElement('dl');
-          if (rowsSinceGroup > 0) inner.classList.add('hdt-list-sep');
-          rowsSinceGroup += 1;
+          /* Each row becomes its own 2-col <table class="hdt-list-card">.
+             First column = header (<th scope="row">), second column = cell
+             value (<td>). Makes the list view literally tabular per item
+             rather than a styled definition list. */
+          var inner = document.createElement('table');
+          inner.className = 'hdt-list-card';
+          var tb = document.createElement('tbody');
           e.cells.forEach(function (cell, i) {
             if (!headers[i]) return;
-            var dt = document.createElement('dt'); dt.innerHTML = headers[i];
-            var dd = document.createElement('dd'); dd.innerHTML = cell;
-            inner.appendChild(dt); inner.appendChild(dd);
+            var rowEl = document.createElement('tr');
+            var th = document.createElement('th');
+            th.setAttribute('scope', 'row');
+            th.innerHTML = headers[i];
+            var td = document.createElement('td');
+            td.innerHTML = cell;
+            rowEl.appendChild(th);
+            rowEl.appendChild(td);
+            tb.appendChild(rowEl);
           });
+          inner.appendChild(tb);
           if (e.iv.href) {
             var a = document.createElement('a');
             a.className = 'hdt-list-row';
@@ -645,9 +785,33 @@ function initReadingAids() {
             btn.appendChild(inner);
             list.appendChild(btn);
           } else {
-            list.appendChild(inner);
+            var wrapEl = document.createElement('div');
+            wrapEl.className = 'hdt-list-row hdt-list-row-static';
+            wrapEl.appendChild(inner);
+            list.appendChild(wrapEl);
           }
         });
+      }
+
+      /* Stats element lives in the controls bar (right side). Updated on
+         every render(); content depends on whether a filter (text or
+         chips) is currently narrowing the result set. */
+      var statsEl = ctrl.querySelector('.hdt-stats');
+      function updateStats(counts) {
+        if (!statsEl) return;
+        var n = counts.visibleRows;
+        var filtering = !!filterText || hasActiveChips();
+        if (!filtering) {
+          statsEl.textContent = n + (n === 1 ? ' row' : ' rows');
+          statsEl.classList.remove('hdt-stats-filtered', 'hdt-stats-empty');
+        } else if (n === 0) {
+          statsEl.textContent = 'No rows match';
+          statsEl.classList.add('hdt-stats-filtered', 'hdt-stats-empty');
+        } else {
+          statsEl.textContent = n + ' of ' + rowCount + (rowCount === 1 ? ' row' : ' rows');
+          statsEl.classList.add('hdt-stats-filtered');
+          statsEl.classList.remove('hdt-stats-empty');
+        }
       }
 
       function updateSortIndicators() {
@@ -665,10 +829,122 @@ function initReadingAids() {
 
       function render() {
         var v = entriesSorted(entriesMatchingFilter());
-        renderTable(v);
-        renderCards(v);
-        renderList(v);
+        var counts = entryCounts(v);
+        renderTable(v, counts);
+        renderCards(v, counts);
+        renderList(v, counts);
         updateSortIndicators();
+        updateStats(counts);
+        updateChipCounts();
+      }
+
+      /* Chip rack — one chip-group per filterable column. Sits between
+         the controls bar and the scroll viewport so it stays visible
+         while the user explores. Each chip is a toggle; clicking it
+         re-renders. Count badges show "if I add this chip alone (within
+         my current other-column filters), how many rows survive?" so
+         the user can see whether a chip will narrow or empty results. */
+      var chipsRack = null;
+      if (hasChipCols) {
+        chipsRack = document.createElement('div');
+        chipsRack.className = 'hdt-chips';
+        Object.keys(chipCols)
+          .sort(function (a, b) { return (+a) - (+b); })
+          .forEach(function (colS) {
+            var col = +colS;
+            var grp = document.createElement('div');
+            grp.className = 'hdt-chip-group';
+            grp.dataset.col = colS;
+            var lbl = document.createElement('span');
+            lbl.className = 'hdt-chip-label';
+            lbl.textContent = chipColLabels[col] + ':';
+            grp.appendChild(lbl);
+            chipCols[col].values.forEach(function (v) {
+              var btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'hdt-chip';
+              btn.dataset.value = v;
+              btn.setAttribute('aria-pressed', 'false');
+              var valSpan = document.createElement('span');
+              valSpan.className = 'hdt-chip-val';
+              valSpan.textContent = v;
+              var cntSpan = document.createElement('span');
+              cntSpan.className = 'hdt-chip-count';
+              btn.appendChild(valSpan);
+              btn.appendChild(cntSpan);
+              btn.addEventListener('click', function () {
+                var st = chipsState[col];
+                if (st.has(v)) {
+                  st.delete(v);
+                  btn.classList.remove('active');
+                  btn.setAttribute('aria-pressed', 'false');
+                } else {
+                  st.add(v);
+                  btn.classList.add('active');
+                  btn.setAttribute('aria-pressed', 'true');
+                }
+                grp.classList.toggle('has-active', st.size > 0);
+                render();
+              });
+              grp.appendChild(btn);
+            });
+            // Per-column clear button — only visible when any chip in
+            // the group is active. Hidden via CSS otherwise.
+            var clr = document.createElement('button');
+            clr.type = 'button';
+            clr.className = 'hdt-chip-clear';
+            clr.textContent = 'clear';
+            clr.addEventListener('click', function () {
+              chipsState[col].clear();
+              grp.querySelectorAll('.hdt-chip').forEach(function (b) {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+              });
+              grp.classList.remove('has-active');
+              render();
+            });
+            grp.appendChild(clr);
+            chipsRack.appendChild(grp);
+          });
+        wrap.insertBefore(chipsRack, scroll);
+      }
+
+      function updateChipCounts() {
+        if (!chipsRack) return;
+        var needle = filterText ? filterText.toLowerCase() : '';
+        chipsRack.querySelectorAll('.hdt-chip-group').forEach(function (grp) {
+          var col = +grp.dataset.col;
+          grp.querySelectorAll('.hdt-chip').forEach(function (btn) {
+            var v = btn.dataset.value;
+            var count = 0;
+            for (var i = 0; i < entries.length; i++) {
+              var e = entries[i];
+              if (e.type !== 'row') continue;
+              if (!rowMatchesText(e, needle)) continue;
+              // Apply chip filters for OTHER columns only — so the count
+              // reflects "what happens if I toggle this chip" rather than
+              // "current rows that have this value".
+              var pass = true;
+              for (var otherCol in chipsState) {
+                if (+otherCol === col) continue;
+                var st = chipsState[otherCol];
+                if (!st || st.size === 0) continue;
+                var ov = cellValuesFor(e, +otherCol);
+                var ok = false;
+                for (var k = 0; k < ov.length; k++) {
+                  if (st.has(ov[k])) { ok = true; break; }
+                }
+                if (!ok) { pass = false; break; }
+              }
+              if (!pass) continue;
+              var vals = cellValuesFor(e, col);
+              if (vals.indexOf(v) !== -1) count++;
+            }
+            var cnt = btn.querySelector('.hdt-chip-count');
+            if (cnt) cnt.textContent = String(count);
+            btn.classList.toggle('hdt-chip-empty', count === 0);
+          });
+        });
       }
 
       // Bind sort on every <th> in <thead>.
@@ -714,14 +990,48 @@ function initReadingAids() {
       render(); // initial: identity sort, no filter — preserves source order
     }
 
-    // Full-width toggle — default-on; this button toggles back to
-    // column-width for tables that look better narrow.
+    // Full-width toggle. Default state is decided by the auto-fit check
+    // below (expand iff the table overflows its column); the first manual
+    // click pins state via wrap.dataset.fitPinned so resize events stop
+    // overriding the user's choice.
     var expBtn = ctrl.querySelector('[data-expand]');
-    expBtn.addEventListener('click', function () {
-      var expanded = wrap.classList.toggle('expanded');
+    function applyExpanded(expanded) {
+      wrap.classList.toggle('expanded', expanded);
       expBtn.classList.toggle('active', expanded);
       expBtn.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+    }
+    expBtn.addEventListener('click', function () {
+      wrap.dataset.fitPinned = '1';
+      applyExpanded(!wrap.classList.contains('expanded'));
     });
+
+    /* Auto-fit: measure once collapsed; if the table's natural width
+       exceeds the column, expand. Re-measure on viewport resize until
+       the user pins manually. The measurement is double-rAF-deferred
+       so layout has settled (fonts, sticky headers, edge fades). */
+    function autoFit() {
+      if (wrap.dataset.fitPinned === '1') return;
+      // Force collapsed for the measurement; if the scroll viewport
+      // overflows in that state, we need the expanded mode.
+      var wasExpanded = wrap.classList.contains('expanded');
+      if (wasExpanded) wrap.classList.remove('expanded');
+      var overflowing = scroll.scrollWidth - scroll.clientWidth > 1;
+      applyExpanded(overflowing);
+    }
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(function () { requestAnimationFrame(autoFit); });
+    } else {
+      setTimeout(autoFit, 0);
+    }
+    if (window.ResizeObserver) {
+      var fitRO = new ResizeObserver(autoFit);
+      fitRO.observe(scroll);
+      // Also observe <main> (or the wrap's offsetParent) so column resizes
+      // — TOC toggle, window resize — trigger a re-measure.
+      if (wrap.parentElement) fitRO.observe(wrap.parentElement);
+    } else {
+      window.addEventListener('resize', autoFit);
+    }
   });
 
   /* Glossary tooltip — legacy v1 .g-wrap mobile tap support. The new

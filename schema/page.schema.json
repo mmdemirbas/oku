@@ -208,14 +208,11 @@
         "kind":    { "const": "table" },
         "headers": {
           "type": "array",
-          "items": { "$ref": "#/$defs/richString" }
+          "items": { "$ref": "#/$defs/tableHeader" }
         },
         "rows": {
           "type": "array",
-          "items": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/richString" }
-          },
+          "items": { "$ref": "#/$defs/tableRow" },
           "description": "Flat row form. Use either rows OR groups, not both."
         },
         "groups": {
@@ -228,16 +225,77 @@
               "title": { "$ref": "#/$defs/richString" },
               "rows":  {
                 "type": "array",
-                "items": {
-                  "type": "array",
-                  "items": { "$ref": "#/$defs/richString" }
-                }
+                "items": { "$ref": "#/$defs/tableRow" }
               }
             }
           },
           "description": "Grouped row form — chrome.js renders each group title as a subhead row across the views."
         }
       }
+    },
+
+    "tableHeader": {
+      "description": "Either a plain header label (string / inline-array) or an object form that declares chip-filtering for the column.",
+      "oneOf": [
+        { "$ref": "#/$defs/richString" },
+        {
+          "type": "object",
+          "required": ["label", "filter", "values"],
+          "additionalProperties": false,
+          "properties": {
+            "label":  { "$ref": "#/$defs/richString" },
+            "filter": { "const": "chips" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "description": "Ordered chip values. Cells in this column should declare one (or more) of these via the object cell form."
+            }
+          }
+        }
+      ]
+    },
+
+    "tableRow": {
+      "description": "Row payload — either a positional array of cells or an object with cells + optional row-level affordances (link target, classes).",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tableCell" }
+        },
+        {
+          "type": "object",
+          "required": ["cells"],
+          "additionalProperties": true,
+          "properties": {
+            "cells": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tableCell" }
+            }
+          }
+        }
+      ]
+    },
+
+    "tableCell": {
+      "description": "Either a plain rich-string value or an object form carrying explicit chip values (supports multi-valued cells).",
+      "oneOf": [
+        { "$ref": "#/$defs/richString" },
+        {
+          "type": "object",
+          "required": ["values"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "$ref": "#/$defs/richString" },
+            "values": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "description": "Chip values for this cell. May contain multiple to mark the row against more than one chip."
+            }
+          }
+        }
+      ]
     },
 
     "annotated-code": {

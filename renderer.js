@@ -360,6 +360,11 @@
       //   { headers: [...], groups: [{title, rows: [[...], ...]}, ...] }
       // The chrome.js post-processor (UX6) discovers groups by class /
       // colspan markers, so we emit those even from the JSON path.
+      //
+      // Header object form `{ label, filter: "chips", values: [...] }`
+      // and cell object form `{ value, values: [...] }` are surfaced as
+      // `data-filter` / `data-values` attributes so chrome.js can build
+      // the chip rack without re-reading the JSON.
       const table = document.createElement('table');
       const headers = block.headers || [];
       if (headers.length) {
@@ -367,7 +372,13 @@
         const tr = document.createElement('tr');
         for (const h of headers) {
           const th = document.createElement('th');
-          th.appendChild(this._renderRich(h));
+          if (h && typeof h === 'object' && !Array.isArray(h) && h.filter === 'chips') {
+            th.setAttribute('data-filter', 'chips');
+            if (Array.isArray(h.values)) th.setAttribute('data-values', h.values.join('|'));
+            th.appendChild(this._renderRich(h.label));
+          } else {
+            th.appendChild(this._renderRich(h));
+          }
           tr.appendChild(th);
         }
         thead.appendChild(tr);
@@ -375,6 +386,17 @@
       }
       const tbody = document.createElement('tbody');
       const cellCount = headers.length || 1;
+
+      const renderCell = (cell) => {
+        const td = document.createElement('td');
+        if (cell && typeof cell === 'object' && !Array.isArray(cell) && Array.isArray(cell.values)) {
+          td.setAttribute('data-values', cell.values.join('|'));
+          td.appendChild(this._renderRich(cell.value != null ? cell.value : cell.values.join(', ')));
+        } else {
+          td.appendChild(this._renderRich(cell));
+        }
+        return td;
+      };
 
       const renderRow = (row, opts) => {
         const tr = document.createElement('tr');
@@ -387,9 +409,7 @@
           tr.addEventListener('click', () => { window.location.href = opts.href; });
         }
         for (const cell of (row.cells || row)) {
-          const td = document.createElement('td');
-          td.appendChild(this._renderRich(cell));
-          tr.appendChild(td);
+          tr.appendChild(renderCell(cell));
         }
         tbody.appendChild(tr);
       };

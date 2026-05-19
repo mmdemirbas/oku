@@ -610,6 +610,92 @@ code:not(pre code) {
 .hdt-table-wrap[data-view="cards"] .hdt-table-scroll,
 .hdt-table-wrap[data-view="cards"] .hdt-table-list { display: none !important; }
 
+/* Chip filter rack — one .hdt-chip-group per filterable column. Each
+   chip is a toggle: clicking it adds/removes the value from the
+   column's active set. Active chips fill with the accent color; an
+   inline count badge previews how many rows would survive if that
+   chip alone were toggled (within current other-column filters). */
+.hdt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin: 0 0 12px 0;
+  padding: 8px 10px;
+  border: 1px dashed var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.hdt-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.hdt-chip-label {
+  font: 600 11px 'Inter', sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin-right: 2px;
+}
+.hdt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: 500 12px 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
+}
+.hdt-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.hdt-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.hdt-chip:active { transform: scale(0.97); }
+.hdt-chip.active {
+  background: var(--accent);
+  color: var(--surface);
+  border-color: var(--accent);
+}
+.hdt-chip-count {
+  font: 600 10.5px 'Inter', sans-serif;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  min-width: 14px;
+  text-align: center;
+}
+.hdt-chip.active .hdt-chip-count {
+  background: rgba(255,255,255,0.22);
+  color: inherit;
+}
+.hdt-chip.hdt-chip-empty {
+  opacity: 0.4;
+}
+.hdt-chip-clear {
+  display: none;
+  font: 500 11px 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.hdt-chip-group.has-active .hdt-chip-clear { display: inline-flex; }
+.hdt-chip-clear:hover { color: var(--accent-strong); background: var(--accent-soft); }
+
 .hdt-table-scroll {
   overflow-x: auto;
   /* Limit vertical height so sticky table headers have something to stick
@@ -700,49 +786,67 @@ a.hdt-card:focus-visible,
 }
 .hdt-card-val { display: block; font-size: 13.5px; color: var(--text); line-height: 1.45; }
 
-/* List view — dl per row, separated lines between rows.
+/* List view — every row is its own 2-col <table class="hdt-list-card">.
+   The first column is the header label; the second column is the cell
+   value. Same vocabulary as the main table, just rotated 90°.
    Group rows become section headings (.hdt-list-group) at the same
    visual weight as the cards-view group header. Rows that carry an
-   onclick/href become .hdt-list-row wrappers so the affordance moves
-   with the row across all three views. */
-.hdt-table-list dl { margin: 0; }
-.hdt-table-list dl.hdt-list-sep {
-  border-top: 1px solid var(--border-soft);
-  padding-top: 14px;
-  margin-top: 14px;
-}
+   onclick/href get wrapped in .hdt-list-row so the affordance moves
+   across all three views. */
+.hdt-table-list { display: flex; flex-direction: column; gap: 10px; }
 .hdt-list-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--accent-strong);
-  margin: 18px 0 8px 0;
+  margin: 18px 0 0 0;
   padding-bottom: 6px;
   border-bottom: 2px solid var(--accent-soft);
 }
 .hdt-list-group:first-child { margin-top: 0; }
-.hdt-table-list dt {
+.hdt-list-card {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.hdt-list-card > tbody > tr + tr > th,
+.hdt-list-card > tbody > tr + tr > td {
+  border-top: 1px solid var(--border-soft);
+}
+.hdt-list-card th[scope="row"] {
+  text-align: left;
+  vertical-align: top;
   font-size: 10.5px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--text-soft);
-  margin-top: 10px;
+  padding: 8px 12px;
+  width: 1%;
+  white-space: nowrap;
+  background: var(--surface-strong, var(--surface));
 }
-.hdt-table-list dt:first-child { margin-top: 0; }
-.hdt-table-list dd {
-  margin: 4px 0 0 0;
+.hdt-list-card td {
+  padding: 8px 12px;
   font-size: 14px;
   color: var(--text);
   line-height: 1.5;
+  vertical-align: top;
 }
 .hdt-list-row {
   display: block;
   text-decoration: none;
   color: inherit;
-  padding: 12px 14px;
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease;
 }
-.hdt-list-row:hover {
+.hdt-list-row.hdt-list-row-static { cursor: default; }
+.hdt-list-row:not(.hdt-list-row-static):hover {
   background: var(--accent-soft);
   transform: translateX(2px);
 }
@@ -750,16 +854,41 @@ a.hdt-card:focus-visible,
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.hdt-list-row > dl.hdt-list-sep {
-  border-top: none;
-  padding-top: 0;
-  margin-top: 0;
+
+/* Stats span — sits at the far right of the controls bar so the reader
+   always knows what they're looking at. Goes accent-strong while a
+   filter or chip set is narrowing the visible rows. */
+.hdt-stats {
+  margin-left: 8px;
+  font: 500 11px 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  transition: color 0.15s ease;
+  white-space: nowrap;
 }
-.hdt-list-row + .hdt-list-row > dl {
-  border-top: 1px solid var(--border-soft);
-  padding-top: 14px;
-  margin-top: 6px;
+.hdt-stats.hdt-stats-filtered { color: var(--accent-strong); }
+.hdt-stats.hdt-stats-empty { color: var(--text-soft); font-style: italic; }
+
+/* Group count badge — appended to a group row's first cell (table view)
+   and inside .hdt-cards-group / .hdt-list-group (cards + list views).
+   Same visual weight everywhere so the reader's eye learns it once. */
+.hdt-group-count {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font: 600 10.5px 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  vertical-align: baseline;
 }
+.hdt-cards-group .hdt-group-count,
+.hdt-list-group .hdt-group-count { margin-left: auto; }
+.hdt-cards-group, .hdt-list-group { justify-content: space-between; }
+.hdt-cards-group { display: flex; align-items: baseline; gap: 8px; }
+.hdt-group-title { display: inline; }
 
 /* ============ Synced highlight pairs · [data-bind] ============ *
  * Any two elements sharing `data-bind="<key>"` flash together when
