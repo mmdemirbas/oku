@@ -1,0 +1,320 @@
+"""Tests for the heavier build helpers: build_site, build_standalone,
+build_kit_bundle, and the kit-assets resolver.
+
+These touch real kit files (chrome.css etc.) under the repo's KIT_ROOT,
+so the tests assert on the wiring (right files copied, JSON inlined,
+pagefind body injected) rather than the content of the kit itself.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from html_doc import cli
+
+
+# Sample HTML stub matching templates/starter.html in shape.
+SAMPLE_STUB = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{title}</title>
+<link rel="stylesheet" href="_kit/chrome.css">
+<script src="_kit/chrome-boot.js"></script>
+<script src="_kit/chrome.js" defer></script>
+<script src="_kit/renderer.js" defer></script>
+</head>
+<body>
+<page-chrome></page-chrome>
+<div class="layout"><main id="main-content"></main></div>
+</body>
+</html>
+"""
+
+
+def _scaffold_project(root: Path, *, with_kit_json: bool = True) -> list[Path]:
+    """Lay out a minimal site under root: two HTML + sibling JSON pages,
+    optional kit.json. Returns the HTML source list.
+    """
+    docs = root
+    pages: list[Path] = []
+    for stem, title in (("index", "Index"), ("about", "About")):
+        (docs / f"{stem}.html").write_text(SAMPLE_STUB.format(title=title), encoding="utf-8")
+        (docs / f"{stem}.json").write_text(
+            json.dumps(
+                {
+                    "kind": "page",
+                    "title": title,
+                    "blocks": [
+                        {"kind": "section", "id": "x", "title": "X",
+                         "blocks": [{"kind": "paragraph", "content": f"Body of {title}"}]}
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        pages.append(docs / f"{stem}.html")
+    if with_kit_json:
+        (docs / "kit.json").write_text(
+            json.dumps({"name": "Test kit", "domains": []}), encoding="utf-8"
+        )
+    return pages
+
+
+# ---------- build_site ----------
+
+
+class TestBuildSite:
+    def test_copies_kit_chrome_files(self, tmp_path: Path) -> None:
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        src_root.mkdir()
+        pages = _scaffold_project(src_root)
+        cli.build_site(pages, out_dir, src_root)
+        for f in cli.KIT_FILES:
+            assert (out_dir / "_kit" / f).exists(), f"missing kit asset: {f}"
+
+    def test_copies_kit_registry_dirs_when_present(self, tmp_path: Path) -> None:
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        src_root.mkdir()
+        pages = _scaffold_project(src_root)
+        cli.build_site(pages, out_dir, src_root)
+        # At minimum schema/ is always shipped with the kit.
+        assert (out_dir / "_kit" / "schema").is_dir()
+
+    def test_copies_kit_json_and_manifest_when_present(self, tmp_path: Path) -> None:
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        src_root.mkdir()
+        pages = _scaffold_project(src_root)
+        # Pre-build manifest + llms so build_site copies them.
+        cli.build_manifest(src_root)
+        cli.build_llms_txt(src_root)
+        cli.build_site(pages, out_dir, src_root)
+        assert (out_dir / "kit.json").exists()
+        assert (out_dir / "site-manifest.json").exists()
+        assert (out_dir / "site-manifest.js").exists()
+        assert (out_dir / "llms.txt").exists()
+
+    def test_copies_html_and_json_pages(self, tmp_path: Path) -> None:
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        src_root.mkdir()
+        pages = _scaffold_project(src_root, with_kit_json=False)
+        cli.build_site(pages, out_dir, src_root)
+        assert (out_dir / "index.html").exists()
+        assert (out_dir / "index.json").exists()
+        assert (out_dir / "about.html").exists()
+        assert (out_dir / "about.json").exists()
+
+    def test_injects_pagefind_body_into_each_html(self, tmp_path: Path) -> None:
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        src_root.mkdir()
+        pages = _scaffold_project(src_root, with_kit_json=False)
+        cli.build_site(pages, out_dir, src_root)
+        body = (out_dir / "index.html").read_text(encoding="utf-8")
+        # The pagefind block uses data-pagefind-body and carries the page title
+        # plus extracted text.
+        assert "data-pagefind-body" in body
+        assert "Body of Index" in body
+        assert 'data-pagefind-meta="title"' in body
+        # The original kit references remain untouched (no inlining at this
+        # step — that's build_standalone's job).
+        assert '_kit/chrome.css' in body
+
+    def test_preserves_nested_directory_structure(self, tmp_path: Path) -> None:
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        (src_root / "guides").mkdir(parents=True)
+        (src_root / "guides" / "intro.html").write_text(
+            SAMPLE_STUB.format(title="Intro"), encoding="utf-8"
+        )
+        (src_root / "guides" / "intro.json").write_text(
+            json.dumps({"kind": "page", "title": "Intro", "blocks": []}), encoding="utf-8"
+        )
+        cli.build_site([src_root / "guides" / "intro.html"], out_dir, src_root)
+        assert (out_dir / "guides" / "intro.html").exists()
+        assert (out_dir / "guides" / "intro.json").exists()
+
+
+# ---------- build_kit_bundle ----------
+
+
+class TestBuildKitBundle:
+    def test_returns_none_without_kit_json(self, tmp_path: Path) -> None:
+        assert cli.build_kit_bundle(tmp_path) is None
+
+    def test_returns_json_blob_with_kit_block(self, tmp_path: Path) -> None:
+        (tmp_path / "kit.json").write_text(
+            json.dumps({"name": "X", "domains": []}), encoding="utf-8"
+        )
+        blob = cli.build_kit_bundle(tmp_path)
+        assert isinstance(blob, str)
+        parsed = json.loads(blob)
+        assert parsed["kit"]["name"] == "X"
+        assert "glossary" in parsed
+        assert "extrefs" in parsed
+
+    def test_skips_unknown_domains_gracefully(self, tmp_path: Path) -> None:
+        # Reference a domain that doesn't exist in the kit — bundle skips
+        # silently rather than raising.
+        (tmp_path / "kit.json").write_text(
+            json.dumps({"name": "X", "domains": ["nonexistent-domain"]}),
+            encoding="utf-8",
+        )
+        blob = cli.build_kit_bundle(tmp_path)
+        parsed = json.loads(blob)
+        assert parsed["glossary"] == {}
+        assert parsed["extrefs"] == {}
+
+    def test_includes_real_domain_entries(self, tmp_path: Path) -> None:
+        # web/ is one of the kit's bundled glossary domains; assert its
+        # entries surface when declared.
+        (tmp_path / "kit.json").write_text(
+            json.dumps({"name": "X", "domains": ["web"]}), encoding="utf-8"
+        )
+        blob = cli.build_kit_bundle(tmp_path)
+        parsed = json.loads(blob)
+        assert "web" in parsed["glossary"]
+        assert parsed["glossary"]["web"]  # non-empty
+
+
+# ---------- build_standalone ----------
+
+
+class TestBuildStandalone:
+    def test_inlines_css_and_scripts(self, tmp_path: Path) -> None:
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        src_root.mkdir()
+        pages = _scaffold_project(src_root)
+        cli.build_standalone(pages, out_dir, src_root)
+        body = (out_dir / "index.html").read_text(encoding="utf-8")
+        # External kit references gone — replaced with inline <style>/<script>.
+        assert 'href="_kit/chrome.css"' not in body
+        assert 'src="_kit/chrome.js"' not in body
+        assert "<style>" in body
+        # Each kit script tag becomes <script>...</script> (count covers boot,
+        # main, renderer, plus the inlined JSON tags).
+        assert body.count("<script>") >= 3
+
+    def test_inlines_page_json(self, tmp_path: Path) -> None:
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        src_root.mkdir()
+        pages = _scaffold_project(src_root)
+        cli.build_standalone(pages, out_dir, src_root)
+        body = (out_dir / "index.html").read_text(encoding="utf-8")
+        # autoBoot looks for this id; missing → standalone is dead on arrival.
+        assert 'id="__htmldoc_page__"' in body
+        assert "Body of Index" in body
+
+    def test_escapes_closing_script_tag_in_json(self, tmp_path: Path) -> None:
+        # JSON content that literally contains "</script" would close the
+        # inline tag early; the build must escape it.
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        src_root.mkdir()
+        (src_root / "tricky.html").write_text(SAMPLE_STUB.format(title="T"), encoding="utf-8")
+        (src_root / "tricky.json").write_text(
+            json.dumps(
+                {
+                    "kind": "page",
+                    "title": "T",
+                    "blocks": [
+                        {
+                            "kind": "section", "id": "x", "title": "X",
+                            "blocks": [
+                                {"kind": "code", "language": "html",
+                                 "source": "<script>alert(1)</script>"}
+                            ],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        cli.build_standalone([src_root / "tricky.html"], out_dir, src_root)
+        body = (out_dir / "tricky.html").read_text(encoding="utf-8")
+        # The inlined JSON block should NOT contain a raw </script that
+        # would terminate the surrounding inline script tag.
+        json_block_start = body.index('id="__htmldoc_page__"')
+        json_block_end = body.index("</script>", json_block_start)
+        json_segment = body[json_block_start:json_block_end]
+        assert "</script" not in json_segment
+
+    def test_inlines_kit_bundle_when_kit_json_present(self, tmp_path: Path) -> None:
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        src_root.mkdir()
+        pages = _scaffold_project(src_root, with_kit_json=True)
+        cli.build_standalone(pages, out_dir, src_root)
+        body = (out_dir / "index.html").read_text(encoding="utf-8")
+        # __htmldoc_kit_bundle__ surfaces when kit.json exists and the
+        # bundle has at least the kit block.
+        assert 'id="__htmldoc_kit_bundle__"' in body
+
+    def test_preserves_nested_directory_structure(self, tmp_path: Path) -> None:
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        (src_root / "guides").mkdir(parents=True)
+        (src_root / "guides" / "intro.html").write_text(
+            SAMPLE_STUB.format(title="Intro"), encoding="utf-8"
+        )
+        (src_root / "guides" / "intro.json").write_text(
+            json.dumps({"kind": "page", "title": "Intro", "blocks": []}), encoding="utf-8"
+        )
+        cli.build_standalone([src_root / "guides" / "intro.html"], out_dir, src_root)
+        assert (out_dir / "guides" / "intro.html").exists()
+
+
+# ---------- _kit_assets_dir ----------
+
+
+class TestKitAssetsResolver:
+    def test_dev_layout_returns_repo_root(self, repo_root: Path) -> None:
+        # In the dev checkout, chrome.css lives at the repo root. The
+        # production resolver should land there.
+        assert (cli._kit_assets_dir() / "chrome.css").exists()
+
+    def test_resolver_walks_up_through_src(self, repo_root: Path) -> None:
+        # The cli module lives at src/html_doc/cli.py; the resolver should
+        # find chrome.css + schema/ at the repo root, not at src/.
+        resolved = cli._kit_assets_dir()
+        # Must be a directory containing both chrome.css AND schema/.
+        assert (resolved / "chrome.css").exists()
+        assert (resolved / "schema").is_dir()
+
+
+# ---------- validate_pages (soft-import jsonschema gate) ----------
+
+
+jsonschema = pytest.importorskip("jsonschema")
+
+
+class TestValidatePages:
+    def test_clean_pages_return_empty_errors(self, tmp_path: Path) -> None:
+        good = tmp_path / "good.json"
+        good.write_text(
+            json.dumps({"kind": "page", "title": "Good", "blocks": []}), encoding="utf-8"
+        )
+        pages = [(good, json.loads(good.read_text(encoding="utf-8")))]
+        # When jsonschema is installed, validate_pages walks each page;
+        # the empty list means no errors.
+        assert cli.validate_pages(pages) == []
+
+    def test_returns_errors_for_invalid_page(self, tmp_path: Path) -> None:
+        bad = tmp_path / "bad.json"
+        # Missing required "title" on the root page schema.
+        bad.write_text(json.dumps({"kind": "page", "blocks": []}), encoding="utf-8")
+        pages = [(bad, json.loads(bad.read_text(encoding="utf-8")))]
+        errors = cli.validate_pages(pages)
+        assert errors  # at least one issue surfaced
+        path, msg = errors[0]
+        assert path == bad
+        assert isinstance(msg, str) and msg

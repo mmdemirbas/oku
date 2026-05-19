@@ -26,7 +26,6 @@ import os
 import queue
 import re
 import shutil
-import socketserver
 import subprocess
 import sys
 import threading
@@ -263,13 +262,20 @@ def _flatten_inline(content) -> str:
         body = content.get('text') or content.get('content', '')
         body = _flatten_inline(body)
         href = content.get('href') or content.get('link', '')
-        if kind in ('em', 'i'):       return '*' + body + '*'
-        if kind in ('strong', 'b'):   return '**' + body + '**'
-        if kind == 'code':            return '`' + body + '`'
-        if kind == 'link':            return f'[{body}]({href})' if href else body
-        if kind == 'ext-ref':         return f'[{body}]({href})' if href else body
-        if kind == 'glossary-term':   return body
-        if kind == 'br':              return '\n'
+        if kind in ('em', 'i'):
+            return '*' + body + '*'
+        if kind in ('strong', 'b'):
+            return '**' + body + '**'
+        if kind == 'code':
+            return '`' + body + '`'
+        if kind == 'link':
+            return f'[{body}]({href})' if href else body
+        if kind == 'ext-ref':
+            return f'[{body}]({href})' if href else body
+        if kind == 'glossary-term':
+            return body
+        if kind == 'br':
+            return '\n'
         return body
     return str(content)
 
@@ -399,8 +405,10 @@ def _md_block(block: dict, depth: int = 0) -> list[str]:
         for card in (block.get('cards') or block.get('cols') or block.get('items') or []):
             t = _flatten_inline(card.get('title', ''))
             body = _flatten_inline(card.get('content') or card.get('summary') or '')
-            if t:    out.append('### ' + t)
-            if body: out.append(body)
+            if t:
+                out.append('### ' + t)
+            if body:
+                out.append(body)
         return out
 
     if kind == 'step-flow':
@@ -832,7 +840,7 @@ def cmd_build(args: argparse.Namespace) -> int:
 
     # Pagefind search index — soft-fail if pagefind isn't installed.
     if pagefind_index(site):
-        print(f'✓ Pagefind index built: dist/site/pagefind/')
+        print('✓ Pagefind index built: dist/site/pagefind/')
 
     print(f'✓ Built {len(srcs)} HTML file(s):')
     print()
@@ -1162,10 +1170,10 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
     print(f'✓ Serving {root} on http://localhost:{port}')
     if watch_enabled:
-        print(f'  Live reload: on  (SSE at /__reload — disable with --no-watch)')
+        print('  Live reload: on  (SSE at /__reload — disable with --no-watch)')
     else:
-        print(f'  Live reload: off')
-    print(f'  Stop with Ctrl-C.')
+        print('  Live reload: off')
+    print('  Stop with Ctrl-C.')
     print()
     target = _pick_open_target(htmls, user_cwd, root)
     if htmls:
