@@ -98,6 +98,43 @@ Playwright tests under `tests/browser/` (not yet wired — install
 layer, the rule is: a bug found by the user must have a test that
 fails before the fix and passes after.
 
+## UI invariants — numeric, enforced
+
+Four rules that prevent the regression class the user has had to
+correct repeatedly. Each is phrased as a binary numeric invariant so
+a test can assert it. "Looks right" is not an acceptable
+formulation — if you can't state the rule as a `boundingBox` /
+computed-style assertion, the rule isn't found yet.
+
+1. **Sidebar surface always spans the visible viewport.** If a sidebar
+   exists, its background+border extends from `y=0` to `y=innerHeight`
+   at every scroll position and on every page. Content inside may
+   overflow with its own scrollbar, but the surface never ends
+   mid-page. Numeric: `page-nav.boundingBox.height === innerHeight`
+   (±1px). Set `height: 100vh` AND `height: 100dvh` — `max-height`
+   alone lets content shrink the element.
+
+2. **Hidden modes have a visible reveal.** Collapsed sidebars, closed
+   drawers, hidden details — every hidden state keeps a clickable
+   affordance visible. No invisible-toggle states. Numeric: the rail
+   (collapsed sidebar) is ≥ 18px wide and click-targetable; the
+   reveal control's `boundingBox` is non-zero and inside the
+   viewport.
+
+3. **Layout invariants are numeric, not eyeball.** Anything you would
+   state as "X should look right" can be phrased as a numeric
+   assertion: bounding-box position, dimension, or computed style.
+   If you can't phrase it numerically, you haven't found the rule
+   yet. Don't ship a "fix" backed only by a screenshot — the
+   screenshot is evidence, not the rule.
+
+4. **Browser-verify before claiming "fixed".** Pytest is necessary,
+   not sufficient. UI changes get opened in a real browser via
+   Playwright at desktop AND ~360px width; the relevant
+   `boundingBox` figures land in the commit message body as the
+   verification record. The record is the proof — no record means
+   no verification.
+
 ## Common pitfalls
 
 - **Stale chrome.js in the browser.** The CDN-loaded Prism autoloader
