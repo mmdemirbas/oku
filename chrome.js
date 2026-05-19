@@ -3507,12 +3507,53 @@ class HtmlDocAnnotatedCode extends HTMLElement {
       });
     }
 
-    // Highlight via Prism if available + the code has a language; otherwise
-    // inject markers immediately on the plain-text code.
+    /* Build the per-line marker gutter: each .hdt-code-line gets a slot
+       at the start (column 1 of a 2-column grid; code at column 2). Empty
+       for unannotated lines; populated by extractMarkers. */
+    function prepareLineSlots() {
+      var c = self.querySelector('pre code');
+      if (!c) return;
+      if (!c.querySelector(':scope > .hdt-code-line')) {
+        _hdtWrapCodeLines(c);
+      }
+      var lines = c.querySelectorAll(':scope > .hdt-code-line');
+      lines.forEach(function (line) {
+        if (line.querySelector(':scope > .hdc-anno-line-marker')) return;
+        var slot = document.createElement('span');
+        slot.className = 'hdc-anno-line-marker';
+        slot.setAttribute('aria-hidden', 'true');
+        line.insertBefore(slot, line.firstChild);
+      });
+      self.classList.add('hdc-anno-gutter-on');
+    }
+
+    /* After markers are injected inline (within the now per-line spans),
+       MOVE each marker into its line's slot. The reader scans the gutter
+       once; no eye-saccade across the code to find a `(N)` mid-line. */
+    function moveMarkersToSlots() {
+      var inline = self.querySelectorAll('pre code .hdc-anno-marker');
+      Array.prototype.forEach.call(inline, function (btn) {
+        var line = btn.closest('.hdt-code-line');
+        if (!line) return;
+        var slot = line.querySelector(':scope > .hdc-anno-line-marker');
+        if (slot && btn.parentElement !== slot) slot.appendChild(btn);
+      });
+    }
+
+    /* Order matters: WRAP lines first, THEN inject markers + move into
+       slots. The previous order (inject → wrap → move) lost button
+       handlers because _hdtWrapCodeLines clones-then-clears the code's
+       children; the new buttons in the wrapped lines would be cloneless
+       copies with no listeners. */
+    function buildMarkers() {
+      prepareLineSlots();
+      injectMarkers();        // walks text nodes inside per-line spans
+      moveMarkersToSlots();
+    }
     if (lang && typeof __prismLoader !== 'undefined') {
-      __prismLoader.highlightAll(this).then(function () { setTimeout(injectMarkers, 0); });
+      __prismLoader.highlightAll(this).then(function () { setTimeout(buildMarkers, 0); });
     } else {
-      injectMarkers();
+      buildMarkers();
     }
   }
 }

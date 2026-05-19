@@ -320,6 +320,44 @@ class TestChromeKitMarkers:
             "single-source restore lives in chrome.js"
         )
 
+    def test_annotated_code_markers_in_left_gutter(self, repo_root: Path) -> None:
+        """Annotation markers must sit in a per-line LEFT gutter, not inline.
+
+        Regression: the original `<html-doc-annotated-code>` placed `(1)`,
+        `(2)` markers inline within the code text. The reader had to scan
+        each line to find them. User asked for markers BEFORE the line,
+        vertically aligned, so the eye can find every annotated line at a
+        glance.
+
+        Enforce by checking:
+        - chrome.js builds the per-line slot (`hdc-anno-line-marker`) AND
+          moves markers from inline into those slots.
+        - chrome.css positions the slot as a left gutter via absolute
+          positioning + reserved padding on the pre.
+        """
+        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        # JS marker construction + extraction.
+        assert "hdc-anno-line-marker" in js, "per-line marker slot missing"
+        assert "prepareLineSlots" in js or "hdc-anno-gutter-on" in js, (
+            "slot prep step missing — annotated lines won't get gutter slots"
+        )
+        assert "moveMarkersToSlots" in js or "slot.appendChild(btn)" in js, (
+            "marker-move-to-slot step missing — markers will stay inline"
+        )
+        # CSS positions the slot to the LEFT of code (negative left:) and
+        # reserves padding on the pre to make room.
+        assert ".hdc-anno-line-marker" in css, "marker slot styling missing"
+        slot_rule = re.search(
+            r"\.hdc-anno-wrap\.hdc-anno-gutter-on\s+\.hdc-anno-line-marker\s*\{([^}]+)\}",
+            css,
+        )
+        assert slot_rule, "scoped slot rule missing"
+        assert "position: absolute" in slot_rule.group(1), (
+            "marker slot must be absolutely positioned so it doesn't break the "
+            "inline flow of Prism token spans on each line"
+        )
+
     def test_list_view_items_visually_separated(self, repo_root: Path) -> None:
         """List-view items must have clear visual separation.
 

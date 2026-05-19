@@ -1260,6 +1260,37 @@ html-doc-annotated-code > pre {
   box-shadow: 0 0 0 3px var(--accent-soft);
   outline: none;
 }
+/* Per-line gutter slot for annotation markers. The .hdt-code-line stays
+   in its native inline-flow (so Prism's token spans keep their layout),
+   while the marker slot is absolutely positioned at the line's left
+   edge. The pre gets padding-left to reserve space for the slot column.
+   Empty slot for unannotated lines; populated for annotated ones.
+   Reader scans the gutter once to find every annotated line, no in-line
+   saccade. Markers stay clickable but exit copy-paste (slot is
+   user-select:none). */
+.hdc-anno-wrap.hdc-anno-gutter-on pre { padding-left: 38px; }
+.hdc-anno-wrap.hdc-anno-gutter-on pre code .hdt-code-line {
+  position: relative;
+  display: block;
+}
+.hdc-anno-wrap.hdc-anno-gutter-on .hdc-anno-line-marker {
+  position: absolute;
+  left: -28px;
+  top: 0;
+  width: 22px;
+  height: 1.55em;             /* matches pre's line-height */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;       /* enabled per-marker via .hdc-anno-marker */
+}
+.hdc-anno-wrap.hdc-anno-gutter-on .hdc-anno-line-marker .hdc-anno-marker {
+  margin: 0;
+  pointer-events: auto;
+}
+
 .hdc-anno-list {
   list-style: none;
   margin: 0;
