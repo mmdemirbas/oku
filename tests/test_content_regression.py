@@ -255,28 +255,39 @@ class TestChromeKitMarkers:
         )
 
     def test_chrome_css_has_code_lang_pill_top_left(self, repo_root: Path) -> None:
-        """Language pill sits top-left so the chrome bar owns top-right.
+        """Language pill is a top-left label tab — above the block boundary.
 
-        Regression: the pill previously rendered at top-right and stacked
-        next to the copy button. User asked for top-left. Verify both the
-        base rule positions with `left:` (not `right:`) AND the line-
-        numbered override clears the gutter.
+        Regression history:
+        - First, pill was at top-right next to copy button (user asked
+          for top-left).
+        - Then, pill was at top:8px inside the pre's padding, which
+          visually overlapped the first character of the first code line.
+        - Now, pill floats half above the pre's top border (top: -8px)
+          so it never overlaps any code regardless of gutter width or
+          first-line content.
+
+        Verify the base rule positions with `left:` AND a negative `top:`
+        so the pill sits as a label tab on the corner, not inside the
+        code area.
         """
         css = (repo_root / "chrome.css").read_text(encoding="utf-8")
         assert ".hdt-code-lang" in css, "code-block language pill rule missing"
-        # Base rule.
-        m = re.search(
-            r"pre\s*>\s*\.hdt-code-lang\s*\{([^}]+)\}", css
-        )
+        m = re.search(r"pre\s*>\s*\.hdt-code-lang\s*\{([^}]+)\}", css)
         assert m, "base `pre > .hdt-code-lang` rule missing"
         block = m.group(1)
         assert "left:" in block, "lang pill must use left: (top-left)"
         assert "right:" not in block, (
             "lang pill must not use right: — top-right belongs to the chrome bar"
         )
-        # Line-numbered override.
-        assert "pre.hdt-line-numbered > .hdt-code-lang" in css, (
-            "missing override that shifts the pill past the line-number gutter"
+        # Pill must straddle the top edge (negative `top:`) so it never
+        # overlaps code horizontally regardless of gutter or line length.
+        top_match = re.search(r"top:\s*(-?\d+)px", block)
+        assert top_match, "lang pill must declare a top: value"
+        top_px = int(top_match.group(1))
+        assert top_px <= 0, (
+            f"lang pill top: {top_px}px sits INSIDE the pre's padding — "
+            "it overlaps code on the first line. Use a negative value so "
+            "the pill floats above the block boundary like a label tab."
         )
 
     def test_sidebar_default_expanded_on_first_visit(self, repo_root: Path) -> None:
