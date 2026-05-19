@@ -1340,6 +1340,19 @@ function _hdtAfterPrismHighlight(env) {
     });
   }
   var lang = (code.className.match(/language-([\w-]+)/) || [0, ''])[1].toLowerCase();
+  // Stamp a small language pill on the pre so the reader sees what
+  // dialect they're looking at. Idempotent — re-runs replace the text
+  // rather than appending duplicates.
+  if (lang && lang !== 'plaintext' && lang !== 'text' && lang !== 'none') {
+    var pill = pre.querySelector(':scope > .hdt-code-lang');
+    if (!pill) {
+      pill = document.createElement('span');
+      pill.className = 'hdt-code-lang';
+      pill.setAttribute('aria-hidden', 'true');
+      pre.appendChild(pill);
+    }
+    pill.textContent = lang;
+  }
   if (/^(js|javascript|ts|typescript|jsx|tsx|json|json5|css|scss|less)$/.test(lang)) {
     var folds = _hdtDetectBraceFolds(code);
     if (folds.length) _hdtApplyFolds(pre, code, folds);
@@ -3571,10 +3584,21 @@ class PageNav extends HTMLElement {
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', adopt);
       } else {
-        // Microtask so page-toc connectedCallback can finish first.
         Promise.resolve().then(adopt);
       }
     }
+    // Click-anywhere-on-the-rail to expand when collapsed. The whole
+    // page-nav becomes the click target; the top-left chrome button
+    // still toggles too. position: relative on the host so the ::after
+    // chevron can absolute-position inside it.
+    this.style.position = this.style.position || 'sticky';
+    this.addEventListener('click', function (e) {
+      if (!document.body.classList.contains('sidebar-collapsed')) return;
+      // Avoid swallowing clicks on inner content (won't be reachable
+      // anyway since visibility: hidden, but defensive).
+      if (e.target && e.target.closest('a, button, input, select')) return;
+      if (typeof toggleTOC === 'function') toggleTOC();
+    });
     // Close mobile drawer on Esc
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') self.classList.remove('open');
