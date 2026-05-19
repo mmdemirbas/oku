@@ -309,6 +309,26 @@ class TestChromeKitMarkers:
             "single-source restore lives in chrome.js"
         )
 
+    def test_code_block_has_wrap_toggle(self, repo_root: Path) -> None:
+        """Every <pre> gets a wrap toggle button next to copy.
+
+        Regression: long lines (URLs, generated tokens, JSON one-liners)
+        force a horizontal scrollbar by default. The wrap toggle lets the
+        reader flip a block to `white-space: pre-wrap` per-block. Symbol-
+        only icon (Feather wrap-line); sits 8px to the left of the copy
+        button on the same row.
+        """
+        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        assert "ICON_WRAP" in js, "wrap button needs a dedicated icon constant"
+        assert "hdt-wrap-btn" in js, "wrap button must be created in chrome.js"
+        assert ".hdt-wrap-btn" in css, "wrap button styling missing"
+        # Toggled state must flip white-space on the inner <code>.
+        assert "pre.hdt-wrap" in css, "wrap state class missing"
+        assert "white-space: pre-wrap" in css, (
+            "wrap state must flip white-space to pre-wrap so long lines wrap"
+        )
+
     def test_fold_markers_separate_from_line_numbers(self, repo_root: Path) -> None:
         """Fold handles must be their own gutter column, IDE-style.
 

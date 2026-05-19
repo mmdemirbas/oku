@@ -522,6 +522,36 @@ pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
 .copy-btn.copied { color: var(--success); border-color: var(--success); background: var(--success-soft); }
 .copy-btn.error  { color: var(--danger);  border-color: var(--danger);  background: var(--danger-soft); }
 
+/* Wrap toggle — same shape and reveal behaviour as .copy-btn, sits to
+   its left. Active state (line wrapping on) tints the button so the
+   reader can see at a glance whether the current block is in wrap mode. */
+.hdt-wrap-btn {
+  position: absolute; top: 8px; right: 46px;  /* 8 + 30 (copy) + 8 gap */
+  width: 30px; height: 30px;
+  background: var(--surface); color: var(--text-soft);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 0; cursor: pointer; opacity: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
+}
+.hdt-wrap-btn svg { width: 14px; height: 14px; }
+pre:hover .hdt-wrap-btn, .hdt-wrap-btn:focus-visible, .hdt-wrap-btn.active { opacity: 1; }
+.hdt-wrap-btn:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
+.hdt-wrap-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+/* Wrap-on state — flip horizontal scroll into wrapping. Apply to the
+   <code> element so the gutter (a sibling positioned absolutely) keeps
+   its layout independent of the wrap. Long lines wrap at word
+   boundaries; very long tokens (URLs, hashes) break inside via
+   overflow-wrap so the block never overflows horizontally. */
+pre.hdt-wrap { overflow-x: visible; }
+pre.hdt-wrap code,
+pre.hdt-wrap > code .hdt-code-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 /* Shared toolbar for diagrams + charts. Lives top-right of the host
    element; reveals on hover/focus-within. Each button is the same
    shape as .copy-btn for a single mental model. */

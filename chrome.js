@@ -55,6 +55,9 @@ const ICON_BRACES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const ICON_CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
 const ICON_RESET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15A9 9 0 1 0 6 5.3L1 10"/></svg>';
 const ICON_GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+/* Wrap toggle icon: horizontal line with a return arrow — visual cue
+   that long lines wrap to the next line instead of scrolling. */
+const ICON_WRAP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 21 6"/><path d="M3 12h15a3 3 0 0 1 0 6h-4"/><polyline points="16 15 13 18 16 21"/><polyline points="3 18 10 18"/></svg>';
 
 /* ============ Three-mode theme cycler (system → light → dark → system) ============ */
 function getThemeMode() {
@@ -380,6 +383,33 @@ function initReadingAids() {
             btn.classList.remove('error');
           }, 1500);
         });
+      });
+    });
+  })();
+
+  /* Wrap toggle on every <pre> — same shape as copy button, sits to its
+     left. Toggles a per-block .hdt-wrap class on the <pre>; CSS flips
+     white-space: pre → pre-wrap and the horizontal scrollbar away.
+     State is per-block on purpose: wrapping a 200-character SQL query
+     to read it shouldn't also wrap a tight CSS sample on the same page. */
+  (function () {
+    document.querySelectorAll('pre').forEach(function (pre) {
+      if (pre.querySelector('.hdt-wrap-btn')) return;
+      // Skip blocks inside hosts that own their own toolbar (charts,
+      // diagrams, live snippets, tooltips).
+      if (pre.closest('html-doc-chart, html-doc-diagram, html-doc-live-snippet, .html-doc-tooltip')) return;
+      var btn = document.createElement('button');
+      btn.className = 'hdt-wrap-btn';
+      btn.type = 'button';
+      btn.innerHTML = ICON_WRAP;
+      btn.title = 'Toggle line wrapping';
+      btn.setAttribute('aria-label', 'Toggle line wrapping');
+      btn.setAttribute('aria-pressed', 'false');
+      pre.appendChild(btn);
+      btn.addEventListener('click', function () {
+        var wrapped = pre.classList.toggle('hdt-wrap');
+        btn.classList.toggle('active', wrapped);
+        btn.setAttribute('aria-pressed', wrapped ? 'true' : 'false');
       });
     });
   })();
