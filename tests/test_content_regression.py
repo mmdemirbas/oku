@@ -14,6 +14,7 @@ existing assertions are not enough.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Iterator
 
@@ -253,9 +254,30 @@ class TestChromeKitMarkers:
             "(URL-bar collapse changes vh) render the sidebar correctly."
         )
 
-    def test_chrome_css_has_code_lang_pill(self, repo_root: Path) -> None:
+    def test_chrome_css_has_code_lang_pill_top_left(self, repo_root: Path) -> None:
+        """Language pill sits top-left so the chrome bar owns top-right.
+
+        Regression: the pill previously rendered at top-right and stacked
+        next to the copy button. User asked for top-left. Verify both the
+        base rule positions with `left:` (not `right:`) AND the line-
+        numbered override clears the gutter.
+        """
         css = (repo_root / "chrome.css").read_text(encoding="utf-8")
         assert ".hdt-code-lang" in css, "code-block language pill rule missing"
+        # Base rule.
+        m = re.search(
+            r"pre\s*>\s*\.hdt-code-lang\s*\{([^}]+)\}", css
+        )
+        assert m, "base `pre > .hdt-code-lang` rule missing"
+        block = m.group(1)
+        assert "left:" in block, "lang pill must use left: (top-left)"
+        assert "right:" not in block, (
+            "lang pill must not use right: — top-right belongs to the chrome bar"
+        )
+        # Line-numbered override.
+        assert "pre.hdt-line-numbered > .hdt-code-lang" in css, (
+            "missing override that shifts the pill past the line-number gutter"
+        )
 
     def test_sidebar_default_expanded_on_first_visit(self, repo_root: Path) -> None:
         """First-time visitor must see the sidebar expanded.
