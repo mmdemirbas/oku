@@ -89,20 +89,34 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', fun
   }
 });
 
-/* ============ TOC toggle (collapse on desktop, drawer on mobile) ============ */
+/* ============ Sidebar toggle (one button, one collapse class) ============ *
+ * Toggles the unified left sidebar (page-nav + page-toc, stacked in the
+ * same column). The class lives on <body> so layout CSS can collapse
+ * the whole grid column with one rule. Mobile uses a drawer mode that
+ * sits on the page-nav element.
+ * ---------------------------------------------------------------- */
 function toggleTOC() {
-  var nav = document.querySelector('page-toc, nav.toc');
-  if (!nav) return;
   if (window.innerWidth <= 920) {
-    nav.classList.toggle('open');
-  } else {
-    document.body.classList.toggle('toc-collapsed');
-    try {
-      localStorage.setItem('tocCollapsed',
-        document.body.classList.contains('toc-collapsed') ? '1' : '0');
-    } catch (e) {}
+    var nav = document.querySelector('page-nav, nav.toc, page-toc');
+    if (nav) nav.classList.toggle('open');
+    return;
   }
+  document.body.classList.toggle('sidebar-collapsed');
+  try {
+    localStorage.setItem('sidebarCollapsed',
+      document.body.classList.contains('sidebar-collapsed') ? '1' : '0');
+  } catch (e) {}
 }
+// Restore persisted state ASAP so the layout doesn't flash open then collapse.
+try {
+  if (localStorage.getItem('sidebarCollapsed') === '1') {
+    document.documentElement.classList.add('sidebar-preload-collapsed');
+    document.addEventListener('DOMContentLoaded', function () {
+      document.body.classList.add('sidebar-collapsed');
+      document.documentElement.classList.remove('sidebar-preload-collapsed');
+    });
+  }
+} catch (e) {}
 
 /* ============ <page-chrome> Web Component ============ */
 class PageChrome extends HTMLElement {
@@ -134,36 +148,20 @@ class PageChrome extends HTMLElement {
 }
 customElements.define('page-chrome', PageChrome);
 
-/* ============ <page-toc> Web Component ============ */
+/* ============ <page-toc> Web Component ============ *
+ * Renders inside the single left sidebar as a section under the site
+ * tree. No edge tab — the unified top-left ctrl-btn (toggleTOC) handles
+ * collapsing the whole sidebar.
+ * --------------------------------------------------------------- */
 class PageToc extends HTMLElement {
   connectedCallback() {
-    var title = this.getAttribute('title') || 'Contents';
-    var inV2Layout = !!this.closest('.layout page-nav, .layout:has(page-nav)');
-    // Edge-tab toggle on the LEFT inner edge (proximity — facing main content).
-    // Only render the tab when in v2 3-column layout; in legacy 2-column the
-    // top-left ctrl-btn handles toggling.
+    var title = this.getAttribute('title') || 'On this page';
     this.innerHTML =
-      (inV2Layout ? '<button class="page-toc-tab" type="button" aria-label="Toggle on-this-page" title="Toggle on-this-page (click anywhere on this edge)">' +
-        '<span class="page-toc-tab-thumb" aria-hidden="true">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>' +
-        '</span>' +
-      '</button>' : '') +
       '<div class="page-toc-panel">' +
         '<div class="toc-header"><h2>' + title + '</h2></div>' +
         '<ol class="toc-list"></ol>' +
       '</div>';
     var self = this;
-    var tab = this.querySelector('.page-toc-tab');
-    if (tab) {
-      tab.addEventListener('click', function () {
-        if (window.innerWidth <= 1024) {
-          self.classList.toggle('open');
-        } else {
-          document.body.classList.toggle('toc-collapsed');
-          try { localStorage.setItem('tocCollapsed', document.body.classList.contains('toc-collapsed') ? '1' : '0'); } catch (e) {}
-        }
-      });
-    }
     // If <main> already has section content (pre-rendered HTML), build
     // the TOC now. For renderer-driven pages, html-doc:rendered will
     // trigger the build later — avoid the wasted empty first pass.
@@ -522,8 +520,12 @@ function initReadingAids() {
       return { type: 'row', cells: cellHtml, cellValues: cellValues, iv: iv, el: tr };
     }
 
-    var entries = rowEls.map(classify).filter(Boolean);
-    var rowCount = entries.filter(function (e) { return e.type === 'row'; }).length;
+    var allClassified = rowEls.map(classify).filter(Boolean);
+    var flatRows = allClassified.filter(function (e) { return e.type === 'row'; });
+    var authorGroupTitles = allClassified.filter(function (e) { return e.type === 'group'; })
+                                         .map(function (e) { return e.title; });
+    var hasAuthorGroups = authorGroupTitles.length > 0;
+    var rowCount = flatRows.length;
     var canPivot = headers.length > 0 && rowCount > 0;
 
     var wrap = document.createElement('div');
@@ -551,6 +553,23 @@ function initReadingAids() {
       '</label>'
     ) : '';
     var statsHTML = canPivot ? '<span class="hdt-stats" aria-live="polite"></span>' : '';
+    var groupByHTML = '';
+    if (canPivot && headers.length > 1) {
+      // Strip HTML tags from header text for the picker option label
+      // so author-emitted <code> / inline formatting doesn't leak into
+      // the dropdown choices.
+      var stripHtml0 = function (s) { return String(s).replace(/<[^>]+>/g, '').trim(); };
+      var opts = ['<option value="none">— no grouping —</option>'];
+      if (hasAuthorGroups) opts.push('<option value="author" selected>Original groups</option>');
+      headers.forEach(function (h, i) {
+        opts.push('<option value="' + i + '">' + escapeXml(stripHtml0(h) || ('Column ' + (i + 1))) + '</option>');
+      });
+      groupByHTML =
+        '<label class="hdt-groupby">' +
+          '<span class="hdt-groupby-label" aria-hidden="true">Group:</span>' +
+          '<select class="hdt-groupby-select" aria-label="Group by column">' + opts.join('') + '</select>' +
+        '</label>';
+    }
     var viewBtns = canPivot ? (
       '<button data-view="table" type="button" class="active" aria-pressed="true">Table</button>' +
       '<button data-view="list"  type="button" aria-pressed="false">List</button>' +
@@ -560,6 +579,7 @@ function initReadingAids() {
     ctrl.innerHTML =
       filterInputHTML +
       statsHTML +
+      groupByHTML +
       viewBtns +
       '<button data-expand type="button" aria-pressed="false" title="Toggle full-width / fit to column">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
@@ -605,6 +625,10 @@ function initReadingAids() {
       var sortDir = 0;       // 1 asc, -1 desc, 0 none
       var filterText = '';
       var tbody = table.querySelector('tbody') || table;
+      // Group-by state: 'author' (use the JSON-declared groups), 'none'
+      // (flat row list), or a stringified column index. Default to
+      // 'author' when the JSON declared groups, else 'none'.
+      var groupByCol = hasAuthorGroups ? 'author' : 'none';
 
       /* Collapsed-group state. Keyed by stripped group title so the
          same toggle state persists across all three views (table /
@@ -662,7 +686,45 @@ function initReadingAids() {
         return e.cells.some(function (c) { return stripHtml(c).toLowerCase().indexOf(needle) !== -1; });
       }
 
+      /* Build the current entry list based on groupByCol:
+           - 'author' → reuse the JSON-declared groups verbatim
+           - 'none'   → flat row list, no group entries
+           - <colIdx> → bucket rows by their value(s) in that column
+         Group entries always carry a fresh <tr class="group"> for the
+         table-view path; collapse state survives across rebuilds via
+         the title-based collapsedGroups Set. */
+      function buildEntries() {
+        if (groupByCol === 'author') return allClassified.slice();
+        if (groupByCol === 'none') return flatRows.slice();
+        var col = +groupByCol;
+        if (!Number.isFinite(col)) return flatRows.slice();
+        var buckets = new Map();
+        flatRows.forEach(function (row) {
+          var vals = cellValuesFor(row, col);
+          var key = vals.length ? vals.join(', ') : '—';
+          if (!buckets.has(key)) buckets.set(key, []);
+          buckets.get(key).push(row);
+        });
+        // Sort group keys: numeric-aware locale compare for stable order.
+        var keys = Array.from(buckets.keys()).sort(function (a, b) {
+          return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        var out = [];
+        keys.forEach(function (k) {
+          var tr = document.createElement('tr');
+          tr.className = 'group';
+          var th = document.createElement('th');
+          th.colSpan = Math.max(1, colCount);
+          th.textContent = k;
+          tr.appendChild(th);
+          out.push({ type: 'group', title: k, el: tr, classes: 'group' });
+          buckets.get(k).forEach(function (r) { out.push(r); });
+        });
+        return out;
+      }
+
       function entriesMatchingFilter() {
+        var entries = buildEntries();
         if (!filterText && !hasActiveChips()) return entries;
         var needle = filterText ? filterText.toLowerCase() : '';
         // Keep groups whose subsequent rows have at least one match.
@@ -1033,14 +1095,16 @@ function initReadingAids() {
       function updateChipCounts() {
         if (!chipsRack) return;
         var needle = filterText ? filterText.toLowerCase() : '';
+        // Chip counts always reflect the underlying flat row population,
+        // independent of the current grouping choice — switching how
+        // rows are bucketed shouldn't change what each chip represents.
         chipsRack.querySelectorAll('.hdt-chip-group').forEach(function (grp) {
           var col = +grp.dataset.col;
           grp.querySelectorAll('.hdt-chip').forEach(function (btn) {
             var v = btn.dataset.value;
             var count = 0;
-            for (var i = 0; i < entries.length; i++) {
-              var e = entries[i];
-              if (e.type !== 'row') continue;
+            for (var i = 0; i < flatRows.length; i++) {
+              var e = flatRows[i];
               if (!rowMatchesText(e, needle)) continue;
               // Apply chip filters for OTHER columns only — so the count
               // reflects "what happens if I toggle this chip" rather than
@@ -1091,6 +1155,18 @@ function initReadingAids() {
       if (filterInput) {
         filterInput.addEventListener('input', function () {
           filterText = filterInput.value;
+          render();
+        });
+      }
+
+      // Group-by select.
+      var groupBySelect = ctrl.querySelector('.hdt-groupby-select');
+      if (groupBySelect) {
+        groupBySelect.addEventListener('change', function () {
+          groupByCol = groupBySelect.value;
+          // Different grouping → previously-collapsed groups don't carry
+          // over by name. Start each fresh slice expanded.
+          collapsedGroups.clear();
           render();
         });
       }
@@ -3435,10 +3511,16 @@ class HtmlDocSnippet extends HTMLElement {
 if (!customElements.get('html-doc-snippet')) customElements.define('html-doc-snippet', HtmlDocSnippet);
 
 /* ============ <page-nav> Custom Element ============ *
- * Loads site-manifest.json from the docs root (adjacent to the page)
- * and renders a collapsible tree of pages. Active page highlighted
- * based on location.pathname. Carries its own edge-tab toggle on the
- * right inner edge (proximity rule).
+ * Loads site-manifest.json from the docs root and renders a collapsible
+ * tree of pages. Active page highlighted from location.pathname. The
+ * panel sits in the single left sidebar; the top-left ctrl-btn handles
+ * sidebar collapse via the body.sidebar-collapsed class.
+ *
+ * If a <page-toc> sibling exists in the same .layout, page-nav adopts
+ * it as its own child so both panels become one stacked flex column.
+ * That keeps the layout grid simple (2 columns, single row), avoids
+ * the row-span ordering gymnastics, and lets the whole sidebar share
+ * one scroll context.
  * ----------------------------------------------------------------- */
 class PageNav extends HTMLElement {
   connectedCallback() {
@@ -3447,28 +3529,23 @@ class PageNav extends HTMLElement {
       '<div class="page-nav-panel">' +
         '<div class="page-nav-header"><h2>' + title + '</h2></div>' +
         '<ol class="page-nav-tree"><li class="page-nav-loading">Loading…</li></ol>' +
-      '</div>' +
-      '<button class="page-nav-tab" type="button" aria-label="Toggle pages" title="Toggle pages (click anywhere on this edge)">' +
-        '<span class="page-nav-tab-thumb" aria-hidden="true">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 6 9 12 15 18"/></svg>' +
-        '</span>' +
-      '</button>';
+      '</div>';
     var self = this;
-    this.querySelector('.page-nav-tab').addEventListener('click', function () {
-      var layout = self.closest('.layout');
-      if (window.innerWidth <= 1024) {
-        self.classList.toggle('open');
-      } else if (layout) {
-        layout.classList.toggle('nav-collapsed');
-        try { localStorage.setItem('pageNavCollapsed', layout.classList.contains('nav-collapsed') ? '1' : '0'); } catch (e) {}
-      }
-    });
-    // Restore desktop collapsed state
+    // Adopt the sibling page-toc into the sidebar so both panels share
+    // a single column without DOM gymnastics. Deferred so the page-toc
+    // can finish its own connectedCallback (renders its inner DOM).
     var layout = this.closest('.layout');
     if (layout) {
-      try {
-        if (localStorage.getItem('pageNavCollapsed') === '1') layout.classList.add('nav-collapsed');
-      } catch (e) {}
+      var adopt = function () {
+        var siblingToc = layout.querySelector(':scope > page-toc, :scope > nav.toc');
+        if (siblingToc && siblingToc.parentElement !== self) self.appendChild(siblingToc);
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', adopt);
+      } else {
+        // Microtask so page-toc connectedCallback can finish first.
+        Promise.resolve().then(adopt);
+      }
     }
     // Close mobile drawer on Esc
     document.addEventListener('keydown', function (e) {

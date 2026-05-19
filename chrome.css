@@ -97,58 +97,41 @@ code, pre, .mono {
   font-size: 13px;
 }
 
-/* Layout — supports 1, 2, or 3 columns depending on which sidebars are
-   present. page-nav on left, main centre, page-toc on right.
-   Default 2-column (legacy): page-toc on left + main, used by the
-   existing template. When a page declares <page-nav>, the layout
-   shifts to v2: nav | main | toc. */
+/* Layout — single left sidebar + main. page-nav adopts page-toc as a
+   child at boot (see PageNav.connectedCallback), so the sidebar is a
+   single grid cell. A two-column grid is all the layout needs. */
 .layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
-  max-width: 1260px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  max-width: 1280px;
   margin: 0 auto;
   transition: grid-template-columns 0.25s ease;
 }
-.layout:has(page-nav) {
-  grid-template-columns: 260px 1fr 240px;
-  max-width: 1440px;
+
+body.sidebar-collapsed .layout {
+  grid-template-columns: 0 minmax(0, 1fr);
 }
-.layout:has(page-nav):not(:has(page-toc)) {
-  grid-template-columns: 260px 1fr;
-}
-.layout:has(page-nav) page-nav { order: 0; }
-.layout:has(page-nav) main { order: 1; }
-.layout:has(page-nav) page-toc { order: 2; }
-.layout.nav-collapsed:has(page-nav) {
-  grid-template-columns: 24px 1fr 240px;
-}
-.layout.nav-collapsed:has(page-nav):not(:has(page-toc)) {
-  grid-template-columns: 24px 1fr;
-}
-body.toc-collapsed .layout { grid-template-columns: 0 1fr; }
-body.toc-collapsed .layout:has(page-nav) { grid-template-columns: 260px 1fr 24px; }
-body.toc-collapsed .layout.nav-collapsed:has(page-nav) { grid-template-columns: 24px 1fr 24px; }
+body.sidebar-collapsed page-nav,
+body.sidebar-collapsed page-toc,
+body.sidebar-collapsed nav.toc { display: none; }
+
 main { padding: 56px 64px 120px 64px; max-width: var(--max-width); margin: 0 auto; }
 
-/* ============ TOC sidebar — top padding clears top-left ctrl-btn ============ */
+/* ============ TOC sidebar section ============ *
+ * Stacks under page-nav inside the single left column. No edge tab —
+ * the top-left ctrl-btn (.toc-toggle) collapses the entire sidebar via
+ * body.sidebar-collapsed. Top padding only on the FIRST sidebar
+ * element so the chrome-button strip clears without doubling up.
+ * --------------------------------------------------------------- */
 nav.toc, page-toc {
-  position: sticky; top: 0; align-self: start;
-  /* Sidebars layer above main content. A full-width-expanded table or
-     any other element with negative margins must not bleed across the
-     sidebar surface. Still below chrome buttons (200) and tooltips. */
+  align-self: start;
   z-index: 60;
-  max-height: 100vh; overflow-y: auto;
-  /* TOP padding clears 16px+44px+16px = 76px chrome button area */
-  padding: 76px 24px 36px 24px;
-  border-right: 1px solid var(--border);
+  padding: 12px 24px 36px 24px;
+  border-right: 1px solid var(--border-soft);
   background: var(--surface);
   font-size: 13.5px; line-height: 1.5;
   display: block;
   transition: padding 0.25s ease, border-color 0.25s ease;
-}
-body.toc-collapsed nav.toc,
-body.toc-collapsed page-toc {
-  padding: 0; border-right: none; overflow: hidden;
 }
 .toc-header { margin: 0 0 14px 0; }
 .toc-header h2 {
@@ -682,6 +665,36 @@ code:not(pre code) {
 .hdt-table-controls .hdt-stats {
   margin-left: 0;
   margin-right: auto;
+}
+
+/* Group-by selector — pick any column at runtime to bucket the rows. */
+.hdt-groupby {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+  font: 500 11px 'Inter', sans-serif;
+  letter-spacing: 0.02em;
+  color: var(--text-soft);
+}
+.hdt-groupby-label {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.hdt-groupby-select {
+  font: inherit;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  cursor: pointer;
+  max-width: 160px;
+}
+.hdt-groupby-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .hdt-filter:focus-within {
   border-color: var(--accent);
@@ -1741,18 +1754,11 @@ footer {
    <page-nav> — site-tree sidebar
    ============================================================ */
 page-nav {
-  position: sticky;
-  top: 0;
   align-self: start;
-  /* See nav.toc above — sidebars layer above main content so wide-
-     table expansion / floats / negative-margin blocks can't bleed
-     onto the sidebar surface. */
   z-index: 60;
-  height: 100vh;
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: block;
   background: var(--surface);
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--border-soft);
   font-size: 13.5px;
   line-height: 1.5;
   transition: background 0.25s, border-color 0.25s;
@@ -1894,24 +1900,23 @@ page-nav .page-nav-tab:active .page-nav-tab-thumb {
 }
 .page-nav-tab-thumb svg { width: 14px; height: 14px; transition: transform 0.2s; }
 .layout.nav-collapsed .page-nav-tab-thumb svg { transform: rotate(180deg); }
+/* The pane edge tabs are no longer rendered by page-nav / page-toc in
+   the single-sidebar layout. If older HTML still contains them, hide. */
+page-nav .page-nav-tab,
+page-toc .page-toc-tab { display: none !important; }
 
-/* page-toc gets its own edge tab on the left side (the side facing main) */
-/* In the v2 layout the inner .page-toc-panel carries the 76px top
-   padding that clears the chrome-button strip. Resetting the outer
-   page-toc padding here prevents 76 + 76 stacking, which left the TOC
-   heading visibly lower than the site-tree heading. */
+/* In the single-sidebar layout, page-toc stacks under page-nav and its
+   inner panel only needs a small top padding (page-nav above already
+   clears the chrome-button strip). The outer page-toc has no padding
+   so the section line-up is visually clean. */
 .layout:has(page-nav) page-toc {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  position: sticky;
-  top: 0;
+  display: block;
   align-self: start;
-  height: 100vh;
-  overflow: visible;
   padding: 0;
 }
 .layout:has(page-nav) page-toc .page-toc-panel {
-  padding: 76px 22px 36px 22px;
+  padding: 16px 22px 36px 22px;
+  border-top: 1px solid var(--border-soft);
   overflow-y: auto;
   transition: opacity 0.2s ease, padding 0.25s;
 }
