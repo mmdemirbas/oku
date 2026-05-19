@@ -400,13 +400,11 @@ pre .hdt-code-gutter {
   top: 16px;
   left: 0;
   width: 40px;
-  padding-right: 10px;
-  text-align: right;
   user-select: none;
   -webkit-user-select: none;
+  /* Gutter is non-interactive by default; .hdt-fold-marker.hdt-foldable
+     re-enables pointer-events on the markers that actually toggle folds. */
   pointer-events: none;
-  color: var(--text-faint);
-  opacity: 0.55;
   /* Inherit pre's monospace + size + line-height so numbers stay row-
      aligned with the code regardless of how the theme tweaks them. */
   font-family: inherit;
@@ -415,7 +413,56 @@ pre .hdt-code-gutter {
   display: flex;
   flex-direction: column;
 }
-pre .hdt-code-ln { display: block; }
+/* Each row is a fold-marker column + a line-number column. Grid keeps
+   the two cells aligned to the same baseline so foldable lines don't
+   shift the number sideways. Hidden lines (folded-away) collapse the
+   whole row in one toggle. */
+pre .hdt-code-row {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  align-items: baseline;
+}
+pre .hdt-code-row.hdt-line-hidden { display: none; }
+/* IDE-style fold-marker column: dimmed grey for foldable lines,
+   invisible for non-foldable. Re-enable pointer-events here only
+   (gutter as a whole is non-interactive so code selection works). */
+pre .hdt-fold-marker {
+  text-align: center;
+  font-size: 9px;
+  line-height: inherit;
+  color: var(--text-faint);
+  opacity: 0;        /* invisible for non-foldable rows */
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+pre .hdt-fold-marker.hdt-foldable {
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0.45;
+}
+pre .hdt-fold-marker.hdt-foldable:hover { opacity: 1; color: var(--text-soft); }
+pre .hdt-fold-marker.hdt-foldable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 2px;
+  opacity: 1;
+  color: var(--text-soft);
+}
+pre .hdt-fold-marker.hdt-foldable::before {
+  content: '▾';
+  display: inline-block;
+  transition: transform 0.18s ease;
+}
+pre .hdt-fold-marker.hdt-foldable.hdt-folded::before { transform: rotate(-90deg); }
+/* Line numbers — UNIFORM across all rows: same color, same size, same
+   weight regardless of foldability. The fold-marker column above is the
+   ONLY thing that changes between foldable and non-foldable rows. */
+pre .hdt-code-ln {
+  display: block;
+  text-align: right;
+  padding-right: 10px;
+  color: var(--text-faint);
+  opacity: 0.55;
+}
 
 /* Language pill — small, dim badge at top-LEFT of the code block.
    Sits in the pre's top padding above the first code line; for
@@ -446,41 +493,16 @@ pre:hover > .hdt-code-lang { opacity: 1; color: var(--text-soft); }
 
 /* Code lines as block elements so display:none collapses them cleanly. */
 pre .hdt-code-line { display: block; }
-pre .hdt-code-line.hdt-line-hidden,
-pre .hdt-code-gutter .hdt-line-hidden { display: none; }
+pre .hdt-code-line.hdt-line-hidden { display: none; }
 
-/* Foldable gutter numbers — clickable, with a chevron next to the
-   number. Re-enable pointer-events for just these (the gutter as a
-   whole is pointer-events:none so it doesn't block code selection). */
-pre .hdt-code-ln.hdt-foldable {
-  pointer-events: auto;
-  cursor: pointer;
-  position: relative;
+/* When at least one fold is collapsed, hint at it via the marker (the
+   chevron rotates) and a subtle accent tint on the opening row's
+   number column so the reader notices where work is hidden — without
+   changing the line-number size/weight that would break gutter
+   alignment. */
+pre.hdt-has-folds .hdt-code-row:has(.hdt-fold-marker.hdt-folded) .hdt-code-ln {
   color: var(--accent);
-  opacity: 0.85;
-  padding-right: 0;
-  transition: opacity 0.15s ease, color 0.15s ease;
-}
-pre .hdt-code-ln.hdt-foldable:hover { opacity: 1; }
-pre .hdt-code-ln.hdt-foldable::after {
-  content: '▾';
-  margin-left: 4px;
-  font-size: 9px;
-  display: inline-block;
-  transition: transform 0.18s ease;
-  vertical-align: middle;
-}
-pre .hdt-code-ln.hdt-foldable.hdt-folded::after { transform: rotate(-90deg); }
-pre .hdt-code-ln.hdt-foldable:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-  border-radius: 2px;
-}
-/* When at least one fold is collapsed, hint at it with a slim accent
-   stroke on the opening row so the reader sees where work is hidden. */
-pre.hdt-has-folds .hdt-code-ln.hdt-foldable.hdt-folded {
-  color: var(--accent-strong);
-  font-weight: 700;
+  opacity: 0.8;
 }
 /* Icon-only Copy on every <pre>. Same shape as the shared toolbar
    used on diagrams and charts (see .hdt-bar below) so the affordance

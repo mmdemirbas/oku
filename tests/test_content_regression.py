@@ -309,6 +309,36 @@ class TestChromeKitMarkers:
             "single-source restore lives in chrome.js"
         )
 
+    def test_fold_markers_separate_from_line_numbers(self, repo_root: Path) -> None:
+        """Fold handles must be their own gutter column, IDE-style.
+
+        Regression: an earlier implementation put fold chevrons inline with
+        line numbers via `pre .hdt-code-ln.hdt-foldable::after`, making
+        foldable line numbers a different colour and weight, breaking
+        gutter alignment. The user asked for IDE-style: numbers uniform,
+        fold handle as a separate dim column.
+
+        Enforce by checking:
+        - chrome.js emits a `.hdt-code-row` per line with both a
+          `.hdt-fold-marker` and a `.hdt-code-ln` child.
+        - chrome.css styles `.hdt-fold-marker` as its own gutter element.
+        - chrome.css does NOT carry the old `pre .hdt-code-ln.hdt-foldable`
+          override that re-coloured the line number.
+        """
+        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        assert "hdt-code-row" in js, "gutter must emit per-line rows"
+        assert "hdt-fold-marker" in js, "gutter must emit a fold-marker span per row"
+        assert ".hdt-fold-marker" in css, "fold-marker styling missing"
+        assert ".hdt-fold-marker.hdt-foldable" in css, (
+            "fold-marker foldable variant missing"
+        )
+        # Negative: the old line-number override must be gone.
+        assert ".hdt-code-ln.hdt-foldable" not in css, (
+            "stale `.hdt-code-ln.hdt-foldable` override resurfaced — fold "
+            "handles must live on `.hdt-fold-marker`, not on the line number"
+        )
+
     def test_page_nav_adopts_page_toc_with_document_fallback(self, repo_root: Path) -> None:
         """page-nav must adopt a page-toc found anywhere in the document.
 

@@ -414,11 +414,21 @@ function initReadingAids() {
     var gutter = document.createElement('span');
     gutter.className = 'hdt-code-gutter';
     gutter.setAttribute('aria-hidden', 'true');
+    // Each row carries two columns: a fold-marker (left, IDE-style dim
+    // chevron) and the line number (right, uniform). Numbers stay
+    // identical regardless of foldability; the marker carries the
+    // affordance. Hidden rows (when a fold collapses) hide as one unit.
     for (var i = 1; i <= lineCount; i++) {
+      var row = document.createElement('span');
+      row.className = 'hdt-code-row';
+      var marker = document.createElement('span');
+      marker.className = 'hdt-fold-marker';
       var ln = document.createElement('span');
       ln.className = 'hdt-code-ln';
       ln.textContent = String(i);
-      gutter.appendChild(ln);
+      row.appendChild(marker);
+      row.appendChild(ln);
+      gutter.appendChild(row);
     }
     pre.insertBefore(gutter, code);
   });
@@ -1329,14 +1339,18 @@ function _hdtAfterPrismHighlight(env) {
   _hdtWrapCodeLines(code);
   pre.setAttribute('data-hdt-lines-wrapped', '1');
   // Clear any stale fold markers so a fresh detection pass attaches
-  // handlers to the current line nodes.
+  // handlers to the current row's fold-marker element.
   var gutter = pre.querySelector('.hdt-code-gutter');
   if (gutter) {
-    Array.prototype.forEach.call(gutter.children, function (ln) {
-      ln.classList.remove('hdt-foldable', 'hdt-folded');
-      ln.removeAttribute('role');
-      ln.removeAttribute('tabindex');
-      ln.removeAttribute('aria-expanded');
+    Array.prototype.forEach.call(gutter.children, function (row) {
+      var marker = row.querySelector('.hdt-fold-marker');
+      if (!marker) return;
+      marker.classList.remove('hdt-foldable', 'hdt-folded');
+      marker.removeAttribute('role');
+      marker.removeAttribute('tabindex');
+      marker.removeAttribute('aria-expanded');
+      marker.removeAttribute('data-fold-start');
+      marker.removeAttribute('data-fold-end');
     });
   }
   var lang = (code.className.match(/language-([\w-]+)/) || [0, ''])[1].toLowerCase();
@@ -1470,9 +1484,11 @@ function _hdtDetectBraceFolds(code) {
 function _hdtApplyFolds(pre, _code, folds) {
   var gutter = pre.querySelector('.hdt-code-gutter');
   if (!gutter) return;
-  var gutterLines = gutter.children;
+  var rows = gutter.children;
   folds.forEach(function (f) {
-    var marker = gutterLines[f.start];
+    var row = rows[f.start];
+    if (!row) return;
+    var marker = row.querySelector('.hdt-fold-marker');
     if (!marker) return;
     marker.classList.add('hdt-foldable');
     marker.setAttribute('role', 'button');
@@ -1493,20 +1509,20 @@ function _hdtApplyFolds(pre, _code, folds) {
     target.setAttribute('aria-expanded', willCollapse ? 'false' : 'true');
     var liveCode = pre.querySelector(':scope > code');
     var lines = liveCode ? liveCode.querySelectorAll(':scope > .hdt-code-line') : [];
-    var glines = gutter.children;
+    var liveRows = gutter.children;
     for (var i = start + 1; i < end; i++) {
       if (lines[i]) lines[i].classList.toggle('hdt-line-hidden', willCollapse);
-      if (glines[i]) glines[i].classList.toggle('hdt-line-hidden', willCollapse);
+      if (liveRows[i]) liveRows[i].classList.toggle('hdt-line-hidden', willCollapse);
     }
-    pre.classList.toggle('hdt-has-folds', !!pre.querySelector('.hdt-foldable.hdt-folded'));
+    pre.classList.toggle('hdt-has-folds', !!pre.querySelector('.hdt-fold-marker.hdt-folded'));
   }
   gutter.addEventListener('click', function (e) {
-    var t = e.target.closest('.hdt-foldable');
+    var t = e.target.closest('.hdt-fold-marker.hdt-foldable');
     if (t) handle(t);
   });
   gutter.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter' && e.key !== ' ') return;
-    var t = e.target.closest('.hdt-foldable');
+    var t = e.target.closest('.hdt-fold-marker.hdt-foldable');
     if (t) { e.preventDefault(); handle(t); }
   });
 }
