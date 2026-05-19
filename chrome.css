@@ -385,7 +385,12 @@ pre {
   background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 16px 18px;
+  /* padding-top is generous (30px) to reserve space for the language
+     pill that sits at top-left and the chrome bar (copy / wrap) that
+     sits at top-right. Both are absolutely positioned INSIDE this
+     reserved band so they never overlap the first code line.
+     padding-bottom stays smaller — nothing floats at the bottom. */
+  padding: 30px 18px 16px;
   overflow-x: auto;
   margin: 16px 0;
 }
@@ -397,7 +402,7 @@ pre {
 pre.hdt-line-numbered { padding-left: 52px; }
 pre .hdt-code-gutter {
   position: absolute;
-  top: 16px;
+  top: 30px;     /* matches pre's padding-top so row 1 aligns with line 1 */
   left: 0;
   width: 40px;
   user-select: none;
@@ -464,15 +469,14 @@ pre .hdt-code-ln {
   opacity: 0.55;
 }
 
-/* Language pill — small, dim label TAB anchored to the top-left edge
-   of the code block. Sits HALF above the pre's top border so it never
-   overlaps the code (gutter or content) regardless of line-number
-   width or first-line length. Same corner on every block — numbered
-   or not. Quiet at rest; brightens on hover so it doesn't fight the
-   code for attention. */
+/* Language pill — small, dim label at top-left of the code block.
+   Sits inside the pre's reserved padding band (top: 7px) so it never
+   overlaps either the gutter (starts at top: 30px) or the first code
+   line. Same position on numbered and non-numbered blocks. Quiet at
+   rest; brightens on hover so it doesn't fight the code for attention. */
 pre > .hdt-code-lang {
   position: absolute;
-  top: -8px;
+  top: 7px;
   left: 10px;
   font: 500 10.5px 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: 0.04em;

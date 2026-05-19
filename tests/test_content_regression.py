@@ -255,22 +255,44 @@ class TestChromeKitMarkers:
         )
 
     def test_chrome_css_has_code_lang_pill_top_left(self, repo_root: Path) -> None:
-        """Language pill is a top-left label tab — above the block boundary.
+        """Language pill sits top-left, in a RESERVED top-padding band.
 
-        Regression history:
-        - First, pill was at top-right next to copy button (user asked
-          for top-left).
-        - Then, pill was at top:8px inside the pre's padding, which
-          visually overlapped the first character of the first code line.
-        - Now, pill floats half above the pre's top border (top: -8px)
-          so it never overlaps any code regardless of gutter width or
-          first-line content.
+        Regression history (chronological):
+        1. Pill was at top-right next to copy button. User asked for
+           top-left.
+        2. Pill at top:8px inside default 16px pre padding visually
+           overlapped the first character of the first code line because
+           the pill height (~17.5px) exceeded the padding.
+        3. Pill at top:-8px straddling the pre's top border avoided
+           overlap but appeared to "float" outside the block and could
+           get clipped by overflow contexts.
+        4. NOW: pre.padding-top widened to 30px (reserved band) and
+           pill sits at top:7px INSIDE that band. The gutter starts at
+           top:30px (matches padding-top) so it aligns with the first
+           code line, never overlapping the pill.
 
-        Verify the base rule positions with `left:` AND a negative `top:`
-        so the pill sits as a label tab on the corner, not inside the
-        code area.
+        Verify:
+        - Base pre rule has padding-top ≥ 28px (room for the pill).
+        - Pill rule uses left: (not right:) and a positive top: that
+          fits inside the reserved padding band.
+        - Gutter top matches the new padding-top, not the old 16px.
         """
         css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        # Reserved padding band on pre.
+        pre_rule = re.search(r"^pre\s*\{([^}]+)\}", css, re.MULTILINE)
+        assert pre_rule, "base pre rule missing"
+        pre_block = pre_rule.group(1)
+        # padding: 30px 18px 16px  OR  padding-top: 30px etc.
+        pad_match = re.search(r"padding(?:-top)?:\s*(\d+)px", pre_block)
+        assert pad_match, "pre padding-top declaration missing"
+        pad_top = int(pad_match.group(1))
+        assert pad_top >= 28, (
+            f"pre padding-top is {pad_top}px — too small to fit the lang "
+            "pill + chrome bar without overlapping the first code line. "
+            "Need ≥28px reserved band."
+        )
+
+        # Pill rule.
         assert ".hdt-code-lang" in css, "code-block language pill rule missing"
         m = re.search(r"pre\s*>\s*\.hdt-code-lang\s*\{([^}]+)\}", css)
         assert m, "base `pre > .hdt-code-lang` rule missing"
@@ -279,15 +301,29 @@ class TestChromeKitMarkers:
         assert "right:" not in block, (
             "lang pill must not use right: — top-right belongs to the chrome bar"
         )
-        # Pill must straddle the top edge (negative `top:`) so it never
-        # overlaps code horizontally regardless of gutter or line length.
         top_match = re.search(r"top:\s*(-?\d+)px", block)
         assert top_match, "lang pill must declare a top: value"
         top_px = int(top_match.group(1))
-        assert top_px <= 0, (
-            f"lang pill top: {top_px}px sits INSIDE the pre's padding — "
-            "it overlaps code on the first line. Use a negative value so "
-            "the pill floats above the block boundary like a label tab."
+        # Pill must sit INSIDE the reserved padding band (0 ≤ top ≤ pad_top - 12).
+        assert 0 <= top_px <= pad_top - 12, (
+            f"lang pill top: {top_px}px must fit inside the reserved padding "
+            f"band [0, {pad_top - 12}]. Outside this range and it either "
+            "overlaps the first code line or floats outside the pre."
+        )
+
+        # Gutter top must match the reserved band so row 1 aligns with line 1.
+        gutter_rule = re.search(
+            r"pre\s+\.hdt-code-gutter\s*\{([^}]+)\}", css
+        )
+        assert gutter_rule, "gutter rule missing"
+        gutter_block = gutter_rule.group(1)
+        gutter_top_match = re.search(r"top:\s*(\d+)px", gutter_block)
+        assert gutter_top_match, "gutter top: declaration missing"
+        gutter_top = int(gutter_top_match.group(1))
+        assert gutter_top == pad_top, (
+            f"gutter top ({gutter_top}px) must equal pre padding-top "
+            f"({pad_top}px) so the first gutter row aligns with the first "
+            "code line."
         )
 
     def test_sidebar_default_expanded_on_first_visit(self, repo_root: Path) -> None:
