@@ -764,11 +764,13 @@ function initReadingAids() {
             toggleGroup(e);
           });
         }
+        // Count badge sits between chevron and the author title so the
+        // numbers line up at the same x across all group rows.
         var badge = cell.querySelector(':scope > .hdt-group-count');
         if (!badge) {
           badge = document.createElement('span');
           badge.className = 'hdt-group-count';
-          cell.appendChild(badge);
+          cell.insertBefore(badge, chev.nextSibling);
         }
         badge.textContent = fmtGroupCount(n);
         var collapsed = isGroupCollapsed(e);
@@ -808,9 +810,11 @@ function initReadingAids() {
         var badge = document.createElement('span');
         badge.className = 'hdt-group-count';
         badge.textContent = fmtGroupCount(count);
+        // Count badge sits second (chevron, count, title) so the
+        // numbers line up at the same x across rows in cards/list view.
         h.appendChild(chev);
-        h.appendChild(title);
         h.appendChild(badge);
+        h.appendChild(title);
         var collapsed = isGroupCollapsed(e);
         h.classList.toggle('hdt-collapsed', collapsed);
         chev.setAttribute('aria-expanded', collapsed ? 'false' : 'true');

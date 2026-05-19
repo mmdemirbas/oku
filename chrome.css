@@ -70,7 +70,15 @@
 
 /* ============ Base layout ============ */
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* Lock the text-size to what the CSS declares. Without this, mobile
+     Safari and some desktop zoom states scale text to fit the viewport,
+     producing the "page is downscaled" effect when narrowing the
+     window. Content should reflow, not shrink. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 body {
   margin: 0; padding: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -78,6 +86,10 @@ body {
   letter-spacing: 0.005em;
   color: var(--text); background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  /* Long URLs / unbroken tokens shouldn't push the page wider than the
+     viewport — break inside the word if there's nowhere else to break. */
+  overflow-wrap: break-word;
+  word-break: normal;
   transition: background-color .18s ease, color .18s ease;
 }
 code, pre, .mono {
@@ -995,13 +1007,15 @@ a.hdt-card:focus-visible,
 .hdt-collapsed .hdt-group-chevron { transform: rotate(-90deg); }
 .hdt-collapsible { cursor: pointer; }
 
-/* Group count badge — appended to a group row's first cell (table view)
-   and inside .hdt-cards-group / .hdt-list-group (cards + list views).
-   Same visual weight everywhere so the reader's eye learns it once. */
+/* Group count badge — sits between the chevron and the title in every
+   view so the numbers align at the same x across rows. Numeric pill
+   shape carries the meaning; no English word required. */
 .hdt-group-count {
   display: inline-block;
-  margin-left: 8px;
+  margin-right: 8px;
   padding: 1px 8px;
+  min-width: 22px;
+  text-align: center;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent-strong);
@@ -1010,10 +1024,7 @@ a.hdt-card:focus-visible,
   text-transform: none;
   vertical-align: baseline;
 }
-.hdt-cards-group .hdt-group-count,
-.hdt-list-group .hdt-group-count { margin-left: auto; }
-.hdt-cards-group, .hdt-list-group { justify-content: space-between; }
-.hdt-cards-group { display: flex; align-items: baseline; gap: 8px; }
+.hdt-cards-group { display: flex; align-items: baseline; gap: 4px; }
 .hdt-group-title { display: inline; }
 
 /* ============ Synced highlight pairs · [data-bind] ============ *
@@ -1869,6 +1880,10 @@ page-nav .page-nav-tab:active .page-nav-tab-thumb {
 .layout.nav-collapsed .page-nav-tab-thumb svg { transform: rotate(180deg); }
 
 /* page-toc gets its own edge tab on the left side (the side facing main) */
+/* In the v2 layout the inner .page-toc-panel carries the 76px top
+   padding that clears the chrome-button strip. Resetting the outer
+   page-toc padding here prevents 76 + 76 stacking, which left the TOC
+   heading visibly lower than the site-tree heading. */
 .layout:has(page-nav) page-toc {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1877,6 +1892,7 @@ page-nav .page-nav-tab:active .page-nav-tab-thumb {
   align-self: start;
   height: 100vh;
   overflow: visible;
+  padding: 0;
 }
 .layout:has(page-nav) page-toc .page-toc-panel {
   padding: 76px 22px 36px 22px;
