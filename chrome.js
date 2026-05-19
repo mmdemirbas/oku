@@ -521,32 +521,31 @@ function initReadingAids() {
 
     var ctrl = document.createElement('div');
     ctrl.className = 'hdt-table-controls';
-    // Filter input on the left (pushes everything else right via margin-right:auto in CSS).
-    // View order: Table → List → Cards (per user request).
+    // Filter input on the left, stats counter immediately after it
+    // (the two are read together: "I filtered, here is what remains").
+    // View order: Table → List → Cards. Stats text is purely numeric
+    // ("5" or "3/5") so the visual language stays neutral across doc
+    // languages.
     var filterInputHTML = canPivot ? (
       '<label class="hdt-filter">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6"/></svg>' +
-        '<input type="search" placeholder="Filter rows…" aria-label="Filter table rows">' +
+        '<input type="search" placeholder="Filter…" aria-label="Filter table rows">' +
       '</label>'
     ) : '';
+    var statsHTML = canPivot ? '<span class="hdt-stats" aria-live="polite"></span>' : '';
     var viewBtns = canPivot ? (
       '<button data-view="table" type="button" class="active" aria-pressed="true">Table</button>' +
       '<button data-view="list"  type="button" aria-pressed="false">List</button>' +
       '<button data-view="cards" type="button" aria-pressed="false">Cards</button>' +
       '<span class="hdt-ctrl-sep" aria-hidden="true"></span>'
     ) : '';
-    // Stats span lives at the very right of the controls bar so the
-    // reader always knows how many rows they're looking at. Empty when
-    // canPivot is false (no headers → render() never runs, no count
-    // computation happens — markdown-style mini tables don't need it).
-    var statsHTML = canPivot ? '<span class="hdt-stats" aria-live="polite"></span>' : '';
     ctrl.innerHTML =
       filterInputHTML +
+      statsHTML +
       viewBtns +
       '<button data-expand type="button" aria-pressed="false" title="Toggle full-width / fit to column">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
-      '</button>' +
-      statsHTML;
+      '</button>';
 
     var scroll = document.createElement('div');
     scroll.className = 'hdt-table-scroll';
@@ -698,7 +697,9 @@ function initReadingAids() {
       }
 
       function fmtGroupCount(n) {
-        return n === 1 ? '1 item' : (n + ' items');
+        // Bare numeral — the badge shape (pill) carries the meaning,
+        // no language token needed.
+        return String(n);
       }
 
       /* Inject (or update) a count badge on a group <tr>'s first cell
@@ -830,16 +831,16 @@ function initReadingAids() {
         if (!statsEl) return;
         var n = counts.visibleRows;
         var filtering = !!filterText || hasActiveChips();
+        // Bare numerals: "N" at rest, "N/M" while filtering, "0/M" when
+        // nothing matches. Language-neutral so the doc can be TR or EN
+        // without touching the kit.
         if (!filtering) {
-          statsEl.textContent = n + (n === 1 ? ' row' : ' rows');
+          statsEl.textContent = String(n);
           statsEl.classList.remove('hdt-stats-filtered', 'hdt-stats-empty');
-        } else if (n === 0) {
-          statsEl.textContent = 'No rows match';
-          statsEl.classList.add('hdt-stats-filtered', 'hdt-stats-empty');
         } else {
-          statsEl.textContent = n + ' of ' + rowCount + (rowCount === 1 ? ' row' : ' rows');
+          statsEl.textContent = n + '/' + rowCount;
           statsEl.classList.add('hdt-stats-filtered');
-          statsEl.classList.remove('hdt-stats-empty');
+          statsEl.classList.toggle('hdt-stats-empty', n === 0);
         }
       }
 
@@ -881,6 +882,10 @@ function initReadingAids() {
           .sort(function (a, b) { return (+a) - (+b); })
           .forEach(function (colS) {
             var col = +colS;
+            /* Two-cell layout: column 1 is the label cell, column 2 is
+               the chips cell. Wrapping the chips in their own row makes
+               the parent grid lay them out as a clean two-column table
+               regardless of how many chips a column declares. */
             var grp = document.createElement('div');
             grp.className = 'hdt-chip-group';
             grp.dataset.col = colS;
@@ -888,6 +893,9 @@ function initReadingAids() {
             lbl.className = 'hdt-chip-label';
             lbl.textContent = chipColLabels[col] + ':';
             grp.appendChild(lbl);
+            var row = document.createElement('div');
+            row.className = 'hdt-chip-row';
+            grp.appendChild(row);
             chipCols[col].values.forEach(function (v) {
               var btn = document.createElement('button');
               btn.type = 'button';
@@ -915,14 +923,15 @@ function initReadingAids() {
                 grp.classList.toggle('has-active', st.size > 0);
                 render();
               });
-              grp.appendChild(btn);
+              row.appendChild(btn);
             });
-            // Per-column clear button — only visible when any chip in
-            // the group is active. Hidden via CSS otherwise.
+            // Per-column clear button — sits with the chips; visible
+            // only while any chip in the column is active.
             var clr = document.createElement('button');
             clr.type = 'button';
             clr.className = 'hdt-chip-clear';
-            clr.textContent = 'clear';
+            clr.textContent = '×';
+            clr.setAttribute('aria-label', 'Clear');
             clr.addEventListener('click', function () {
               chipsState[col].clear();
               grp.querySelectorAll('.hdt-chip').forEach(function (b) {
@@ -932,7 +941,7 @@ function initReadingAids() {
               grp.classList.remove('has-active');
               render();
             });
-            grp.appendChild(clr);
+            row.appendChild(clr);
             chipsRack.appendChild(grp);
           });
         wrap.insertBefore(chipsRack, scroll);

@@ -33,6 +33,9 @@
   --ctrl-bg-hover:  rgba(245, 243, 255, 0.95);
   --line-strong:    #cbc7dd;
   --scrim:          rgba(30, 27, 41, 0.45);
+  /* Code block fill — clearly separated from the page bg so fenced
+     code reads as a distinct surface at a glance. */
+  --code-bg:        #eef0f6;
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] {
@@ -61,6 +64,7 @@
   --ctrl-bg-hover:  rgba(46, 42, 74, 0.92);
   --line-strong:    #4e4870;
   --scrim:          rgba(0, 0, 0, 0.55);
+  --code-bg:        #14121f;
   color-scheme: dark;
 }
 
@@ -335,7 +339,7 @@ h2:hover .permalink, h3:hover .permalink, .permalink:focus-visible { opacity: 1;
 
 pre {
   position: relative;
-  background: var(--surface-2);
+  background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px 18px;
@@ -581,14 +585,20 @@ code:not(pre code) {
 .hdt-filter {
   display: inline-flex;
   align-items: center;
+  margin-right: 8px;
   gap: 6px;
   padding: 4px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
-  margin-right: auto;
   color: var(--text-soft);
   transition: border-color 0.15s ease, background 0.15s ease;
+}
+/* Stats lives next to the filter — they're read together. Pure
+   numerics ("5" or "3/5") so the visual language stays neutral. */
+.hdt-table-controls .hdt-stats {
+  margin-left: 0;
+  margin-right: auto;
 }
 .hdt-filter:focus-within {
   border-color: var(--accent);
@@ -641,34 +651,38 @@ code:not(pre code) {
 .hdt-table-wrap[data-view="cards"] .hdt-table-scroll,
 .hdt-table-wrap[data-view="cards"] .hdt-table-list { display: none !important; }
 
-/* Chip filter rack — one .hdt-chip-group per filterable column. Each
-   chip is a toggle: clicking it adds/removes the value from the
-   column's active set. Active chips fill with the accent color; an
-   inline count badge previews how many rows would survive if that
-   chip alone were toggled (within current other-column filters). */
+/* Chip filter rack — tabular layout: column 1 is the label cell, column
+   2 is the chip cell. Multiple filterable columns stack vertically; the
+   labels right-align so the chip flush-left edge is shared. Each chip
+   is a toggle and its inline count badge previews how many rows would
+   survive if it were toggled (within current other-column filters). */
 .hdt-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 14px;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 14px;
+  row-gap: 10px;
   align-items: center;
   margin: 0 0 12px 0;
-  padding: 8px 10px;
+  padding: 10px 14px;
   border: 1px dashed var(--border-soft);
   border-radius: 8px;
   background: var(--surface);
 }
 .hdt-chip-group {
+  display: contents;
+}
+.hdt-chip-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
 .hdt-chip-label {
+  text-align: right;
   font: 600 11px 'Inter', sans-serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-soft);
-  margin-right: 2px;
 }
 .hdt-chip {
   display: inline-flex;
@@ -715,26 +729,28 @@ code:not(pre code) {
 }
 .hdt-chip-clear {
   display: none;
-  font: 500 11px 'Inter', sans-serif;
-  letter-spacing: 0.02em;
-  padding: 3px 8px;
+  font: 600 14px 'Inter', sans-serif;
+  width: 22px;
+  height: 22px;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--text-soft);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 .hdt-chip-group.has-active .hdt-chip-clear { display: inline-flex; }
 .hdt-chip-clear:hover { color: var(--accent-strong); background: var(--accent-soft); }
 
 .hdt-table-scroll {
   overflow-x: auto;
-  /* Limit vertical height so sticky table headers have something to stick
-     within. Tall tables become scroll-y inside the wrapper; the rest of
-     the page stays calm. The cap is generous enough that most tables
-     never need it. */
-  max-height: 70vh;
-  overflow-y: auto;
+  /* Headers stick to the viewport top via thead th `position: sticky`.
+     Internal vertical scrolling would hide the header behind the
+     scroll container; instead, the whole page scrolls and the header
+     row pins to the viewport for tables of any height. */
   border-radius: 8px;
   /* Edge fade shadows hint at horizontal overflow. */
   background:
@@ -1286,10 +1302,11 @@ table th {
   text-align: left; background: var(--surface-2);
   padding: 12px 14px; border-bottom: 2px solid var(--border);
   font-weight: 700; color: var(--text); font-size: 13px;
-  /* Sticky column headers: when the scroll container has max-height
-     (.hdt-table-scroll above) and the user scrolls within it, the row
-     of <th>s pins to the top so the column meaning never leaves view.
-     z-index lifts above tbody cells so hover/border doesn't bleed. */
+}
+/* Sticky column headers — only on top-level <thead> rows. Scoped this
+   way so row-headers in the list-card view (<th scope="row">) don't
+   inherit sticky positioning, which would scramble that layout. */
+table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
