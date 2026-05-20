@@ -229,7 +229,7 @@ Tags follow semver. Symlink users get HEAD; pull when you want updates.
 CDN consumers should pin to a tag — e.g.
 `https://cdn.jsdelivr.net/gh/mmdemirbas/html-doc@v0.2.0/chrome.css`.
 
-See `CHANGELOG.md`.
+History lives in the git log (`git log --oneline`).
 
 ## Companion files
 

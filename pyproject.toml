@@ -59,7 +59,6 @@ include = [
     "bin/html-doc",
     "kit/",
     "README.md",
-    "CHANGELOG.md",
 ]
 
 [tool.uv]

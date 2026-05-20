@@ -481,9 +481,8 @@ def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
     for p in root.rglob("*.md"):
         if any(part in SKIP_DIRS for part in p.parts):
             continue
-        # Repo-root .md files are project meta (README, CHANGELOG,
-        # CLAUDE), not docs pages. Only files under at least one
-        # subdir become pages.
+        # Repo-root .md files are project meta (README, CLAUDE), not
+        # docs pages. Only files under at least one subdir become pages.
         if p.parent == root:
             continue
         try:
@@ -571,8 +570,8 @@ def find_json_pages(root: Path):
     # Also walk .md files — convert each into a synthesized page dict
     # via md_to_page. The "path" returned uses .json so consumers that
     # do path.with_suffix(".html") still derive the right stub URL.
-    # Repo-root .md files (README, CHANGELOG, CLAUDE) are excluded —
-    # they're project meta, not docs pages.
+    # Repo-root .md files (README, CLAUDE) are excluded — they're
+    # project meta, not docs pages.
     for p in root.rglob("*.md"):
         if any(part in SKIP_DIRS for part in p.parts):
             continue
