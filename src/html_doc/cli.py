@@ -1763,7 +1763,10 @@ def cmd_serve(args: argparse.Namespace) -> int:
     # Markdown twins, the build's pagefind index, and dist outputs all
     # land under dist/ via `html-doc build`.
 
-    htmls = sorted(p for p in root.rglob("*.html") if "dist" not in p.parts and "node_modules" not in p.parts)
+    htmls = sorted(
+        p for p in root.rglob("*.html")
+        if not any(part in SKIP_DIRS for part in p.parts)
+    )
 
     # Serve-time Pagefind index (background, best-effort) so search works
     # without requiring the user to run `html-doc build` first.
