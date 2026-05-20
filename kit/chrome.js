@@ -2013,8 +2013,8 @@ var __htmldocTooltip = (function () {
   // SECURITY: data-def is injected via innerHTML to render rich markup
   // (<strong>, <em>, <br>, inline <a>) inside tooltips. The trust
   // boundary is: data-def must only ever be set by code that reads from
-  // kit-controlled sources — _kit-data/glossary/<domain>.json and
-  // _kit-data/extrefs/<domain>.json. The GlossaryTerm and ExtRef
+  // kit-controlled sources — _kit/glossary/<domain>.json and
+  // _kit/extrefs/<domain>.json. The GlossaryTerm and ExtRef
   // connectedCallback handlers are the only setters; both pull from the
   // kit resolver. Do NOT use this controller to render tooltips with
   // arbitrary author input.
@@ -2150,13 +2150,13 @@ var __htmldocKit = (function () {
         // Load each domain file in parallel
         var promises = kit.domains.flatMap(function (d) {
           return [
-            fetch(wa(__htmldocDocsRoot + '_kit-data/glossary/' + d + '.json'), { cache: 'no-cache' })
+            fetch(wa(__htmldocDocsRoot + '_kit/glossary/' + d + '.json'), { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
                 if (j && j.entries) kit.glossary[d] = j.entries;
               }),
-            fetch(wa(__htmldocDocsRoot + '_kit-data/extrefs/' + d + '.json'), { cache: 'no-cache' })
+            fetch(wa(__htmldocDocsRoot + '_kit/extrefs/' + d + '.json'), { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {

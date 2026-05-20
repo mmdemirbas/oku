@@ -89,9 +89,9 @@ class TestBuildSite:
         src_root.mkdir()
         pages = _scaffold_project(src_root)
         cli.build_site(pages, out_dir, src_root)
-        # Runtime JS/CSS lives under _kit/; shared JSON under _kit-data/.
-        # At minimum schema/ is always shipped, in _kit-data/.
-        assert (out_dir / "_kit-data" / "schema").is_dir()
+        # Runtime JS/CSS and shared registries (schema/glossary/extrefs)
+        # both live under _kit/. schema/ is always shipped.
+        assert (out_dir / "_kit" / "schema").is_dir()
 
     def test_copies_kit_json_when_present(self, tmp_path: Path) -> None:
         # build_site copies the user-authored kit.json. site-manifest /
@@ -287,32 +287,22 @@ class TestBuildStandalone:
         assert (out_dir / "guides" / "intro.html").exists()
 
 
-# ---------- _kit_assets_dirs ----------
+# ---------- _kit_assets_dir ----------
 
 
 class TestKitAssetsResolver:
-    def test_dev_layout_returns_split_dirs(self, repo_root: Path) -> None:
-        # Dev checkout: kit/ has the runtime JS/CSS; kit-data/ has
-        # schema/, glossary/, extrefs/. The resolver should return
-        # both as distinct paths.
-        kit_dir, data_dir = cli._kit_assets_dirs()
-        assert (kit_dir / "chrome.css").exists()
-        assert (data_dir / "schema").is_dir()
-        # In the split dev layout they are NOT the same directory.
-        assert kit_dir != data_dir
-
     def test_resolver_walks_up_through_src(self, repo_root: Path) -> None:
         # The cli module lives at src/html_doc/cli.py; the resolver
-        # must walk up to the repo root to find the split kit / kit-data
-        # layout (not stop at src/ or html_doc/).
-        kit_dir, data_dir = cli._kit_assets_dirs()
+        # must walk up to the repo root to find <repo>/kit/ (not stop
+        # at src/ or html_doc/).
+        kit_dir = cli._kit_assets_dir()
         assert (kit_dir / "chrome.css").exists()
         assert (kit_dir / "chrome.js").exists()
         assert (kit_dir / "chrome-boot.js").exists()
         assert (kit_dir / "renderer.js").exists()
-        assert (data_dir / "schema" / "page.schema.json").exists()
-        assert (data_dir / "glossary").is_dir()
-        assert (data_dir / "extrefs").is_dir()
+        assert (kit_dir / "schema" / "page.schema.json").exists()
+        assert (kit_dir / "glossary").is_dir()
+        assert (kit_dir / "extrefs").is_dir()
 
 
 # ---------- validate_pages (soft-import jsonschema gate) ----------

@@ -40,22 +40,18 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/html_doc"]
 
-# Pack the kit assets under html_doc/assets/ in the installed wheel so
-# cli._kit_assets_dir() finds them on PATH-installed deployments. The
-# dev layout (chrome.css at repo root) keeps working — the helper picks
-# whichever exists.
-# Source layout splits kit JS/CSS (kit/) from shared JSON data
-# (kit-data/{schema,glossary,extrefs}/). The wheel still flattens
-# everything into html_doc/assets/ — the runtime lookup
-# (_kit_assets_dirs in cli.py) understands both layouts.
+# Pack the kit's runtime assets + shared registries (schema, glossary,
+# extrefs) under html_doc/assets/ in the installed wheel. The dev layout
+# at <repo>/kit/ mirrors the same shape; _kit_assets_dir() in cli.py
+# selects whichever exists.
 [tool.hatch.build.targets.wheel.force-include]
 "kit/chrome.css"      = "html_doc/assets/chrome.css"
 "kit/chrome.js"       = "html_doc/assets/chrome.js"
 "kit/chrome-boot.js"  = "html_doc/assets/chrome-boot.js"
 "kit/renderer.js"     = "html_doc/assets/renderer.js"
-"kit-data/schema"     = "html_doc/assets/schema"
-"kit-data/glossary"   = "html_doc/assets/glossary"
-"kit-data/extrefs"    = "html_doc/assets/extrefs"
+"kit/schema"          = "html_doc/assets/schema"
+"kit/glossary"        = "html_doc/assets/glossary"
+"kit/extrefs"         = "html_doc/assets/extrefs"
 "templates"           = "html_doc/assets/templates"
 
 [tool.hatch.build.targets.sdist]
@@ -63,7 +59,6 @@ include = [
     "src/html_doc",
     "bin/html-doc",
     "kit/",
-    "kit-data/",
     "templates/",
     "README.md",
     "CHANGELOG.md",

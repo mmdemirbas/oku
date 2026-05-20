@@ -34,49 +34,36 @@ import webbrowser
 from pathlib import Path
 
 
-def _kit_assets_dirs() -> tuple[Path, Path]:
-    """Locate the kit's asset directories — (kit_dir, data_dir).
+def _kit_assets_dir() -> Path:
+    """Locate the kit's asset directory.
 
     Two layouts are valid:
 
     - **Installed** (uv tool install / pip install): hatchling's
-      force-include packs everything FLAT into
-      ``<site-packages>/html_doc/assets/`` (chrome.{css,js},
-      chrome-boot.js, renderer.js, schema/, glossary/, extrefs/,
-      templates/). Both returned paths point at the same flat dir.
-    - **Development** (cloned repo, no install): the source is SPLIT
-      across ``kit/`` (JS/CSS) and ``kit-data/`` (schema/, glossary/,
-      extrefs/). Walk up from ``cli.py`` until we find a directory
-      containing both ``kit/chrome.css`` and ``kit-data/schema``.
-
-    The two-layout selector means ``html-doc init`` keeps working from
-    either invocation path. Callers reference kit_dir for chrome.{css,js}
-    / chrome-boot.js / renderer.js, and data_dir for schema/, glossary/,
-    extrefs/.
+      force-include packs everything into
+      ``<site-packages>/html_doc/assets/`` — chrome.{css,js},
+      chrome-boot.js, renderer.js, plus schema/, glossary/, extrefs/.
+    - **Development** (cloned repo, no install): the same shape lives
+      at ``<repo>/kit/``. Walk up from ``cli.py`` until we find a
+      directory containing ``kit/chrome.css`` AND ``kit/schema``.
     """
     here = Path(__file__).resolve()
     pkg_assets = here.parent / "assets"
     if (pkg_assets / "chrome.css").exists():
-        # Flat wheel layout — both dirs are the same.
-        return (pkg_assets, pkg_assets)
-    # Split dev layout — kit/ + kit-data/ at the repo root.
+        return pkg_assets
     for ancestor in [here.parent, *here.parents]:
-        if (ancestor / "kit" / "chrome.css").exists() and (ancestor / "kit-data" / "schema").exists():
-            return (ancestor / "kit", ancestor / "kit-data")
-    # Last-chance fallback to the old flat layout (pre-restructure repos).
-    for ancestor in [here.parent, *here.parents]:
-        if (ancestor / "chrome.css").exists() and (ancestor / "schema").exists():
-            return (ancestor, ancestor)
+        if (ancestor / "kit" / "chrome.css").exists() and (ancestor / "kit" / "schema").exists():
+            return ancestor / "kit"
     raise RuntimeError(
-        "Could not locate kit assets — expected kit/chrome.css + kit-data/schema "
-        "at the repo root, or a flat html_doc/assets/ from a wheel install."
+        "Could not locate kit assets — expected kit/chrome.css + kit/schema "
+        "at the repo root, or html_doc/assets/ from a wheel install."
     )
 
 
-KIT_DIR, KIT_DATA_DIR = _kit_assets_dirs()
+KIT_DIR = _kit_assets_dir()
 KIT_FILES = ["chrome.css", "chrome.js", "chrome-boot.js", "renderer.js"]
 SKIP_DIRS = {
-    "dist", "_kit", "_kit-data", "node_modules", ".git", "venv", ".venv",
+    "dist", "_kit", "node_modules", ".git", "venv", ".venv",
     "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".idea",
     # templates/ ships the starter for `html-doc init`; not a docs page.
     # Walking it earlier produced a stray templates/starter.md every build.
@@ -105,7 +92,7 @@ def report(label: str, path: Path) -> None:
 
 # ---------- init ----------
 def cmd_init(args: argparse.Namespace) -> int:
-    """Create docs/_kit -> KIT_DIR + docs/_kit-data -> KIT_DATA_DIR symlinks."""
+    """Create docs/_kit -> KIT_DIR symlink."""
     project = Path.cwd()
     docs = project / "docs"
     docs.mkdir(exist_ok=True)
@@ -115,11 +102,6 @@ def cmd_init(args: argparse.Namespace) -> int:
         if target.is_symlink() and Path(os.readlink(target)) == KIT_DIR:
             print(f"✓ Already linked: {target} -> {KIT_DIR}")
             print(f"  Open kit:     {file_url(KIT_DIR)}")
-            # Ensure the data symlink is also there.
-            data_link = docs / "_kit-data"
-            if KIT_DATA_DIR != KIT_DIR and not data_link.exists():
-                data_link.symlink_to(KIT_DATA_DIR)
-                print(f"✓ Linked {data_link} -> {KIT_DATA_DIR}")
             return 0
         print(f"✗ Path exists and is not the expected symlink: {target}", file=sys.stderr)
         print(
@@ -130,11 +112,6 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     target.symlink_to(KIT_DIR)
     print(f"✓ Linked {target} -> {KIT_DIR}")
-    if KIT_DATA_DIR != KIT_DIR:
-        data_link = docs / "_kit-data"
-        if not data_link.exists():
-            data_link.symlink_to(KIT_DATA_DIR)
-            print(f"✓ Linked {data_link} -> {KIT_DATA_DIR}")
     print()
     print("  Reference the kit in your HTML <head>:")
     print('    <script src="_kit/chrome-boot.js"></script>')
@@ -520,12 +497,12 @@ def html_escape(s: str) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-_KIT_URL_RE = re.compile(r'((?:src|href)=")(_kit(?:-data)?/)', re.I)
+_KIT_URL_RE = re.compile(r'((?:src|href)=")(_kit/)', re.I)
 
 
 def _retarget_kit_urls(html: str, depth: int) -> str:
-    """Rewrite ``_kit/`` and ``_kit-data/`` URLs in a stub for a page
-    nested ``depth`` levels deep (depth 0 = top-level dist page).
+    """Rewrite ``_kit/`` URLs in a stub for a page nested ``depth``
+    levels deep (depth 0 = top-level dist page).
 
     Pages at e.g. dist/site/examples/storage/iceberg-detail.html need
     `_kit/chrome.js` to resolve to `dist/site/_kit/chrome.js` —
@@ -590,7 +567,7 @@ def _load_schema():
     global _schema_cache
     if _schema_cache is not None:
         return _schema_cache
-    schema_path = KIT_DATA_DIR / "schema" / "page.schema.json"
+    schema_path = KIT_DIR / "schema" / "page.schema.json"
     if schema_path.exists():
         try:
             _schema_cache = json.loads(schema_path.read_text(encoding="utf-8"))
@@ -1118,16 +1095,13 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
 
     Layout:
       dist/site/
-        _kit/              ← chrome.css, chrome.js, chrome-boot.js, renderer.js
-        _kit-data/         ← glossary/, extrefs/, schema/
+        _kit/              ← chrome.{css,js}, chrome-boot.js, renderer.js,
+                             glossary/, extrefs/, schema/
         kit.json           ← copied from src_root if present
         site-manifest.json ← copied from src_root
         llms.txt           ← copied from src_root if present
         *.html             ← each source HTML, kept as-is
         *.json             ← page JSON for the runtime renderer to fetch
-
-    The split mirrors the source layout (kit/ vs kit-data/) and the
-    URL convention (_kit/ for JS/CSS, _kit-data/ for shared JSON).
 
     For each HTML, if a sibling page-JSON exists, inject its extracted
     text into a hidden data-pagefind-body element so the static
@@ -1136,17 +1110,15 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     kit_out = out_dir / "_kit"
     kit_out.mkdir(exist_ok=True)
-    data_out = out_dir / "_kit-data"
-    data_out.mkdir(exist_ok=True)
 
     # Runtime chrome files → _kit/
     for f in KIT_FILES:
         shutil.copy(KIT_DIR / f, kit_out / f)
-    # Shared registry directories → _kit-data/
+    # Shared registry directories → _kit/<name>/
     for d in ("glossary", "extrefs", "schema"):
-        src_dir = KIT_DATA_DIR / d
+        src_dir = KIT_DIR / d
         if src_dir.exists():
-            dst_dir = data_out / d
+            dst_dir = kit_out / d
             if dst_dir.exists():
                 shutil.rmtree(dst_dir)
             shutil.copytree(src_dir, dst_dir)
@@ -1161,8 +1133,7 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
 
     # Page sources (HTML stubs + JSON content) — preserve directory structure.
     # For nested pages, rewrite `_kit/...` URLs in the stub to climb the
-    # right number of levels up to the dist's single _kit/ + _kit-data/
-    # at out_dir/.
+    # right number of levels up to the dist's single _kit/ at out_dir/.
     for src, html, page_data in srcs:
         rel = src.relative_to(src_root)
         dest_html = out_dir / rel
@@ -1214,7 +1185,7 @@ def build_kit_bundle(src_root: Path) -> str | None:
     extrefs = {}
 
     for domain in domains:
-        g_path = KIT_DATA_DIR / "glossary" / f"{domain}.json"
+        g_path = KIT_DIR / "glossary" / f"{domain}.json"
         if g_path.exists():
             try:
                 g_data = json.loads(g_path.read_text(encoding="utf-8"))
@@ -1222,7 +1193,7 @@ def build_kit_bundle(src_root: Path) -> str | None:
                     glossary[domain] = g_data["entries"]
             except (json.JSONDecodeError, OSError):
                 pass
-        e_path = KIT_DATA_DIR / "extrefs" / f"{domain}.json"
+        e_path = KIT_DIR / "extrefs" / f"{domain}.json"
         if e_path.exists():
             try:
                 e_data = json.loads(e_path.read_text(encoding="utf-8"))

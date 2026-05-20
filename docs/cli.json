@@ -66,7 +66,7 @@
             {
               "num": "2",
               "title": "Schema validation (optional)",
-              "content": "If jsonschema is installed (pip install jsonschema), every page is checked against kit-data/schema/page.schema.json. Errors print with field paths. Without jsonschema, prints a one-line hint and skips."
+              "content": "If jsonschema is installed (pip install jsonschema), every page is checked against kit/schema/page.schema.json. Errors print with field paths. Without jsonschema, prints a one-line hint and skips."
             },
             {
               "num": "3",
@@ -76,7 +76,7 @@
             {
               "num": "4",
               "title": "build_site — multi-page deployable",
-              "content": "Write a per-page stub + copy the source JSON to dist/site/ with directory structure preserved. Copy _kit/ and _kit-data/. Inject extracted text into hidden data-pagefind-body for indexing."
+              "content": "Write a per-page stub + copy the source JSON to dist/site/ with directory structure preserved. Copy the kit (chrome.{js,css}, schema/, glossary/, extrefs/) into dist/site/_kit/. Inject extracted text into hidden data-pagefind-body for indexing."
             },
             {
               "num": "5",

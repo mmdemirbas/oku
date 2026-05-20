@@ -20,7 +20,7 @@
       "summary": "A v2 page is one JSON file. Authoring it is filling in a tree of kind-tagged blocks. No HTML stub to maintain — the dev server synthesizes one in memory from each .json (or .md) source; the build writes one into dist/.",
       "bullets": [
         "Start a new project with html-doc init. One file per page: name.json (or name.md). Source dirs hold authored content only.",
-        "The schema is at kit-data/schema/page.schema.json — VS Code and Cursor autocomplete every node kind.",
+        "The schema is at kit/schema/page.schema.json — VS Code and Cursor autocomplete every node kind.",
         "Rich text inside a paragraph is an array: plain strings interleaved with inline nodes (glossary-term, ext-ref, code, em, strong, link).",
         "Per-page metadata picks accent color, page order in the nav, and the one-line summary that appears in nav tooltips and llms.txt."
       ]
