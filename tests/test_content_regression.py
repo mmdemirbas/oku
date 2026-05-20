@@ -477,26 +477,29 @@ class TestChromeKitMarkers:
             "_splitInlineTags regex must restrict to code/em/strong tags"
         )
 
-    def test_serve_synthesizes_md_pages(self, repo_root: Path) -> None:
-        """`html-doc serve` synthesizes .html + .json from .md sources.
+    def test_serve_synthesizes_md_and_json_pages(self, repo_root: Path) -> None:
+        """`html-doc serve` synthesizes .html / .json on the fly (D5).
 
-        Before this fix, the dev server returned 404 for any *.html
-        request that had no real .html file on disk, even if a sibling
-        .md existed. That broke the `html-doc serve` preview workflow
-        for markdown-authored pages. The build path (cmd_build) emits
-        them into dist/, but serve must work without a build.
+        Three synthesis paths:
+          /name.html + name.md   sibling → md→page→stub
+          /name.json + name.md   sibling → md→page json
+          /name.html + name.json sibling → stub from json's title
 
-        Verify the handler has the `_serve_md_synthesized` method and
-        it short-circuits do_GET when a sibling .md exists.
+        The .json-sibling case (added in D5) lets authors author only
+        the .json content — the source dir doesn't need an .html stub.
         """
         cli_src = (repo_root / "src" / "html_doc" / "cli.py").read_text(encoding="utf-8")
-        assert "_serve_md_synthesized" in cli_src, "md synthesis handler missing"
-        # Must be invoked from do_GET before super().do_GET().
+        assert "_serve_synthesized" in cli_src, "synthesis handler missing"
         m = re.search(
-            r"def do_GET\(self\)[\s\S]*?if self\._serve_md_synthesized\(\)",
+            r"def do_GET\(self\)[\s\S]*?if self\._serve_synthesized\(\)",
             cli_src,
         )
-        assert m, "_serve_md_synthesized must be called from do_GET"
+        assert m, "_serve_synthesized must be called from do_GET"
+        # Must handle the .json-sibling case for .html requests (D5).
+        assert "json_path.exists()" in cli_src, (
+            "_serve_synthesized must fall back to a .json sibling for "
+            "missing-on-disk .html requests"
+        )
 
     def test_search_has_in_page_fallback(self, repo_root: Path) -> None:
         """Search degrades to in-page navigation when Pagefind is absent.

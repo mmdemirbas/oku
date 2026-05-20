@@ -35,14 +35,20 @@ SAMPLE_STUB = """<!DOCTYPE html>
 """
 
 
-def _scaffold_project(root: Path, *, with_kit_json: bool = True) -> list[Path]:
+def _scaffold_project(
+    root: Path, *, with_kit_json: bool = True
+) -> list[tuple[Path, str, dict | None]]:
     """Lay out a minimal site under root: two HTML + sibling JSON pages,
-    optional kit.json. Returns the HTML source list.
+    optional kit.json. Returns the iter_page_stubs-shaped tuple list
+    (path, html_text, page_data | None) that build_site / build_standalone
+    consume.
     """
     docs = root
-    pages: list[Path] = []
+    pages: list[tuple[Path, str, dict | None]] = []
     for stem, title in (("index", "Index"), ("about", "About")):
-        (docs / f"{stem}.html").write_text(SAMPLE_STUB.format(title=title), encoding="utf-8")
+        html_path = docs / f"{stem}.html"
+        html_text = SAMPLE_STUB.format(title=title)
+        html_path.write_text(html_text, encoding="utf-8")
         (docs / f"{stem}.json").write_text(
             json.dumps(
                 {
@@ -56,7 +62,7 @@ def _scaffold_project(root: Path, *, with_kit_json: bool = True) -> list[Path]:
             ),
             encoding="utf-8",
         )
-        pages.append(docs / f"{stem}.html")
+        pages.append((html_path, html_text, None))
     if with_kit_json:
         (docs / "kit.json").write_text(
             json.dumps({"name": "Test kit", "domains": []}), encoding="utf-8"
@@ -132,13 +138,14 @@ class TestBuildSite:
         src_root = tmp_path / "src"
         out_dir = tmp_path / "out"
         (src_root / "guides").mkdir(parents=True)
-        (src_root / "guides" / "intro.html").write_text(
-            SAMPLE_STUB.format(title="Intro"), encoding="utf-8"
-        )
+        html_text = SAMPLE_STUB.format(title="Intro")
+        (src_root / "guides" / "intro.html").write_text(html_text, encoding="utf-8")
         (src_root / "guides" / "intro.json").write_text(
             json.dumps({"kind": "page", "title": "Intro", "blocks": []}), encoding="utf-8"
         )
-        cli.build_site([src_root / "guides" / "intro.html"], out_dir, src_root)
+        cli.build_site(
+            [(src_root / "guides" / "intro.html", html_text, None)], out_dir, src_root
+        )
         assert (out_dir / "guides" / "intro.html").exists()
         assert (out_dir / "guides" / "intro.json").exists()
 
@@ -221,7 +228,8 @@ class TestBuildStandalone:
         src_root = tmp_path / "src"
         out_dir = tmp_path / "out"
         src_root.mkdir()
-        (src_root / "tricky.html").write_text(SAMPLE_STUB.format(title="T"), encoding="utf-8")
+        tricky_html = SAMPLE_STUB.format(title="T")
+        (src_root / "tricky.html").write_text(tricky_html, encoding="utf-8")
         (src_root / "tricky.json").write_text(
             json.dumps(
                 {
@@ -240,7 +248,9 @@ class TestBuildStandalone:
             ),
             encoding="utf-8",
         )
-        cli.build_standalone([src_root / "tricky.html"], out_dir, src_root)
+        cli.build_standalone(
+            [(src_root / "tricky.html", tricky_html, None)], out_dir, src_root
+        )
         body = (out_dir / "tricky.html").read_text(encoding="utf-8")
         # The inlined JSON block should NOT contain a raw </script that
         # would terminate the surrounding inline script tag.
@@ -264,13 +274,14 @@ class TestBuildStandalone:
         src_root = tmp_path / "src"
         out_dir = tmp_path / "out"
         (src_root / "guides").mkdir(parents=True)
-        (src_root / "guides" / "intro.html").write_text(
-            SAMPLE_STUB.format(title="Intro"), encoding="utf-8"
-        )
+        intro_html = SAMPLE_STUB.format(title="Intro")
+        (src_root / "guides" / "intro.html").write_text(intro_html, encoding="utf-8")
         (src_root / "guides" / "intro.json").write_text(
             json.dumps({"kind": "page", "title": "Intro", "blocks": []}), encoding="utf-8"
         )
-        cli.build_standalone([src_root / "guides" / "intro.html"], out_dir, src_root)
+        cli.build_standalone(
+            [(src_root / "guides" / "intro.html", intro_html, None)], out_dir, src_root
+        )
         assert (out_dir / "guides" / "intro.html").exists()
 
 

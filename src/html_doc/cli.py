@@ -178,6 +178,40 @@ def find_html_files(root: Path):
     return sorted(out, key=lambda x: str(x).lower())
 
 
+def iter_page_stubs(root: Path):
+    """Yield (html_path, html_text, page_data) for every page in root.
+
+    Combines two source styles into one iterable for the build / preview
+    code path (D5):
+
+    - On-disk ``page.html`` stubs paired with their ``page.json`` —
+      authored as a pair, kit-loaded the usual way. page_data is None;
+      downstream re-reads the json sibling.
+    - Synthesized stubs for ``page.json`` (or ``page.md``) pages with
+      no on-disk ``page.html`` sibling. page_data is the parsed page
+      dict so downstream can write the json into dist (for md cases
+      where the json isn't on disk) and inject pagefind keywords.
+
+    The path always uses the .html suffix and reflects where the page
+    source actually lives on disk; for synthesized stubs the file may
+    not exist. On-disk stubs win when both forms describe the same
+    path, so authors can override the default stub.
+    """
+    stubs: dict[Path, tuple[str, dict | None]] = {}
+    for p in find_html_files(root):
+        stubs[p.resolve()] = (p.read_text(encoding="utf-8"), None)
+    for json_path, page in find_json_pages(root):
+        stub_path = json_path.with_suffix(".html").resolve()
+        if stub_path in stubs:
+            continue
+        title = page.get("title") or json_path.stem
+        stubs[stub_path] = (_stub_for(title), page)
+    return sorted(
+        [(p, h, d) for p, (h, d) in stubs.items()],
+        key=lambda x: str(x[0]).lower(),
+    )
+
+
 # ---------- JSON pages + site manifest ----------
 # ---------- Markdown → page-JSON ----------
 #
@@ -1113,8 +1147,7 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
     # For nested pages, rewrite `_kit/...` URLs in the stub to climb the
     # right number of levels up to the dist's single _kit/ + _kit-data/
     # at out_dir/.
-    for src in srcs:
-        html = src.read_text(encoding="utf-8")
+    for src, html, page_data in srcs:
         rel = src.relative_to(src_root)
         dest_html = out_dir / rel
         dest_html.parent.mkdir(parents=True, exist_ok=True)
@@ -1122,19 +1155,28 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
         html = _retarget_kit_urls(html, depth)
 
         json_sibling = src.with_suffix(".json")
-        if json_sibling.exists():
+        page = page_data
+        if page is None and json_sibling.exists():
+            try:
+                page = json.loads(json_sibling.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                page = None
+        if page is not None:
             json_rel = json_sibling.relative_to(src_root)
             dest_json = out_dir / json_rel
             dest_json.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(json_sibling, dest_json)
-            try:
-                data = json.loads(json_sibling.read_text(encoding="utf-8"))
-                if isinstance(data, dict) and data.get("kind") == "page":
-                    text = extract_page_text(data)
-                    title = data.get("title") or src.stem
-                    html = inject_pagefind_body(html, text, title)
-            except (json.JSONDecodeError, OSError):
-                pass
+            if json_sibling.exists():
+                shutil.copy(json_sibling, dest_json)
+            else:
+                # Synthesized from .md — write the converted page dict.
+                dest_json.write_text(
+                    json.dumps(page, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            if isinstance(page, dict) and page.get("kind") == "page":
+                text = extract_page_text(page)
+                title = page.get("title") or src.stem
+                html = inject_pagefind_body(html, text, title)
         dest_html.write_text(html, encoding="utf-8")
 
 
@@ -1203,8 +1245,7 @@ def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
     renderer = _safe_js((KIT_DIR / "renderer.js").read_text(encoding="utf-8"))
     kit_bundle = build_kit_bundle(src_root)  # may be None
 
-    for src in srcs:
-        html = src.read_text(encoding="utf-8")
+    for src, html, page_data in srcs:
         html = LINK_TO_KIT_CSS.sub(lambda m: f"<style>\n{css}\n</style>", html, count=1)
         html = SCRIPT_TO_KIT_BOOT.sub(lambda m: f"<script>\n{boot}\n</script>", html, count=1)
         html = SCRIPT_TO_KIT_MAIN.sub(lambda m: f"<script>\n{main}\n</script>", html, count=1)
@@ -1212,8 +1253,12 @@ def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
 
         # Inline the JSON page content so autoBoot finds it offline.
         json_sibling = src.with_suffix(".json")
-        if json_sibling.exists():
+        data_text = None
+        if page_data is not None:
+            data_text = json.dumps(page_data, ensure_ascii=False, indent=2)
+        elif json_sibling.exists():
             data_text = json_sibling.read_text(encoding="utf-8")
+        if data_text:
             # Escape </script in the JSON to be safe inside an inline script.
             safe = data_text.replace("</script", "<\\/script")
             inline = f'<script type="application/json" id="__htmldoc_page__">{safe}</script>'
@@ -1237,7 +1282,7 @@ def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
 
 def cmd_build(args: argparse.Namespace) -> int:
     root = Path.cwd()
-    srcs = find_html_files(root)
+    srcs = iter_page_stubs(root)
     json_pages = find_json_pages(root)
     if not srcs and not json_pages:
         print(f"✗ No .html or page-JSON files found in {root}", file=sys.stderr)
@@ -1293,26 +1338,12 @@ def cmd_build(args: argparse.Namespace) -> int:
     if md_site:
         print(f"✓ Wrote {md_site} page.md twin(s) under dist/site/ + dist/standalone/")
 
-    # Markdown-authored pages: each .md becomes a synthesized page in
-    # dist (.json + thin .html stub). Source .md stays untouched.
-    md_pages = find_markdown_pages(root)
-    if md_pages:
-        for md_path, page in md_pages:
-            rel_html = md_path.relative_to(root).with_suffix(".html")
-            rel_json = md_path.relative_to(root).with_suffix(".json")
-            depth = len(rel_html.parts) - 1
-            stub = _retarget_kit_urls(
-                _stub_for(page.get("title") or md_path.stem), depth
-            )
-            for dist_root in (standalone, site):
-                dest_html = dist_root / rel_html
-                dest_json = dist_root / rel_json
-                dest_html.parent.mkdir(parents=True, exist_ok=True)
-                dest_json.write_text(
-                    json.dumps(page, ensure_ascii=False, indent=2), encoding="utf-8"
-                )
-                dest_html.write_text(stub, encoding="utf-8")
-        print(f"✓ Wrote {len(md_pages)} markdown-authored page(s) under dist/")
+    # Synthesized stubs (from .json or .md sources with no on-disk
+    # .html sibling) are emitted inline by build_site / build_standalone
+    # via iter_page_stubs — no separate pass needed.
+    synth_count = sum(1 for _, _, d in srcs if d is not None)
+    if synth_count:
+        print(f"✓ Synthesized {synth_count} stub(s) for pages without on-disk .html")
 
     # Pagefind search index — soft-fail if pagefind isn't installed.
     if pagefind_index(site):
@@ -1321,12 +1352,12 @@ def cmd_build(args: argparse.Namespace) -> int:
     print(f"✓ Built {len(srcs)} HTML file(s):")
     print()
     print("  standalone (inline, send-as-file):")
-    for src in srcs:
+    for src, _, _ in srcs:
         report("", standalone / src.relative_to(root))
     print()
     print("  site (shared assets, multi-page):")
     report("site root:", site)
-    for src in srcs:
+    for src, _, _ in srcs:
         report("", site / src.relative_to(root))
     return 0
 
@@ -1381,7 +1412,7 @@ def _build_serve_search_index(root: Path) -> bool:
         )
         return False
     docs_dir = _common_docs_dir(root, pages)
-    htmls = [p for p in find_html_files(docs_dir) if "dist" not in p.parts]
+    htmls = [s for s in iter_page_stubs(docs_dir) if "dist" not in s[0].parts]
     if not htmls:
         return False
     target = root / "dist" / "_search" / "site"
@@ -1498,53 +1529,74 @@ def _make_serve_handler(root: Path):
             if self.path == "/__reload":
                 self._serve_reload_stream()
                 return
-            # Synthesize stubs / JSON for .md-authored pages on the fly so
-            # `html-doc serve` previews markdown sources without an explicit
-            # build step. Pages in source are .md; runtime expects .html
-            # (the stub) + .json (the renderer fetches this sibling).
-            if self._serve_md_synthesized():
+            # Synthesize stubs / JSON on the fly so `html-doc serve` previews
+            # markdown- and json-authored sources without a build step:
+            #   /<name>.html  + .md sibling  → md→page→stub
+            #   /<name>.json  + .md sibling  → md→page JSON
+            #   /<name>.html  + .json sibling → stub from json's title
+            # Runtime expects .html (the kit-loading shell) + .json (the
+            # renderer fetches this sibling). Authoring only the .json (or
+            # .md) keeps source dirs free of boilerplate stubs (D5).
+            if self._serve_synthesized():
                 return
             super().do_GET()
 
-        def _serve_md_synthesized(self) -> bool:
-            """If the request targets `<name>.html` or `<name>.json` and a
-            sibling `<name>.md` exists on disk (but no real `<name>.html`
-            / `<name>.json` does), synthesize the response from the .md
-            via md_to_page. Returns True if handled.
+        def _serve_synthesized(self) -> bool:
+            """Handle missing-on-disk .html / .json requests by synthesizing
+            from a sibling source. Returns True if the response was sent.
+
+            Order: .md > .json. A real on-disk file always wins (returns
+            False, letting the static handler serve it). The runtime stub
+            is identical to the one the build emits via `_stub_for`.
             """
             url_path = self.path.split("?", 1)[0]
-            # Need .html or .json suffix to consider synthesis.
             if not (url_path.endswith(".html") or url_path.endswith(".json")):
                 return False
             try:
-                # Translate the URL path to a filesystem path.
-                # SimpleHTTPRequestHandler's translate_path doesn't
-                # honour the `directory=` arg consistently across Python
-                # versions; resolve manually relative to `root`.
+                # Translate the URL path to a filesystem path. Resolve
+                # manually relative to `root` — SimpleHTTPRequestHandler's
+                # translate_path doesn't honour `directory=` consistently
+                # across Python versions.
                 rel = url_path.lstrip("/")
                 fs = (root / rel).resolve()
-                # Don't escape the root.
                 if root not in fs.parents and fs != root:
                     return False
             except (OSError, ValueError):
                 return False
-            # Only synthesize if the real file is missing.
             if fs.exists():
                 return False
+
             md_path = fs.with_suffix(".md")
-            if not md_path.exists():
-                return False
-            try:
-                text = md_path.read_text(encoding="utf-8")
-                page = md_to_page(text, default_title=md_path.stem)
-            except (OSError, ValueError):
-                return False
-            if url_path.endswith(".json"):
-                body = json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8")
-                content_type = "application/json; charset=utf-8"
-            else:
-                body = _stub_for(page.get("title") or md_path.stem).encode("utf-8")
+            json_path = fs.with_suffix(".json")
+            body: bytes | None = None
+            content_type: str | None = None
+
+            if md_path.exists():
+                try:
+                    text = md_path.read_text(encoding="utf-8")
+                    page = md_to_page(text, default_title=md_path.stem)
+                except (OSError, ValueError):
+                    return False
+                if url_path.endswith(".json"):
+                    body = json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8")
+                    content_type = "application/json; charset=utf-8"
+                else:
+                    body = _stub_for(page.get("title") or md_path.stem).encode("utf-8")
+                    content_type = "text/html; charset=utf-8"
+            elif url_path.endswith(".html") and json_path.exists():
+                # The .json file IS on disk; only the .html shell is missing.
+                # Synthesize the stub from the json's title (D5).
+                try:
+                    page = json.loads(json_path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    return False
+                if not (isinstance(page, dict) and page.get("kind") == "page"):
+                    return False
+                body = _stub_for(page.get("title") or json_path.stem).encode("utf-8")
                 content_type = "text/html; charset=utf-8"
+            else:
+                return False
+
             try:
                 self.send_response(200)
                 self.send_header("Content-Type", content_type)
