@@ -24,6 +24,27 @@
       this.warnings = [];
     }
 
+    /* Split an authored prose string into a mixed [string, inline-node]
+       array when it contains <code>…</code> / <em>…</em> / <strong>…</strong>
+       tags. Author convenience — lets a writer keep flat strings for
+       paragraphs that only carry inline-code without paying the cost of
+       a content array. Match is non-greedy + restricted to three known
+       tags so element-name documentation like "<callout>" stays literal. */
+    static _splitInlineTags(text) {
+      const re = /<(code|em|strong)>([\s\S]*?)<\/\1>/g;
+      const out = [];
+      let pos = 0;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        if (m.index > pos) out.push(text.slice(pos, m.index));
+        out.push({ kind: m[1], text: m[2] });
+        pos = m.index + m[0].length;
+      }
+      if (pos === 0) return [text];     // no matches — single string
+      if (pos < text.length) out.push(text.slice(pos));
+      return out;
+    }
+
     /** Fetch JSON, parse, and render into the host. */
     async renderFromUrl(url, host) {
       let page;
@@ -565,7 +586,22 @@
       const frag = document.createDocumentFragment();
       if (rich === undefined || rich === null) return frag;
       if (typeof rich === 'string') {
-        frag.appendChild(document.createTextNode(rich));
+        // Strings authored with `<code>…</code>` (or other simple inline
+        // tags) used to render as literal text. Detect and convert to
+        // inline code/em/strong so authors can write either form. The
+        // detection is intentionally narrow — only the three text-shape
+        // primitives the kit also exposes in the JSON inline schema —
+        // so unrelated angle-bracket text (e.g. element names in
+        // documentation like "<callout>") still renders literally.
+        const pseudoInline = HtmlDocRenderer._splitInlineTags(rich);
+        if (pseudoInline.length > 1) {
+          for (const part of pseudoInline) {
+            if (typeof part === 'string') frag.appendChild(document.createTextNode(part));
+            else { const el = this._renderInline(part); if (el) frag.appendChild(el); }
+          }
+        } else {
+          frag.appendChild(document.createTextNode(rich));
+        }
         return frag;
       }
       if (!Array.isArray(rich)) {

@@ -254,76 +254,135 @@ class TestChromeKitMarkers:
             "(URL-bar collapse changes vh) render the sidebar correctly."
         )
 
-    def test_chrome_css_has_code_lang_pill_top_left(self, repo_root: Path) -> None:
-        """Language pill sits top-left, in a RESERVED top-padding band.
+    def test_code_lang_pill_is_static_label_not_button(self, repo_root: Path) -> None:
+        """Lang pill must be a flush corner label, never a hover-responsive button.
 
-        Regression history (chronological):
-        1. Pill was at top-right next to copy button. User asked for
-           top-left.
-        2. Pill at top:8px inside default 16px pre padding visually
-           overlapped the first character of the first code line because
-           the pill height (~17.5px) exceeded the padding.
-        3. Pill at top:-8px straddling the pre's top border avoided
-           overlap but appeared to "float" outside the block and could
-           get clipped by overflow contexts.
-        4. NOW: pre.padding-top widened to 30px (reserved band) and
-           pill sits at top:7px INSIDE that band. The gutter starts at
-           top:30px (matches padding-top) so it aligns with the first
-           code line, never overlapping the pill.
-
-        Verify:
-        - Base pre rule has padding-top ≥ 28px (room for the pill).
-        - Pill rule uses left: (not right:) and a positive top: that
-          fits inside the reserved padding band.
-        - Gutter top matches the new padding-top, not the old 16px.
+        Regression: previous polishes added :hover / :focus rules that
+        made the pill change color and border, signaling "click me" when
+        it's actually pointer-events: none. The user wanted a static
+        label flush to the top-left edge. Lock in:
+        - No `pre:hover > .hdt-code-lang` rule.
+        - top: 0, left: 0 (corner-flush, not 7px / 10px inset).
+        - border-radius drops corner-rounding except the inner one.
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        # Reserved padding band on pre.
-        pre_rule = re.search(r"^pre\s*\{([^}]+)\}", css, re.MULTILINE)
-        assert pre_rule, "base pre rule missing"
-        pre_block = pre_rule.group(1)
-        # padding: 30px 18px 16px  OR  padding-top: 30px etc.
-        pad_match = re.search(r"padding(?:-top)?:\s*(\d+)px", pre_block)
-        assert pad_match, "pre padding-top declaration missing"
-        pad_top = int(pad_match.group(1))
-        assert pad_top >= 28, (
-            f"pre padding-top is {pad_top}px — too small to fit the lang "
-            "pill + chrome bar without overlapping the first code line. "
-            "Need ≥28px reserved band."
+        assert "pre:hover > .hdt-code-lang" not in css, (
+            "lang pill must not have a hover state — it's a label, not a button"
         )
-
-        # Pill rule.
-        assert ".hdt-code-lang" in css, "code-block language pill rule missing"
         m = re.search(r"pre\s*>\s*\.hdt-code-lang\s*\{([^}]+)\}", css)
-        assert m, "base `pre > .hdt-code-lang` rule missing"
+        assert m, "base lang pill rule missing"
         block = m.group(1)
-        assert "left:" in block, "lang pill must use left: (top-left)"
-        assert "right:" not in block, (
-            "lang pill must not use right: — top-right belongs to the chrome bar"
+        top_match = re.search(r"top:\s*(-?\d+)(?:px)?", block)
+        left_match = re.search(r"left:\s*(-?\d+)(?:px)?", block)
+        assert top_match and int(top_match.group(1)) == 0, "lang pill must sit at top: 0"
+        assert left_match and int(left_match.group(1)) == 0, "lang pill must sit at left: 0"
+
+    def test_code_fold_marker_right_of_line_number(self, repo_root: Path) -> None:
+        """Fold-marker column sits to the RIGHT of the line-number column.
+
+        IntelliJ / VSCode / GitHub all put the fold gutter on the inside
+        of the line number (closer to the code). The kit follows that
+        convention so the marker doesn't dominate the gutter's leftmost
+        column. Verify via the per-line grid template.
+        """
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        m = re.search(
+            r"pre\.hdt-line-numbered\s+\.hdt-code-line\s*\{([^}]+)\}",
+            css,
         )
-        top_match = re.search(r"top:\s*(-?\d+)px", block)
-        assert top_match, "lang pill must declare a top: value"
-        top_px = int(top_match.group(1))
-        # Pill must sit INSIDE the reserved padding band (0 ≤ top ≤ pad_top - 12).
-        assert 0 <= top_px <= pad_top - 12, (
-            f"lang pill top: {top_px}px must fit inside the reserved padding "
-            f"band [0, {pad_top - 12}]. Outside this range and it either "
-            "overlaps the first code line or floats outside the pre."
+        assert m, "per-line grid rule missing"
+        block = m.group(1)
+        cols = re.search(r"grid-template-columns:\s*([^;]+);", block)
+        assert cols, "grid-template-columns declaration missing"
+        # First column should be the line-number width (>= 28px),
+        # second the fold-marker (<= 18px), third the content (1fr).
+        parts = cols.group(1).strip().split()
+        assert len(parts) >= 3, f"expected ≥3 grid columns, got: {parts}"
+        # Triangle glyphs for the fold marker — \25BC (▼) + \25B6 (▶).
+        assert "25BC" in css.upper() or "25BC" in css, (
+            "fold marker should use a triangle arrow (▼)"
+        )
+        assert "25B6" in css.upper() or "25B6" in css, (
+            "folded marker should rotate to a right-arrow (▶)"
         )
 
-        # Gutter top must match the reserved band so row 1 aligns with line 1.
-        gutter_rule = re.search(
-            r"pre\s+\.hdt-code-gutter\s*\{([^}]+)\}", css
+    def test_word_wrap_keeps_line_number_at_logical_line_top(self, repo_root: Path) -> None:
+        """Word-wrap must align numbers to the START of the wrapped line.
+
+        Regression: with the previous absolute-positioned gutter, when
+        a logical line wrapped to multiple visual rows the line numbers
+        froze in place — content shifted but numbers didn't, so they
+        no longer matched the line they labeled.
+
+        Architecture fix: per-line grid replaces the absolute gutter.
+        Verify the .hdt-code-line uses display: grid and
+        `align-items: start` so cells anchor to the row top while
+        content can grow to wrapped height.
+        """
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        m = re.search(
+            r"pre\.hdt-line-numbered\s+\.hdt-code-line\s*\{([^}]+)\}",
+            css,
         )
-        assert gutter_rule, "gutter rule missing"
-        gutter_block = gutter_rule.group(1)
-        gutter_top_match = re.search(r"top:\s*(\d+)px", gutter_block)
-        assert gutter_top_match, "gutter top: declaration missing"
-        gutter_top = int(gutter_top_match.group(1))
-        assert gutter_top == pad_top, (
-            f"gutter top ({gutter_top}px) must equal pre padding-top "
-            f"({pad_top}px) so the first gutter row aligns with the first "
-            "code line."
+        assert m, "per-line grid rule missing"
+        block = m.group(1)
+        assert "display: grid" in block, "line must be a grid container"
+        assert "align-items: start" in block, (
+            "cells must anchor to row top so wrapped content doesn't centre the number"
+        )
+
+    def test_anno_marker_in_own_column_with_tooltip(self, repo_root: Path) -> None:
+        """Annotation marker has its own gutter column + hover tooltip.
+
+        Regression: markers previously sat at the same x as line
+        numbers, blocking them. Fixed by adding a 4th column to the
+        per-line grid for annotated-code. Also added hover preview
+        tooltip (`.hdc-anno-tip`).
+        """
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        # JS attaches the tooltip with the annotation body.
+        assert "hdc-anno-tip" in js, "annotation tooltip injection missing"
+        # CSS: 4-column grid override for annotated-code line.
+        assert ".hdc-anno-wrap.hdc-anno-gutter-on pre.hdt-line-numbered .hdt-code-line" in css, (
+            "annotation-mode grid override missing"
+        )
+        # Hover/focus shows the tip.
+        assert ".hdc-anno-marker:hover + .hdc-anno-tip" in css, (
+            "hover-to-show tooltip CSS missing"
+        )
+
+    def test_renderer_converts_inline_code_tags_in_strings(self, repo_root: Path) -> None:
+        """Renderer auto-converts `<code>…</code>` strings to inline code.
+
+        Regression: authored callouts/paragraphs contained literal
+        `<code>...</code>` strings in `content`. The renderer used to
+        HTML-escape them, showing the angle-bracket tag as text instead
+        of a code element. Added _splitInlineTags to detect + convert
+        the three text-shape primitives (code, em, strong) so either
+        authoring form works.
+        """
+        js = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "_splitInlineTags" in js, "inline-tag converter missing"
+        # Regex targets only code / em / strong — not arbitrary tags
+        # (otherwise documentation like "<callout>" gets eaten).
+        assert "(code|em|strong)" in js, (
+            "_splitInlineTags regex must restrict to code/em/strong tags"
+        )
+
+    def test_search_has_in_page_fallback(self, repo_root: Path) -> None:
+        """Search degrades to in-page navigation when Pagefind is absent.
+
+        Regression: IDE-served projects don't have the Pagefind index
+        built, so the search modal used to dead-end with "index not
+        found". User asked: "at least help me to navigate the current
+        document". The fallback walks `#main-content` headings and
+        returns same-page anchor hits.
+        """
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "_inPageSearch" in js, "in-page fallback function missing"
+        assert "site index unavailable" in js or "On this page" in js, (
+            "fallback status message missing"
         )
 
     def test_sidebar_default_expanded_on_first_visit(self, repo_root: Path) -> None:
@@ -676,44 +735,6 @@ class TestChromeKitMarkers:
         assert "hdt-lightbox-backdrop" in js, "backdrop close target missing"
         assert "e.key === 'Escape'" in js, "Escape close path missing"
 
-    def test_annotated_code_markers_in_left_gutter(self, repo_root: Path) -> None:
-        """Annotation markers must sit in a per-line LEFT gutter, not inline.
-
-        Regression: the original `<html-doc-annotated-code>` placed `(1)`,
-        `(2)` markers inline within the code text. The reader had to scan
-        each line to find them. User asked for markers BEFORE the line,
-        vertically aligned, so the eye can find every annotated line at a
-        glance.
-
-        Enforce by checking:
-        - chrome.js builds the per-line slot (`hdc-anno-line-marker`) AND
-          moves markers from inline into those slots.
-        - chrome.css positions the slot as a left gutter via absolute
-          positioning + reserved padding on the pre.
-        """
-        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
-        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        # JS marker construction + extraction.
-        assert "hdc-anno-line-marker" in js, "per-line marker slot missing"
-        assert "prepareLineSlots" in js or "hdc-anno-gutter-on" in js, (
-            "slot prep step missing — annotated lines won't get gutter slots"
-        )
-        assert "moveMarkersToSlots" in js or "slot.appendChild(btn)" in js, (
-            "marker-move-to-slot step missing — markers will stay inline"
-        )
-        # CSS positions the slot to the LEFT of code (negative left:) and
-        # reserves padding on the pre to make room.
-        assert ".hdc-anno-line-marker" in css, "marker slot styling missing"
-        slot_rule = re.search(
-            r"\.hdc-anno-wrap\.hdc-anno-gutter-on\s+\.hdc-anno-line-marker\s*\{([^}]+)\}",
-            css,
-        )
-        assert slot_rule, "scoped slot rule missing"
-        assert "position: absolute" in slot_rule.group(1), (
-            "marker slot must be absolutely positioned so it doesn't break the "
-            "inline flow of Prism token spans on each line"
-        )
-
     def test_table_has_board_view(self, repo_root: Path) -> None:
         """Tables expose a 4th view: Board (kanban-style lanes).
 
@@ -795,36 +816,6 @@ class TestChromeKitMarkers:
         assert "pre.hdt-wrap" in css, "wrap state class missing"
         assert "white-space: pre-wrap" in css, (
             "wrap state must flip white-space to pre-wrap so long lines wrap"
-        )
-
-    def test_fold_markers_separate_from_line_numbers(self, repo_root: Path) -> None:
-        """Fold handles must be their own gutter column, IDE-style.
-
-        Regression: an earlier implementation put fold chevrons inline with
-        line numbers via `pre .hdt-code-ln.hdt-foldable::after`, making
-        foldable line numbers a different colour and weight, breaking
-        gutter alignment. The user asked for IDE-style: numbers uniform,
-        fold handle as a separate dim column.
-
-        Enforce by checking:
-        - chrome.js emits a `.hdt-code-row` per line with both a
-          `.hdt-fold-marker` and a `.hdt-code-ln` child.
-        - chrome.css styles `.hdt-fold-marker` as its own gutter element.
-        - chrome.css does NOT carry the old `pre .hdt-code-ln.hdt-foldable`
-          override that re-coloured the line number.
-        """
-        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
-        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        assert "hdt-code-row" in js, "gutter must emit per-line rows"
-        assert "hdt-fold-marker" in js, "gutter must emit a fold-marker span per row"
-        assert ".hdt-fold-marker" in css, "fold-marker styling missing"
-        assert ".hdt-fold-marker.hdt-foldable" in css, (
-            "fold-marker foldable variant missing"
-        )
-        # Negative: the old line-number override must be gone.
-        assert ".hdt-code-ln.hdt-foldable" not in css, (
-            "stale `.hdt-code-ln.hdt-foldable` override resurfaced — fold "
-            "handles must live on `.hdt-fold-marker`, not on the line number"
         )
 
     def test_page_nav_adopts_page_toc_with_document_fallback(self, repo_root: Path) -> None:

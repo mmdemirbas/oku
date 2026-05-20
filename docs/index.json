@@ -298,7 +298,15 @@
           "kind": "callout",
           "type": "warn",
           "title": "Try the warn callout type",
-          "content": "This callout uses <code>type=\"warn\"</code>, which aliases the canonical <code>warning</code> styling. The kit accepts both names plus the industry-standard <code>note / tip / info / caution</code> aliases."
+          "content": [
+            "This callout uses ",
+            {"kind": "code", "text": "type=\"warn\""},
+            ", which aliases the canonical ",
+            {"kind": "code", "text": "warning"},
+            " styling. The kit accepts both names plus the industry-standard ",
+            {"kind": "code", "text": "note / tip / info / caution"},
+            " aliases."
+          ]
         }
       ]
     },

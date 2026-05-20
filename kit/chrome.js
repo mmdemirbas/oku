@@ -538,26 +538,10 @@ function initReadingAids() {
     if (lineCount < 1) return;
     pre.setAttribute('data-hdt-numbered', '1');
     pre.classList.add('hdt-line-numbered');
-    var gutter = document.createElement('span');
-    gutter.className = 'hdt-code-gutter';
-    gutter.setAttribute('aria-hidden', 'true');
-    // Each row carries two columns: a fold-marker (left, IDE-style dim
-    // chevron) and the line number (right, uniform). Numbers stay
-    // identical regardless of foldability; the marker carries the
-    // affordance. Hidden rows (when a fold collapses) hide as one unit.
-    for (var i = 1; i <= lineCount; i++) {
-      var row = document.createElement('span');
-      row.className = 'hdt-code-row';
-      var marker = document.createElement('span');
-      marker.className = 'hdt-fold-marker';
-      var ln = document.createElement('span');
-      ln.className = 'hdt-code-ln';
-      ln.textContent = String(i);
-      row.appendChild(marker);
-      row.appendChild(ln);
-      gutter.appendChild(row);
-    }
-    pre.insertBefore(gutter, code);
+    // No standalone gutter element — number + fold cells are injected
+    // into each per-line span by _hdtWrapCodeLines. This makes line
+    // numbers ride along with their code line when word-wrap is on
+    // (which absolute-positioned gutters cannot do).
   });
   // Code blocks that have no language-* class (and so never trigger
   // the Prism `complete` hook) still get line-wrapping so folds can
@@ -1532,21 +1516,16 @@ function _hdtAfterPrismHighlight(env) {
   if (code.querySelector(':scope > .hdt-code-line')) return; // already wrapped, intact
   _hdtWrapCodeLines(code);
   pre.setAttribute('data-hdt-lines-wrapped', '1');
-  // Clear any stale fold markers so a fresh detection pass attaches
-  // handlers to the current row's fold-marker element.
-  var gutter = pre.querySelector('.hdt-code-gutter');
-  if (gutter) {
-    Array.prototype.forEach.call(gutter.children, function (row) {
-      var marker = row.querySelector('.hdt-fold-marker');
-      if (!marker) return;
-      marker.classList.remove('hdt-foldable', 'hdt-folded');
-      marker.removeAttribute('role');
-      marker.removeAttribute('tabindex');
-      marker.removeAttribute('aria-expanded');
-      marker.removeAttribute('data-fold-start');
-      marker.removeAttribute('data-fold-end');
-    });
-  }
+  // Clear any stale fold-marker state inside per-line cells so a fresh
+  // detection pass attaches handlers to the current line's marker.
+  Array.prototype.forEach.call(code.querySelectorAll(':scope > .hdt-code-line > .hdt-fold-marker'), function (marker) {
+    marker.classList.remove('hdt-foldable', 'hdt-folded');
+    marker.removeAttribute('role');
+    marker.removeAttribute('tabindex');
+    marker.removeAttribute('aria-expanded');
+    marker.removeAttribute('data-fold-start');
+    marker.removeAttribute('data-fold-end');
+  });
   var lang = (code.className.match(/language-([\w-]+)/) || [0, ''])[1].toLowerCase();
   // Stamp a small language pill on the pre so the reader sees what
   // dialect they're looking at. Idempotent — re-runs replace the text
@@ -1578,19 +1557,45 @@ function _hdtAfterPrismHighlight(env) {
  * preserves coloring across the split.
  * ------------------------------------------------------------------- */
 function _hdtWrapCodeLines(code) {
-  var lines = [document.createElement('span')];
-  lines[0].className = 'hdt-code-line';
-  lines[0].setAttribute('data-line', '1');
+  // Each .hdt-code-line is a grid row with three cells:
+  //   [.hdt-code-ln (number)]  [.hdt-fold-marker]  [.hdt-code-content]
+  //
+  // Numbers + fold markers ride with their code line — when word-wrap
+  // is enabled and a logical line spans multiple visual rows, the
+  // number stays at the row's top (align-self: start) while the
+  // content cell grows to its wrapped height. The absolute-positioned
+  // gutter the previous design used couldn't do this (numbers froze
+  // at the same y while wrapped content pushed code below).
+  function makeLine(lineIdx) {
+    var line = document.createElement('span');
+    line.className = 'hdt-code-line';
+    line.setAttribute('data-line', String(lineIdx));
+    var num = document.createElement('span');
+    num.className = 'hdt-code-ln';
+    num.textContent = String(lineIdx);
+    num.setAttribute('aria-hidden', 'true');
+    var fold = document.createElement('span');
+    fold.className = 'hdt-fold-marker';
+    fold.setAttribute('aria-hidden', 'true');
+    var content = document.createElement('span');
+    content.className = 'hdt-code-content';
+    line.appendChild(num);
+    line.appendChild(fold);
+    line.appendChild(content);
+    return line;
+  }
 
-  function pushChar(s) { lines[lines.length - 1].appendChild(document.createTextNode(s)); }
+  var lines = [makeLine(1)];
+  function activeContent() {
+    return lines[lines.length - 1].querySelector(':scope > .hdt-code-content');
+  }
+
+  function pushChar(s) { activeContent().appendChild(document.createTextNode(s)); }
   function newline() {
     // Trailing newline lives in the CURRENT line so display:none also
     // hides the blank that would otherwise remain.
-    lines[lines.length - 1].appendChild(document.createTextNode('\n'));
-    var nl = document.createElement('span');
-    nl.className = 'hdt-code-line';
-    nl.setAttribute('data-line', String(lines.length + 1));
-    lines.push(nl);
+    activeContent().appendChild(document.createTextNode('\n'));
+    lines.push(makeLine(lines.length + 1));
   }
 
   function emit(node) {
@@ -1609,7 +1614,7 @@ function _hdtWrapCodeLines(code) {
       if (full.indexOf('\n') === -1) {
         // Whole element fits one line — move it intact, preserving any
         // descendant tokens Prism created.
-        lines[lines.length - 1].appendChild(node.cloneNode(true));
+        activeContent().appendChild(node.cloneNode(true));
       } else {
         // Multi-line element — split into per-line clones at the same
         // className. The descendants are reduced to plain text in each
@@ -1621,7 +1626,7 @@ function _hdtWrapCodeLines(code) {
           if (segs[s].length) {
             var clone = node.cloneNode(false);
             clone.textContent = segs[s];
-            lines[lines.length - 1].appendChild(clone);
+            activeContent().appendChild(clone);
           }
         }
       }
@@ -1666,23 +1671,17 @@ function _hdtDetectBraceFolds(code) {
   return folds;
 }
 
-/* Wire fold toggles into the line-number gutter. Foldable markers
+/* Wire fold toggles into the per-line fold markers. Foldable markers
    carry the fold range as data attrs (foldStart, foldEnd); a single
-   delegated listener on the gutter handles clicks. The delegated
-   pattern matters because Prism's autoloader can replace the <code>'s
-   innerHTML twice per block — first a language-less pass, then again
-   when the language module arrives — and per-marker handlers from the
-   first pass would survive the second wrap with stale closures over
-   detached line spans. The delegated handler always re-queries the
-   live line spans at click time. */
-function _hdtApplyFolds(pre, _code, folds) {
-  var gutter = pre.querySelector('.hdt-code-gutter');
-  if (!gutter) return;
-  var rows = gutter.children;
+   delegated listener on the <code> handles clicks so Prism's
+   re-highlight (which can replace <code>.innerHTML mid-flight) doesn't
+   leave dangling handlers attached to detached line spans. */
+function _hdtApplyFolds(pre, code, folds) {
+  var lines = code.querySelectorAll(':scope > .hdt-code-line');
   folds.forEach(function (f) {
-    var row = rows[f.start];
-    if (!row) return;
-    var marker = row.querySelector('.hdt-fold-marker');
+    var line = lines[f.start];
+    if (!line) return;
+    var marker = line.querySelector(':scope > .hdt-fold-marker');
     if (!marker) return;
     marker.classList.add('hdt-foldable');
     marker.setAttribute('role', 'button');
@@ -1702,19 +1701,17 @@ function _hdtApplyFolds(pre, _code, folds) {
     target.classList.toggle('hdt-folded', willCollapse);
     target.setAttribute('aria-expanded', willCollapse ? 'false' : 'true');
     var liveCode = pre.querySelector(':scope > code');
-    var lines = liveCode ? liveCode.querySelectorAll(':scope > .hdt-code-line') : [];
-    var liveRows = gutter.children;
+    var liveLines = liveCode ? liveCode.querySelectorAll(':scope > .hdt-code-line') : [];
     for (var i = start + 1; i < end; i++) {
-      if (lines[i]) lines[i].classList.toggle('hdt-line-hidden', willCollapse);
-      if (liveRows[i]) liveRows[i].classList.toggle('hdt-line-hidden', willCollapse);
+      if (liveLines[i]) liveLines[i].classList.toggle('hdt-line-hidden', willCollapse);
     }
     pre.classList.toggle('hdt-has-folds', !!pre.querySelector('.hdt-fold-marker.hdt-folded'));
   }
-  gutter.addEventListener('click', function (e) {
+  code.addEventListener('click', function (e) {
     var t = e.target.closest('.hdt-fold-marker.hdt-foldable');
     if (t) handle(t);
   });
-  gutter.addEventListener('keydown', function (e) {
+  code.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     var t = e.target.closest('.hdt-fold-marker.hdt-foldable');
     if (t) { e.preventDefault(); handle(t); }
@@ -3702,9 +3699,10 @@ class HtmlDocAnnotatedCode extends HTMLElement {
       });
     }
 
-    /* Build the per-line marker gutter: each .hdt-code-line gets a slot
-       at the start (column 1 of a 2-column grid; code at column 2). Empty
-       for unannotated lines; populated by extractMarkers. */
+    /* Build the per-line annotation slot: each .hdt-code-line gets an
+       extra cell that lives in its OWN grid column (not overlapping
+       line numbers). Empty by default; populated by moveMarkersToSlots
+       when an annotation marker for this line exists. */
     function prepareLineSlots() {
       var c = self.querySelector('pre code');
       if (!c) return;
@@ -3717,21 +3715,39 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         var slot = document.createElement('span');
         slot.className = 'hdc-anno-line-marker';
         slot.setAttribute('aria-hidden', 'true');
+        // Insert BEFORE the line-number cell so the annotation column
+        // is the leftmost gutter cell. The CSS override (below) widens
+        // .hdt-code-line's grid-template-columns to add a 4th column.
         line.insertBefore(slot, line.firstChild);
       });
       self.classList.add('hdc-anno-gutter-on');
     }
 
     /* After markers are injected inline (within the now per-line spans),
-       MOVE each marker into its line's slot. The reader scans the gutter
-       once; no eye-saccade across the code to find a `(N)` mid-line. */
+       MOVE each marker into its line's annotation slot AND attach a
+       hover-tooltip carrying the annotation body so the reader can
+       preview the explanation without scanning the list below. */
     function moveMarkersToSlots() {
       var inline = self.querySelectorAll('pre code .hdc-anno-marker');
       Array.prototype.forEach.call(inline, function (btn) {
         var line = btn.closest('.hdt-code-line');
         if (!line) return;
         var slot = line.querySelector(':scope > .hdc-anno-line-marker');
-        if (slot && btn.parentElement !== slot) slot.appendChild(btn);
+        if (!slot) return;
+        if (btn.parentElement !== slot) slot.appendChild(btn);
+        // Tooltip carrying the annotation body. Pull from the matching
+        // list item's body so authored HTML survives.
+        if (!slot.querySelector(':scope > .hdc-anno-tip')) {
+          var id = btn.getAttribute('data-anno-id');
+          var match = self.querySelector('.hdc-anno-item[data-anno-id="' + id + '"] .hdc-anno-body');
+          if (match) {
+            var tip = document.createElement('span');
+            tip.className = 'hdc-anno-tip';
+            tip.setAttribute('role', 'tooltip');
+            tip.innerHTML = match.innerHTML;
+            slot.appendChild(tip);
+          }
+        }
       });
     }
 
@@ -4273,6 +4289,91 @@ var __htmldocSearch = (function () {
     return modal;
   }
 
+  /* In-page fallback search: when the Pagefind index is missing (IDE-
+     served dev pages, no `html-doc build` has run yet), scan the
+     current page's headings + paragraph text for the query. Returns a
+     small list of section-anchored matches so the reader can at least
+     navigate the page they're on, instead of getting a dead-end "index
+     not found" toast. */
+  function _inPageSearch(query) {
+    var q = String(query || '').trim().toLowerCase();
+    if (!q) return [];
+    var main = document.querySelector('#main-content') || document.body;
+    var sections = main.querySelectorAll('section[id], h2[id], h3[id]');
+    var hits = [];
+    var seen = new Set();
+    sections.forEach(function (sec) {
+      var id = sec.id;
+      if (!id || seen.has(id)) return;
+      var heading = sec.tagName.toLowerCase().startsWith('h')
+        ? sec
+        : sec.querySelector(':scope > h2, :scope > h3');
+      if (!heading) return;
+      var headingText = (heading.textContent || '').replace(/\s+/g, ' ').trim();
+      // Walk the section's text and look for matches.
+      var scopeEl = sec.tagName.toLowerCase().startsWith('h')
+        ? (function () {
+            // Headings without a section wrapper — collect following
+            // siblings until the next heading.
+            var parts = [];
+            var n = sec.nextElementSibling;
+            while (n && !/^H[1-6]$/.test(n.tagName)) {
+              parts.push(n.textContent || '');
+              n = n.nextElementSibling;
+            }
+            return parts.join(' ');
+          })()
+        : (sec.textContent || '');
+      var body = scopeEl.replace(/\s+/g, ' ').trim();
+      var lc = body.toLowerCase();
+      var pos = lc.indexOf(q);
+      var headingMatch = headingText.toLowerCase().indexOf(q) >= 0;
+      if (pos < 0 && !headingMatch) return;
+      seen.add(id);
+      var excerpt = body;
+      if (pos >= 0) {
+        var start = Math.max(0, pos - 40);
+        var end = Math.min(body.length, pos + q.length + 80);
+        excerpt = (start > 0 ? '… ' : '') + body.slice(start, end) + (end < body.length ? ' …' : '');
+        // Wrap match in <mark>.
+        var rePos = excerpt.toLowerCase().indexOf(q);
+        if (rePos >= 0) {
+          excerpt =
+            escapeHTML(excerpt.slice(0, rePos)) +
+            '<mark>' + escapeHTML(excerpt.slice(rePos, rePos + q.length)) + '</mark>' +
+            escapeHTML(excerpt.slice(rePos + q.length));
+        } else {
+          excerpt = escapeHTML(excerpt);
+        }
+      } else {
+        excerpt = escapeHTML(excerpt.slice(0, 120) + (body.length > 120 ? ' …' : ''));
+      }
+      hits.push({
+        url: '#' + id,
+        title: headingText || id,
+        excerpt: excerpt,
+      });
+    });
+    return hits.slice(0, 20);
+  }
+
+  function _renderHits(hits, resultsEl) {
+    resultsEl.innerHTML = '';
+    hits.forEach(function (d) {
+      var li = document.createElement('li');
+      li.className = 'search-result';
+      var url = escapeHTML(d.url || '');
+      var title = escapeHTML(d.title || (d.url || ''));
+      var excerpt = d.excerpt || '';
+      li.innerHTML =
+        '<a href="' + url + '">' +
+          '<div class="search-result-title">' + title + '</div>' +
+          '<div class="search-result-excerpt">' + excerpt + '</div>' +
+        '</a>';
+      resultsEl.appendChild(li);
+    });
+  }
+
   function runSearch(query, status, resultsEl) {
     status.textContent = 'Searching…';
     resultsEl.innerHTML = '';
@@ -4282,6 +4383,14 @@ var __htmldocSearch = (function () {
       })
       .then(function (search) {
         if (!search.results.length) {
+          // Pagefind ran but found nothing. Fall back to in-page so
+          // the reader at least sees same-page matches.
+          var localHits = _inPageSearch(query);
+          if (localHits.length) {
+            status.textContent = 'On this page: ' + localHits.length + ' match' + (localHits.length === 1 ? '' : 'es');
+            _renderHits(localHits, resultsEl);
+            return;
+          }
           status.textContent = 'No results.';
           return;
         }
@@ -4289,28 +4398,32 @@ var __htmldocSearch = (function () {
         // Resolve top 10 results' data
         return Promise.all(search.results.slice(0, 10).map(function (r) { return r.data(); }))
           .then(function (datas) {
-            resultsEl.innerHTML = '';
-            datas.forEach(function (d) {
-              var li = document.createElement('li');
-              li.className = 'search-result';
-              var url = escapeHTML(d.url || '');
-              var title = escapeHTML((d.meta && d.meta.title) ? d.meta.title : (d.url || ''));
-              // d.excerpt intentionally raw — Pagefind injects <mark> tags
-              // for match highlighting. Source is the index we just built.
-              var excerpt = d.excerpt || '';
-              li.innerHTML =
-                '<a href="' + url + '">' +
-                  '<div class="search-result-title">' + title + '</div>' +
-                  '<div class="search-result-excerpt">' + excerpt + '</div>' +
-                '</a>';
-              resultsEl.appendChild(li);
+            var hits = datas.map(function (d) {
+              return {
+                url: d.url || '',
+                title: (d.meta && d.meta.title) ? d.meta.title : (d.url || ''),
+                excerpt: d.excerpt || '',
+              };
             });
+            _renderHits(hits, resultsEl);
           });
       })
       .catch(function (err) {
+        // Pagefind index missing (IDE-served, no build yet). Don't
+        // dead-end the user — fall back to in-page search so they can
+        // at least navigate the current document.
+        var localHits = _inPageSearch(query);
+        if (localHits.length) {
+          status.innerHTML = 'On this page: <strong>' + localHits.length +
+            '</strong> match' + (localHits.length === 1 ? '' : 'es') +
+            ' &middot; <em>site index unavailable</em>';
+          _renderHits(localHits, resultsEl);
+          return;
+        }
         var msg = String((err && err.message) || err);
-        if (/pagefind|404|404|Not Found|fetch/i.test(msg)) {
-          status.innerHTML = 'Search index not found. Run <code>html-doc build</code> and view from <code>dist/site/</code>.';
+        if (/pagefind|404|Not Found|fetch/i.test(msg)) {
+          status.innerHTML = 'Site index unavailable and no matches on this page. ' +
+            'Run <code>html-doc build</code> + view from <code>dist/site/</code> for full-site search.';
         } else {
           status.textContent = 'Search error: ' + msg;
         }
