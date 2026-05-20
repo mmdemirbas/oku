@@ -65,8 +65,9 @@ KIT_FILES = ["chrome.css", "chrome.js", "chrome-boot.js", "renderer.js"]
 SKIP_DIRS = {
     "dist", "_kit", "node_modules", ".git", "venv", ".venv",
     "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".idea",
-    # templates/ ships the starter for `html-doc init`; not a docs page.
-    # Walking it earlier produced a stray templates/starter.md every build.
+    # templates/ ships the starter pair for `html-doc init` (now under
+    # src/html_doc/templates/). Walking it earlier produced stray
+    # starter.{md,html} pages in every build.
     "templates",
     # _internal/ holds session / scratch docs the user explicitly keeps
     # out of the published site.
@@ -1719,7 +1720,7 @@ def _pick_open_target(htmls: list[Path], user_cwd: Path, root: Path) -> Path | N
             return h
     if under_user:
         return under_user[0]
-    skipped = {"_internal", "templates", "examples"}
+    skipped = {"_internal", "examples"}
     public = [h for h in htmls if not (set(h.relative_to(root).parts) & skipped)]
     if public:
         return public[0]

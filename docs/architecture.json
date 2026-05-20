@@ -34,7 +34,7 @@
         {
           "kind": "code",
           "language": "text",
-          "source": "html-doc/\n├── bin/html-doc            # Python CLI — init, build, serve\n├── src/html_doc/           # CLI implementation\n├── kit/                    # chrome.{js,css}, chrome-boot.js, renderer.js,\n│                           # schema/, glossary/, extrefs/\n├── docs/                   # this site — JSON-only sources + _kit symlink\n├── examples/               # tour pages — same shape as docs/\n├── templates/              # starter page pair for `html-doc init`\n├── tests/                  # pytest suite\n└── README.md, CHANGELOG.md, CLAUDE.md"
+          "source": "html-doc/\n├── bin/html-doc            # Python CLI — init, build, serve\n├── src/html_doc/           # CLI implementation\n│   └── templates/          # starter page pair for `html-doc init`\n├── kit/                    # chrome.{js,css}, chrome-boot.js, renderer.js,\n│                           # schema/, glossary/, extrefs/\n├── docs/                   # this site — JSON-only sources + _kit symlink\n├── examples/               # tour pages — same shape as docs/\n├── tests/                  # pytest suite\n└── README.md, CHANGELOG.md, CLAUDE.md"
         },
         {
           "kind": "info-tip",

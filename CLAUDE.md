@@ -23,11 +23,12 @@ stub that loads the kit and the page JSON). `html-doc build` produces
 | `chrome.js` | Custom Elements, init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring), Prism/Mermaid lazy loaders, tooltip controller. ~3.9k LoC. |
 | `chrome.css` | All visual tokens (light/dark), layout grid, every primitive's styling. ~2.4k LoC. |
 | `renderer.js` | JSON → DOM mapping. `_renderTable`, `_renderTldr`, etc. ~700 LoC. |
-| `schema/page.schema.json` | JSON-schema for page sources. Every `docs/*.json` validates against it; the optional `jsonschema` dep makes the check active. |
+| `kit/schema/page.schema.json` | JSON-schema for page sources. Every `docs/*.json` validates against it; the optional `jsonschema` dep makes the check active. |
+| `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
 | `src/html_doc/cli.py` | `html-doc init / build / serve` plus the `_md_block` markdown twin emitter. |
+| `src/html_doc/templates/` | `starter.{json,html}` — pair to copy when starting a new page. |
 | `bin/html-doc` | PEP 723 shim — runs without install via `uv run bin/html-doc …`. |
 | `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. |
-| `templates/starter.json` | Template emitted by `html-doc init`. |
 
 ## Develop / verify
 

@@ -934,7 +934,7 @@
       "kind": "section",
       "id": "layout-chrome",
       "title": "Layout / chrome — not in the page JSON",
-      "lead": "page-chrome, page-nav, page-toc are set in the HTML stub, not the page JSON. The stub copy-pastes from templates/starter.html and you usually don't touch it.",
+      "lead": "page-chrome, page-nav, page-toc are set in the HTML stub, not the page JSON. The stub copy-pastes from src/html_doc/templates/starter.html and you usually don't touch it.",
       "blocks": [
         {
           "kind": "code",

@@ -216,7 +216,7 @@
         },
         {
           "kind": "paragraph",
-          "content": "Installs html-doc as a console script. The wheel packs chrome.{css,js}, schema/, glossary/, extrefs/, templates/ inside html_doc/assets/ so init/build find the kit assets without a git layout."
+          "content": "Installs html-doc as a console script. The wheel packs chrome.{css,js}, schema/, glossary/, extrefs/ inside html_doc/assets/ and ships starter templates under html_doc/templates/, so init/build find everything without a git layout."
         },
         {
           "kind": "heading",

@@ -47,8 +47,8 @@ python3 bin/html-doc serve       # plain Python works too (no extras)
 ```bash
 mkdir my-knowledge-base && cd my-knowledge-base
 html-doc init                    # creates docs/_kit -> kit symlink
-cp ../html-doc/templates/starter.json docs/index.json
-cp ../html-doc/templates/starter.html docs/index.html
+cp ../html-doc/src/html_doc/templates/starter.json docs/index.json
+cp ../html-doc/src/html_doc/templates/starter.html docs/index.html
 # edit docs/index.json to taste
 html-doc serve                   # opens in the browser, live-reloads on save
 ```
@@ -56,7 +56,7 @@ html-doc serve                   # opens in the browser, live-reloads on save
 ## Authoring model
 
 Each page is a `*.json` file at any depth under your docs root. A thin
-HTML stub next to it (`*.html`, copy of `templates/starter.html`)
+HTML stub next to it (`*.html`, copy of `src/html_doc/templates/starter.html`)
 bootstraps the renderer. Authors only ever edit the JSON.
 
 ```jsonc
@@ -229,6 +229,6 @@ See `CHANGELOG.md`.
 
 ## Companion files
 
-- `templates/starter.html` + `templates/starter.json` — copy to start a new page.
-- `schema/page.schema.json` — the page schema; editors pick this up via the `$schema` field.
+- `src/html_doc/templates/starter.html` + `src/html_doc/templates/starter.json` — copy to start a new page.
+- `kit/schema/page.schema.json` — the page schema; editors pick this up via the `$schema` field.
 - `docs/` — the project's own docs (built with the kit, dogfood).

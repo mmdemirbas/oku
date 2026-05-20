@@ -250,7 +250,6 @@ class TestPickOpenTarget:
             "docs/index.html",
             "docs/architecture.html",
             "_internal/iceberg.html",
-            "templates/starter.html",
         ):
             full = tmp_path / rel
             full.parent.mkdir(parents=True, exist_ok=True)
@@ -280,7 +279,7 @@ class TestPickOpenTarget:
         # that wins over alphabetically-first _internal/iceberg.html.
         htmls, root = self._setup(tmp_path)
         picked = cli._pick_open_target(htmls, root, root)
-        # Public docs (docs/) beat _internal/, templates/, examples/.
+        # Public docs (docs/) beat _internal/ and examples/.
         assert picked == root / "docs/index.html"
 
     def test_empty_htmls_returns_none(self, tmp_path: Path) -> None:

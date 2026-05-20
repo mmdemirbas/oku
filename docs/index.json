@@ -327,7 +327,7 @@
             "Each page is a JSON file under the project root. The companion HTML stub (",
             {
               "kind": "code",
-              "text": "templates/starter.html"
+              "text": "src/html_doc/templates/starter.html"
             },
             ") calls ",
             {

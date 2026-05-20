@@ -52,14 +52,12 @@ packages = ["src/html_doc"]
 "kit/schema"          = "html_doc/assets/schema"
 "kit/glossary"        = "html_doc/assets/glossary"
 "kit/extrefs"         = "html_doc/assets/extrefs"
-"templates"           = "html_doc/assets/templates"
 
 [tool.hatch.build.targets.sdist]
 include = [
     "src/html_doc",
     "bin/html-doc",
     "kit/",
-    "templates/",
     "README.md",
     "CHANGELOG.md",
 ]

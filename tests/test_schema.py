@@ -38,9 +38,12 @@ def test_docs_page_validates(doc_name: str, page_schema: dict, repo_root: Path) 
 
 
 def test_starter_template_validates(page_schema: dict, repo_root: Path) -> None:
-    """templates/starter.json — emitted to fresh projects via `html-doc init`.
-    A starter that doesn't pass schema would mislead every new author."""
-    data = json.loads((repo_root / "templates" / "starter.json").read_text(encoding="utf-8"))
+    """src/html_doc/templates/starter.json — emitted to fresh projects
+    via `html-doc init`. A starter that doesn't pass schema would
+    mislead every new author."""
+    data = json.loads(
+        (repo_root / "src" / "html_doc" / "templates" / "starter.json").read_text(encoding="utf-8")
+    )
     jsonschema.validate(data, page_schema)
 
 

@@ -34,7 +34,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd ~/path/to/your-project\nhtml-doc init     # creates docs/_kit -> kit symlink\n\n# Optional: copy the starter as a blank page\ncp ~/dev/mmdemirbas/html-doc/templates/starter.json docs/my-page.json\n\nhtml-doc serve    # opens in the browser; synthesizes stubs + manifest in-memory"
+          "source": "cd ~/path/to/your-project\nhtml-doc init     # creates docs/_kit -> kit symlink\n\n# Optional: copy the starter as a blank page\ncp ~/dev/mmdemirbas/html-doc/src/html_doc/templates/starter.json docs/my-page.json\n\nhtml-doc serve    # opens in the browser; synthesizes stubs + manifest in-memory"
         },
         {
           "kind": "paragraph",

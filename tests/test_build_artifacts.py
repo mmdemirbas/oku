@@ -16,7 +16,7 @@ import pytest
 from html_doc import cli
 
 
-# Sample HTML stub matching templates/starter.html in shape.
+# Sample HTML stub matching src/html_doc/templates/starter.html in shape.
 SAMPLE_STUB = """<!DOCTYPE html>
 <html lang="en">
 <head>
