@@ -356,6 +356,78 @@ class TestChromeKitMarkers:
             "single-source restore lives in chrome.js"
         )
 
+    def test_primitives_code_samples_have_live_demos(self, repo_root: Path) -> None:
+        """Every code sample in docs/primitives.json must have a matching demo.
+
+        Rule: when a `<code>` block contains JSON describing an html-doc
+        block (single top-level object with a `kind` field), one of the
+        next ≤4 sibling blocks must be a block of that kind, OR one of
+        those siblings must contain that kind as an inline element.
+
+        Prevents author-drift where someone edits the code sample but
+        forgets the live demo (or vice versa). User explicitly called
+        out: "Some examples are different than the rendered content
+        below it, some doesn't have a rendered counterpart at all."
+        """
+        page_path = repo_root / "docs" / "primitives.json"
+        assert page_path.exists(), "docs/primitives.json missing"
+        data = json.loads(page_path.read_text(encoding="utf-8"))
+
+        def inline_kinds(node, acc=None):
+            if acc is None:
+                acc = set()
+            if isinstance(node, list):
+                for item in node:
+                    inline_kinds(item, acc)
+                return acc
+            if not isinstance(node, dict):
+                return acc
+            kind = node.get("kind")
+            if isinstance(kind, str):
+                acc.add(kind)
+            for key in ("content", "children", "blocks", "items"):
+                if key in node:
+                    inline_kinds(node[key], acc)
+            return acc
+
+        issues = []
+
+        def walk(blocks, path):
+            for i, b in enumerate(blocks):
+                if isinstance(b, dict) and b.get("kind") == "code":
+                    src = (b.get("source") or b.get("code") or "").strip()
+                    if not src.startswith("{") or not src.endswith("}"):
+                        continue
+                    try:
+                        parsed = json.loads(src)
+                    except json.JSONDecodeError:
+                        continue
+                    claimed = parsed.get("kind") if isinstance(parsed, dict) else None
+                    if not claimed:
+                        continue
+                    found = False
+                    for j in range(i + 1, min(i + 5, len(blocks))):
+                        c = blocks[j]
+                        if not isinstance(c, dict):
+                            continue
+                        if c.get("kind") == "heading" and j > i + 1:
+                            break
+                        if c.get("kind") == claimed:
+                            found = True
+                            break
+                        if claimed in inline_kinds(c):
+                            found = True
+                            break
+                    if not found:
+                        issues.append(f"{path}[{i}] claims kind={claimed!r} but no demo follows")
+                if isinstance(b, dict):
+                    for key in ("children", "blocks"):
+                        if isinstance(b.get(key), list):
+                            walk(b[key], f"{path}/{b.get('kind')}[{i}].{key}")
+
+        walk(data.get("blocks", []), "")
+        assert not issues, "primitives.json drift:\n" + "\n".join(issues)
+
     def test_root_index_redirects_to_docs(self, repo_root: Path) -> None:
         """Repo-root `index.html` must exist and forward to docs/index.html.
 
