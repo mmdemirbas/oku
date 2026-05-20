@@ -153,13 +153,11 @@ SCRIPT_TO_KIT_RENDERER = re.compile(r'<script\s+src="_kit/renderer\.js"\s+defer\
 
 
 def find_html_files(root: Path):
-    """Find HTML files recursively under root, skipping generated dirs.
+    """Find kit-rendered HTML files under root, skipping generated dirs.
 
-    Forwarder pages (e.g. the repo-root ``index.html`` that redirects to
-    ``docs/index.html`` so IDE-served projects work) are skipped — they
-    don't reference the kit and processing them would overwrite real
-    pages in the dist output. Detection: the file lacks both the kit's
-    boot script and the renderer script.
+    Files that don't reference the kit boot or renderer (scratch pages,
+    foreign HTML) are skipped — processing them would overwrite real
+    pages in the dist output.
     """
     out = []
     for p in root.rglob("*.html"):
@@ -172,7 +170,6 @@ def find_html_files(root: Path):
         except OSError:
             continue
         if "_kit/chrome.js" not in head and "_kit/chrome-boot.js" not in head:
-            # Not a kit-rendered page. Likely a forwarder or scratch file.
             continue
         out.append(p)
     return sorted(out, key=lambda x: str(x).lower())
