@@ -215,6 +215,51 @@ class TestChromeKitMarkers:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "sidebar-collapsed" in src, "sidebar collapse class wiring missing"
 
+    def test_reader_can_cycle_content_width(self, repo_root: Path) -> None:
+        """Reader has a chrome button to cycle content width modes (D3).
+
+        Default narrow (860px, optimal line length); wide (1100px, more
+        cards per row); max (fills the grid cell, useful for tables
+        and matrices on wide screens). Mode persists to localStorage so
+        the choice survives reloads.
+
+        Locks:
+        - chrome.css declares `--content-width` and the three body
+          attribute overrides
+        - chrome.js exposes `cycleContentWidth` and a boot-time restore
+          path reading `localStorage['htmldoc-content-width']`
+        - PageChrome injects a `.width-toggle` button alongside the
+          other top-right chrome controls
+        - `.personalize-toggle` shifts to right: 136px so it doesn't
+          collide with `.width-toggle` at right: 76px
+        """
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert "--content-width" in css, "missing --content-width CSS variable"
+        for mode in ("narrow", "wide", "max"):
+            assert f'body[data-content-width="{mode}"]' in css, (
+                f"missing CSS rule for width mode '{mode}'"
+            )
+        assert ".width-toggle { top: 16px; right: 76px;" in css, (
+            "width-toggle button must sit at right:76px (left of theme)"
+        )
+        assert ".personalize-toggle { top: 16px; right: 136px;" in css, (
+            "personalize-toggle must shift to right:136px to make room "
+            "for the new width-toggle button"
+        )
+
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "cycleContentWidth" in js, "cycleContentWidth handler missing"
+        assert "htmldoc-content-width" in js, (
+            "localStorage key for the width-mode preference missing"
+        )
+        assert "WIDTH_MODES" in js and "'narrow'" in js and "'wide'" in js and "'max'" in js, (
+            "WIDTH_MODES list must enumerate the three modes"
+        )
+        assert ".width-toggle" in js, (
+            "PageChrome must inject a .width-toggle button"
+        )
+        assert "ICON_WIDTH" in js, "width-toggle icon constant missing"
+
     def test_layout_is_edge_anchored_not_centered(self, repo_root: Path) -> None:
         """The `.layout` grid must span the viewport edge-to-edge, with
         no centered max-width band that pushes the sidebar inward.

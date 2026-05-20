@@ -27,6 +27,10 @@
   --success-soft: #dcfce7;
   --on-accent: #ffffff;
   --max-width: 860px;
+  /* Reader-controlled content width (D3). Default narrow (= --max-width)
+     is the optimal reading line length. Wide / max are opt-in via the
+     top-right chrome button; choice persists to localStorage. */
+  --content-width: 860px;
   --shadow-strong: rgba(30, 27, 41, 0.18);
   --shadow-soft:   rgba(30, 27, 41, 0.06);
   --ctrl-bg:        rgba(255, 255, 255, 0.85);
@@ -257,7 +261,14 @@ nav.toc, page-toc {
 .ctrl-btn svg { width: 20px; height: 20px; display: block; }
 .toc-toggle { top: 16px; left: 16px; }
 .theme-toggle { top: 16px; right: 16px; }
-.personalize-toggle { top: 16px; right: 76px; /* 16 + 44 + 16 gap, left of theme */ }
+.width-toggle { top: 16px; right: 76px; /* 16 + 44 + 16 gap, left of theme */ }
+.personalize-toggle { top: 16px; right: 136px; /* shifted left of .width-toggle */ }
+
+/* Content-width modes (D3). The CSS variable wins because <main> reads
+   it via max-width; the body attribute is the persisted source of truth. */
+body[data-content-width="narrow"] { --content-width: 860px; }
+body[data-content-width="wide"]   { --content-width: 1100px; }
+body[data-content-width="max"]    { --content-width: 100vw; }
 .back-to-top { bottom: 18px; right: 18px; opacity: 0; pointer-events: none; }
 .back-to-top.visible { opacity: 1; pointer-events: auto; }
 

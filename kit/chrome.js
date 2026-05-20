@@ -48,6 +48,7 @@ const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
 const ICON_SYSTEM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
 const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+const ICON_WIDTH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="3" y2="18"/><line x1="21" y1="6" x2="21" y2="18"/><polyline points="8 8 5 12 8 16"/><polyline points="16 8 19 12 16 16"/></svg>';
 const ICON_CLIPBOARD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>';
 const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
 const ICON_CROSS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
@@ -184,18 +185,42 @@ try {
   }
 } catch (e) {}
 
+/* Content-width mode (D3) — reader picks narrow / wide / max, persists.
+ * narrow = 860px (optimal line length); wide = 1100px (more cards per
+ * row, still readable prose); max = fill the grid cell (tables, code,
+ * matrices in particular benefit on wide screens). State lives on
+ * `<body data-content-width=...>`; CSS does the rest via --content-width. */
+var WIDTH_MODES = ['narrow', 'wide', 'max'];
+function cycleContentWidth() {
+  var current = document.body.getAttribute('data-content-width') || 'narrow';
+  var i = WIDTH_MODES.indexOf(current);
+  var next = WIDTH_MODES[(i + 1) % WIDTH_MODES.length];
+  document.body.setAttribute('data-content-width', next);
+  try { localStorage.setItem('htmldoc-content-width', next); } catch (e) {}
+}
+try {
+  var savedWidth = localStorage.getItem('htmldoc-content-width');
+  if (savedWidth && WIDTH_MODES.indexOf(savedWidth) !== -1) {
+    document.addEventListener('DOMContentLoaded', function () {
+      document.body.setAttribute('data-content-width', savedWidth);
+    });
+  }
+} catch (e) {}
+
 /* ============ <page-chrome> Web Component ============ */
 class PageChrome extends HTMLElement {
   connectedCallback() {
     var skipLabel = this.getAttribute('skip-label') || 'Skip to content';
     var tocLabel = this.getAttribute('toc-label') || 'Toggle table of contents';
     var themeLabel = this.getAttribute('theme-label') || 'Cycle theme (system / light / dark)';
+    var widthLabel = this.getAttribute('width-label') || 'Cycle content width (narrow / wide / max)';
     var topLabel = this.getAttribute('top-label') || 'Back to top';
 
     this.innerHTML =
       '<a class="skip-link" href="#main-content">' + skipLabel + '</a>' +
       '<div class="progress-bar" id="progress-bar"></div>' +
       '<button class="ctrl-btn toc-toggle" type="button" aria-label="' + tocLabel + '" title="' + tocLabel + '">' + ICON_MENU + '</button>' +
+      '<button class="ctrl-btn width-toggle" type="button" aria-label="' + widthLabel + '" title="' + widthLabel + '">' + ICON_WIDTH + '</button>' +
       '<button class="ctrl-btn theme-toggle" type="button" aria-label="' + themeLabel + '" title="' + themeLabel + '">' +
         '<span class="icon-system">' + ICON_SYSTEM + '</span>' +
         '<span class="icon-sun">' + ICON_SUN + '</span>' +
@@ -204,6 +229,7 @@ class PageChrome extends HTMLElement {
       '<button class="ctrl-btn back-to-top" type="button" aria-label="' + topLabel + '" title="' + topLabel + '">' + ICON_UP + '</button>';
 
     this.querySelector('.toc-toggle').addEventListener('click', toggleTOC);
+    this.querySelector('.width-toggle').addEventListener('click', cycleContentWidth);
     this.querySelector('.theme-toggle').addEventListener('click', cycleTheme);
     this.querySelector('.back-to-top').addEventListener('click', function () {
       window.scrollTo({ top: 0, behavior: 'smooth' });
