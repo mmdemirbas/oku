@@ -356,6 +356,122 @@ class TestChromeKitMarkers:
             "single-source restore lives in chrome.js"
         )
 
+    def test_no_unresolved_references_in_docs(self, repo_root: Path) -> None:
+        """Every glossary-term / ext-ref / anchor link in docs must resolve.
+
+        Audit findings on first run: 3 broken ext-refs in primitives.json
+        (Iceberg paper, RFC 9457, Iceberg 1.4 release) — they were
+        authored but never defined in extrefs/*.json. The user explicitly
+        asked: "Identify the missing references in our docs and fix them."
+
+        Symbol tables:
+        - Glossary terms: union of `entries` keys across glossary/*.json
+          (case-insensitive match against the term `term` field).
+        - Ext-refs: union of `entries` keys across extrefs/*.json
+          (case-sensitive match against the `name` field).
+        - Anchors: each docs/*.json page collects every `id` from its
+          blocks recursively. `<link href="#foo">` resolves against the
+          current page's anchors; `<link href="page.html#foo">` against
+          the target page's anchors.
+        """
+        glossary_terms: set[str] = set()
+        for p in (repo_root / "glossary").glob("*.json"):
+            data = json.loads(p.read_text(encoding="utf-8"))
+            for term in (data.get("entries") or {}).keys():
+                glossary_terms.add(term.lower())
+
+        extref_names: set[str] = set()
+        for p in (repo_root / "extrefs").glob("*.json"):
+            data = json.loads(p.read_text(encoding="utf-8"))
+            for name in (data.get("entries") or {}).keys():
+                extref_names.add(name)
+
+        all_anchors: dict[str, set[str]] = {}
+        for p in (repo_root / "docs").glob("*.json"):
+            if p.name in ("kit.json", "site-manifest.json"):
+                continue
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
+            if data.get("kind") != "page":
+                continue
+            ids: set[str] = set()
+
+            def collect(node):  # noqa: ANN001
+                if isinstance(node, list):
+                    for x in node:
+                        collect(x)
+                    return
+                if not isinstance(node, dict):
+                    return
+                if isinstance(node.get("id"), str):
+                    ids.add(node["id"])
+                for k in ("content", "children", "blocks", "items"):
+                    if k in node:
+                        collect(node[k])
+
+            collect(data.get("blocks", []))
+            all_anchors[p.stem] = ids
+
+        anchor_re = re.compile(r"([^#]+)\.html#(.+)$")
+        unresolved: list[str] = []
+
+        def walk(node, page: str, path: str) -> None:
+            if isinstance(node, list):
+                for i, x in enumerate(node):
+                    walk(x, page, f"{path}[{i}]")
+                return
+            if not isinstance(node, dict):
+                return
+            kind = node.get("kind")
+            if kind == "glossary-term":
+                term = (node.get("term") or "").lower()
+                if term and term not in glossary_terms:
+                    unresolved.append(
+                        f"{page}:{path} glossary-term {term!r} not in any glossary/*.json"
+                    )
+            elif kind == "ext-ref":
+                name = node.get("name") or ""
+                if name and name not in extref_names:
+                    unresolved.append(
+                        f"{page}:{path} ext-ref {name!r} not in any extrefs/*.json"
+                    )
+            elif kind == "link":
+                href = node.get("href") or ""
+                if href.startswith("#"):
+                    anchor = href[1:]
+                    if all_anchors.get(page) and anchor not in all_anchors[page]:
+                        unresolved.append(
+                            f"{page}:{path} local anchor {href!r} not found on this page"
+                        )
+                else:
+                    m = anchor_re.match(href)
+                    if m:
+                        target = Path(m.group(1)).name
+                        anchor = m.group(2)
+                        if target in all_anchors and anchor not in all_anchors[target]:
+                            unresolved.append(
+                                f"{page}:{path} cross-page link {href!r} target page exists "
+                                "but anchor missing"
+                            )
+            for k in ("content", "children", "blocks", "items"):
+                if k in node:
+                    walk(node[k], page, f"{path}/{k}")
+
+        for p in (repo_root / "docs").glob("*.json"):
+            if p.name in ("kit.json", "site-manifest.json"):
+                continue
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
+            if data.get("kind") != "page":
+                continue
+            walk(data.get("blocks", []), p.stem, "/blocks")
+
+        assert not unresolved, "Unresolved references:\n  " + "\n  ".join(unresolved)
+
     def test_primitives_code_samples_have_live_demos(self, repo_root: Path) -> None:
         """Every code sample in docs/primitives.json must have a matching demo.
 

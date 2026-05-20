@@ -30,6 +30,27 @@
         "summary": "Streaming lakehouse format. Designed for low-latency stream-table convergence.",
         "link": "https://paimon.apache.org"
       }
+    },
+    "Iceberg paper": {
+      "en": {
+        "name": "Iceberg paper",
+        "summary": "The original Apache Iceberg design paper — argues for snapshot isolation as the foundation for a table format over object stores.",
+        "link": "https://iceberg.apache.org/docs/latest/spec/"
+      }
+    },
+    "Iceberg 1.4 release": {
+      "en": {
+        "name": "Iceberg 1.4 release notes",
+        "summary": "Iceberg 1.4 release notes — introduces cross-engine sort orders so Spark / Flink / Trino agree on row layout.",
+        "link": "https://iceberg.apache.org/releases/#140-release"
+      }
+    },
+    "RFC 9457": {
+      "en": {
+        "name": "RFC 9457",
+        "summary": "Problem Details for HTTP APIs (IETF). Standard machine-readable error payload format used to wire structured errors into HTTP responses.",
+        "link": "https://datatracker.ietf.org/doc/html/rfc9457"
+      }
     }
   }
 }
