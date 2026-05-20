@@ -45,12 +45,17 @@ python3 bin/html-doc serve       # plain Python works too (no extras)
 ## Quick start — new project
 
 ```bash
-mkdir my-knowledge-base && cd my-knowledge-base
-html-doc init                    # creates docs/_kit + docs/index.html
-cp ../html-doc/src/html_doc/templates/starter.json docs/index.json
-# edit docs/index.json to taste
+mkdir -p my-knowledge-base/docs && cd my-knowledge-base/docs
+html-doc init                    # creates _kit symlink + index.html in cwd
+cp ../../html-doc/src/html_doc/templates/starter.json index.json
+# edit index.json to taste
+cd ..
 html-doc serve                   # opens in the browser, live-reloads on save
 ```
+
+`html-doc init` treats the **current directory** as the docs root —
+there is no implicit `docs/` subdir. Run it wherever you want pages
+to live.
 
 ## Authoring model
 
@@ -92,7 +97,7 @@ kind.
 Three commands, all run from the project root or a subdirectory:
 
 ```bash
-html-doc init                    # one-time: docs/_kit symlink + docs/index.html stub
+html-doc init                    # one-time, runs in cwd: _kit symlink + index.html stub
 html-doc build                   # dist/standalone/ + dist/site/ + search index
 html-doc serve                   # local HTTP, live reload, Pagefind in background
 html-doc serve --no-watch        # disable filesystem watcher

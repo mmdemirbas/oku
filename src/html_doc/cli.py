@@ -93,23 +93,24 @@ def report(label: str, path: Path) -> None:
 
 # ---------- init ----------
 def cmd_init(args: argparse.Namespace) -> int:
-    """Idempotently scaffold the project's docs/ root.
+    """Idempotently scaffold the CURRENT directory as a docs root.
 
-    Creates two things if missing:
+    Creates two things in cwd if missing:
 
-    - docs/_kit → KIT_DIR symlink (kit JS/CSS + schema/glossary/extrefs).
-    - docs/index.html — top-level entry stub. Keeping this single
-      stub on disk is what makes IDE-served workflows work (IntelliJ's
-      built-in HTTP server, Live Server, etc.); deeper pages remain
-      JSON-only and rely on the dev server's in-memory synthesis.
+    - ``_kit`` → KIT_DIR symlink (kit JS/CSS + schema/glossary/extrefs).
+      If a stale symlink already points somewhere else, it is replaced;
+      a non-symlink path of the same name is left alone with an error.
+    - ``index.html`` — entry stub. A single on-disk stub at the docs
+      root is what makes IDE-served workflows work (IntelliJ's built-in
+      HTTP server, Live Server, etc.); deeper pages stay JSON-only and
+      rely on the dev server's in-memory synthesis.
 
-    Re-running does nothing destructive. Existing files are reported
-    and left alone.
+    Run this in whichever directory you treat as your docs root —
+    typically ``cd docs && html-doc init``. The command never creates
+    or descends into a "docs" subdir; cwd IS the docs root.
     """
-    project = Path.cwd()
-    docs = project / "docs"
-    docs.mkdir(exist_ok=True)
-    kit_link = docs / "_kit"
+    root = Path.cwd()
+    kit_link = root / "_kit"
 
     if kit_link.is_symlink():
         # Resolve before comparing — the on-disk symlink may be relative
@@ -118,21 +119,25 @@ def cmd_init(args: argparse.Namespace) -> int:
         if kit_link.resolve() == KIT_DIR.resolve():
             print(f"✓ Already linked: {kit_link} -> {os.readlink(kit_link)}")
         else:
-            print(f"✗ {kit_link} is a symlink to a different target: {os.readlink(kit_link)}", file=sys.stderr)
-            return 1
+            # Stale symlink — replace it. Symlinks are cheap; refreshing
+            # avoids "the kit moved, init won't fix it" surprises.
+            old = os.readlink(kit_link)
+            kit_link.unlink()
+            kit_link.symlink_to(KIT_DIR)
+            print(f"✓ Refreshed {kit_link} -> {KIT_DIR} (was -> {old})")
     elif kit_link.exists():
-        print(f"✗ {kit_link} exists and is not a symlink", file=sys.stderr)
+        print(f"✗ {kit_link} exists and is not a symlink — refusing to overwrite", file=sys.stderr)
         return 1
     else:
         kit_link.symlink_to(KIT_DIR)
         print(f"✓ Linked {kit_link} -> {KIT_DIR}")
 
-    index_html = docs / "index.html"
+    index_html = root / "index.html"
     if index_html.exists():
         print(f"✓ Already present: {index_html}")
     else:
         title = "Documentation"
-        index_json = docs / "index.json"
+        index_json = root / "index.json"
         if index_json.exists():
             try:
                 data = json.loads(index_json.read_text(encoding="utf-8"))
@@ -143,8 +148,9 @@ def cmd_init(args: argparse.Namespace) -> int:
         index_html.write_text(_stub_for(title), encoding="utf-8")
         print(f"✓ Created {index_html}")
     print()
-    print("  Author pages as docs/<name>.json (or .md). Open docs/index.html")
-    print("  in your IDE or run `html-doc serve` for a live-reloading dev server.")
+    print("  Author pages as <name>.json (or .md) next to index.html.")
+    print("  Open index.html in your IDE, or run `html-doc serve` from the")
+    print("  project root for a live-reloading dev server.")
     return 0
 
 

@@ -127,67 +127,87 @@ class TestCLIBuild:
 
 
 class TestCLIInit:
-    def test_init_creates_kit_symlink(self, tmp_path: Path, repo_root: Path) -> None:
+    # cmd_init operates on cwd directly — never on a "docs/" subdir.
+    # Tests run init from tmp_path and assert outputs live there.
+
+    def test_init_creates_kit_symlink_in_cwd(self, tmp_path: Path, repo_root: Path) -> None:
         proc = _run_cli(tmp_path, "init", repo_root=repo_root)
         assert proc.returncode == 0, f"init failed:\n{proc.stderr}\n{proc.stdout}"
-        link = tmp_path / "docs" / "_kit"
+        link = tmp_path / "_kit"
         assert link.is_symlink()
         # The symlink target is the resolver's choice — dev layout points
-        # at the repo root (where chrome.css lives next to schema/).
+        # at <repo>/kit (chrome.css + schema/ both live there).
         target = Path(os.readlink(link))
         assert (target / "chrome.css").exists()
+        # init does NOT create a docs/ subdir.
+        assert not (tmp_path / "docs").exists()
 
     def test_init_is_idempotent(self, tmp_path: Path, repo_root: Path) -> None:
-        # Running init twice on the same project should succeed both times
-        # — first creates, second sees the existing link and reports OK.
+        # Running init twice in the same dir should succeed both times.
         proc1 = _run_cli(tmp_path, "init", repo_root=repo_root)
         proc2 = _run_cli(tmp_path, "init", repo_root=repo_root)
         assert proc1.returncode == 0
         assert proc2.returncode == 0
 
-    def test_init_creates_docs_index_html(self, tmp_path: Path, repo_root: Path) -> None:
-        # The single on-disk stub at docs/index.html is what makes the
-        # IDE-served workflow work — IntelliJ's HTTP server can serve it
-        # without `html-doc serve` running.
+    def test_init_creates_index_html_in_cwd(self, tmp_path: Path, repo_root: Path) -> None:
+        # The on-disk stub at cwd/index.html is what makes IDE-served
+        # workflows work (IntelliJ's HTTP server, Live Server, etc.)
+        # — without it, only `html-doc serve` can render pages.
         proc = _run_cli(tmp_path, "init", repo_root=repo_root)
         assert proc.returncode == 0, f"init failed:\n{proc.stderr}\n{proc.stdout}"
-        index = tmp_path / "docs" / "index.html"
+        index = tmp_path / "index.html"
         assert index.exists()
         body = index.read_text(encoding="utf-8")
-        # Stub must reference the kit (boot, css, main, renderer) so the
-        # page actually renders when opened in a browser.
+        # Stub must reference the kit (boot, css, main, renderer).
         assert "_kit/chrome-boot.js" in body
         assert "_kit/chrome.css" in body
         assert "_kit/chrome.js" in body
         assert "_kit/renderer.js" in body
-        # autoBoot is what fetches the sibling JSON at load time.
+        # autoBoot fetches the sibling JSON at load time.
         assert "autoBoot" in body
 
     def test_init_picks_title_from_existing_index_json(self, tmp_path: Path, repo_root: Path) -> None:
-        # If docs/index.json already exists, init should use its title
-        # for the stub's <title> element — otherwise the browser tab
-        # shows "Documentation" until the renderer overwrites it.
-        docs = tmp_path / "docs"
-        docs.mkdir()
-        (docs / "index.json").write_text(
+        # If cwd/index.json already exists, init should use its title
+        # for the stub's <title> — otherwise the tab shows the generic
+        # fallback until the renderer overwrites it.
+        (tmp_path / "index.json").write_text(
             json.dumps({"kind": "page", "title": "My Project Docs", "blocks": []}),
             encoding="utf-8",
         )
         proc = _run_cli(tmp_path, "init", repo_root=repo_root)
         assert proc.returncode == 0
-        body = (docs / "index.html").read_text(encoding="utf-8")
+        body = (tmp_path / "index.html").read_text(encoding="utf-8")
         assert "<title>My Project Docs</title>" in body
 
     def test_init_does_not_overwrite_existing_index_html(self, tmp_path: Path, repo_root: Path) -> None:
         # Idempotency for index.html: a user-edited stub must survive
         # a re-run of `html-doc init`.
-        docs = tmp_path / "docs"
-        docs.mkdir()
         custom = "<!doctype html><html><body>HANDS OFF</body></html>"
-        (docs / "index.html").write_text(custom, encoding="utf-8")
+        (tmp_path / "index.html").write_text(custom, encoding="utf-8")
         proc = _run_cli(tmp_path, "init", repo_root=repo_root)
         assert proc.returncode == 0
-        assert (docs / "index.html").read_text(encoding="utf-8") == custom
+        assert (tmp_path / "index.html").read_text(encoding="utf-8") == custom
+
+    def test_init_refreshes_stale_kit_symlink(self, tmp_path: Path, repo_root: Path) -> None:
+        # Stale symlink (left over from a moved kit checkout) should be
+        # transparently refreshed to the resolver's current KIT_DIR.
+        elsewhere = tmp_path / "stale-target"
+        elsewhere.mkdir()
+        (tmp_path / "_kit").symlink_to(elsewhere)
+        proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+        assert proc.returncode == 0, f"init failed:\n{proc.stderr}\n{proc.stdout}"
+        # The symlink now points at the kit, not the stale target.
+        new_target = Path(os.readlink(tmp_path / "_kit"))
+        assert (new_target / "chrome.css").exists()
+        assert "Refreshed" in proc.stdout
+
+    def test_init_refuses_to_overwrite_non_symlink_kit(self, tmp_path: Path, repo_root: Path) -> None:
+        # A regular file or directory at cwd/_kit is user data; init
+        # must not clobber it.
+        (tmp_path / "_kit").mkdir()
+        proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+        assert proc.returncode != 0
+        assert "_kit" in proc.stderr
 
 
 class TestCLIHelp:

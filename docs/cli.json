@@ -17,9 +17,10 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "init creates the docs/_kit symlink + docs/index.html stub in your project. build produces dist/standalone/ + dist/site/ (each with their own site-manifest.json, llms.txt, page.md twins, plus Pagefind for site/ if installed). serve runs a local HTTP server and synthesizes stubs + manifest + llms.txt in memory — source dirs stay clean apart from the one entry stub.",
+      "summary": "init scaffolds the cwd as a docs root: _kit symlink + index.html entry stub. build produces dist/standalone/ + dist/site/ (each with their own site-manifest.json, llms.txt, page.md twins, plus Pagefind for site/ if installed). serve runs a local HTTP server and synthesizes stubs + manifest + llms.txt in memory — source dirs stay clean apart from the one entry stub.",
       "bullets": [
-        "Source dirs hold JSON (or MD) plus a single docs/index.html entry stub so IDE-served workflows work without the dev server running.",
+        "init treats cwd as the docs root. Run it from wherever you want pages to live (typically cd into your docs/ subdir first).",
+        "Source dirs hold JSON (or MD) plus a single index.html entry stub so IDE-served workflows work without the dev server running.",
         "build is idempotent; safe to re-run. dist/ is wiped each time.",
         "serve synthesizes stubs and the manifest fresh on each request — no source writes.",
         "Optional deps: pagefind (search index), jsonschema (page validation). Both soft-fail."
@@ -29,18 +30,18 @@
       "kind": "section",
       "id": "init",
       "title": "html-doc init",
-      "lead": "One-time per project. Creates the docs/_kit symlink so pages can reference _kit/chrome.js etc., and the docs/index.html entry stub that IDE-served workflows open directly (IntelliJ's built-in HTTP server, Live Server, etc.).",
+      "lead": "One-time per docs root. Creates a _kit symlink so pages can reference _kit/chrome.js etc., and an index.html entry stub that IDE-served workflows open directly (IntelliJ's built-in HTTP server, Live Server, etc.). Both land in cwd — there is no implicit docs/ subdir.",
       "blocks": [
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd ~/path/to/your-project\nhtml-doc init\n\n# ✓ Linked /path/to/your-project/docs/_kit -> ../kit\n# ✓ Created /path/to/your-project/docs/index.html\n#\n#   Author pages as docs/<name>.json (or .md). Open docs/index.html\n#   in your IDE or run `html-doc serve` for a live-reloading dev server."
+          "source": "cd ~/path/to/your-project/docs\nhtml-doc init\n\n# ✓ Linked /path/to/your-project/docs/_kit -> /path/to/html-doc/kit\n# ✓ Created /path/to/your-project/docs/index.html\n#\n#   Author pages as <name>.json (or .md) next to index.html.\n#   Open index.html in your IDE, or run `html-doc serve` from the\n#   project root for a live-reloading dev server."
         },
         {
           "kind": "callout",
           "type": "neutral",
-          "title": "Idempotent",
-          "content": "Re-running init leaves both targets alone if they already match: prints \"already linked\" for the symlink, \"already present\" for the stub. A user-edited index.html survives a re-run. Different symlink target → error with the current target so you can decide."
+          "title": "Idempotent + self-healing",
+          "content": "Re-running init is safe. If the symlink already resolves to the kit, it prints \"already linked\". If it points to a stale target (e.g. the kit repo moved), init transparently refreshes it. A non-symlink file at _kit is treated as user data and refused. An existing index.html is left untouched so your edits survive."
         }
       ]
     },

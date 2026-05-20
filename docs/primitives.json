@@ -690,7 +690,7 @@
               "num": "1",
               "title": "Init",
               "meta": "~1 min · one-time per project",
-              "content": "html-doc init creates docs/_kit symlink."
+              "content": "cd into your docs root, then html-doc init scaffolds the _kit symlink and an index.html stub there."
             },
             {
               "num": "2",
