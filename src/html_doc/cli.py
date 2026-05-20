@@ -529,12 +529,21 @@ def render_page_markdown(page_json: dict) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def build_markdown_twins(root: Path) -> int:
-    """For each JSON page under root, emit a sibling <name>.md. Returns count."""
+def build_markdown_twins(root: Path, dest_root: Path | None = None) -> int:
+    """For each JSON page under root, emit <name>.md (LLM-readable twin).
+
+    By default writes under ``dest_root`` (defaults to ``root`` for
+    backward compat). Pass ``dest_root=dist/site/`` to keep generated
+    .md files out of the source dirs — the user-stated policy is
+    "generated files live under a well-known path (dist/), not mixed
+    with the original .json content".
+    """
     n = 0
+    target_root = dest_root if dest_root is not None else root
     for p, data in find_json_pages(root):
         rel = p.relative_to(root)
-        out_path = root / rel.with_suffix(".md")
+        out_path = target_root / rel.with_suffix(".md")
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             out_path.write_text(render_page_markdown(data), encoding="utf-8")
             n += 1
@@ -879,18 +888,19 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f"✗ No .html or page-JSON files found in {root}", file=sys.stderr)
         return 1
 
-    # Always regenerate manifest + llms.txt + markdown twins so <page-nav>
-    # + AI consumers see fresh state. Write them at the docs root (the
-    # closest common parent of JSON pages) so chrome.js's fetch URL —
-    # __htmldocDocsRoot + 'site-manifest.json' — resolves naturally.
+    # Always regenerate manifest + llms.txt at the docs root so the
+    # runtime's `__htmldocDocsRoot + 'site-manifest.json'` fetch resolves
+    # naturally — these two are runtime-fetched, so they have to live
+    # alongside the JSON pages. Markdown twins, on the other hand, are
+    # ONLY consumed by external LLM crawlers — they don't need to be in
+    # the source tree, so the build emits them into dist/ exclusively
+    # (matches "generated files live under a well-known path, not
+    # mixed with original content" policy).
     docs_dir = _common_docs_dir(root, json_pages)
     manifest_path = build_manifest(docs_dir)
     llms_path = build_llms_txt(docs_dir)
-    md_count = build_markdown_twins(docs_dir)
     print(f"✓ Wrote {manifest_path.relative_to(root)} ({len(json_pages)} JSON page(s))")
     print(f"✓ Wrote {llms_path.relative_to(root)} (sitemap for LLM consumers)")
-    if md_count:
-        print(f"✓ Wrote {md_count} page.md twin(s) (LLM-readable markdown per page)")
 
     # Schema validation — soft-fails without jsonschema.
     if _HAS_JSONSCHEMA:
@@ -919,6 +929,14 @@ def cmd_build(args: argparse.Namespace) -> int:
 
     build_standalone(srcs, standalone, root)
     build_site(srcs, site, root)
+
+    # Markdown twins land in BOTH dist trees (standalone + site) — never
+    # in the source dirs. Consumers fetch them from the dist they
+    # actually serve.
+    md_standalone = build_markdown_twins(docs_dir, dest_root=standalone / docs_dir.relative_to(root))
+    md_site = build_markdown_twins(docs_dir, dest_root=site / docs_dir.relative_to(root))
+    if md_site:
+        print(f"✓ Wrote {md_site} page.md twin(s) under dist/site/ + dist/standalone/")
 
     # Pagefind search index — soft-fail if pagefind isn't installed.
     if pagefind_index(site):
@@ -1077,13 +1095,14 @@ def _watcher_loop(root: Path, stop: threading.Event) -> None:
         cur = _snapshot_tree(root)
         last = cur
         try:
-            # Write generated artifacts at the docs root (same logic as the
-            # one-shot path in cmd_serve), not at the project root.
+            # Refresh runtime-fetched generated files at the docs root.
+            # Markdown twins are skipped — they're LLM-crawler artifacts,
+            # not needed in source during a browser session. See cmd_serve
+            # for the same reasoning.
             pages_now = find_json_pages(root)
             docs_dir = _common_docs_dir(root, pages_now)
             build_manifest(docs_dir)
             build_llms_txt(docs_dir)
-            build_markdown_twins(docs_dir)
         except OSError:
             pass
         _sse_broadcast("change")
@@ -1225,11 +1244,12 @@ def cmd_serve(args: argparse.Namespace) -> int:
     try:
         manifest_path = build_manifest(docs_dir)
         llms_path = build_llms_txt(docs_dir)
-        md_count = build_markdown_twins(docs_dir)
         print(f"✓ Refreshed site-manifest: {manifest_path.relative_to(root)}")
         print(f"✓ Refreshed llms.txt:       {llms_path.relative_to(root)}")
-        if md_count:
-            print(f"✓ Refreshed page.md twins: {md_count} file(s)")
+        # Markdown twins are LLM-crawler artifacts; they don't matter for
+        # an interactive browser session. Skip them in serve so the
+        # source dirs stay clean. `html-doc build` emits them under
+        # dist/ when you need a deployable bundle.
     except OSError as e:
         print(f"! Could not write manifest/llms.txt: {e}", file=sys.stderr)
 

@@ -18,11 +18,18 @@ __pycache__/
 .pytest_cache/
 
 # html-doc: generated artifacts (regenerated on every serve/build)
+# Note: page.md twins NO LONGER land in source — they go to dist/ only.
+# Only manifest + llms.txt remain in source (runtime-fetched).
 docs/site-manifest.json
 docs/site-manifest.js
 docs/llms.txt
 docs/pagefind/
 docs/*.md
+examples/site-manifest.json
+examples/site-manifest.js
+examples/llms.txt
+examples/pagefind/
+examples/*.md
 
 # html-doc: pollution from older serves that wrote at the project root
 # instead of the docs root. cmd_serve r10 writes at the docs root, but

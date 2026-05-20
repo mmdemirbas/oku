@@ -81,16 +81,24 @@ class TestCLIBuild:
         docs = sample_project / "docs"
         proc = _run_cli(docs, "build", repo_root=repo_root)
         assert proc.returncode == 0, f"build failed:\n{proc.stderr}\n{proc.stdout}"
-        # Generated artifacts at the docs root.
+        # Runtime-fetched generated artifacts at the docs root.
+        # (Manifest + llms.txt live here so the chrome.js fetch resolves.)
         assert (docs / "site-manifest.json").exists()
         assert (docs / "site-manifest.js").exists()
         assert (docs / "llms.txt").exists()
-        assert (docs / "index.md").exists()
-        assert (docs / "about.md").exists()
+        # Markdown twins are LLM-crawler artifacts; they belong under
+        # dist/ only, NOT in the source dir. The user-stated policy:
+        # generated files live under a well-known path (dist/), not
+        # mixed with original content.
+        assert not (docs / "index.md").exists(), "page.md must not land in source"
+        assert not (docs / "about.md").exists(), "page.md must not land in source"
         # dist/ directories.
         assert (docs / "dist" / "standalone" / "index.html").exists()
         assert (docs / "dist" / "site" / "index.html").exists()
         assert (docs / "dist" / "site" / "_kit" / "chrome.css").exists()
+        # Twins ARE in dist (both flavors).
+        assert (docs / "dist" / "site" / "index.md").exists()
+        assert (docs / "dist" / "standalone" / "index.md").exists()
 
     def test_manifest_lists_both_pages(self, sample_project: Path, repo_root: Path) -> None:
         docs = sample_project / "docs"
