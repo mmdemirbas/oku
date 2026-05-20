@@ -17,10 +17,10 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "A v2 page is one JSON file. Authoring it is filling in a tree of kind-tagged blocks. The HTML stub next to it bootstraps the renderer; you do not edit the HTML.",
+      "summary": "A v2 page is one JSON file. Authoring it is filling in a tree of kind-tagged blocks. No HTML stub to maintain — the dev server synthesizes one in memory from each .json (or .md) source; the build writes one into dist/.",
       "bullets": [
-        "Start a new project with html-doc init. Two files per page: name.json (content) and name.html (one-time stub).",
-        "The schema is at schema/page.schema.json — VS Code and Cursor autocomplete every node kind.",
+        "Start a new project with html-doc init. One file per page: name.json (or name.md). Source dirs hold authored content only.",
+        "The schema is at kit-data/schema/page.schema.json — VS Code and Cursor autocomplete every node kind.",
         "Rich text inside a paragraph is an array: plain strings interleaved with inline nodes (glossary-term, ext-ref, code, em, strong, link).",
         "Per-page metadata picks accent color, page order in the nav, and the one-line summary that appears in nav tooltips and llms.txt."
       ]
@@ -34,7 +34,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd ~/path/to/your-project\nhtml-doc init     # creates docs/_kit -> kit symlink\n\n# Optional: copy the starter pair for a blank page\ncp ~/dev/mmdemirbas/html-doc/templates/starter.html docs/my-page.html\ncp ~/dev/mmdemirbas/html-doc/templates/starter.json docs/my-page.json\n\nhtml-doc serve    # opens in the browser"
+          "source": "cd ~/path/to/your-project\nhtml-doc init     # creates docs/_kit -> kit symlink\n\n# Optional: copy the starter as a blank page\ncp ~/dev/mmdemirbas/html-doc/templates/starter.json docs/my-page.json\n\nhtml-doc serve    # opens in the browser; synthesizes stubs + manifest in-memory"
         },
         {
           "kind": "paragraph",

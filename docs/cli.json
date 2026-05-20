@@ -17,11 +17,11 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "init creates the docs/_kit symlink in your project. build produces site-manifest.json, llms.txt, dist/site/, dist/standalone/, plus Pagefind if installed. serve walks up to find the project, refreshes the manifest, opens a local HTTP server.",
+      "summary": "init creates the docs/_kit symlink in your project. build produces dist/standalone/ + dist/site/ (each with their own site-manifest.json, llms.txt, page.md twins, plus Pagefind for site/ if installed). serve runs a local HTTP server and synthesizes stubs + manifest + llms.txt in memory — source dirs stay clean.",
       "bullets": [
-        "All three commands take zero flags — defaults always.",
+        "Source dirs hold JSON (or MD) only. Generated artifacts (stubs, manifest, llms.txt) never land in source.",
         "build is idempotent; safe to re-run. dist/ is wiped each time.",
-        "serve regenerates the manifest on startup so <page-nav> reflects current state.",
+        "serve synthesizes stubs and the manifest fresh on each request — no source writes.",
         "Optional deps: pagefind (search index), jsonschema (page validation). Both soft-fail."
       ]
     },
@@ -48,40 +48,40 @@
       "kind": "section",
       "id": "build",
       "title": "html-doc build",
-      "lead": "Walks the current directory, produces all the build artifacts. Run before deploying to dist/site/, before sharing dist/standalone/ files, and any time you add or rename a page (so site-manifest.json refreshes).",
+      "lead": "Walks the current directory, produces every dist artifact. Run before deploying dist/site/, before sharing dist/standalone/ files, or any time a search index needs to refresh. Source dir is never written to.",
       "blocks": [
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd ~/path/to/your-project/docs\nhtml-doc build\n\n# ✓ Wrote site-manifest.json (6 JSON page(s))\n# ✓ Wrote llms.txt (sitemap for LLM consumers)\n# ✓ Schema validation: 6 page(s) clean\n# ✓ Pagefind index built: dist/site/pagefind/\n# ✓ Built 6 HTML file(s):\n#\n#   standalone (inline, send-as-file):\n#                file:///.../dist/standalone/index.html\n#                ...\n#\n#   site (shared assets, multi-page):\n#   site root:   file:///.../dist/site\n#                ..."
+          "source": "cd ~/path/to/your-project\nhtml-doc build\n\n# ✓ Schema validation: 6 page(s) clean\n# ✓ Wrote site-manifest + llms.txt under dist/{standalone,site}/docs/ (6 JSON page(s))\n# ✓ Wrote 6 page.md twin(s) under dist/site/ + dist/standalone/\n# ✓ Synthesized 6 stub(s) for pages without on-disk .html\n# ✓ Pagefind index built: dist/site/pagefind/\n# ✓ Built 6 HTML file(s):\n#\n#   standalone (inline, send-as-file):\n#                file:///.../dist/standalone/docs/index.html\n#                ...\n#\n#   site (shared assets, multi-page):\n#   site root:   file:///.../dist/site\n#                ..."
         },
         {
           "kind": "step-flow",
           "steps": [
             {
               "num": "1",
-              "title": "Walk *.json pages recursively",
-              "content": "Skips dist/, _kit/, node_modules/, .git/, venv/, __pycache__/. Treats files with kind:\"page\" as pages."
+              "title": "Walk *.json and *.md pages recursively",
+              "content": "Skips dist/, _kit/, node_modules/, .git/, venv/, __pycache__/. Treats files with kind:\"page\" (and any .md) as pages."
             },
             {
               "num": "2",
-              "title": "Write site-manifest.json + llms.txt",
-              "content": "At the project root. Manifest drives <page-nav>; llms.txt is the AI-consumer sitemap."
+              "title": "Schema validation (optional)",
+              "content": "If jsonschema is installed (pip install jsonschema), every page is checked against kit-data/schema/page.schema.json. Errors print with field paths. Without jsonschema, prints a one-line hint and skips."
             },
             {
               "num": "3",
-              "title": "Schema validation (optional)",
-              "content": "If jsonschema is installed (pip install jsonschema), every page is checked against schema/page.schema.json. Errors print with field paths. Without jsonschema, prints a one-line hint and skips."
+              "title": "build_standalone — single-file per page",
+              "content": "For each page, synthesize the HTML stub in memory, inline chrome.css/.js, chrome-boot.js, renderer.js, the page JSON, and the kit bundle. Output to dist/standalone/ with directory structure preserved."
             },
             {
               "num": "4",
-              "title": "build_standalone — single-file per page",
-              "content": "For each *.html stub, inline chrome.css, chrome.js, renderer.js, the page JSON, and the kit bundle. Output to dist/standalone/ with directory structure preserved."
+              "title": "build_site — multi-page deployable",
+              "content": "Write a per-page stub + copy the source JSON to dist/site/ with directory structure preserved. Copy _kit/ and _kit-data/. Inject extracted text into hidden data-pagefind-body for indexing."
             },
             {
               "num": "5",
-              "title": "build_site — multi-page deployable",
-              "content": "Copy every *.html + *.json to dist/site/ with directory structure preserved. Copy _kit/ to dist/site/_kit/. Inject extracted text into hidden data-pagefind-body for indexing."
+              "title": "Write site-manifest + llms.txt into both dist trees",
+              "content": "Generated alongside the pages they describe. The runtime's __htmldocDocsRoot + 'site-manifest.json' fetch resolves naturally."
             },
             {
               "num": "6",
@@ -102,12 +102,12 @@
       "kind": "section",
       "id": "serve",
       "title": "html-doc serve",
-      "lead": "Local HTTP server in the project root. Refreshes site-manifest.json + llms.txt on startup, picks the first free port from 9876, opens the first HTML page in the browser.",
+      "lead": "Local HTTP server in the project root. Synthesizes per-page .html stubs, site-manifest.{json,js}, and llms.txt in memory on each request — source dir stays clean. Picks the first free port from 9876.",
       "blocks": [
         {
           "kind": "code",
           "language": "bash",
-          "source": "html-doc serve\n\n# ✓ Refreshed site-manifest: site-manifest.json\n# ✓ Refreshed llms.txt:       llms.txt\n# ✓ Serving /path/to/your-project on http://localhost:9876\n#   Stop with Ctrl-C.\n#\n#   HTML files:\n#     http://localhost:9876/docs/index.html\n#     http://localhost:9876/docs/authoring.html\n#     ..."
+          "source": "html-doc serve\n\n# ✓ Serving /path/to/your-project on http://localhost:9876\n#   Stop with Ctrl-C.\n#\n#   HTML files:\n#     http://localhost:9876/docs/index.html\n#     http://localhost:9876/docs/authoring.html\n#     ..."
         },
         {
           "kind": "list",
@@ -120,7 +120,10 @@
               "First free port from 9876–9900. Caps at 9900 (if all taken, errors out)."
             ],
             [
-              "Refreshes site-manifest.json + llms.txt — but not the Pagefind index. Search only works on a built site (run html-doc build first if you need search)."
+              "Synthesizes /<docs>/<name>.html stubs from sibling .json or .md files on the fly; same for site-manifest.{json,js} and llms.txt. No filesystem writes."
+            ],
+            [
+              "Pagefind is not built by serve. Run html-doc build first if you need full-text search; serve falls back to in-page anchor search otherwise."
             ],
             [
               "Opens the first HTML it finds in the default browser. Ctrl-C to stop."

@@ -20,21 +20,6 @@ from pathlib import Path
 import pytest
 
 
-SAMPLE_STUB = """<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="UTF-8">
-<title>{title}</title>
-<link rel="stylesheet" href="_kit/chrome.css">
-<script src="_kit/chrome-boot.js"></script>
-<script src="_kit/chrome.js" defer></script>
-<script src="_kit/renderer.js" defer></script>
-</head><body>
-<page-chrome></page-chrome>
-<div class="layout"><main id="main-content"></main></div>
-</body></html>
-"""
-
-
 def _run_cli(cwd: Path, *args: str, repo_root: Path) -> subprocess.CompletedProcess[str]:
     """Run bin/html-doc as a subprocess. We use the in-tree shim rather
     than an installed binary so the test stays portable — works against
@@ -57,8 +42,8 @@ def sample_project(tmp_path: Path, repo_root: Path) -> Path:
     docs.mkdir()
     # _kit symlink — what `html-doc init` would have created.
     (docs / "_kit").symlink_to(repo_root)
+    # Source is JSON-only; build synthesizes the .html stub into dist.
     for stem, title in (("index", "Index"), ("about", "About")):
-        (docs / f"{stem}.html").write_text(SAMPLE_STUB.format(title=title), encoding="utf-8")
         (docs / f"{stem}.json").write_text(
             json.dumps(
                 {
@@ -81,21 +66,23 @@ class TestCLIBuild:
         docs = sample_project / "docs"
         proc = _run_cli(docs, "build", repo_root=repo_root)
         assert proc.returncode == 0, f"build failed:\n{proc.stderr}\n{proc.stdout}"
-        # Runtime-fetched generated artifacts at the docs root.
-        # (Manifest + llms.txt live here so the chrome.js fetch resolves.)
-        assert (docs / "site-manifest.json").exists()
-        assert (docs / "site-manifest.js").exists()
-        assert (docs / "llms.txt").exists()
-        # Markdown twins are LLM-crawler artifacts; they belong under
-        # dist/ only, NOT in the source dir. The user-stated policy:
-        # generated files live under a well-known path (dist/), not
-        # mixed with original content.
-        assert not (docs / "index.md").exists(), "page.md must not land in source"
-        assert not (docs / "about.md").exists(), "page.md must not land in source"
-        # dist/ directories.
+        # Source dir stays clean — manifest / llms.txt / page.md twins
+        # / .html stubs all live under dist/ only.
+        for offender in ("site-manifest.json", "site-manifest.js", "llms.txt",
+                         "index.md", "about.md", "index.html", "about.html"):
+            assert not (docs / offender).exists(), (
+                f"{offender} leaked into source: must live under dist/"
+            )
+        # dist/ trees carry the actual artifacts the runtime needs.
         assert (docs / "dist" / "standalone" / "index.html").exists()
         assert (docs / "dist" / "site" / "index.html").exists()
         assert (docs / "dist" / "site" / "_kit" / "chrome.css").exists()
+        # Manifest + llms.txt land alongside the JSON pages in each dist
+        # tree (the runtime fetches them via `__htmldocDocsRoot + ...`).
+        assert (docs / "dist" / "site" / "site-manifest.json").exists()
+        assert (docs / "dist" / "site" / "site-manifest.js").exists()
+        assert (docs / "dist" / "site" / "llms.txt").exists()
+        assert (docs / "dist" / "standalone" / "site-manifest.json").exists()
         # Twins ARE in dist (both flavors).
         assert (docs / "dist" / "site" / "index.md").exists()
         assert (docs / "dist" / "standalone" / "index.md").exists()
@@ -103,7 +90,9 @@ class TestCLIBuild:
     def test_manifest_lists_both_pages(self, sample_project: Path, repo_root: Path) -> None:
         docs = sample_project / "docs"
         _run_cli(docs, "build", repo_root=repo_root)
-        manifest = json.loads((docs / "site-manifest.json").read_text(encoding="utf-8"))
+        manifest = json.loads(
+            (docs / "dist" / "site" / "site-manifest.json").read_text(encoding="utf-8")
+        )
         titles = {entry["title"] for entry in manifest["pages"]}
         assert titles == {"Index", "About"}
 
@@ -131,7 +120,7 @@ class TestCLIBuild:
     def test_llms_txt_has_pages_section(self, sample_project: Path, repo_root: Path) -> None:
         docs = sample_project / "docs"
         _run_cli(docs, "build", repo_root=repo_root)
-        text = (docs / "llms.txt").read_text(encoding="utf-8")
+        text = (docs / "dist" / "site" / "llms.txt").read_text(encoding="utf-8")
         assert "## Pages" in text
         assert "Index" in text
         assert "About" in text

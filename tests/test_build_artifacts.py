@@ -93,19 +93,21 @@ class TestBuildSite:
         # At minimum schema/ is always shipped, in _kit-data/.
         assert (out_dir / "_kit-data" / "schema").is_dir()
 
-    def test_copies_kit_json_and_manifest_when_present(self, tmp_path: Path) -> None:
+    def test_copies_kit_json_when_present(self, tmp_path: Path) -> None:
+        # build_site copies the user-authored kit.json. site-manifest /
+        # llms.txt are NO LONGER copied from source — cmd_build writes
+        # them directly into each dist tree to keep source clean.
         src_root = tmp_path / "src"
         out_dir = tmp_path / "out"
         src_root.mkdir()
         pages = _scaffold_project(src_root)
-        # Pre-build manifest + llms so build_site copies them.
-        cli.build_manifest(src_root)
-        cli.build_llms_txt(src_root)
         cli.build_site(pages, out_dir, src_root)
         assert (out_dir / "kit.json").exists()
-        assert (out_dir / "site-manifest.json").exists()
-        assert (out_dir / "site-manifest.js").exists()
-        assert (out_dir / "llms.txt").exists()
+        # Manifest / llms NOT here — written by cmd_build into the dist
+        # tree's docs_dir, not by build_site from source files.
+        assert not (out_dir / "site-manifest.json").exists()
+        assert not (out_dir / "site-manifest.js").exists()
+        assert not (out_dir / "llms.txt").exists()
 
     def test_copies_html_and_json_pages(self, tmp_path: Path) -> None:
         src_root = tmp_path / "src"

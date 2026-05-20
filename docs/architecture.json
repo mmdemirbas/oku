@@ -34,7 +34,7 @@
         {
           "kind": "code",
           "language": "text",
-          "source": "html-doc/\n├── bin/html-doc            # Python CLI — init, build, serve\n├── chrome.css              # styles + design tokens\n├── chrome-boot.js          # synchronous pre-paint theme + TOC state\n├── chrome.js               # behavior — Custom Elements, tooltip, search, etc.\n├── renderer.js             # JSON → Custom Element DOM walker\n├── schema/page.schema.json # authoring contract\n├── glossary/<domain>.json  # central glossary by domain\n├── extrefs/<domain>.json   # central ext-refs by domain\n├── templates/              # starter page pair\n└── README.md, CHANGELOG.md, SPEC.md"
+          "source": "html-doc/\n├── bin/html-doc            # Python CLI — init, build, serve\n├── src/html_doc/           # CLI implementation\n├── kit/                    # runtime — chrome.{js,css}, chrome-boot.js, renderer.js\n├── kit-data/\n│   ├── schema/page.schema.json   # authoring contract\n│   ├── glossary/<domain>.json    # central glossary by domain\n│   └── extrefs/<domain>.json     # central ext-refs by domain\n├── docs/                   # this site — JSON-only sources + _kit symlinks\n├── examples/               # tour pages — same shape as docs/\n├── templates/              # starter page pair for `html-doc init`\n├── tests/                  # pytest suite\n└── README.md, CHANGELOG.md, CLAUDE.md"
         },
         {
           "kind": "info-tip",
@@ -43,7 +43,7 @@
             {
               "kind": "paragraph",
               "content": [
-                "chrome.js is 1300+ lines in one file. Splitting it would mean either more script tags in every stub (worse onboarding) or a build step (more complexity). The current bet: one file with a clear table of contents at the top (see the section banner there). If it grows past 2000 lines, revisit."
+                "chrome.js is ~4.5k lines in one file. Splitting it would mean either more script tags in every stub (worse onboarding) or a build step (more complexity, defeating the no-build-for-content goal). The current bet: one file with a clear table of contents at the top (see the section banner there). Reviewed each time the design changes shape; still wins on author ergonomics."
               ]
             }
           ]
