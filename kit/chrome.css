@@ -963,12 +963,24 @@ code:not(pre code) {
 /* CSS-driven view switching — the wrapper's data-view attribute selects
    which container is visible. Avoids the [hidden]-attribute vs
    display:grid conflict where cards.hidden was overridden. */
+/* View-toggle visibility. Each [data-view] hides the three NON-active
+   variants. Board is the fourth alternate; default (attribute absent)
+   shows the table view. */
 .hdt-table-wrap[data-view="table"] .hdt-table-cards,
 .hdt-table-wrap[data-view="table"] .hdt-table-list,
+.hdt-table-wrap[data-view="table"] .hdt-table-board,
 .hdt-table-wrap[data-view="list"]  .hdt-table-scroll,
 .hdt-table-wrap[data-view="list"]  .hdt-table-cards,
+.hdt-table-wrap[data-view="list"]  .hdt-table-board,
 .hdt-table-wrap[data-view="cards"] .hdt-table-scroll,
-.hdt-table-wrap[data-view="cards"] .hdt-table-list { display: none !important; }
+.hdt-table-wrap[data-view="cards"] .hdt-table-list,
+.hdt-table-wrap[data-view="cards"] .hdt-table-board,
+.hdt-table-wrap[data-view="board"] .hdt-table-scroll,
+.hdt-table-wrap[data-view="board"] .hdt-table-cards,
+.hdt-table-wrap[data-view="board"] .hdt-table-list { display: none !important; }
+.hdt-table-wrap:not([data-view]) .hdt-table-cards,
+.hdt-table-wrap:not([data-view]) .hdt-table-list,
+.hdt-table-wrap:not([data-view]) .hdt-table-board { display: none !important; }
 
 /* Chip filter rack — tabular layout: column 1 is the label cell, column
    2 is the chip cell. Multiple filterable columns stack vertically; the
@@ -1191,6 +1203,97 @@ a.hdt-card:focus-visible,
 .hdt-list-card:hover {
   border-color: var(--line-strong);
   box-shadow: 0 2px 6px var(--shadow-strong, var(--shadow-soft));
+}
+
+/* ====== Board (kanban) view ====== *
+ * One lane per active group; each lane stacks its rows as compact
+ * cards. Lanes flow horizontally and scroll when they overflow the
+ * available width — never stack vertically (a wrapping kanban defeats
+ * the purpose of the metaphor). Tight lane width (260px) keeps the
+ * card density readable on a typical viewport. */
+.hdt-table-board {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  overflow-x: auto;
+  align-items: flex-start;
+  padding-bottom: 8px;
+}
+.hdt-board-lane {
+  flex: 0 0 260px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  max-height: 70vh;
+}
+.hdt-board-lane-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0;
+  background: inherit;
+  border-radius: 12px 12px 0 0;
+}
+.hdt-board-lane-title {
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--accent-strong);
+}
+.hdt-board-lane-count {
+  font: 700 11px 'JetBrains Mono', monospace;
+  color: var(--text-soft);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 1px 8px;
+  min-width: 22px; text-align: center;
+}
+.hdt-board-lane-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  display: flex; flex-direction: column;
+  gap: 10px;
+}
+.hdt-board-card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 1px 2px var(--shadow-soft);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
+}
+.hdt-board-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 6px var(--shadow-strong, var(--shadow-soft));
+  transform: translateX(2px);
+}
+.hdt-board-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.hdt-board-card-row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 2px 0;
+}
+.hdt-board-card-key {
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-soft);
+  align-self: start;
+}
+.hdt-board-card-val {
+  color: var(--text);
+  word-wrap: break-word;
 }
 .hdt-list-card > tbody > tr + tr > th,
 .hdt-list-card > tbody > tr + tr > td {

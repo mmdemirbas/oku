@@ -711,6 +711,7 @@ function initReadingAids() {
       '<button data-view="table" type="button" class="active" aria-pressed="true">Table</button>' +
       '<button data-view="list"  type="button" aria-pressed="false">List</button>' +
       '<button data-view="cards" type="button" aria-pressed="false">Cards</button>' +
+      '<button data-view="board" type="button" aria-pressed="false">Board</button>' +
       '<span class="hdt-ctrl-sep" aria-hidden="true"></span>'
     ) : '';
     ctrl.innerHTML =
@@ -749,13 +750,16 @@ function initReadingAids() {
 
       function stripHtml(s) { return String(s).replace(/<[^>]+>/g, '').trim(); }
 
-      // Cards + List containers (rebuilt by render()).
+      // Cards + List + Board containers (rebuilt by render()).
       var cards = document.createElement('div');
       cards.className = 'hdt-table-cards';
       wrap.appendChild(cards);
       var list = document.createElement('div');
       list.className = 'hdt-table-list';
       wrap.appendChild(list);
+      var board = document.createElement('div');
+      board.className = 'hdt-table-board';
+      wrap.appendChild(board);
 
       // State
       var sortCol = -1;
@@ -1105,6 +1109,68 @@ function initReadingAids() {
         });
       }
 
+      /* Board view — kanban-style lanes, one per unique value in the
+         active group column. Lane order follows the existing group
+         iteration order (group_by_author preserves declared order;
+         column-based grouping falls back to insertion order = first
+         occurrence in the rows). Each row becomes a card in its lane.
+         When no grouping is active, the board collapses to a single
+         "All" lane (still useful as a card flow without group rules). */
+      function renderBoard(visible, counts) {
+        board.innerHTML = '';
+        // Bucket rows by their active group key. `visible` is the same
+        // alternating [group?, row, row, group, row, ...] sequence the
+        // other views consume; we just need to re-bucket it.
+        var lanes = new Map();
+        var currentGroup = null;
+        visible.forEach(function (e) {
+          if (e.type === 'group') {
+            currentGroup = e;
+            if (!lanes.has(e)) lanes.set(e, []);
+            return;
+          }
+          var key = currentGroup || '__all__';
+          if (!lanes.has(key)) lanes.set(key, []);
+          lanes.get(key).push(e);
+        });
+        // Render each lane as a column with a header + stacked cards.
+        lanes.forEach(function (rows, key) {
+          var lane = document.createElement('div');
+          lane.className = 'hdt-board-lane';
+          var head = document.createElement('div');
+          head.className = 'hdt-board-lane-head';
+          if (key === '__all__') {
+            head.innerHTML = '<span class="hdt-board-lane-title">All</span>' +
+                             '<span class="hdt-board-lane-count">' + rows.length + '</span>';
+          } else {
+            var title = (key.label || key.title || key.key || '').toString();
+            head.innerHTML =
+              '<span class="hdt-board-lane-title">' + escapeXml(title) + '</span>' +
+              '<span class="hdt-board-lane-count">' + rows.length + '</span>';
+          }
+          lane.appendChild(head);
+          var laneBody = document.createElement('div');
+          laneBody.className = 'hdt-board-lane-body';
+          rows.forEach(function (e) {
+            var card = document.createElement(e.iv.href ? 'a' : 'div');
+            card.className = 'hdt-board-card';
+            applyRowInteractivity(card, e.iv);
+            e.cells.forEach(function (cell, i) {
+              if (!headers[i]) return;
+              var r = document.createElement('div');
+              r.className = 'hdt-board-card-row';
+              r.innerHTML =
+                '<span class="hdt-board-card-key">' + headers[i] + '</span>' +
+                '<span class="hdt-board-card-val">' + cell + '</span>';
+              card.appendChild(r);
+            });
+            laneBody.appendChild(card);
+          });
+          lane.appendChild(laneBody);
+          board.appendChild(lane);
+        });
+      }
+
       /* Stats element lives in the controls bar (right side). Updated on
          every render(); content depends on whether a filter (text or
          chips) is currently narrowing the result set. */
@@ -1145,6 +1211,7 @@ function initReadingAids() {
         renderTable(v, counts);
         renderCards(v, counts);
         renderList(v, counts);
+        renderBoard(v, counts);
         updateSortIndicators();
         updateStats(counts);
         updateChipCounts();

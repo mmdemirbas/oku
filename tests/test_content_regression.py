@@ -659,6 +659,28 @@ class TestChromeKitMarkers:
             "inline flow of Prism token spans on each line"
         )
 
+    def test_table_has_board_view(self, repo_root: Path) -> None:
+        """Tables expose a 4th view: Board (kanban-style lanes).
+
+        User asked for "board view in tables" alongside the existing
+        Table / List / Cards. Group-by drives lanes; rows become cards.
+        Lock in:
+
+        - JS toolbar emits a `data-view="board"` button.
+        - JS has a `renderBoard` function and a `.hdt-table-board`
+          container.
+        - CSS view-toggle hides `.hdt-table-board` for the three
+          non-active views and hides it by default (no data-view attr).
+        - CSS provides `.hdt-board-lane` styling.
+        """
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert 'data-view="board"' in js, "Board toggle button missing in toolbar"
+        assert "renderBoard" in js, "renderBoard function missing"
+        assert "hdt-table-board" in js, "board container missing"
+        assert ".hdt-board-lane" in css, "lane styling missing"
+        assert '[data-view="board"]' in css, "board active-view rule missing"
+
     def test_list_view_items_visually_separated(self, repo_root: Path) -> None:
         """List-view items must have clear visual separation.
 
