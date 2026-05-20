@@ -12,7 +12,9 @@ from pathlib import Path
 import pytest
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+# conftest.py lives at <repo>/src/html_doc_tests/conftest.py — three
+# parents up reaches the repo root.
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(scope="session")

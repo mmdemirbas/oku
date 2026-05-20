@@ -64,7 +64,7 @@ code.
 **No demo sibling pages.** Every example for a primitive lives
 inside `docs/primitives.json` next to the primitive's heading: code
 sample + rendered block. Don't create `docs/<thing>-demo.{html,json}`
-— `tests/test_content_regression.py::TestNoStrayDemoPages` enforces.
+— `src/html_doc_tests/test_content_regression.py::TestNoStrayDemoPages` enforces.
 
 **No process/round/historical references in docs.** "Round-N",
 "v2 review", "fixed in round 5" etc. are forbidden in `docs/*.json`.
@@ -91,10 +91,11 @@ block — a `.then()` chain after `highlightAll()` races and loses.
 
 **Add a regression test with every fix.** The user has explicitly
 called out that bugs keep recurring because tests don't cover the
-surface. For Python CLI behaviour use pytest under `tests/`. For
-JSON-content regressions use `tests/test_content_regression.py` (walk
-the doc tree, assert on shape). For runtime browser behaviour add
-Playwright tests under `tests/browser/` (not yet wired — install
+surface. For Python CLI behaviour use pytest under
+`src/html_doc_tests/`. For JSON-content regressions use
+`src/html_doc_tests/test_content_regression.py` (walk the doc tree,
+assert on shape). For runtime browser behaviour add Playwright tests
+under `src/html_doc_tests/browser/` (not yet wired — install
 `pytest-playwright` + `playwright install` first). Whatever the
 layer, the rule is: a bug found by the user must have a test that
 fails before the fix and passes after.

@@ -214,7 +214,7 @@ Click opens a panel listing entries; Dismiss closes it for the session.
 ## Tests
 
 ```bash
-uv run --with pytest --with jsonschema pytest tests/
+uv run --with pytest --with jsonschema pytest src/html_doc_tests/
 ```
 
 61 tests, runs in under a second. Covers pure functions
