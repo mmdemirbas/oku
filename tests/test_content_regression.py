@@ -215,6 +215,27 @@ class TestChromeKitMarkers:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "sidebar-collapsed" in src, "sidebar collapse class wiring missing"
 
+    def test_sidebar_toggle_button_is_not_always_hidden(self, repo_root: Path) -> None:
+        """The top-left sidebar collapse button must not be hidden by a
+        stale CSS rule that always matches.
+
+        Regression (D2, 2026-05-20): a dead `:has()` rule from the
+        previous edge-tab design always matched on doc pages
+        (`body:has(.layout page-nav) .ctrl-btn.toc-toggle { display: none }`),
+        making the collapse toggle invisible on every page. The
+        single-sidebar layout has only one toggle — it must be visible.
+        """
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        forbidden = [
+            "body:has(.layout page-nav) .ctrl-btn.toc-toggle",
+            ".layout-has-v2 ~ .ctrl-btn.toc-toggle",
+        ]
+        for pattern in forbidden:
+            assert pattern not in css, (
+                f"dead always-match rule `{pattern}` re-introduced — it "
+                "hides the only sidebar collapse toggle on every doc page"
+            )
+
     def test_chrome_css_has_sticky_sidebar(self, repo_root: Path) -> None:
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "position: sticky" in css, "sticky position missing in chrome.css"

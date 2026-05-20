@@ -2402,11 +2402,6 @@ body.toc-collapsed .layout:has(page-nav) page-toc .page-toc-panel {
 .page-toc-tab-thumb svg { width: 14px; height: 14px; transition: transform 0.2s; }
 body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
 
-/* In v2 layout, hide the top-left ctrl-btn .toc-toggle (its job is now done
-   by the edge tabs that live on each sidebar). The theme toggle stays. */
-.layout-has-v2 ~ .ctrl-btn.toc-toggle,
-body:has(.layout page-nav) .ctrl-btn.toc-toggle { display: none; }
-
 /* Narrow viewport: each pane becomes a drawer on its own edge. The
    edge tabs are already viewport-anchored (above), so they remain
    reachable in either drawer state. */
