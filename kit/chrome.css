@@ -115,12 +115,14 @@ table { font-variant-numeric: tabular-nums; }
 
 /* Layout — single left sidebar + main. page-nav adopts page-toc as a
    child at boot (see PageNav.connectedCallback), so the sidebar is a
-   single grid cell. A two-column grid is all the layout needs. */
+   single grid cell. A two-column grid is all the layout needs. The
+   layout spans the full viewport — the sidebar anchors at left:0 so
+   it never looks "floating in the middle" on wide windows. Content
+   width is governed by `main { max-width: ... }`, which respects the
+   reader's width-mode preference (see --content-width). */
 .layout {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  max-width: 1280px;
-  margin: 0 auto;
   transition: grid-template-columns 0.25s ease;
 }
 
@@ -163,7 +165,14 @@ body.sidebar-collapsed page-nav:hover::after {
 body.sidebar-collapsed page-toc,
 body.sidebar-collapsed nav.toc { display: none; }
 
-main { padding: 56px 64px 120px 64px; max-width: var(--max-width); margin: 0 auto; }
+main {
+  padding: 56px 64px 120px 64px;
+  max-width: var(--content-width, var(--max-width));
+  /* Content left-aligns in its grid cell (no auto margins) so it sits
+     immediately next to the edge-anchored sidebar. The reader-controlled
+     width modes (narrow/wide/max) live on body via --content-width;
+     --max-width is the unmodified default. */
+}
 
 /* ============ TOC sidebar section ============ *
  * Stacks under page-nav inside the single left column. No edge tab —
@@ -808,11 +817,13 @@ code:not(pre code) {
 }
 .hdt-table-wrap .hdt-table-scroll { background: var(--bg); }
 .hdt-table-wrap.expanded {
-  /* Stretch into the empty gutter on either side of <main>. The amount
-     of overflow caps at half the viewport minus half the main width;
-     the 24px breathing-room keeps the table from kissing the panes. */
-  margin-left:  calc(-1 * max(0px, (100vw - var(--max-width)) / 2 - 24px));
-  margin-right: calc(-1 * max(0px, (100vw - var(--max-width)) / 2 - 24px));
+  /* Bleed into the available space. With the edge-anchored sidebar
+     (D1), `<main>` is left-aligned in the remaining grid cell, so
+     bleed is asymmetric: a constant 40px on the left (lining up
+     ~24px past the sidebar's right edge) and as far as the right
+     gutter allows on the right, capped to 40px at narrow widths. */
+  margin-left: -40px;
+  margin-right: calc(-1 * max(40px, 100vw - var(--content-width, var(--max-width)) - 368px));
 }
 .hdt-table-controls {
   display: flex;

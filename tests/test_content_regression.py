@@ -215,6 +215,47 @@ class TestChromeKitMarkers:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "sidebar-collapsed" in src, "sidebar collapse class wiring missing"
 
+    def test_layout_is_edge_anchored_not_centered(self, repo_root: Path) -> None:
+        """The `.layout` grid must span the viewport edge-to-edge, with
+        no centered max-width band that pushes the sidebar inward.
+
+        Regression target (D1): the previous layout was
+        `.layout { max-width: 1280px; margin: 0 auto; }`, which at 1920w
+        put the sidebar at x=320 instead of x=0 — visually "floating in
+        the middle". The fix anchors the sidebar to the viewport edge
+        and lets `<main>` take its width from `--content-width` (D3),
+        left-aligned in the remaining grid cell.
+
+        Locks:
+        - `.layout` rule does NOT declare `max-width` or `margin: 0 auto`
+        - `main` rule does NOT declare `margin: 0 auto` (would re-center
+          inside the grid cell and undo the edge feel)
+        - `main` uses `--content-width` (D3) with `--max-width` fallback
+        """
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        layout_idx = css.find("\n.layout {")
+        assert layout_idx != -1, "base `.layout { ... }` rule missing"
+        layout_block = css[layout_idx : css.find("\n}", layout_idx)]
+        assert "max-width" not in layout_block, (
+            "`.layout` must not declare max-width — that re-introduces the "
+            "centered band and floats the sidebar away from the viewport edge"
+        )
+        assert "margin: 0 auto" not in layout_block, (
+            "`.layout` must not declare `margin: 0 auto` — same regression"
+        )
+
+        main_idx = css.find("\nmain {")
+        assert main_idx != -1, "base `main { ... }` rule missing"
+        main_block = css[main_idx : css.find("\n}", main_idx)]
+        assert "margin: 0 auto" not in main_block, (
+            "`main` must not re-center inside the grid cell — D1 requires "
+            "left-aligned content panel next to the edge-anchored sidebar"
+        )
+        assert "--content-width" in main_block, (
+            "main must respect --content-width (D3's reader-controlled "
+            "width mode) with --max-width as the default fallback"
+        )
+
     def test_sidebar_toggle_button_is_not_always_hidden(self, repo_root: Path) -> None:
         """The top-left sidebar collapse button must not be hidden by a
         stale CSS rule that always matches.
