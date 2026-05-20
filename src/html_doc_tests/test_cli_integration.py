@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -181,12 +182,52 @@ class TestCLIInit:
 
     def test_init_does_not_overwrite_existing_index_html(self, tmp_path: Path, repo_root: Path) -> None:
         # Idempotency for index.html: a user-edited stub must survive
-        # a re-run of `html-doc init`.
+        # a re-run of `html-doc init`. "User-edited" = anything inside
+        # <body> (the default stub leaves it empty).
         custom = "<!doctype html><html><body>HANDS OFF</body></html>"
         (tmp_path / "index.html").write_text(custom, encoding="utf-8")
         proc = _run_cli(tmp_path, "init", repo_root=repo_root)
         assert proc.returncode == 0
         assert (tmp_path / "index.html").read_text(encoding="utf-8") == custom
+
+    def test_init_stamps_cache_buster_on_kit_urls(self, tmp_path: Path, repo_root: Path) -> None:
+        # Static file servers (IntelliJ :63342, plain http.server) don't
+        # send revalidation headers we control; without a query-string
+        # buster, chrome.js / chrome.css / renderer.js sit in the
+        # browser cache indefinitely. The stub stamps the latest kit
+        # mtime so every kit change forces a fresh fetch.
+        proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+        assert proc.returncode == 0
+        body = (tmp_path / "index.html").read_text(encoding="utf-8")
+        assert re.search(r'_kit/chrome\.css\?v=\d+', body), body
+        assert re.search(r'_kit/chrome\.js\?v=\d+', body), body
+        assert re.search(r'_kit/chrome-boot\.js\?v=\d+', body), body
+        assert re.search(r'_kit/renderer\.js\?v=\d+', body), body
+
+    def test_init_refreshes_default_stub_with_new_cache_buster(
+        self, tmp_path: Path, repo_root: Path
+    ) -> None:
+        # An on-disk stub generated long ago has a stale ?v=N. Re-running
+        # init must rewrite the URLs so the new kit mtime takes effect —
+        # provided the stub is still default-shaped (empty body).
+        stale = (
+            '<!DOCTYPE html>\n<html><head>'
+            '<script src="_kit/chrome-boot.js?v=1"></script>'
+            '<link rel="stylesheet" href="_kit/chrome.css?v=1">'
+            '<script src="_kit/chrome.js?v=1" defer></script>'
+            '<script src="_kit/renderer.js?v=1" defer></script>'
+            "</head><body></body></html>\n"
+        )
+        (tmp_path / "index.html").write_text(stale, encoding="utf-8")
+        proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+        assert proc.returncode == 0, f"init failed:\n{proc.stderr}\n{proc.stdout}"
+        refreshed = (tmp_path / "index.html").read_text(encoding="utf-8")
+        # The stale ?v=1 must be gone; whichever fresh mtime got stamped,
+        # it's almost certainly > 1.
+        assert "?v=1\"" not in refreshed
+        m = re.search(r'_kit/chrome\.js\?v=(\d+)', refreshed)
+        assert m is not None
+        assert int(m.group(1)) > 1
 
     def test_init_refreshes_stale_kit_symlink(self, tmp_path: Path, repo_root: Path) -> None:
         # Stale symlink (left over from a moved kit checkout) should be

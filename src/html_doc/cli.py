@@ -62,6 +62,41 @@ def _kit_assets_dir() -> Path:
 
 KIT_DIR = _kit_assets_dir()
 KIT_FILES = ["chrome.css", "chrome.js", "chrome-boot.js", "renderer.js"]
+
+
+_DEFAULT_STUB_BODY_RE = re.compile(r'<body\s*>\s*</body>', re.IGNORECASE)
+
+
+def _is_default_shaped_stub(content: str) -> bool:
+    """True if the stub looks like one we generated — empty <body>.
+
+    `html-doc init` re-writes default-shaped stubs to refresh the kit
+    cache-buster. Anything an author has added inside <body> counts as
+    customisation and means the stub stays untouched.
+    """
+    return bool(_DEFAULT_STUB_BODY_RE.search(content))
+
+
+def _kit_version() -> int:
+    """Integer mtime of the most recently modified kit asset.
+
+    Used as a cache-buster in per-page stub URLs (?v=<n>): static file
+    servers (IntelliJ's :63342, plain http.server, file://) don't send
+    revalidation headers we control, so without this the browser caches
+    chrome.js/chrome.css/renderer.js indefinitely and changes to the kit
+    don't take effect until the reader hard-reloads. The query string
+    forces a fresh fetch the moment any kit file is touched.
+    """
+    latest = 0.0
+    for name in KIT_FILES:
+        p = KIT_DIR / name
+        try:
+            mt = p.stat().st_mtime
+        except OSError:
+            continue
+        if mt > latest:
+            latest = mt
+    return int(latest)
 SKIP_DIRS = {
     "dist", "_kit", "node_modules", ".git", "venv", ".venv",
     "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".idea",
@@ -133,19 +168,30 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"✓ Linked {kit_link} -> {KIT_DIR}")
 
     index_html = root / "index.html"
+    title = "Documentation"
+    index_json = root / "index.json"
+    if index_json.exists():
+        try:
+            data = json.loads(index_json.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("title"), str):
+                title = data["title"]
+        except (json.JSONDecodeError, OSError):
+            pass
+    fresh = _stub_for(title)
     if index_html.exists():
-        print(f"✓ Already present: {index_html}")
+        existing = index_html.read_text(encoding="utf-8")
+        if existing == fresh:
+            print(f"✓ Already present: {index_html}")
+        elif _is_default_shaped_stub(existing):
+            # Default-shaped (empty <body>): safe to rewrite so the kit
+            # cache-buster gets refreshed. Any author customisation lives
+            # outside this shape and would be preserved by the elif above.
+            index_html.write_text(fresh, encoding="utf-8")
+            print(f"✓ Refreshed {index_html} (kit cache-buster updated)")
+        else:
+            print(f"✓ Already present: {index_html} (custom content, untouched)")
     else:
-        title = "Documentation"
-        index_json = root / "index.json"
-        if index_json.exists():
-            try:
-                data = json.loads(index_json.read_text(encoding="utf-8"))
-                if isinstance(data, dict) and isinstance(data.get("title"), str):
-                    title = data["title"]
-            except (json.JSONDecodeError, OSError):
-                pass
-        index_html.write_text(_stub_for(title), encoding="utf-8")
+        index_html.write_text(fresh, encoding="utf-8")
         print(f"✓ Created {index_html}")
     print()
     print("  Author pages as <name>.json (or .md) next to index.html.")
@@ -155,10 +201,13 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 
 # ---------- build ----------
-LINK_TO_KIT_CSS = re.compile(r'<link\s+rel="stylesheet"\s+href="_kit/chrome\.css"\s*/?>', re.I)
-SCRIPT_TO_KIT_BOOT = re.compile(r'<script\s+src="_kit/chrome-boot\.js"\s*></script>', re.I)
-SCRIPT_TO_KIT_MAIN = re.compile(r'<script\s+src="_kit/chrome\.js"\s+defer\s*></script>', re.I)
-SCRIPT_TO_KIT_RENDERER = re.compile(r'<script\s+src="_kit/renderer\.js"\s+defer\s*></script>', re.I)
+# The href/src may carry an optional ?v=<n> cache-buster — match it
+# greedily so the standalone-build inliner can swap the tag whether or
+# not the stub generator stamped a version on it.
+LINK_TO_KIT_CSS = re.compile(r'<link\s+rel="stylesheet"\s+href="_kit/chrome\.css(?:\?[^"]*)?"\s*/?>', re.I)
+SCRIPT_TO_KIT_BOOT = re.compile(r'<script\s+src="_kit/chrome-boot\.js(?:\?[^"]*)?"\s*></script>', re.I)
+SCRIPT_TO_KIT_MAIN = re.compile(r'<script\s+src="_kit/chrome\.js(?:\?[^"]*)?"\s+defer\s*></script>', re.I)
+SCRIPT_TO_KIT_RENDERER = re.compile(r'<script\s+src="_kit/renderer\.js(?:\?[^"]*)?"\s+defer\s*></script>', re.I)
 
 
 def find_html_files(root: Path):
@@ -504,16 +553,17 @@ def _stub_for(title: str) -> str:
     — is owned by the kit's CSS and JS. The stub stays small so
     authors who customise it have little to read or maintain.
     """
+    v = _kit_version()
     return (
         '<!DOCTYPE html>\n'
         '<html lang="en">\n<head>\n'
         '<meta charset="UTF-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
         f'<title>{html_escape(title)}</title>\n'
-        '<script src="_kit/chrome-boot.js"></script>\n'
-        '<link rel="stylesheet" href="_kit/chrome.css">\n'
-        '<script src="_kit/chrome.js" defer></script>\n'
-        '<script src="_kit/renderer.js" defer></script>\n'
+        f'<script src="_kit/chrome-boot.js?v={v}"></script>\n'
+        f'<link rel="stylesheet" href="_kit/chrome.css?v={v}">\n'
+        f'<script src="_kit/chrome.js?v={v}" defer></script>\n'
+        f'<script src="_kit/renderer.js?v={v}" defer></script>\n'
         '</head>\n<body></body>\n</html>\n'
     )
 
