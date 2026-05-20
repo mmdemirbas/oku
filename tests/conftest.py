@@ -23,8 +23,8 @@ def repo_root() -> Path:
 
 @pytest.fixture(scope="session")
 def page_schema() -> dict:
-    """Loaded schema/page.schema.json — every docs/*.json must validate."""
-    return json.loads((REPO_ROOT / "schema" / "page.schema.json").read_text(encoding="utf-8"))
+    """Loaded kit-data/schema/page.schema.json — every docs/*.json must validate."""
+    return json.loads((REPO_ROOT / "kit-data" / "schema" / "page.schema.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture

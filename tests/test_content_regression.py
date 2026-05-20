@@ -202,21 +202,21 @@ class TestChromeKitMarkers:
     while doing an unrelated refactor."""
 
     def test_chrome_has_groupby_picker(self, repo_root: Path) -> None:
-        src = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "hdt-groupby-select" in src, "table group-by picker source markers missing"
 
     def test_chrome_has_fold_handler(self, repo_root: Path) -> None:
-        src = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert (
             "_hdtDetectBraceFolds" in src
         ), "code-block brace-fold detector missing from chrome.js"
 
     def test_chrome_has_sidebar_toggle(self, repo_root: Path) -> None:
-        src = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "sidebar-collapsed" in src, "sidebar collapse class wiring missing"
 
     def test_chrome_css_has_sticky_sidebar(self, repo_root: Path) -> None:
-        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "position: sticky" in css, "sticky position missing in chrome.css"
         # Sidebar should be sticky + scrollable independently.
         assert (
@@ -234,7 +234,7 @@ class TestChromeKitMarkers:
         100vh (desktop) and 100dvh (mobile-toolbar correctness) — alongside
         the max-height cap.
         """
-        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         # Find the base `page-nav { ... }` block (not body.sidebar-collapsed or
         # any descendant rule). Locate the brace pair after the bare selector.
         marker = "\npage-nav {"
@@ -277,7 +277,7 @@ class TestChromeKitMarkers:
           fits inside the reserved padding band.
         - Gutter top matches the new padding-top, not the old 16px.
         """
-        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         # Reserved padding band on pre.
         pre_rule = re.search(r"^pre\s*\{([^}]+)\}", css, re.MULTILINE)
         assert pre_rule, "base pre rule missing"
@@ -340,8 +340,8 @@ class TestChromeKitMarkers:
           (its responsibility is theme + auth; nav state belongs to
           chrome.js to keep the restore path single-source).
         """
-        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
-        boot = (repo_root / "chrome-boot.js").read_text(encoding="utf-8")
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        boot = (repo_root / "kit" / "chrome-boot.js").read_text(encoding="utf-8")
         assert (
             "localStorage.getItem('sidebarCollapsed') === '1'" in js
         ), (
@@ -375,13 +375,13 @@ class TestChromeKitMarkers:
           the target page's anchors.
         """
         glossary_terms: set[str] = set()
-        for p in (repo_root / "glossary").glob("*.json"):
+        for p in (repo_root / "kit-data" / "glossary").glob("*.json"):
             data = json.loads(p.read_text(encoding="utf-8"))
             for term in (data.get("entries") or {}).keys():
                 glossary_terms.add(term.lower())
 
         extref_names: set[str] = set()
-        for p in (repo_root / "extrefs").glob("*.json"):
+        for p in (repo_root / "kit-data" / "extrefs").glob("*.json"):
             data = json.loads(p.read_text(encoding="utf-8"))
             for name in (data.get("entries") or {}).keys():
                 extref_names.add(name)
@@ -583,7 +583,7 @@ class TestChromeKitMarkers:
         Lock both into the diagram custom element so a future refactor
         can't quietly drop either.
         """
-        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         # Find the diagram custom element's _attachToolbar block.
         m = re.search(
             r"class\s+HtmlDocDiagram[\s\S]*?_attachToolbar\(\)\s*\{[\s\S]*?makeToolbar\(this,\s*\[([\s\S]*?)\]\)",
@@ -605,8 +605,8 @@ class TestChromeKitMarkers:
         diagrams (and later Mermaid). One shared overlay so the affordance
         is identical everywhere.
         """
-        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
-        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "__htmldocLightbox" in js, "lightbox module missing"
         assert ".hdt-lightbox" in css, "lightbox CSS missing"
         assert "ICON_EXPAND" in js, "expand icon constant missing"
@@ -636,8 +636,8 @@ class TestChromeKitMarkers:
         - chrome.css positions the slot as a left gutter via absolute
           positioning + reserved padding on the pre.
         """
-        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
-        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         # JS marker construction + extraction.
         assert "hdc-anno-line-marker" in js, "per-line marker slot missing"
         assert "prepareLineSlots" in js or "hdc-anno-gutter-on" in js, (
@@ -671,7 +671,7 @@ class TestChromeKitMarkers:
         carries (a) a meaningful gap (≥16px), (b) a non-soft outer border
         token, and (c) a box-shadow declaration.
         """
-        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         # Match the BASE list rule (the data-view variants are display:none
         # and don't carry layout). Anchor on the unique `display: flex` shape.
         list_rule = re.search(
@@ -709,8 +709,8 @@ class TestChromeKitMarkers:
         only icon (Feather wrap-line); sits 8px to the left of the copy
         button on the same row.
         """
-        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
-        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "ICON_WRAP" in js, "wrap button needs a dedicated icon constant"
         assert "hdt-wrap-btn" in js, "wrap button must be created in chrome.js"
         assert ".hdt-wrap-btn" in css, "wrap button styling missing"
@@ -736,8 +736,8 @@ class TestChromeKitMarkers:
         - chrome.css does NOT carry the old `pre .hdt-code-ln.hdt-foldable`
           override that re-coloured the line number.
         """
-        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
-        css = (repo_root / "chrome.css").read_text(encoding="utf-8")
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "hdt-code-row" in js, "gutter must emit per-line rows"
         assert "hdt-fold-marker" in js, "gutter must emit a fold-marker span per row"
         assert ".hdt-fold-marker" in css, "fold-marker styling missing"
@@ -764,7 +764,7 @@ class TestChromeKitMarkers:
         connectedCallback contains both the layout-scoped query AND the
         document-level fallback.
         """
-        js = (repo_root / "chrome.js").read_text(encoding="utf-8")
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         # The layout-scoped query (preserved as the primary lookup).
         assert (
             "layout.querySelector(':scope > page-toc, :scope > nav.toc')" in js
