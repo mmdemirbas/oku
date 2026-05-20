@@ -50,11 +50,26 @@ like "my change didn't take effect" — it did; the runtime is stale.
 
 **Single LEFT sidebar.** `page-nav` adopts `page-toc` as a child at
 boot so site-tree + on-page TOC stack in one column. NO dual-pane,
-NO right-side TOC, NO mid-edge collapse tab. The top-left chrome
-button (`.ctrl-btn.toc-toggle`) toggles `body.sidebar-collapsed`,
-which shrinks the column to a 24px rail with a chevron. Clicking
-anywhere on the rail re-expands. The sidebar is `position: sticky`
-with its own scroll — main scrolls under it.
+NO right-side TOC. The sidebar is `position: sticky` with its own
+scroll — main scrolls under it.
+
+Two affordances toggle / size it, both edge-anchored (no top-left
+button on wide viewports):
+- **Right-edge handle** (`.page-nav-edge`, full-height): click without
+  drag → collapse to a 24px rail; drag → resize the sidebar width
+  (persisted as `--sidebar-width` + `localStorage.sidebarWidth`).
+- **Collapsed rail** (24px column, chevron pointing right): click
+  anywhere on it → re-expand.
+
+The two affordances are symmetric: full-edge expand AND full-edge
+collapse. The old top-left `.ctrl-btn.toc-toggle` was removed.
+
+On narrow viewports (`≤768px`) the column becomes an off-canvas
+drawer (`body.drawer-open` slides it in, backdrop dims the page,
+Escape or backdrop click closes). The `.ctrl-btn.drawer-toggle`
+hamburger appears in the chrome strip only at this width — it's the
+only top-left button on mobile. The right-edge handle is hidden in
+drawer mode (the drawer IS the affordance).
 
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never

@@ -131,9 +131,13 @@ table { font-variant-numeric: tabular-nums; }
    reader's width-mode preference (see --content-width). */
 .layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 280px) minmax(0, 1fr);
   transition: grid-template-columns 0.25s ease;
 }
+/* Suppress the grid transition while the reader is dragging the
+   resizer — otherwise the column lags behind the cursor. */
+body.sidebar-resizing .layout { transition: none; }
+body.sidebar-resizing { cursor: col-resize; user-select: none; }
 
 /* Collapsed state — keep a 24px rail with a vertical chevron so the
    reader has an obvious "click here to expand" target. The panel
@@ -174,6 +178,63 @@ body.sidebar-collapsed page-nav:hover::after {
 body.sidebar-collapsed page-toc,
 body.sidebar-collapsed nav.toc { display: none; }
 
+/* ============ Right-edge resize + collapse handle ============
+   On the expanded sidebar a vertical full-height strip on the right
+   edge doubles as resize handle (drag) and collapse button (click).
+   It mirrors the collapsed 24px rail's full-edge expand affordance.
+   The chevron points LEFT — same metaphor as the rail's right-pointing
+   chevron, just inverted. page-nav is `position: sticky` already (set
+   in the base rule far below), which is enough containing-block for
+   the absolute-positioned handle. */
+.page-nav-edge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+  z-index: 5;
+}
+.page-nav-edge::before {
+  /* Subtle vertical bar that brightens on hover so the reader sees
+     the affordance without it feeling busy. */
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  background: var(--border-soft);
+  transition: background 0.15s ease;
+}
+.page-nav-edge::after {
+  content: '‹';
+  position: absolute;
+  top: 50%;
+  right: 1px;
+  transform: translateY(-50%);
+  font: 700 14px 'Inter', sans-serif;
+  color: var(--text-soft);
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+  pointer-events: none;
+}
+.page-nav-edge:hover { background: var(--accent-soft); }
+.page-nav-edge:hover::before { background: var(--accent-strong); }
+.page-nav-edge:hover::after { opacity: 1; color: var(--accent-strong); }
+.page-nav-edge:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* Hidden in collapsed mode (the rail itself is the affordance). */
+body.sidebar-collapsed .page-nav-edge { display: none; }
+
+/* The drawer-toggle is the off-canvas opener at narrow widths. On wide
+   viewports the right-edge handle is the affordance, so hide the button. */
+.ctrl-btn.drawer-toggle { display: none; }
+
 main {
   padding: 56px 64px 120px 64px;
   max-width: var(--content-width, var(--max-width));
@@ -184,10 +245,12 @@ main {
 }
 
 /* ============ TOC sidebar section ============ *
- * Stacks under page-nav inside the single left column. No edge tab —
- * the top-left ctrl-btn (.toc-toggle) collapses the entire sidebar via
- * body.sidebar-collapsed. Top padding only on the FIRST sidebar
- * element so the chrome-button strip clears without doubling up.
+ * Stacks under page-nav inside the single left column. On wide
+ * viewports the right-edge handle (.page-nav-edge) collapses the
+ * sidebar via body.sidebar-collapsed; on narrow (≤768px) the
+ * .drawer-toggle button opens it as an off-canvas drawer. Top padding
+ * only on the FIRST sidebar element so the chrome-button strip clears
+ * without doubling up.
  * --------------------------------------------------------------- */
 nav.toc, page-toc {
   align-self: start;
@@ -264,7 +327,7 @@ nav.toc, page-toc {
 .ctrl-btn { transform: translate(var(--vv-left, 0), var(--vv-top, 0)); }
 .ctrl-btn:active { transform: translate(var(--vv-left, 0), var(--vv-top, 0)) scale(0.96); }
 .ctrl-btn svg { width: 20px; height: 20px; display: block; }
-.toc-toggle { top: 16px; left: 16px; }
+.drawer-toggle { top: 16px; left: 16px; }
 .theme-toggle { top: 16px; right: 16px; }
 .width-toggle { top: 16px; right: 76px; /* 16 + 44 + 16 gap, left of theme */ }
 .personalize-toggle { top: 16px; right: 136px; /* shifted left of .width-toggle */ }
@@ -1954,19 +2017,52 @@ footer {
 }
 
 /* ============ Responsive ============ */
-@media (max-width: 920px) {
+/* ≤768px: off-canvas drawer. page-nav (which has page-toc adopted as a
+   child) becomes a fixed slide-over panel anchored to the left edge.
+   The .drawer-toggle button in the chrome strip opens it; clicking the
+   backdrop or pressing Escape closes. The right-edge resize handle and
+   the collapse rail are both irrelevant at this width — hidden. */
+@media (max-width: 768px) {
   .layout { display: block; }
-  body.toc-collapsed .layout { grid-template-columns: none; }
-  nav.toc, page-toc {
-    position: fixed; top: 0; left: -300px;
-    width: 300px; height: 100vh; z-index: 99;
+  /* body-prefixed so this beats the base `page-nav { position: sticky }`
+     rule defined further down in source order. */
+  body page-nav {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: min(320px, 88vw);
+    max-width: none;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    z-index: 99;
     transition: left 0.25s ease;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.1);
-    padding: 76px 24px 60px 24px;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+    padding-top: 64px;
   }
-  body.toc-collapsed nav.toc,
-  body.toc-collapsed page-toc { padding: 76px 24px 60px 24px; border-right: none; overflow-y: auto; }
-  nav.toc.open, page-toc.open { left: 0; }
+  body.drawer-open page-nav { left: 0; }
+  /* Drawer backdrop — single rule, no extra element needed. */
+  body.drawer-open::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 90;
+    animation: htmldoc-fade-in 0.2s ease;
+  }
+  @keyframes htmldoc-fade-in {
+    from { opacity: 0; } to { opacity: 1; }
+  }
+  body.drawer-open { overflow: hidden; }
+  .page-nav-edge { display: none; }
+  /* Hamburger surfaces as the drawer opener at this width. */
+  .ctrl-btn.drawer-toggle { display: inline-flex; }
+  /* The collapsed-rail design doesn't apply: drop the styles so the
+     drawer reads normally even if the user previously persisted
+     sidebar-collapsed = '1'. */
+  body.sidebar-collapsed .layout { grid-template-columns: none; }
+  body.sidebar-collapsed page-nav::after { display: none; }
+  body.sidebar-collapsed page-nav { background: var(--surface); cursor: default; }
+  body.sidebar-collapsed page-nav > * { visibility: visible; pointer-events: auto; }
   main { padding: 28px 22px 96px 22px; }
   header.cover h1 { font-size: 30px; }
   header.cover .subtitle { font-size: 16px; }
@@ -2429,50 +2525,11 @@ body.toc-collapsed .layout:has(page-nav) page-toc .page-toc-panel {
 .page-toc-tab-thumb svg { width: 14px; height: 14px; transition: transform 0.2s; }
 body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
 
-/* Narrow viewport: each pane becomes a drawer on its own edge. The
-   edge tabs are already viewport-anchored (above), so they remain
-   reachable in either drawer state. */
-@media (max-width: 1024px) {
-  .layout:has(page-nav) {
-    grid-template-columns: 1fr !important;
-  }
-  page-nav {
-    position: fixed;
-    top: 0; bottom: 0; left: 0;
-    width: 80vw; max-width: 320px;
-    height: 100vh;
-    z-index: 100;
-    transform: translateX(-100%);
-    transition: transform 0.2s ease;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.15);
-  }
-  page-nav.open { transform: translateX(0); }
-  page-nav.open .page-nav-tab svg { transform: rotate(180deg); }
-  /* Drawer mode: ignore the JS-synced offset (drawer slides offscreen)
-     and anchor each tab to its viewport edge so it stays reachable. */
-  page-nav .page-nav-tab { left: 0 !important; }
-  .layout:has(page-nav) page-toc .page-toc-tab { right: 0 !important; }
-
-  /* Mirror: page-toc becomes a right drawer */
-  .layout:has(page-nav) page-toc {
-    position: fixed;
-    top: 0; bottom: 0; right: 0;
-    width: 80vw; max-width: 320px;
-    height: 100vh;
-    z-index: 100;
-    transform: translateX(100%);
-    transition: transform 0.2s ease;
-    box-shadow: -4px 0 24px rgba(0,0,0,0.15);
-    display: block;
-    background: var(--surface);
-  }
-  .layout:has(page-nav) page-toc.open { transform: translateX(0); }
-  .layout:has(page-nav) page-toc.open .page-toc-tab svg { transform: rotate(180deg); }
-  .layout:has(page-nav) page-toc .page-toc-panel {
-    height: 100%;
-    overflow-y: auto;
-  }
-}
+/* Narrow-viewport drawer rules live in the single @media (max-width: 768px)
+   block earlier in this file. A previous (pre-page-nav-adopts-page-toc)
+   design had a parallel block here for max-width: 1024px that treated
+   page-toc as a separate right-edge drawer; both that drawer and the
+   `.open` class it toggled were dropped along with the adoption refactor. */
 
 /* ============================================================
    Forward-compat warning indicator

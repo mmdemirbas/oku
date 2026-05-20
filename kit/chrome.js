@@ -163,17 +163,33 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', fun
  * sits on the page-nav element.
  * ---------------------------------------------------------------- */
 function toggleTOC() {
-  if (window.innerWidth <= 920) {
-    var nav = document.querySelector('page-nav, nav.toc, page-toc');
-    if (nav) nav.classList.toggle('open');
+  if (window.innerWidth <= 768) {
+    // Narrow viewport: drawer mode. body.drawer-open powers both the
+    // slide-in animation on page-nav and the backdrop pseudo-element.
+    document.body.classList.toggle('drawer-open');
     return;
   }
+  // Wide viewport: column collapse via the persistent body class.
   document.body.classList.toggle('sidebar-collapsed');
   try {
     localStorage.setItem('sidebarCollapsed',
       document.body.classList.contains('sidebar-collapsed') ? '1' : '0');
   } catch (e) {}
 }
+
+// Close the mobile drawer on outside click or Escape.
+document.addEventListener('click', function (e) {
+  if (!document.body.classList.contains('drawer-open')) return;
+  if (window.innerWidth > 768) return;
+  var nav = document.querySelector('page-nav');
+  var hamburger = document.querySelector('.ctrl-btn.drawer-toggle');
+  if (nav && nav.contains(e.target)) return;
+  if (hamburger && hamburger.contains(e.target)) return;
+  document.body.classList.remove('drawer-open');
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') document.body.classList.remove('drawer-open');
+});
 // Restore persisted state ASAP so the layout doesn't flash open then collapse.
 try {
   if (localStorage.getItem('sidebarCollapsed') === '1') {
@@ -235,15 +251,19 @@ if (document.readyState === 'loading') {
 class PageChrome extends HTMLElement {
   connectedCallback() {
     var skipLabel = this.getAttribute('skip-label') || 'Skip to content';
-    var tocLabel = this.getAttribute('toc-label') || 'Toggle table of contents';
+    var drawerLabel = this.getAttribute('drawer-label') || 'Open navigation';
     var themeLabel = this.getAttribute('theme-label') || 'Cycle theme (system / light / dark)';
     var widthLabel = this.getAttribute('width-label') || 'Cycle content width (narrow / wide / max)';
     var topLabel = this.getAttribute('top-label') || 'Back to top';
 
+    // .drawer-toggle is hidden via CSS on wide viewports — the right-
+    // edge handle on page-nav is the collapse affordance there. On
+    // narrow (≤768px) the sidebar becomes an off-canvas drawer and
+    // this is its only toggle.
     this.innerHTML =
       '<a class="skip-link" href="#main-content">' + skipLabel + '</a>' +
       '<div class="progress-bar" id="progress-bar"></div>' +
-      '<button class="ctrl-btn toc-toggle" type="button" aria-label="' + tocLabel + '" title="' + tocLabel + '">' + ICON_MENU + '</button>' +
+      '<button class="ctrl-btn drawer-toggle" type="button" aria-label="' + drawerLabel + '" title="' + drawerLabel + '">' + ICON_MENU + '</button>' +
       '<button class="ctrl-btn width-toggle" type="button" aria-label="' + widthLabel + '" title="' + widthLabel + '">' + ICON_WIDTH + '</button>' +
       '<button class="ctrl-btn theme-toggle" type="button" aria-label="' + themeLabel + '" title="' + themeLabel + '">' +
         '<span class="icon-system">' + ICON_SYSTEM + '</span>' +
@@ -252,7 +272,7 @@ class PageChrome extends HTMLElement {
       '</button>' +
       '<button class="ctrl-btn back-to-top" type="button" aria-label="' + topLabel + '" title="' + topLabel + '">' + ICON_UP + '</button>';
 
-    this.querySelector('.toc-toggle').addEventListener('click', toggleTOC);
+    this.querySelector('.drawer-toggle').addEventListener('click', toggleTOC);
     this.querySelector('.width-toggle').addEventListener('click', cycleContentWidth);
     this.querySelector('.theme-toggle').addEventListener('click', cycleTheme);
     this.querySelector('.back-to-top').addEventListener('click', function () {
@@ -3946,7 +3966,11 @@ class PageNav extends HTMLElement {
       '<div class="page-nav-panel">' +
         '<div class="page-nav-header"><h2>' + title + '</h2></div>' +
         '<ol class="page-nav-tree"><li class="page-nav-loading">Loading…</li></ol>' +
-      '</div>';
+      '</div>' +
+      // Right-edge handle: drag to resize, click (no drag) to collapse.
+      // Symmetric to the collapsed 24px rail's full-edge expand affordance.
+      '<div class="page-nav-edge" role="separator" aria-orientation="vertical" ' +
+        'aria-label="Resize or collapse sidebar" tabindex="0"></div>';
     var self = this;
     // Adopt the page-toc into the sidebar so both panels share a single
     // column without DOM gymnastics. Deferred so the page-toc can finish
@@ -3974,21 +3998,81 @@ class PageNav extends HTMLElement {
       Promise.resolve().then(adopt);
     }
     // Click-anywhere-on-the-rail to expand when collapsed. The whole
-    // page-nav becomes the click target; the top-left chrome button
-    // still toggles too. position: relative on the host so the ::after
-    // chevron can absolute-position inside it.
-    this.style.position = this.style.position || 'sticky';
+    // page-nav becomes the click target. The base CSS already sets
+    // position: sticky on page-nav, which is enough containing-block
+    // for the absolute-positioned children; setting it inline here
+    // used to break the narrow-viewport `position: fixed` drawer rule.
     this.addEventListener('click', function (e) {
       if (!document.body.classList.contains('sidebar-collapsed')) return;
-      // Avoid swallowing clicks on inner content (won't be reachable
-      // anyway since visibility: hidden, but defensive).
       if (e.target && e.target.closest('a, button, input, select')) return;
+      if (e.target && e.target.classList.contains('page-nav-edge')) return;
       if (typeof toggleTOC === 'function') toggleTOC();
     });
-    // Close mobile drawer on Esc
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') self.classList.remove('open');
-    });
+
+    // Right-edge handle: click (no drag) toggles collapse; drag resizes.
+    // Heuristic: mouseup with movement <= EDGE_DRAG_THRESHOLD is a click;
+    // anything beyond is a resize. Width persists per host across reloads.
+    var edge = this.querySelector('.page-nav-edge');
+    if (edge) {
+      var EDGE_DRAG_THRESHOLD = 4;
+      var MIN_WIDTH = 200;
+      var MAX_WIDTH_FRAC = 0.6;
+      // Restore persisted width (only when not collapsed).
+      try {
+        var stored = parseInt(localStorage.getItem('sidebarWidth') || '', 10);
+        if (stored && stored >= MIN_WIDTH) {
+          document.body.style.setProperty('--sidebar-width', stored + 'px');
+        }
+      } catch (eRestore) {}
+      edge.addEventListener('mousedown', function (e) {
+        // Ignore right/middle clicks.
+        if (e.button !== 0) return;
+        if (document.body.classList.contains('sidebar-collapsed')) {
+          // In collapsed mode the rail handles expansion; bail.
+          return;
+        }
+        e.preventDefault();
+        var startX = e.clientX;
+        var startWidth = self.getBoundingClientRect().width;
+        var moved = false;
+        document.body.classList.add('sidebar-resizing');
+        function onMove(ev) {
+          var dx = ev.clientX - startX;
+          if (!moved && Math.abs(dx) <= EDGE_DRAG_THRESHOLD) return;
+          moved = true;
+          var w = startWidth + dx;
+          var max = Math.floor(window.innerWidth * MAX_WIDTH_FRAC);
+          if (w < MIN_WIDTH) w = MIN_WIDTH;
+          if (w > max) w = max;
+          document.body.style.setProperty('--sidebar-width', w + 'px');
+        }
+        function onUp() {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          document.body.classList.remove('sidebar-resizing');
+          if (moved) {
+            try {
+              var w = parseInt((document.body.style.getPropertyValue('--sidebar-width') || '').replace('px', ''), 10);
+              if (w) localStorage.setItem('sidebarWidth', String(w));
+            } catch (eStore) {}
+          } else {
+            if (typeof toggleTOC === 'function') toggleTOC();
+          }
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+      // Keyboard alternative for collapse — focus the handle, press Enter/Space.
+      edge.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (typeof toggleTOC === 'function') toggleTOC();
+        }
+      });
+    }
+    // Drawer Escape handling now lives next to toggleTOC; this block
+    // used to remove a stale `.open` class on page-nav that the new
+    // drawer model doesn't use.
 
     // Defer until the document is fully parsed so we can reliably detect
     // the standalone-build inline page-data script (which sits at the

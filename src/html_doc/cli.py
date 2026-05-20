@@ -177,17 +177,18 @@ def cmd_init(args: argparse.Namespace) -> int:
                 title = data["title"]
         except (json.JSONDecodeError, OSError):
             pass
-    fresh = _stub_for(title)
+    fresh = _stub_for(title, inline_manifest=_init_time_manifest(root))
     if index_html.exists():
         existing = index_html.read_text(encoding="utf-8")
         if existing == fresh:
             print(f"✓ Already present: {index_html}")
         elif _is_default_shaped_stub(existing):
-            # Default-shaped (empty <body>): safe to rewrite so the kit
-            # cache-buster gets refreshed. Any author customisation lives
-            # outside this shape and would be preserved by the elif above.
+            # Default-shaped (empty <body>): safe to rewrite so the
+            # cache-buster + embedded site manifest stay current. Any
+            # author customisation lives outside this shape and would be
+            # preserved by the elif above.
             index_html.write_text(fresh, encoding="utf-8")
-            print(f"✓ Refreshed {index_html} (kit cache-buster updated)")
+            print(f"✓ Refreshed {index_html} (kit cache-buster + page list updated)")
         else:
             print(f"✓ Already present: {index_html} (custom content, untouched)")
     else:
@@ -543,7 +544,7 @@ def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
     return sorted(out, key=lambda x: str(x[0]).lower())
 
 
-def _stub_for(title: str) -> str:
+def _stub_for(title: str, *, inline_manifest: dict | None = None) -> str:
     """Minimal HTML stub for a page. Authored on disk by `html-doc init`
     (for the entry stub), synthesized in-memory by the dev server, and
     written to dist/ by the build.
@@ -552,20 +553,44 @@ def _stub_for(title: str) -> str:
     (page-chrome + layout + nav + main + toc), and the autoBoot call
     — is owned by the kit's CSS and JS. The stub stays small so
     authors who customise it have little to read or maintain.
+
+    When ``inline_manifest`` is supplied, the dict is embedded as a
+    ``window.__htmldocManifest`` script before the kit loads — so the
+    site-tree sidebar populates even when the page is opened via a
+    static file server (IDE, file://) that can't reach the dev-time
+    manifest synthesis.
     """
     v = _kit_version()
+    manifest_block = ""
+    if inline_manifest is not None:
+        manifest_json = json.dumps(inline_manifest, ensure_ascii=False, separators=(',', ':'))
+        manifest_block = f'<script>window.__htmldocManifest={manifest_json};</script>\n'
     return (
         '<!DOCTYPE html>\n'
         '<html lang="en">\n<head>\n'
         '<meta charset="UTF-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
         f'<title>{html_escape(title)}</title>\n'
+        f'{manifest_block}'
         f'<script src="_kit/chrome-boot.js?v={v}"></script>\n'
         f'<link rel="stylesheet" href="_kit/chrome.css?v={v}">\n'
         f'<script src="_kit/chrome.js?v={v}" defer></script>\n'
         f'<script src="_kit/renderer.js?v={v}" defer></script>\n'
         '</head>\n<body></body>\n</html>\n'
     )
+
+
+def _init_time_manifest(root: Path) -> dict:
+    """Manifest snapshot for the init-time stub.
+
+    Drops ``generated_at`` (which would otherwise differ on every run
+    and trigger a needless re-write) and trims to the fields the
+    runtime sidebar actually consumes. The result is what gets
+    embedded as window.__htmldocManifest in docs/index.html.
+    """
+    manifest = compute_manifest(root)
+    manifest.pop("generated_at", None)
+    return manifest
 
 
 
