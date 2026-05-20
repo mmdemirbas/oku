@@ -178,8 +178,284 @@ def find_html_files(root: Path):
 
 
 # ---------- JSON pages + site manifest ----------
+# ---------- Markdown → page-JSON ----------
+#
+# Minimal markdown subset converter. Supports the common cases an
+# existing .md doc would use: ATX headings, paragraphs with inline
+# formatting (**bold**, *italic*, `code`, [text](url)), fenced code
+# blocks (incl. ``` mermaid → diagram), unordered + ordered lists,
+# blockquotes (→ callout), GFM-style pipe tables, horizontal rules.
+#
+# Not a full CommonMark parser — author-driven coverage. Edge cases
+# left out: nested lists, footnotes, definition lists, HTML in
+# markdown, reference-style links. If a real .md file hits one of
+# those, the converter degrades to text-with-anchors-stripped rather
+# than producing invalid kit JSON.
+
+_MD_INLINE_RE = re.compile(
+    r"(\*\*([^*]+)\*\*"          # **bold**
+    r"|\*([^*]+)\*"              # *italic*
+    r"|__([^_]+)__"              # __bold__
+    r"|_([^_]+)_"                # _italic_
+    r"|`([^`]+)`"                # `code`
+    r"|\[([^\]]+)\]\(([^)\s]+)\)"  # [text](url)
+    r")"
+)
+
+
+def _md_inline(text: str) -> list:
+    """Split a markdown text fragment into the kit's inline-content
+    array: a sequence of plain strings and inline-block objects
+    ({kind: code|em|strong|link}). Returns a flat list. Falls back to
+    a single string when no inline markers are present.
+    """
+    if not text:
+        return [""]
+    parts: list = []
+    pos = 0
+    for m in _MD_INLINE_RE.finditer(text):
+        if m.start() > pos:
+            parts.append(text[pos:m.start()])
+        if m.group(2) is not None:
+            parts.append({"kind": "strong", "text": m.group(2)})
+        elif m.group(3) is not None:
+            parts.append({"kind": "em", "text": m.group(3)})
+        elif m.group(4) is not None:
+            parts.append({"kind": "strong", "text": m.group(4)})
+        elif m.group(5) is not None:
+            parts.append({"kind": "em", "text": m.group(5)})
+        elif m.group(6) is not None:
+            parts.append({"kind": "code", "text": m.group(6)})
+        elif m.group(7) is not None:
+            parts.append({"kind": "link", "text": m.group(7), "href": m.group(8)})
+        pos = m.end()
+    if pos < len(text):
+        parts.append(text[pos:])
+    if len(parts) == 1 and isinstance(parts[0], str):
+        return parts
+    return parts
+
+
+def _md_slug(text: str) -> str:
+    """ATX-heading style id: lowercase, non-alnum → '-', trimmed."""
+    s = re.sub(r"[^\w\s-]", "", text.lower()).strip()
+    s = re.sub(r"[\s_]+", "-", s)
+    return s.strip("-") or "section"
+
+
+def md_to_page(text: str, default_title: str = "Untitled") -> dict:
+    """Parse markdown text into a kit page-JSON dict.
+
+    Returns ``{"kind": "page", "title": ..., "blocks": [...]}``. The
+    title is taken from the first H1 if present, else ``default_title``.
+    Subsequent H2s become top-level sections; everything else flows as
+    block content.
+    """
+    lines = text.split("\n")
+    i = 0
+    blocks: list = []
+    title = default_title
+
+    def take_paragraph(start: int) -> tuple[int, dict]:
+        buf: list = []
+        j = start
+        while j < len(lines) and lines[j].strip() != "" and not _is_block_start(lines[j]):
+            buf.append(lines[j].strip())
+            j += 1
+        content = _md_inline(" ".join(buf))
+        return j, {"kind": "paragraph", "content": content}
+
+    def take_code_fence(start: int) -> tuple[int, dict]:
+        m = re.match(r"^```(\S*)\s*$", lines[start])
+        lang = (m.group(1) if m else "").lower()
+        body: list = []
+        j = start + 1
+        while j < len(lines) and not re.match(r"^```\s*$", lines[j]):
+            body.append(lines[j])
+            j += 1
+        source = "\n".join(body)
+        if lang == "mermaid":
+            return j + 1, {"kind": "diagram", "source": source}
+        block: dict = {"kind": "code", "source": source}
+        if lang:
+            block["language"] = lang
+        return j + 1, block
+
+    def take_list(start: int) -> tuple[int, dict]:
+        m = re.match(r"^(\s*)([-*]|\d+\.)\s+(.*)$", lines[start])
+        ordered = bool(m and re.match(r"\d+\.", m.group(2)))
+        items: list = []
+        j = start
+        while j < len(lines):
+            mm = re.match(r"^(\s*)([-*]|\d+\.)\s+(.*)$", lines[j])
+            if not mm or lines[j].strip() == "":
+                break
+            items.append(_md_inline(mm.group(3)))
+            j += 1
+        return j, {"kind": "list", "style": "ordered" if ordered else "bullet", "items": items}
+
+    def take_blockquote(start: int) -> tuple[int, dict]:
+        buf: list = []
+        j = start
+        while j < len(lines) and lines[j].startswith(">"):
+            buf.append(lines[j].lstrip("> ").rstrip())
+            j += 1
+        content = " ".join(buf).strip()
+        return j, {"kind": "callout", "type": "note", "content": _md_inline(content)}
+
+    def take_table(start: int) -> tuple[int, dict] | tuple[int, None]:
+        # GFM pipe table — first line headers, second line --- separator,
+        # rest are rows. Bail out unless the second line is the sep.
+        if start + 1 >= len(lines) or not re.match(r"^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?\s*$", lines[start + 1]):
+            return start, None
+        def cells(line: str) -> list:
+            line = line.strip().strip("|")
+            return [c.strip() for c in line.split("|")]
+        headers = cells(lines[start])
+        rows = []
+        j = start + 2
+        while j < len(lines) and "|" in lines[j] and lines[j].strip() != "":
+            rows.append([_md_inline(c) for c in cells(lines[j])])
+            j += 1
+        return j, {"kind": "table", "headers": headers, "rows": rows}
+
+    def _is_block_start(line: str) -> bool:
+        s = line.strip()
+        return bool(
+            re.match(r"^#{1,6}\s", line)
+            or re.match(r"^```", line)
+            or re.match(r"^[-*]\s+", line)
+            or re.match(r"^\d+\.\s+", line)
+            or s.startswith(">")
+            or re.match(r"^-{3,}\s*$", line)
+            or s.startswith("|")
+        )
+
+    while i < len(lines):
+        line = lines[i]
+        s = line.strip()
+        if s == "":
+            i += 1
+            continue
+        if re.match(r"^-{3,}\s*$", line):
+            blocks.append({"kind": "hr"})
+            i += 1
+            continue
+        if line.startswith("|"):
+            j, table = take_table(i)
+            if table:
+                blocks.append(table)
+                i = j
+                continue
+        h = re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", line)
+        if h:
+            level = len(h.group(1))
+            heading_text = h.group(2)
+            if level == 1 and title == default_title:
+                title = heading_text
+                i += 1
+                continue
+            blocks.append(
+                {"kind": "heading", "level": level, "id": _md_slug(heading_text), "title": heading_text}
+            )
+            i += 1
+            continue
+        if re.match(r"^```", line):
+            i, block = take_code_fence(i)
+            blocks.append(block)
+            continue
+        if re.match(r"^[-*]\s+", line) or re.match(r"^\d+\.\s+", line):
+            i, block = take_list(i)
+            blocks.append(block)
+            continue
+        if s.startswith(">"):
+            i, block = take_blockquote(i)
+            blocks.append(block)
+            continue
+        # Default — paragraph (consumes until blank line / block start).
+        i, block = take_paragraph(i)
+        blocks.append(block)
+
+    return {"kind": "page", "title": title, "blocks": blocks}
+
+
+def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
+    """Walk *.md files under root, return (md_path, synthesized_page_dict).
+
+    Skips README.md and anything under SKIP_DIRS. Files that fail to
+    convert are silently omitted (the converter is permissive — only an
+    unreadable file would trigger this).
+    """
+    out: list[tuple[Path, dict]] = []
+    for p in root.rglob("*.md"):
+        if any(part in SKIP_DIRS for part in p.parts):
+            continue
+        if p.name == "README.md":
+            continue
+        try:
+            text = p.read_text(encoding="utf-8")
+            page = md_to_page(text, default_title=p.stem)
+        except (OSError, ValueError):
+            continue
+        out.append((p, page))
+    return sorted(out, key=lambda x: str(x[0]).lower())
+
+
+def _stub_for(title: str) -> str:
+    """Minimal HTML stub for a synthesized .md page. Uses the same kit
+    boot pattern as templates/starter.html — relative `_kit/` refs that
+    the dev symlinks and dist copies handle."""
+    return (
+        '<!DOCTYPE html>\n<html lang="en">\n<head>\n'
+        '<meta charset="UTF-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+        f'<title>{html_escape(title)}</title>\n'
+        '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">\n'
+        '<script src="_kit/chrome-boot.js"></script>\n'
+        '<link rel="stylesheet" href="_kit/chrome.css">\n'
+        '<script src="_kit/chrome.js" defer></script>\n'
+        '<script src="_kit/renderer.js" defer></script>\n'
+        '</head>\n<body>\n<page-chrome></page-chrome>\n'
+        '<div class="layout">\n'
+        '  <page-nav  title="Pages"></page-nav>\n'
+        '  <main id="main-content"></main>\n'
+        '  <page-toc  title="On this page"></page-toc>\n'
+        '</div>\n'
+        '<script>window.addEventListener("DOMContentLoaded",function(){HtmlDocRenderer.autoBoot();});</script>\n'
+        '</body>\n</html>\n'
+    )
+
+
+def html_escape(s: str) -> str:
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+_KIT_URL_RE = re.compile(r'((?:src|href)=")(_kit(?:-data)?/)', re.I)
+
+
+def _retarget_kit_urls(html: str, depth: int) -> str:
+    """Rewrite ``_kit/`` and ``_kit-data/`` URLs in a stub for a page
+    nested ``depth`` levels deep (depth 0 = top-level dist page).
+
+    Pages at e.g. dist/site/examples/storage/iceberg-detail.html need
+    `_kit/chrome.js` to resolve to `dist/site/_kit/chrome.js` —
+    that's two levels up. This rewriter prefixes the kit URL with the
+    right number of `../`.
+    """
+    if depth <= 0:
+        return html
+    prefix = "../" * depth
+    return _KIT_URL_RE.sub(lambda m: m.group(1) + prefix + m.group(2), html)
+
+
 def find_json_pages(root: Path):
     """Recursively find *.json files where the root object has kind == 'page'.
+
+    ALSO converts .md files into synthesized page dicts. The returned
+    path uses a .json suffix (the in-memory virtual path) so downstream
+    code that does `path.with_suffix(".html")` still works.
 
     Returns list of (path, parsed-data) tuples sorted by path.
     """
@@ -195,6 +471,25 @@ def find_json_pages(root: Path):
             continue
         if isinstance(data, dict) and data.get("kind") == "page":
             pages.append((p, data))
+    # Also walk .md files — convert each into a synthesized page dict
+    # via md_to_page. The "path" returned uses .json so consumers that
+    # do path.with_suffix(".html") still derive the right stub URL.
+    # README.md is excluded (it's project meta, not a docs page).
+    for p in root.rglob("*.md"):
+        if any(part in SKIP_DIRS for part in p.parts):
+            continue
+        if p.name == "README.md":
+            continue
+        try:
+            text = p.read_text(encoding="utf-8")
+            page = md_to_page(text, default_title=p.stem)
+        except (OSError, ValueError):
+            continue
+        synth_path = p.with_suffix(".json")
+        # Don't shadow a real .json sibling if both exist.
+        if any(real == synth_path for real, _ in pages):
+            continue
+        pages.append((synth_path, page))
     return sorted(pages, key=lambda x: str(x[0]).lower())
 
 
@@ -760,11 +1055,16 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
             shutil.copy(sp, out_dir / f)
 
     # Page sources (HTML stubs + JSON content) — preserve directory structure.
+    # For nested pages, rewrite `_kit/...` URLs in the stub to climb the
+    # right number of levels up to the dist's single _kit/ + _kit-data/
+    # at out_dir/.
     for src in srcs:
         html = src.read_text(encoding="utf-8")
         rel = src.relative_to(src_root)
         dest_html = out_dir / rel
         dest_html.parent.mkdir(parents=True, exist_ok=True)
+        depth = len(rel.parts) - 1  # parts excludes filename via -1
+        html = _retarget_kit_urls(html, depth)
 
         json_sibling = src.with_suffix(".json")
         if json_sibling.exists():
@@ -937,6 +1237,27 @@ def cmd_build(args: argparse.Namespace) -> int:
     md_site = build_markdown_twins(docs_dir, dest_root=site / docs_dir.relative_to(root))
     if md_site:
         print(f"✓ Wrote {md_site} page.md twin(s) under dist/site/ + dist/standalone/")
+
+    # Markdown-authored pages: each .md becomes a synthesized page in
+    # dist (.json + thin .html stub). Source .md stays untouched.
+    md_pages = find_markdown_pages(root)
+    if md_pages:
+        for md_path, page in md_pages:
+            rel_html = md_path.relative_to(root).with_suffix(".html")
+            rel_json = md_path.relative_to(root).with_suffix(".json")
+            depth = len(rel_html.parts) - 1
+            stub = _retarget_kit_urls(
+                _stub_for(page.get("title") or md_path.stem), depth
+            )
+            for dist_root in (standalone, site):
+                dest_html = dist_root / rel_html
+                dest_json = dist_root / rel_json
+                dest_html.parent.mkdir(parents=True, exist_ok=True)
+                dest_json.write_text(
+                    json.dumps(page, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                dest_html.write_text(stub, encoding="utf-8")
+        print(f"✓ Wrote {len(md_pages)} markdown-authored page(s) under dist/")
 
     # Pagefind search index — soft-fail if pagefind isn't installed.
     if pagefind_index(site):

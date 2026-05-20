@@ -544,6 +544,56 @@ class TestChromeKitMarkers:
         walk(data.get("blocks", []), "")
         assert not issues, "primitives.json drift:\n" + "\n".join(issues)
 
+    def test_markdown_pages_convert_to_kit_json(self, repo_root: Path) -> None:
+        """cli.md_to_page must convert common Markdown into kit page JSON.
+
+        User asked: "We can add Markdown rendering support so existing
+        markdown documents could be also incorporated to the existing
+        knowledge base without re-writing them. But we must be ensure
+        that the links, diagrams, sections, titles, everything works
+        just like HTML and integrates well natively."
+
+        Verify the round-trip on the bundled examples/markdown-demo.md:
+        H1 → title, H2 → heading blocks with id slugs, fences → code
+        blocks (mermaid → diagram), lists → list blocks, inline
+        emphasis/links survive into the content array.
+        """
+        from html_doc.cli import md_to_page  # noqa: PLC0415
+
+        sample = repo_root / "examples" / "markdown-demo.md"
+        if not sample.exists():
+            pytest.skip("markdown-demo.md sample missing")
+        page = md_to_page(sample.read_text(encoding="utf-8"))
+
+        assert page["kind"] == "page"
+        assert page["title"] == "Markdown demo"
+
+        kinds = [b.get("kind") for b in page["blocks"]]
+        assert "heading" in kinds, "H2 → heading block missing"
+        assert "code" in kinds, "fenced code → code block missing"
+        assert "diagram" in kinds, "```mermaid → diagram block missing"
+        assert "list" in kinds, "- list → list block missing"
+        assert "callout" in kinds, "> blockquote → callout block missing"
+
+        # Inline link survived into a paragraph's content array.
+        paragraphs = [b for b in page["blocks"] if b.get("kind") == "paragraph"]
+        flat = [
+            item
+            for p in paragraphs
+            for item in p.get("content", [])
+            if isinstance(item, dict)
+        ]
+        kinds_inline = {x.get("kind") for x in flat}
+        assert "link" in kinds_inline, "inline [text](url) → link missing"
+        assert "strong" in kinds_inline, "inline **bold** → strong missing"
+        assert "code" in kinds_inline, "inline `code` → code missing"
+
+        # Headings get slugified ids.
+        for b in page["blocks"]:
+            if b.get("kind") == "heading":
+                assert "id" in b, f"heading missing id: {b}"
+                assert re.match(r"^[a-z0-9-]+$", b["id"]), f"non-slug id: {b['id']}"
+
     def test_root_index_redirects_to_docs(self, repo_root: Path) -> None:
         """Repo-root `index.html` must exist and forward to docs/index.html.
 
