@@ -505,12 +505,17 @@ class TestChromeKitMarkers:
             for cand in [repo_root / name, repo_root / "docs" / name]:
                 if cand.exists():
                     offenders.append(str(cand.relative_to(repo_root)))
-        # Stubs: any .html under docs/ or examples/ is now an offender.
+        # Stubs: any .html under docs/ or examples/ is an offender,
+        # EXCEPT docs/index.html — `html-doc init` writes that single
+        # entry stub on purpose so IDE-served workflows work without
+        # the dev server running.
         for d in (repo_root / "docs", repo_root / "examples"):
             if not d.exists():
                 continue
             for p in d.rglob("*.html"):
                 if "dist" in p.parts:
+                    continue
+                if p == repo_root / "docs" / "index.html":
                     continue
                 offenders.append(str(p.relative_to(repo_root)))
         assert not offenders, (

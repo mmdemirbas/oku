@@ -145,6 +145,50 @@ class TestCLIInit:
         assert proc1.returncode == 0
         assert proc2.returncode == 0
 
+    def test_init_creates_docs_index_html(self, tmp_path: Path, repo_root: Path) -> None:
+        # The single on-disk stub at docs/index.html is what makes the
+        # IDE-served workflow work — IntelliJ's HTTP server can serve it
+        # without `html-doc serve` running.
+        proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+        assert proc.returncode == 0, f"init failed:\n{proc.stderr}\n{proc.stdout}"
+        index = tmp_path / "docs" / "index.html"
+        assert index.exists()
+        body = index.read_text(encoding="utf-8")
+        # Stub must reference the kit (boot, css, main, renderer) so the
+        # page actually renders when opened in a browser.
+        assert "_kit/chrome-boot.js" in body
+        assert "_kit/chrome.css" in body
+        assert "_kit/chrome.js" in body
+        assert "_kit/renderer.js" in body
+        # autoBoot is what fetches the sibling JSON at load time.
+        assert "autoBoot" in body
+
+    def test_init_picks_title_from_existing_index_json(self, tmp_path: Path, repo_root: Path) -> None:
+        # If docs/index.json already exists, init should use its title
+        # for the stub's <title> element — otherwise the browser tab
+        # shows "Documentation" until the renderer overwrites it.
+        docs = tmp_path / "docs"
+        docs.mkdir()
+        (docs / "index.json").write_text(
+            json.dumps({"kind": "page", "title": "My Project Docs", "blocks": []}),
+            encoding="utf-8",
+        )
+        proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+        assert proc.returncode == 0
+        body = (docs / "index.html").read_text(encoding="utf-8")
+        assert "<title>My Project Docs</title>" in body
+
+    def test_init_does_not_overwrite_existing_index_html(self, tmp_path: Path, repo_root: Path) -> None:
+        # Idempotency for index.html: a user-edited stub must survive
+        # a re-run of `html-doc init`.
+        docs = tmp_path / "docs"
+        docs.mkdir()
+        custom = "<!doctype html><html><body>HANDS OFF</body></html>"
+        (docs / "index.html").write_text(custom, encoding="utf-8")
+        proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+        assert proc.returncode == 0
+        assert (docs / "index.html").read_text(encoding="utf-8") == custom
+
 
 class TestCLIHelp:
     def test_no_args_prints_help(self, tmp_path: Path, repo_root: Path) -> None:

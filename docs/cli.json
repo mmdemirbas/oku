@@ -17,9 +17,9 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "init creates the docs/_kit symlink in your project. build produces dist/standalone/ + dist/site/ (each with their own site-manifest.json, llms.txt, page.md twins, plus Pagefind for site/ if installed). serve runs a local HTTP server and synthesizes stubs + manifest + llms.txt in memory — source dirs stay clean.",
+      "summary": "init creates the docs/_kit symlink + docs/index.html stub in your project. build produces dist/standalone/ + dist/site/ (each with their own site-manifest.json, llms.txt, page.md twins, plus Pagefind for site/ if installed). serve runs a local HTTP server and synthesizes stubs + manifest + llms.txt in memory — source dirs stay clean apart from the one entry stub.",
       "bullets": [
-        "Source dirs hold JSON (or MD) only. Generated artifacts (stubs, manifest, llms.txt) never land in source.",
+        "Source dirs hold JSON (or MD) plus a single docs/index.html entry stub so IDE-served workflows work without the dev server running.",
         "build is idempotent; safe to re-run. dist/ is wiped each time.",
         "serve synthesizes stubs and the manifest fresh on each request — no source writes.",
         "Optional deps: pagefind (search index), jsonschema (page validation). Both soft-fail."
@@ -29,18 +29,18 @@
       "kind": "section",
       "id": "init",
       "title": "html-doc init",
-      "lead": "One-time per project. Creates the docs/_kit symlink so pages can reference _kit/chrome.js etc.",
+      "lead": "One-time per project. Creates the docs/_kit symlink so pages can reference _kit/chrome.js etc., and the docs/index.html entry stub that IDE-served workflows open directly (IntelliJ's built-in HTTP server, Live Server, etc.).",
       "blocks": [
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd ~/path/to/your-project\nhtml-doc init\n\n# ✓ Linked /path/to/your-project/docs/_kit -> /path/to/html-doc\n#\n#   Reference the kit in your HTML <head>:\n#     <script src=\"_kit/chrome-boot.js\"></script>\n#     <link rel=\"stylesheet\" href=\"_kit/chrome.css\">\n#     <script src=\"_kit/chrome.js\" defer></script>\n#\n#   Then run `html-doc build` to produce dist/standalone/ + dist/site/."
+          "source": "cd ~/path/to/your-project\nhtml-doc init\n\n# ✓ Linked /path/to/your-project/docs/_kit -> ../kit\n# ✓ Created /path/to/your-project/docs/index.html\n#\n#   Author pages as docs/<name>.json (or .md). Open docs/index.html\n#   in your IDE or run `html-doc serve` for a live-reloading dev server."
         },
         {
           "kind": "callout",
           "type": "neutral",
-          "title": "If docs/_kit already exists",
-          "content": "Re-running init is safe — if the symlink already points at the kit, it prints \"already linked\" and exits 0. If it exists but points somewhere else, it errors and tells you what's there so you can decide."
+          "title": "Idempotent",
+          "content": "Re-running init leaves both targets alone if they already match: prints \"already linked\" for the symlink, \"already present\" for the stub. A user-edited index.html survives a re-run. Different symlink target → error with the current target so you can decide."
         }
       ]
     },

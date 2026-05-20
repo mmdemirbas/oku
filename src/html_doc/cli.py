@@ -93,33 +93,58 @@ def report(label: str, path: Path) -> None:
 
 # ---------- init ----------
 def cmd_init(args: argparse.Namespace) -> int:
-    """Create docs/_kit -> KIT_DIR symlink."""
+    """Idempotently scaffold the project's docs/ root.
+
+    Creates two things if missing:
+
+    - docs/_kit → KIT_DIR symlink (kit JS/CSS + schema/glossary/extrefs).
+    - docs/index.html — top-level entry stub. Keeping this single
+      stub on disk is what makes IDE-served workflows work (IntelliJ's
+      built-in HTTP server, Live Server, etc.); deeper pages remain
+      JSON-only and rely on the dev server's in-memory synthesis.
+
+    Re-running does nothing destructive. Existing files are reported
+    and left alone.
+    """
     project = Path.cwd()
     docs = project / "docs"
     docs.mkdir(exist_ok=True)
-    target = docs / "_kit"
+    kit_link = docs / "_kit"
 
-    if target.exists() or target.is_symlink():
-        if target.is_symlink() and Path(os.readlink(target)) == KIT_DIR:
-            print(f"✓ Already linked: {target} -> {KIT_DIR}")
-            print(f"  Open kit:     {file_url(KIT_DIR)}")
-            return 0
-        print(f"✗ Path exists and is not the expected symlink: {target}", file=sys.stderr)
-        print(
-            f"  Current target: {os.readlink(target) if target.is_symlink() else '(not a symlink)'}",
-            file=sys.stderr,
-        )
+    if kit_link.is_symlink():
+        # Resolve before comparing — the on-disk symlink may be relative
+        # (e.g. "../kit") while KIT_DIR is absolute. Comparing literals
+        # would falsely flag the link as pointing somewhere else.
+        if kit_link.resolve() == KIT_DIR.resolve():
+            print(f"✓ Already linked: {kit_link} -> {os.readlink(kit_link)}")
+        else:
+            print(f"✗ {kit_link} is a symlink to a different target: {os.readlink(kit_link)}", file=sys.stderr)
+            return 1
+    elif kit_link.exists():
+        print(f"✗ {kit_link} exists and is not a symlink", file=sys.stderr)
         return 1
+    else:
+        kit_link.symlink_to(KIT_DIR)
+        print(f"✓ Linked {kit_link} -> {KIT_DIR}")
 
-    target.symlink_to(KIT_DIR)
-    print(f"✓ Linked {target} -> {KIT_DIR}")
+    index_html = docs / "index.html"
+    if index_html.exists():
+        print(f"✓ Already present: {index_html}")
+    else:
+        title = "Documentation"
+        index_json = docs / "index.json"
+        if index_json.exists():
+            try:
+                data = json.loads(index_json.read_text(encoding="utf-8"))
+                if isinstance(data, dict) and isinstance(data.get("title"), str):
+                    title = data["title"]
+            except (json.JSONDecodeError, OSError):
+                pass
+        index_html.write_text(_stub_for(title), encoding="utf-8")
+        print(f"✓ Created {index_html}")
     print()
-    print("  Reference the kit in your HTML <head>:")
-    print('    <script src="_kit/chrome-boot.js"></script>')
-    print('    <link rel="stylesheet" href="_kit/chrome.css">')
-    print('    <script src="_kit/chrome.js" defer></script>')
-    print()
-    print("  Then run `html-doc build` to produce dist/standalone/ + dist/site/.")
+    print("  Author pages as docs/<name>.json (or .md). Open docs/index.html")
+    print("  in your IDE or run `html-doc serve` for a live-reloading dev server.")
     return 0
 
 

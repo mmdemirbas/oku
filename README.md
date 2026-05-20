@@ -46,9 +46,8 @@ python3 bin/html-doc serve       # plain Python works too (no extras)
 
 ```bash
 mkdir my-knowledge-base && cd my-knowledge-base
-html-doc init                    # creates docs/_kit -> kit symlink
+html-doc init                    # creates docs/_kit + docs/index.html
 cp ../html-doc/src/html_doc/templates/starter.json docs/index.json
-cp ../html-doc/src/html_doc/templates/starter.html docs/index.html
 # edit docs/index.json to taste
 html-doc serve                   # opens in the browser, live-reloads on save
 ```
@@ -93,7 +92,7 @@ kind.
 Three commands, all run from the project root or a subdirectory:
 
 ```bash
-html-doc init                    # one-time: docs/_kit symlink
+html-doc init                    # one-time: docs/_kit symlink + docs/index.html stub
 html-doc build                   # dist/standalone/ + dist/site/ + search index
 html-doc serve                   # local HTTP, live reload, Pagefind in background
 html-doc serve --no-watch        # disable filesystem watcher
