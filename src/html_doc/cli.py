@@ -76,7 +76,8 @@ def _kit_assets_dirs() -> tuple[Path, Path]:
 KIT_DIR, KIT_DATA_DIR = _kit_assets_dirs()
 KIT_FILES = ["chrome.css", "chrome.js", "chrome-boot.js", "renderer.js"]
 SKIP_DIRS = {
-    "dist", "_kit", "node_modules", ".git", "venv", ".venv", "__pycache__",
+    "dist", "_kit", "_kit-data", "node_modules", ".git", "venv", ".venv",
+    "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".idea",
     # templates/ ships the starter for `html-doc init`; not a docs page.
     # Walking it earlier produced a stray templates/starter.md every build.
     "templates",
@@ -246,14 +247,18 @@ def _md_slug(text: str) -> str:
 def md_to_page(text: str, default_title: str = "Untitled") -> dict:
     """Parse markdown text into a kit page-JSON dict.
 
-    Returns ``{"kind": "page", "title": ..., "blocks": [...]}``. The
-    title is taken from the first H1 if present, else ``default_title``.
-    Subsequent H2s become top-level sections; everything else flows as
-    block content.
+    Returns ``{"kind": "page", "title": ..., "blocks": [section, ...]}``.
+
+    The kit's schema requires top-level blocks to be sections (or tldr
+    / kpi-grid). md_to_page enforces that shape:
+    - First H1 (or default_title) → page title.
+    - Each H2 starts a new section with the H2 text as title + slug id.
+    - Content before the first H2 lands in an implicit "intro" section.
+    - Sub-headings (H3+), paragraphs, code, lists, blockquotes,
+      tables, hr's all nest inside the active section's `blocks`.
     """
     lines = text.split("\n")
     i = 0
-    blocks: list = []
     title = default_title
 
     def take_paragraph(start: int) -> tuple[int, dict]:
@@ -292,7 +297,7 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
                 break
             items.append(_md_inline(mm.group(3)))
             j += 1
-        return j, {"kind": "list", "style": "ordered" if ordered else "bullet", "items": items}
+        return j, {"kind": "list", "style": "numbered" if ordered else "bullet", "items": items}
 
     def take_blockquote(start: int) -> tuple[int, dict]:
         buf: list = []
@@ -331,6 +336,42 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
             or s.startswith("|")
         )
 
+    # Top-level state: each H2 opens a new section. Content before the
+    # first H2 lives in an implicit "intro" section so the page always
+    # validates against the schema (which requires top blocks to be
+    # sections / tldr / kpi-grid).
+    sections: list = []
+    current_section: dict | None = None
+    used_ids: set = set()
+
+    def _unique_id(slug: str) -> str:
+        if slug not in used_ids:
+            used_ids.add(slug)
+            return slug
+        n = 2
+        while f"{slug}-{n}" in used_ids:
+            n += 1
+        out = f"{slug}-{n}"
+        used_ids.add(out)
+        return out
+
+    def open_section(slug: str, heading_text: str) -> None:
+        nonlocal current_section
+        section_id = _unique_id(slug)
+        current_section = {
+            "kind": "section",
+            "id": section_id,
+            "title": heading_text,
+            "blocks": [],
+        }
+        sections.append(current_section)
+
+    def add_block(block: dict) -> None:
+        nonlocal current_section
+        if current_section is None:
+            open_section("intro", "Intro")
+        current_section["blocks"].append(block)
+
     while i < len(lines):
         line = lines[i]
         s = line.strip()
@@ -338,13 +379,13 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
             i += 1
             continue
         if re.match(r"^-{3,}\s*$", line):
-            blocks.append({"kind": "hr"})
+            add_block({"kind": "hr"})
             i += 1
             continue
         if line.startswith("|"):
             j, table = take_table(i)
             if table:
-                blocks.append(table)
+                add_block(table)
                 i = j
                 continue
         h = re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", line)
@@ -355,28 +396,38 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
                 title = heading_text
                 i += 1
                 continue
-            blocks.append(
-                {"kind": "heading", "level": level, "id": _md_slug(heading_text), "title": heading_text}
+            if level == 2:
+                open_section(_md_slug(heading_text), heading_text)
+                i += 1
+                continue
+            # H3 and deeper land as heading blocks inside the active section.
+            add_block(
+                {
+                    "kind": "heading",
+                    "level": level,
+                    "id": _unique_id(_md_slug(heading_text)),
+                    "title": heading_text,
+                }
             )
             i += 1
             continue
         if re.match(r"^```", line):
             i, block = take_code_fence(i)
-            blocks.append(block)
+            add_block(block)
             continue
         if re.match(r"^[-*]\s+", line) or re.match(r"^\d+\.\s+", line):
             i, block = take_list(i)
-            blocks.append(block)
+            add_block(block)
             continue
         if s.startswith(">"):
             i, block = take_blockquote(i)
-            blocks.append(block)
+            add_block(block)
             continue
         # Default — paragraph (consumes until blank line / block start).
         i, block = take_paragraph(i)
-        blocks.append(block)
+        add_block(block)
 
-    return {"kind": "page", "title": title, "blocks": blocks}
+    return {"kind": "page", "title": title, "blocks": sections}
 
 
 def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
@@ -390,7 +441,10 @@ def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
     for p in root.rglob("*.md"):
         if any(part in SKIP_DIRS for part in p.parts):
             continue
-        if p.name == "README.md":
+        # Repo-root .md files are project meta (README, CHANGELOG,
+        # CLAUDE), not docs pages. Only files under at least one
+        # subdir become pages.
+        if p.parent == root:
             continue
         try:
             text = p.read_text(encoding="utf-8")
@@ -474,11 +528,12 @@ def find_json_pages(root: Path):
     # Also walk .md files — convert each into a synthesized page dict
     # via md_to_page. The "path" returned uses .json so consumers that
     # do path.with_suffix(".html") still derive the right stub URL.
-    # README.md is excluded (it's project meta, not a docs page).
+    # Repo-root .md files (README, CHANGELOG, CLAUDE) are excluded —
+    # they're project meta, not docs pages.
     for p in root.rglob("*.md"):
         if any(part in SKIP_DIRS for part in p.parts):
             continue
-        if p.name == "README.md":
+        if p.parent == root:
             continue
         try:
             text = p.read_text(encoding="utf-8")

@@ -568,15 +568,26 @@ class TestChromeKitMarkers:
         assert page["kind"] == "page"
         assert page["title"] == "Markdown demo"
 
-        kinds = [b.get("kind") for b in page["blocks"]]
-        assert "heading" in kinds, "H2 → heading block missing"
-        assert "code" in kinds, "fenced code → code block missing"
-        assert "diagram" in kinds, "```mermaid → diagram block missing"
-        assert "list" in kinds, "- list → list block missing"
-        assert "callout" in kinds, "> blockquote → callout block missing"
+        # Top-level blocks are sections (schema requires it). H2s map
+        # to section titles; everything else nests inside sections.
+        top_kinds = [b.get("kind") for b in page["blocks"]]
+        assert top_kinds and all(k == "section" for k in top_kinds), (
+            f"top-level blocks must all be sections, got: {top_kinds}"
+        )
+        # Each section has a slug id (kebab-case).
+        for sec in page["blocks"]:
+            assert re.match(r"^[a-z0-9-]+$", sec["id"]), f"non-slug id: {sec['id']}"
 
-        # Inline link survived into a paragraph's content array.
-        paragraphs = [b for b in page["blocks"] if b.get("kind") == "paragraph"]
+        # Flatten the inner blocks to check primitive coverage.
+        inner = [b for sec in page["blocks"] for b in sec.get("blocks", [])]
+        inner_kinds = {b.get("kind") for b in inner}
+        assert "code" in inner_kinds, "fenced code → code block missing"
+        assert "diagram" in inner_kinds, "```mermaid → diagram block missing"
+        assert "list" in inner_kinds, "- list → list block missing"
+        assert "callout" in inner_kinds, "> blockquote → callout block missing"
+
+        # Inline link / strong / code survive into paragraph content arrays.
+        paragraphs = [b for b in inner if b.get("kind") == "paragraph"]
         flat = [
             item
             for p in paragraphs
@@ -587,12 +598,6 @@ class TestChromeKitMarkers:
         assert "link" in kinds_inline, "inline [text](url) → link missing"
         assert "strong" in kinds_inline, "inline **bold** → strong missing"
         assert "code" in kinds_inline, "inline `code` → code missing"
-
-        # Headings get slugified ids.
-        for b in page["blocks"]:
-            if b.get("kind") == "heading":
-                assert "id" in b, f"heading missing id: {b}"
-                assert re.match(r"^[a-z0-9-]+$", b["id"]), f"non-slug id: {b['id']}"
 
     def test_root_index_redirects_to_docs(self, repo_root: Path) -> None:
         """Repo-root `index.html` must exist and forward to docs/index.html.
