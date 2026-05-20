@@ -370,6 +370,27 @@ class TestChromeKitMarkers:
             "_splitInlineTags regex must restrict to code/em/strong tags"
         )
 
+    def test_serve_synthesizes_md_pages(self, repo_root: Path) -> None:
+        """`html-doc serve` synthesizes .html + .json from .md sources.
+
+        Before this fix, the dev server returned 404 for any *.html
+        request that had no real .html file on disk, even if a sibling
+        .md existed. That broke the `html-doc serve` preview workflow
+        for markdown-authored pages. The build path (cmd_build) emits
+        them into dist/, but serve must work without a build.
+
+        Verify the handler has the `_serve_md_synthesized` method and
+        it short-circuits do_GET when a sibling .md exists.
+        """
+        cli_src = (repo_root / "src" / "html_doc" / "cli.py").read_text(encoding="utf-8")
+        assert "_serve_md_synthesized" in cli_src, "md synthesis handler missing"
+        # Must be invoked from do_GET before super().do_GET().
+        m = re.search(
+            r"def do_GET\(self\)[\s\S]*?if self\._serve_md_synthesized\(\)",
+            cli_src,
+        )
+        assert m, "_serve_md_synthesized must be called from do_GET"
+
     def test_search_has_in_page_fallback(self, repo_root: Path) -> None:
         """Search degrades to in-page navigation when Pagefind is absent.
 

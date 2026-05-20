@@ -1498,7 +1498,63 @@ def _make_serve_handler(root: Path):
             if self.path == "/__reload":
                 self._serve_reload_stream()
                 return
+            # Synthesize stubs / JSON for .md-authored pages on the fly so
+            # `html-doc serve` previews markdown sources without an explicit
+            # build step. Pages in source are .md; runtime expects .html
+            # (the stub) + .json (the renderer fetches this sibling).
+            if self._serve_md_synthesized():
+                return
             super().do_GET()
+
+        def _serve_md_synthesized(self) -> bool:
+            """If the request targets `<name>.html` or `<name>.json` and a
+            sibling `<name>.md` exists on disk (but no real `<name>.html`
+            / `<name>.json` does), synthesize the response from the .md
+            via md_to_page. Returns True if handled.
+            """
+            url_path = self.path.split("?", 1)[0]
+            # Need .html or .json suffix to consider synthesis.
+            if not (url_path.endswith(".html") or url_path.endswith(".json")):
+                return False
+            try:
+                # Translate the URL path to a filesystem path.
+                # SimpleHTTPRequestHandler's translate_path doesn't
+                # honour the `directory=` arg consistently across Python
+                # versions; resolve manually relative to `root`.
+                rel = url_path.lstrip("/")
+                fs = (root / rel).resolve()
+                # Don't escape the root.
+                if root not in fs.parents and fs != root:
+                    return False
+            except (OSError, ValueError):
+                return False
+            # Only synthesize if the real file is missing.
+            if fs.exists():
+                return False
+            md_path = fs.with_suffix(".md")
+            if not md_path.exists():
+                return False
+            try:
+                text = md_path.read_text(encoding="utf-8")
+                page = md_to_page(text, default_title=md_path.stem)
+            except (OSError, ValueError):
+                return False
+            if url_path.endswith(".json"):
+                body = json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8")
+                content_type = "application/json; charset=utf-8"
+            else:
+                body = _stub_for(page.get("title") or md_path.stem).encode("utf-8")
+                content_type = "text/html; charset=utf-8"
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            return True
 
         def _serve_reload_stream(self) -> None:
             try:
