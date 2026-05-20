@@ -1,0 +1,33 @@
+{
+  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Iceberg deep dive",
+  "accent": "teal",
+  "meta": {
+    "eyebrow": "Storage · subfolder demo",
+    "subtitle": "Nested-page test for H3 fix. This page lives at storage/iceberg-detail.* — confirms the recursive build preserves directory structure.",
+    "date": "2026-05-17",
+    "order": 1,
+    "summary": "Subfolder page used to verify the H3 recursive-build fix."
+  },
+  "blocks": [
+    {
+      "kind": "section",
+      "id": "intro",
+      "title": "Subfolder page",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": [
+            "This page exists at ",
+            { "kind": "code", "text": "_internal/demo-page/storage/iceberg-detail.json" },
+            ". Its HTML stub lives next to it. Before H3, the build wrote the manifest entry but never copied the HTML stub to ",
+            { "kind": "code", "text": "dist/site/" },
+            " — page-nav would link to a 404. After H3, the build preserves the storage/ subdirectory all the way through to dist/site/storage/iceberg-detail.html."
+          ]
+        }
+      ]
+    }
+  ]
+}

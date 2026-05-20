@@ -928,12 +928,12 @@ def cmd_build(args: argparse.Namespace) -> int:
     print()
     print("  standalone (inline, send-as-file):")
     for src in srcs:
-        report("", standalone / src.name)
+        report("", standalone / src.relative_to(root))
     print()
     print("  site (shared assets, multi-page):")
     report("site root:", site)
     for src in srcs:
-        report("", site / src.name)
+        report("", site / src.relative_to(root))
     return 0
 
 
