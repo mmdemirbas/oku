@@ -356,6 +356,37 @@ class TestChromeKitMarkers:
             "single-source restore lives in chrome.js"
         )
 
+    def test_root_index_redirects_to_docs(self, repo_root: Path) -> None:
+        """Repo-root `index.html` must exist and forward to docs/index.html.
+
+        Use case: IntelliJ's built-in HTTP server (and any static host
+        serving the repo root) lands on this file. Without it, opening
+        the project URL yields a 404 unless the user knows to navigate
+        to docs/. Tiny forwarder; no kit assets.
+
+        Must:
+        - Exist at repo root.
+        - Reference docs/index.html as the target.
+        - Forward the IntelliJ `_ijt` query token so internal asset
+          fetches keep their auth.
+        """
+        idx = (repo_root / "index.html")
+        assert idx.exists(), "root index.html missing"
+        body = idx.read_text(encoding="utf-8")
+        assert "docs/index.html" in body, "root index must forward to docs/index.html"
+        # Either a meta-refresh, a JS location.replace, or a plain link works.
+        # We need at least one of them.
+        assert (
+            "http-equiv=\"refresh\"" in body
+            or "location.replace" in body
+            or 'href="docs/index.html"' in body
+        ), "root index must contain a forwarding mechanism"
+        # _ijt token must be forwarded so IntelliJ asset fetches still resolve.
+        assert "_ijt" in body, (
+            "root index must forward the IntelliJ _ijt token through to "
+            "the docs index so internal asset URLs keep their auth"
+        )
+
     def test_diagram_toolbar_has_copy_and_expand(self, repo_root: Path) -> None:
         """Mermaid diagrams must expose both copy-source and expand actions.
 
