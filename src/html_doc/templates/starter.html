@@ -1,17 +1,17 @@
 <!--
-  html-doc v2 starter — per-page HTML stub.
+  html-doc starter — per-page HTML stub.
 
-  Pair this file with a sibling {{ NAME }}.json (use templates/starter.json
-  as the starting JSON). The renderer fetches the JSON at load time and
-  builds the page from it. Re-use this stub verbatim for every new page;
-  the only per-page bit is the JSON filename in the script tag below.
+  Pair with a sibling {{ NAME }}.json (start from templates/starter.json).
+  The renderer fetches the JSON at load time and builds the page from it.
+
+  Re-use verbatim for every new page; the only per-page bit is the
+  <title>. Body skeleton, font loading, and autoBoot are owned by the
+  kit's CSS and JS — leave <body> empty.
 
   Quick start:
-    1. Copy this file as docs/my-page.html
-    2. Copy templates/starter.json as docs/my-page.json
-    3. Edit my-page.json — fill the {{ }} placeholders
-    4. Run `html-doc build` (or `html-doc serve`) to refresh
-       site-manifest.json so <page-nav> sees the new page
+    1. Copy this file as <my-page>.html
+    2. Copy templates/starter.json as <my-page>.json
+    3. Edit <my-page>.json — fill the {{ }} placeholders
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -19,32 +19,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ TITLE }}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="_kit/chrome-boot.js"></script>
 <link rel="stylesheet" href="_kit/chrome.css">
 <script src="_kit/chrome.js" defer></script>
 <script src="_kit/renderer.js" defer></script>
 </head>
-<body>
-
-<page-chrome></page-chrome>
-
-<div class="layout">
-  <page-nav  title="Pages"></page-nav>
-  <main id="main-content"></main>
-  <page-toc  title="On this page"></page-toc>
-</div>
-
-<script>
-  // autoBoot picks up an inline JSON payload (standalone builds) or
-  // fetches the sibling *.json derived from this page's URL (dev pages
-  // and dist/site/ multi-page builds).
-  window.addEventListener('DOMContentLoaded', function () {
-    HtmlDocRenderer.autoBoot();
-  });
-</script>
-
-</body>
+<body></body>
 </html>

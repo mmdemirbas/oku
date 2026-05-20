@@ -5,6 +5,11 @@
    in a small <style> block on the page itself.
    ============================================================ */
 
+/* Web fonts. Loaded here (not via a <link> in the page stub) so the
+   per-page HTML stays minimal. The stylesheet itself blocks render,
+   which @import would too — there's no extra waterfall cost. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
 /* ============ Tokens — light ============ */
 :root {
   --bg: #fafaf9;

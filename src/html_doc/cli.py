@@ -495,30 +495,26 @@ def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
 
 
 def _stub_for(title: str) -> str:
-    """Minimal HTML stub for a synthesized page. Used in-memory by the
-    dev server and written to dist/ by the build — never persisted to
-    source dirs (those hold authored JSON/MD only)."""
+    """Minimal HTML stub for a page. Authored on disk by `html-doc init`
+    (for the entry stub), synthesized in-memory by the dev server, and
+    written to dist/ by the build.
+
+    Everything the page needs at runtime — fonts, the body skeleton
+    (page-chrome + layout + nav + main + toc), and the autoBoot call
+    — is owned by the kit's CSS and JS. The stub stays small so
+    authors who customise it have little to read or maintain.
+    """
     return (
         '<!DOCTYPE html>\n'
         '<html lang="en">\n<head>\n'
         '<meta charset="UTF-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
         f'<title>{html_escape(title)}</title>\n'
-        '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
-        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">\n'
         '<script src="_kit/chrome-boot.js"></script>\n'
         '<link rel="stylesheet" href="_kit/chrome.css">\n'
         '<script src="_kit/chrome.js" defer></script>\n'
         '<script src="_kit/renderer.js" defer></script>\n'
-        '</head>\n<body>\n<page-chrome></page-chrome>\n'
-        '<div class="layout">\n'
-        '  <page-nav  title="Pages"></page-nav>\n'
-        '  <main id="main-content"></main>\n'
-        '  <page-toc  title="On this page"></page-toc>\n'
-        '</div>\n'
-        '<script>window.addEventListener("DOMContentLoaded",function(){HtmlDocRenderer.autoBoot();});</script>\n'
-        '</body>\n</html>\n'
+        '</head>\n<body></body>\n</html>\n'
     )
 
 

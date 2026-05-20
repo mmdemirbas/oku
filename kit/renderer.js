@@ -738,19 +738,37 @@
    * sibling *.json file derived from the current URL.
    */
   HtmlDocRenderer.autoBoot = function (opts) {
+    // Idempotent: legacy stubs include an inline autoBoot script that
+    // races with the self-trigger below. Skip the second call so we
+    // don't render twice.
+    if (HtmlDocRenderer._autoBootRan) return HtmlDocRenderer._autoBootRan;
     const inline = document.getElementById('__htmldoc_page__');
+    let result;
     if (inline) {
       try {
         const data = JSON.parse(inline.textContent);
-        return new HtmlDocRenderer(opts || {}).render(data);
+        result = new HtmlDocRenderer(opts || {}).render(data);
       } catch (e) {
         console.error('[html-doc] inline page parse failed', e);
       }
     }
-    const last = window.location.pathname.split('/').pop() || '';
-    const jsonName = last.replace(/\.html$/, '.json') || 'index.json';
-    return new HtmlDocRenderer(opts || {}).renderFromUrl(jsonName);
+    if (result === undefined) {
+      const last = window.location.pathname.split('/').pop() || '';
+      const jsonName = last.replace(/\.html$/, '.json') || 'index.json';
+      result = new HtmlDocRenderer(opts || {}).renderFromUrl(jsonName);
+    }
+    HtmlDocRenderer._autoBootRan = result;
+    return result;
   };
 
   window.HtmlDocRenderer = HtmlDocRenderer;
+
+  // Self-trigger so per-page stubs don't need an inline autoBoot script.
+  // The legacy inline form remains compatible — autoBoot itself is
+  // idempotent (see _autoBootRan guard above).
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { HtmlDocRenderer.autoBoot(); });
+  } else {
+    HtmlDocRenderer.autoBoot();
+  }
 })();

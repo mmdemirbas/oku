@@ -207,6 +207,30 @@ try {
   }
 } catch (e) {}
 
+/* Body skeleton injection. The per-page stub may carry as little as
+ * <body></body> — chrome.js then fills in <page-chrome> + the layout
+ * grid (page-nav, main, page-toc) on DOMContentLoaded. Authors who
+ * want a custom layout can still write the elements themselves; this
+ * function bails out the moment it sees an existing <page-chrome>. */
+function ensureLayoutSkeleton() {
+  if (document.querySelector('page-chrome')) return;
+  var body = document.body;
+  if (!body) return;
+  body.insertAdjacentHTML('afterbegin',
+    '<page-chrome></page-chrome>' +
+    '<div class="layout">' +
+      '<page-nav title="Pages"></page-nav>' +
+      '<main id="main-content"></main>' +
+      '<page-toc title="On this page"></page-toc>' +
+    '</div>'
+  );
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', ensureLayoutSkeleton);
+} else {
+  ensureLayoutSkeleton();
+}
+
 /* ============ <page-chrome> Web Component ============ */
 class PageChrome extends HTMLElement {
   connectedCallback() {
@@ -3976,17 +4000,12 @@ class PageNav extends HTMLElement {
       }
       loadManifest()
         .then(function (manifest) { self._renderTree(manifest); })
-        .catch(function (e) {
+        .catch(function () {
+          // No manifest: degrade silently. The sidebar prints an inline
+          // hint about running `html-doc serve` so the user knows how
+          // to enable full site navigation. A floating warning banner
+          // was noisy for IDE-served previews where this is expected.
           self._renderTree(null);
-          window.dispatchEvent(new CustomEvent('html-doc:warnings', {
-            detail: [{
-              code: 'manifest-fetch-failed',
-              msg: 'Could not load site-manifest.json' +
-                   (e && e.__htmldocManifestStatus ? ' (HTTP ' + e.__htmldocManifestStatus + ')' : '') +
-                   ' — run `html-doc build` to regenerate it.',
-              level: 'warn'
-            }]
-          }));
         });
     }
 
@@ -4046,9 +4065,10 @@ class PageNav extends HTMLElement {
     if (!tree) return;
     tree.innerHTML = '';
     if (!manifest) {
-      // Fetch failed — the catch handler in start() already dispatched a
-      // specific warning. Just show inline placeholder.
-      tree.innerHTML = '<li class="page-nav-empty">No site-manifest.json found. Run <code>html-doc build</code>.</li>';
+      // No manifest available — typical when the page is opened directly
+      // (IDE-served, file://). Tell the reader how to enable the full
+      // site tree without making it look like an error.
+      tree.innerHTML = '<li class="page-nav-empty">Run <code>html-doc serve</code> for full site navigation.</li>';
       return;
     }
     if (!Array.isArray(manifest.pages)) {

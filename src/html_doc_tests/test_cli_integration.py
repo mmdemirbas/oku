@@ -159,12 +159,12 @@ class TestCLIInit:
         assert index.exists()
         body = index.read_text(encoding="utf-8")
         # Stub must reference the kit (boot, css, main, renderer).
+        # autoBoot is self-triggered by renderer.js — the stub no longer
+        # carries an inline script.
         assert "_kit/chrome-boot.js" in body
         assert "_kit/chrome.css" in body
         assert "_kit/chrome.js" in body
         assert "_kit/renderer.js" in body
-        # autoBoot fetches the sibling JSON at load time.
-        assert "autoBoot" in body
 
     def test_init_picks_title_from_existing_index_json(self, tmp_path: Path, repo_root: Path) -> None:
         # If cwd/index.json already exists, init should use its title
