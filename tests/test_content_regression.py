@@ -777,6 +777,66 @@ class TestChromeKitMarkers:
         assert "hdt-lightbox-backdrop" in js, "backdrop close target missing"
         assert "e.key === 'Escape'" in js, "Escape close path missing"
 
+    def test_table_board_view_honors_board_order(self, repo_root: Path) -> None:
+        """Board (kanban) lanes must be orderable via a column header.
+
+        Authors declare `boardOrder` on a column header; when that column
+        is the board view's group-by, lanes render in that order rather
+        than first-occurrence-in-rows order. Without this knob the board
+        view is functionally a colored list — useless as a kanban.
+
+        Locks:
+        - renderer.js emits `data-board-order` on the th when the header
+          object declares boardOrder
+        - chrome.js renderBoard reads `data-board-order` and sorts the
+          lane list by it (unknown values appended at end)
+        - schema/page.schema.json declares boardOrder on tableHeader
+        - docs/primitives.json carries a worked example so the demo
+          stays in sync with the renderer
+        """
+        renderer = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "data-board-order" in renderer, (
+            "renderer must emit data-board-order from header.boardOrder"
+        )
+
+        chrome_js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "data-board-order" in chrome_js, (
+            "renderBoard must read data-board-order to order lanes"
+        )
+        assert "laneOrder" in chrome_js and "laneRank" in chrome_js, (
+            "renderBoard must define a lane-rank function to sort lanes "
+            "by the declared boardOrder"
+        )
+
+        schema = json.loads(
+            (repo_root / "kit-data" / "schema" / "page.schema.json").read_text(encoding="utf-8")
+        )
+        defs = schema.get("$defs") or schema.get("definitions") or {}
+        header_def = defs.get("tableHeader") or {}
+        header_blob = json.dumps(header_def)
+        assert "boardOrder" in header_blob, (
+            "tableHeader schema must declare boardOrder as an optional "
+            "ordered string array"
+        )
+
+        primitives = json.loads(
+            (repo_root / "docs" / "primitives.json").read_text(encoding="utf-8")
+        )
+        demo_seen = False
+        for block in _walk_blocks(primitives):
+            if block.get("kind") != "table":
+                continue
+            for h in block.get("headers", []):
+                if isinstance(h, dict) and isinstance(h.get("boardOrder"), list):
+                    demo_seen = True
+                    break
+            if demo_seen:
+                break
+        assert demo_seen, (
+            "docs/primitives.json must demonstrate a boardOrder header "
+            "so authors see how to drive kanban lane ordering"
+        )
+
     def test_table_has_board_view(self, repo_root: Path) -> None:
         """Tables expose a 4th view: Board (kanban-style lanes).
 

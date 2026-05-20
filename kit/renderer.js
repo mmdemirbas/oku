@@ -394,9 +394,14 @@
         const tr = document.createElement('tr');
         for (const h of headers) {
           const th = document.createElement('th');
-          if (h && typeof h === 'object' && !Array.isArray(h) && h.filter === 'chips') {
-            th.setAttribute('data-filter', 'chips');
-            if (Array.isArray(h.values)) th.setAttribute('data-values', h.values.join('|'));
+          if (h && typeof h === 'object' && !Array.isArray(h)) {
+            if (h.filter === 'chips') {
+              th.setAttribute('data-filter', 'chips');
+              if (Array.isArray(h.values)) th.setAttribute('data-values', h.values.join('|'));
+            }
+            if (Array.isArray(h.boardOrder) && h.boardOrder.length) {
+              th.setAttribute('data-board-order', h.boardOrder.join('|'));
+            }
             th.appendChild(this._renderRich(h.label));
           } else {
             th.appendChild(this._renderRich(h));

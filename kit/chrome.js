@@ -1094,12 +1094,15 @@ function initReadingAids() {
       }
 
       /* Board view — kanban-style lanes, one per unique value in the
-         active group column. Lane order follows the existing group
-         iteration order (group_by_author preserves declared order;
-         column-based grouping falls back to insertion order = first
-         occurrence in the rows). Each row becomes a card in its lane.
-         When no grouping is active, the board collapses to a single
-         "All" lane (still useful as a card flow without group rules). */
+         active group column. Lane order: (a) honor the active column's
+         data-board-order attribute when column-grouping (so the author
+         can declare "next, doing, done" instead of getting whichever
+         value first-occurs in the rows); (b) fall back to group
+         iteration order otherwise (group_by_author preserves declared
+         order; bare column-grouping keeps first-occurrence). Each row
+         becomes a card in its lane. When no grouping is active, the
+         board collapses to a single "All" lane (still useful as a card
+         flow without group rules). */
       function renderBoard(visible, counts) {
         board.innerHTML = '';
         // Bucket rows by their active group key. `visible` is the same
@@ -1117,8 +1120,33 @@ function initReadingAids() {
           if (!lanes.has(key)) lanes.set(key, []);
           lanes.get(key).push(e);
         });
+        // Apply boardOrder when column-grouping. Unknown values keep
+        // first-occurrence order at the end so the author sees them.
+        var laneOrder = null;
+        if (groupByCol !== 'author' && groupByCol !== 'none') {
+          var colIdx = +groupByCol;
+          if (Number.isFinite(colIdx)) {
+            var thsB = table.querySelectorAll('thead th');
+            var orderAttr = thsB[colIdx] && thsB[colIdx].getAttribute('data-board-order');
+            if (orderAttr) laneOrder = orderAttr.split('|');
+          }
+        }
+        var laneEntries = Array.from(lanes.entries());
+        if (laneOrder) {
+          var laneKeyTitle = function (k) {
+            if (k === '__all__') return '';
+            return stripHtml((k.label || k.title || k.key || '').toString()).trim();
+          };
+          var laneRank = function (k) {
+            var i = laneOrder.indexOf(laneKeyTitle(k));
+            return i === -1 ? laneOrder.length : i;
+          };
+          laneEntries.sort(function (a, b) { return laneRank(a[0]) - laneRank(b[0]); });
+        }
         // Render each lane as a column with a header + stacked cards.
-        lanes.forEach(function (rows, key) {
+        laneEntries.forEach(function (entry) {
+          var key = entry[0];
+          var rows = entry[1];
           var lane = document.createElement('div');
           lane.className = 'hdt-board-lane';
           var head = document.createElement('div');

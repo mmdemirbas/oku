@@ -532,6 +532,35 @@
         },
         {
           "kind": "heading",
+          "level": 4,
+          "title": "Board view: kanban lanes in declared order"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Switch any table to <em>Board</em> view (the fourth view toggle) and pick a column to group by &mdash; rows become cards in lanes, one lane per unique value. Declare <code>boardOrder</code> on the column header to force the lane sequence; without it, lanes appear in first-occurrence order, which rarely matches the kanban flow you want. Values present in row data but missing from <code>boardOrder</code> render at the end so authors can spot the omission."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\n    \"Item\",\n    { \"label\": \"Status\",\n      \"boardOrder\": [\"queued\", \"in-progress\", \"blocked\", \"done\"] }\n  ],\n  \"rows\": [\n    [\"Cut release tag\",        \"queued\"],\n    [\"Wire CI matrix\",         \"in-progress\"],\n    [\"Vendor security review\", \"blocked\"],\n    [\"Migrate auth layer\",     \"done\"],\n    [\"Draft RFC\",              \"in-progress\"],\n    [\"Update changelog\",       \"queued\"]\n  ]\n}"
+        },
+        {
+          "kind": "table",
+          "headers": [
+            "Item",
+            { "label": "Status", "boardOrder": ["queued", "in-progress", "blocked", "done"] }
+          ],
+          "rows": [
+            ["Cut release tag",        "queued"],
+            ["Wire CI matrix",         "in-progress"],
+            ["Vendor security review", "blocked"],
+            ["Migrate auth layer",     "done"],
+            ["Draft RFC",              "in-progress"],
+            ["Update changelog",       "queued"]
+          ]
+        },
+        {
+          "kind": "heading",
           "level": 3,
           "id": "compare-grid",
           "title": "compare-grid"

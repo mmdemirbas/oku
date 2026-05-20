@@ -239,12 +239,12 @@
     },
 
     "tableHeader": {
-      "description": "Either a plain header label (string / inline-array) or an object form that declares chip-filtering for the column.",
+      "description": "Either a plain header label (string / inline-array) or an object form with optional chip-filter and/or board-lane-order declarations.",
       "oneOf": [
         { "$ref": "#/$defs/richString" },
         {
           "type": "object",
-          "required": ["label", "filter", "values"],
+          "required": ["label"],
           "additionalProperties": false,
           "properties": {
             "label":  { "$ref": "#/$defs/richString" },
@@ -253,9 +253,22 @@
               "type": "array",
               "items": { "type": "string" },
               "minItems": 1,
-              "description": "Ordered chip values. Cells in this column should declare one (or more) of these via the object cell form."
+              "description": "Ordered chip values for chip-filter columns. Cells should declare one (or more) of these via the object cell form."
+            },
+            "boardOrder": {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "description": "When this column drives the board view's group-by, render lanes in this order. Values present in row data but missing from boardOrder render at the end in first-occurrence order."
             }
-          }
+          },
+          "dependentRequired": {
+            "filter": ["values"]
+          },
+          "anyOf": [
+            { "required": ["filter"] },
+            { "required": ["boardOrder"] }
+          ]
         }
       ]
     },
