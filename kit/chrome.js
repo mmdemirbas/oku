@@ -300,6 +300,9 @@ function __htmldocRefreshActiveLink(pagePath) {
 // browser's Back/Forward buttons (which fire hashchange when only
 // the fragment changes).
 window.addEventListener('hashchange', function () {
+  // Tell the scroll-spy to pause its replaceState writes for a tick —
+  // otherwise the scroll-driven hash update fights the click-driven one.
+  try { window.dispatchEvent(new Event('html-doc:hash-routing')); } catch (e) { /* ignore */ }
   __htmldocRenderHash().catch(function (err) {
     console.warn('[html-doc] hash navigation failed', err);
   });
@@ -580,6 +583,22 @@ function buildTOC(tocList) {
     });
   });
 
+  // Page-aware hash prefix matches buildTOC above — so an in-flight
+  // scroll past a section stamps a URL that fully restores state on
+  // refresh / paste.
+  var pageForHash = window.__htmldocCurrentPage;
+  var hashPrefix = (pageForHash && pageForHash !== 'index.html') ? '#' + pageForHash + ':' : '#';
+  var lastHash = null;
+  // While the user is interacting with a hash-routed link (click on a
+  // TOC entry, programmatic scroll triggered by the router), we let the
+  // existing hash stand for one tick so we don't overwrite it before
+  // the smooth scroll lands on the target.
+  var suspendHashUpdate = false;
+  window.addEventListener('html-doc:hash-routing', function () {
+    suspendHashUpdate = true;
+    setTimeout(function () { suspendHashUpdate = false; }, 600);
+  });
+
   function updateActive() {
     var y = window.scrollY + 150;
     var current = headings[0];
@@ -588,7 +607,34 @@ function buildTOC(tocList) {
       var top = rect.top + window.scrollY;
       if (top <= y) current = headings[k]; else break;
     }
-    if (current) setActive(current.sectionId, current.h3Id);
+    if (!current) return;
+    setActive(current.sectionId, current.h3Id);
+
+    // URL hash mirrors the heading nearest the viewport top so a refresh
+    // restores the same reading position. Uses replaceState so we don't
+    // pollute history with every scroll wheel tick. Only fires when the
+    // hash would actually change AND we're not in the middle of routing.
+    if (suspendHashUpdate) return;
+    var anchorId = current.h3Id || current.sectionId;
+    if (!anchorId) return;
+    // At the very top of the page (no scroll yet), don't stamp a hash —
+    // a bare URL is preferable to a permanent #first-section anchor.
+    if (window.scrollY < 80) {
+      if (window.location.hash) {
+        try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) { /* ignore */ }
+        lastHash = '';
+      }
+      return;
+    }
+    var nextHash = hashPrefix + anchorId;
+    if (nextHash === lastHash || nextHash === window.location.hash) {
+      lastHash = nextHash;
+      return;
+    }
+    try {
+      history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
+      lastHash = nextHash;
+    } catch (e) { /* ignore in environments without history API */ }
   }
 
   var ticking = false;
