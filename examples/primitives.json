@@ -108,7 +108,7 @@
       "blocks": [
         {
           "kind": "diagram",
-          "caption": "End-to-end request flow when a v2 page loads.",
+          "caption": "End-to-end request flow when a page loads.",
           "source": "sequenceDiagram\n    participant Browser\n    participant Server\n    participant Renderer\n    participant Kit as kit.json + glossary/*\n\n    Browser->>Server: GET iceberg.html\n    Server-->>Browser: HTML stub (chrome.js + renderer.js)\n    Browser->>Server: GET iceberg.json\n    Server-->>Browser: page tree\n    Browser->>Server: GET kit.json + glossary/*.json\n    Server-->>Browser: registry data\n    Renderer->>Browser: emit Custom Elements\n    Note over Browser: glossary-term tooltips ready"
         },
         {

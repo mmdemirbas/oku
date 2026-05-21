@@ -751,7 +751,7 @@ _KNOWN_INLINE_KINDS = {"glossary-term", "ext-ref", "code", "em", "strong", "link
 # case-insensitively, word-boundary-anchored where it matters.
 _FORBIDDEN_PROSE_PATTERNS = [
     re.compile(r"\bround[- ]\d+\b", re.IGNORECASE),
-    re.compile(r"\bv2 review\b", re.IGNORECASE),
+    re.compile(r"\bv\d+ review\b", re.IGNORECASE),
     re.compile(r"\bfixed in round\b", re.IGNORECASE),
     re.compile(r"\bsince round\b", re.IGNORECASE),
 ]

@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/project-kit.schema.json",
-  "name": "html-doc v2",
+  "name": "html-doc",
   "description": "Interactive knowledge platform for AI-emitted documentation, learning notes, and reviews.",
   "domains": ["data-platforms", "web", "ai-llm", "doc-tooling"],
   "lang": "en",

@@ -2,16 +2,16 @@
   "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
   "kind": "page",
   "schema_version": 1,
-  "title": "html-doc v2",
+  "title": "html-doc",
   "accent": "teal",
   "meta": {
     "eyebrow": "Project status · 2026-05-17",
-    "subtitle": "Interactive knowledge platform for AI-emitted documentation, learning notes, and reviews. This page is the live status board and primitives reference, authored in the v2 JSON format itself.",
+    "subtitle": "Interactive knowledge platform for AI-emitted documentation, learning notes, and reviews. This page is the live status board and primitives reference, authored in the JSON format itself.",
     "audience": "Author",
     "date": "2026-05-17",
     "read_time": "~10 min read",
     "order": 1,
-    "summary": "v2 status, build progress, live primitives tour, architecture, what's next.",
+    "summary": "Current status, primitives reference, architecture, what's next.",
     "updated": "2026-05-18"
   },
   "blocks": [
@@ -50,7 +50,7 @@
       "kind": "section",
       "id": "docs",
       "title": "Documentation",
-      "lead": "Five reference pages cover everything you need to use and extend the kit. Each is itself a v2 JSON page rendered by the system — you can read the source as a working example.",
+      "lead": "Five reference pages cover everything you need to use and extend the kit. Each is itself a JSON page rendered by the system — you can read the source as a working example.",
       "blocks": [
         {
           "kind": "step-flow",
@@ -73,7 +73,7 @@
               "title": "Primitives reference",
               "meta": "~12 min · every element with live examples",
               "content": [
-                "Every Custom Element shipped with v2 — JSON shape, attributes, live example. The catalog you reach for while authoring. ",
+                "Every Custom Element shipped with the kit — JSON shape, attributes, live example. The catalog you reach for while authoring. ",
                 {
                   "kind": "link",
                   "text": "Open primitives.html",
@@ -141,7 +141,7 @@
                 "Client-side renderer (renderer.js) — JSON → Custom Element DOM at load time",
                 "<page-chrome> + Visual Viewport pinch-zoom stability",
                 "<page-nav> site-tree sidebar with right-edge tab toggle",
-                "<page-toc> section-TOC with left-edge tab toggle (v2 layout)",
+                "<page-toc> section-TOC with left-edge tab toggle",
                 "Three-column CSS grid + mobile drawers",
                 "kit.json loader + multi-domain, multi-language registry",
                 "Tooltip controller: hover, bridge, click-pin, touch-only-click, Esc",
@@ -280,7 +280,7 @@
         },
         {
           "kind": "diagram",
-          "caption": "End-to-end when this page loaded — the same pipeline applies to every v2 page.",
+          "caption": "End-to-end when this page loaded — the same pipeline applies to every page.",
           "source": "sequenceDiagram\n    autonumber\n    participant B as Browser\n    participant H as HTML stub\n    participant R as renderer.js\n    participant C as chrome.js\n    participant K as kit.json + glossary/*\n\n    B->>H: GET index.html\n    H-->>B: stub + chrome.css\n    B->>C: load chrome.js + renderer.js\n    C->>K: fetch kit.json\n    K-->>C: domains, lang, overrides\n    C->>K: fetch glossary/<domain>.json (xN)\n    Note over C,K: Promise.all then apply overrides\n    H->>R: autoBoot()\n    R->>B: fetch index.json\n    B-->>R: page tree\n    R->>B: emit Custom Element DOM\n    C->>B: build TOC, init reading aids\n    Note over B: glossary-term, ext-ref attach tooltip controller"
         },
         {
@@ -323,11 +323,11 @@
       "kind": "section",
       "id": "architecture",
       "title": "Architecture",
-      "lead": "Anatomy of a v2 project and how the runtime fits together.",
+      "lead": "Anatomy of a project and how the runtime fits together.",
       "blocks": [
         {
           "kind": "diagram",
-          "caption": "Files in a v2 project. Solid arrows are runtime; dashed are build-time.",
+          "caption": "Files in a project. Solid arrows are runtime; dashed are build-time.",
           "source": "flowchart LR\n    subgraph SRC[Project source]\n      P[*.json pages]\n      H[*.html stubs]\n      KJ[kit.json]\n    end\n    subgraph KIT[Kit — symlinked _kit/]\n      CC[chrome.css]\n      CJ[chrome.js]\n      RJ[renderer.js]\n      G[glossary/*.json]\n      E[extrefs/*.json]\n    end\n    subgraph BUILD[html-doc build]\n      MFG[site-manifest.json]\n      LLM[llms.txt]\n      PF[pagefind/]\n      DS[dist/standalone/]\n      DT[dist/site/]\n    end\n    H -.-> DS\n    H -.-> DT\n    P -.-> DS\n    P -.-> DT\n    P -.-> MFG\n    P -.-> LLM\n    DT -.-> PF\n    P --> RJ\n    KJ --> CJ\n    G --> CJ\n    E --> CJ\n    RJ --> DOM[Custom Element DOM]\n    CJ --> DOM"
         },
         {
@@ -368,13 +368,13 @@
       "kind": "section",
       "id": "next",
       "title": "What's next",
-      "lead": "All review items addressed. Remaining is discretionary polish and the v2.0.0 tag.",
+      "lead": "All review items addressed. Remaining is discretionary polish before the stable tag.",
       "blocks": [
         {
           "kind": "callout",
           "type": "success",
-          "title": "Ready to tag v2.0.0",
-          "content": "All review showstoppers, highs, and mediums shipped. Polish items (Mermaid SRI, element-name normalization, chrome.js split) can land in v2.x point releases. The tag itself is deferred until you say so — once cut, branches relying on v2 can pin via CDN."
+          "title": "Ready to cut a stable release",
+          "content": "All review showstoppers, highs, and mediums shipped. Polish items (Mermaid SRI, element-name normalization, chrome.js split) can land in point releases. The tag itself is deferred until you say so — once cut, branches relying on this kit can pin via CDN."
         },
         {
           "kind": "step-flow",

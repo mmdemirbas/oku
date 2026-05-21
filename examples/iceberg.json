@@ -5,7 +5,7 @@
   "title": "Iceberg storage layer",
   "accent": "teal",
   "meta": {
-    "eyebrow": "Architecture · v2 demo",
+    "eyebrow": "Architecture · demo",
     "subtitle": "End-to-end demonstration of the JSON-source renderer, glossary tooltips, and the Visual Viewport pinch-zoom fix.",
     "audience": "Spark+Iceberg team",
     "date": "2026-05-17",

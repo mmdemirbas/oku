@@ -5,7 +5,7 @@
   "title": "Spark integration",
   "accent": "teal",
   "meta": {
-    "eyebrow": "Engine · v2 demo",
+    "eyebrow": "Engine · demo",
     "subtitle": "Second page in the demo knowledge base — used to verify <page-nav> renders the tree and active-page highlighting works.",
     "audience": "Spark+Iceberg team",
     "date": "2026-05-17",

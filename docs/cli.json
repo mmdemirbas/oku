@@ -148,7 +148,7 @@
                 ", ",
                 { "kind": "code", "text": "unknown-inline" }
               ],
-              "Prose containing round-N / v2 review / fixed in round (kit documents current behaviour only). Glossary terms / ext-refs that don't resolve against kit/glossary/ / kit/extrefs/."
+              "Prose containing round-N / vN review / fixed in round (kit documents current behaviour only). Glossary terms / ext-refs that don't resolve against kit/glossary/ / kit/extrefs/."
             ],
             [
               [{ "kind": "strong", "text": "info" }],
@@ -269,7 +269,7 @@
       "kind": "section",
       "id": "future",
       "title": "Install + run",
-      "lead": "Not in v2. Worth noting because they're frequently asked.",
+      "lead": "Worth noting because they're frequently asked.",
       "blocks": [
         {
           "kind": "paragraph",

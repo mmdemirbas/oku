@@ -6,7 +6,7 @@
   "accent": "teal",
   "meta": {
     "eyebrow": "Reference",
-    "subtitle": "Every Custom Element shipped with v2. Each entry: what it does, the JSON shape, every attribute, and a live example you can interact with.",
+    "subtitle": "Every Custom Element shipped with the kit. Each entry: what it does, the JSON shape, every attribute, and a live example you can interact with.",
     "audience": "Author",
     "date": "2026-05-18",
     "read_time": "~12 min read",
@@ -836,7 +836,7 @@
             },
             {
               "verdict": "good",
-              "title": "Authored JSON (v2)",
+              "title": "Authored JSON",
               "content": "Structured tree. Atomic edits. JSON.parse is the contract."
             }
           ]
@@ -869,7 +869,7 @@
           "cards": [
             {
               "verdict": "in",
-              "title": "v2 ships",
+              "title": "Ships now",
               "items": [
                 "JSON-source runtime rendering",
                 "Multi-domain glossary with EN/TR",

@@ -6,7 +6,7 @@
   "accent": "teal",
   "meta": {
     "eyebrow": "Guide",
-    "subtitle": "How to write a v2 page. Project setup, JSON page structure, rich text, per-page metadata, build outputs. Every section has a real example.",
+    "subtitle": "How to write a page. Project setup, JSON page structure, rich text, per-page metadata, build outputs. Every section has a real example.",
     "audience": "Author",
     "date": "2026-05-18",
     "read_time": "~8 min read",
@@ -17,7 +17,7 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "A v2 page is one JSON file. Authoring it is filling in a tree of kind-tagged blocks. No HTML stub to maintain — the dev server synthesizes one in memory from each .json (or .md) source; the build writes one into dist/.",
+      "summary": "A page is one JSON file. Authoring it is filling in a tree of kind-tagged blocks. No HTML stub to maintain — the dev server synthesizes one in memory from each .json (or .md) source; the build writes one into dist/.",
       "bullets": [
         "Start a new project with html-doc init. One file per page: name.json (or name.md). Source dirs hold authored content only.",
         "The schema is at kit/schema/page.schema.json — VS Code and Cursor autocomplete every node kind.",
