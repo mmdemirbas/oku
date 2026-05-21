@@ -42,6 +42,12 @@
  *     - Internal helpers:        nested inside their controller IIFE
  * ────────────────────────────────────────────────────────────────── */
 
+/* ============ Kit version ============ *
+ * Surfaced in the sidebar footer (dimmed) so a reader can see at a
+ * glance which build of html-doc rendered the page. Bump in lockstep
+ * with pyproject.toml's [project] version. */
+const KIT_VERSION = '0.2.0';
+
 /* ============ SVG icon set ============ */
 const ICON_MENU = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>';
 const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.5" y1="4.5" x2="6.6" y2="6.6"/><line x1="17.4" y1="17.4" x2="19.5" y2="19.5"/><line x1="4.5" y1="19.5" x2="6.6" y2="17.4"/><line x1="17.4" y1="6.6" x2="19.5" y2="4.5"/></svg>';
@@ -388,9 +394,9 @@ function ensureLayoutSkeleton() {
   body.insertAdjacentHTML('afterbegin',
     '<page-chrome></page-chrome>' +
     '<div class="layout">' +
-      '<page-nav title="Pages"></page-nav>' +
+      '<page-nav></page-nav>' +
       '<main id="main-content"></main>' +
-      '<page-toc title="On this page"></page-toc>' +
+      '<page-toc></page-toc>' +
     '</div>'
   );
 }
@@ -444,13 +450,38 @@ customElements.define('page-chrome', PageChrome);
  * --------------------------------------------------------------- */
 class PageToc extends HTMLElement {
   connectedCallback() {
-    var title = this.getAttribute('title') || 'On this page';
+    // Header text mirrors the current page title — far less noise than
+    // "On this page" and gives the reader a label when the sidebar is
+    // visible on wide screens. Falls back to a custom attribute or
+    // document.title if the renderer hasn't filled in either yet; an
+    // html-doc:rendered listener below refreshes once the page mounts.
+    var override = this.getAttribute('title');
+    var initial = override || document.title || '';
     this.innerHTML =
       '<div class="page-toc-panel">' +
-        '<div class="toc-header"><h2>' + title + '</h2></div>' +
+        '<div class="toc-header"><h2 class="page-toc-title"></h2></div>' +
         '<ol class="toc-list"></ol>' +
       '</div>';
     var self = this;
+    var heading = self.querySelector('.page-toc-title');
+    if (heading) heading.textContent = initial;
+    function refreshTitle() {
+      if (!heading) return;
+      // The author-supplied attribute, if set, always wins.
+      if (override) { heading.textContent = override; return; }
+      var pageH1 = document.querySelector('main header.cover h1, main h1');
+      heading.textContent = (pageH1 && pageH1.textContent.trim()) || document.title || '';
+    }
+    // The renderer dispatches html-doc:rendered on window after every
+    // render (initial + each hash-nav re-render), which is exactly
+    // when document.title and main's h1 are fresh.
+    window.addEventListener('html-doc:rendered', refreshTitle);
+    window.addEventListener('hashchange', function () {
+      // Defensive: if a flow path swaps <main> faster than the
+      // rendered event fires, the next microtask still picks up the
+      // new title.
+      setTimeout(refreshTitle, 0);
+    });
     // If <main> already has section content (pre-rendered HTML), build
     // the TOC now. For renderer-driven pages, html-doc:rendered will
     // trigger the build later — avoid the wasted empty first pass.
@@ -3986,9 +4017,34 @@ class HtmlDocDiagram extends HTMLElement {
         });
       })
       .catch(function (err) {
-        renderHost.innerHTML = '<pre class="hdd-fallback">' + escapeXml(src) + '</pre>';
+        // Stable id so the warning panel can jump-link back here.
+        if (!self.id) self.id = 'hdd-error-' + Math.random().toString(36).slice(2, 9);
+        var raw = String((err && err.message) || err);
+        // Mermaid otherwise stamps a half-rendered SVG carrying
+        // "Syntax error in text mermaid version X" — replace the
+        // render surface with our own card so the framework noise
+        // doesn't leak through. The toolbar's source toggle still
+        // lets the reader inspect the offending source.
+        renderHost.classList.add('hdd-error');
+        renderHost.innerHTML =
+          '<div class="hdd-error-card" role="alert">' +
+            '<strong>Diagram could not be rendered.</strong>' +
+            '<div class="hdd-error-hint">The source is preserved — open it from the toolbar to debug.</div>' +
+            '<details>' +
+              '<summary>Show parse error</summary>' +
+              '<pre>' + escapeXml(raw) + '</pre>' +
+            '</details>' +
+          '</div>';
+        self._attachToolbar();
+        var firstLine = raw.split('\n')[0].trim();
+        var label = (caption || 'Diagram') + ' — ' + (firstLine || 'parse error');
         window.dispatchEvent(new CustomEvent('html-doc:warnings', {
-          detail: [{ code: 'mermaid-render-failed', msg: String(err.message || err), level: 'warn' }]
+          detail: [{
+            code: 'mermaid-render-failed',
+            msg: label,
+            level: 'warn',
+            target: '#' + self.id
+          }]
         }));
       });
   }
@@ -4491,16 +4547,29 @@ if (!customElements.get('html-doc-snippet')) customElements.define('html-doc-sni
  * ----------------------------------------------------------------- */
 class PageNav extends HTMLElement {
   connectedCallback() {
-    var title = this.getAttribute('title') || 'Pages';
+    // DOM shape:
+    //   .page-nav-scroll   ← flex-1, scrolls; holds the site-tree panel
+    //                        AND the adopted page-toc (appended by
+    //                        adopt() below).
+    //   .page-nav-edge     ← absolute-positioned right-edge handle.
+    //   .page-nav-footer   ← flex-shrink:0, pinned at the literal
+    //                        bottom edge of the sidebar; never scrolls
+    //                        and never sits between tree and TOC.
+    // The version label is dimmed; it tells the reader which build
+    // of html-doc they're reading without competing with content.
     this.innerHTML =
-      '<div class="page-nav-panel">' +
-        '<div class="page-nav-header"><h2>' + title + '</h2></div>' +
-        '<ol class="page-nav-tree"><li class="page-nav-loading">Loading…</li></ol>' +
+      '<div class="page-nav-scroll">' +
+        '<div class="page-nav-panel">' +
+          '<ol class="page-nav-tree"><li class="page-nav-loading">Loading…</li></ol>' +
+        '</div>' +
       '</div>' +
       // Right-edge handle: drag to resize, click (no drag) to collapse.
       // Symmetric to the collapsed 24px rail's full-edge expand affordance.
       '<div class="page-nav-edge" role="separator" aria-orientation="vertical" ' +
-        'aria-label="Resize or collapse sidebar" tabindex="0"></div>';
+        'aria-label="Resize or collapse sidebar" tabindex="0"></div>' +
+      '<div class="page-nav-footer">' +
+        'html-doc <span class="page-nav-version">v' + KIT_VERSION + '</span>' +
+      '</div>';
     var self = this;
     // Adopt the page-toc into the sidebar so both panels share a single
     // column without DOM gymnastics. Deferred so the page-toc can finish
@@ -4520,7 +4589,14 @@ class PageNav extends HTMLElement {
       if (!siblingToc) {
         siblingToc = document.querySelector('page-toc, nav.toc');
       }
-      if (siblingToc && siblingToc.parentElement !== self) self.appendChild(siblingToc);
+      // Adopt INTO the scroll wrapper so the site-tree panel and the
+      // TOC share one scroll context, with the footer fixed below.
+      // If the wrapper isn't there for any reason (custom shape), the
+      // page-nav element itself is the next-best parent.
+      var scrollHost = self.querySelector(':scope > .page-nav-scroll') || self;
+      if (siblingToc && siblingToc.parentElement !== scrollHost) {
+        scrollHost.appendChild(siblingToc);
+      }
     };
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', adopt);
@@ -4623,48 +4699,185 @@ class PageNav extends HTMLElement {
         });
     }
 
-    /* Three-stage manifest loader.
-       1) standalone inline (window.__htmldocManifest pre-populated)
-       2) fetch JSON over HTTP (fast happy path; works whenever the page
-          is served by an HTTP server that allows same-origin GETs)
-       3) script-tag <site-manifest.js> fallback for environments where
-          fetch is blocked (file:// CORS) or refused (IntelliJ's built-in
-          server returns 404 for token-less GETs). The .js companion is
-          emitted next to the .json by build_manifest() in bin/html-doc. */
+    /* Site tree discovery — three stages, in order of authority.
+       1) GET docs/site-manifest.json. `html-doc serve` synthesises this
+          in memory on each request (no file written to source); a built
+          dist/site/ has the real file next to the pages. No-op on any
+          static server that doesn't expose it (404 → next stage).
+       2) Subdir walker. For each subdir already known from the inline
+          seed (plus the docs root itself, in case the server returned a
+          listing there), fetch the HTML directory listing the server
+          serves for a dir URL — Python http.server, nginx autoindex,
+          most static servers — parse the anchors, fetch each *.json,
+          keep the ones with kind="page". Picks up pages added under
+          existing subdirs without re-init.
+       3) Inline window.__htmldocManifest. Last-resort seed for setups
+          that do neither — file://, IntelliJ built-in webserver, the
+          standalone single-file build. `html-doc init` refreshes the
+          inline at the moment a new top-level page joins the tree. */
     function loadManifest() {
-      if (window.__htmldocManifest) return Promise.resolve(window.__htmldocManifest);
-      var wa = (window.__htmldocWithAuth || function (u) { return u; });
       var fileProto = (window.location && window.location.protocol === 'file:');
-      var fetchAttempt = fileProto
-        ? Promise.reject(new Error('file:// — skipping fetch'))
-        : fetch(wa(__htmldocDocsRoot + 'site-manifest.json'), { cache: 'no-cache' })
-            .then(function (r) {
-              if (r.ok) return r.json();
-              var err = new Error('manifest http ' + r.status);
-              err.__htmldocManifestStatus = r.status;
-              throw err;
-            });
-      return fetchAttempt.catch(function (fetchErr) {
-        return loadManifestViaScript().catch(function () {
-          // Surface the more informative original fetch error.
-          throw fetchErr;
+      var inline = window.__htmldocManifest;
+      if (fileProto) {
+        return inline
+          ? Promise.resolve(inline)
+          : Promise.reject(new Error('file:// — no manifest reachable'));
+      }
+      return fetchManifestOverHttp()
+        .catch(function () { return discoverManifestByWalking(__htmldocDocsRoot, inline); })
+        .catch(function (err) {
+          if (inline) return inline;
+          throw err;
         });
-      });
     }
 
-    function loadManifestViaScript() {
-      if (window.__htmldocManifest) return Promise.resolve(window.__htmldocManifest);
+    function fetchManifestOverHttp() {
+      /* Synthesised per-request by `html-doc serve` (in memory; nothing
+         lands in docs/), and a real file in built dist/site/. Treat any
+         non-2xx as "not provided by this server" and fall through to
+         the walker. */
       var wa = (window.__htmldocWithAuth || function (u) { return u; });
-      return new Promise(function (resolve, reject) {
-        var s = document.createElement('script');
-        s.src = wa(__htmldocDocsRoot + 'site-manifest.js');
-        s.async = true;
-        s.onload = function () {
-          if (window.__htmldocManifest) resolve(window.__htmldocManifest);
-          else reject(new Error('site-manifest.js loaded but did not set window.__htmldocManifest'));
-        };
-        s.onerror = function () { reject(new Error('site-manifest.js not reachable')); };
-        document.head.appendChild(s);
+      return fetch(wa(__htmldocDocsRoot + 'site-manifest.json'), { cache: 'no-cache' })
+        .then(function (r) {
+          if (r.ok) return r.json();
+          throw new Error('manifest http ' + r.status);
+        });
+    }
+
+    function discoverManifestByWalking(rootUrl, seed) {
+      /* Build the manifest from a hybrid source: the inline seed gives
+         us top-level pages (which can't be enumerated over HTTP because
+         servers serve index.html for the docs/ URL), then each subdir
+         already known from the seed — plus subdirs discovered by walking
+         the root in case the server *did* return a listing — is fetched
+         fresh so newly-added pages appear without re-init. SKIP mirrors
+         SKIP_DIRS in src/html_doc/cli.py; META lists .json filenames
+         that aren't pages. */
+      var wa = (window.__htmldocWithAuth || function (u) { return u; });
+      var SKIP = {
+        '_kit': 1, 'kit': 1, 'dist': 1, 'build': 1, 'node_modules': 1,
+        '.git': 1, '.idea': 1, '.venv': 1, 'venv': 1,
+        '__pycache__': 1, '.pytest_cache': 1, '.ruff_cache': 1,
+        '.mypy_cache': 1, 'templates': 1, '_internal': 1
+      };
+      var META = /^(site-manifest|kit|package|tsconfig)\.json$/i;
+      var pages = [];
+      var visited = {};
+      var known = {};
+
+      // Seed: every page the inline manifest reported. Subsequent walks
+      // skip these (de-dup by HTML path) and only push new pages.
+      if (seed && Array.isArray(seed.pages)) {
+        seed.pages.forEach(function (p) {
+          if (!p || !p.path || known[p.path]) return;
+          pages.push(p);
+          known[p.path] = true;
+        });
+      }
+
+      function listDir(absoluteUrl) {
+        return fetch(wa(absoluteUrl), {
+          cache: 'no-cache',
+          headers: { 'Accept': 'text/html' }
+        }).then(function (r) {
+          if (!r.ok) return [];
+          var ctype = (r.headers.get('Content-Type') || '').toLowerCase();
+          if (ctype.indexOf('text/html') === -1 &&
+              ctype.indexOf('application/xhtml') === -1) {
+            return [];
+          }
+          return r.text().then(function (html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            // A directory listing has plain anchors to siblings; our own
+            // index.html loads the kit via _kit/. When we hit index.html
+            // (server preferred it over the directory listing), there's
+            // nothing to enumerate — return [] and rely on the seed for
+            // this level.
+            if (doc.querySelector('script[src*="/_kit/"], link[href*="/_kit/"], page-chrome')) {
+              return [];
+            }
+            var out = [];
+            var anchors = doc.querySelectorAll('a[href]');
+            for (var i = 0; i < anchors.length; i++) {
+              var h = anchors[i].getAttribute('href');
+              if (!h) continue;
+              h = h.split('?')[0].split('#')[0];
+              if (!h || h === '../' || h === '/') continue;
+              if (h.indexOf('://') !== -1) continue;  // off-host link
+              if (h.charAt(0) === '/') continue;       // server-absolute
+              out.push(h);
+            }
+            return out;
+          });
+        }).catch(function () { return []; });
+      }
+
+      function fetchPage(absoluteUrl, relPath) {
+        var navPath = relPath.replace(/\.json$/i, '.html');
+        if (known[navPath]) return Promise.resolve();
+        known[navPath] = true;  // claim early so a parallel walk doesn't dup
+        return fetch(wa(absoluteUrl), { cache: 'no-cache' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (data) {
+            if (!data || typeof data !== 'object' || data.kind !== 'page') return;
+            var slash = navPath.lastIndexOf('/');
+            var parent = slash >= 0 ? navPath.slice(0, slash) : null;
+            var meta = data.meta || {};
+            var entry = {
+              path: navPath,
+              source: relPath,
+              title: data.title || navPath,
+              parent: parent
+            };
+            if (meta.order != null) entry.order = meta.order;
+            if (meta.summary != null) entry.summary = meta.summary;
+            pages.push(entry);
+          })
+          .catch(function () { /* unreadable .json — not a page */ });
+      }
+
+      function walk(absoluteUrl, relPrefix, depth) {
+        // Cap recursion at 8 levels. A docs/ tree that goes deeper is
+        // either a misconfiguration or a tree we shouldn't be walking.
+        if (depth > 8) return Promise.resolve();
+        if (visited[absoluteUrl]) return Promise.resolve();
+        visited[absoluteUrl] = true;
+        return listDir(absoluteUrl).then(function (hrefs) {
+          var pending = [];
+          for (var i = 0; i < hrefs.length; i++) {
+            var href = hrefs[i];
+            if (href.charAt(href.length - 1) === '/') {
+              var name = href.slice(0, -1);
+              if (SKIP[name]) continue;
+              pending.push(walk(absoluteUrl + href, relPrefix + href, depth + 1));
+            } else if (/\.json$/i.test(href) && !META.test(href)) {
+              pending.push(fetchPage(absoluteUrl + href, relPrefix + href));
+            }
+          }
+          return Promise.all(pending);
+        });
+      }
+
+      // Walk the docs root (no-op when the server returns our index.html
+      // there — see listDir above) and every subdir referenced by the
+      // seed. The latter is what makes adding a page under plans/ etc.
+      // visible on refresh without any kit-side state.
+      var starts = [walk(rootUrl, '', 0)];
+      var seenSubdir = {};
+      if (seed && Array.isArray(seed.pages)) {
+        seed.pages.forEach(function (p) {
+          if (!p.parent || seenSubdir[p.parent] || SKIP[p.parent]) return;
+          seenSubdir[p.parent] = true;
+          starts.push(walk(rootUrl + p.parent + '/', p.parent + '/', 1));
+        });
+      }
+
+      return Promise.all(starts).then(function () {
+        if (!pages.length) throw new Error('walk: no pages discovered under ' + rootUrl);
+        pages.sort(function (a, b) {
+          return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
+        });
+        return { schema_version: 1, root: '.', pages: pages };
       });
     }
     if (document.readyState === 'loading') {
@@ -4847,7 +5060,14 @@ var __htmldocWarnings = (function () {
     html += '<ul>';
     list.forEach(function (w) {
       var levelClass = (w.level === 'error') ? 'level-error' : 'level-warn';
-      html += '<li class="' + levelClass + '"><code>' + (w.code || 'warn') + '</code> ' + escapeHTML(w.msg || '') + '</li>';
+      html += '<li class="' + levelClass + '"><code>' + (w.code || 'warn') + '</code> ' + escapeHTML(w.msg || '');
+      if (w.target) {
+        // Selector-based jump: scrolls + briefly highlights the offending
+        // element so the reader can find the source of the warning
+        // without scanning the whole page.
+        html += ' <a class="warning-panel-jump" href="' + escapeHTML(w.target) + '">Jump to</a>';
+      }
+      html += '</li>';
     });
     html += '</ul>';
     panel.innerHTML = html;
@@ -4856,6 +5076,20 @@ var __htmldocWarnings = (function () {
       dismissed = true;
       hide();
       if (panel && panel.parentNode) { panel.parentNode.removeChild(panel); panel = null; }
+    });
+    panel.querySelectorAll('.warning-panel-jump').forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var sel = a.getAttribute('href') || '';
+        var el = null;
+        try { el = sel ? document.querySelector(sel) : null; } catch (e) { el = null; }
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Brief flash so the eye locks onto the right element even
+        // when several are visible after the scroll settles.
+        el.classList.add('html-doc-flash');
+        setTimeout(function () { el.classList.remove('html-doc-flash'); }, 1800);
+      });
     });
   }
 
@@ -4879,6 +5113,17 @@ var __htmldocWarnings = (function () {
     refresh();
   }
 
+  function clear() {
+    // Reset the page-scoped store. Used on hash navigation so a stale
+    // warning from the previous page (e.g. a mermaid parse error in
+    // build-architecture) doesn't follow the reader to an unrelated
+    // page. Per-session dismiss is also reset — the next page gets a
+    // fresh chance to surface its own issues.
+    list.length = 0;
+    dismissed = false;
+    hide();
+  }
+
   // Capture standard error channels too
   window.addEventListener('error', function (e) {
     push([{ code: 'window-error', msg: (e.message || 'unknown') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || 0), level: 'error' }]);
@@ -4887,11 +5132,18 @@ var __htmldocWarnings = (function () {
     push([{ code: 'unhandled-rejection', msg: String((e && e.reason && e.reason.message) || e.reason || 'unknown'), level: 'error' }]);
   });
 
-  return { push: push };
+  return { push: push, clear: clear };
 })();
 
 window.addEventListener('html-doc:warnings', function (e) {
   if (e && e.detail) __htmldocWarnings.push(e.detail);
+});
+
+// Scope warnings to the active page: clear the store on every hash
+// navigation so stale entries from the previous page (e.g. a mermaid
+// parse error) don't carry over. New renders push fresh entries.
+window.addEventListener('hashchange', function () {
+  __htmldocWarnings.clear();
 });
 
 /* ============ Pagefind search ============ *
