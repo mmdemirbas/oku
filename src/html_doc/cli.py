@@ -706,6 +706,403 @@ def validate_pages(pages) -> list:
     return errors
 
 
+# ---------- html-doc check (doctree linter) ----------
+#
+# A single pass over every page-JSON the project owns, surfacing problems
+# at three severities:
+#
+#   error    — broken in a way the renderer can't paper over (unknown
+#              kind, missing required field, duplicate anchor, unresolved
+#              glossary term, deprecated primitive). Exits non-zero.
+#   warning  — works at runtime but indicates rot: missing language on a
+#              code block, page with no meta.summary, forbidden process
+#              language ("round-N", "v2 review") leaking into prose.
+#              Exits zero unless --strict.
+#   info     — opinion / quality nudges (no title on a chart, etc.).
+#
+# Output is human-readable by default; --json emits a machine-parseable
+# stream for the html-doc skill's auto-verify step.
+#
+# The function is also the right entry point for tests: it returns the
+# list of issues so unit tests can assert against shapes rather than
+# parsing stdout.
+
+# Deprecated block kinds the renderer no longer wires up. Listed here so
+# that any old content still using these surfaces a clear migration
+# pointer (instead of a generic "unknown block kind" warning).
+_DEPRECATED_KINDS = {
+    "bar-chart": "chart with type:bar (top-level rows[] preserved)",
+    "scope-grid": "compare-grid with verdict in/out and items[] on each card",
+}
+
+# Block kinds the kit knows how to render. Cross-checked against the
+# renderer's switch in kit/renderer.js — keep this list in sync when a
+# kind is added or removed.
+_KNOWN_BLOCK_KINDS = {
+    "section", "paragraph", "heading", "callout", "insight", "info-tip",
+    "list", "code", "annotated-code", "table", "tldr", "kpi-grid",
+    "step-flow", "compare-grid", "chart", "diagram", "live-snippet",
+}
+
+_KNOWN_INLINE_KINDS = {"glossary-term", "ext-ref", "code", "em", "strong", "link"}
+
+# Phrases that signal process / round breadcrumbs in prose — the kit
+# documents current behaviour, never how it got there. Matched
+# case-insensitively, word-boundary-anchored where it matters.
+_FORBIDDEN_PROSE_PATTERNS = [
+    re.compile(r"\bround[- ]\d+\b", re.IGNORECASE),
+    re.compile(r"\bv2 review\b", re.IGNORECASE),
+    re.compile(r"\bfixed in round\b", re.IGNORECASE),
+    re.compile(r"\bsince round\b", re.IGNORECASE),
+]
+
+
+def _walk_blocks(blocks, path=("blocks",)):
+    """Yield (path_tuple, block_dict) for every block in a JSON page,
+    descending into sections, info-tip content, table groups, and so on.
+    Path tuple is a sequence of (key, index) hops suitable for joining
+    into a JSONPath-like locator.
+    """
+    if not isinstance(blocks, list):
+        return
+    for i, blk in enumerate(blocks):
+        if not isinstance(blk, dict):
+            continue
+        here = path + (i,)
+        yield here, blk
+        # Recurse into structural containers.
+        if blk.get("kind") == "section":
+            yield from _walk_blocks(blk.get("blocks") or [], here + ("blocks",))
+        elif blk.get("kind") == "info-tip":
+            yield from _walk_blocks(blk.get("content") or [], here + ("content",))
+
+
+def _walk_rich(rich):
+    """Yield every inline-node dict embedded in a rich-string (either a
+    plain string, or an array mixing strings with inline objects)."""
+    if isinstance(rich, str):
+        return
+    if not isinstance(rich, list):
+        return
+    for item in rich:
+        if isinstance(item, dict):
+            yield item
+
+
+def _walk_all_rich(page):
+    """Yield every rich-string container's content from a parsed page.
+    Used by inline-resolution checks (glossary terms, ext-refs).
+
+    Block kinds whose `content` field is a sequence of *block dicts*
+    (info-tip is the only one today) are NOT descended into here —
+    `_walk_blocks` already covers them. Otherwise rich-string content
+    looks like a list of strings and inline-objects (`glossary-term`,
+    `ext-ref`, `code`, `em`, `strong`, `link`)."""
+    BLOCK_CONTENT_KINDS = {"info-tip"}  # `content` is list-of-blocks, not rich
+    for _, blk in _walk_blocks(page.get("blocks") or []):
+        kind = blk.get("kind")
+        if kind not in BLOCK_CONTENT_KINDS:
+            if "content" in blk:
+                yield from _walk_rich(blk["content"])
+        if isinstance(blk.get("bullets"), list):
+            for b in blk["bullets"]:
+                yield from _walk_rich(b)
+        if isinstance(blk.get("items"), list):
+            for it in blk["items"]:
+                yield from _walk_rich(it)
+        # compare-grid cards
+        for card in blk.get("cards") or []:
+            if isinstance(card, dict):
+                if "content" in card:
+                    yield from _walk_rich(card["content"])
+                for it in card.get("items") or []:
+                    yield from _walk_rich(it)
+        # step-flow steps
+        for step in blk.get("steps") or []:
+            if isinstance(step, dict) and "content" in step:
+                yield from _walk_rich(step["content"])
+        # table cells (rows + groups)
+        rows = blk.get("rows") or []
+        for r in rows:
+            if isinstance(r, dict):
+                r = r.get("cells") or []
+            for cell in r:
+                if isinstance(cell, dict) and "value" in cell:
+                    yield from _walk_rich(cell["value"])
+                else:
+                    yield from _walk_rich(cell)
+        for grp in blk.get("groups") or []:
+            if isinstance(grp, dict):
+                yield from _walk_rich(grp.get("title"))
+                for r in grp.get("rows") or []:
+                    if isinstance(r, dict):
+                        r = r.get("cells") or []
+                    for cell in r:
+                        if isinstance(cell, dict) and "value" in cell:
+                            yield from _walk_rich(cell["value"])
+                        else:
+                            yield from _walk_rich(cell)
+
+
+def _load_registry(kit_dir: Path, kind: str) -> dict:
+    """Load all glossary or extrefs JSON files under kit/{kind}/ and
+    return a {term_key: {domain, langs}} index. Term keys are stored
+    lowercase for case-insensitive matching."""
+    out: dict = {}
+    base = kit_dir / kind
+    if not base.is_dir():
+        return out
+    for f in base.glob("*.json"):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        domain = data.get("domain") or f.stem
+        for term, langs in (data.get("entries") or {}).items():
+            key = term.lower()
+            entry = out.setdefault(key, {"domain": domain, "term": term, "langs": set()})
+            if isinstance(langs, dict):
+                for lang in langs:
+                    entry["langs"].add(lang)
+    return out
+
+
+def _flatten_text(rich) -> str:
+    """Concatenate all plain text from a rich-string for prose
+    scanning. Inline objects contribute their `text`/`name`/`term` fields
+    so author-emitted code/term content gets scanned too."""
+    if rich is None:
+        return ""
+    if isinstance(rich, str):
+        return rich
+    if not isinstance(rich, list):
+        return ""
+    parts: list[str] = []
+    for it in rich:
+        if isinstance(it, str):
+            parts.append(it)
+        elif isinstance(it, dict):
+            for key in ("text", "name", "term"):
+                v = it.get(key)
+                if isinstance(v, str):
+                    parts.append(v)
+    return " ".join(parts)
+
+
+def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[dict]:
+    """Run the full lint pass and return a list of issue dicts.
+
+    Each issue: {path: Path, severity: str, code: str, where: str, message: str}
+    severity is one of 'error' | 'warning' | 'info'.
+    """
+    if kit_dir is None:
+        kit_dir = KIT_DIR
+    issues: list[dict] = []
+
+    def add(p: Path, severity: str, code: str, where: str, message: str) -> None:
+        issues.append({
+            "path": p,
+            "severity": severity,
+            "code": code,
+            "where": where,
+            "message": message,
+        })
+
+    # 1. Schema validation — surfaces shape errors before anything else.
+    if _HAS_JSONSCHEMA:
+        for p, err in validate_pages(pages):
+            add(p, "error", "schema", "(root)", err)
+
+    # Load glossary + extref registries once.
+    glossary = _load_registry(kit_dir, "glossary")
+    extrefs = _load_registry(kit_dir, "extrefs")
+
+    # 2. Stray demo pages — `<thing>-demo.{html,json}` is forbidden;
+    # primitive examples live inline in primitives.json.
+    for p, _data in pages:
+        stem = p.stem
+        if stem.endswith("-demo") and stem != "markdown-demo":
+            add(p, "error", "stray-demo", "(filename)",
+                f"Demo page '{p.name}' is forbidden — fold the example into docs/primitives.json instead.")
+
+    # Per-page passes.
+    for p, page in pages:
+        page_blocks = page.get("blocks") or []
+
+        # 3. Forbidden prose / process breadcrumbs — applies to every
+        # rich-string in the page.
+        for blk_path, blk in _walk_blocks(page_blocks):
+            where_prefix = "/".join(str(x) for x in blk_path) + f":kind={blk.get('kind','?')}"
+            for key in ("lead", "title", "summary", "content"):
+                v = blk.get(key)
+                if v is None:
+                    continue
+                text = _flatten_text(v) if not isinstance(v, str) else v
+                for pat in _FORBIDDEN_PROSE_PATTERNS:
+                    m = pat.search(text)
+                    if m:
+                        add(p, "warning", "process-breadcrumb",
+                            where_prefix + f".{key}",
+                            f"Prose contains process/history reference {m.group(0)!r}; the kit documents current behaviour only.")
+                        # One issue per (block, key) is enough — overlapping
+                        # patterns would otherwise pile up on the same line.
+                        break
+
+            # 4. Deprecated kinds — flag with migration pointer.
+            kind = blk.get("kind")
+            if kind in _DEPRECATED_KINDS:
+                add(p, "error", "deprecated-kind", where_prefix,
+                    f"Block kind '{kind}' is no longer supported. Migrate to: {_DEPRECATED_KINDS[kind]}.")
+            elif kind and kind not in _KNOWN_BLOCK_KINDS:
+                add(p, "error", "unknown-kind", where_prefix,
+                    f"Unknown block kind '{kind}'. Known: {sorted(_KNOWN_BLOCK_KINDS)}.")
+
+            # 5. Code blocks should declare a language (Prism + the language
+            # pill need it).
+            if kind == "code" and not blk.get("language"):
+                add(p, "info", "code-no-language", where_prefix,
+                    "Code block has no `language` field; Prism syntax highlighting and the language pill are skipped.")
+
+            # 6. Chart shape sanity by type.
+            if kind == "chart":
+                ctype = blk.get("type")
+                if ctype == "bar":
+                    if not blk.get("rows"):
+                        add(p, "error", "chart-bar-missing-rows", where_prefix,
+                            "chart with type:bar requires a `rows` array.")
+                elif ctype in ("scatter", "line"):
+                    if not blk.get("series"):
+                        add(p, "error", "chart-cartesian-missing-series", where_prefix,
+                            f"chart with type:{ctype} requires a `series` array.")
+                elif ctype is not None:
+                    add(p, "error", "chart-unknown-type", where_prefix,
+                        f"chart type '{ctype}' is not supported. Use scatter, line, or bar.")
+
+        # 7. Duplicate section IDs within a page — anchors must be unique.
+        seen_ids: dict[str, int] = {}
+        for blk_path, blk in _walk_blocks(page_blocks):
+            if blk.get("kind") in ("section", "heading"):
+                sid = blk.get("id")
+                if not sid:
+                    continue
+                if sid in seen_ids:
+                    where = "/".join(str(x) for x in blk_path)
+                    add(p, "error", "duplicate-anchor", where,
+                        f"Section / heading id '{sid}' already used in this page.")
+                seen_ids[sid] = seen_ids.get(sid, 0) + 1
+
+        # 8. Glossary + ext-ref resolution — every inline reference must
+        # land on an entry the kit knows about.
+        for inline in _walk_all_rich(page):
+            if inline.get("kind") == "glossary-term":
+                term = inline.get("term") or inline.get("text")
+                if term and term.lower() not in glossary:
+                    add(p, "warning", "unresolved-glossary",
+                        f"glossary-term:{term!r}",
+                        f"Glossary term '{term}' not found in any kit/glossary/*.json registry.")
+            elif inline.get("kind") == "ext-ref":
+                name = inline.get("name")
+                if name and name.lower() not in extrefs:
+                    add(p, "warning", "unresolved-extref",
+                        f"ext-ref:{name!r}",
+                        f"External reference '{name}' not found in any kit/extrefs/*.json registry.")
+            elif inline.get("kind") and inline.get("kind") not in _KNOWN_INLINE_KINDS:
+                add(p, "warning", "unknown-inline",
+                    f"inline:{inline.get('kind')!r}",
+                    f"Unknown inline kind '{inline.get('kind')}'.")
+
+        # 9. Page-level metadata sanity.
+        meta = page.get("meta") or {}
+        if not meta.get("summary"):
+            add(p, "info", "no-summary", "meta.summary",
+                "Page has no meta.summary — site-manifest tooltips + llms.txt lose the one-line description.")
+        if not page.get("title"):
+            add(p, "error", "no-title", "title",
+                "Page has no title; the document <title> and cover <h1> will be empty.")
+
+    return issues
+
+
+def _format_issue(issue: dict, root: Path) -> str:
+    """Single-line human-readable rendering of one issue."""
+    try:
+        rel = issue["path"].relative_to(root)
+    except ValueError:
+        rel = issue["path"]
+    icon = {"error": "✗", "warning": "!", "info": "·"}.get(issue["severity"], "·")
+    return f"  {icon} {rel}:{issue['where']} [{issue['code']}] {issue['message']}"
+
+
+def cmd_check(args: argparse.Namespace) -> int:
+    """`html-doc check` — comprehensive doctree lint.
+
+    Runs schema validation plus a suite of structural / content checks
+    (deprecated kinds, duplicate anchors, glossary + ext-ref resolution,
+    forbidden process language, chart shape sanity, …). Fast — designed
+    to be the html-doc skill's auto-verify step.
+
+    Exit codes:
+      0 — clean (no errors; warnings allowed unless --strict).
+      1 — at least one error (or any warning when --strict).
+    """
+    root = Path.cwd()
+    pages = find_json_pages(root)
+    if not pages:
+        print(f"✗ No page-JSON files found under {root}", file=sys.stderr)
+        return 1
+
+    issues = check_pages(pages, root)
+
+    if args.json:
+        # Emit a machine-parseable stream. Path is serialised relative
+        # to root so consumers don't have to strip absolute prefixes.
+        payload = []
+        for it in issues:
+            try:
+                rel = str(it["path"].relative_to(root))
+            except ValueError:
+                rel = str(it["path"])
+            payload.append({
+                "path": rel,
+                "severity": it["severity"],
+                "code": it["code"],
+                "where": it["where"],
+                "message": it["message"],
+            })
+        print(json.dumps({"page_count": len(pages), "issues": payload}, ensure_ascii=False, indent=2))
+    else:
+        # Group by severity for the terminal report.
+        errors = [i for i in issues if i["severity"] == "error"]
+        warnings = [i for i in issues if i["severity"] == "warning"]
+        infos = [i for i in issues if i["severity"] == "info"]
+
+        if errors:
+            print(f"✗ {len(errors)} error(s):")
+            for it in errors:
+                print(_format_issue(it, root))
+        if warnings and not args.errors_only:
+            print(f"! {len(warnings)} warning(s):")
+            for it in warnings:
+                print(_format_issue(it, root))
+        if infos and args.verbose:
+            print(f"· {len(infos)} info note(s):")
+            for it in infos:
+                print(_format_issue(it, root))
+
+        if not errors and not warnings:
+            print(f"✓ {len(pages)} page(s) clean (schema + structural + content)")
+        elif not errors:
+            print(f"✓ {len(pages)} page(s) — no errors (warnings present)")
+
+    has_errors = any(i["severity"] == "error" for i in issues)
+    has_warnings = any(i["severity"] == "warning" for i in issues)
+    if has_errors:
+        return 1
+    if args.strict and has_warnings:
+        return 1
+    return 0
+
+
 def compute_manifest(root: Path) -> dict:
     """Walk JSON pages under root, return the site manifest dict.
 
@@ -1393,17 +1790,24 @@ def cmd_build(args: argparse.Namespace) -> int:
     # authored-content-only.
     docs_dir = _common_docs_dir(root, json_pages)
 
-    # Schema validation — soft-fails without jsonschema.
-    if _HAS_JSONSCHEMA:
-        schema_errors = validate_pages(json_pages)
-        if schema_errors:
-            print(f"! Schema validation: {len(schema_errors)} issue(s):")
-            for p, msg in schema_errors:
-                print(f"    {p.relative_to(root)} — {msg}")
+    # Schema validation + structural lint — runs the same checks as
+    # `html-doc check` so the build never produces a doctree that the
+    # standalone linter would have rejected. Soft-fails without
+    # jsonschema (the structural checks still run).
+    if json_pages:
+        check_issues = check_pages(json_pages, root)
+        errors = [i for i in check_issues if i["severity"] == "error"]
+        warnings = [i for i in check_issues if i["severity"] == "warning"]
+        if errors:
+            print(f"! Doctree check: {len(errors)} error(s):")
+            for it in errors:
+                print(_format_issue(it, root))
+        elif warnings:
+            print(f"✓ Doctree check: {len(json_pages)} page(s) clean (errors); {len(warnings)} warning(s) — run `html-doc check` for the full report.")
         else:
-            print(f"✓ Schema validation: {len(json_pages)} page(s) clean")
-    elif json_pages:
-        print("  (schema validation skipped — `pip install jsonschema` to enable)")
+            print(f"✓ Doctree check: {len(json_pages)} page(s) clean")
+        if not _HAS_JSONSCHEMA:
+            print("  (schema validation skipped — `pip install jsonschema` to enable; structural checks still ran)")
 
     if not srcs:
         return 0
@@ -1935,6 +2339,30 @@ def main() -> int:
     sub = parser.add_subparsers(dest="cmd")
     sub.add_parser("init", help="create docs/_kit symlink in the current project")
     sub.add_parser("build", help="build dist/standalone/ + dist/site/ from current dir")
+    check_parser = sub.add_parser(
+        "check",
+        help="lint every page-JSON in the project (schema + structural + content)",
+    )
+    check_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit 1 on warnings too (default exits 1 only on errors)",
+    )
+    check_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="emit issues as a JSON stream (for the html-doc skill's auto-verify step)",
+    )
+    check_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="show info-level nudges in addition to errors and warnings",
+    )
+    check_parser.add_argument(
+        "--errors-only",
+        action="store_true",
+        help="suppress warnings in the human-readable output (errors still shown; exit code unchanged)",
+    )
     serve_parser = sub.add_parser(
         "serve",
         help="start local HTTP server so kit assets resolve correctly (live-reload by default)",
@@ -1955,6 +2383,8 @@ def main() -> int:
         return cmd_init(args)
     if args.cmd == "build":
         return cmd_build(args)
+    if args.cmd == "check":
+        return cmd_check(args)
     if args.cmd == "serve":
         return cmd_serve(args)
     parser.print_help()

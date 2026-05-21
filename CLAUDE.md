@@ -34,11 +34,20 @@ stub that loads the kit and the page JSON). `html-doc build` produces
 
 ```bash
 uv sync --extra dev           # pulls pytest, ruff, jsonschema
+html-doc check                # schema + structural lint (the fast verify gate)
+html-doc check --strict       # exit 1 on warnings too
 html-doc build                # writes dist/standalone/ + dist/site/
 html-doc serve --no-watch     # local server (live-reload on by default)
-uv run pytest -q              # 125+ tests; should all pass
+uv run pytest -q              # 170+ tests; should all pass
 uv run ruff check . && uv run ruff format --check .
 ```
+
+`html-doc check` is the canonical verify step for any doc-content
+change — it runs the schema + a suite of structural checks (deprecated
+kinds, duplicate anchors, unresolved glossary terms / ext-refs,
+forbidden process language, chart shape sanity). Run it before
+calling a doc change done. `html-doc build` invokes the same checks
+internally and refuses to ship if it errors.
 
 After ANY change to chrome.js / chrome.css: hard-reload the browser
 (`location.reload(true)` from the page console, or close the tab and

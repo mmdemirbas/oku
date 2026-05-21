@@ -101,6 +101,76 @@
     },
     {
       "kind": "section",
+      "id": "check",
+      "title": "html-doc check",
+      "lead": "Lint every page-JSON in the project. Schema validation plus structural / content checks. Fast — runs in milliseconds. Designed as the html-doc skill's auto-verify step.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "bash",
+          "source": "html-doc check\n\n# ✓ 11 page(s) clean (schema + structural + content)\n#\n# html-doc check --strict       # exit 1 on warnings too\n# html-doc check --json         # machine-parseable output\n# html-doc check --verbose      # also surface info-level nudges\n# html-doc check --errors-only  # suppress warnings in the report"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Issues land at three severities. Exit code is 1 if any error is present (or any warning under --strict); 0 otherwise."
+        },
+        {
+          "kind": "table",
+          "headers": ["Severity", "Codes", "What it catches"],
+          "rows": [
+            [
+              [{ "kind": "strong", "text": "error" }],
+              [
+                { "kind": "code", "text": "schema" },
+                ", ",
+                { "kind": "code", "text": "deprecated-kind" },
+                ", ",
+                { "kind": "code", "text": "unknown-kind" },
+                ", ",
+                { "kind": "code", "text": "duplicate-anchor" },
+                ", ",
+                { "kind": "code", "text": "chart-*" },
+                ", ",
+                { "kind": "code", "text": "stray-demo" },
+                ", ",
+                { "kind": "code", "text": "no-title" }
+              ],
+              "JSON shape problems, removed primitives still in use, duplicate section / heading IDs, malformed chart payloads, demo pages outside docs/primitives.json, page without a title."
+            ],
+            [
+              [{ "kind": "strong", "text": "warning" }],
+              [
+                { "kind": "code", "text": "process-breadcrumb" },
+                ", ",
+                { "kind": "code", "text": "unresolved-glossary" },
+                ", ",
+                { "kind": "code", "text": "unresolved-extref" },
+                ", ",
+                { "kind": "code", "text": "unknown-inline" }
+              ],
+              "Prose containing round-N / v2 review / fixed in round (kit documents current behaviour only). Glossary terms / ext-refs that don't resolve against kit/glossary/ / kit/extrefs/."
+            ],
+            [
+              [{ "kind": "strong", "text": "info" }],
+              [
+                { "kind": "code", "text": "code-no-language" },
+                ", ",
+                { "kind": "code", "text": "no-summary" }
+              ],
+              "Code blocks without a declared language (Prism + the language pill skipped). Pages without meta.summary (manifest tooltips and llms.txt lose the one-liner)."
+            ]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "title": "Adding to the html-doc skill flow",
+          "content": "Run html-doc check --strict before declaring an HTML artifact done. Use the --json mode if you want to surface findings programmatically. The linter is designed to be the fastest verification step in the auto-verify loop — no browser required."
+        }
+      ]
+    },
+    {
+      "kind": "section",
       "id": "serve",
       "title": "html-doc serve",
       "lead": "Local HTTP server in the project root. Synthesizes per-page .html stubs, site-manifest.{json,js}, and llms.txt in memory on each request — source dir stays clean. Picks the first free port from 9876.",
