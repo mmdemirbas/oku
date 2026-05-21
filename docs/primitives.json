@@ -255,17 +255,37 @@
         },
         {
           "kind": "paragraph",
-          "content": "Numbered code annotations. Markers like <code>(1)</code> / <code>(2)</code> inside the source become circular accent chips that pair with a numbered side panel. Hover or click any chip lights the matching row and vice versa. Prism highlights first so the chips survive the token tree."
+          "content": "Numbered code annotations. Markers like <code>(1)</code> / <code>(2)</code> inside the source become circular accent chips, paired with a numbered side panel. Hovering a chip drops a tooltip BELOW the line (never blocking the code) and highlights the line it points at. Click to jump between chip and panel item."
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Each annotation can also declare ",
+            { "kind": "code", "text": "lines" },
+            " (a 1-based line spec — ",
+            { "kind": "code", "text": "\"3\"" },
+            ", ",
+            { "kind": "code", "text": "\"1-3\"" },
+            ", ",
+            { "kind": "code", "text": "\"1,5-7\"" },
+            ") to mark a range or set, and / or ",
+            { "kind": "code", "text": "match" },
+            " (string or array) to highlight specific substrings on hover. When ",
+            { "kind": "code", "text": "lines" },
+            " is set and no inline ",
+            { "kind": "code", "text": "(N)" },
+            " marker is present, the chip auto-places at the start of the first listed line — the source stays clean."
+          ]
         },
         {
           "kind": "code",
           "language": "json",
-          "source": "{\n  \"kind\": \"annotated-code\",\n  \"language\": \"javascript\",\n  \"source\": \"const x = 1; // (1)\\nfunction greet(name) { // (2)\\n  return `Hello, ${name}!`;\\n}\",\n  \"annotations\": [\n    { \"id\": 1, \"content\": \"<code>const</code> creates a block-scoped binding.\" },\n    { \"id\": 2, \"content\": \"Functions are first-class values.\" }\n  ]\n}"
+          "source": "{\n  \"kind\": \"annotated-code\",\n  \"language\": \"javascript\",\n  \"source\": \"const x = 1; // (1)\\nfunction greet(name) {\\n  return `Hello, ${name}!`;\\n}\",\n  \"annotations\": [\n    { \"id\": 1, \"content\": \"<code>const</code> creates a block-scoped binding.\" },\n    { \"id\": 2, \"content\": \"Function body — highlights lines 2-4.\", \"lines\": \"2-4\" },\n    { \"id\": 3, \"content\": \"Template-literal interpolation.\", \"match\": \"${name}\" }\n  ]\n}"
         },
         {
           "kind": "annotated-code",
           "language": "javascript",
-          "source": "const x = 1; // (1)\nfunction greet(name) { // (2)\n  return `Hello, ${name}!`;\n}",
+          "source": "const x = 1; // (1)\nfunction greet(name) {\n  return `Hello, ${name}!`;\n}",
           "annotations": [
             {
               "id": 1,
@@ -273,7 +293,13 @@
             },
             {
               "id": 2,
-              "content": "Functions are first-class values."
+              "content": "Function body — hovering this chip highlights lines 2-4 in the gutter.",
+              "lines": "2-4"
+            },
+            {
+              "id": 3,
+              "content": "Template-literal interpolation — hovering this chip highlights the <code>${name}</code> substring.",
+              "match": "${name}"
             }
           ]
         }

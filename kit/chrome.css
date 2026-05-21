@@ -1602,18 +1602,20 @@ html-doc-annotated-code > pre {
      remains attached to the logical line it annotates. */
   margin-top: 4px;
 }
-/* Tooltip on marker hover/focus. Sits to the right of the marker so
-   the slot's narrow containing-block doesn't squeeze content into a
-   one-word-per-line column — explicit width: max-content lets it
-   grow up to max-width based on the annotation body. */
+/* Tooltip on marker hover/focus. Sits BELOW the marker's line so it
+   never blocks the code the annotation refers to. Anchored to the
+   slot's left edge; `width: max-content` lets it grow to its content
+   up to max-width based on the annotation body. The line itself is
+   highlighted via .hdt-anno-target so the reader can see at a glance
+   which row(s) the chip points at. */
 .hdc-anno-tip {
   position: absolute;
-  top: 0;
-  left: 28px;
+  top: calc(100% + 6px);
+  left: -28px;
   display: none;
   z-index: 80;
   width: max-content;
-  max-width: 340px;
+  max-width: 360px;
   min-width: 220px;
   padding: 10px 14px;
   background: var(--surface);
@@ -1635,6 +1637,33 @@ html-doc-annotated-code > pre {
   background: var(--surface-2, var(--code-bg));
   padding: 1px 4px;
   border-radius: 3px;
+}
+
+/* Hover-target highlight on the line(s) the annotation refers to.
+   The accent-soft band runs full-row width and never obscures the
+   text — so the reader sees which line(s) belong to the chip the
+   moment they hover the marker. Activated by JS toggling
+   .hdt-anno-target on the relevant .hdt-code-line spans. */
+.hdc-anno-wrap pre.hdt-line-numbered .hdt-code-line.hdt-anno-target {
+  background: var(--accent-soft);
+  transition: background 0.12s ease;
+}
+/* Substring mark for `annotation.match` — narrow, inline highlight
+   so the chip can point at a token rather than a whole line. Light
+   underline at rest; the row's background lift applies via the line-
+   level rule above when the line is also in the target set. */
+.hdc-anno-substr {
+  background: transparent;
+  color: inherit;
+  border-bottom: 1px dashed var(--accent);
+  border-radius: 2px;
+  padding: 0 1px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.hdc-anno-substr.hovered {
+  background: var(--accent);
+  color: var(--bg);
+  border-bottom-color: transparent;
 }
 .hdc-anno-marker:hover + .hdc-anno-tip,
 .hdc-anno-marker:focus + .hdc-anno-tip,

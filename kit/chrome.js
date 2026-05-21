@@ -3993,6 +3993,43 @@ class HtmlDocAnnotatedCode extends HTMLElement {
     var self = this;
     var validIds = annos.reduce(function (acc, a) { acc[String(a.id)] = true; return acc; }, {});
 
+    // Parse `lines: "1-3,5"` into a sorted unique array of 1-based line
+    // numbers. Empty / malformed input → [].
+    function parseLineSpec(spec) {
+      if (!spec) return [];
+      var seen = {};
+      var out = [];
+      String(spec).split(',').forEach(function (part) {
+        part = part.trim();
+        if (!part) return;
+        var dash = part.indexOf('-');
+        if (dash !== -1) {
+          var lo = parseInt(part.slice(0, dash), 10);
+          var hi = parseInt(part.slice(dash + 1), 10);
+          if (lo > 0 && hi >= lo) {
+            for (var i = lo; i <= hi; i++) {
+              if (!seen[i]) { seen[i] = true; out.push(i); }
+            }
+          }
+        } else {
+          var n = parseInt(part, 10);
+          if (n > 0 && !seen[n]) { seen[n] = true; out.push(n); }
+        }
+      });
+      return out.sort(function (a, b) { return a - b; });
+    }
+
+    // Per-annotation: { lines: [1-based ints], match: [strings] }.
+    // Captures structured target info the markers carry as data attrs.
+    var annoTargets = {};
+    annos.forEach(function (a) {
+      var lines = parseLineSpec(a.lines);
+      var match = [];
+      if (typeof a.match === 'string' && a.match) match = [a.match];
+      else if (Array.isArray(a.match)) match = a.match.filter(function (s) { return typeof s === 'string' && s; });
+      annoTargets[String(a.id)] = { lines: lines, match: match };
+    });
+
     function injectMarkers() {
       var c = self.querySelector('pre code');
       if (!c) return;
@@ -4001,6 +4038,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
       var walker = document.createTreeWalker(c, NodeFilter.SHOW_TEXT, null);
       var n;
       while ((n = walker.nextNode())) textNodes.push(n);
+      var placedIds = {};
       textNodes.forEach(function (textNode) {
         var text = textNode.nodeValue;
         if (text.indexOf('(') === -1) return;
@@ -4018,29 +4056,117 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         while ((m = pattern.exec(text)) !== null) {
           if (!validIds[m[1]]) continue;
           if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
-          var btn = document.createElement('button');
-          btn.className = 'hdc-anno-marker';
-          btn.type = 'button';
-          btn.setAttribute('data-anno-id', m[1]);
-          btn.setAttribute('aria-label', 'Annotation ' + m[1]);
-          btn.textContent = m[1];
-          frag.appendChild(btn);
+          frag.appendChild(makeMarker(m[1]));
+          placedIds[m[1]] = true;
           last = m.index + m[0].length;
         }
         if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
         textNode.parentNode.replaceChild(frag, textNode);
       });
+
+      // For annotations declaring `lines` but NOT placed inline by an
+      // (N) marker in the source, auto-place the chip at the start of
+      // the first target line. Lets authors keep the source clean and
+      // declare targets externally.
+      annos.forEach(function (a) {
+        var id = String(a.id);
+        if (placedIds[id]) return;
+        var targets = annoTargets[id];
+        if (!targets || !targets.lines.length) return;
+        var firstLine = targets.lines[0];
+        var lineEl = c.querySelector(':scope > .hdt-code-line[data-line="' + firstLine + '"]');
+        if (!lineEl) return;
+        var content = lineEl.querySelector(':scope > .hdt-code-content');
+        if (!content) return;
+        content.insertBefore(makeMarker(id), content.firstChild);
+        placedIds[id] = true;
+      });
+
       bindSync();
+    }
+
+    function makeMarker(id) {
+      var btn = document.createElement('button');
+      btn.className = 'hdc-anno-marker';
+      btn.type = 'button';
+      btn.setAttribute('data-anno-id', id);
+      btn.setAttribute('aria-label', 'Annotation ' + id);
+      btn.textContent = id;
+      return btn;
+    }
+
+    // Wrap every occurrence of a `match` substring inside the wrapped
+    // code lines in <mark class=hdc-anno-substr data-anno-id=N>. Walks
+    // text nodes only (Prism's tokens survive because we never replace
+    // ancestors). Splits text nodes around each occurrence so the wrap
+    // sits next to the surrounding tokens. Idempotent — re-runs skip
+    // text nodes already inside a .hdc-anno-substr.
+    function injectSubstringMarks() {
+      var c = self.querySelector('pre code');
+      if (!c) return;
+      annos.forEach(function (a) {
+        var id = String(a.id);
+        var matches = (annoTargets[id] && annoTargets[id].match) || [];
+        if (!matches.length) return;
+        matches.forEach(function (needle) {
+          if (!needle) return;
+          var walker = document.createTreeWalker(c, NodeFilter.SHOW_TEXT, null);
+          var nodes = [];
+          var n;
+          while ((n = walker.nextNode())) {
+            if (n.parentElement && n.parentElement.closest('.hdc-anno-substr,.hdc-anno-marker')) continue;
+            if (n.nodeValue.indexOf(needle) !== -1) nodes.push(n);
+          }
+          nodes.forEach(function (textNode) {
+            var text = textNode.nodeValue;
+            var frag = document.createDocumentFragment();
+            var i = 0;
+            var idx;
+            while ((idx = text.indexOf(needle, i)) !== -1) {
+              if (idx > i) frag.appendChild(document.createTextNode(text.slice(i, idx)));
+              var mark = document.createElement('mark');
+              mark.className = 'hdc-anno-substr';
+              mark.setAttribute('data-anno-id', id);
+              mark.textContent = needle;
+              frag.appendChild(mark);
+              i = idx + needle.length;
+            }
+            if (i < text.length) frag.appendChild(document.createTextNode(text.slice(i)));
+            textNode.parentNode.replaceChild(frag, textNode);
+          });
+        });
+      });
     }
 
     function bindSync() {
       function setHover(id, on) {
+        // Toggle .hovered on the marker, the side-panel item, and any
+        // .hdc-anno-substr matches.
         self.querySelectorAll('[data-anno-id="' + id + '"]').forEach(function (el) {
           el.classList.toggle('hovered', on);
+        });
+        // Toggle .hdt-anno-target on every line the annotation points
+        // at. Falls back to the line carrying the marker when no
+        // explicit `lines` was authored.
+        var targets = annoTargets[id];
+        var lines = (targets && targets.lines.length) ? targets.lines.slice() : [];
+        if (!lines.length) {
+          var markerEl = self.querySelector('.hdc-anno-marker[data-anno-id="' + id + '"]');
+          var lineEl = markerEl && markerEl.closest('.hdt-code-line');
+          if (lineEl) {
+            var ln = parseInt(lineEl.getAttribute('data-line'), 10);
+            if (ln) lines.push(ln);
+          }
+        }
+        lines.forEach(function (n) {
+          var lineEl = self.querySelector('pre code > .hdt-code-line[data-line="' + n + '"]');
+          if (lineEl) lineEl.classList.toggle('hdt-anno-target', on);
         });
       }
       self.querySelectorAll('.hdc-anno-marker, .hdc-anno-item').forEach(function (el) {
         var id = el.getAttribute('data-anno-id');
+        if (el.dataset.hdcAnnoBound === '1') return;
+        el.dataset.hdcAnnoBound = '1';
         el.addEventListener('mouseenter', function () { setHover(id, true); });
         el.addEventListener('mouseleave', function () { setHover(id, false); });
         el.addEventListener('focus',      function () { setHover(id, true); });
@@ -4120,6 +4246,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
        copies with no listeners. */
     function buildMarkers() {
       prepareLineSlots();
+      injectSubstringMarks(); // wrap `match` occurrences BEFORE injecting (N) markers
       injectMarkers();        // walks text nodes inside per-line spans
       moveMarkersToSlots();
     }

@@ -320,7 +320,7 @@
       "properties": {
         "kind": { "const": "annotated-code" },
         "language": { "type": "string" },
-        "source": { "type": "string", "description": "Code body. Use (1), (2)... as inline markers; each matches an annotation by id." },
+        "source": { "type": "string", "description": "Code body. Use (1), (2)... as inline markers; each matches an annotation by id. Annotations may also declare `lines` / `match` externally and skip the inline marker." },
         "annotations": {
           "type": "array",
           "items": {
@@ -329,7 +329,18 @@
             "additionalProperties": false,
             "properties": {
               "id":      { "type": "integer", "minimum": 1 },
-              "content": { "type": "string", "description": "HTML snippet. Allowed inline markup: <code>, <strong>, <em>, <a>." }
+              "content": { "type": "string", "description": "HTML snippet. Allowed inline markup: <code>, <strong>, <em>, <a>." },
+              "lines": {
+                "type": "string",
+                "description": "Optional line spec — '3' for a single line, '1-3' for a range, '1,5-7' for mixed. Hovering the marker highlights every listed line; when no inline (N) marker is present, the chip auto-places on the first listed line. Line numbers are 1-based and match the gutter."
+              },
+              "match": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+                ],
+                "description": "Optional substring(s) of the source. Each occurrence is highlighted on marker hover, so you can point at a token without polluting the source with (N)."
+              }
             }
           }
         }
