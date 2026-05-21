@@ -195,8 +195,8 @@
     {
       "kind": "section",
       "id": "starter",
-      "title": "Starter content shipped",
-      "lead": "v1 ships three domains populated, three as empty structural stubs.",
+      "title": "Bundled starter content",
+      "lead": "Three domains arrive populated; three are empty structural stubs ready to fill in.",
       "blocks": [
         {
           "kind": "compare-grid",

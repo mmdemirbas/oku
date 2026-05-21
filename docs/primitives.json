@@ -38,7 +38,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd ~/path/to/your-project/docs\nhtml-doc init     # creates _kit symlink + index.html in cwd\n\n# Optional: copy the starter as a blank page\ncp ~/dev/mmdemirbas/html-doc/src/html_doc/templates/starter.json my-page.json\n\ncd ..\nhtml-doc serve    # opens in the browser; synthesizes stubs + manifest in-memory"
+          "source": "cd path/to/your-project/docs\nhtml-doc init     # creates _kit symlink + index.html in cwd\n\n# Optional: drop a starter page into the docs root\n# (The starter pair ships inside the html_doc package — for a\n# git checkout it lives at src/html_doc/templates/starter.json.)\n\ncd ..\nhtml-doc serve    # http://localhost:9876 with live reload"
         },
         {
           "kind": "paragraph",

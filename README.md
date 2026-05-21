@@ -1,31 +1,30 @@
 # html-doc
 
-An opinionated **interactive knowledge platform** for AI-emitted
-documentation, learning notes, and reviews. JSON pages, a tiny runtime
-renderer, a curated library of rich primitives — glossary tooltips,
-type-themed citation cards, syntax-highlighted code with annotations,
-interactive charts with pan/zoom, Mermaid diagrams, sortable rich tables,
-inline placeholder personalization — plus a multi-page navigation tree,
-full-text search, live reload, and a forward-compat warning indicator.
-No build step for content. No Markdown.
+A documentation kit. Authors write pages in JSON (or Markdown — both
+are first-class); the browser renders them via Custom Elements; the
+CLI builds a multi-page site, a search index, and standalone single-
+file copies for offline reading.
 
-## What this is and isn't
+## What's in the box
 
-It is **not** a documentation generator. It is not a wiki. It is not a
-static-site generator competing with MkDocs or Starlight.
-
-It is a **reader-first interactive surface** for the use case where a
-long, rich, citation-dense answer needs to be absorbed deeply without
-leaving the page — hover an unknown term to see its definition, hover a
-citation to see who said it, hover one paragraph to flash the matching
-code, drop in your own API key and watch every snippet on every page
-swap to your value. The platform makes consumption feel like a guided
-tour, not a wall of text.
-
-Format: **HTML5 with a curated library of Custom Elements**, with a
-**JSON source-of-truth** the runtime renderer maps to that DOM. The AI
-read / write loop is the load-bearing constraint; structured JSON wins
-it cleanly.
+- **Sources:** `*.json` (kit schema) or `*.md`. Markdown files drop in
+  unchanged — relative `.md` links retarget to `.html`, code fences
+  highlight, fenced ` ```mermaid ` becomes a live diagram.
+- **Primitives:** paragraph / heading / list / code / annotated-code,
+  callout, insight, info-tip, tldr, kpi-grid, table (sort + filter +
+  view-switch), compare-grid, step-flow, chart (scatter / line / area
+  / bubble / quadrant / bar / stacked-bar / grouped-bar / donut),
+  diagram (Mermaid), live-snippet, glossary tooltips, citation cards.
+- **Chrome:** site-tree sidebar with drag-to-resize + off-canvas drawer
+  on mobile, sticky section TOC with scroll-spy, three-mode theme
+  cycler (system / light / dark), full-text search (Pagefind),
+  forward-compat warning indicator, reader-side placeholder
+  personalization.
+- **CLI:** `init` symlinks the kit + writes an index stub; `build`
+  emits `dist/site/` (multi-page + Pagefind) and `dist/standalone/`
+  (single file with inline page JSON); `check` lints the doctree
+  (schema + structural + content); `serve` runs a local HTTP server
+  with live reload.
 
 ## Install
 
@@ -42,20 +41,21 @@ uv run bin/html-doc serve        # PEP 723 inline metadata pulls deps
 python3 bin/html-doc serve       # plain Python works too (no extras)
 ```
 
-## Quick start — new project
+## Quick start
 
 ```bash
-mkdir -p my-knowledge-base/docs && cd my-knowledge-base/docs
-html-doc init                    # creates _kit symlink + index.html in cwd
-cp ../../html-doc/src/html_doc/templates/starter.json index.json
-# edit index.json to taste
-cd ..
-html-doc serve                   # opens in the browser, live-reloads on save
+mkdir -p my-project/docs && cd my-project/docs
+html-doc init                    # _kit symlink + index.html in cwd
+# author *.json or *.md pages anywhere under the docs root
+html-doc serve                   # http://localhost:9876 with live reload
 ```
 
 `html-doc init` treats the **current directory** as the docs root —
 there is no implicit `docs/` subdir. Run it wherever you want pages
 to live.
+
+Existing Markdown docs need no conversion: drop `.md` files into the
+tree and they appear in the site tree alongside JSON pages.
 
 ## Authoring model
 
@@ -65,7 +65,7 @@ bootstraps the renderer. Authors only ever edit the JSON.
 
 ```jsonc
 {
-  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
   "kind": "page",
   "title": "Iceberg storage layer",
   "meta": {
@@ -94,10 +94,11 @@ kind.
 
 ## CLI
 
-Three commands, all run from the project root or a subdirectory:
+Four commands, all run from the project root or a subdirectory:
 
 ```bash
 html-doc init                    # one-time, runs in cwd: _kit symlink + index.html stub
+html-doc check                   # lint the doctree (schema + structural + content)
 html-doc build                   # dist/standalone/ + dist/site/ + search index
 html-doc serve                   # local HTTP, live reload, Pagefind in background
 html-doc serve --no-watch        # disable filesystem watcher

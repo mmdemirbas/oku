@@ -5,52 +5,27 @@
   "title": "html-doc",
   "accent": "teal",
   "meta": {
-    "eyebrow": "Project status · 2026-05-17",
-    "subtitle": "Interactive knowledge platform for AI-emitted documentation, learning notes, and reviews. This page is the live status board and primitives reference, authored in the JSON format itself.",
+    "subtitle": "A documentation kit that renders JSON or Markdown pages in the browser. Single-source content, no build step for authoring, multi-page site with full-text search when you want one.",
     "audience": "Author",
-    "date": "2026-05-17",
-    "read_time": "~10 min read",
     "order": 1,
-    "summary": "Current status, primitives reference, architecture, what's next.",
-    "updated": "2026-05-18"
+    "summary": "What the kit is, how it's organised, where the documentation lives."
   },
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "Interactive knowledge platform for AI-emitted documentation, learning notes, and reviews. Single-source JSON content, runtime renderer, no build step. Standalone-file mode for offline reading; multi-page site mode with full-text search. This page uses every primitive — hover terms, click external refs, edit the live snippet, watch the chart and diagram render.",
+      "summary": "Pages are JSON or Markdown. The browser renders them via Custom Elements; no build step needed to read. Run html-doc build to emit a multi-page site (with Pagefind search) or a standalone single file for offline reading.",
       "bullets": [
-        "Authoring source = JSON. The single file you hand to an AI to read, modify, or extend.",
-        "Renderer = chrome.js + renderer.js running in the browser. Custom Elements provide behavior.",
-        "Tooltips, multi-domain glossary, pinch-zoom-stable chrome, Mermaid diagrams, live snippets, citation cards, charts, syntax highlight, code folding, full-text search.",
-        "Same vocabulary covers reviews, study docs, plan reviews, team briefs."
-      ]
-    },
-    {
-      "kind": "kpi-grid",
-      "tiles": [
-        {
-          "num": "15 / 15",
-          "label": "Build steps complete"
-        },
-        {
-          "num": "11 / 11",
-          "label": "Review items addressed"
-        },
-        {
-          "num": "6",
-          "label": "Commits on branch"
-        },
-        {
-          "num": "0",
-          "label": "Console errors across 3 modes"
-        }
+        "Source: <name>.json (kit schema) or <name>.md (existing Markdown drops in unchanged).",
+        "Runtime: chrome.js + renderer.js load from a _kit symlink. No copies, no version drift.",
+        "Primitives: callout, kpi-grid, table, compare-grid, step-flow, chart, diagram, live-snippet, annotated-code, glossary tooltips, citation cards.",
+        "Output: dist/site/ (multi-page + Pagefind) and dist/standalone/ (single file with inline page JSON for email / archive)."
       ]
     },
     {
       "kind": "section",
       "id": "docs",
       "title": "Documentation",
-      "lead": "Four reference pages cover everything you need to use and extend the kit. Each is itself a JSON page rendered by the system — you can read the source as a working example.",
+      "lead": "Four pages. Read the Reference first; the others go deeper on their topics.",
       "blocks": [
         {
           "kind": "step-flow",
@@ -58,53 +33,37 @@
             {
               "num": "1",
               "title": "Reference",
-              "meta": "~15 min · start here",
+              "meta": "start here",
               "content": [
-                "Project setup, page anatomy, every primitive with its JSON shape and a live example, per-page metadata, build outputs. The single page an author opens to find the kind they want and how to configure it. ",
-                {
-                  "kind": "link",
-                  "text": "Open primitives.html",
-                  "href": "primitives.html"
-                }
+                "Project setup, page anatomy, Markdown sources, every primitive with its JSON shape and a live example, per-page metadata, build outputs. ",
+                { "kind": "link", "text": "Open primitives.html", "href": "primitives.html" }
               ]
             },
             {
               "num": "2",
               "title": "Glossary & ext-refs",
-              "meta": "~6 min · how the multi-domain registry works",
+              "meta": "how the multi-domain registry works",
               "content": [
-                "File layout, multi-language entries, project overrides, disambiguation syntax, resolution algorithm. Adding new entries — local first, then central. ",
-                {
-                  "kind": "link",
-                  "text": "Open glossary.html",
-                  "href": "glossary.html"
-                }
+                "File layout, multi-language entries, project overrides, disambiguation syntax, resolution algorithm. ",
+                { "kind": "link", "text": "Open glossary.html", "href": "glossary.html" }
               ]
             },
             {
               "num": "3",
               "title": "Architecture",
-              "meta": "~7 min · internals · developer audience",
+              "meta": "internals · developer audience",
               "content": [
-                "How the kit fits together at runtime. The render flow, tooltip controller, Visual Viewport API, kit loader, build pipeline, standalone bundle. Read this when extending or debugging the kit itself. ",
-                {
-                  "kind": "link",
-                  "text": "Open architecture.html",
-                  "href": "architecture.html"
-                }
+                "How the kit fits together at runtime — render flow, tooltip controller, kit loader, build pipeline, standalone bundle. Read this when extending or debugging the kit itself. ",
+                { "kind": "link", "text": "Open architecture.html", "href": "architecture.html" }
               ]
             },
             {
               "num": "4",
               "title": "CLI reference",
-              "meta": "~5 min · init, build, check, serve",
+              "meta": "init, build, check, serve",
               "content": [
-                "Four commands. What each does, what output to expect, the doctree linter's severity table, the optional pagefind and jsonschema dependencies. ",
-                {
-                  "kind": "link",
-                  "text": "Open cli.html",
-                  "href": "cli.html"
-                }
+                "Four commands. What each does, what output to expect, the doctree linter's severity table, the optional Pagefind and jsonschema dependencies. ",
+                { "kind": "link", "text": "Open cli.html", "href": "cli.html" }
               ]
             }
           ]
@@ -113,277 +72,55 @@
     },
     {
       "kind": "section",
-      "id": "roadmap",
-      "title": "Roadmap",
-      "lead": "What's in, what's deferred. Status reflects the actual repo state, not the plan.",
+      "id": "shape",
+      "title": "What a page looks like",
+      "lead": "The same page authored two ways — JSON for kit-native content, Markdown for existing docs that should drop in unchanged.",
       "blocks": [
         {
           "kind": "compare-grid",
           "cards": [
             {
-              "verdict": "in",
-              "title": "Shipped",
-              "items": [
-                "JSON page schema (schema/page.schema.json) — 14 block kinds, inline rich-text union",
-                "Client-side renderer (renderer.js) — JSON → Custom Element DOM at load time",
-                "<page-chrome> + Visual Viewport pinch-zoom stability",
-                "<page-nav> site-tree sidebar with right-edge tab toggle",
-                "<page-toc> section-TOC with left-edge tab toggle",
-                "Three-column CSS grid + mobile drawers",
-                "kit.json loader + multi-domain, multi-language registry",
-                "Tooltip controller: hover, bridge, click-pin, touch-only-click, Esc",
-                "<glossary-term> and <ext-ref> elements",
-                "Content primitives: <callout>, <insight>, <info-tip>, <kpi-grid>, <compare-grid>, <step-flow>",
-                "Diagram + chart: <html-doc-chart> (scatter / line SVG), <chart type=\"bar\"> (CSS bars), <html-doc-diagram> (Mermaid)",
-                "<html-doc-snippet> editable HTML/CSS/JS with iframe preview",
-                "Build pipeline: site-manifest.json, llms.txt, Pagefind index over dist/site/",
-                "Forward-compat warning indicator with per-session dismiss",
-                "Standalone single-file output with autoBoot (inline page JSON)"
-              ]
+              "verdict": "neutral",
+              "title": "JSON source",
+              "content": "Hand-authored or AI-emitted. Every block declares its kind explicitly; nothing has to be guessed."
             },
             {
-              "verdict": "out",
-              "title": "Deferred",
-              "items": [
-                "Mermaid CDN integrity hash (needs verified SRI value — left as a note)",
-                "Custom Element naming normalization across <page-*>, <html-doc-*>, unprefixed (preferably during a project rename)",
-                "chrome.js file split (~1300 lines, three structural patterns — discretionary)",
-                "Demo _kit symlink commit (only when _internal/demo-page/ is promoted to public examples)"
-              ]
+              "verdict": "neutral",
+              "title": "Markdown source",
+              "content": "Drop existing .md files into the docs root. ATX headings, code fences (mermaid included), lists, tables, blockquotes, inline formatting all convert. Relative .md links retarget to .html."
             }
           ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json\",\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"blocks\": [\n    { \"kind\": \"section\", \"id\": \"overview\", \"title\": \"Overview\", \"blocks\": [\n      { \"kind\": \"paragraph\", \"content\": \"Plain prose works as a string.\" }\n    ]}\n  ]\n}"
         }
       ]
     },
     {
       "kind": "section",
-      "id": "primitives",
-      "title": "Live primitives tour",
-      "lead": "Every primitive on the page below is real, not a screenshot. Hover terms, click external references, edit the snippet — they work because this page is rendered by the same renderer.js you'd use for any other page.",
+      "id": "quickstart",
+      "title": "Quickstart",
+      "lead": "Three commands. Adopt the kit for an existing docs/ directory without rewriting anything.",
       "blocks": [
         {
-          "kind": "paragraph",
-          "content": [
-            "The visible vocabulary: ",
-            {
-              "kind": "glossary-term",
-              "term": "ACID",
-              "text": "ACID"
-            },
-            " from data-platforms, ",
-            {
-              "kind": "glossary-term",
-              "term": "Custom Elements",
-              "text": "Custom Elements"
-            },
-            " from web, and ",
-            {
-              "kind": "glossary-term",
-              "term": "Prompt cache",
-              "text": "prompt caching"
-            },
-            " from ai-llm — three domains active, all resolved from kit.json. Click any underlined term to pin its tooltip. Reference tools live in extrefs: ",
-            {
-              "kind": "ext-ref",
-              "name": "Pagefind",
-              "text": "Pagefind"
-            },
-            " powers search, ",
-            {
-              "kind": "ext-ref",
-              "name": "Mermaid",
-              "text": "Mermaid"
-            },
-            " powers diagrams."
-          ]
-        },
-        {
-          "kind": "callout",
-          "type": "neutral",
-          "title": "Tooltip behavior to test",
-          "content": "Hover a term — tooltip appears after 120ms. Move the mouse toward the tooltip — it stays visible (bridge-hover). Select text inside — it works because the tooltip is a real DOM node. Click the term — pinned (accent ring). Click again or click another term — unpinned."
-        },
-        {
-          "kind": "info-tip",
-          "summary": "How the tooltip controller works",
-          "content": [
-            {
-              "kind": "paragraph",
-              "content": "A single global controller manages one active tooltip. Mouseenter triggers a 120ms show delay; mouseleave triggers a 300ms hide. If the mouse enters the tooltip during the hide window, the timer cancels. Click toggles pinned state (visible accent ring). Touch devices (matchMedia '(hover: none)') get click-only behavior. Esc closes pinned. Click anywhere outside .gloss or .tooltip-popup closes pinned."
-            }
-          ]
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "chart",
-          "title": "Chart — line chart sample"
-        },
-        {
-          "kind": "chart",
-          "type": "line",
-          "title": "Lines added per build step",
-          "x_label": "Step",
-          "y_label": "Insertions",
-          "series": [
-            {
-              "label": "Lines added",
-              "color": "accent",
-              "data": [
-                {
-                  "x": 1,
-                  "y": 1616,
-                  "label": "foundation"
-                },
-                {
-                  "x": 2,
-                  "y": 569,
-                  "label": "page-nav"
-                },
-                {
-                  "x": 3,
-                  "y": 612,
-                  "label": "primitives"
-                },
-                {
-                  "x": 4,
-                  "y": 886,
-                  "label": "search"
-                },
-                {
-                  "x": 5,
-                  "y": 120,
-                  "label": "fixes"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "diagram",
-          "title": "Diagram — request flow"
-        },
-        {
-          "kind": "diagram",
-          "caption": "End-to-end when this page loaded — the same pipeline applies to every page.",
-          "source": "sequenceDiagram\n    autonumber\n    participant B as Browser\n    participant H as HTML stub\n    participant R as renderer.js\n    participant C as chrome.js\n    participant K as kit.json + glossary/*\n\n    B->>H: GET index.html\n    H-->>B: stub + chrome.css\n    B->>C: load chrome.js + renderer.js\n    C->>K: fetch kit.json\n    K-->>C: domains, lang, overrides\n    C->>K: fetch glossary/<domain>.json (xN)\n    Note over C,K: Promise.all then apply overrides\n    H->>R: autoBoot()\n    R->>B: fetch index.json\n    B-->>R: page tree\n    R->>B: emit Custom Element DOM\n    C->>B: build TOC, init reading aids\n    Note over B: glossary-term, ext-ref attach tooltip controller"
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "snippet",
-          "title": "Live snippet — playable example"
-        },
-        {
-          "kind": "live-snippet",
-          "label": "Edit the gradient and message — preview updates as you type",
-          "source": "<style>\n  body {\n    margin: 0;\n    height: 100vh;\n    display: grid;\n    place-items: center;\n    background: linear-gradient(135deg, #0f766e, #2dd4bf);\n    font-family: system-ui, sans-serif;\n  }\n  .card {\n    background: white;\n    border-radius: 16px;\n    padding: 24px 32px;\n    box-shadow: 0 12px 36px rgba(0,0,0,0.2);\n    text-align: center;\n  }\n  .card h1 { margin: 0 0 8px; color: #115e59; font-size: 22px; }\n  .card p  { margin: 0; color: #475569; font-size: 14px; }\n</style>\n<div class=\"card\">\n  <h1>Hello, learner.</h1>\n  <p>Edit the source on the left — this preview updates live.</p>\n</div>"
-        },
-        {
-          "kind": "callout",
-          "type": "warn",
-          "title": "Try the warn callout type",
-          "content": [
-            "This callout uses ",
-            {
-              "kind": "code",
-              "text": "type=\"warn\""
-            },
-            ", which aliases the canonical ",
-            {
-              "kind": "code",
-              "text": "warning"
-            },
-            " styling. The kit accepts both names plus the industry-standard ",
-            {
-              "kind": "code",
-              "text": "note / tip / info / caution"
-            },
-            " aliases."
-          ]
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "architecture",
-      "title": "Architecture",
-      "lead": "Anatomy of a project and how the runtime fits together.",
-      "blocks": [
-        {
-          "kind": "diagram",
-          "caption": "Files in a project. Solid arrows are runtime; dashed are build-time.",
-          "source": "flowchart LR\n    subgraph SRC[Project source]\n      P[*.json pages]\n      H[*.html stubs]\n      KJ[kit.json]\n    end\n    subgraph KIT[Kit — symlinked _kit/]\n      CC[chrome.css]\n      CJ[chrome.js]\n      RJ[renderer.js]\n      G[glossary/*.json]\n      E[extrefs/*.json]\n    end\n    subgraph BUILD[html-doc build]\n      MFG[site-manifest.json]\n      LLM[llms.txt]\n      PF[pagefind/]\n      DS[dist/standalone/]\n      DT[dist/site/]\n    end\n    H -.-> DS\n    H -.-> DT\n    P -.-> DS\n    P -.-> DT\n    P -.-> MFG\n    P -.-> LLM\n    DT -.-> PF\n    P --> RJ\n    KJ --> CJ\n    G --> CJ\n    E --> CJ\n    RJ --> DOM[Custom Element DOM]\n    CJ --> DOM"
+          "kind": "code",
+          "language": "bash",
+          "source": "cd path/to/your-project/docs\nhtml-doc init     # creates _kit symlink + index.html\nhtml-doc serve    # http://localhost:9876 with live reload"
         },
         {
           "kind": "paragraph",
           "content": [
-            "Each page is a JSON file under the project root. The companion HTML stub (",
-            {
-              "kind": "code",
-              "text": "src/html_doc/templates/starter.html"
-            },
-            ") calls ",
-            {
-              "kind": "code",
-              "text": "HtmlDocRenderer.autoBoot()"
-            },
-            " — which fetches the sibling JSON in dev mode, or reads an inline ",
-            {
-              "kind": "code",
-              "text": "<script type=\"application/json\" id=\"__htmldoc_page__\">"
-            },
-            " tag in standalone mode. The renderer walks the tree and emits Custom Elements; chrome.js handles tooltips, search, theme, and the warning indicator."
-          ]
-        },
-        {
-          "kind": "info-tip",
-          "summary": "Page JSON anatomy — minimal example",
-          "content": [
-            {
-              "kind": "code",
-              "language": "json",
-              "source": "{\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"accent\": \"teal\",\n  \"meta\": {\n    \"eyebrow\": \"Notes\",\n    \"date\": \"2026-05-17\",\n    \"order\": 10,\n    \"summary\": \"One-line summary for nav and llms.txt.\"\n  },\n  \"blocks\": [\n    { \"kind\": \"tldr\", \"summary\": \"...\", \"bullets\": [\"...\"] },\n    { \"kind\": \"section\", \"id\": \"overview\", \"title\": \"Overview\", \"blocks\": [\n      { \"kind\": \"paragraph\", \"content\": [\n        \"Plain text and \",\n        { \"kind\": \"glossary-term\", \"term\": \"ACID\", \"text\": \"ACID\" },\n        \" inline.\"\n      ]}\n    ]}\n  ]\n}"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "next",
-      "title": "What's next",
-      "lead": "All review items addressed. Remaining is discretionary polish before the stable tag.",
-      "blocks": [
-        {
-          "kind": "callout",
-          "type": "success",
-          "title": "Ready to cut a stable release",
-          "content": "All review showstoppers, highs, and mediums shipped. Polish items (Mermaid SRI, element-name normalization, chrome.js split) can land in point releases. The tag itself is deferred until you say so — once cut, branches relying on this kit can pin via CDN."
-        },
-        {
-          "kind": "step-flow",
-          "steps": [
-            {
-              "num": "A",
-              "title": "Mermaid CDN integrity hash",
-              "meta": "deferred — needs verified SRI value",
-              "content": "chrome.js loads mermaid@10 from jsDelivr without an integrity hash. For a personal tool this is acceptable supply-chain exposure; for any team or hosted deployment, pin to a specific minor and add a verified integrity attribute."
-            },
-            {
-              "num": "B",
-              "title": "Element-name normalization",
-              "meta": "discretionary — natural during a rename",
-              "content": "<page-*>, <html-doc-*>, and unprefixed (<glossary-term>, <ext-ref>) coexist. Pick one prefix project-wide when the time is right."
-            },
-            {
-              "num": "C",
-              "title": "chrome.js split",
-              "meta": "discretionary — ~1300 lines in one file",
-              "content": "Could split into tooltip + layout + search + warnings modules. Not blocking anything; just hygiene."
-            }
+            "After ",
+            { "kind": "code", "text": "init" },
+            ", any ",
+            { "kind": "code", "text": ".json" },
+            " or ",
+            { "kind": "code", "text": ".md" },
+            " file in the docs tree is a page. The sidebar lists them; the on-page TOC builds from H2 / H3; full-text search builds with ",
+            { "kind": "code", "text": "html-doc build" },
+            " (if Pagefind is on PATH)."
           ]
         }
       ]
