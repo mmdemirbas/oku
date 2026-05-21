@@ -1,0 +1,441 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Build architecture",
+  "accent": "teal",
+  "meta": {
+    "eyebrow": "Reference",
+    "subtitle": "What html-doc build emits, why each tree exists, and how the browser boots them.",
+    "audience": "Engineer",
+    "order": 130,
+    "summary": "End-to-end map of the build: sources, the three dist trees, runtime boot paths, and the dev server."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "html-doc build reads JSON and Markdown sources, emits three single-purpose trees under dist/, and each tree's runtime answers a different question about who the reader is and how they fetch the page.",
+      "bullets": [
+        "dist/standalone/ — one self-contained HTML per page. Inlines kit + page JSON + manifest. Human, file://, send-as-attachment.",
+        "dist/site/ — thin HTML stubs + shared _kit/ + per-page .json sidecars + one site-manifest.json + Pagefind index. Human, HTTP, SPA-style hash navigation.",
+        "dist/markdown/ — page.md twins + llms.txt sitemap. AI / LLM consumer. Not part of the runtime.",
+        "Source dirs stay clean — every artifact above is generated. The dev server synthesizes the same artifacts in memory so pre-build authoring sees the same shape."
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "sources",
+      "title": "Sources — what the build reads",
+      "lead": "Two authoring shapes feed every page. The build treats them uniformly past parse time.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Shape", "Where", "Carries"],
+          "rows": [
+            [
+              [{ "kind": "code", "text": "*.json" }],
+              "anywhere under the docs root",
+              "The canonical kit schema (kind:\"page\", title, meta, blocks). Validated against kit/schema/page.schema.json."
+            ],
+            [
+              [{ "kind": "code", "text": "*.md" }],
+              "anywhere under the docs root (project-meta files like README.md, CLAUDE.md, LICENSE.md are skipped)",
+              "ATX headings, paragraphs, fenced code (incl. mermaid), lists, blockquotes, GFM pipe tables. md_to_page() in cli.py converts to a kit page dict in memory."
+            ],
+            [
+              [{ "kind": "code", "text": "*.html" }],
+              "next to the JSON / MD",
+              "Optional thin stub that loads _kit/. When absent the build / dev server synthesizes one via _stub_for()."
+            ],
+            [
+              [{ "kind": "code", "text": "kit.json" }],
+              "project root",
+              "Optional. Lists active glossary / extref domains and project name."
+            ]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "JSON and MD are first-class siblings",
+          "content": "The runtime renderer and the build pipeline both consume the same in-memory page dict. Markdown is parsed once at build / serve time; there is no second renderer. Relative `.md` links inside Markdown sources retarget to `.html` so cross-page navigation works the same as JSON pages."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "pipeline",
+      "title": "The build pipeline",
+      "lead": "cmd_build in cli.py runs five stages, in order.",
+      "blocks": [
+        {
+          "kind": "diagram",
+          "caption": "Build pipeline. Schema validation runs first; any error aborts before writing.",
+          "source": "flowchart TD\n    A[\"html-doc build\"] --> B[\"iter_page_stubs(root)\\nfind_json_pages(root)\"]\n    B --> C[\"check_pages()\\nschema + structural lint\"]\n    C -->|errors| X[\"exit non-zero\"]\n    C -->|clean| D[\"build_standalone()\\n→ dist/standalone/\"]\n    C --> E[\"build_site()\\n→ dist/site/ + _kit/\"]\n    D --> F[\"build_manifest()\\n→ dist/site/site-manifest.json\"]\n    E --> F\n    F --> G[\"build_markdown_twins()\\nbuild_llms_txt()\\n→ dist/markdown/\"]\n    G --> H[\"pagefind_index(site)\\n→ dist/site/pagefind/\\n(soft-fail)\"]"
+        },
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "Walk + parse",
+              "meta": "iter_page_stubs · find_json_pages",
+              "content": "Recursive scan of the project root for .json and .md. Skips dist/, _kit/, .git/, venv/, node_modules/, __pycache__/, .ruff_cache/, .mypy_cache/, .idea/, .pytest_cache/, templates/. Markdown files convert to kit page dicts in memory. Synthesized HTML stubs are produced for any page-JSON or page-MD with no on-disk .html sibling."
+            },
+            {
+              "num": "2",
+              "title": "Validate",
+              "meta": "check_pages",
+              "content": "JSON-schema validation (if `jsonschema` is installed) plus structural lint: deprecated kinds, duplicate anchors, unresolved glossary terms and external references, forbidden process language, chart shape sanity. Errors abort the build; warnings print a summary."
+            },
+            {
+              "num": "3",
+              "title": "Emit human trees",
+              "meta": "build_standalone · build_site",
+              "content": "Two independent emitters. build_standalone inlines kit CSS/JS + page JSON + glossary bundle into each HTML. build_site copies the kit to a single _kit/ directory and writes thin stubs that load from it."
+            },
+            {
+              "num": "4",
+              "title": "Emit derived artifacts",
+              "meta": "build_manifest · build_markdown_twins · build_llms_txt",
+              "content": "site-manifest.json is computed once from the JSON page set and dropped into dist/site/'s docs root. Markdown twins (page.md per page) and llms.txt land under dist/markdown/."
+            },
+            {
+              "num": "5",
+              "title": "Index",
+              "meta": "pagefind",
+              "content": "If `pagefind` is on PATH (or invokable via npx), runs against dist/site/ to build dist/site/pagefind/. Soft-fails — build succeeds without it; the search button just won't function on the built site."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "trees",
+      "title": "The three trees",
+      "lead": "One axis per tree: who reads it, how it gets to them, what shape the runtime needs. No artifact appears in more than one tree.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "neutral",
+              "title": "dist/standalone/",
+              "items": [
+                "Audience: humans.",
+                "Transport: file:// or email attachment.",
+                "Per-page: one self-contained .html with everything inlined.",
+                "Inlined: chrome.css, chrome-boot.js, chrome.js, renderer.js, page JSON, glossary + extref bundle, window.__htmldocManifest seed.",
+                "External fetches: Google Fonts; Mermaid CDN if a diagram block is present.",
+                "Trade-off: largest per-file (~400KB inlined kit). No sharing between pages."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "dist/site/",
+              "items": [
+                "Audience: humans.",
+                "Transport: any static HTTP server.",
+                "Per-page: thin .html stub + sibling .json with the content.",
+                "Shared: dist/site/_kit/ (one copy of every kit asset), dist/site/site-manifest.json, dist/site/pagefind/.",
+                "External fetches: kit assets (cached after first page), page .json on each navigation, manifest on first page, glossary/extref domains on first page.",
+                "Trade-off: smallest network footprint when the user browses more than one page."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "dist/markdown/",
+              "items": [
+                "Audience: AI / LLM consumers.",
+                "Transport: any.",
+                "Per-page: one .md twin rendered from the JSON page tree (render_page_markdown).",
+                "Sitemap: dist/markdown/llms.txt — one line per page (title + summary + link) following the llmstxt.org convention.",
+                "Trade-off: prose-only. Charts, diagrams, interactive primitives degrade to text descriptions or are dropped."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "standalone-runtime",
+      "title": "Runtime — dist/standalone/",
+      "lead": "Every page is a self-contained document. autoBoot finds the inlined JSON and renders without a network round-trip.",
+      "blocks": [
+        {
+          "kind": "diagram",
+          "caption": "Standalone boot — every dependency is in the HTML.",
+          "source": "sequenceDiagram\n    autonumber\n    participant B as Browser\n    participant H as page.html (everything inlined)\n    participant R as renderer.js (inline)\n    participant C as chrome.js (inline)\n\n    B->>H: open file or HTTP URL\n    H->>B: parse inline style and script tags\n    Note over B: chrome-boot.js sets data-theme pre-paint\n    R->>H: find inline JSON script (id __htmldoc_page__)\n    R->>B: parse JSON, walk blocks, emit DOM\n    R->>C: dispatch html-doc:rendered\n    C->>B: build TOC, init glossary tooltips, wire reading aids\n    Note over B: no fetch except Fonts / Mermaid (if used)"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Inline form is identical to a dev page authored with an inline JSON block — autoBoot is idempotent, so loading the inline script before the renderer's self-trigger is safe.",
+            "window.__htmldocManifest is seeded in the same HTML so the site-tree sidebar populates even with no fetch.",
+            "Cross-page links in standalone HTMLs still work, but each link target is a separate file the reader must have open / receive separately."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "site-runtime",
+      "title": "Runtime — dist/site/",
+      "lead": "Thin stubs share one kit instance. chrome.js intercepts internal links and uses hash-based SPA navigation to swap content without reloading.",
+      "blocks": [
+        {
+          "kind": "diagram",
+          "caption": "Site boot + first navigation. The kit and the manifest are fetched once; per-page work is a single .json fetch + re-render of <main>.",
+          "source": "sequenceDiagram\n    autonumber\n    participant B as Browser\n    participant H as page.html (stub)\n    participant K as _kit/* (cached after first page)\n    participant M as site-manifest.json\n    participant J as page.json sibling\n\n    B->>H: GET docs/index.html\n    H-->>B: ~3KB stub referencing _kit/\n    B->>K: GET _kit/chrome.css, chrome.js, renderer.js (parallel)\n    K-->>B: kit assets (304 on subsequent pages)\n    B->>K: GET _kit/glossary and _kit/extrefs per active domain\n    B->>M: GET site-manifest.json (sidebar tree)\n    M-->>B: page list\n    Note over B: autoBoot has no inline JSON, derives sibling .json from URL\n    B->>J: GET docs/index.json\n    J-->>B: page tree\n    B->>B: renderFromUrl, walk blocks, emit DOM\n\n    Note over B: user clicks site-tree link to architecture.html\n    B->>B: chrome.js intercepts, sets location.hash to architecture.html\n    B->>J: GET docs/architecture.json\n    J-->>B: page tree\n    B->>B: re-render main element only, sidebar and chrome stay put"
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "title": "Why the .json sibling is load-bearing",
+          "content": "The site build's defining feature is SPA-style hash navigation: clicking a link in the page-nav sidebar swaps content without a full page reload, which preserves sidebar state, scroll position, theme, and reading aids. The kit implements this by fetching the target page's .json and re-rendering only the <main> element. Drop the .json siblings and the SPA breaks — every nav becomes a full HTML reload. The .json files are the per-navigation content payload, not redundant copies of the inline JSON used by standalone."
+        },
+        {
+          "kind": "table",
+          "headers": ["Artifact", "Path", "Why it exists"],
+          "rows": [
+            [
+              [{ "kind": "code", "text": "_kit/chrome.{css,js}" }],
+              "dist/site/_kit/",
+              "One copy of the visual + behaviour kit, cached across every page in the site."
+            ],
+            [
+              [{ "kind": "code", "text": "_kit/glossary/<domain>.json" }],
+              "dist/site/_kit/glossary/",
+              "Glossary entries for each active domain. Fetched once at first page load; chrome.js merges them into a per-tab registry."
+            ],
+            [
+              [{ "kind": "code", "text": "_kit/extrefs/<domain>.json" }],
+              "dist/site/_kit/extrefs/",
+              "External-reference (citation) registries, same lifecycle as glossary."
+            ],
+            [
+              [{ "kind": "code", "text": "_kit/schema/" }],
+              "dist/site/_kit/schema/",
+              "JSON schemas. Shipped so an offline editor can still autocomplete."
+            ],
+            [
+              [{ "kind": "code", "text": "site-manifest.json" }],
+              "dist/site/<docs-root>/",
+              "Page list consumed by the site-tree sidebar. Fetched by chrome.js on every page (no-cache header)."
+            ],
+            [
+              [{ "kind": "code", "text": "*.html (stub)" }],
+              "preserves source layout",
+              "Boot loader. Loads chrome-boot.js (synchronous, sets theme), then chrome.js + renderer.js deferred. No inlined content."
+            ],
+            [
+              [{ "kind": "code", "text": "*.json (sibling)" }],
+              "preserves source layout",
+              "The page body. Fetched by autoBoot on first paint and by hash navigation on subsequent clicks."
+            ],
+            [
+              [{ "kind": "code", "text": "pagefind/" }],
+              "dist/site/pagefind/",
+              "Static full-text index emitted by the Pagefind CLI (if available). Loaded lazily when the search button opens."
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "markdown-runtime",
+      "title": "Runtime — dist/markdown/",
+      "lead": "Not a runtime in the JS sense. The kit doesn't read these. They're for crawlers, prompt context, and humans who want a plain-text rendering.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "render_page_markdown(page_json) in cli.py walks the same block tree the renderer walks but emits semantic Markdown — headings, paragraphs, lists, code fences, GFM tables, blockquotes.",
+            "Charts, diagrams, and other purely visual primitives degrade to text (caption + data table where applicable, dropped otherwise).",
+            "llms.txt follows the llmstxt.org convention: one Markdown link per page, title + summary, grouped under a `## Pages` heading. Designed to be pasted into an LLM context window as a sitemap."
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "Why a separate tree",
+          "content": "Earlier builds duplicated the .md twins inside both dist/standalone/ and dist/site/. The duplication was invisible — neither human runtime reads them — but doubled the build output and confused deployment. One canonical home, addressable as dist/markdown/<page>.md, drops 50% of the markdown footprint and clarifies who is supposed to read it."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "manifest",
+      "title": "site-manifest.json — the kit's single source of page truth",
+      "lead": "One generated file describes every page the runtime should know about. Three places consume it; only one writes it.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"schema_version\": 1,\n  \"generated_at\": \"2026-05-21T14:20:10Z\",\n  \"root\": \".\",\n  \"pages\": [\n    {\n      \"path\": \"docs/architecture.html\",\n      \"source\": \"docs/architecture.json\",\n      \"title\": \"Architecture\",\n      \"parent\": \"docs\",\n      \"order\": 40,\n      \"summary\": \"Runtime mental model + build pipeline.\"\n    }\n  ]\n}"
+        },
+        {
+          "kind": "table",
+          "headers": ["Consumer", "Reads from", "Used for"],
+          "rows": [
+            [
+              "page-nav (site-tree sidebar)",
+              "fetch(site-manifest.json) on every page load",
+              "Build the collapsible tree on the left edge. Marks the active page, drives the search popover's per-page tooltips."
+            ],
+            [
+              "standalone autoBoot",
+              "window.__htmldocManifest (inlined into the HTML)",
+              "Same sidebar, but the manifest is shipped with the HTML so file:// loads have no fetch."
+            ],
+            [
+              "fallback walker (dev / static servers)",
+              "neither — synthesizes a manifest by listing the docs directory and fetching each .json",
+              "Last-resort path when neither the inline manifest nor the .json fetch is available."
+            ]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "site-manifest.js is retired",
+          "content": "A fourth fallback (window.__htmldocManifest set via <script src=\"site-manifest.js\">) existed for environments that blocked fetch but allowed <script src>. No template wired it; both runtime paths above are sufficient. The build and the dev server no longer emit it."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "dev-server",
+      "title": "html-doc serve — synthesis without source writes",
+      "lead": "The dev server mirrors the build's runtime contracts without writing anything to disk. Source dirs stay authored-content-only.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "Static serve",
+              "meta": "SimpleHTTPRequestHandler",
+              "content": "Files on disk win — JSON, MD, HTML, kit assets, kit.json. Served as-is with no-cache headers."
+            },
+            {
+              "num": "2",
+              "title": "Synthesize stubs",
+              "meta": "_serve_synthesized",
+              "content": "GET /page.html when only page.json or page.md exists → synthesize a stub from _stub_for(). GET /page.json when only page.md exists → md_to_page() and serialize. Real-file-on-disk always wins; synthesis is the gap-filler."
+            },
+            {
+              "num": "3",
+              "title": "Synthesize artifacts",
+              "meta": "_serve_generated_artifact",
+              "content": "GET /<docs>/site-manifest.json → compute_manifest() result, fresh. GET /<docs>/llms.txt → compute_llms_txt() result, fresh. No source-side files written; refresh shows current state with no rebuild."
+            },
+            {
+              "num": "4",
+              "title": "Live reload",
+              "meta": "_watcher_loop + SSE",
+              "content": "Background thread snapshots the tree every ~400ms (skipping dist/, _kit/, .git/, etc., plus site-manifest.json / llms.txt to avoid feedback). On any source change, broadcasts a 'change' event to connected /__reload SSE clients."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "title": "Why synthesis instead of writing files",
+          "content": "Writing site-manifest.json, llms.txt, or .html stubs to the source dir would have two failure modes: every save would dirty git, and the watcher would see its own writes and re-fire. Synthesizing in memory at request time eliminates both. The trade is a tiny per-request cost (one tree walk + JSON serialize) that nobody notices for projects with ≤ a few hundred pages."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "open-questions",
+      "title": "Open question — can the site .json siblings go away?",
+      "lead": "A natural instinct on first reading is that .json siblings inside dist/site/ duplicate the page content. They don't — they're the SPA navigation payload — but there are alternatives worth weighing.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "in",
+              "title": "Status quo — keep .json siblings",
+              "items": [
+                "SPA navigation cost: one fetch per click, the JSON itself (typically 5–50KB).",
+                "Tree size: largest of the three options.",
+                "Kit complexity: zero change.",
+                "Refresh behaviour: each URL is real; refresh / share / right-click-open-in-tab all work."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "Inline JSON in HTML + drop .json siblings, keep SPA",
+              "items": [
+                "Per-page HTML grows by the JSON size; kit assets still shared.",
+                "Initial paint: zero fetch — the page's JSON is already in the HTML.",
+                "Hash navigation: fetch sibling .html, use DOMParser to pull the inline <script id=\"__htmldoc_page__\">, parse, render.",
+                "Kit cost: ~20 LoC in chrome.js (DOMParser path)."
+              ]
+            },
+            {
+              "verdict": "out",
+              "title": "Inline JSON + full MPA (no SPA)",
+              "items": [
+                "Cleanest tree, simplest kit (drop the click interceptor and hashchange handler).",
+                "Every internal click is a full page reload — sidebar, scroll, theme, reading-aid state all reflow.",
+                "On a docs site read in long sessions, the jank is noticeable."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "Not decided",
+          "content": "Both alternatives are coherent. The status quo costs nothing today; either alternative costs a kit change. Likely revisit when the site footprint matters more (a public deploy with many pages) or when a kit refactor is on the table anyway."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "trees-recap",
+      "title": "What's in each tree, at a glance",
+      "lead": "After the recent reorganization, no artifact appears twice. If you find a duplicate, it's a regression.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Artifact", "standalone", "site", "markdown"],
+          "rows": [
+            ["page HTML (inlined kit + JSON + manifest)", "✓", "—", "—"],
+            ["page HTML stub (loads from _kit/)", "—", "✓", "—"],
+            ["page JSON sibling", "—", "✓", "—"],
+            ["_kit/ (chrome.{css,js}, renderer.js, glossary/, extrefs/, schema/)", "—", "✓", "—"],
+            ["site-manifest.json", "inlined per HTML", "✓ at docs root", "—"],
+            ["pagefind/", "—", "✓ (if pagefind on PATH)", "—"],
+            ["page.md (LLM twin)", "—", "—", "✓"],
+            ["llms.txt sitemap", "—", "—", "✓"]
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "footnotes",
+      "title": "Footnotes",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "All paths above are relative to a project root. The docs root inside dist/<tree>/ preserves the source layout, so a page authored at docs/plans/build-architecture.json lands at dist/site/docs/plans/build-architecture.{html,json} and dist/markdown/docs/plans/build-architecture.md.",
+            "_common_docs_dir(root, pages) picks the closest common parent of every JSON page. For repos that put pages directly in cwd, the manifest URL is /site-manifest.json; for repos with docs/, it's /docs/site-manifest.json. chrome.js's __htmldocDocsRoot derivation reads the depth from the first _kit reference it finds in the loaded HTML.",
+            "The build is idempotent — re-running html-doc build cleans every dist/<tree>/ first, so stale files never persist. The watcher excludes dist/ entirely, so a build during serve doesn't trigger a reload."
+          ]
+        }
+      ]
+    }
+  ]
+}

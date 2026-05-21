@@ -1,0 +1,254 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "src → cli + CLI file collocation",
+  "accent": "amber",
+  "meta": {
+    "eyebrow": "Plan",
+    "subtitle": "Should src/ be renamed to cli/ and the CLI-specific files moved into one directory?",
+    "audience": "Maintainer",
+    "order": 150,
+    "summary": "Pros, cons, and the recommended outcome: keep src/ — rename buys little and breaks Python ecosystem expectations."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "The rename feels appealing because every file under src/ is in fact CLI code. But the Python ecosystem treats src/<package>/ as the canonical layout — every tool (uv, pip, hatchling, ruff, mypy, pytest) recognises it without configuration. Renaming to cli/ saves zero confusion (the directory contents already say 'CLI') while requiring overrides in every tool, and the bin/ shim is a separate concern best left where it is.",
+      "bullets": [
+        "Recommendation: keep src/, keep bin/html-doc, keep pyproject.toml at the repo root.",
+        "If the legibility concern is real, add a one-line README inside src/ saying 'this is the CLI source; the runtime is in kit/' — that solves the actual confusion at zero structural cost.",
+        "Reopen if a non-CLI Python module ever joins the codebase (then src/cli/ + src/<other>/ become natural)."
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "today",
+      "title": "Today's layout",
+      "lead": "Every Python file lives under src/. Everything else at the root falls into one of: kit runtime, docs, examples, packaging, CI.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "html-doc/\n├── bin/\n│   └── html-doc                 ← PEP 723 shim (uv run bin/html-doc …)\n├── src/\n│   ├── html_doc/\n│   │   ├── cli.py               ← the entire CLI: argparse, build, serve, check, init, clean\n│   │   ├── __init__.py\n│   │   ├── assets/              ← copied from kit/ during build (force-include)\n│   │   └── templates/           ← starter.{json,html}\n│   └── html_doc_tests/          ← pytest suite (≈200 tests)\n├── kit/                         ← runtime: chrome.js, chrome.css, renderer.js, schemas, glossary, extrefs\n├── docs/                        ← the kit's own documentation pages\n├── examples/                    ← demo projects rendered by the kit\n├── pyproject.toml               ← packaging + dep + tool config\n├── uv.lock\n├── README.md\n└── CLAUDE.md"
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "Two languages, two homes",
+          "content": "kit/ is the runtime (JS + CSS, what the browser executes). src/ is the build/serve toolchain (Python, what the CLI executes). The split is clean: kit/ ships to readers, src/ ships to authors. The proposed rename would blur this — readers don't need 'cli', the kit handles them."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "options",
+      "title": "Three candidate restructures",
+      "lead": "Each weighed on legibility, Python-ecosystem cost, and downstream churn.",
+      "blocks": [
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "option-a",
+          "title": "A — Status quo (recommended)"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Keep src/html_doc/ as the package home. Keep bin/html-doc as the launcher. Keep pyproject.toml at the repo root. Optionally add a one-line README inside src/ explaining the boundary."
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "+ Zero churn. No imports change, no CI changes, no install command changes.",
+            "+ Matches the documented Python `src layout` (pyproject.toml lives next to src/<package>/). uv, pip, hatchling, ruff, mypy, pytest all recognise this without configuration.",
+            "+ Consistent with the existing wheel: `pip install html-doc` already installs the `html_doc` package — the on-disk directory matches the importable name.",
+            "− Costs the maintainer the urge to make 'src' say what's in it.",
+            "− If a future non-CLI Python module ever joins, the urge will return."
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "option-b",
+          "title": "B — Rename src/html_doc/ to cli/html_doc/"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Pure directory rename. Package name stays html_doc; the only change is the parent directory."
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "+ Directory name now hints at the contents.",
+            "− Every Python tool that auto-detects src/ now needs a config override. pyproject.toml gains `[tool.hatch.build.targets.wheel] packages = [\"cli/html_doc\"]`. Same for ruff (`src = [\"cli\"]`), pytest (`pythonpath = [\"cli\"]`), mypy if used.",
+            "− Breaks editor / IDE discovery heuristics that look at `src/` first.",
+            "− Doesn't solve the actual problem (a reader doesn't open src/ wondering 'is this kit code or CLI code?' — that gets answered by the file's first line).",
+            "− Cost is paid by every contributor who knows the standard layout and now has to learn this one."
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "option-c",
+          "title": "C — Move bin/, pyproject.toml, and src/ all into a cli/ subdir"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Maximalist version: cli/ contains pyproject.toml, src/html_doc/, bin/html-doc, uv.lock. The repo root holds only kit/, docs/, examples/, README.md, CLAUDE.md."
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "+ Clean conceptual split at the top level: kit (runtime) vs cli (toolchain) vs docs (content).",
+            "− Install command becomes `uv tool install ./cli` instead of `uv tool install .`. Every README, CI workflow, and IDE preset must learn this exception.",
+            "− pyproject.toml inside a subdir breaks one-line shortcut tools that assume the root (`pip install .`, `uv run --project .`).",
+            "− Worktree / IDE roots that pin to the repo top see a `cli/` they have to descend into; the repo no longer 'looks like' a Python project at the top.",
+            "− The bin/ shim has its own UNIX convention (executable entrypoints at the top); burying it inside cli/ doesn't help discoverability."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "ecosystem-cost",
+      "title": "The Python-ecosystem cost of moving src/",
+      "lead": "Every tool that auto-discovers source needs a config override the moment you stop using src/.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Tool", "Default behaviour", "Override needed if src/ moves"],
+          "rows": [
+            ["hatchling (build backend)", "Picks up src/<package>/ automatically", "[tool.hatch.build.targets.wheel] packages override"],
+            ["uv / pip", "Walks pyproject.toml; picks up src layout if hatchling configured", "Indirect — depends on hatchling override"],
+            ["pytest", "rootdir + sys.path auto-includes src/ via importlib mode", "tool.pytest.ini_options.pythonpath"],
+            ["ruff", "Treats src/ as first-party module root", "tool.ruff.src override"],
+            ["mypy / pyright", "Discovers packages via src/ heuristics", "mypy.ini or pyrightconfig override"],
+            ["IDEs (PyCharm, VS Code)", "Highlights src/ as 'source root' automatically", "Per-IDE config; not portable across contributors"],
+            ["coverage.py", "source=src/ default", "tool.coverage.run.source override"]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "title": "Cost asymmetry",
+          "content": "Keeping src/ costs zero configuration. Moving it costs configuration in every tool that ever touches Python code. Each override is small individually; the aggregate is a layer of \"why does this repo not just work?\" friction that every new contributor (and every new tool) hits forever."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "what-rename-doesnt-fix",
+      "title": "What the rename doesn't actually fix",
+      "lead": "The premise of the rename is that 'src' is generic and doesn't say what's inside. But that confusion isn't real in this repo — the rename would replace a non-confusion with friction.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "A reader entering the repo sees kit/, src/, docs/, examples/ at the top. The naming pattern is already 'runtime / source / content / demos' — every Python-aware reader maps src/ to 'source' instantly.",
+            "Inside src/, the package is named html_doc — same as the wheel they'd install. The package's contents are cli.py + templates/ + assets/ + tests. A reader opens cli.py and sees the argparse setup in the first 200 lines. No naming change to the parent directory would explain that faster.",
+            "If the worry is 'what if I add a non-CLI Python module later?' — the answer is `src/html_doc/<new_module>.py` (a sibling to cli.py). No directory restructure required."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "bin-decision",
+      "title": "What about bin/html-doc?",
+      "lead": "Separate question, separate answer. The shim is a UNIX convention — leave it at the top.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "in",
+              "title": "Keep bin/html-doc at the repo root",
+              "items": [
+                "UNIX-shaped expectation: project executables live in bin/.",
+                "PEP 723 inline-script metadata in bin/html-doc is the file's primary purpose — it has to be a single executable file users can run with `uv run bin/html-doc`. Burying it in src/ contradicts the shape.",
+                "The shim is tiny (one file, no dependencies on its location)."
+              ]
+            },
+            {
+              "verdict": "out",
+              "title": "Move bin/ inside src/ or cli/",
+              "items": [
+                "Breaks the UNIX convention contributors expect.",
+                "Doesn't reduce the number of top-level entries — replaces bin/ with one fewer top-level dir, but only at the cost of harder-to-find executables.",
+                "Users running `uv run path/to/html-doc` need a stable, top-level path."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "pyproject-decision",
+      "title": "What about pyproject.toml?",
+      "lead": "Has to stay at the root. Moving it makes the repo no longer a discoverable Python project.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "uv, pip, build, ruff, pytest, every Python-aware tool searches the cwd for pyproject.toml. Moving it under cli/ means every one of those commands needs the path explicitly or a wrapper script.",
+            "GitHub's repo-language detection uses pyproject.toml at the root to classify the project. Burying it makes the repo show up as JavaScript-first (kit/ dominates the line count).",
+            "Editors that use 'open project' on the repo root would no longer find the package metadata."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "recommendation",
+      "title": "Recommendation",
+      "lead": "Keep the current layout. Add a single small marker to make the boundary explicit.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "No rename",
+              "meta": "decision",
+              "content": "src/ stays. bin/ stays. pyproject.toml stays at the root. The rename neither earns its churn cost nor solves a real confusion."
+            },
+            {
+              "num": "2",
+              "title": "Add src/README.md",
+              "meta": "~5 minutes",
+              "content": "A four-line marker explaining the boundary: 'This directory contains the html-doc CLI source — the toolchain that builds and serves docs. The runtime (chrome.js, chrome.css, renderer.js) lives in ../kit/.' Settles the question for any reader who arrives via the directory tree rather than the README."
+            },
+            {
+              "num": "3",
+              "title": "Revisit only on real second-module pressure",
+              "meta": "deferred trigger",
+              "content": "If a second non-CLI Python module ever joins the codebase (e.g., a shared library used by both the CLI and an external integration), the natural next step is `src/html_doc/cli/` + `src/html_doc/<other>/` — still within the standard layout."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "open-questions",
+      "title": "Open questions",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Should src/html_doc/cli.py itself be split? It's ~2400 lines covering init / build / serve / check / clean plus the markdown converter and the dev server. The single-file shape is convenient for `bin/html-doc` (PEP 723 inline script) but pressure to split will grow if the file passes 3000 lines. Separate plan if it becomes painful.",
+            "Should html_doc_tests/ move into a top-level tests/ directory? The Python standard practice splits tests out of src/. Today they live alongside the package which means the wheel ships test files — minor footgun. Worth a separate small refactor.",
+            "Should bin/ contain more than one entry? Possible future shims (a docs-LLM wrapper, a syntax converter) would all live there. Not blocking until those exist."
+          ]
+        }
+      ]
+    }
+  ]
+}

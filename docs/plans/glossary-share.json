@@ -1,0 +1,231 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Shareable kit — glossary strategy",
+  "accent": "violet",
+  "meta": {
+    "eyebrow": "Plan",
+    "subtitle": "Separating personal glossary content from the shipped kit so html-doc can be released publicly.",
+    "audience": "Maintainer",
+    "order": 140,
+    "summary": "What stays in the kit, what splits off, what a community-shared registry would look like."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "The kit currently bundles personal-domain glossaries (adhd, hadith, voice) alongside general-purpose ones (web, data-platforms, ai-llm, doc-tooling). Public release needs the personal ones to live outside the kit while keeping per-project glossary authoring frictionless. The recommended path is three layers: a small built-in default set, a per-project override layer (already exists via kit.json), and a community-shared registry fetched on demand.",
+      "bullets": [
+        "Built-in (ships with kit): general-purpose, generally-useful — keep as defaults.",
+        "Private (lives in personal repos or a private fork): personal-domain glossaries, never published.",
+        "Project override (already works via kit.json + the domains list): users declare which built-ins to load and add their own.",
+        "Community registry (new, optional): fetchable third-party glossary packs — npm-style, but JSON files."
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "today",
+      "title": "Today — what ships where",
+      "lead": "Glossary content currently sits inside the kit asset directory. The kit fetches files matching the active domains in kit.json on every page load.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "kit/\n├── chrome.css\n├── chrome.js\n├── chrome-boot.js\n├── renderer.js\n├── schema/\n├── glossary/\n│   ├── adhd.json          ← personal\n│   ├── ai-llm.json        ← general\n│   ├── data-platforms.json ← general\n│   ├── doc-tooling.json   ← general\n│   ├── hadith.json        ← personal\n│   ├── voice.json         ← personal\n│   └── web.json           ← general\n└── extrefs/\n    ├── ai-llm.json\n    ├── data-platforms.json\n    ├── doc-tooling.json\n    └── web.json"
+        },
+        {
+          "kind": "callout",
+          "type": "warn",
+          "title": "Why this is a release blocker",
+          "content": "Three of the seven glossary domains (adhd, hadith, voice) are personal — they relate to private notes the maintainer keeps in other repos. Public release of the kit would either expose half-filled personal entries or require contributors to inherit a vocabulary that isn't theirs. Either way the kit can't be the registry."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "decision-matrix",
+      "title": "Decision matrix per domain",
+      "lead": "Score each existing domain on general usefulness vs personal scope, then pick a destination.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Domain", "Useful to whom", "Destination", "Reason"],
+          "rows": [
+            ["doc-tooling", "Anyone using html-doc", "Built-in", "Defines kit's own vocabulary (page-nav, page-toc, primitives, etc.). Ship as default."],
+            ["web", "Web-platform authors", "Built-in (small)", "HTTP, CORS, MIME, etc. Broadly useful, low maintenance."],
+            ["data-platforms", "Iceberg / Spark / lakehouse work", "Optional pack", "Specific niche. Keep as a downloadable pack, not bundled."],
+            ["ai-llm", "AI / agent / SDK work", "Optional pack", "Specific niche. Same treatment as data-platforms."],
+            ["adhd", "Maintainer only", "Private", "Personal-notes vocabulary. Stays in the maintainer's private repos."],
+            ["hadith", "Maintainer only", "Private", "Same."],
+            ["voice", "Maintainer only", "Private", "Same."]
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "three-layers",
+      "title": "Three-layer model",
+      "lead": "Each layer answers a different question. Combine cleanly with no override surprise.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "Built-in (kit ships it)",
+              "meta": "doc-tooling, web",
+              "content": "Small, general, opinionated. Ships in the kit zip / wheel. Available to every project by default — kit.json.domains can list any of these and chrome.js fetches them from _kit/glossary/."
+            },
+            {
+              "num": "2",
+              "title": "Project (the author writes it)",
+              "meta": "kit.json + glossary_overrides",
+              "content": "kit.json's domains list selects built-ins. The project may also define inline term overrides (already supported) and ship its own glossary files alongside kit.json. The author owns this layer entirely."
+            },
+            {
+              "num": "3",
+              "title": "Community pack (fetched on demand)",
+              "meta": "kit.json.packs",
+              "content": "Third-party glossary bundles. Distributed as JSON files on any CDN / GitHub raw URL. kit.json lists pack URLs; chrome.js fetches and merges them into the registry at load time. Authors can publish their own domain packs without modifying the kit."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "private-layer",
+      "title": "The private layer — what happens to adhd, hadith, voice",
+      "lead": "These domains live in private projects that depend on the kit. The simplest answer keeps them entirely outside this repo.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Move adhd.json, hadith.json, voice.json out of kit/glossary/ into the projects that actually use them.",
+            "Each consuming project carries the glossary file next to its kit.json — chrome.js's project-glossary path (already in the loader) picks them up.",
+            "Optional: a single private repo (~/.local/share/html-doc-personal/) holds shared personal domains and is referenced via a packs URL in each project's kit.json. Keeps the personal vocabulary in one place across the maintainer's projects without involving the public kit."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "community-registry",
+      "title": "Community registry — design sketch",
+      "lead": "Optional Phase-3 work. Lets contributors publish glossary packs the way they'd publish an npm package — without forking the kit.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "in",
+              "title": "Minimum: list of URLs in kit.json",
+              "items": [
+                "kit.json gains a packs: [{ name, url, version? }] array.",
+                "chrome.js fetches each URL on first paint, validates against glossary.schema.json, merges into the per-domain registry under the declared name.",
+                "Zero infrastructure cost — any HTTPS URL works (GitHub raw, jsDelivr, R2, S3).",
+                "Authors publish a pack by pushing a single JSON file to any CDN."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "Optional: a registry index",
+              "items": [
+                "A central JSON index (registry.html-doc.org or a community GitHub repo) listing known packs with metadata (description, author, version, schema_version).",
+                "Lets html-doc init or a future html-doc search-packs surface available packs.",
+                "Adds curation overhead — needs a maintainer (or a PR-driven update model).",
+                "Not blocking for Phase 1 or 2. Worth doing only if pack count grows beyond what a README can list."
+              ]
+            },
+            {
+              "verdict": "out",
+              "title": "Reject: a runtime package manager",
+              "items": [
+                "Building html-doc install <pack>, lockfiles, semver resolution, etc. is npm-shaped scope that the use case doesn't justify.",
+                "If pack count grows that much, the community will fork the existing JS/npm ecosystem rather than re-build it in Python."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "mechanism",
+      "title": "Concrete mechanism — kit.json after the change",
+      "lead": "The schema gets one optional field; everything else stays compatible.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/project-kit.schema.json\",\n  \"name\": \"my-project\",\n  \"description\": \"...\",\n  \"lang\": \"en\",\n\n  // Built-ins that ship with the kit.\n  \"domains\": [\"doc-tooling\", \"web\"],\n\n  // Optional: external packs fetched at runtime.\n  \"packs\": [\n    { \"name\": \"iceberg\", \"url\": \"https://example.com/iceberg-glossary.json\" },\n    { \"name\": \"adhd\",    \"url\": \"file:///Users/md/private/adhd-glossary.json\" }\n  ]\n}"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "domains keeps its current meaning — names of built-in glossaries shipped under _kit/glossary/.",
+            "packs is new — each entry is fetched at runtime, merged into the per-name registry. Failures soft-fail with a warning (no broken UX if a CDN is down).",
+            "file:// pack URLs work for personal layer when the project is served via html-doc serve (the dev server can resolve them); standalone build inlines them like other glossary data."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "phased-plan",
+      "title": "Phased plan",
+      "lead": "Each phase is independently shippable. Stop after any phase if the next isn't worth the work.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "Split private domains out",
+              "meta": "~1 hour, no kit changes",
+              "content": "Move adhd.json, hadith.json, voice.json into private repos. Drop them from kit/glossary/. Update kit.json in each consuming project to load them via the existing project-glossary fallback path (chrome.js already supports this via per-project glossary/ next to kit.json). No JS or schema changes; just file moves."
+            },
+            {
+              "num": "2",
+              "title": "Trim built-ins to general-use only",
+              "meta": "decision + small JS change",
+              "content": "Keep doc-tooling + web as built-ins. Move data-platforms + ai-llm out — either as initial community packs hosted on this same repo (separate branch / release artifact) or into the consuming projects' own kit.json. After this phase the public kit ships with a small, general default vocabulary."
+            },
+            {
+              "num": "3",
+              "title": "Add packs[] support",
+              "meta": "~half-day kit change + tests",
+              "content": "Extend project-kit.schema.json with the optional packs[] array. Update chrome.js's kit.json loader to fetch each pack URL in parallel, validate, merge into the named registry, surface failures via the warning panel (with jump targets to the pack URL). Add jsonschema validation in html-doc check so a typo'd pack URL fails the build."
+            },
+            {
+              "num": "4",
+              "title": "(optional) Community index",
+              "meta": "deferred",
+              "content": "Curate a community-maintained list of known packs. Could live as a simple JSON file in the kit repo (PR-driven) or a separate site. Reopen the decision once enough packs exist to make a curated list useful (rough threshold: >10 third-party packs)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "open-questions",
+      "title": "Open questions",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Version pinning. If a pack changes, every project loading it sees the new version on next paint. Add an optional checksum or version field to packs[] entries? Pin by URL is the simplest answer (CDNs version via path) — start there.",
+            "Schema evolution. A pack written against schema_version 1 must keep working when the kit moves to schema_version 2. The current schema has version-tolerant defaults; the packs loader should reject schema_version > current with a clear warning, not silently coerce.",
+            "Trust. Loading arbitrary URLs is a (mild) attack surface — the kit doesn't execute pack JSON as code, but a hostile pack could spoof glossary entries to misinform readers. For initial release, document the trust model (\"only add packs from sources you trust\") and let curation be opt-in.",
+            "Personal-layer ergonomics. The maintainer wants frictionless reuse of adhd / hadith / voice across multiple personal projects. The packs[] file:// path supports this for served pages; standalone builds need the packs inlined (cli.py's build_kit_bundle already inlines glossary; extending to inline packs is straightforward)."
+          ]
+        }
+      ]
+    }
+  ]
+}
