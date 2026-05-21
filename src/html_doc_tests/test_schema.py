@@ -20,7 +20,7 @@ DOC_FILES = [
     "cli.json",
     "glossary.json",
     "index.json",
-    "primitives.json",
+    "reference.json",
 ]
 
 

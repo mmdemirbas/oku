@@ -68,22 +68,19 @@ class TestFindHelpers:
 
 
 class TestBuildManifest:
-    def test_emits_both_json_and_js_companions(self, tmp_path: Path) -> None:
+    def test_emits_only_json(self, tmp_path: Path) -> None:
         _write_page(tmp_path / "a.json", title="Alpha")
         _write_page(tmp_path / "b.json", title="Beta")
         manifest = cli.build_manifest(tmp_path)
-        # JSON file
         assert manifest == tmp_path / "site-manifest.json"
         body = json.loads(manifest.read_text(encoding="utf-8"))
         assert body["schema_version"] == 1
         titles = {entry["title"] for entry in body["pages"]}
         assert titles == {"Alpha", "Beta"}
-        # JS companion exists for file:// + IDE token-gated fetches
-        js = tmp_path / "site-manifest.js"
-        assert js.exists()
-        js_text = js.read_text(encoding="utf-8")
-        assert "window.__htmldocManifest" in js_text
-        assert "Alpha" in js_text
+        # No .js companion — the runtime falls back to inline
+        # window.__htmldocManifest (shipped in every standalone HTML)
+        # or to a fresh fetch on each request.
+        assert not (tmp_path / "site-manifest.js").exists()
 
     def test_entries_include_meta_fields_when_present(self, tmp_path: Path) -> None:
         _write_page(

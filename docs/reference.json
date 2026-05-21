@@ -26,7 +26,7 @@
         "Emphasis · callout, insight, info-tip",
         "Layout · tldr, kpi-grid, table, compare-grid, step-flow",
         "Visual · chart (scatter / line / area / bubble / quadrant / bar / stacked-bar / grouped-bar / donut), diagram, live-snippet",
-        "Build · html-doc build → manifest, llms.txt, dist/standalone/, dist/site/ (+ Pagefind)"
+        "Build · html-doc build → dist/standalone/, dist/site/ (+ Pagefind), dist/markdown/ (page.md twins + llms.txt)"
       ]
     },
     {
@@ -1224,7 +1224,7 @@
               "num": "3",
               "title": "Build",
               "meta": "before deploy or before sharing standalone",
-              "content": "html-doc build → manifest, llms.txt, dist/site/, dist/standalone/, Pagefind index (if pagefind on PATH)."
+              "content": "html-doc build → dist/standalone/ (single-file HTMLs), dist/site/ (shared-asset multi-page + manifest + Pagefind), dist/markdown/ (page.md twins + llms.txt for LLM consumers)."
             }
           ]
         }
@@ -1947,34 +1947,28 @@
       "kind": "section",
       "id": "build",
       "title": "Build outputs",
-      "lead": "html-doc build produces four artifacts. Authors don't need to run it during dev — the runtime renderer fetches JSON directly — but build is required for search, the standalone single-file mode, and the llms.txt sitemap.",
+      "lead": "html-doc build produces three trees under dist/, one per audience. Authors don't need to run it during dev — the runtime renderer fetches JSON directly — but build is required for search, the standalone single-file mode, and the llms.txt sitemap.",
       "blocks": [
         {
           "kind": "step-flow",
           "steps": [
             {
               "num": "1",
-              "title": "site-manifest.json",
-              "meta": "<page-nav> reads this",
-              "content": "Page tree consumed by the site-tree sidebar at runtime. Generated from every *.json file in the project."
+              "title": "dist/site/",
+              "meta": "humans, HTTP",
+              "content": "Deployable multi-page site. Every HTML + JSON copied with directory structure preserved. Kit assets bundled at dist/site/_kit/. site-manifest.json sits at the docs root for the runtime page-nav fetch. Drop on any static host."
             },
             {
               "num": "2",
-              "title": "llms.txt",
-              "meta": "AI-consumer sitemap",
-              "content": "One line per page: URL + title + summary. Convention from llmstxt.org. Drop into LLM context to give the model an overview."
+              "title": "dist/standalone/",
+              "meta": "humans, file://",
+              "content": "Single-file artifacts. Every HTML inlines kit JS, CSS, page JSON, glossary bundle, and the manifest as window.__htmldocManifest. One self-contained file per page that opens offline — email-as-attachment ready. No sidecar manifest or llms.txt needed."
             },
             {
               "num": "3",
-              "title": "dist/site/",
-              "meta": "deployable multi-page site",
-              "content": "Every HTML + JSON copied with directory structure preserved. Kit assets bundled at dist/site/_kit/. Drop on any static host."
-            },
-            {
-              "num": "4",
-              "title": "dist/standalone/",
-              "meta": "single-file artifacts",
-              "content": "Every HTML inlined: kit JS, CSS, page JSON, glossary bundle. One self-contained file per page that opens offline — email-as-attachment ready."
+              "title": "dist/markdown/",
+              "meta": "AI / LLM consumers",
+              "content": "page.md twin for every JSON page + a single llms.txt sitemap (one line per page: URL + title + summary, convention from llmstxt.org). Single canonical home — no duplication across the human trees."
             }
           ]
         },
@@ -1995,7 +1989,7 @@
         {
           "kind": "code",
           "language": "html",
-          "source": "<page-chrome></page-chrome>\n\n<div class=\"layout\">\n  <page-nav title=\"Pages\"></page-nav>\n  <main id=\"main-content\"></main>\n  <page-toc title=\"On this page\"></page-toc>\n</div>\n\n<script>\n  window.addEventListener('DOMContentLoaded', function () {\n    HtmlDocRenderer.autoBoot();\n  });\n</script>"
+          "source": "<page-chrome></page-chrome>\n\n<div class=\"layout\">\n  <page-nav></page-nav>\n  <main id=\"main-content\"></main>\n  <page-toc></page-toc>\n</div>\n\n<script>\n  window.addEventListener('DOMContentLoaded', function () {\n    HtmlDocRenderer.autoBoot();\n  });\n</script>"
         },
         {
           "kind": "list",
@@ -2013,14 +2007,14 @@
                 "kind": "code",
                 "text": "<page-nav>"
               },
-              " — left site-tree sidebar. Reads site-manifest.json. Mark active page; edge-tab toggle."
+              " — boxed site-tree at the top of the single left sidebar; reads site-manifest.json (or the inline window.__htmldocManifest in standalone builds). Marks the active page. Right-edge handle resizes / collapses. Footer at the bottom carries the kit version."
             ],
             [
               {
                 "kind": "code",
                 "text": "<page-toc>"
               },
-              " — right section-TOC sidebar. Built from main > section > h2/h3 after the renderer fires html-doc:rendered."
+              " — section-TOC stacked under the site tree inside the same left sidebar. Heading reflects the current page title; the list is built from main > section > h2/h3 after the renderer fires html-doc:rendered."
             ]
           ]
         },

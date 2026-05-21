@@ -36,7 +36,7 @@
               "meta": "start here",
               "content": [
                 "Project setup, page anatomy, Markdown sources, every primitive with its JSON shape and a live example, per-page metadata, build outputs. ",
-                { "kind": "link", "text": "Open primitives.html", "href": "primitives.html" }
+                { "kind": "link", "text": "Open reference.html", "href": "reference.html" }
               ]
             },
             {

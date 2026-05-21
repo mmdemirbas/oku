@@ -22,7 +22,7 @@
         "Format: JSON tree → renderer.js walks it → Custom Element DOM → chrome.js attaches behavior.",
         "kit.json + per-domain glossary/extref JSON files are the registry; loaded once at page start, resolved per element.",
         "Visual Viewport API keeps fixed-position chrome buttons anchored during pinch-zoom on Safari.",
-        "Build pipeline (html-doc CLI) produces 4 artifacts: site-manifest.json, llms.txt, dist/site/, dist/standalone/."
+        "Build pipeline (html-doc CLI) emits three single-purpose trees under dist/: standalone/ (self-contained HTMLs), site/ (multi-page + Pagefind + manifest), markdown/ (page.md twins + llms.txt)."
       ]
     },
     {
@@ -211,7 +211,7 @@
       "kind": "section",
       "id": "docs-root",
       "title": "Docs-root discovery",
-      "lead": "kit.json and site-manifest.json live at the project root, not the page directory. The kit needs to find the root from any page depth.",
+      "lead": "kit.json and site-manifest.json live at the docs root (the directory containing _kit/), not next to each page. The kit derives that root from any page depth so subdir pages resolve their assets without per-page configuration.",
       "blocks": [
         {
           "kind": "code",
@@ -241,12 +241,12 @@
       "kind": "section",
       "id": "build",
       "title": "Build pipeline",
-      "lead": "bin/html-doc build walks the project, produces four output artifacts. Soft-fails on optional dependencies (Pagefind, jsonschema) so the kit doesn't acquire hard requirements.",
+      "lead": "bin/html-doc build walks the project and emits three single-purpose dist/ trees, one per audience. Soft-fails on optional dependencies (Pagefind, jsonschema) so the kit doesn't acquire hard requirements.",
       "blocks": [
         {
           "kind": "diagram",
-          "caption": "Build inputs and outputs.",
-          "source": "flowchart LR\n    subgraph IN[Project source]\n      P[*.json pages]\n      H[*.html stubs]\n      KJ[kit.json]\n    end\n    subgraph K[Kit — symlinked _kit/]\n      KIT[chrome.css/js, renderer.js]\n      G[glossary/*.json]\n      E[extrefs/*.json]\n    end\n    BUILD[html-doc build]\n    P --> BUILD\n    H --> BUILD\n    KJ --> BUILD\n    G --> BUILD\n    E --> BUILD\n    KIT --> BUILD\n    BUILD --> M[site-manifest.json]\n    BUILD --> L[llms.txt]\n    BUILD --> S[dist/site/]\n    BUILD --> D[dist/standalone/]\n    BUILD --> PF[dist/site/pagefind/]\n    PF -.-> |if pagefind on PATH| BUILD"
+          "caption": "Build inputs and the three dist trees.",
+          "source": "flowchart LR\n    subgraph IN[Project source]\n      P[*.json + *.md pages]\n      H[*.html stubs]\n      KJ[kit.json]\n    end\n    subgraph K[Kit — symlinked _kit/]\n      KIT[chrome.css/js, renderer.js]\n      G[glossary/*.json]\n      E[extrefs/*.json]\n    end\n    BUILD[html-doc build]\n    P --> BUILD\n    H --> BUILD\n    KJ --> BUILD\n    G --> BUILD\n    E --> BUILD\n    KIT --> BUILD\n    BUILD --> S[dist/standalone/<br/>self-contained HTML]\n    BUILD --> SI[dist/site/<br/>multi-page + manifest]\n    BUILD --> MD[dist/markdown/<br/>page.md + llms.txt]\n    BUILD --> PF[dist/site/pagefind/]\n    PF -.-> |if pagefind on PATH| BUILD"
         },
         {
           "kind": "list",
@@ -258,22 +258,22 @@
                 "kind": "code",
                 "text": "kind: \"page\""
               },
-              " — gather their meta."
+              " plus *.md files (skipping project-meta files like README.md, CLAUDE.md)."
             ],
             [
-              "write site-manifest.json with one entry per page (path, title, parent, order, summary)."
+              "if jsonschema is installed, validate every page against schema/page.schema.json; print errors with field paths. Structural lint runs regardless of jsonschema."
             ],
             [
-              "write llms.txt with one Markdown link per page — for AI consumers."
+              "build_standalone: for each page, inline chrome.css + chrome.js + renderer.js + page JSON + kit bundle + window.__htmldocManifest seed into a single self-contained HTML. No external dependencies beyond Google Fonts and Mermaid CDN (when used)."
             ],
             [
-              "if jsonschema is installed, validate every page against schema/page.schema.json; print errors with field paths."
+              "build_site: copy every HTML stub + sibling JSON into dist/site/<rel-path>; copy _kit/ as dist/site/_kit/ once; embed extracted text via hidden data-pagefind-body div for indexing."
             ],
             [
-              "build_site: copy every HTML stub + sibling JSON into dist/site/<rel-path>; copy _kit/ as dist/site/_kit/ for self-contained deployable; embed extracted text via hidden data-pagefind-body div for indexing."
+              "write a single site-manifest.json under dist/site/<docs-root>/. chrome.js fetches it at runtime to populate the page-nav sidebar."
             ],
             [
-              "build_standalone: for each page, inline chrome.css + chrome.js + renderer.js + page JSON + kit bundle into a single self-contained file."
+              "build_markdown_twins + build_llms_txt: emit per-page page.md plus a single llms.txt sitemap under dist/markdown/. LLM-readable, never duplicated across the human trees."
             ],
             [
               "if pagefind is on PATH, index dist/site/ to dist/site/pagefind/."
@@ -318,8 +318,8 @@
         {
           "kind": "callout",
           "type": "note",
-          "title": "Generated files at the docs root, not the project root",
-          "content": "<code>cmd_serve</code> writes <code>site-manifest.json</code>, <code>site-manifest.js</code>, <code>llms.txt</code>, and <code>page.md</code> twins at the closest common parent of JSON pages — typically <code>docs/</code>. <code>_common_docs_dir(root, pages)</code> in cli.py picks the directory, so the manifest URL prefix matches the served tree and git status stays clean."
+          "title": "Generated artifacts live under dist/, never source",
+          "content": "<code>html-doc build</code> writes site-manifest.json (dist/site/), llms.txt (dist/markdown/), and page.md twins (dist/markdown/) at the closest common parent of JSON pages — picked by <code>_common_docs_dir(root, pages)</code> in cli.py, typically <code>docs/</code>. <code>html-doc serve</code> doesn't write at all — it synthesizes site-manifest.json and llms.txt in memory on each request so source dirs stay authored-content-only."
         },
         {
           "kind": "callout",

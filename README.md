@@ -21,10 +21,11 @@ file copies for offline reading.
   forward-compat warning indicator, reader-side placeholder
   personalization.
 - **CLI:** `init` symlinks the kit + writes an index stub; `build`
-  emits `dist/site/` (multi-page + Pagefind) and `dist/standalone/`
-  (single file with inline page JSON); `check` lints the doctree
-  (schema + structural + content); `serve` runs a local HTTP server
-  with live reload.
+  emits `dist/site/` (multi-page + Pagefind), `dist/standalone/`
+  (single file with inline page JSON), and `dist/markdown/`
+  (`page.md` twins + `llms.txt` for LLM consumers); `check` lints
+  the doctree (schema + structural + content); `serve` runs a local
+  HTTP server with live reload.
 
 ## Install
 
@@ -99,17 +100,25 @@ Four commands, all run from the project root or a subdirectory:
 ```bash
 html-doc init                    # one-time, runs in cwd: _kit symlink + index.html stub
 html-doc check                   # lint the doctree (schema + structural + content)
-html-doc build                   # dist/standalone/ + dist/site/ + search index
+html-doc build                   # dist/standalone/ + dist/site/ + dist/markdown/ + search index
 html-doc serve                   # local HTTP, live reload, Pagefind in background
 html-doc serve --no-watch        # disable filesystem watcher
 html-doc serve --no-search       # skip background Pagefind index
 ```
 
-`serve` writes `site-manifest.json`, `site-manifest.js`, `llms.txt`,
-and `<name>.md` twins at the closest common parent of your JSON pages
-(typically `docs/`). The `.md` twins are LLM-readable renderings of
-each page; the `.js` companion is for environments that block
-same-origin `fetch()` (file://, IDE built-in servers).
+`build` writes three single-purpose trees under `dist/`:
+
+- `dist/standalone/` — every HTML inlines kit + page JSON +
+  `window.__htmldocManifest`. Open via `file://`, attach to email.
+- `dist/site/` — multi-page site with shared `_kit/` assets and a
+  Pagefind index. One `site-manifest.json` sits at the docs root for
+  the runtime page-nav fetch. Drop on any static host.
+- `dist/markdown/` — one `<name>.md` twin per JSON page plus a single
+  `llms.txt` sitemap. Single canonical home for LLM consumers; not
+  duplicated across the human trees.
+
+`serve` synthesizes `site-manifest.json` and `llms.txt` in memory on
+each request so source dirs stay clean.
 
 ## Primitives
 

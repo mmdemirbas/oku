@@ -2,7 +2,7 @@
 
 These guard against accidental deletion or shape-drift of the worked
 examples that prove a primitive works. Schema validation alone won't
-catch "primitives.json no longer contains a chip-filtered table" — a
+catch "reference.json no longer contains a chip-filtered table" — a
 future edit could pass the schema while silently removing the demo.
 
 The browser layer (table filter / chip toggle / fold region) is NOT
@@ -22,8 +22,8 @@ import pytest
 
 
 @pytest.fixture(scope="module")
-def primitives(repo_root: Path) -> dict:
-    return json.loads((repo_root / "docs" / "primitives.json").read_text(encoding="utf-8"))
+def reference(repo_root: Path) -> dict:
+    return json.loads((repo_root / "docs" / "reference.json").read_text(encoding="utf-8"))
 
 
 def _walk_blocks(node: dict | list) -> Iterator[dict]:
@@ -49,42 +49,42 @@ def _find_block(page: dict, predicate) -> dict | None:
 
 
 class TestTablePrimitive:
-    """The primitives reference must keep the three worked examples:
+    """The reference reference must keep the three worked examples:
     flat, grouped, and chip-filtered with multi-valued cells. Without
     them the table block has no visible documentation."""
 
-    def test_flat_table_present(self, primitives: dict) -> None:
+    def test_flat_table_present(self, reference: dict) -> None:
         block = _find_block(
-            primitives,
+            reference,
             lambda b: b.get("kind") == "table"
             and isinstance(b.get("headers"), list)
             and "rows" in b
             and "groups" not in b,
         )
-        assert block is not None, "flat table example missing from primitives.json"
+        assert block is not None, "flat table example missing from reference.json"
 
-    def test_grouped_table_present(self, primitives: dict) -> None:
+    def test_grouped_table_present(self, reference: dict) -> None:
         block = _find_block(
-            primitives,
+            reference,
             lambda b: b.get("kind") == "table" and isinstance(b.get("groups"), list),
         )
-        assert block is not None, "grouped table example missing from primitives.json"
+        assert block is not None, "grouped table example missing from reference.json"
         assert len(block["groups"]) >= 2, "grouped example should declare multiple groups"
 
-    def test_chip_filtered_table_present(self, primitives: dict) -> None:
+    def test_chip_filtered_table_present(self, reference: dict) -> None:
         """At least one table header uses the object form with
         filter='chips' + values."""
-        for block in _walk_blocks(primitives):
+        for block in _walk_blocks(reference):
             if block.get("kind") != "table":
                 continue
             for h in block.get("headers", []):
                 if isinstance(h, dict) and h.get("filter") == "chips" and h.get("values"):
                     return
-        pytest.fail("chip-filtered table example missing from primitives.json")
+        pytest.fail("chip-filtered table example missing from reference.json")
 
-    def test_chip_cells_use_object_form(self, primitives: dict) -> None:
+    def test_chip_cells_use_object_form(self, reference: dict) -> None:
         """Cells under chip columns must declare a `values` array."""
-        for block in _walk_blocks(primitives):
+        for block in _walk_blocks(reference):
             if block.get("kind") != "table":
                 continue
             chip_cols = []
@@ -108,22 +108,22 @@ class TestTablePrimitive:
 
 
 class TestTldrPrimitive:
-    def test_tldr_render_sample(self, primitives: dict) -> None:
+    def test_tldr_render_sample(self, reference: dict) -> None:
         """tldr now renders inside contentBlock context, so the
-        primitives reference must include both a code example and a
+        reference reference must include both a code example and a
         live tldr render."""
-        tldrs = [b for b in _walk_blocks(primitives) if b.get("kind") == "tldr"]
-        assert tldrs, "no tldr render sample in primitives.json"
+        tldrs = [b for b in _walk_blocks(reference) if b.get("kind") == "tldr"]
+        assert tldrs, "no tldr render sample in reference.json"
 
 
 # ---------- kpi-grid sync ----------
 
 
 class TestKpiGridSync:
-    def test_kpi_example_matches_render(self, primitives: dict) -> None:
+    def test_kpi_example_matches_render(self, reference: dict) -> None:
         """The kpi-grid example code and the adjacent rendered sample
         must agree on the tile set, otherwise the doc is lying."""
-        blocks = list(_walk_blocks(primitives))
+        blocks = list(_walk_blocks(reference))
         # Find the rendered kpi-grid that immediately follows the
         # heading id="kpi-grid".
         rendered = None
@@ -157,16 +157,16 @@ class TestKpiGridSync:
 
 
 class TestCrossCuttingFeatures:
-    def test_section_present(self, primitives: dict) -> None:
-        for b in _walk_blocks(primitives):
+    def test_section_present(self, reference: dict) -> None:
+        for b in _walk_blocks(reference):
             if b.get("kind") == "section" and b.get("id") == "cross-cutting":
                 return
-        pytest.fail("cross-cutting section missing from primitives.json")
+        pytest.fail("cross-cutting section missing from reference.json")
 
-    def test_data_bind_demo_paired(self, primitives: dict) -> None:
+    def test_data_bind_demo_paired(self, reference: dict) -> None:
         """A bound paragraph and callout must share a `bind` key — the
         live demo of the synced-hover feature."""
-        bind_blocks = [b for b in _walk_blocks(primitives) if b.get("bind")]
+        bind_blocks = [b for b in _walk_blocks(reference) if b.get("bind")]
         keys = [b["bind"] for b in bind_blocks]
         # At least one key shared between two blocks
         from collections import Counter
@@ -180,16 +180,16 @@ class TestCrossCuttingFeatures:
 
 
 class TestNoStrayDemoPages:
-    """User explicitly requested table-demo be merged into primitives.
+    """User explicitly requested table-demo be merged into reference.
     Make sure it doesn't sneak back in."""
 
     def test_no_table_demo(self, repo_root: Path) -> None:
         assert not (
             repo_root / "docs" / "table-demo.html"
-        ).exists(), "table-demo.html should live inside primitives, not as a separate doc"
+        ).exists(), "table-demo.html should live inside reference, not as a separate doc"
         assert not (
             repo_root / "docs" / "table-demo.json"
-        ).exists(), "table-demo.json should live inside primitives, not as a separate doc"
+        ).exists(), "table-demo.json should live inside reference, not as a separate doc"
 
 
 # ---------- chrome.js / chrome.css regression markers ----------
@@ -565,15 +565,19 @@ class TestChromeKitMarkers:
         )
 
     def test_serve_synthesizes_generated_artifacts(self, repo_root: Path) -> None:
-        """Dev server returns site-manifest / llms.txt fresh on each
-        request — keyed by the URL's parent dir as the docs root."""
+        """Dev server returns site-manifest.json / llms.txt fresh on
+        each request — keyed by the URL's parent dir as the docs
+        root. The .js companion was retired (every standalone HTML
+        already inlines window.__htmldocManifest; the site fetches
+        the .json variant)."""
         cli_src = (repo_root / "src" / "html_doc" / "cli.py").read_text(encoding="utf-8")
-        assert "compute_manifest" in cli_src and "manifest_to_js" in cli_src, (
-            "manifest synthesis helpers must exist"
-        )
+        assert "compute_manifest" in cli_src, "compute_manifest helper missing"
         assert "compute_llms_txt" in cli_src, "llms.txt synthesis helper missing"
-        assert '"site-manifest.json"' in cli_src and '"site-manifest.js"' in cli_src, (
-            "synthesis must handle both .json and .js manifest forms"
+        assert '"site-manifest.json"' in cli_src, (
+            "synthesis must handle site-manifest.json"
+        )
+        assert '"site-manifest.js"' not in cli_src, (
+            ".js manifest form is retired — drop it from dev server too"
         )
         assert '"llms.txt"' in cli_src, "synthesis must handle llms.txt"
 
@@ -649,7 +653,7 @@ class TestChromeKitMarkers:
     def test_no_unresolved_references_in_docs(self, repo_root: Path) -> None:
         """Every glossary-term / ext-ref / anchor link in docs must resolve.
 
-        Audit findings on first run: 3 broken ext-refs in primitives.json
+        Audit findings on first run: 3 broken ext-refs in reference.json
         (Iceberg paper, RFC 9457, Iceberg 1.4 release) — they were
         authored but never defined in extrefs/*.json. The user explicitly
         asked: "Identify the missing references in our docs and fix them."
@@ -762,8 +766,8 @@ class TestChromeKitMarkers:
 
         assert not unresolved, "Unresolved references:\n  " + "\n  ".join(unresolved)
 
-    def test_primitives_code_samples_have_live_demos(self, repo_root: Path) -> None:
-        """Every code sample in docs/primitives.json must have a matching demo.
+    def test_reference_code_samples_have_live_demos(self, repo_root: Path) -> None:
+        """Every code sample in docs/reference.json must have a matching demo.
 
         Rule: when a `<code>` block contains JSON describing an html-doc
         block (single top-level object with a `kind` field), one of the
@@ -775,8 +779,8 @@ class TestChromeKitMarkers:
         out: "Some examples are different than the rendered content
         below it, some doesn't have a rendered counterpart at all."
         """
-        page_path = repo_root / "docs" / "primitives.json"
-        assert page_path.exists(), "docs/primitives.json missing"
+        page_path = repo_root / "docs" / "reference.json"
+        assert page_path.exists(), "docs/reference.json missing"
         data = json.loads(page_path.read_text(encoding="utf-8"))
 
         def inline_kinds(node, acc=None):
@@ -837,7 +841,7 @@ class TestChromeKitMarkers:
                             walk(b[key], f"{path}/{b.get('kind')}[{i}].{key}")
 
         walk(data.get("blocks", []), "")
-        assert not issues, "primitives.json drift:\n" + "\n".join(issues)
+        assert not issues, "reference.json drift:\n" + "\n".join(issues)
 
     def test_markdown_pages_convert_to_kit_json(self, repo_root: Path) -> None:
         """cli.md_to_page must convert common Markdown into kit page JSON.
@@ -954,7 +958,7 @@ class TestChromeKitMarkers:
         - chrome.js renderBoard reads `data-board-order` and sorts the
           lane list by it (unknown values appended at end)
         - schema/page.schema.json declares boardOrder on tableHeader
-        - docs/primitives.json carries a worked example so the demo
+        - docs/reference.json carries a worked example so the demo
           stays in sync with the renderer
         """
         renderer = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
@@ -982,11 +986,11 @@ class TestChromeKitMarkers:
             "ordered string array"
         )
 
-        primitives = json.loads(
-            (repo_root / "docs" / "primitives.json").read_text(encoding="utf-8")
+        reference = json.loads(
+            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
         )
         demo_seen = False
-        for block in _walk_blocks(primitives):
+        for block in _walk_blocks(reference):
             if block.get("kind") != "table":
                 continue
             for h in block.get("headers", []):
@@ -996,7 +1000,7 @@ class TestChromeKitMarkers:
             if demo_seen:
                 break
         assert demo_seen, (
-            "docs/primitives.json must demonstrate a boardOrder header "
+            "docs/reference.json must demonstrate a boardOrder header "
             "so authors see how to drive kanban lane ordering"
         )
 

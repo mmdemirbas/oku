@@ -11,18 +11,19 @@
     "date": "2026-05-18",
     "read_time": "~4 min read",
     "order": 50,
-    "summary": "html-doc init / build / serve — what each does.",
-    "updated": "2026-05-18"
+    "summary": "html-doc init / build / clean / check / serve — what each does.",
+    "updated": "2026-05-21"
   },
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "init scaffolds the cwd as a docs root: _kit symlink + index.html entry stub. build produces dist/standalone/ + dist/site/ (each with their own site-manifest.json, llms.txt, page.md twins, plus Pagefind for site/ if installed). serve runs a local HTTP server and synthesizes stubs + manifest + llms.txt in memory — source dirs stay clean apart from the one entry stub.",
+      "summary": "init scaffolds the cwd as a docs root: _kit symlink + index.html entry stub. build emits three single-purpose trees — dist/standalone/, dist/site/ (with manifest + Pagefind), dist/markdown/ (page.md twins + llms.txt). clean wipes dist/. check lints every page. serve runs a local HTTP server and synthesizes the manifest + llms.txt in memory — source dirs stay clean apart from the one entry stub.",
       "bullets": [
         "init treats cwd as the docs root. Run it from wherever you want pages to live (typically cd into your docs/ subdir first).",
         "Source dirs hold JSON (or MD) plus a single index.html entry stub so IDE-served workflows work without the dev server running.",
-        "build is idempotent; safe to re-run. dist/ is wiped each time.",
-        "serve synthesizes stubs and the manifest fresh on each request — no source writes.",
+        "build is idempotent; safe to re-run. dist/{standalone,site,markdown}/ are wiped each time.",
+        "clean removes dist/ entirely — no-op if it's already absent.",
+        "serve synthesizes the manifest fresh on each request — no source writes.",
         "Optional deps: pagefind (search index), jsonschema (page validation). Both soft-fail."
       ]
     },
@@ -54,7 +55,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd ~/path/to/your-project\nhtml-doc build\n\n# ✓ Schema validation: 6 page(s) clean\n# ✓ Wrote site-manifest + llms.txt under dist/{standalone,site}/docs/ (6 JSON page(s))\n# ✓ Wrote 6 page.md twin(s) under dist/site/ + dist/standalone/\n# ✓ Synthesized 6 stub(s) for pages without on-disk .html\n# ✓ Pagefind index built: dist/site/pagefind/\n# ✓ Built 6 HTML file(s):\n#\n#   standalone (inline, send-as-file):\n#                file:///.../dist/standalone/docs/index.html\n#                ...\n#\n#   site (shared assets, multi-page):\n#   site root:   file:///.../dist/site\n#                ..."
+          "source": "cd ~/path/to/your-project\nhtml-doc build\n\n# ✓ Doctree check: 6 page(s) clean\n# ✓ Wrote dist/site/docs/site-manifest.json (6 JSON page(s))\n# ✓ Wrote 6 page.md twin(s) + llms.txt under dist/markdown/docs/\n# ✓ Synthesized 6 stub(s) for pages without on-disk .html\n# ✓ Pagefind index built: dist/site/pagefind/\n# ✓ Built 6 HTML file(s):\n#\n#   standalone (inline, send-as-file):\n#                file:///.../dist/standalone/docs/index.html\n#                ...\n#\n#   site (shared assets, multi-page):\n#   site root:   file:///.../dist/site\n#                ...\n#\n#   markdown (LLM twins + llms.txt):\n#   markdown root: file:///.../dist/markdown"
         },
         {
           "kind": "step-flow",
@@ -71,18 +72,18 @@
             },
             {
               "num": "3",
-              "title": "build_standalone — single-file per page",
-              "content": "For each page, synthesize the HTML stub in memory, inline chrome.css/.js, chrome-boot.js, renderer.js, the page JSON, and the kit bundle. Output to dist/standalone/ with directory structure preserved."
+              "title": "build_standalone — single-file per page (humans, file://)",
+              "content": "For each page, synthesize the HTML stub in memory, inline chrome.css/.js, chrome-boot.js, renderer.js, the page JSON, the kit bundle, and the site-manifest seed (window.__htmldocManifest). One self-contained file per page; no sidecars. Output to dist/standalone/ with directory structure preserved."
             },
             {
               "num": "4",
-              "title": "build_site — multi-page deployable",
-              "content": "Write a per-page stub + copy the source JSON to dist/site/ with directory structure preserved. Copy the kit (chrome.{js,css}, schema/, glossary/, extrefs/) into dist/site/_kit/. Inject extracted text into hidden data-pagefind-body for indexing."
+              "title": "build_site — multi-page deployable (humans, HTTP)",
+              "content": "Write a per-page stub + copy the source JSON to dist/site/ with directory structure preserved. Copy the kit once into dist/site/_kit/. Write a single site-manifest.json at the docs root (chrome.js fetches it at runtime). Inject extracted text into hidden data-pagefind-body for indexing."
             },
             {
               "num": "5",
-              "title": "Write site-manifest + llms.txt into both dist trees",
-              "content": "Generated alongside the pages they describe. The runtime's __htmldocDocsRoot + 'site-manifest.json' fetch resolves naturally."
+              "title": "build_markdown_twins + llms.txt (LLM consumers)",
+              "content": "For each JSON page, emit a sibling page.md under dist/markdown/. Relative .html links rewrite to .md so internal navigation stays consistent inside the tree. Drop one llms.txt sitemap (llmstxt.org convention) at the markdown docs root."
             },
             {
               "num": "6",
@@ -94,8 +95,30 @@
         {
           "kind": "callout",
           "type": "warn",
-          "title": "build wipes dist/",
-          "content": "build removes dist/standalone/ and dist/site/ before rebuilding so stale files don't accumulate. If you have anything else under dist/ you care about, move it out first. (You shouldn't.)"
+          "title": "build wipes its three dist trees",
+          "content": "build removes dist/standalone/, dist/site/, and dist/markdown/ before rebuilding so stale files don't accumulate. Anything else you've parked under dist/ is left alone — use html-doc clean to wipe the entire dist/ tree."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "clean",
+      "title": "html-doc clean",
+      "lead": "Remove the dist/ tree under the current project root. Idempotent — no-op when dist/ doesn't exist. Source files and the _kit symlink are untouched.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "bash",
+          "source": "html-doc clean\n\n# ✓ Removed /path/to/your-project/dist\n\n# Second run, nothing left:\nhtml-doc clean\n\n# ✓ Nothing to clean — /path/to/your-project/dist does not exist."
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            ["Useful before publishing a release artifact, switching branches, or just to ensure a fresh build."],
+            ["Safe to chain: html-doc clean && html-doc build."],
+            ["Doesn't touch source pages, the _kit symlink, or kit.json. Only generated output."]
+          ]
         }
       ]
     },
@@ -135,7 +158,7 @@
                 ", ",
                 { "kind": "code", "text": "no-title" }
               ],
-              "JSON shape problems, removed primitives still in use, duplicate section / heading IDs, malformed chart payloads, demo pages outside docs/primitives.json, page without a title."
+              "JSON shape problems, removed primitives still in use, duplicate section / heading IDs, malformed chart payloads, demo pages outside docs/reference.json, page without a title."
             ],
             [
               [{ "kind": "strong", "text": "warning" }],
@@ -173,12 +196,12 @@
       "kind": "section",
       "id": "serve",
       "title": "html-doc serve",
-      "lead": "Local HTTP server in the project root. Synthesizes per-page .html stubs, site-manifest.{json,js}, and llms.txt in memory on each request — source dir stays clean. Picks the first free port from 9876.",
+      "lead": "Local HTTP server in the project root. Synthesizes per-page .html stubs, site-manifest.json, and llms.txt in memory on each request — source dir stays clean. Picks the first free port from 9876.",
       "blocks": [
         {
           "kind": "code",
           "language": "bash",
-          "source": "html-doc serve\n\n# ✓ Serving /path/to/your-project on http://localhost:9876\n#   Stop with Ctrl-C.\n#\n#   HTML files:\n#     http://localhost:9876/docs/index.html\n#     http://localhost:9876/docs/primitives.html\n#     ..."
+          "source": "html-doc serve\n\n# ✓ Serving /path/to/your-project on http://localhost:9876\n#   Stop with Ctrl-C.\n#\n#   HTML files:\n#     http://localhost:9876/docs/index.html\n#     http://localhost:9876/docs/reference.html\n#     ..."
         },
         {
           "kind": "list",
@@ -191,7 +214,7 @@
               "First free port from 9876–9900. Caps at 9900 (if all taken, errors out)."
             ],
             [
-              "Synthesizes /<docs>/<name>.html stubs from sibling .json or .md files on the fly; same for site-manifest.{json,js} and llms.txt. No filesystem writes."
+              "Synthesizes /<docs>/<name>.html stubs from sibling .json or .md files on the fly; same for site-manifest.json and llms.txt. No filesystem writes."
             ],
             [
               "Pagefind is not built by serve. Run html-doc build first if you need full-text search; serve falls back to in-page anchor search otherwise."

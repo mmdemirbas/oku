@@ -44,9 +44,52 @@ def test_build_manifest_with_unicode_titles(tmp_path: Path) -> None:
     path = cli.build_manifest(tmp_path)
     body = json.loads(path.read_text(encoding="utf-8"))
     assert body["pages"][0]["title"] == "Şehir"
-    # The .js companion preserves Unicode too (no ensure_ascii=True hack).
-    js = (tmp_path / "site-manifest.js").read_text(encoding="utf-8")
-    assert "Şehir" in js
+
+
+# ---------- Markdown twin link rewriting ----------
+
+
+def test_md_twin_rewrites_relative_html_link_to_md() -> None:
+    link = {"kind": "link", "text": "Architecture", "href": "architecture.html"}
+    assert cli._flatten_inline(link) == "[Architecture](architecture.md)"
+
+
+def test_md_twin_preserves_fragment_on_rewrite() -> None:
+    link = {"kind": "link", "text": "Section", "href": "architecture.html#perf"}
+    assert cli._flatten_inline(link) == "[Section](architecture.md#perf)"
+
+
+def test_md_twin_rewrites_nested_relative_html() -> None:
+    link = {"kind": "link", "text": "Plan", "href": "plans/wide-screen.html"}
+    assert cli._flatten_inline(link) == "[Plan](plans/wide-screen.md)"
+
+
+def test_md_twin_leaves_absolute_url_alone() -> None:
+    link = {"kind": "link", "text": "Site", "href": "https://example.com/a.html"}
+    assert cli._flatten_inline(link) == "[Site](https://example.com/a.html)"
+
+
+def test_md_twin_leaves_fragment_only_alone() -> None:
+    link = {"kind": "link", "text": "Top", "href": "#overview"}
+    assert cli._flatten_inline(link) == "[Top](#overview)"
+
+
+def test_md_twin_leaves_absolute_path_alone() -> None:
+    link = {"kind": "link", "text": "Home", "href": "/index.html"}
+    assert cli._flatten_inline(link) == "[Home](/index.html)"
+
+
+def test_md_twin_passes_non_html_relative_through() -> None:
+    # A relative non-.html link (rare, e.g., an asset) stays unchanged.
+    link = {"kind": "link", "text": "Asset", "href": "images/diagram.svg"}
+    assert cli._flatten_inline(link) == "[Asset](images/diagram.svg)"
+
+
+def test_md_twin_leaves_ext_ref_alone() -> None:
+    # ext-ref is for citations / external resources — never rewritten,
+    # even if it happens to carry an .html href.
+    node = {"kind": "ext-ref", "text": "RFC", "href": "rfc7159.html"}
+    assert cli._flatten_inline(node) == "[RFC](rfc7159.html)"
 
 
 # ---------- Deep nesting ----------

@@ -78,15 +78,23 @@ class TestCLIBuild:
         assert (docs / "dist" / "standalone" / "index.html").exists()
         assert (docs / "dist" / "site" / "index.html").exists()
         assert (docs / "dist" / "site" / "_kit" / "chrome.css").exists()
-        # Manifest + llms.txt land alongside the JSON pages in each dist
-        # tree (the runtime fetches them via `__htmldocDocsRoot + ...`).
+        # site-manifest.json lives under dist/site/ only — chrome.js
+        # fetches it at runtime when serving over HTTP. Standalone HTMLs
+        # inline window.__htmldocManifest directly, so they don't need
+        # a sidecar.
         assert (docs / "dist" / "site" / "site-manifest.json").exists()
-        assert (docs / "dist" / "site" / "site-manifest.js").exists()
-        assert (docs / "dist" / "site" / "llms.txt").exists()
-        assert (docs / "dist" / "standalone" / "site-manifest.json").exists()
-        # Twins ARE in dist (both flavors).
-        assert (docs / "dist" / "site" / "index.md").exists()
-        assert (docs / "dist" / "standalone" / "index.md").exists()
+        assert not (docs / "dist" / "standalone" / "site-manifest.json").exists()
+        # The historical .js companion (set window.__htmldocManifest
+        # via <script src>) is no longer emitted in either tree.
+        assert not (docs / "dist" / "site" / "site-manifest.js").exists()
+        assert not (docs / "dist" / "standalone" / "site-manifest.js").exists()
+        # .md twins + llms.txt live under dist/markdown/ only — one
+        # canonical home for LLM consumers, no duplication.
+        assert (docs / "dist" / "markdown" / "index.md").exists()
+        assert (docs / "dist" / "markdown" / "llms.txt").exists()
+        for tree in ("standalone", "site"):
+            assert not (docs / "dist" / tree / "index.md").exists()
+            assert not (docs / "dist" / tree / "llms.txt").exists()
 
     def test_manifest_lists_both_pages(self, sample_project: Path, repo_root: Path) -> None:
         docs = sample_project / "docs"
@@ -121,10 +129,37 @@ class TestCLIBuild:
     def test_llms_txt_has_pages_section(self, sample_project: Path, repo_root: Path) -> None:
         docs = sample_project / "docs"
         _run_cli(docs, "build", repo_root=repo_root)
-        text = (docs / "dist" / "site" / "llms.txt").read_text(encoding="utf-8")
+        text = (docs / "dist" / "markdown" / "llms.txt").read_text(encoding="utf-8")
         assert "## Pages" in text
         assert "Index" in text
         assert "About" in text
+
+
+class TestCLIClean:
+    def test_clean_removes_dist(self, sample_project: Path, repo_root: Path) -> None:
+        docs = sample_project / "docs"
+        _run_cli(docs, "build", repo_root=repo_root)
+        assert (docs / "dist").exists()
+        proc = _run_cli(docs, "clean", repo_root=repo_root)
+        assert proc.returncode == 0, f"clean failed:\n{proc.stderr}\n{proc.stdout}"
+        assert not (docs / "dist").exists()
+
+    def test_clean_is_idempotent(self, sample_project: Path, repo_root: Path) -> None:
+        docs = sample_project / "docs"
+        # First run: nothing to clean — should succeed and print a friendly note.
+        proc1 = _run_cli(docs, "clean", repo_root=repo_root)
+        assert proc1.returncode == 0
+        assert "Nothing to clean" in proc1.stdout
+
+    def test_clean_does_not_touch_source(self, sample_project: Path, repo_root: Path) -> None:
+        docs = sample_project / "docs"
+        _run_cli(docs, "build", repo_root=repo_root)
+        _run_cli(docs, "clean", repo_root=repo_root)
+        # Source pages must survive.
+        assert (docs / "index.json").exists()
+        assert (docs / "about.json").exists()
+        # _kit symlink must survive — it's not under dist/.
+        assert (docs / "_kit").exists()
 
 
 class TestCLIInit:

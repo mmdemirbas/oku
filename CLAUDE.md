@@ -13,8 +13,13 @@ assets and `renderer.js` walks the JSON tree at page load.
 
 Authoring shape: `docs/<page>.json` (data) + `docs/<page>.html` (thin
 stub that loads the kit and the page JSON). `html-doc build` produces
-`dist/standalone/` (self-contained single files) and `dist/site/`
-(shared-assets multi-page site with Pagefind search).
+three single-purpose trees under `dist/`:
+- `dist/standalone/` — self-contained single files (humans, file://).
+  Each HTML inlines kit + page JSON + `window.__htmldocManifest`.
+- `dist/site/` — shared-assets multi-page site with Pagefind search
+  (humans, HTTP). Holds the one `site-manifest.json` chrome.js fetches.
+- `dist/markdown/` — `page.md` twins + `llms.txt` (AI/LLM consumers).
+  Single canonical home; not duplicated across the human trees.
 
 ## Top-level files
 
@@ -36,7 +41,7 @@ stub that loads the kit and the page JSON). `html-doc build` produces
 uv sync --extra dev           # pulls pytest, ruff, jsonschema
 html-doc check                # schema + structural lint (the fast verify gate)
 html-doc check --strict       # exit 1 on warnings too
-html-doc build                # writes dist/standalone/ + dist/site/
+html-doc build                # writes dist/{standalone,site,markdown}/
 html-doc serve --no-watch     # local server (live-reload on by default)
 uv run pytest -q              # 170+ tests; should all pass
 uv run ruff check . && uv run ruff format --check .
@@ -86,7 +91,7 @@ English words. The page can flip to TR or EN without touching kit
 code.
 
 **No demo sibling pages.** Every example for a primitive lives
-inside `docs/primitives.json` next to the primitive's heading: code
+inside `docs/reference.json` next to the primitive's heading: code
 sample + rendered block. Don't create `docs/<thing>-demo.{html,json}`
 — `src/html_doc_tests/test_content_regression.py::TestNoStrayDemoPages` enforces.
 
@@ -200,7 +205,7 @@ computed-style assertion, the rule isn't found yet.
 ## What NOT to do
 
 - Don't introduce a `docs/<thing>-demo.{html,json}` page. Fold demos
-  into `docs/primitives.json`.
+  into `docs/reference.json`.
 - Don't reintroduce the dual-pane sidebar / right-side TOC / mid-edge
   collapse tab. They were explicitly removed.
 - Don't add English words to count badges or stats text. Numbers only.
