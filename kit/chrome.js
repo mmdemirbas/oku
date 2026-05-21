@@ -191,36 +191,63 @@ document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') document.body.classList.remove('drawer-open');
 });
 
-/* ============ SPA-style navigation =============================== *
- * `html-doc init` only writes docs/index.html. Sub-pages
- * (architecture.html, etc.) are JSON sources with no on-disk stub.
- * To make the sidebar links work under static file servers (IntelliJ
- * :63342, file://, plain http.server), intercept clicks on internal
- * .html links: fetch the sibling .json, re-render in place, update
- * the URL + title + sidebar active state via history.pushState.
+/* ============ Hash-based SPA navigation ========================== *
+ * `html-doc init` only writes docs/index.html on disk. Sub-pages
+ * (architecture.html, etc.) live as JSON sources with no .html
+ * sibling. For the sidebar to navigate AND for refresh + middle-
+ * click + copy-link to all stay robust under static file servers
+ * (IntelliJ :63342, file://, plain http.server), the URL's pathname
+ * always stays at index.html and the fragment carries the page:
  *
- * Under `html-doc serve`, the same intercept skips a full page load
- * and round-trip — equivalent UX but quicker.
+ *   /docs/index.html              → renders index.json
+ *   /docs/index.html#architecture.html
+ *                                 → renders architecture.json
+ *   /docs/index.html#architecture.html:perf
+ *                                 → renders architecture.json, then
+ *                                   scrolls to #perf
  *
- * Known limitation: refreshing the browser while parked on a
- * sub-page in static-served mode hits a 404, because the static
- * server has no fallback to index.html. Users land on index after
- * the next navigation. (`html-doc serve` synthesizes all sub-page
- * stubs so refresh works there.)
+ * Why hash: the URL's pathname always points at an on-disk file
+ * (index.html) so reload never 404s, regardless of which page the
+ * reader is on. The renderer doesn't have to coordinate with any
+ * server-side rewrite.
  * ------------------------------------------------------------------- */
-function __htmldocSpaNavigate(absPath, hash) {
+
+// Parse "<pagePath>" or "<pagePath>:<anchor>" out of a raw hash string.
+function __htmldocParseHash(rawHash) {
+  var raw = (rawHash || '').replace(/^#/, '');
+  if (!raw) return { page: null, anchor: null };
+  var sep = raw.indexOf(':');
+  var page = sep >= 0 ? raw.slice(0, sep) : raw;
+  var anchor = sep >= 0 ? raw.slice(sep + 1) : '';
+  if (!page.endsWith('.html')) {
+    // Looks like a plain in-page anchor (e.g., "#perf"). Let the
+    // browser handle it natively — we just scroll, not re-render.
+    return { page: null, anchor: page || null };
+  }
+  return { page: page, anchor: anchor || null };
+}
+
+function __htmldocRenderHash() {
   if (typeof HtmlDocRenderer === 'undefined') return Promise.reject(new Error('renderer not loaded'));
-  var jsonUrl = absPath.replace(/\.html$/, '.json');
+  var parsed = __htmldocParseHash(window.location.hash);
+  if (!parsed.page) {
+    // No page in the hash — render index.json (the entry).
+    return __htmldocFetchAndRender('index.html', parsed.anchor);
+  }
+  return __htmldocFetchAndRender(parsed.page, parsed.anchor);
+}
+
+function __htmldocFetchAndRender(pagePath, anchor) {
   var wa = (window.__htmldocWithAuth || function (u) { return u; });
-  return fetch(wa(jsonUrl), { cache: 'no-cache' })
+  var jsonUrl = wa(__htmldocDocsRoot + pagePath.replace(/\.html$/, '.json'));
+  return fetch(jsonUrl, { cache: 'no-cache' })
     .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function (page) {
       new HtmlDocRenderer({}).render(page);
-      __htmldocRefreshActiveLink(absPath);
-      if (hash) {
-        // Defer to next frame so render-emitted IDs exist.
+      __htmldocRefreshActiveLink(pagePath);
+      if (anchor) {
         requestAnimationFrame(function () {
-          var target = document.querySelector(hash);
+          var target = document.getElementById(anchor) || document.querySelector('[id="' + anchor + '"]');
           if (target) target.scrollIntoView();
         });
       } else {
@@ -229,24 +256,40 @@ function __htmldocSpaNavigate(absPath, hash) {
     });
 }
 
-function __htmldocRefreshActiveLink(absPath) {
+function __htmldocRefreshActiveLink(pagePath) {
   document.querySelectorAll('page-nav .page-nav-item.active').forEach(function (li) {
     li.classList.remove('active');
     var a = li.querySelector('a');
     if (a) a.removeAttribute('aria-current');
   });
   document.querySelectorAll('page-nav a[href]').forEach(function (a) {
-    try {
-      var hrefAbs = new URL(a.getAttribute('href'), window.location.href).pathname;
-      if (hrefAbs === absPath) {
-        var li = a.closest('.page-nav-item');
-        if (li) li.classList.add('active');
-        a.setAttribute('aria-current', 'page');
-      }
-    } catch (e) { /* ignore malformed hrefs */ }
+    var href = a.getAttribute('href') || '';
+    var ref = __htmldocParseHash(href);
+    var hrefPage = ref.page || '';
+    var match = hrefPage === pagePath || (!hrefPage && pagePath === 'index.html');
+    if (match) {
+      var li = a.closest('.page-nav-item');
+      if (li) li.classList.add('active');
+      a.setAttribute('aria-current', 'page');
+    }
   });
 }
 
+// Hashchange covers: native hash-link clicks (sidebar), explicit
+// location.hash assignments from the interceptor below, and the
+// browser's Back/Forward buttons (which fire hashchange when only
+// the fragment changes).
+window.addEventListener('hashchange', function () {
+  __htmldocRenderHash().catch(function (err) {
+    console.warn('[html-doc] hash navigation failed', err);
+  });
+  document.body.classList.remove('drawer-open');
+});
+
+// Intercept clicks on internal .html links that DON'T already use
+// the hash form (e.g., inline cross-page links written as plain
+// "architecture.html" inside JSON content). Convert them to hash
+// navigation so refresh-on-page stays robust.
 document.addEventListener('click', function (e) {
   if (e.defaultPrevented) return;
   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -256,31 +299,26 @@ document.addEventListener('click', function (e) {
   if (a.target && a.target !== '_self') return;
   if (a.hasAttribute('download')) return;
   var href = a.getAttribute('href');
-  if (!href || href.charAt(0) === '#') return;
+  if (!href || href.charAt(0) === '#') return; // already hash — native handling
   var url;
-  try {
-    url = new URL(href, window.location.href);
-  } catch (err) { return; }
+  try { url = new URL(href, window.location.href); } catch (err) { return; }
   if (url.origin !== window.location.origin) return;
   if (!url.pathname.endsWith('.html')) return;
-  if (url.pathname === window.location.pathname && !url.hash) return;
+  // Compute pagePath relative to the docs root.
+  var docsRootPath;
+  try { docsRootPath = new URL(__htmldocDocsRoot, window.location.origin).pathname; } catch (e2) { docsRootPath = '/'; }
+  var pagePath = url.pathname.indexOf(docsRootPath) === 0
+    ? url.pathname.slice(docsRootPath.length)
+    : url.pathname;
   e.preventDefault();
-  var navUrl = url.pathname + url.hash;
-  __htmldocSpaNavigate(url.pathname, url.hash).then(function () {
-    window.history.pushState({ htmldocSpa: true }, '', navUrl);
-    document.body.classList.remove('drawer-open');
-  }).catch(function (err) {
-    // Fall back to a normal navigation if SPA fetch failed (page
-    // genuinely missing) — the browser's 404 is a better signal than
-    // a silent no-op.
-    console.warn('[html-doc] SPA navigation failed, falling back', err);
-    window.location.href = navUrl;
-  });
-});
-
-window.addEventListener('popstate', function () {
-  if (typeof HtmlDocRenderer === 'undefined') return;
-  __htmldocSpaNavigate(window.location.pathname, window.location.hash).catch(function () {});
+  var anchor = url.hash.replace(/^#/, '');
+  var newHash = '#' + pagePath + (anchor ? ':' + anchor : '');
+  if (window.location.hash === newHash) {
+    // Same target — re-render anyway (scroll to top).
+    __htmldocRenderHash().catch(function () {});
+  } else {
+    window.location.hash = newHash; // fires hashchange
+  }
 });
 // Restore persisted state ASAP so the layout doesn't flash open then collapse.
 try {
@@ -4276,11 +4314,20 @@ class PageNav extends HTMLElement {
       byParent[key].push(p);
     });
 
-    var here = window.location.pathname;
+    // Hash-based router: the URL pathname always stays at the entry
+    // stub (e.g., index.html). The hash carries the current page —
+    // "#architecture.html" — so refresh / middle-click / copy-link
+    // stay robust under any static host. The "active" page is whatever
+    // the hash points to; falls back to index.html when empty.
+    function currentHashPage() {
+      var raw = (window.location.hash || '').replace(/^#/, '');
+      var sep = raw.indexOf(':');
+      var p = sep >= 0 ? raw.slice(0, sep) : raw;
+      if (p && p.endsWith('.html')) return p;
+      return 'index.html';
+    }
     function isActive(page) {
-      // page.path is project-relative (e.g., "iceberg.html"); the URL
-      // path may include a longer prefix. Endswith catches the common case.
-      return here.endsWith('/' + page.path);
+      return currentHashPage() === page.path;
     }
 
     function renderLevel(parentKey, depth) {
@@ -4291,7 +4338,10 @@ class PageNav extends HTMLElement {
         var li = document.createElement('li');
         li.className = 'page-nav-item';
         var anchor = document.createElement('a');
-        anchor.href = relativizeHref(here, page.path);
+        // Hash-only hrefs keep the pathname pinned to index.html so
+        // refresh and middle-click both stay valid even when no
+        // per-page stub exists on disk.
+        anchor.href = '#' + page.path;
         anchor.textContent = page.title || page.path;
         if (page.summary) anchor.title = page.summary;
         if (isActive(page)) {

@@ -753,8 +753,21 @@
       }
     }
     if (result === undefined) {
-      const last = window.location.pathname.split('/').pop() || '';
-      const jsonName = last.replace(/\.html$/, '.json') || 'index.json';
+      // Hash-based routing: when URL is "...index.html#architecture.html",
+      // render that target instead of index.json. chrome.js's hashchange
+      // handler covers subsequent navigation; this branch only handles
+      // the very first paint so we don't show index then flash to the
+      // requested page.
+      const rawHash = (window.location.hash || '').replace(/^#/, '');
+      const sep = rawHash.indexOf(':');
+      const hashPage = sep >= 0 ? rawHash.slice(0, sep) : rawHash;
+      let jsonName;
+      if (hashPage && hashPage.endsWith('.html')) {
+        jsonName = hashPage.replace(/\.html$/, '.json');
+      } else {
+        const last = window.location.pathname.split('/').pop() || '';
+        jsonName = last.replace(/\.html$/, '.json') || 'index.json';
+      }
       result = new HtmlDocRenderer(opts || {}).renderFromUrl(jsonName);
     }
     HtmlDocRenderer._autoBootRan = result;
