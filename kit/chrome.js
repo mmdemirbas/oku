@@ -190,6 +190,98 @@ document.addEventListener('click', function (e) {
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') document.body.classList.remove('drawer-open');
 });
+
+/* ============ SPA-style navigation =============================== *
+ * `html-doc init` only writes docs/index.html. Sub-pages
+ * (architecture.html, etc.) are JSON sources with no on-disk stub.
+ * To make the sidebar links work under static file servers (IntelliJ
+ * :63342, file://, plain http.server), intercept clicks on internal
+ * .html links: fetch the sibling .json, re-render in place, update
+ * the URL + title + sidebar active state via history.pushState.
+ *
+ * Under `html-doc serve`, the same intercept skips a full page load
+ * and round-trip — equivalent UX but quicker.
+ *
+ * Known limitation: refreshing the browser while parked on a
+ * sub-page in static-served mode hits a 404, because the static
+ * server has no fallback to index.html. Users land on index after
+ * the next navigation. (`html-doc serve` synthesizes all sub-page
+ * stubs so refresh works there.)
+ * ------------------------------------------------------------------- */
+function __htmldocSpaNavigate(absPath, hash) {
+  if (typeof HtmlDocRenderer === 'undefined') return Promise.reject(new Error('renderer not loaded'));
+  var jsonUrl = absPath.replace(/\.html$/, '.json');
+  var wa = (window.__htmldocWithAuth || function (u) { return u; });
+  return fetch(wa(jsonUrl), { cache: 'no-cache' })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function (page) {
+      new HtmlDocRenderer({}).render(page);
+      __htmldocRefreshActiveLink(absPath);
+      if (hash) {
+        // Defer to next frame so render-emitted IDs exist.
+        requestAnimationFrame(function () {
+          var target = document.querySelector(hash);
+          if (target) target.scrollIntoView();
+        });
+      } else {
+        window.scrollTo(0, 0);
+      }
+    });
+}
+
+function __htmldocRefreshActiveLink(absPath) {
+  document.querySelectorAll('page-nav .page-nav-item.active').forEach(function (li) {
+    li.classList.remove('active');
+    var a = li.querySelector('a');
+    if (a) a.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('page-nav a[href]').forEach(function (a) {
+    try {
+      var hrefAbs = new URL(a.getAttribute('href'), window.location.href).pathname;
+      if (hrefAbs === absPath) {
+        var li = a.closest('.page-nav-item');
+        if (li) li.classList.add('active');
+        a.setAttribute('aria-current', 'page');
+      }
+    } catch (e) { /* ignore malformed hrefs */ }
+  });
+}
+
+document.addEventListener('click', function (e) {
+  if (e.defaultPrevented) return;
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  if (e.button !== 0) return;
+  var a = e.target && e.target.closest && e.target.closest('a[href]');
+  if (!a) return;
+  if (a.target && a.target !== '_self') return;
+  if (a.hasAttribute('download')) return;
+  var href = a.getAttribute('href');
+  if (!href || href.charAt(0) === '#') return;
+  var url;
+  try {
+    url = new URL(href, window.location.href);
+  } catch (err) { return; }
+  if (url.origin !== window.location.origin) return;
+  if (!url.pathname.endsWith('.html')) return;
+  if (url.pathname === window.location.pathname && !url.hash) return;
+  e.preventDefault();
+  var navUrl = url.pathname + url.hash;
+  __htmldocSpaNavigate(url.pathname, url.hash).then(function () {
+    window.history.pushState({ htmldocSpa: true }, '', navUrl);
+    document.body.classList.remove('drawer-open');
+  }).catch(function (err) {
+    // Fall back to a normal navigation if SPA fetch failed (page
+    // genuinely missing) — the browser's 404 is a better signal than
+    // a silent no-op.
+    console.warn('[html-doc] SPA navigation failed, falling back', err);
+    window.location.href = navUrl;
+  });
+});
+
+window.addEventListener('popstate', function () {
+  if (typeof HtmlDocRenderer === 'undefined') return;
+  __htmldocSpaNavigate(window.location.pathname, window.location.hash).catch(function () {});
+});
 // Restore persisted state ASAP so the layout doesn't flash open then collapse.
 try {
   if (localStorage.getItem('sidebarCollapsed') === '1') {
