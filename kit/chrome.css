@@ -1862,36 +1862,6 @@ details.info-tip > *:not(summary) p:last-child { margin-bottom: 0; }
   color: var(--text);
 }
 
-/* Scope-grid — in / out columns with semantic borders. */
-.scope-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  margin: 24px 0;
-}
-.scope-col {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 18px 20px;
-  background: var(--surface);
-}
-.scope-col.in  { border-top: 4px solid var(--success); }
-.scope-col.out { border-top: 4px solid var(--text-soft); }
-.scope-col h4 {
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-.scope-col.in  h4 { color: var(--success); }
-.scope-col.out h4 { color: var(--text-soft); }
-.scope-col ul {
-  margin: 0;
-  padding-left: 20px;
-  font-size: 14px;
-  line-height: 1.6;
-}
-.scope-col li { margin: 4px 0; }
 .callout.danger h4 { color: var(--danger); }
 .callout.success h4,
 .callout.tip h4 { color: var(--success); }
@@ -1967,7 +1937,21 @@ table tr:hover td { background: var(--surface-2); }
 .compare-card.bad:hover  { border-color: var(--danger); }
 .compare-card.good { border-top: 4px solid var(--success); }
 .compare-card.good:hover { border-color: var(--success); }
+.compare-card.in   { border-top: 4px solid var(--success); }
+.compare-card.in:hover   { border-color: var(--success); }
+.compare-card.out  { border-top: 4px solid var(--text-soft); }
+.compare-card.out:hover  { border-color: var(--text-soft); }
+.compare-card.in h4  { color: var(--success); }
+.compare-card.out h4 { color: var(--text-soft); }
 .compare-card h4 { margin: 0 0 12px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--text); }
+/* Items list (was scope-col ul) — sits below the optional `content` body. */
+.compare-card ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.compare-card ul li { margin: 4px 0; }
 
 details.card {
   margin: 14px 0; padding: 16px 20px;
@@ -2067,7 +2051,7 @@ footer {
   header.cover h1 { font-size: 30px; }
   header.cover .subtitle { font-size: 16px; }
   h2 { font-size: 24px; }
-  .kpi-grid, .compare-grid, .scope-grid { grid-template-columns: 1fr; }
+  .kpi-grid, .compare-grid { grid-template-columns: 1fr; }
   .bar-row { grid-template-columns: 110px 1fr 50px; font-size: 12.5px; gap: 8px; }
   .copy-btn { opacity: 1; }
   .permalink { display: none; }

@@ -118,8 +118,8 @@ same-origin `fetch()` (file://, IDE built-in servers).
 | `<ext-ref name="...">` · `<html-doc-cite>` | Citation card with type theming (paper / rfc / release / blog / other). Auto-infers type from link domain. |
 | `<callout type="note\|tip\|info\|caution\|warn\|danger\|success\|neutral">` | Block-level themed note. |
 | `<insight>` | Pull-quote for a key takeaway. |
-| `kpi-grid` · `compare-grid` · `scope-grid` · `bar-chart` · `step-flow` | Visual primitives, all layout-safe by structure. |
-| `<chart type="scatter\|line">` | SVG chart with pan/zoom/reset, log scale, hover tooltips, legend toggle, screenshot button. |
+| `kpi-grid` · `compare-grid` · `step-flow` | Layout primitives, all layout-safe by structure. `compare-grid` carries verdict variants `good` / `bad` / `neutral` (quality contrast) and `in` / `out` (scope contrast); cards accept either a rich `content` body, an `items` bullet list, or both. |
+| `<chart type="scatter\|line\|bar">` | Single primitive, three modes. Scatter / line render an interactive SVG with pan / zoom / log scale / hover tooltips / legend toggle / PNG export. Bar renders row-per-item CSS bars (label + track + readout) — no axes, no JS after first paint. |
 | `<diagram>` | Mermaid wrapper. Lazy-loads from CDN. Re-renders on theme toggle. Has Copy-source, Copy-SVG, Screenshot buttons. |
 | `<live-snippet>` | Editable HTML/CSS/JS textarea + sandboxed iframe preview. |
 | `annotated-code` | Code block with numbered `(1)`(2) chips that sync with a side panel of annotations. |

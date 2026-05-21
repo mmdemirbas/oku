@@ -5,8 +5,8 @@
   "title": "Interactive primitives tour",
   "accent": "teal",
   "meta": {
-    "eyebrow": "Reference · v2 demo",
-    "subtitle": "Live exercise of the chart, diagram, and live-snippet primitives added in round 3.",
+    "eyebrow": "Reference · interactive demo",
+    "subtitle": "Live exercise of the chart, diagram, and live-snippet primitives.",
     "audience": "Spark+Iceberg team",
     "date": "2026-05-17",
     "read_time": "~4 min read",
@@ -16,7 +16,7 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "Three interactive primitives shipped in round 3: data-driven SVG charts (scatter and line), Mermaid diagrams (lazy-loaded, theme-reactive), and editable HTML/CSS/JS snippets with iframe preview.",
+      "summary": "Three interactive primitives: data-driven SVG charts (scatter and line), Mermaid diagrams (lazy-loaded, theme-reactive), and editable HTML/CSS/JS snippets with iframe preview.",
       "bullets": [
         "<chart> renders scatter and line plots from a series-of-points JSON shape. SVG-only, theme-aware.",
         "<diagram> wraps Mermaid; loads the library on demand and re-renders on theme toggle.",
@@ -37,7 +37,7 @@
           "y_label": "User-visible impact",
           "series": [
             {
-              "label": "Round 1 features",
+              "label": "Shipped features",
               "color": "success",
               "data": [
                 { "x": 3, "y": 8, "label": "JSON renderer" },
@@ -46,7 +46,7 @@
               ]
             },
             {
-              "label": "Round 2 features",
+              "label": "Polish",
               "color": "accent",
               "data": [
                 { "x": 4, "y": 9, "label": "Site nav" },

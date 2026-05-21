@@ -22,8 +22,8 @@
         "Inline · glossary-term, ext-ref, code, em, strong, link",
         "Prose · paragraph, heading, list, code, annotated-code",
         "Emphasis · callout, insight, info-tip",
-        "Layout · tldr, kpi-grid, table, compare-grid, scope-grid, step-flow",
-        "Visual · bar-chart, chart, diagram, live-snippet"
+        "Layout · tldr, kpi-grid, table, compare-grid, step-flow",
+        "Visual · chart (scatter / line / bar), diagram, live-snippet"
       ]
     },
     {
@@ -68,7 +68,11 @@
           "kind": "paragraph",
           "content": [
             "Example: hover ",
-            { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
+            {
+              "kind": "glossary-term",
+              "term": "ACID",
+              "text": "ACID"
+            },
             " — click to pin; move toward the tooltip to keep it open."
           ]
         },
@@ -108,7 +112,11 @@
           "kind": "paragraph",
           "content": [
             "Example: ",
-            { "kind": "ext-ref", "name": "Pagefind", "text": "Pagefind" },
+            {
+              "kind": "ext-ref",
+              "name": "Pagefind",
+              "text": "Pagefind"
+            },
             " — hover for the card, click to pin."
           ]
         },
@@ -127,13 +135,26 @@
           "kind": "paragraph",
           "content": [
             "Example: inline ",
-            { "kind": "code", "text": "build_manifest()" },
+            {
+              "kind": "code",
+              "text": "build_manifest()"
+            },
             ", ",
-            { "kind": "em", "text": "italic" },
+            {
+              "kind": "em",
+              "text": "italic"
+            },
             ", ",
-            { "kind": "strong", "text": "bold" },
+            {
+              "kind": "strong",
+              "text": "bold"
+            },
             ", and a ",
-            { "kind": "link", "text": "jsDelivr", "href": "https://cdn.jsdelivr.net" },
+            {
+              "kind": "link",
+              "text": "jsDelivr",
+              "href": "https://cdn.jsdelivr.net"
+            },
             " link (opens in a new tab)."
           ]
         }
@@ -204,11 +225,20 @@
           "kind": "paragraph",
           "content": [
             "Code blocks. ",
-            { "kind": "code", "text": "language" },
+            {
+              "kind": "code",
+              "text": "language"
+            },
             " is informational; the renderer puts a ",
-            { "kind": "code", "text": "language-*" },
+            {
+              "kind": "code",
+              "text": "language-*"
+            },
             " class on the inner ",
-            { "kind": "code", "text": "<code>" },
+            {
+              "kind": "code",
+              "text": "<code>"
+            },
             " so Prism (loaded lazily from CDN) highlights on demand. The runtime then adds a gray gutter with line numbers and — for brace languages — a click target on each foldable region's opening line."
           ]
         },
@@ -237,8 +267,14 @@
           "language": "javascript",
           "source": "const x = 1; // (1)\nfunction greet(name) { // (2)\n  return `Hello, ${name}!`;\n}",
           "annotations": [
-            { "id": 1, "content": "<code>const</code> creates a block-scoped binding." },
-            { "id": 2, "content": "Functions are first-class values." }
+            {
+              "id": 1,
+              "content": "<code>const</code> creates a block-scoped binding."
+            },
+            {
+              "id": 2,
+              "content": "Functions are first-class values."
+            }
           ]
         }
       ]
@@ -259,31 +295,32 @@
           "kind": "paragraph",
           "content": [
             "Block-level themed note. ",
-            {
-              "kind": "code",
-              "text": "type"
-            },
-            " is ",
-            {
-              "kind": "code",
-              "text": "warn"
-            },
-            ", ",
-            {
-              "kind": "code",
-              "text": "danger"
-            },
-            ", ",
-            {
-              "kind": "code",
-              "text": "success"
-            },
-            ", or ",
-            {
-              "kind": "code",
-              "text": "neutral"
-            },
-            " (default). Optional title. Content is richString."
+            { "kind": "code", "text": "type" },
+            " picks the colour band: ",
+            { "kind": "code", "text": "warn" },
+            " / ",
+            { "kind": "code", "text": "warning" },
+            " / ",
+            { "kind": "code", "text": "caution" },
+            " (amber), ",
+            { "kind": "code", "text": "danger" },
+            " (red), ",
+            { "kind": "code", "text": "success" },
+            " / ",
+            { "kind": "code", "text": "tip" },
+            " (green), ",
+            { "kind": "code", "text": "info" },
+            " / ",
+            { "kind": "code", "text": "note" },
+            " (accent blue), ",
+            { "kind": "code", "text": "neutral" },
+            " (gray, default). Optional ",
+            { "kind": "code", "text": "title" },
+            ". ",
+            { "kind": "code", "text": "content" },
+            " is richString. Optional ",
+            { "kind": "code", "text": "bind" },
+            " pairs this callout with another block of the same bind key — hovering one flashes the other (see Cross-cutting › Synced hover pairs)."
           ]
         },
         {
@@ -377,7 +414,7 @@
       "kind": "section",
       "id": "layout",
       "title": "Structured-layout primitives",
-      "lead": "tldr, kpi-grid, compare-grid, scope-grid, step-flow — when prose isn't the right shape.",
+      "lead": "tldr, kpi-grid, compare-grid, step-flow — when prose isn't the right shape.",
       "blocks": [
         {
           "kind": "heading",
@@ -435,9 +472,18 @@
         {
           "kind": "kpi-grid",
           "tiles": [
-            { "num": "17",   "label": "Primitives" },
-            { "num": "JSON", "label": "Source" },
-            { "num": "0",    "label": "Build steps for content" }
+            {
+              "num": "17",
+              "label": "Primitives"
+            },
+            {
+              "num": "JSON",
+              "label": "Source"
+            },
+            {
+              "num": "0",
+              "label": "Build steps for content"
+            }
           ]
         },
         {
@@ -462,12 +508,32 @@
         },
         {
           "kind": "table",
-          "headers": ["Stage", "Status", "Duration"],
+          "headers": [
+            "Stage",
+            "Status",
+            "Duration"
+          ],
           "rows": [
-            ["Plan",  "done",        "1d"],
-            ["Build", "done",        "3d"],
-            ["Test",  "in-progress", "2d"],
-            ["Ship",  "queued",      "—"]
+            [
+              "Plan",
+              "done",
+              "1d"
+            ],
+            [
+              "Build",
+              "done",
+              "3d"
+            ],
+            [
+              "Test",
+              "in-progress",
+              "2d"
+            ],
+            [
+              "Ship",
+              "queued",
+              "—"
+            ]
           ]
         },
         {
@@ -482,19 +548,45 @@
         },
         {
           "kind": "table",
-          "headers": ["Engine", "Storage", "License"],
+          "headers": [
+            "Engine",
+            "Storage",
+            "License"
+          ],
           "groups": [
-            { "title": "Lakehouse formats",
+            {
+              "title": "Lakehouse formats",
               "rows": [
-                ["Apache Iceberg", "Object store", "Apache 2.0"],
-                ["Apache Hudi",    "Object store", "Apache 2.0"],
-                ["Delta Lake",     "Object store", "Apache 2.0"]
+                [
+                  "Apache Iceberg",
+                  "Object store",
+                  "Apache 2.0"
+                ],
+                [
+                  "Apache Hudi",
+                  "Object store",
+                  "Apache 2.0"
+                ],
+                [
+                  "Delta Lake",
+                  "Object store",
+                  "Apache 2.0"
+                ]
               ]
             },
-            { "title": "Query engines",
+            {
+              "title": "Query engines",
               "rows": [
-                ["Trino",  "Pluggable", "Apache 2.0"],
-                ["Presto", "Pluggable", "Apache 2.0"]
+                [
+                  "Trino",
+                  "Pluggable",
+                  "Apache 2.0"
+                ],
+                [
+                  "Presto",
+                  "Pluggable",
+                  "Apache 2.0"
+                ]
               ]
             }
           ]
@@ -517,17 +609,129 @@
           "kind": "table",
           "headers": [
             "Engine",
-            { "label": "Tags",     "filter": "chips", "values": ["lakehouse", "streaming", "query", "metadata"] },
-            { "label": "Maturity", "filter": "chips", "values": ["incubating", "ga", "experimental"] }
+            {
+              "label": "Tags",
+              "filter": "chips",
+              "values": [
+                "lakehouse",
+                "streaming",
+                "query",
+                "metadata"
+              ]
+            },
+            {
+              "label": "Maturity",
+              "filter": "chips",
+              "values": [
+                "incubating",
+                "ga",
+                "experimental"
+              ]
+            }
           ],
           "rows": [
-            ["Apache Iceberg",   { "values": ["lakehouse", "metadata"] },   { "value": "GA",           "values": ["ga"] }],
-            ["Apache Hudi",      { "values": ["lakehouse", "streaming"] },  { "value": "GA",           "values": ["ga"] }],
-            ["Delta Lake",       { "values": ["lakehouse"] },                { "value": "GA",           "values": ["ga"] }],
-            ["Apache Paimon",    { "values": ["lakehouse", "streaming"] },  { "value": "Incubating",   "values": ["incubating"] }],
-            ["Trino",            { "values": ["query"] },                    { "value": "GA",           "values": ["ga"] }],
-            ["Apache Flink",     { "values": ["streaming"] },                { "value": "GA",           "values": ["ga"] }],
-            ["Pulsar Functions", { "values": ["streaming", "metadata"] },   { "value": "Experimental", "values": ["experimental"] }]
+            [
+              "Apache Iceberg",
+              {
+                "values": [
+                  "lakehouse",
+                  "metadata"
+                ]
+              },
+              {
+                "value": "GA",
+                "values": [
+                  "ga"
+                ]
+              }
+            ],
+            [
+              "Apache Hudi",
+              {
+                "values": [
+                  "lakehouse",
+                  "streaming"
+                ]
+              },
+              {
+                "value": "GA",
+                "values": [
+                  "ga"
+                ]
+              }
+            ],
+            [
+              "Delta Lake",
+              {
+                "values": [
+                  "lakehouse"
+                ]
+              },
+              {
+                "value": "GA",
+                "values": [
+                  "ga"
+                ]
+              }
+            ],
+            [
+              "Apache Paimon",
+              {
+                "values": [
+                  "lakehouse",
+                  "streaming"
+                ]
+              },
+              {
+                "value": "Incubating",
+                "values": [
+                  "incubating"
+                ]
+              }
+            ],
+            [
+              "Trino",
+              {
+                "values": [
+                  "query"
+                ]
+              },
+              {
+                "value": "GA",
+                "values": [
+                  "ga"
+                ]
+              }
+            ],
+            [
+              "Apache Flink",
+              {
+                "values": [
+                  "streaming"
+                ]
+              },
+              {
+                "value": "GA",
+                "values": [
+                  "ga"
+                ]
+              }
+            ],
+            [
+              "Pulsar Functions",
+              {
+                "values": [
+                  "streaming",
+                  "metadata"
+                ]
+              },
+              {
+                "value": "Experimental",
+                "values": [
+                  "experimental"
+                ]
+              }
+            ]
           ]
         },
         {
@@ -548,15 +752,41 @@
           "kind": "table",
           "headers": [
             "Item",
-            { "label": "Status", "boardOrder": ["queued", "in-progress", "blocked", "done"] }
+            {
+              "label": "Status",
+              "boardOrder": [
+                "queued",
+                "in-progress",
+                "blocked",
+                "done"
+              ]
+            }
           ],
           "rows": [
-            ["Cut release tag",        "queued"],
-            ["Wire CI matrix",         "in-progress"],
-            ["Vendor security review", "blocked"],
-            ["Migrate auth layer",     "done"],
-            ["Draft RFC",              "in-progress"],
-            ["Update changelog",       "queued"]
+            [
+              "Cut release tag",
+              "queued"
+            ],
+            [
+              "Wire CI matrix",
+              "in-progress"
+            ],
+            [
+              "Vendor security review",
+              "blocked"
+            ],
+            [
+              "Migrate auth layer",
+              "done"
+            ],
+            [
+              "Draft RFC",
+              "in-progress"
+            ],
+            [
+              "Update changelog",
+              "queued"
+            ]
           ]
         },
         {
@@ -612,42 +842,33 @@
           ]
         },
         {
-          "kind": "heading",
-          "level": 3,
-          "id": "scope-grid",
-          "title": "scope-grid"
-        },
-        {
           "kind": "paragraph",
           "content": [
-            "Two columns with semantic borders. ",
-            {
-              "kind": "code",
-              "text": "status"
-            },
-            " is ",
-            {
-              "kind": "code",
-              "text": "in"
-            },
-            " (green top border) or ",
-            {
-              "kind": "code",
-              "text": "out"
-            },
-            " (gray)."
+            "Scope variant — set ",
+            { "kind": "code", "text": "verdict" },
+            " to ",
+            { "kind": "code", "text": "in" },
+            " (green border) or ",
+            { "kind": "code", "text": "out" },
+            " (muted), and use ",
+            { "kind": "code", "text": "items" },
+            " for a bullet list inside the card. ",
+            { "kind": "code", "text": "content" },
+            " and ",
+            { "kind": "code", "text": "items" },
+            " can coexist — content renders first, items below."
           ]
         },
         {
           "kind": "code",
           "language": "json",
-          "source": "{\n  \"kind\": \"scope-grid\",\n  \"columns\": [\n    { \"status\": \"in\",  \"title\": \"v1\",     \"items\": [\"...\"] },\n    { \"status\": \"out\", \"title\": \"Future\", \"items\": [\"...\"] }\n  ]\n}"
+          "source": "{\n  \"kind\": \"compare-grid\",\n  \"cards\": [\n    { \"verdict\": \"in\",  \"title\": \"v1\",     \"items\": [\"...\"] },\n    { \"verdict\": \"out\", \"title\": \"Future\", \"items\": [\"...\"] }\n  ]\n}"
         },
         {
-          "kind": "scope-grid",
-          "columns": [
+          "kind": "compare-grid",
+          "cards": [
             {
-              "status": "in",
+              "verdict": "in",
               "title": "v2 ships",
               "items": [
                 "JSON-source runtime rendering",
@@ -657,7 +878,7 @@
               ]
             },
             {
-              "status": "out",
+              "verdict": "out",
               "title": "Out of scope",
               "items": [
                 "Markdown authoring path",
@@ -712,70 +933,8 @@
       "kind": "section",
       "id": "visual",
       "title": "Visual primitives",
-      "lead": "bar-chart, chart, diagram, live-snippet — the rich content primitives that justify the JSON-source choice over Markdown.",
+      "lead": "chart, diagram, live-snippet — the rich content primitives that justify the JSON-source choice over Markdown.",
       "blocks": [
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "bar-chart",
-          "title": "bar-chart"
-        },
-        {
-          "kind": "paragraph",
-          "content": [
-            "Row-per-item horizontal bars. Layout-safe by structure (no label collision). ",
-            {
-              "kind": "code",
-              "text": "value"
-            },
-            " on each row; ",
-            {
-              "kind": "code",
-              "text": "max"
-            },
-            " optional (defaults to ",
-            {
-              "kind": "code",
-              "text": "max(rows.value)"
-            },
-            "); ",
-            {
-              "kind": "code",
-              "text": "display"
-            },
-            " optional override for the readout text; ",
-            {
-              "kind": "code",
-              "text": "color"
-            },
-            " is one of accent / warn / danger / success."
-          ]
-        },
-        {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"bar-chart\",\n  \"rows\": [\n    { \"label\": \"Spark\",  \"value\": 95, \"display\": \"95 / 100\" },\n    { \"label\": \"Flink\",  \"value\": 80 },\n    { \"label\": \"Trino\",  \"value\": 75 }\n  ]\n}"
-        },
-        {
-          "kind": "bar-chart",
-          "rows": [
-            {
-              "label": "Spark",
-              "value": 95,
-              "display": "95 / 100"
-            },
-            {
-              "label": "Flink",
-              "value": 80,
-              "display": "80 / 100"
-            },
-            {
-              "label": "Trino",
-              "value": 75,
-              "display": "75 / 100"
-            }
-          ]
-        },
         {
           "kind": "heading",
           "level": 3,
@@ -785,23 +944,34 @@
         {
           "kind": "paragraph",
           "content": [
-            "Generic SVG chart. ",
-            {
-              "kind": "code",
-              "text": "type"
-            },
-            " is ",
-            {
-              "kind": "code",
-              "text": "scatter"
-            },
-            " or ",
-            {
-              "kind": "code",
-              "text": "line"
-            },
-            ". Series of points with optional per-point labels and per-series colors. Auto-scaled axes with 5 ticks each."
+            "Single primitive, three render modes via the ",
+            { "kind": "code", "text": "type" },
+            " field: ",
+            { "kind": "code", "text": "scatter" },
+            " and ",
+            { "kind": "code", "text": "line" },
+            " produce an interactive SVG Cartesian plot (auto-scaled axes, pan, zoom, log scale toggle, PNG export). ",
+            { "kind": "code", "text": "bar" },
+            " produces row-per-item horizontal bars (label / track / readout) — layout-safe by structure, no axes. The Cartesian and bar forms have different payload shapes; the renderer dispatches by ",
+            { "kind": "code", "text": "type" },
+            "."
           ]
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "Library underneath",
+          "content": "Both modes are kit-native (no third-party chart library). Scatter / line render as inline SVG drawn by the html-doc-chart Custom Element. Bar renders as plain HTML + CSS — no JavaScript after first paint."
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-scatter-line",
+          "title": "type: scatter | line"
+        },
+        {
+          "kind": "paragraph",
+          "content": "One or more series of {x, y} points. Per-point label optional (shown on hover). Per-series colour drawn from the accent / warn / danger / success / muted vocabulary. Axes auto-scale; pass x-scale=log / y-scale=log on the element for log axes."
         },
         {
           "kind": "code",
@@ -857,6 +1027,42 @@
                 }
               ]
             }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-bar",
+          "title": "type: bar"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Row-per-item horizontal bars. Each row carries ",
+            { "kind": "code", "text": "label" },
+            ", ",
+            { "kind": "code", "text": "value" },
+            ", optional ",
+            { "kind": "code", "text": "display" },
+            " (right-hand readout override), and optional ",
+            { "kind": "code", "text": "color" },
+            " (accent / warn / danger / success). ",
+            { "kind": "code", "text": "max" },
+            " caps the bar full-width; if omitted, the largest row's value sets the scale. Use when you want a label/value comparison without axis chrome."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bar\",\n  \"rows\": [\n    { \"label\": \"Spark\",  \"value\": 95, \"display\": \"95 / 100\" },\n    { \"label\": \"Flink\",  \"value\": 80 },\n    { \"label\": \"Trino\",  \"value\": 75 }\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "bar",
+          "rows": [
+            { "label": "Spark", "value": 95, "display": "95 / 100" },
+            { "label": "Flink", "value": 80, "display": "80 / 100" },
+            { "label": "Trino", "value": 75, "display": "75 / 100" }
           ]
         },
         {
@@ -1012,11 +1218,20 @@
           "kind": "paragraph",
           "content": [
             "Inline sample — hover any reference to see the card: see ",
-            { "kind": "ext-ref", "name": "Iceberg paper" },
+            {
+              "kind": "ext-ref",
+              "name": "Iceberg paper"
+            },
             " for the original snapshot-isolation argument, ",
-            { "kind": "ext-ref", "name": "RFC 9457" },
+            {
+              "kind": "ext-ref",
+              "name": "RFC 9457"
+            },
             " for the HTTP problem-details format, and the ",
-            { "kind": "ext-ref", "name": "Iceberg 1.4 release" },
+            {
+              "kind": "ext-ref",
+              "name": "Iceberg 1.4 release"
+            },
             " for cross-engine sort orders."
           ]
         },

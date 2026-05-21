@@ -131,10 +131,10 @@
       "lead": "What's in, what's deferred. Status reflects the actual repo state, not the plan.",
       "blocks": [
         {
-          "kind": "scope-grid",
-          "columns": [
+          "kind": "compare-grid",
+          "cards": [
             {
-              "status": "in",
+              "verdict": "in",
               "title": "Shipped",
               "items": [
                 "JSON page schema (schema/page.schema.json) — 14 block kinds, inline rich-text union",
@@ -146,8 +146,8 @@
                 "kit.json loader + multi-domain, multi-language registry",
                 "Tooltip controller: hover, bridge, click-pin, touch-only-click, Esc",
                 "<glossary-term> and <ext-ref> elements",
-                "Content primitives: <callout>, <insight>, <info-tip>, <kpi-grid>, <compare-grid>, <scope-grid>, <bar-chart>, <step-flow>",
-                "Diagram + chart: <html-doc-chart> (scatter/line SVG), <html-doc-diagram> (Mermaid)",
+                "Content primitives: <callout>, <insight>, <info-tip>, <kpi-grid>, <compare-grid>, <step-flow>",
+                "Diagram + chart: <html-doc-chart> (scatter / line SVG), <chart type=\"bar\"> (CSS bars), <html-doc-diagram> (Mermaid)",
                 "<html-doc-snippet> editable HTML/CSS/JS with iframe preview",
                 "Build pipeline: site-manifest.json, llms.txt, Pagefind index over dist/site/",
                 "Forward-compat warning indicator with per-session dismiss",
@@ -155,7 +155,7 @@
               ]
             },
             {
-              "status": "out",
+              "verdict": "out",
               "title": "Deferred",
               "items": [
                 "Mermaid CDN integrity hash (needs verified SRI value — left as a note)",
@@ -300,11 +300,20 @@
           "title": "Try the warn callout type",
           "content": [
             "This callout uses ",
-            {"kind": "code", "text": "type=\"warn\""},
+            {
+              "kind": "code",
+              "text": "type=\"warn\""
+            },
             ", which aliases the canonical ",
-            {"kind": "code", "text": "warning"},
+            {
+              "kind": "code",
+              "text": "warning"
+            },
             " styling. The kit accepts both names plus the industry-standard ",
-            {"kind": "code", "text": "note / tip / info / caution"},
+            {
+              "kind": "code",
+              "text": "note / tip / info / caution"
+            },
             " aliases."
           ]
         }

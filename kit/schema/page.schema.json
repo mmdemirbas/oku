@@ -108,10 +108,8 @@
         { "$ref": "#/$defs/table" },
         { "$ref": "#/$defs/tldr" },
         { "$ref": "#/$defs/kpi-grid" },
-        { "$ref": "#/$defs/bar-chart" },
         { "$ref": "#/$defs/step-flow" },
         { "$ref": "#/$defs/compare-grid" },
-        { "$ref": "#/$defs/scope-grid" },
         { "$ref": "#/$defs/chart" },
         { "$ref": "#/$defs/diagram" },
         { "$ref": "#/$defs/live-snippet" }
@@ -338,30 +336,6 @@
       }
     },
 
-    "bar-chart": {
-      "type": "object",
-      "required": ["kind", "rows"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": { "const": "bar-chart" },
-        "max": { "type": "number", "description": "Bar full-width value; defaults to max(rows.value)." },
-        "rows": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["label", "value"],
-            "additionalProperties": false,
-            "properties": {
-              "label": { "type": "string" },
-              "value": { "type": "number" },
-              "display": { "type": "string", "description": "Override the right-hand readout." },
-              "color": { "enum": ["accent", "warn", "danger", "success"], "default": "accent" }
-            }
-          }
-        }
-      }
-    },
-
     "step-flow": {
       "type": "object",
       "required": ["kind", "steps"],
@@ -389,6 +363,7 @@
       "type": "object",
       "required": ["kind", "cards"],
       "additionalProperties": false,
+      "description": "N-card comparison grid. Use verdict to colour each card; mix `content` (rich text body) and/or `items` (bullet list) freely. The verdict vocabulary covers both quality contrasts (good/bad/neutral) and scope contrasts (in/out) — the kit renders in/out cards with the same border vocabulary scope-grid used previously.",
       "properties": {
         "kind": { "const": "compare-grid" },
         "cards": {
@@ -398,9 +373,18 @@
             "required": ["title"],
             "additionalProperties": false,
             "properties": {
-              "verdict": { "enum": ["good", "bad", "neutral"], "default": "neutral" },
+              "verdict": {
+                "enum": ["good", "bad", "neutral", "in", "out"],
+                "default": "neutral",
+                "description": "Card accent: good (success border), bad (danger), neutral (default), in (success — was scope-grid status:in), out (muted — was scope-grid status:out)."
+              },
               "title": { "type": "string" },
-              "content": { "$ref": "#/$defs/richString" }
+              "content": { "$ref": "#/$defs/richString", "description": "Rich-text body. Combine with items, or use either alone." },
+              "items": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/richString" },
+                "description": "Bullet list inside the card. Renders below `content` when both are present."
+              }
             }
           }
         }
@@ -409,16 +393,21 @@
 
     "chart": {
       "type": "object",
-      "required": ["kind", "type", "series"],
+      "required": ["kind", "type"],
       "additionalProperties": false,
+      "description": "Data-driven chart. type=scatter|line renders an interactive SVG plot (pan/zoom/export) using `series` of {x,y} points; type=bar renders horizontal CSS bars (one per `rows[]` entry) — useful for label/value comparisons that don't need a Cartesian axis.",
       "properties": {
         "kind": { "const": "chart" },
-        "type": { "enum": ["scatter", "line"], "description": "For row-per-item bars use 'bar-chart' instead." },
+        "type": {
+          "enum": ["scatter", "line", "bar"],
+          "description": "scatter — interactive SVG points; line — same plus connecting strokes; bar — horizontal CSS bars (no axes, no pan/zoom)."
+        },
         "title": { "type": "string" },
-        "x_label": { "type": "string" },
-        "y_label": { "type": "string" },
+        "x_label": { "type": "string", "description": "Scatter / line only." },
+        "y_label": { "type": "string", "description": "Scatter / line only." },
         "series": {
           "type": "array",
+          "description": "Scatter / line only. Required when type is scatter or line.",
           "items": {
             "type": "object",
             "required": ["data"],
@@ -441,8 +430,34 @@
               }
             }
           }
+        },
+        "rows": {
+          "type": "array",
+          "description": "Bar only. Required when type is bar. One row per bar.",
+          "items": {
+            "type": "object",
+            "required": ["label", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "value": { "type": "number" },
+              "display": { "type": "string", "description": "Override the right-hand readout (e.g. '95 / 100' instead of '95')." },
+              "color": { "enum": ["accent", "warn", "danger", "success"], "default": "accent" }
+            }
+          }
+        },
+        "max": { "type": "number", "description": "Bar only. Full-width value; defaults to max(rows.value)." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "bar" } }, "required": ["type"] },
+          "then": { "required": ["rows"] }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["scatter", "line"] } }, "required": ["type"] },
+          "then": { "required": ["series"] }
         }
-      }
+      ]
     },
 
     "diagram": {
@@ -465,30 +480,6 @@
         "language": { "enum": ["html-css-js"], "default": "html-css-js" },
         "label": { "type": "string" },
         "source": { "type": "string" }
-      }
-    },
-
-    "scope-grid": {
-      "type": "object",
-      "required": ["kind", "columns"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": { "const": "scope-grid" },
-        "columns": {
-          "type": "array",
-          "minItems": 2,
-          "maxItems": 2,
-          "items": {
-            "type": "object",
-            "required": ["status", "title", "items"],
-            "additionalProperties": false,
-            "properties": {
-              "status": { "enum": ["in", "out"] },
-              "title": { "type": "string" },
-              "items": { "type": "array", "items": { "$ref": "#/$defs/richString" } }
-            }
-          }
-        }
       }
     },
 

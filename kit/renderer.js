@@ -253,10 +253,8 @@
         case 'table':        el = this._renderTable(block); break;
         case 'tldr':         el = this._renderTldr(block); break;
         case 'kpi-grid':     el = this._renderKpiGrid(block); break;
-        case 'bar-chart':    el = this._renderBarChart(block); break;
         case 'step-flow':    el = this._renderStepFlow(block); break;
         case 'compare-grid': el = this._renderCompareGrid(block); break;
-        case 'scope-grid':   el = this._renderScopeGrid(block); break;
         case 'chart':        el = this._renderChart(block); break;
         case 'diagram':      el = this._renderDiagram(block); break;
         case 'live-snippet': el = this._renderLiveSnippet(block); break;
@@ -270,8 +268,15 @@
     }
 
     _renderChart(block) {
+      // Dispatch by type. Bar charts render as DIV-based horizontal bars
+      // (the row-per-item shape is fundamentally different from a
+      // Cartesian scatter/line and benefits from real DOM text + fluid
+      // resizing). Scatter / line render through the HtmlDocChart Custom
+      // Element which owns SVG, pan/zoom, and the export toolbar.
+      const type = block.type || 'scatter';
+      if (type === 'bar') return this._renderBars(block);
       const el = document.createElement('html-doc-chart');
-      el.setAttribute('type', block.type || 'scatter');
+      el.setAttribute('type', type);
       if (block.title) el.setAttribute('title', block.title);
       if (block.x_label) el.setAttribute('x-label', block.x_label);
       if (block.y_label) el.setAttribute('y-label', block.y_label);
@@ -479,13 +484,24 @@
       return el;
     }
 
-    _renderBarChart(block) {
+    _renderBars(block) {
+      // Horizontal CSS-bar markup. Used by chart type=bar (and
+      // historically by the standalone bar-chart kind, which folded
+      // into chart). One .bar-row per data row: [label] [track > fill]
+      // [readout]. Width is derived from block.max (or auto-derived
+      // from the largest value).
       const rows = block.rows || [];
       const max = block.max !== undefined ? block.max : Math.max.apply(null, rows.map(function (r) { return r.value || 0; }).concat([1]));
       const wrap = document.createElement('div');
       wrap.className = 'bar-chart';
       wrap.setAttribute('role', 'img');
-      wrap.setAttribute('aria-label', 'Bar chart with ' + rows.length + ' rows');
+      wrap.setAttribute('aria-label', (block.title ? block.title + ' — ' : '') + 'Bar chart with ' + rows.length + ' rows');
+      if (block.title) {
+        const h = document.createElement('h4');
+        h.className = 'bar-chart-title';
+        h.textContent = block.title;
+        wrap.appendChild(h);
+      }
       for (const r of rows) {
         const row = document.createElement('div');
         row.className = 'bar-row';
@@ -542,6 +558,14 @@
     }
 
     _renderCompareGrid(block) {
+      // Unified comparison grid. Each card can carry:
+      //   verdict: good | bad | neutral | in | out
+      //     good/in render with a success-coloured top border;
+      //     bad/out render with danger / muted respectively.
+      //   content: rich-string body
+      //   items:   array of rich-strings rendered as a <ul> inside the card
+      // Either field is optional. When both are present, content appears
+      // first, then the items list.
       const grid = document.createElement('div');
       grid.className = 'compare-grid';
       for (const c of (block.cards || [])) {
@@ -557,28 +581,16 @@
           p.appendChild(this._renderRich(c.content));
           card.appendChild(p);
         }
-        grid.appendChild(card);
-      }
-      return grid;
-    }
-
-    _renderScopeGrid(block) {
-      const grid = document.createElement('div');
-      grid.className = 'scope-grid';
-      for (const col of (block.columns || [])) {
-        const c = document.createElement('div');
-        c.className = 'scope-col ' + (col.status || 'in');
-        const h = document.createElement('h4');
-        h.textContent = col.title || '';
-        c.appendChild(h);
-        const ul = document.createElement('ul');
-        for (const it of (col.items || [])) {
-          const li = document.createElement('li');
-          li.appendChild(this._renderRich(it));
-          ul.appendChild(li);
+        if (Array.isArray(c.items) && c.items.length) {
+          const ul = document.createElement('ul');
+          for (const it of c.items) {
+            const li = document.createElement('li');
+            li.appendChild(this._renderRich(it));
+            ul.appendChild(li);
+          }
+          card.appendChild(ul);
         }
-        c.appendChild(ul);
-        grid.appendChild(c);
+        grid.appendChild(card);
       }
       return grid;
     }

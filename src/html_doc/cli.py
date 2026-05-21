@@ -929,23 +929,16 @@ def _md_block(block: dict, depth: int = 0) -> list[str]:
             out.append(f"- **{num}** — {label}")
         return out
 
-    if kind == "bar-chart":
-        title = _flatten_inline(block.get("title") or "Bar chart")
-        out.append("### " + title)
-        for row in block.get("rows") or block.get("data") or []:
-            label = _flatten_inline(row.get("label", ""))
-            value = row.get("value", "")
-            out.append(f"- {label}: {value}")
-        return out
-
-    if kind in ("compare-grid", "scope-grid"):
-        for card in block.get("cards") or block.get("cols") or block.get("items") or []:
+    if kind == "compare-grid":
+        for card in block.get("cards") or []:
             t = _flatten_inline(card.get("title", ""))
-            body = _flatten_inline(card.get("content") or card.get("summary") or "")
+            body = _flatten_inline(card.get("content") or "")
             if t:
                 out.append("### " + t)
             if body:
                 out.append(body)
+            for it in card.get("items") or []:
+                out.append("- " + _flatten_inline(it))
         return out
 
     if kind == "step-flow":
@@ -958,9 +951,25 @@ def _md_block(block: dict, depth: int = 0) -> list[str]:
                     out.append("   " + line)
         return out
 
-    if kind in ("chart", "diagram"):
-        title = _flatten_inline(block.get("title") or block.get("caption") or kind)
-        out.append(f"_[{kind}: {title}]_")
+    if kind == "chart":
+        title = _flatten_inline(block.get("title") or "chart")
+        # Bar-chart shape emits as a definition list so the markdown
+        # twin still carries the label/value pairs; scatter / line are
+        # rendered as a placeholder line (no useful textual form).
+        if block.get("type") == "bar":
+            out.append("### " + title)
+            for row in block.get("rows") or []:
+                label = _flatten_inline(row.get("label", ""))
+                value = row.get("value", "")
+                display = row.get("display")
+                out.append(f"- {label}: {display if display is not None else value}")
+            return out
+        out.append(f"_[chart: {title}]_")
+        return out
+
+    if kind == "diagram":
+        title = _flatten_inline(block.get("caption") or "diagram")
+        out.append(f"_[diagram: {title}]_")
         return out
 
     if kind == "live-snippet":

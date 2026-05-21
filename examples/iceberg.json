@@ -27,10 +27,22 @@
     {
       "kind": "kpi-grid",
       "tiles": [
-        { "num": "JSON", "label": "Source of truth" },
-        { "num": "0", "label": "Build steps for content" },
-        { "num": "17", "label": "Primitives in v1 library (3 wired in this demo)" },
-        { "num": "EN+TR", "label": "Multi-language registry" }
+        {
+          "num": "JSON",
+          "label": "Source of truth"
+        },
+        {
+          "num": "0",
+          "label": "Build steps for content"
+        },
+        {
+          "num": "17",
+          "label": "Primitives in v1 library (3 wired in this demo)"
+        },
+        {
+          "num": "EN+TR",
+          "label": "Multi-language registry"
+        }
       ]
     },
     {
@@ -43,15 +55,35 @@
           "kind": "paragraph",
           "content": [
             "Iceberg gives you ",
-            { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
+            {
+              "kind": "glossary-term",
+              "term": "ACID",
+              "text": "ACID"
+            },
             " transactions, time travel, and schema evolution over object stores. It is engine-agnostic — read it from ",
-            { "kind": "glossary-term", "term": "Spark", "text": "Spark" },
+            {
+              "kind": "glossary-term",
+              "term": "Spark",
+              "text": "Spark"
+            },
             ", ",
-            { "kind": "glossary-term", "term": "Flink", "text": "Flink" },
+            {
+              "kind": "glossary-term",
+              "term": "Flink",
+              "text": "Flink"
+            },
             ", Trino, or anything else that speaks the format. Underneath, it relies on ",
-            { "kind": "glossary-term", "term": "MVCC", "text": "MVCC" },
+            {
+              "kind": "glossary-term",
+              "term": "MVCC",
+              "text": "MVCC"
+            },
             " and ",
-            { "kind": "glossary-term", "term": "Snapshot", "text": "snapshots" },
+            {
+              "kind": "glossary-term",
+              "term": "Snapshot",
+              "text": "snapshots"
+            },
             " to support concurrent readers and writers without coordination."
           ]
         },
@@ -69,11 +101,20 @@
               "kind": "paragraph",
               "content": [
                 "The HTML host is a tiny stub that loads chrome.css, chrome.js, and renderer.js. It then calls ",
-                { "kind": "code", "text": "new HtmlDocRenderer().renderFromUrl('iceberg.json')" },
+                {
+                  "kind": "code",
+                  "text": "new HtmlDocRenderer().renderFromUrl('iceberg.json')"
+                },
                 ". The renderer fetches the JSON, walks the tree, and emits DOM (regular tags + Custom Elements) into ",
-                { "kind": "code", "text": "<main id=\"main-content\">" },
+                {
+                  "kind": "code",
+                  "text": "<main id=\"main-content\">"
+                },
                 ". When the renderer finishes, it fires an ",
-                { "kind": "code", "text": "html-doc:rendered" },
+                {
+                  "kind": "code",
+                  "text": "html-doc:rendered"
+                },
                 " event that chrome.js listens for to build the TOC and initialize reading aids."
               ]
             },
@@ -110,7 +151,11 @@
           "kind": "paragraph",
           "content": [
             "The cost: metadata accumulates. Without ",
-            { "kind": "glossary-term", "term": "Compaction", "text": "compaction" },
+            {
+              "kind": "glossary-term",
+              "term": "Compaction",
+              "text": "compaction"
+            },
             " and expire-snapshots maintenance, the manifest list grows linearly with snapshot count. Both are cheap to run as periodic jobs."
           ]
         },
@@ -118,7 +163,11 @@
           "kind": "insight",
           "content": [
             "The Iceberg ",
-            { "kind": "glossary-term", "term": "Catalog", "text": "catalog" },
+            {
+              "kind": "glossary-term",
+              "term": "Catalog",
+              "text": "catalog"
+            },
             " is the locking primitive. Two writers don't lock the table; they race to update the catalog's current-snapshot pointer. The loser retries with the new base snapshot. This is what makes concurrent writes possible without a coordinator."
           ]
         }
@@ -131,13 +180,34 @@
       "lead": "All major OLAP engines support Iceberg, but feature coverage varies. Bar chart below shows rough capability scores out of 100, where 100 = full read/write/maintenance/predicate-pushdown support.",
       "blocks": [
         {
-          "kind": "bar-chart",
+          "kind": "chart",
+          "type": "bar",
           "rows": [
-            { "label": "Spark",  "value": 95, "display": "95 / 100" },
-            { "label": "Flink",  "value": 80, "display": "80 / 100" },
-            { "label": "Trino",  "value": 75, "display": "75 / 100" },
-            { "label": "Snowflake", "value": 60, "display": "60 / 100" },
-            { "label": "DuckDB", "value": 50, "display": "50 / 100" }
+            {
+              "label": "Spark",
+              "value": 95,
+              "display": "95 / 100"
+            },
+            {
+              "label": "Flink",
+              "value": 80,
+              "display": "80 / 100"
+            },
+            {
+              "label": "Trino",
+              "value": 75,
+              "display": "75 / 100"
+            },
+            {
+              "label": "Snowflake",
+              "value": 60,
+              "display": "60 / 100"
+            },
+            {
+              "label": "DuckDB",
+              "value": 50,
+              "display": "50 / 100"
+            }
           ]
         },
         {
@@ -150,25 +220,25 @@
       "kind": "section",
       "id": "scope",
       "title": "What's in v1 of this kit (vs. not)",
-      "lead": "Demonstrating the scope-grid primitive: parallel in / out columns with semantic borders.",
+      "lead": "Demonstrating compare-grid's in / out verdict variant: parallel columns with semantic borders.",
       "blocks": [
         {
-          "kind": "scope-grid",
-          "columns": [
+          "kind": "compare-grid",
+          "cards": [
             {
-              "status": "in",
+              "verdict": "in",
               "title": "In v1",
               "items": [
                 "JSON-source rendering at runtime (no build)",
                 "Glossary tooltips with bridge-hover + click-pin",
                 "Multi-domain, multi-language glossary architecture",
                 "Visual Viewport API pinch-zoom stability",
-                "Core primitives: paragraph, callout, insight, info-tip, kpi-grid, compare-grid, scope-grid, bar-chart, step-flow",
+                "Core primitives: paragraph, callout, insight, info-tip, kpi-grid, compare-grid, step-flow, chart",
                 "Three-mode theme cycler + sticky TOC + scroll-spy"
               ]
             },
             {
-              "status": "out",
+              "verdict": "out",
               "title": "Out (later or never)",
               "items": [
                 "Markdown authoring path",
@@ -192,13 +262,25 @@
           "kind": "paragraph",
           "content": [
             "This demo covers build steps 1–3, plus the core renderer + tooltip pieces from steps 5–10. Still to wire in subsequent rounds: ",
-            { "kind": "code", "text": "<page-nav>" },
+            {
+              "kind": "code",
+              "text": "<page-nav>"
+            },
             " site-tree sidebar, ",
-            { "kind": "code", "text": "<live-snippet>" },
+            {
+              "kind": "code",
+              "text": "<live-snippet>"
+            },
             ", ",
-            { "kind": "code", "text": "<chart>" },
+            {
+              "kind": "code",
+              "text": "<chart>"
+            },
             "/",
-            { "kind": "code", "text": "<diagram>" },
+            {
+              "kind": "code",
+              "text": "<diagram>"
+            },
             ", Pagefind integration, the forward-compat warning indicator, and the html-doc CLI extensions."
           ]
         }

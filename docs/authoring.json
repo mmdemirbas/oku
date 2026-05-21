@@ -200,8 +200,8 @@
               "content": [
                 "paragraph, heading, list, code — prose primitives. ",
                 "callout, insight, info-tip — emphasis primitives. ",
-                "kpi-grid, compare-grid, scope-grid — structured layout primitives. ",
-                "bar-chart, step-flow, chart, diagram, live-snippet — visual primitives."
+                "kpi-grid, compare-grid, step-flow — structured layout primitives. ",
+                "chart (scatter / line / bar), diagram, live-snippet — visual primitives."
               ]
             }
           ]

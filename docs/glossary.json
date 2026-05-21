@@ -24,7 +24,6 @@
         "Unknown terms surface in the forward-compat warning indicator; add the entry to project kit.json or push to central."
       ]
     },
-
     {
       "kind": "section",
       "id": "layout",
@@ -38,7 +37,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "entry-shape",
@@ -58,7 +56,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "project-config",
@@ -83,19 +80,27 @@
               "kind": "paragraph",
               "content": [
                 "When the same term appears in both ",
-                { "kind": "code", "text": "kit.json" },
+                {
+                  "kind": "code",
+                  "text": "kit.json"
+                },
                 "'s ",
-                { "kind": "code", "text": "glossary[\"data-platforms\"]" },
+                {
+                  "kind": "code",
+                  "text": "glossary[\"data-platforms\"]"
+                },
                 " AND in the central ",
-                { "kind": "code", "text": "_kit/glossary/data-platforms.json" },
-                ", the project version is used. Merge happens after the central file loads — the round-5 fix (S1) corrected an earlier race where project overrides were silently discarded."
+                {
+                  "kind": "code",
+                  "text": "_kit/glossary/data-platforms.json"
+                },
+                ", the project version is used. Merge happens after the central file loads, so a project override is never silently discarded by a later registry fetch."
               ]
             }
           ]
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "disambiguation",
@@ -111,15 +116,20 @@
           "kind": "paragraph",
           "content": [
             "The ",
-            { "kind": "code", "text": "in" },
+            {
+              "kind": "code",
+              "text": "in"
+            },
             " attribute restricts lookup to one domain even if it's not first in the project's domains list. The ",
-            { "kind": "code", "text": "lang" },
+            {
+              "kind": "code",
+              "text": "lang"
+            },
             " attribute overrides the project's preferred language for that instance — useful when one term in a TR-default project needs an English-source citation."
           ]
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "resolution",
@@ -153,7 +163,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "extending",
@@ -183,7 +192,6 @@
         }
       ]
     },
-
     {
       "kind": "section",
       "id": "starter",
@@ -191,10 +199,10 @@
       "lead": "v1 ships three domains populated, three as empty structural stubs.",
       "blocks": [
         {
-          "kind": "scope-grid",
-          "columns": [
+          "kind": "compare-grid",
+          "cards": [
             {
-              "status": "in",
+              "verdict": "in",
               "title": "Populated",
               "items": [
                 "data-platforms — ACID, MVCC, Iceberg, Spark, Flink, Paimon, Catalog, Snapshot, Compaction, Time travel (with TR translations on the most common)",
@@ -203,7 +211,7 @@
               ]
             },
             {
-              "status": "out",
+              "verdict": "out",
               "title": "Structural stubs",
               "items": [
                 "adhd — populate with RSD, hyperfocus, executive dysfunction, etc.",
