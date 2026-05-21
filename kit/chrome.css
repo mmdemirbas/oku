@@ -915,6 +915,11 @@ code:not(pre code) {
   gap: 4px;
   align-items: center;
   justify-content: flex-end;
+  /* Allow secondary rows when the cumulative width of filter + stats +
+     groupby + view buttons + expand exceeds the wrap's inner width.
+     Without wrapping, justify-content: flex-end pushes overflow off
+     the START edge, putting the filter outside the table border. */
+  flex-wrap: wrap;
   margin-bottom: 8px;
   opacity: 0.45;
   transition: opacity 0.18s ease;
@@ -968,6 +973,10 @@ code:not(pre code) {
   border-radius: 6px;
   color: var(--text-soft);
   transition: border-color 0.15s ease, background 0.15s ease;
+  /* Flex items default to min-width: min-content; without this the
+     filter refuses to shrink and overflows the wrap on narrow widths. */
+  min-width: 0;
+  flex-shrink: 1;
 }
 /* Stats lives next to the filter — they're read together. Pure
    numerics ("5" or "3/5") so the visual language stays neutral. */
@@ -1017,6 +1026,9 @@ code:not(pre code) {
   color: var(--text);
   min-width: 0;
   width: 140px;
+  /* Lets the input shrink (down to min-width) when the controls bar
+     is crowded — paired with .hdt-filter { min-width: 0 }. */
+  flex: 1 1 0;
 }
 .hdt-filter input::placeholder { color: var(--text-faint); }
 
