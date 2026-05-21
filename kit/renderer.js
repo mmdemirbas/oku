@@ -268,26 +268,131 @@
     }
 
     _renderChart(block) {
-      // Dispatch by type. Bar charts render as DIV-based horizontal bars
-      // (the row-per-item shape is fundamentally different from a
-      // Cartesian scatter/line and benefits from real DOM text + fluid
-      // resizing). Scatter / line render through the HtmlDocChart Custom
-      // Element which owns SVG, pan/zoom, and the export toolbar.
+      // Dispatch by type. Three rendering paths:
+      //
+      // - bar / stacked-bar / grouped-bar — DIV-based horizontal CSS
+      //   bars. Real DOM text, fluid resizing, no JS after first paint.
+      // - scatter / line / area / bubble / quadrant / donut — the
+      //   html-doc-chart Custom Element, which owns SVG + pan/zoom +
+      //   PNG export. The element parses its data + extras from child
+      //   <script> tags (avoids attribute-encoding pain).
       const type = block.type || 'scatter';
       if (type === 'bar') return this._renderBars(block);
+      if (type === 'stacked-bar' || type === 'grouped-bar') {
+        return this._renderMultiBars(block, type);
+      }
       const el = document.createElement('html-doc-chart');
       el.setAttribute('type', type);
       if (block.title) el.setAttribute('title', block.title);
       if (block.x_label) el.setAttribute('x-label', block.x_label);
       if (block.y_label) el.setAttribute('y-label', block.y_label);
-      // Stash data as a JSON script tag inside the element; the
-      // Custom Element parses it. Avoids encoding/quoting issues in
-      // attributes for complex data.
+      // Cartesian data: stash series as JSON.
       const data = document.createElement('script');
       data.type = 'application/json';
       data.textContent = JSON.stringify(block.series || []);
       el.appendChild(data);
+      // Quadrant overlay: ship the {x, y, labels} as a second JSON
+      // script tag; the element looks for `script[data-extras]`.
+      if (type === 'quadrant' && block.quadrants) {
+        const q = document.createElement('script');
+        q.type = 'application/json';
+        q.setAttribute('data-extras', 'quadrants');
+        q.textContent = JSON.stringify(block.quadrants);
+        el.appendChild(q);
+      }
+      // Donut slices: separate payload from `series`.
+      if (type === 'donut' && Array.isArray(block.slices)) {
+        const d = document.createElement('script');
+        d.type = 'application/json';
+        d.setAttribute('data-extras', 'slices');
+        d.textContent = JSON.stringify(block.slices);
+        el.appendChild(d);
+      }
       return el;
+    }
+
+    _renderMultiBars(block, mode) {
+      // Horizontal multi-series bar render. Each category is a row;
+      // within the row, each series contributes either a stacked
+      // segment (mode=stacked-bar) or a side-by-side mini-bar
+      // (mode=grouped-bar). Layout is CSS-only — no SVG, no JS.
+      const categories = block.categories || [];
+      const series = block.series || [];
+      const wrap = document.createElement('div');
+      wrap.className = 'bar-chart bar-chart-multi bar-chart-' + mode;
+      wrap.setAttribute('role', 'img');
+      wrap.setAttribute('aria-label', (block.title ? block.title + ' — ' : '') + mode + ' with ' + categories.length + ' categories');
+      if (block.title) {
+        const h = document.createElement('h4');
+        h.className = 'bar-chart-title';
+        h.textContent = block.title;
+        wrap.appendChild(h);
+      }
+      // Legend chip rack at the top — one entry per series.
+      if (series.some(s => s.label)) {
+        const legend = document.createElement('div');
+        legend.className = 'bar-chart-legend';
+        for (const s of series) {
+          if (!s.label) continue;
+          const chip = document.createElement('span');
+          chip.className = 'bar-chart-legend-chip ' + (s.color || 'accent');
+          const sw = document.createElement('span');
+          sw.className = 'bar-chart-legend-swatch';
+          chip.appendChild(sw);
+          chip.appendChild(document.createTextNode(s.label));
+          legend.appendChild(chip);
+        }
+        wrap.appendChild(legend);
+      }
+      // Compute the scale max.
+      let scaleMax;
+      if (block.max !== undefined) {
+        scaleMax = block.max;
+      } else if (mode === 'stacked-bar') {
+        // Sum across series per category, then take the max.
+        scaleMax = 0;
+        for (let ci = 0; ci < categories.length; ci++) {
+          let sum = 0;
+          for (const s of series) sum += (s.values && s.values[ci]) || 0;
+          if (sum > scaleMax) scaleMax = sum;
+        }
+      } else {
+        // grouped: largest single value across all series.
+        scaleMax = 1;
+        for (const s of series) {
+          for (const v of (s.values || [])) if (v > scaleMax) scaleMax = v;
+        }
+      }
+      if (scaleMax <= 0) scaleMax = 1;
+      categories.forEach((cat, ci) => {
+        const row = document.createElement('div');
+        row.className = 'bar-row';
+        const lab = document.createElement('span');
+        lab.className = 'bar-label';
+        lab.textContent = cat;
+        row.appendChild(lab);
+        const track = document.createElement('div');
+        track.className = 'bar-track';
+        let rowTotal = 0;
+        series.forEach((s, si) => {
+          const v = (s.values && s.values[ci]) || 0;
+          rowTotal += v;
+          const fill = document.createElement('div');
+          fill.className = 'bar-fill ' + (s.color || 'accent');
+          fill.setAttribute('data-series', String(si));
+          const pct = Math.max(0, Math.min(100, (v / scaleMax) * 100));
+          fill.style.width = pct + '%';
+          if (s.label) fill.title = s.label + ': ' + v;
+          track.appendChild(fill);
+        });
+        row.appendChild(track);
+        const val = document.createElement('span');
+        val.className = 'bar-value';
+        val.textContent = String(rowTotal);
+        row.appendChild(val);
+        wrap.appendChild(row);
+      });
+      return wrap;
     }
 
     _renderDiagram(block) {

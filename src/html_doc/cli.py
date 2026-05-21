@@ -970,13 +970,27 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     if not blk.get("rows"):
                         add(p, "error", "chart-bar-missing-rows", where_prefix,
                             "chart with type:bar requires a `rows` array.")
-                elif ctype in ("scatter", "line"):
+                elif ctype in ("scatter", "line", "area", "bubble", "quadrant"):
                     if not blk.get("series"):
                         add(p, "error", "chart-cartesian-missing-series", where_prefix,
                             f"chart with type:{ctype} requires a `series` array.")
+                    if ctype == "quadrant" and not blk.get("quadrants"):
+                        add(p, "error", "chart-quadrant-missing-quadrants", where_prefix,
+                            "chart with type:quadrant requires a `quadrants` object ({x, y, labels?}).")
+                elif ctype in ("stacked-bar", "grouped-bar"):
+                    if not blk.get("categories"):
+                        add(p, "error", "chart-multi-bar-missing-categories", where_prefix,
+                            f"chart with type:{ctype} requires a `categories` array.")
+                    if not blk.get("series"):
+                        add(p, "error", "chart-multi-bar-missing-series", where_prefix,
+                            f"chart with type:{ctype} requires a `series` array.")
+                elif ctype == "donut":
+                    if not blk.get("slices"):
+                        add(p, "error", "chart-donut-missing-slices", where_prefix,
+                            "chart with type:donut requires a `slices` array.")
                 elif ctype is not None:
                     add(p, "error", "chart-unknown-type", where_prefix,
-                        f"chart type '{ctype}' is not supported. Use scatter, line, or bar.")
+                        f"chart type '{ctype}' is not supported. Use scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, or donut.")
 
         # 7. Duplicate section IDs within a page — anchors must be unique.
         seen_ids: dict[str, int] = {}

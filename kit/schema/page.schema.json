@@ -406,28 +406,28 @@
       "type": "object",
       "required": ["kind", "type"],
       "additionalProperties": false,
-      "description": "Data-driven chart. type=scatter|line renders an interactive SVG plot (pan/zoom/export) using `series` of {x,y} points; type=bar renders horizontal CSS bars (one per `rows[]` entry) — useful for label/value comparisons that don't need a Cartesian axis.",
+      "description": "Data-driven chart. The `type` field picks the render mode: Cartesian (scatter / line / area / bubble / quadrant) share an SVG plot with axes, pan, zoom, log scale, and PNG export; bar variants render label/value bars; donut renders a distribution arc. Each type has its own payload shape — the renderer dispatches by `type` so unused fields are simply ignored.",
       "properties": {
         "kind": { "const": "chart" },
         "type": {
-          "enum": ["scatter", "line", "bar"],
-          "description": "scatter — interactive SVG points; line — same plus connecting strokes; bar — horizontal CSS bars (no axes, no pan/zoom)."
+          "enum": ["scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut"],
+          "description": "Render mode. scatter / line / area / bubble / quadrant — Cartesian SVG using `series` of {x,y} points. bar — horizontal CSS bars from `rows`. stacked-bar / grouped-bar — multi-series horizontal bars using `categories` + `series.values`. donut — single-ring distribution from `slices`."
         },
         "title": { "type": "string" },
-        "x_label": { "type": "string", "description": "Scatter / line only." },
-        "y_label": { "type": "string", "description": "Scatter / line only." },
+        "x_label": { "type": "string", "description": "Cartesian only (scatter / line / area / bubble / quadrant)." },
+        "y_label": { "type": "string", "description": "Cartesian only." },
         "series": {
           "type": "array",
-          "description": "Scatter / line only. Required when type is scatter or line.",
+          "description": "Cartesian or stacked-bar / grouped-bar series. For Cartesian: each series carries `data: [{x, y, label, size?}]`. For stacked-bar / grouped-bar: each series carries `values: [number]` aligned to `categories`.",
           "items": {
             "type": "object",
-            "required": ["data"],
             "additionalProperties": false,
             "properties": {
               "label": { "type": "string" },
               "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" },
               "data": {
                 "type": "array",
+                "description": "Cartesian payload — list of points.",
                 "items": {
                   "type": "object",
                   "required": ["x", "y"],
@@ -435,9 +435,15 @@
                   "properties": {
                     "x": { "type": "number" },
                     "y": { "type": "number" },
-                    "label": { "type": "string" }
+                    "label": { "type": "string" },
+                    "size": { "type": "number", "description": "Bubble only. Drives the dot radius (sqrt-scaled so dot area is proportional to size)." }
                   }
                 }
+              },
+              "values": {
+                "type": "array",
+                "description": "stacked-bar / grouped-bar payload — one numeric value per entry in `categories`.",
+                "items": { "type": "number" }
               }
             }
           }
@@ -457,7 +463,45 @@
             }
           }
         },
-        "max": { "type": "number", "description": "Bar only. Full-width value; defaults to max(rows.value)." }
+        "max": { "type": "number", "description": "Bar / stacked-bar / grouped-bar — full-width value. Defaults to the largest row value (bar) or the largest category total (stacked) / category max (grouped)." },
+        "categories": {
+          "type": "array",
+          "description": "stacked-bar / grouped-bar — ordered list of category labels (rows of the chart). Each series.values[] index aligns to this list.",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "quadrants": {
+          "type": "object",
+          "description": "Quadrant chart only. Splits the plot into four regions with reference lines at (x, y) and optionally names each quadrant.",
+          "required": ["x", "y"],
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number", "description": "Vertical reference line position on the x-axis." },
+            "y": { "type": "number", "description": "Horizontal reference line position on the y-axis." },
+            "labels": {
+              "type": "array",
+              "description": "Four labels in order [top-left, top-right, bottom-left, bottom-right]. Use empty strings to skip a corner.",
+              "items": { "type": "string" },
+              "minItems": 4,
+              "maxItems": 4
+            }
+          }
+        },
+        "slices": {
+          "type": "array",
+          "description": "donut / pie only. Each slice is a labelled value; the renderer normalises to 100%.",
+          "items": {
+            "type": "object",
+            "required": ["label", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "value": { "type": "number", "minimum": 0 },
+              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+            }
+          },
+          "minItems": 2
+        }
       },
       "allOf": [
         {
@@ -465,8 +509,20 @@
           "then": { "required": ["rows"] }
         },
         {
-          "if": { "properties": { "type": { "enum": ["scatter", "line"] } }, "required": ["type"] },
+          "if": { "properties": { "type": { "enum": ["scatter", "line", "area", "bubble", "quadrant"] } }, "required": ["type"] },
           "then": { "required": ["series"] }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["stacked-bar", "grouped-bar"] } }, "required": ["type"] },
+          "then": { "required": ["categories", "series"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "quadrant" } }, "required": ["type"] },
+          "then": { "required": ["quadrants"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "donut" } }, "required": ["type"] },
+          "then": { "required": ["slices"] }
         }
       ]
     },

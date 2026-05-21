@@ -970,24 +970,36 @@
         {
           "kind": "paragraph",
           "content": [
-            "Single primitive, three render modes via the ",
+            "Single primitive, many render modes via the ",
             { "kind": "code", "text": "type" },
-            " field: ",
+            " field. The Cartesian family (",
             { "kind": "code", "text": "scatter" },
-            " and ",
+            ", ",
             { "kind": "code", "text": "line" },
-            " produce an interactive SVG Cartesian plot (auto-scaled axes, pan, zoom, log scale toggle, PNG export). ",
+            ", ",
+            { "kind": "code", "text": "area" },
+            ", ",
+            { "kind": "code", "text": "bubble" },
+            ", ",
+            { "kind": "code", "text": "quadrant" },
+            ") share an interactive SVG plot with pan / zoom / log axes / PNG export. The bar family (",
             { "kind": "code", "text": "bar" },
-            " produces row-per-item horizontal bars (label / track / readout) — layout-safe by structure, no axes. The Cartesian and bar forms have different payload shapes; the renderer dispatches by ",
+            ", ",
+            { "kind": "code", "text": "stacked-bar" },
+            ", ",
+            { "kind": "code", "text": "grouped-bar" },
+            ") renders horizontal CSS bars. ",
+            { "kind": "code", "text": "donut" },
+            " renders a distribution arc. The renderer dispatches by ",
             { "kind": "code", "text": "type" },
-            "."
+            " — each mode has its own payload shape; unused fields are ignored."
           ]
         },
         {
           "kind": "callout",
           "type": "info",
           "title": "Library underneath",
-          "content": "Both modes are kit-native (no third-party chart library). Scatter / line render as inline SVG drawn by the html-doc-chart Custom Element. Bar renders as plain HTML + CSS — no JavaScript after first paint."
+          "content": "All modes are kit-native — no third-party chart library. Cartesian + donut modes render as inline SVG drawn by the html-doc-chart Custom Element. The bar family renders as plain HTML + CSS, no JavaScript after first paint."
         },
         {
           "kind": "heading",
@@ -1089,6 +1101,223 @@
             { "label": "Spark", "value": 95, "display": "95 / 100" },
             { "label": "Flink", "value": 80, "display": "80 / 100" },
             { "label": "Trino", "value": 75, "display": "75 / 100" }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-area",
+          "title": "type: area"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Same shape as line — series of {x, y} points — but the curve is filled down to the baseline. Useful for cumulative metrics over time where magnitude matters as much as direction."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"area\",\n  \"x_label\": \"Day\",\n  \"y_label\": \"Active users\",\n  \"series\": [\n    { \"label\": \"Daily\", \"color\": \"accent\", \"data\": [\n      { \"x\": 1, \"y\": 40 }, { \"x\": 2, \"y\": 65 },\n      { \"x\": 3, \"y\": 55 }, { \"x\": 4, \"y\": 80 },\n      { \"x\": 5, \"y\": 95 }, { \"x\": 6, \"y\": 110 },\n      { \"x\": 7, \"y\": 130 }\n    ]}\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "area",
+          "title": "Active users — first week",
+          "x_label": "Day",
+          "y_label": "Active users",
+          "series": [
+            {
+              "label": "Daily",
+              "color": "accent",
+              "data": [
+                { "x": 1, "y": 40 }, { "x": 2, "y": 65 },
+                { "x": 3, "y": 55 }, { "x": 4, "y": 80 },
+                { "x": 5, "y": 95 }, { "x": 6, "y": 110 },
+                { "x": 7, "y": 130 }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-bubble",
+          "title": "type: bubble"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Scatter plot with a third dimension encoded as dot size. Each point gains an optional ",
+            { "kind": "code", "text": "size" },
+            " field; the renderer takes its square root so the dot's AREA is proportional to size (eye reads area, not radius). Useful for cost vs. impact vs. confidence-style decision matrices."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bubble\",\n  \"x_label\": \"Cost\",\n  \"y_label\": \"Impact\",\n  \"series\": [\n    { \"label\": \"Initiatives\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"size\": 40,  \"label\": \"Search\" },\n      { \"x\": 6, \"y\": 9, \"size\": 120, \"label\": \"Auth\" },\n      { \"x\": 4, \"y\": 4, \"size\": 80,  \"label\": \"Logging\" },\n      { \"x\": 7, \"y\": 2, \"size\": 25,  \"label\": \"Theme\" }\n    ]}\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "bubble",
+          "title": "Initiatives — cost vs. impact vs. team-size",
+          "x_label": "Cost",
+          "y_label": "Impact",
+          "series": [
+            {
+              "label": "Initiatives",
+              "color": "accent",
+              "data": [
+                { "x": 2, "y": 8, "size": 40, "label": "Search" },
+                { "x": 6, "y": 9, "size": 120, "label": "Auth" },
+                { "x": 4, "y": 4, "size": 80, "label": "Logging" },
+                { "x": 7, "y": 2, "size": 25, "label": "Theme" }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-quadrant",
+          "title": "type: quadrant"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Scatter plot split into four regions by two reference lines. Author supplies a ",
+            { "kind": "code", "text": "quadrants" },
+            " block with ",
+            { "kind": "code", "text": "x" },
+            " (vertical split) + ",
+            { "kind": "code", "text": "y" },
+            " (horizontal split) and optionally four corner labels (",
+            { "kind": "code", "text": "[TL, TR, BL, BR]" },
+            "). Reads as a 2×2 decision matrix at a glance."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"quadrant\",\n  \"x_label\": \"Effort\",\n  \"y_label\": \"Value\",\n  \"quadrants\": {\n    \"x\": 5, \"y\": 5,\n    \"labels\": [\"Quick wins\", \"Big bets\", \"Skip\", \"Re-evaluate\"]\n  },\n  \"series\": [\n    { \"label\": \"Items\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"label\": \"A\" },\n      { \"x\": 7, \"y\": 8, \"label\": \"B\" },\n      { \"x\": 2, \"y\": 3, \"label\": \"C\" },\n      { \"x\": 8, \"y\": 2, \"label\": \"D\" }\n    ]}\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "quadrant",
+          "title": "Effort × value — decision matrix",
+          "x_label": "Effort",
+          "y_label": "Value",
+          "quadrants": {
+            "x": 5,
+            "y": 5,
+            "labels": ["Quick wins", "Big bets", "Skip", "Re-evaluate"]
+          },
+          "series": [
+            {
+              "label": "Items",
+              "color": "accent",
+              "data": [
+                { "x": 2, "y": 8, "label": "A" },
+                { "x": 7, "y": 8, "label": "B" },
+                { "x": 2, "y": 3, "label": "C" },
+                { "x": 8, "y": 2, "label": "D" }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-stacked",
+          "title": "type: stacked-bar"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Multi-series horizontal bars where each row's series stack into a single bar. Author supplies ",
+            { "kind": "code", "text": "categories" },
+            " (one per row) and ",
+            { "kind": "code", "text": "series" },
+            " of ",
+            { "kind": "code", "text": "{label, color, values}" },
+            ", with ",
+            { "kind": "code", "text": "values[i]" },
+            " aligning to ",
+            { "kind": "code", "text": "categories[i]" },
+            ". The right-hand readout is the row total. Use for breakdown-of-a-total visualisation."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"stacked-bar\",\n  \"title\": \"Build time by phase\",\n  \"categories\": [\"v1.0\", \"v1.1\", \"v1.2\"],\n  \"series\": [\n    { \"label\": \"compile\", \"color\": \"accent\",  \"values\": [12, 14, 11] },\n    { \"label\": \"test\",    \"color\": \"success\", \"values\": [8,  10, 12] },\n    { \"label\": \"package\", \"color\": \"warn\",    \"values\": [3,  4,  3] }\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "stacked-bar",
+          "title": "Build time by phase",
+          "categories": ["v1.0", "v1.1", "v1.2"],
+          "series": [
+            { "label": "compile", "color": "accent",  "values": [12, 14, 11] },
+            { "label": "test",    "color": "success", "values": [8,  10, 12] },
+            { "label": "package", "color": "warn",    "values": [3,  4,  3] }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-grouped",
+          "title": "type: grouped-bar"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Same payload as stacked-bar, but each series renders as its own thin sub-bar within the row rather than stacking. Use for direct comparison across series within the same category."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"grouped-bar\",\n  \"title\": \"Latency by region\",\n  \"categories\": [\"p50\", \"p95\", \"p99\"],\n  \"series\": [\n    { \"label\": \"EU\", \"color\": \"accent\",  \"values\": [40, 110, 220] },\n    { \"label\": \"US\", \"color\": \"success\", \"values\": [55, 130, 260] },\n    { \"label\": \"AP\", \"color\": \"warn\",    \"values\": [70, 180, 340] }\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "grouped-bar",
+          "title": "Latency by region (ms)",
+          "categories": ["p50", "p95", "p99"],
+          "series": [
+            { "label": "EU", "color": "accent",  "values": [40, 110, 220] },
+            { "label": "US", "color": "success", "values": [55, 130, 260] },
+            { "label": "AP", "color": "warn",    "values": [70, 180, 340] }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-donut",
+          "title": "type: donut"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Single-ring distribution chart. Each ",
+            { "kind": "code", "text": "slice" },
+            " is a ",
+            { "kind": "code", "text": "{label, value, color?}" },
+            "; the renderer normalises values to percentages of the total, draws an arc per slice, and shows the total + a legend on the side."
+          ]
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"donut\",\n  \"title\": \"Page load breakdown\",\n  \"slices\": [\n    { \"label\": \"HTML\",  \"value\": 12, \"color\": \"accent\" },\n    { \"label\": \"CSS\",   \"value\": 28, \"color\": \"success\" },\n    { \"label\": \"JS\",    \"value\": 44, \"color\": \"warn\" },\n    { \"label\": \"Other\", \"value\": 16, \"color\": \"muted\" }\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "donut",
+          "title": "Page load breakdown (KB)",
+          "slices": [
+            { "label": "HTML",  "value": 12, "color": "accent" },
+            { "label": "CSS",   "value": 28, "color": "success" },
+            { "label": "JS",    "value": 44, "color": "warn" },
+            { "label": "Other", "value": 16, "color": "muted" }
           ]
         },
         {

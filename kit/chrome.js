@@ -2878,21 +2878,41 @@ if (!customElements.get('html-doc-cite')) customElements.define('html-doc-cite',
  * --------------------------------------------------------------- */
 class HtmlDocChart extends HTMLElement {
   connectedCallback() {
-    var dataNode = this.querySelector('script[type="application/json"]');
+    var dataNode = this.querySelector('script[type="application/json"]:not([data-extras])');
+    var extrasNodes = this.querySelectorAll('script[data-extras]');
     var series = [];
     if (dataNode) {
       try { series = JSON.parse(dataNode.textContent || '[]'); } catch (e) { series = []; }
     }
-    this._series  = series;
-    this._type    = this.getAttribute('type') || 'scatter';
-    this._title   = this.getAttribute('title') || '';
-    this._xLabel  = this.getAttribute('x-label') || '';
-    this._yLabel  = this.getAttribute('y-label') || '';
-    this._xScale  = (this.getAttribute('x-scale') || 'linear').toLowerCase();
-    this._yScale  = (this.getAttribute('y-scale') || 'linear').toLowerCase();
+    // Extras hold type-specific payloads that don't fit the `series`
+    // shape — quadrant reference lines, donut slices, etc.
+    var extras = {};
+    Array.prototype.forEach.call(extrasNodes, function (n) {
+      var key = n.getAttribute('data-extras');
+      if (!key) return;
+      try { extras[key] = JSON.parse(n.textContent || 'null'); } catch (e) { /* keep as undefined */ }
+    });
+    this._series   = series;
+    this._extras   = extras;
+    this._type     = this.getAttribute('type') || 'scatter';
+    this._title    = this.getAttribute('title') || '';
+    this._xLabel   = this.getAttribute('x-label') || '';
+    this._yLabel   = this.getAttribute('y-label') || '';
+    this._xScale   = (this.getAttribute('x-scale') || 'linear').toLowerCase();
+    this._yScale   = (this.getAttribute('y-scale') || 'linear').toLowerCase();
 
     this.innerHTML = '';
     if (dataNode) this.appendChild(dataNode);
+    Array.prototype.forEach.call(extrasNodes, function (n) { this.appendChild(n); }, this);
+
+    // Donut takes a separate render path — no Cartesian axes, just
+    // arcs over the `slices` payload. Branches off early so the rest
+    // of connectedCallback (scale derivation, pan/zoom) is unused.
+    if (this._type === 'donut') {
+      this._renderDonut();
+      this._attachToolbar();
+      return;
+    }
 
     var allPoints = [];
     series.forEach(function (s) { (s.data || []).forEach(function (p) { allPoints.push(p); }); });
@@ -2999,26 +3019,72 @@ class HtmlDocChart extends HTMLElement {
       parts.push('<text x="' + (pad.left - 6) + '" y="' + (pos + 4) + '" text-anchor="end" class="hdc-tick">' + fmtNum(val) + '</text>');
     });
 
+    // Quadrant overlay: two reference lines + optional corner labels.
+    // Drawn BEFORE the plot region so the data dots sit on top.
+    if (self._type === 'quadrant' && self._extras && self._extras.quadrants) {
+      var q = self._extras.quadrants;
+      if (typeof q.x === 'number') {
+        var qx = sx(q.x);
+        parts.push('<line x1="' + qx + '" y1="' + pad.top + '" x2="' + qx + '" y2="' + (pad.top + plotH) + '" class="hdc-quadrant"/>');
+      }
+      if (typeof q.y === 'number') {
+        var qy = sy(q.y);
+        parts.push('<line x1="' + pad.left + '" y1="' + qy + '" x2="' + (W - pad.right) + '" y2="' + qy + '" class="hdc-quadrant"/>');
+      }
+      if (Array.isArray(q.labels)) {
+        var ql = q.labels;
+        // Order: [TL, TR, BL, BR].
+        if (ql[0]) parts.push('<text x="' + (pad.left + 8) + '" y="' + (pad.top + 14) + '" class="hdc-quadrant-label">' + escapeXml(ql[0]) + '</text>');
+        if (ql[1]) parts.push('<text x="' + (W - pad.right - 8) + '" y="' + (pad.top + 14) + '" text-anchor="end" class="hdc-quadrant-label">' + escapeXml(ql[1]) + '</text>');
+        if (ql[2]) parts.push('<text x="' + (pad.left + 8) + '" y="' + (pad.top + plotH - 8) + '" class="hdc-quadrant-label">' + escapeXml(ql[2]) + '</text>');
+        if (ql[3]) parts.push('<text x="' + (W - pad.right - 8) + '" y="' + (pad.top + plotH - 8) + '" text-anchor="end" class="hdc-quadrant-label">' + escapeXml(ql[3]) + '</text>');
+      }
+    }
+
     // Plot region (clipped). All series + their dots / labels live here so
     // points that scroll past the axes don't leak.
     parts.push('<g clip-path="url(#hdc-clip)">');
     var plotMidX = pad.left + plotW / 2;
+    var drawsConnector = (self._type === 'line' || self._type === 'area');
+    var drawsFill = (self._type === 'area');
+    var drawsBubble = (self._type === 'bubble');
     this._series.forEach(function (s, i) {
       var color = palette[s.color] || palette.accent;
       parts.push('<g class="hdc-series" data-series-idx="' + i + '">');
-      if (self._type === 'line') {
-        var d = (s.data || []).map(function (p, idx) {
-          return (idx === 0 ? 'M ' : 'L ') + sx(p.x) + ' ' + sy(p.y);
-        }).join(' ');
-        parts.push('<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" class="hdc-line"/>');
+      if (drawsConnector) {
+        var data = s.data || [];
+        if (data.length) {
+          var d = data.map(function (p, idx) {
+            return (idx === 0 ? 'M ' : 'L ') + sx(p.x) + ' ' + sy(p.y);
+          }).join(' ');
+          if (drawsFill) {
+            // Close down to a baseline so the polygon is filled. Use
+            // y=0 when the range straddles zero, otherwise the y-axis
+            // minimum (which keeps the fill within the plot rect).
+            var baseY = (v.yMin <= 0 && v.yMax >= 0) ? sy(0) : sy(v.yMin);
+            var firstX = sx(data[0].x), lastX = sx(data[data.length - 1].x);
+            var areaD = d + ' L ' + lastX + ' ' + baseY + ' L ' + firstX + ' ' + baseY + ' Z';
+            parts.push('<path d="' + areaD + '" fill="' + color + '" fill-opacity="0.18" stroke="none" class="hdc-area"/>');
+          }
+          parts.push('<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" class="hdc-line"/>');
+        }
       }
       (s.data || []).forEach(function (p, j) {
         var key = i + '-' + j;
         var dotLabel = escapeXml(String(p.label != null ? p.label : ''));
         var seriesLbl = escapeXml(String(s.label != null ? s.label : ''));
         var px = sx(p.x), py = sy(p.y);
+        // Bubble: radius from p.size (sqrt so dot area is proportional
+        // to size). Clamp to a reasonable range so a single large
+        // outlier doesn't fill the plot.
+        var r = 4;
+        if (drawsBubble && p.size != null) {
+          var s2 = Math.abs(+p.size) || 0;
+          r = Math.max(4, Math.min(28, Math.sqrt(s2) * 1.2));
+        }
         parts.push(
-          '<circle cx="' + px + '" cy="' + py + '" r="4" fill="' + color +
+          '<circle cx="' + px + '" cy="' + py + '" r="' + r + '" fill="' + color +
+          (drawsBubble ? '" fill-opacity="0.55' : '') +
           '" class="hdc-dot"' +
           ' data-point-key="' + key + '" data-x="' + p.x + '" data-y="' + p.y +
           '" data-point-label="' + dotLabel + '" data-series-label="' + seriesLbl + '"' +
@@ -3135,6 +3201,79 @@ class HtmlDocChart extends HTMLElement {
         box.el.classList.add('hdc-label-hidden');
       }
     });
+  }
+
+  /* Donut render — distribution over `slices: [{label, value, color?}]`.
+     Skips the Cartesian render path entirely (no axes, no pan/zoom).
+     Slice geometry: cumulative angles starting at -π/2 (top), each
+     slice as an SVG arc path. A centre label shows the total. Legend
+     chips on the right map colour to slice label.
+
+     The arc-flag is set when the slice covers > 180° so the arc takes
+     the long way around; otherwise SVG would short-circuit through
+     the donut centre. */
+  _renderDonut() {
+    var slices = (this._extras && this._extras.slices) || [];
+    var total = 0;
+    for (var i = 0; i < slices.length; i++) total += Math.max(0, +slices[i].value || 0);
+    if (total <= 0 || slices.length < 1) {
+      this.appendChild(document.createTextNode(''));
+      return;
+    }
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var W = 420, H = 320;
+    var cx = 140, cy = H / 2;
+    var rOuter = 110, rInner = 64;
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Donut chart') + '" class="hdc-svg hdc-donut">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+
+    var angleStart = -Math.PI / 2; // 12 o'clock
+    slices.forEach(function (slice, idx) {
+      var value = Math.max(0, +slice.value || 0);
+      if (value <= 0) return;
+      var fraction = value / total;
+      var angleEnd = angleStart + fraction * Math.PI * 2;
+      var largeArc = fraction > 0.5 ? 1 : 0;
+      var x1 = cx + rOuter * Math.cos(angleStart);
+      var y1 = cy + rOuter * Math.sin(angleStart);
+      var x2 = cx + rOuter * Math.cos(angleEnd);
+      var y2 = cy + rOuter * Math.sin(angleEnd);
+      var ix1 = cx + rInner * Math.cos(angleEnd);
+      var iy1 = cy + rInner * Math.sin(angleEnd);
+      var ix2 = cx + rInner * Math.cos(angleStart);
+      var iy2 = cy + rInner * Math.sin(angleStart);
+      var d = 'M ' + x1 + ' ' + y1 +
+              ' A ' + rOuter + ' ' + rOuter + ' 0 ' + largeArc + ' 1 ' + x2 + ' ' + y2 +
+              ' L ' + ix1 + ' ' + iy1 +
+              ' A ' + rInner + ' ' + rInner + ' 0 ' + largeArc + ' 0 ' + ix2 + ' ' + iy2 +
+              ' Z';
+      var color = palette[slice.color] || palette.accent;
+      parts.push('<path d="' + d + '" fill="' + color + '" class="hdc-slice"' +
+                 ' data-slice-idx="' + idx + '" data-slice-label="' + escapeXml(slice.label || '') + '"' +
+                 ' tabindex="0" role="img" aria-label="' + escapeXml(slice.label || '') + ': ' + fmtNum(value) + ' (' + Math.round(fraction * 100) + '%)"/>');
+      angleStart = angleEnd;
+    });
+
+    // Centre readout — total + a small caption.
+    parts.push('<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" class="hdc-donut-total">' + escapeXml(fmtNum(total)) + '</text>');
+    parts.push('<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" class="hdc-donut-caption">total</text>');
+
+    // Legend on the right side, one row per slice.
+    var lx = 280;
+    slices.forEach(function (slice, idx) {
+      var color = palette[slice.color] || palette.accent;
+      var ly = 64 + idx * 22;
+      var pct = Math.round((Math.max(0, +slice.value || 0) / total) * 100);
+      parts.push('<g class="hdc-donut-legend" data-slice-idx="' + idx + '">' +
+                 '<rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/>' +
+                 '<text x="' + (lx + 18) + '" y="' + ly + '" class="hdc-donut-legend-label">' +
+                   escapeXml(slice.label || '') + ' · ' + pct + '%' +
+                 '</text></g>');
+    });
+    parts.push('</svg>');
+    var svg = document.createRange().createContextualFragment(parts.join(''));
+    this.appendChild(svg);
   }
 
   _attachToolbar() {

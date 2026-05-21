@@ -161,7 +161,7 @@ def test_chart_unknown_type_errors(tmp_path: Path) -> None:
     }
     issues = _issues_of(_run(page, tmp_path=tmp_path), code="chart-unknown-type")
     assert len(issues) == 1
-    assert "scatter, line, or bar" in issues[0]["message"]
+    assert "scatter, line, area, bubble, quadrant" in issues[0]["message"]
 
 
 # ---------- duplicate anchors ----------
