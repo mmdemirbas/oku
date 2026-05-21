@@ -161,6 +161,65 @@
               "content": "meta.summary is surfaced in three places: the page-nav tooltip on hover, the llms.txt sitemap line for AI consumers, and (when present) the Pagefind search excerpt. Keep it one tight sentence focused on what the page contains — not a teaser."
             }
           ]
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "markdown-sources",
+          "title": "Markdown sources"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Existing ",
+            { "kind": "code", "text": ".md" },
+            " files anywhere under the docs root are first-class pages — they appear in the site tree, render with the kit's TOC + chrome, and survive ",
+            { "kind": "code", "text": "html-doc check / build / serve" },
+            " alongside JSON pages. You don't have to convert anything before adopting the kit; existing Markdown documentation drops in unchanged."
+          ]
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "in",
+              "title": "Markdown → page kinds",
+              "items": [
+                "ATX heading H1 → page.title",
+                "ATX heading H2 → section (id auto-slugged from title)",
+                "ATX heading H3 / H4 → heading block inside the active section",
+                "Paragraph with **bold** / *italic* / `code` / [text](url) → paragraph + inline nodes",
+                "Fenced code block → code (language preserved)",
+                "Fenced `mermaid` block → diagram (rendered via the kit's diagram primitive)",
+                "Unordered + ordered lists → list (style: bullet | numbered)",
+                "Blockquote → callout (type: neutral)",
+                "GFM-style pipe table → table",
+                "Horizontal rule (---) → hr"
+              ]
+            },
+            {
+              "verdict": "out",
+              "title": "Not in the converter",
+              "items": [
+                "Nested lists (rendered flat)",
+                "Footnotes, definition lists, reference-style links",
+                "Inline HTML inside Markdown (stripped to text)",
+                "Front-matter YAML (treat per-page metadata via a sibling .json page if you need it)"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "Relative .md links rewrite to .html",
+          "content": "<code>[overview](other.md#section)</code> in a Markdown page becomes <code>other.html#section</code> at render time, so links between .md pages work the same as between .json pages. Absolute URLs (http, https, mailto), fragment-only refs (<code>#section</code>), and absolute paths (<code>/x</code>) pass through unchanged."
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "Project-meta files excluded",
+          "content": "README.md, CHANGELOG.md, CLAUDE.md, AGENTS.md, LICENSE.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md are skipped wherever they appear in the tree. The kit treats them as repo metadata, not documentation pages. Any other .md is included automatically."
         }
       ]
     },

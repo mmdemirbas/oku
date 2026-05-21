@@ -284,3 +284,118 @@ class TestPickOpenTarget:
 
     def test_empty_htmls_returns_none(self, tmp_path: Path) -> None:
         assert cli._pick_open_target([], tmp_path, tmp_path) is None
+
+
+# ---------- Markdown link-href rewriting ----------
+
+
+class TestMdLinkHref:
+    """`[text](other.md)` style links must point at the rendered .html
+    page; absolute URLs and fragments must pass through untouched."""
+
+    def test_relative_md_link_rewritten(self) -> None:
+        assert cli._md_link_href("other.md") == "other.html"
+
+    def test_relative_md_link_with_fragment(self) -> None:
+        assert cli._md_link_href("notes/details.md#thing") == "notes/details.html#thing"
+
+    def test_parent_relative_md_link(self) -> None:
+        assert cli._md_link_href("../sibling.md") == "../sibling.html"
+
+    def test_absolute_url_passthrough(self) -> None:
+        for href in (
+            "https://example.com/x.md",
+            "http://example.com/x.md",
+            "mailto:foo@bar.md",
+            "//cdn.example.com/x.md",
+        ):
+            assert cli._md_link_href(href) == href, f"absolute URL {href!r} should pass through"
+
+    def test_fragment_only_passthrough(self) -> None:
+        assert cli._md_link_href("#section") == "#section"
+
+    def test_root_absolute_path_passthrough(self) -> None:
+        # /a/b.md is a server-relative absolute path; leave it alone —
+        # the kit can't know whether that maps to a rendered .html.
+        assert cli._md_link_href("/docs/foo.md") == "/docs/foo.md"
+
+    def test_non_md_passthrough(self) -> None:
+        assert cli._md_link_href("other.html") == "other.html"
+        assert cli._md_link_href("data.json") == "data.json"
+
+
+# ---------- md_to_page integration ----------
+
+
+class TestMdToPage:
+    """End-to-end checks on md_to_page output shape."""
+
+    def test_h1_becomes_title(self) -> None:
+        page = cli.md_to_page("# Hello\n\nbody")
+        assert page["kind"] == "page"
+        assert page["title"] == "Hello"
+
+    def test_h2_starts_a_section(self) -> None:
+        page = cli.md_to_page("# X\n\nintro\n\n## First\n\nbody")
+        ids = [b.get("id") for b in page["blocks"] if b.get("kind") == "section"]
+        assert "intro" in ids, "implicit intro section missing"
+        assert "first" in ids, "h2 'First' did not become a section with id='first'"
+
+    def test_md_link_in_paragraph_rewritten_to_html(self) -> None:
+        """Live integration — the link rewriter must actually run on
+        paragraph content emitted by md_to_page."""
+        page = cli.md_to_page("# X\n\n## Sec\n\nSee [details](notes/details.md#thing).")
+        # Walk to the link node.
+        found = None
+        def walk(node):
+            nonlocal found
+            if isinstance(node, dict):
+                if node.get("kind") == "link":
+                    found = node
+                    return
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for it in node:
+                    walk(it)
+        walk(page)
+        assert found is not None, "no link node emitted"
+        assert found["href"] == "notes/details.html#thing"
+
+
+# ---------- find_json_pages / project-meta exclusion ----------
+
+
+class TestFindJsonPagesMd:
+    """Markdown files anywhere under the docs root become first-class
+    pages, except a small set of well-known project-meta filenames."""
+
+    def test_md_under_root_included(self, tmp_path: Path) -> None:
+        (tmp_path / "overview.md").write_text("# Overview\n\nbody", encoding="utf-8")
+        (tmp_path / "notes").mkdir()
+        (tmp_path / "notes" / "details.md").write_text("# Details", encoding="utf-8")
+        pages = cli.find_json_pages(tmp_path)
+        paths = sorted(str(p.relative_to(tmp_path)) for p, _ in pages)
+        assert "overview.json" in paths, "top-level overview.md was not surfaced as a page"
+        assert "notes/details.json" in paths
+
+    def test_well_known_project_meta_excluded(self, tmp_path: Path) -> None:
+        for name in ("README.md", "CLAUDE.md", "CHANGELOG.md", "LICENSE.md"):
+            (tmp_path / name).write_text(f"# {name}", encoding="utf-8")
+        (tmp_path / "real.md").write_text("# Real", encoding="utf-8")
+        pages = cli.find_json_pages(tmp_path)
+        paths = {str(p.relative_to(tmp_path)) for p, _ in pages}
+        for name in ("README.md", "CLAUDE.md", "CHANGELOG.md", "LICENSE.md"):
+            assert name.replace(".md", ".json") not in paths, (
+                f"{name} should be excluded as project meta"
+            )
+        assert "real.json" in paths
+
+    def test_manifest_source_points_at_real_md(self, tmp_path: Path) -> None:
+        """For md-derived pages, compute_manifest must report the .md
+        file as the source (not the virtual .json path)."""
+        (tmp_path / "overview.md").write_text("# Overview\n\nx", encoding="utf-8")
+        manifest = cli.compute_manifest(tmp_path)
+        entry = next((e for e in manifest["pages"] if e["path"] == "overview.html"), None)
+        assert entry is not None
+        assert entry["source"] == "overview.md"

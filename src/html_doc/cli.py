@@ -97,6 +97,16 @@ def _kit_version() -> int:
         if mt > latest:
             latest = mt
     return int(latest)
+# Project-meta filenames excluded from the .md-as-page walk. These
+# carry README / CHANGELOG / LICENSE-style content that the package
+# manager / forge displays separately; pulling them into the site tree
+# would surface noise (and often paths that don't render cleanly).
+_PROJECT_META_MD = {
+    "README.md", "CLAUDE.md", "CHANGELOG.md", "AGENTS.md",
+    "LICENSE.md", "LICENCE.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md",
+    "SECURITY.md",
+}
+
 SKIP_DIRS = {
     "dist", "_kit", "node_modules", ".git", "venv", ".venv",
     "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".idea",
@@ -294,6 +304,24 @@ _MD_INLINE_RE = re.compile(
 )
 
 
+_MD_REL_LINK_RE = re.compile(r"^(?!\w+:|//|#|/)(.+?)\.md(#[^\s]*)?$", re.IGNORECASE)
+
+
+def _md_link_href(href: str) -> str:
+    """Rewrite a markdown link href so `.md` extensions point at the
+    rendered `.html` page. Absolute URLs (http://, https://, mailto:),
+    fragment-only refs (`#foo`), and absolute paths (`/x`) pass
+    through untouched — only relative `.md` paths get retargeted. A
+    trailing fragment is preserved so `[X](foo.md#section)` becomes
+    `foo.html#section`."""
+    if not href:
+        return href
+    m = _MD_REL_LINK_RE.match(href)
+    if not m:
+        return href
+    return m.group(1) + ".html" + (m.group(2) or "")
+
+
 def _md_inline(text: str) -> list:
     """Split a markdown text fragment into the kit's inline-content
     array: a sequence of plain strings and inline-block objects
@@ -318,7 +346,7 @@ def _md_inline(text: str) -> list:
         elif m.group(6) is not None:
             parts.append({"kind": "code", "text": m.group(6)})
         elif m.group(7) is not None:
-            parts.append({"kind": "link", "text": m.group(7), "href": m.group(8)})
+            parts.append({"kind": "link", "text": m.group(7), "href": _md_link_href(m.group(8))})
         pos = m.end()
     if pos < len(text):
         parts.append(text[pos:])
@@ -641,12 +669,13 @@ def find_json_pages(root: Path):
     # Also walk .md files — convert each into a synthesized page dict
     # via md_to_page. The "path" returned uses .json so consumers that
     # do path.with_suffix(".html") still derive the right stub URL.
-    # Repo-root .md files (README, CLAUDE) are excluded — they're
-    # project meta, not docs pages.
+    # A small set of well-known project-meta filenames is excluded
+    # wherever they appear (a top-level docs/README.md is NOT meta —
+    # it's a page the user expects to see in the site tree).
     for p in root.rglob("*.md"):
         if any(part in SKIP_DIRS for part in p.parts):
             continue
-        if p.parent == root:
+        if p.name in _PROJECT_META_MD:
             continue
         try:
             text = p.read_text(encoding="utf-8")
@@ -1131,9 +1160,18 @@ def compute_manifest(root: Path) -> dict:
         nav_path = rel.with_suffix(".html").as_posix()
         parent = rel.parent.as_posix() if rel.parent != Path(".") else None
         meta = data.get("meta") or {}
+        # `p` is always a .json virtual path. For .md-derived pages the
+        # .json file doesn't exist on disk; the real source is the
+        # sibling .md. Report whichever is real so the manifest's source
+        # field matches what a reader can open in their editor.
+        source_rel = rel
+        if not p.exists():
+            md_sibling = p.with_suffix(".md")
+            if md_sibling.exists():
+                source_rel = md_sibling.relative_to(root)
         entry = {
             "path": nav_path,
-            "source": rel.as_posix(),
+            "source": source_rel.as_posix(),
             "title": data.get("title") or p.stem,
             "parent": parent,
         }
