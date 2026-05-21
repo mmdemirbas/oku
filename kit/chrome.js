@@ -1831,7 +1831,12 @@ function _hdtWrapCodeLines(code) {
     line.setAttribute('data-line', String(lineIdx));
     var num = document.createElement('span');
     num.className = 'hdt-code-ln';
-    num.textContent = String(lineIdx);
+    // Number rendered via ::before { content: attr(data-ln) } so it
+    // does NOT contribute to code.textContent. Prism's autoloader can
+    // fire `complete` twice (once before the language module arrives,
+    // once after); the second pass re-reads textContent and would
+    // otherwise see "1uv …" / "2# …" / "3htm …" baked in.
+    num.setAttribute('data-ln', String(lineIdx));
     num.setAttribute('aria-hidden', 'true');
     var fold = document.createElement('span');
     fold.className = 'hdt-fold-marker';

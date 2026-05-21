@@ -520,6 +520,12 @@ pre .hdt-code-ln {
   -webkit-user-select: none;
   font-variant-numeric: tabular-nums;
 }
+/* Render the line number via ::before so it does NOT contribute to
+   <code>.textContent — Prism's autoloader fires `complete` twice (once
+   before the language module arrives, once after) and the second pass
+   re-reads textContent; if numbers leaked in, every line would render
+   with a duplicated "1uv …" / "2# …" prefix. */
+pre .hdt-code-ln::before { content: attr(data-ln); }
 /* Fold marker column — sits to the RIGHT of the line number (IntelliJ
    convention). Empty for non-foldable lines; shows ▼ (expanded) or
    ▶ (collapsed) for foldable ones. Dim grey at rest; brighter on
