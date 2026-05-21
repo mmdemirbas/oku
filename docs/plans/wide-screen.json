@@ -1,0 +1,384 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Wide-screen utilization",
+  "accent": "indigo",
+  "meta": {
+    "eyebrow": "Plan",
+    "subtitle": "How to use the empty space on wide monitors — options weighed, recommendation, open questions.",
+    "audience": "Designer",
+    "order": 100,
+    "summary": "Design plan for asymmetric bleed — prose locked, scan-friendly primitives widen to fill the column."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "Today the content column maxes out around 1100px even when the monitor offers 1500+. Prose doesn't benefit from a wider column (readability caps at ~80 chars), but tables, charts, code blocks, and diagrams do. The recommended path is asymmetric bleed: cap prose at the readable column, let scan-friendly primitives extend to the grid-cell edge.",
+      "bullets": [
+        "A — raise --max-width: cheap, breaks prose readability. Rejected as default.",
+        "B — asymmetric bleed (prose locked, primitives bleed): recommended.",
+        "C — right-rail of supporting content: defer until a concrete second-surface candidate exists.",
+        "D — multi-column prose: rejected (awkward in scroll-based reading).",
+        "E — side-by-side comparison: deferred (niche)."
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "today",
+      "title": "What's there today",
+      "lead": "Three width modes selected by the chrome cycler; max-width applies uniformly to every primitive in the content column.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "css",
+          "source": ":root { --max-width: 1100px; }\nmain {\n  max-width: var(--content-width, var(--max-width));\n  margin: 0 auto;\n}"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "The width cycler stamps ",
+            { "kind": "code", "text": "body[data-content-width=…]" },
+            " across three modes:"
+          ]
+        },
+        {
+          "kind": "table",
+          "headers": ["Mode", "--content-width", "Intent"],
+          "rows": [
+            [
+              [{ "kind": "code", "text": "narrow" }],
+              "860px",
+              "Optimal line-length for prose (~80 chars)."
+            ],
+            [
+              [{ "kind": "code", "text": "wide" }],
+              "1100px",
+              "More cards per row; prose still readable."
+            ],
+            [
+              [{ "kind": "code", "text": "max" }],
+              "no cap",
+              "Whatever the main grid cell gives."
+            ]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Effective ceiling on common viewports",
+          "content": "On a 1440px monitor with a 280px sidebar, max mode delivers ~1100px — a tie with wide. On 1920+ monitors max widens past 1500px and prose lines become unreadable. The current cap is silently the wrong cap on either side of that boundary."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "problem",
+      "title": "The actual problem",
+      "lead": "Wide monitors are wasted on prose, valuable for scan-friendly primitives. The current single max-width applies the same rule to both.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "out",
+              "title": "Prose — narrow wins",
+              "items": [
+                "Past ~80 characters per line, eye saccades farther and re-acquisition slows.",
+                "It's a measurable readability limit, not a personal preference.",
+                "Every typography-aware platform (Stripe, Notion, Material, GitBook) caps prose at 720–860px regardless of viewport."
+              ]
+            },
+            {
+              "verdict": "in",
+              "title": "Scan-friendly primitives — wide wins",
+              "items": [
+                "Tables with many columns benefit from horizontal real-estate.",
+                "Code blocks with long lines (URLs, queries, JSON) avoid horizontal scroll.",
+                "Charts (scatter / quadrant / multi-series bars) read more accurately at higher width.",
+                "Mermaid diagrams with many participants stay legible without overlap.",
+                "KPI grids fit more tiles per row, cutting vertical scroll.",
+                "Image / live-snippet pairs gain breathing room."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "options",
+      "title": "Options",
+      "lead": "Five candidates, scored on cost, readability impact, and design surface.",
+      "blocks": [
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "option-a",
+          "title": "A — Raise --max-width"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Single-line change. Quick to ship, easy to revert. Wrecks prose readability at 1500+. Not viable as the default."
+        },
+        {
+          "kind": "callout",
+          "type": "danger",
+          "title": "Rejected",
+          "content": "Trades readability for empty-space utilisation. The kit is reader-first; that's the wrong trade."
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "option-b",
+          "title": "B — Asymmetric bleed (prose locked, primitives bleed)"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Cap prose at ~860px (the readable column). Block-level primitives that are scan-friendly opt-in to wider rendering via a CSS class or per-block attribute, bleeding up to the grid cell."
+        },
+        {
+          "kind": "code",
+          "language": "css",
+          "source": "main { max-width: 860px; margin: 0 auto; }\n.full-bleed {\n  /* Break out of main's max-width by reaching back through the\n     grid column. Works because main is centred inside a larger\n     grid cell; negative margin pulls the bleed item back to the\n     cell edge. */\n  margin-inline: calc((var(--column-width) - var(--prose-width)) / -2);\n  max-width: none;\n}"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Two ways to decide which blocks bleed:"
+        },
+        {
+          "kind": "list",
+          "style": "numbered",
+          "items": [
+            [
+              { "kind": "strong", "text": "Author opt-in" },
+              " — a ",
+              { "kind": "code", "text": "wide: true" },
+              " attribute on the block, carried as ",
+              { "kind": "code", "text": ".full-bleed" },
+              " on the rendered DOM."
+            ],
+            [
+              { "kind": "strong", "text": "Auto-bleed by kind" },
+              " — the renderer tags ",
+              { "kind": "code", "text": "chart" },
+              ", ",
+              { "kind": "code", "text": "diagram" },
+              ", ",
+              { "kind": "code", "text": "table" },
+              ", ",
+              { "kind": "code", "text": "live-snippet" },
+              ", and ",
+              { "kind": "code", "text": "code" },
+              " at section depth. Narrower primitives (callout, insight, info-tip, list, paragraph, small kpi-grid) keep prose width."
+            ]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "success",
+          "title": "Recommended",
+          "content": "Auto-bleed by kind is the right default — readers don't have to know about the option, and the kit's kind set is small enough that the rule lives in one place. Opt-in stays available as an override (rare; explicit when used)."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "What we gain",
+              "items": [
+                "Prose stays readable on every viewport.",
+                "Tables / charts / diagrams use the space they actually need.",
+                "No new mode for the reader to learn — defaults work."
+              ]
+            },
+            {
+              "verdict": "bad",
+              "title": "What it costs",
+              "items": [
+                "Centred bleed in a non-sticky main needs the grid-cell width — CSS custom properties + container queries carry it; a JS ResizeObserver is the fallback.",
+                "Mixed prose + inline-table sections feel inconsistent at the edges. Pin the rule: bleed at the block boundary, never mid-paragraph.",
+                "Existing .hdt-table-wrap.expanded already does an ad-hoc bleed; refactor it to use the same mechanism so there's one bleed system, not two."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "option-c",
+          "title": "C — Right-rail of supporting content"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Treat the right gutter as a real surface — anchor permanent panels there: section TOC (currently left-side), pinned glossary tooltips, a related-pages rail derived from shared sections, or a notes pad."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "What we gain",
+              "items": [
+                "All horizontal space is used.",
+                "Pinned tooltips no longer overlap the body.",
+                "Cross-reference / related-page UX becomes possible."
+              ]
+            },
+            {
+              "verdict": "bad",
+              "title": "What it costs",
+              "items": [
+                "Substantial layout work. Current grid is left-sidebar + main; needs a third column with breakpoints for narrow → mobile.",
+                "Three columns on 1440-class screens squeeze prose toward the centre even when the rail is empty. The rail has to conditionally render.",
+                "Each candidate (TOC, pinned tooltips, notes, related links) is its own design decision. We'd settle what lives there before building."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "Deferred",
+          "content": "Worth doing the day a concrete second-surface candidate justifies the column. Pinned glossary tooltips is the strongest standalone; even then it's a separate design pass."
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "option-d",
+          "title": "D — Multi-column prose"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Use CSS ",
+            { "kind": "code", "text": "column-count: 2" },
+            " on prose-heavy sections at wide viewports."
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "danger",
+          "title": "Rejected",
+          "content": "Awkward in scroll-based reading — readers scroll down for column 1, then up for column 2. Mixes badly with code blocks, tables, charts (must span both columns). No competitor (Stripe, Notion, GitBook, Material) does this."
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "option-e",
+          "title": "E — Side-by-side comparison view"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Render two pages or two sections of one page in parallel columns. Powerful for diffs / before-and-after, niche for most reading."
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "Deferred",
+          "content": "Niche. Adds a navigation mode (which two pages? how to choose them?) and routing complexity for hash-based nav. Revisit if a real use case shows up."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "recommendation",
+      "title": "Recommendation",
+      "lead": "Ship B with auto-bleed defaults. Collapse the existing three width modes into two. Defer C until concrete. Reject D, defer E.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "neutral",
+              "title": "Current (3 modes)",
+              "items": [
+                "narrow — 860px on EVERYTHING (prose + primitives)",
+                "wide — 1100px on everything",
+                "max — uncapped on everything"
+              ]
+            },
+            {
+              "verdict": "in",
+              "title": "After B (2 modes)",
+              "items": [
+                "prose-locked — 860px on prose AND primitives (no bleed)",
+                "default — prose 860px, primitives bleed to the grid cell"
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "What changes for existing pages",
+          "content": "Nothing in source — bleed is auto-applied by kind. Readers who explicitly chose narrow / wide / max in localStorage are migrated: narrow → prose-locked, wide / max → default. The cycler icon stays in the top-right cluster; one click toggles."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "open-questions",
+      "title": "Open questions",
+      "lead": "Before implementing B, decide each of these — they affect either the data model or the geometry rule.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "Where the bleed edge sits",
+              "content": "Out to the grid cell (internally consistent) or out to the viewport minus a fixed gutter (hides the right-edge cue)? Probably grid-cell — keeps the math local to the layout."
+            },
+            {
+              "num": "2",
+              "title": "Annotated-code bleed",
+              "content": "annotated-code's side panel of annotations needs the prose-width constraint to stay legible. Should the CODE bleed while the panel stays narrow? Likely yes, but the layout needs verifying — the code + panel are siblings today."
+            },
+            {
+              "num": "3",
+              "title": "Kpi-grid threshold",
+              "content": "3 tiles fit at 860px; 4 stack to two rows. Should 4-tile grids bleed to a single row, or accept the 2×2? Probably the latter — preserves vertical rhythm."
+            },
+            {
+              "num": "4",
+              "title": "Print stylesheet",
+              "content": "Bleed shouldn't apply when printing. Add a @media print rule that neutralises .full-bleed margins so the printed page stays inside its sheet."
+            },
+            {
+              "num": "5",
+              "title": "Code-block long-lines composition",
+              "content": "Bleed solves 'code spans wider than prose,' but readers may also want wrap mode (already per-block). Both compose; document that both exist so authors pick the right tool."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "triggers",
+      "title": "Skip / revisit triggers",
+      "lead": "What would cause us to abandon B mid-build or revisit a rejected option.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            [
+              { "kind": "strong", "text": "Skip B" },
+              " if it ever produces a layout that's 'wide but the eye doesn't know what to land on' — a chart bleeding past the caption it belongs to is worse than tight."
+            ],
+            [
+              { "kind": "strong", "text": "Revisit C" },
+              " the day a second-surface candidate (pinned tooltip, notes pad, comments) becomes a real concrete spec."
+            ],
+            [
+              { "kind": "strong", "text": "Revisit E" },
+              " if a diff / before-and-after use case is requested by a real reader, not extrapolated from theory."
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}
