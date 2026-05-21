@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/extrefs.schema.json",
+  "title": "html-doc external-references registry",
+  "description": "One domain-scoped ext-ref registry. Lives under kit/extrefs/<domain>.json (or a project's kit.json override). Loaded at runtime by chrome.js and consulted whenever an <ext-ref> inline is rendered. Same shape as glossary but each entry carries name + summary + link instead of def.",
+  "type": "object",
+  "required": ["domain", "version", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "description": "Optional schema URL for editor autocomplete." },
+    "domain": {
+      "type": "string",
+      "description": "Domain name. Must match the filename. Used to disambiguate when the same entity is registered under two domains."
+    },
+    "version": {
+      "type": "integer",
+      "default": 1
+    },
+    "entries": {
+      "type": "object",
+      "description": "Map of canonical name → per-language entry. The name key is the canonical spelling; case-insensitive for lookup.",
+      "additionalProperties": { "$ref": "#/$defs/multiLangEntry" }
+    }
+  },
+  "$defs": {
+    "multiLangEntry": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/langEntry" },
+      "minProperties": 1
+    },
+    "langEntry": {
+      "type": "object",
+      "required": ["name", "summary", "link"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name shown in the tooltip header."
+        },
+        "summary": {
+          "type": "string",
+          "description": "One-paragraph description of the entity. Plain text; no markup."
+        },
+        "link": {
+          "type": "string",
+          "description": "Canonical URL. Tooltip exposes a Learn more button to this link."
+        }
+      }
+    }
+  }
+}

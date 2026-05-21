@@ -1,5 +1,5 @@
 {
-  "$schema": "https://html-doc.dev/schema/extrefs-v1.json",
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/extrefs.schema.json",
   "domain": "web",
   "version": 1,
   "entries": {}

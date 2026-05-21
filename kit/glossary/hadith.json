@@ -1,5 +1,5 @@
 {
-  "$schema": "https://html-doc.dev/schema/glossary-v1.json",
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/glossary.schema.json",
   "domain": "hadith",
   "version": 1,
   "entries": {}

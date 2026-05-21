@@ -1,5 +1,5 @@
 {
-  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
   "kind": "page",
   "schema_version": 1,
   "title": "Glossary & external refs",
@@ -46,7 +46,7 @@
         {
           "kind": "code",
           "language": "json",
-          "source": "// _kit/glossary/data-platforms.json\n{\n  \"$schema\": \"https://html-doc.dev/schema/glossary-v1.json\",\n  \"domain\": \"data-platforms\",\n  \"version\": 1,\n  \"entries\": {\n    \"ACID\": {\n      \"en\": {\n        \"def\": \"<strong>Atomicity, consistency, isolation, durability.</strong> Transaction guarantees.\",\n        \"link\": \"https://en.wikipedia.org/wiki/ACID\"\n      },\n      \"tr\": {\n        \"def\": \"Veritabanı işlemlerinde atomiklik, tutarlılık, izolasyon, dayanıklılık garantileri.\"\n      }\n    }\n  }\n}"
+          "source": "// _kit/glossary/data-platforms.json\n{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/glossary.schema.json\",\n  \"domain\": \"data-platforms\",\n  \"version\": 1,\n  \"entries\": {\n    \"ACID\": {\n      \"en\": {\n        \"def\": \"<strong>Atomicity, consistency, isolation, durability.</strong> Transaction guarantees.\",\n        \"link\": \"https://en.wikipedia.org/wiki/ACID\"\n      },\n      \"tr\": {\n        \"def\": \"Veritabanı işlemlerinde atomiklik, tutarlılık, izolasyon, dayanıklılık garantileri.\"\n      }\n    }\n  }\n}"
         },
         {
           "kind": "callout",

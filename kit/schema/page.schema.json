@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://html-doc.dev/schema/page-v1.json",
+  "$id": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
   "title": "html-doc page",
   "description": "Source of truth for one renderable page. Authored as JSON; the kit's renderer maps the tree to Custom-Element DOM at load time.",
   "type": "object",

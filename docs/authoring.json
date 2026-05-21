@@ -1,5 +1,5 @@
 {
-  "$schema": "https://html-doc.dev/schema/page-v1.json",
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
   "kind": "page",
   "schema_version": 1,
   "title": "Authoring guide",
@@ -74,7 +74,7 @@
         {
           "kind": "code",
           "language": "json",
-          "source": "{\n  \"$schema\": \"https://html-doc.dev/schema/page-v1.json\",\n  \"kind\": \"page\",\n  \"schema_version\": 1,\n  \"title\": \"My note\",\n  \"accent\": \"teal\",\n  \"meta\": {\n    \"eyebrow\": \"Notes\",\n    \"subtitle\": \"One-line subtitle below the H1.\",\n    \"date\": \"2026-05-18\",\n    \"order\": 10,\n    \"summary\": \"One-line summary for nav tooltips and llms.txt.\"\n  },\n  \"blocks\": [\n    { \"kind\": \"tldr\", \"summary\": \"...\", \"bullets\": [\"...\"] },\n    { \"kind\": \"section\", \"id\": \"overview\", \"title\": \"Overview\", \"blocks\": [\n      { \"kind\": \"paragraph\", \"content\": \"Plain prose works as a string.\" }\n    ]}\n  ]\n}"
+          "source": "{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json\",\n  \"kind\": \"page\",\n  \"schema_version\": 1,\n  \"title\": \"My note\",\n  \"accent\": \"teal\",\n  \"meta\": {\n    \"eyebrow\": \"Notes\",\n    \"subtitle\": \"One-line subtitle below the H1.\",\n    \"date\": \"2026-05-18\",\n    \"order\": 10,\n    \"summary\": \"One-line summary for nav tooltips and llms.txt.\"\n  },\n  \"blocks\": [\n    { \"kind\": \"tldr\", \"summary\": \"...\", \"bullets\": [\"...\"] },\n    { \"kind\": \"section\", \"id\": \"overview\", \"title\": \"Overview\", \"blocks\": [\n      { \"kind\": \"paragraph\", \"content\": \"Plain prose works as a string.\" }\n    ]}\n  ]\n}"
         },
         {
           "kind": "heading",

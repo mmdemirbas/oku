@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/project-kit.schema.json",
+  "title": "html-doc project kit.json",
+  "description": "Per-project configuration for the html-doc kit. Lives at docs/kit.json (or wherever the project's docs root is). Declares which glossary / ext-ref domains are active, in what priority order, the preferred reading language, the language fallback chain, project-local glossary / extref overrides, and optional reader personalization keys.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "description": "Optional schema URL for editor autocomplete." },
+    "name": {
+      "type": "string",
+      "description": "Display name of the project. Surfaced in the page chrome and llms.txt."
+    },
+    "description": {
+      "type": "string",
+      "description": "One-paragraph project description."
+    },
+    "domains": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Glossary / ext-ref domains active for this project, in priority order. When a term resolves against multiple domains, the first listed wins (unless the inline carries `in:` to qualify)."
+    },
+    "lang": {
+      "type": "string",
+      "description": "Preferred reading language code (en, tr, …). Glossary entries are resolved against this language first."
+    },
+    "lang_fallback": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Ordered fallback languages, tried when the preferred lang has no entry for a term. Typical value: ['en']."
+    },
+    "glossary": {
+      "type": "object",
+      "description": "Project-local glossary additions / overrides. Map of domain → { term → { lang → langEntry } }. Local entries always win against the kit's central registries for the same key.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["def"],
+            "additionalProperties": false,
+            "properties": {
+              "def": { "type": "string" },
+              "link": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "extrefs": {
+      "type": "object",
+      "description": "Project-local ext-ref additions / overrides. Same map shape as glossary but each langEntry carries name + summary + link.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["name", "summary", "link"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "summary": { "type": "string" },
+              "link": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "personalization": {
+      "type": "array",
+      "description": "Reader-side variables substituted into code blocks at runtime. Each entry declares one key the reader can fill in via the chrome gear icon; matching {{key}} markers in code blocks swap in the reader's value. Values persist in localStorage.",
+      "items": {
+        "type": "object",
+        "required": ["key", "label"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "description": "Variable name; appears as {{key}} in code blocks." },
+          "label": { "type": "string", "description": "Human-readable label shown in the personalization panel." },
+          "default": { "type": "string", "description": "Initial value before the reader sets one." },
+          "type": { "type": "string", "description": "Optional input type hint (e.g. 'password' to mask)." }
+        }
+      }
+    }
+  }
+}

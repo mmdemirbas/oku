@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/glossary.schema.json",
+  "title": "html-doc glossary registry",
+  "description": "One domain-scoped glossary registry. Lives under kit/glossary/<domain>.json (or a project's kit.json override). Loaded at runtime by chrome.js and consulted whenever a <glossary-term> inline is rendered.",
+  "type": "object",
+  "required": ["domain", "version", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "description": "Optional schema URL for editor autocomplete." },
+    "domain": {
+      "type": "string",
+      "description": "Domain name. Must match the filename (data-platforms.json → domain: data-platforms). Used to disambiguate when the same term appears under two domains."
+    },
+    "version": {
+      "type": "integer",
+      "default": 1,
+      "description": "Registry version. Forward-compat: readers compare against the version they understand."
+    },
+    "entries": {
+      "type": "object",
+      "description": "Map of term → per-language entry. The term key is the canonical spelling; case-insensitive for lookup.",
+      "additionalProperties": { "$ref": "#/$defs/multiLangEntry" }
+    }
+  },
+  "$defs": {
+    "multiLangEntry": {
+      "type": "object",
+      "description": "Per-language entries for one term. Project language is checked first; falls back to en.",
+      "additionalProperties": { "$ref": "#/$defs/langEntry" },
+      "minProperties": 1
+    },
+    "langEntry": {
+      "type": "object",
+      "required": ["def"],
+      "additionalProperties": false,
+      "properties": {
+        "def": {
+          "type": "string",
+          "description": "Definition body. Allowed inline HTML: <strong>, <em>, <code>, <a>."
+        },
+        "link": {
+          "type": "string",
+          "description": "Optional external 'Learn more' URL; if present, the tooltip shows a button to this link."
+        }
+      }
+    }
+  }
+}
