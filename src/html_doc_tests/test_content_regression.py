@@ -1078,6 +1078,37 @@ class TestChromeKitMarkers:
             "wrap state must flip white-space to pre-wrap so long lines wrap"
         )
 
+    def test_copy_wrap_buttons_attach_to_non_scrolling_host(self, repo_root: Path) -> None:
+        """Copy + wrap buttons must live on .hdt-pre-host, not inside
+        the scrolling <pre>.
+
+        Regression: when buttons were appended to <pre> directly, a
+        horizontal scroll of the pre's content pushed the buttons
+        off-screen with the content (the buttons are children of the
+        scroll viewport). Wrapping every <pre> in a non-scrolling
+        .hdt-pre-host keeps the buttons pinned at the host's edges.
+        """
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        # Host must exist as a CSS class with position: relative.
+        host_rule = re.search(r"\.hdt-pre-host\s*\{([^}]*)\}", css)
+        assert host_rule, ".hdt-pre-host CSS rule missing"
+        assert "position: relative" in host_rule.group(1), (
+            ".hdt-pre-host must be position: relative — it's the buttons' anchor"
+        )
+        # Buttons are appended to the host, not pre.
+        assert "host.appendChild(btn)" in js, (
+            "copy / wrap buttons must be appended to the .hdt-pre-host, "
+            "not the scrolling <pre>"
+        )
+        # Hover-reveal selectors target the host.
+        assert ".hdt-pre-host:hover .copy-btn" in css, (
+            "hover-reveal must trigger from the host, not from pre"
+        )
+        assert ".hdt-pre-host:hover .hdt-wrap-btn" in css, (
+            "wrap-btn hover-reveal must trigger from the host"
+        )
+
     def test_page_nav_adopts_page_toc_with_document_fallback(self, repo_root: Path) -> None:
         """page-nav must adopt a page-toc found anywhere in the document.
 

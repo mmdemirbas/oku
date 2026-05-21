@@ -713,20 +713,41 @@ function initReadingAids() {
     });
   }
 
+  /* Wrap every <pre> in an .hdt-pre-host. The host is the non-scrolling
+     containing block for the copy / wrap buttons; without it the
+     buttons live INSIDE the scrolling pre, so a horizontal scroll
+     pushes them off-screen with the content. Run before either button
+     is injected so both attach to the host, not the pre. */
+  function _hdtEnsurePreHost(pre) {
+    if (!pre || !pre.parentNode) return pre.parentNode;
+    var parent = pre.parentNode;
+    if (parent.classList && parent.classList.contains('hdt-pre-host')) return parent;
+    // Skip pres that belong to a Custom Element rendering its own
+    // toolbar (charts, diagrams, snippets, tooltip popovers).
+    if (pre.closest('html-doc-chart, html-doc-diagram, html-doc-live-snippet, .html-doc-tooltip')) return parent;
+    var host = document.createElement('div');
+    host.className = 'hdt-pre-host';
+    parent.insertBefore(host, pre);
+    host.appendChild(pre);
+    return host;
+  }
+
   /* Copy-to-clipboard on every <pre> block — re-runs safely; already
      guarded by `if (pre.querySelector('.copy-btn')) return`. Icon-only
      (clipboard → checkmark on success → cross on failure). */
   (function () {
     if (!navigator.clipboard) return;
     document.querySelectorAll('pre').forEach(function (pre) {
-      if (pre.querySelector('.copy-btn')) return;
+      var host = _hdtEnsurePreHost(pre);
+      if (!host || host === pre.parentNode === false) return;
+      if (host.querySelector(':scope > .copy-btn')) return;
       var btn = document.createElement('button');
       btn.className = 'copy-btn';
       btn.type = 'button';
       btn.innerHTML = ICON_CLIPBOARD;
       btn.title = 'Copy code to clipboard';
       btn.setAttribute('aria-label', 'Copy code to clipboard');
-      pre.appendChild(btn);
+      host.appendChild(btn);
       btn.addEventListener('click', function () {
         var code = pre.querySelector('code');
         var text = code ? code.textContent : pre.textContent;
@@ -790,10 +811,12 @@ function initReadingAids() {
      to read it shouldn't also wrap a tight CSS sample on the same page. */
   (function () {
     document.querySelectorAll('pre').forEach(function (pre) {
-      if (pre.querySelector('.hdt-wrap-btn')) return;
       // Skip blocks inside hosts that own their own toolbar (charts,
       // diagrams, live snippets, tooltips).
       if (pre.closest('html-doc-chart, html-doc-diagram, html-doc-live-snippet, .html-doc-tooltip')) return;
+      var host = _hdtEnsurePreHost(pre);
+      if (!host) return;
+      if (host.querySelector(':scope > .hdt-wrap-btn')) return;
       var btn = document.createElement('button');
       btn.className = 'hdt-wrap-btn';
       btn.type = 'button';
@@ -801,7 +824,7 @@ function initReadingAids() {
       btn.title = 'Toggle line wrapping';
       btn.setAttribute('aria-label', 'Toggle line wrapping');
       btn.setAttribute('aria-pressed', 'false');
-      pre.appendChild(btn);
+      host.appendChild(btn);
       btn.addEventListener('click', function () {
         var wrapped = pre.classList.toggle('hdt-wrap');
         btn.classList.toggle('active', wrapped);

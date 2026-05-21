@@ -595,9 +595,20 @@ pre.hdt-has-folds .hdt-code-line:has(.hdt-fold-marker.hdt-folded) .hdt-code-ln {
   color: var(--accent);
   opacity: 0.8;
 }
+/* Pre-host: a non-scrolling containing block wrapping every <pre>.
+   The copy / wrap icon buttons live on the host, NOT inside the
+   scrolling pre — without this they'd ride the pre's horizontal scroll
+   and disappear off-screen when the reader scrolls a long line. The
+   host carries pre's outer margin so the visible spacing is unchanged. */
+.hdt-pre-host {
+  position: relative;
+  margin: 16px 0;
+}
+.hdt-pre-host > pre { margin: 0; }
 /* Icon-only Copy on every <pre>. Same shape as the shared toolbar
    used on diagrams and charts (see .hdt-bar below) so the affordance
-   is identical wherever copy/screenshot live. */
+   is identical wherever copy/screenshot live. Anchored to the host
+   so horizontal scroll of the pre doesn't push the button away. */
 .copy-btn {
   position: absolute; top: 8px; right: 8px;
   width: 30px; height: 30px;
@@ -608,7 +619,7 @@ pre.hdt-has-folds .hdt-code-line:has(.hdt-fold-marker.hdt-folded) .hdt-code-ln {
   transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
 }
 .copy-btn svg { width: 14px; height: 14px; }
-pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
+.hdt-pre-host:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
 .copy-btn:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
 .copy-btn.copied { color: var(--success); border-color: var(--success); background: var(--success-soft); }
 .copy-btn.error  { color: var(--danger);  border-color: var(--danger);  background: var(--danger-soft); }
@@ -626,7 +637,7 @@ pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
   transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
 }
 .hdt-wrap-btn svg { width: 14px; height: 14px; }
-pre:hover .hdt-wrap-btn, .hdt-wrap-btn:focus-visible, .hdt-wrap-btn.active { opacity: 1; }
+.hdt-pre-host:hover .hdt-wrap-btn, .hdt-wrap-btn:focus-visible, .hdt-wrap-btn.active { opacity: 1; }
 .hdt-wrap-btn:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
 .hdt-wrap-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 
