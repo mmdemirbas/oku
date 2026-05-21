@@ -227,12 +227,35 @@ function __htmldocParseHash(rawHash) {
   return { page: page, anchor: anchor || null };
 }
 
+function __htmldocScrollToAnchor(anchor) {
+  if (!anchor) { window.scrollTo(0, 0); return; }
+  requestAnimationFrame(function () {
+    var target = document.getElementById(anchor) || document.querySelector('[id="' + anchor + '"]');
+    if (target) target.scrollIntoView();
+  });
+}
+
 function __htmldocRenderHash() {
   if (typeof HtmlDocRenderer === 'undefined') return Promise.reject(new Error('renderer not loaded'));
   var parsed = __htmldocParseHash(window.location.hash);
+  var current = window.__htmldocCurrentPage;
+  // Anchor-only change while parked on a page (e.g., page-toc click on
+  // a non-index page): the user wants to scroll within the current
+  // page, NOT navigate back to index.
   if (!parsed.page) {
-    // No page in the hash — render index.json (the entry).
+    if (current) {
+      __htmldocScrollToAnchor(parsed.anchor);
+      return Promise.resolve();
+    }
+    // No current page (cold boot with anchor-only hash) → render index
+    // and scroll. autoBoot also covers the same case; this branch
+    // mostly catches Back-button into a pre-page state.
     return __htmldocFetchAndRender('index.html', parsed.anchor);
+  }
+  // Same page, new anchor → scroll without re-render.
+  if (current === parsed.page) {
+    __htmldocScrollToAnchor(parsed.anchor);
+    return Promise.resolve();
   }
   return __htmldocFetchAndRender(parsed.page, parsed.anchor);
 }
@@ -243,16 +266,13 @@ function __htmldocFetchAndRender(pagePath, anchor) {
   return fetch(jsonUrl, { cache: 'no-cache' })
     .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function (page) {
+      // Set BEFORE calling render so the html-doc:rendered handlers
+      // (buildTOC, etc.) see the right "current page" when they fire
+      // — they need it to namespace TOC hrefs.
+      window.__htmldocCurrentPage = pagePath;
       new HtmlDocRenderer({}).render(page);
       __htmldocRefreshActiveLink(pagePath);
-      if (anchor) {
-        requestAnimationFrame(function () {
-          var target = document.getElementById(anchor) || document.querySelector('[id="' + anchor + '"]');
-          if (target) target.scrollIntoView();
-        });
-      } else {
-        window.scrollTo(0, 0);
-      }
+      __htmldocScrollToAnchor(anchor);
     });
 }
 
@@ -448,9 +468,12 @@ function slugify(text) {
 
 function appendPermalink(heading, id, label) {
   if (heading.querySelector('.permalink')) return;
+  // Page-aware so copy-link gives a URL that fully restores state.
+  var current = window.__htmldocCurrentPage;
+  var prefix = (current && current !== 'index.html') ? '#' + current + ':' : '#';
   var a = document.createElement('a');
   a.className = 'permalink';
-  a.href = '#' + id;
+  a.href = prefix + id;
   a.textContent = '#';
   a.setAttribute('aria-label', label || 'Permalink');
   heading.appendChild(a);
@@ -461,6 +484,14 @@ function buildTOC(tocList) {
   var sections = document.querySelectorAll('main > section');
   if (sections.length === 0) return;
   tocList.innerHTML = '';
+
+  // Page-aware hash prefix: under hash routing, plain "#sec-id" hrefs
+  // would clobber the current page entry in the URL hash. Anchoring
+  // each TOC entry to "<currentPage>:<sec-id>" keeps the page context
+  // intact and makes copy-link work correctly. For index.html (no
+  // current page or explicit index), the bare "#sec-id" is fine.
+  var current = window.__htmldocCurrentPage;
+  var hashPrefix = (current && current !== 'index.html') ? '#' + current + ':' : '#';
 
   // Count TOC-eligible sections separately so the numbering doesn't
   // jump when buildable sections precede in DOM order.
@@ -493,7 +524,7 @@ function buildTOC(tocList) {
     head.innerHTML =
       '<span class="chevron">▸</span>' +
       '<span class="num">' + num + '.</span>' +
-      '<a href="#' + sec.id + '">' + title + '</a>';
+      '<a href="' + hashPrefix + sec.id + '">' + title + '</a>';
     li.appendChild(head);
 
     var h3s = sec.querySelectorAll('h3');
@@ -504,7 +535,7 @@ function buildTOC(tocList) {
       appendPermalink(h3, h3.id);
       var subLi = document.createElement('li');
       var a = document.createElement('a');
-      a.href = '#' + h3.id;
+      a.href = hashPrefix + h3.id;
       a.textContent = h3.textContent.replace(/#$/, '').trim();
       subLi.appendChild(a);
       subOl.appendChild(subLi);

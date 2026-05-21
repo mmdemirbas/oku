@@ -762,13 +762,33 @@
       const sep = rawHash.indexOf(':');
       const hashPage = sep >= 0 ? rawHash.slice(0, sep) : rawHash;
       let jsonName;
+      let pagePath;
       if (hashPage && hashPage.endsWith('.html')) {
+        pagePath = hashPage;
         jsonName = hashPage.replace(/\.html$/, '.json');
       } else {
         const last = window.location.pathname.split('/').pop() || '';
+        pagePath = last.endsWith('.html') ? last : 'index.html';
         jsonName = last.replace(/\.html$/, '.json') || 'index.json';
       }
+      // Set BEFORE renderFromUrl so chrome.js's render-event handlers
+      // (e.g., buildTOC) namespace anchors to the right page.
+      window.__htmldocCurrentPage = pagePath;
       result = new HtmlDocRenderer(opts || {}).renderFromUrl(jsonName);
+      // Honor the in-page anchor on first paint: refresh on
+      // "#architecture.html:perf" should land at #perf, not page-top.
+      // hashchange doesn't fire on reload (URL is unchanged), so scroll
+      // explicitly here once render resolves.
+      const trailingAnchor = sep >= 0 ? rawHash.slice(sep + 1) : '';
+      if (trailingAnchor && result && typeof result.then === 'function') {
+        result.then(function () {
+          requestAnimationFrame(function () {
+            const el = document.getElementById(trailingAnchor)
+              || document.querySelector('[id="' + trailingAnchor + '"]');
+            if (el) el.scrollIntoView();
+          });
+        });
+      }
     }
     HtmlDocRenderer._autoBootRan = result;
     return result;
