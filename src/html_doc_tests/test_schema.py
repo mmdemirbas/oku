@@ -17,7 +17,6 @@ jsonschema = pytest.importorskip("jsonschema")
 
 DOC_FILES = [
     "architecture.json",
-    "authoring.json",
     "cli.json",
     "glossary.json",
     "index.json",

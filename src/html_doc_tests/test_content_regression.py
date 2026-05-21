@@ -811,6 +811,11 @@ class TestChromeKitMarkers:
                     claimed = parsed.get("kind") if isinstance(parsed, dict) else None
                     if not claimed:
                         continue
+                    # Root-level kinds (page) are shown to document the
+                    # top-of-file structure, not as renderable blocks. No
+                    # demo can follow.
+                    if claimed == "page":
+                        continue
                     found = False
                     for j in range(i + 1, min(i + 5, len(blocks))):
                         c = blocks[j]

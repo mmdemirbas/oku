@@ -178,7 +178,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "html-doc serve\n\n# ✓ Serving /path/to/your-project on http://localhost:9876\n#   Stop with Ctrl-C.\n#\n#   HTML files:\n#     http://localhost:9876/docs/index.html\n#     http://localhost:9876/docs/authoring.html\n#     ..."
+          "source": "html-doc serve\n\n# ✓ Serving /path/to/your-project on http://localhost:9876\n#   Stop with Ctrl-C.\n#\n#   HTML files:\n#     http://localhost:9876/docs/index.html\n#     http://localhost:9876/docs/primitives.html\n#     ..."
         },
         {
           "kind": "list",

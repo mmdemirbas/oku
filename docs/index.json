@@ -50,30 +50,17 @@
       "kind": "section",
       "id": "docs",
       "title": "Documentation",
-      "lead": "Five reference pages cover everything you need to use and extend the kit. Each is itself a JSON page rendered by the system — you can read the source as a working example.",
+      "lead": "Four reference pages cover everything you need to use and extend the kit. Each is itself a JSON page rendered by the system — you can read the source as a working example.",
       "blocks": [
         {
           "kind": "step-flow",
           "steps": [
             {
               "num": "1",
-              "title": "Authoring guide",
-              "meta": "~8 min · start here",
+              "title": "Reference",
+              "meta": "~15 min · start here",
               "content": [
-                "How to write a page in JSON — project setup, page anatomy, rich text, per-page metadata, build outputs. ",
-                {
-                  "kind": "link",
-                  "text": "Open authoring.html",
-                  "href": "authoring.html"
-                }
-              ]
-            },
-            {
-              "num": "2",
-              "title": "Primitives reference",
-              "meta": "~12 min · every element with live examples",
-              "content": [
-                "Every Custom Element shipped with the kit — JSON shape, attributes, live example. The catalog you reach for while authoring. ",
+                "Project setup, page anatomy, every primitive with its JSON shape and a live example, per-page metadata, build outputs. The single page an author opens to find the kind they want and how to configure it. ",
                 {
                   "kind": "link",
                   "text": "Open primitives.html",
@@ -82,7 +69,7 @@
               ]
             },
             {
-              "num": "3",
+              "num": "2",
               "title": "Glossary & ext-refs",
               "meta": "~6 min · how the multi-domain registry works",
               "content": [
@@ -95,11 +82,11 @@
               ]
             },
             {
-              "num": "4",
+              "num": "3",
               "title": "Architecture",
-              "meta": "~7 min · internals",
+              "meta": "~7 min · internals · developer audience",
               "content": [
-                "How the kit fits together at runtime. The render flow, tooltip controller, Visual Viewport API, kit loader, build pipeline, standalone bundle. ",
+                "How the kit fits together at runtime. The render flow, tooltip controller, Visual Viewport API, kit loader, build pipeline, standalone bundle. Read this when extending or debugging the kit itself. ",
                 {
                   "kind": "link",
                   "text": "Open architecture.html",
@@ -108,11 +95,11 @@
               ]
             },
             {
-              "num": "5",
+              "num": "4",
               "title": "CLI reference",
-              "meta": "~4 min · init, build, serve",
+              "meta": "~5 min · init, build, check, serve",
               "content": [
-                "Three commands, zero flags. What each does, what output to expect, the optional pagefind and jsonschema dependencies. ",
+                "Four commands. What each does, what output to expect, the doctree linter's severity table, the optional pagefind and jsonschema dependencies. ",
                 {
                   "kind": "link",
                   "text": "Open cli.html",

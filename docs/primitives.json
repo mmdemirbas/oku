@@ -2,28 +2,166 @@
   "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
   "kind": "page",
   "schema_version": 1,
-  "title": "Primitives reference",
+  "title": "Reference",
   "accent": "teal",
   "meta": {
     "eyebrow": "Reference",
-    "subtitle": "Every Custom Element shipped with the kit. Each entry: what it does, the JSON shape, every attribute, and a live example you can interact with.",
+    "subtitle": "Everything an author needs in one page — project setup, page anatomy, every primitive with its JSON shape and a live example, per-page metadata, build outputs.",
     "audience": "Author",
     "date": "2026-05-18",
-    "read_time": "~12 min read",
+    "read_time": "~15 min read",
     "order": 20,
-    "summary": "Every primitive with JSON shape + live example.",
-    "updated": "2026-05-18"
+    "summary": "Project setup, page shape, every primitive with JSON shape + live example, metadata, build outputs.",
+    "updated": "2026-05-21"
   },
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "Every primitive in one page — JSON shape on the left, the rendered block right under it. Inline kinds nest inside rich-text content; block kinds stand alone in a section's blocks; visual primitives are SVG / JS-backed.",
+      "summary": "Set up a project once, then write JSON pages. Every page is a tree of kind-tagged blocks; this page documents the kinds (inline, prose, emphasis, layout, visual), how to thread them together, per-page metadata, and the build outputs.",
       "bullets": [
+        "Setup · html-doc init creates _kit symlink + an index.html stub. One-time per project.",
+        "Page · kind:\"page\" → title + meta + blocks; blocks are sections (which contain content blocks) or top-level tldr / kpi-grid.",
         "Inline · glossary-term, ext-ref, code, em, strong, link",
         "Prose · paragraph, heading, list, code, annotated-code",
         "Emphasis · callout, insight, info-tip",
         "Layout · tldr, kpi-grid, table, compare-grid, step-flow",
-        "Visual · chart (scatter / line / bar), diagram, live-snippet"
+        "Visual · chart (scatter / line / area / bubble / quadrant / bar / stacked-bar / grouped-bar / donut), diagram, live-snippet",
+        "Build · html-doc build → manifest, llms.txt, dist/standalone/, dist/site/ (+ Pagefind)"
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "setup",
+      "title": "Project setup",
+      "lead": "One-time per project. Links the kit so pages can reference _kit/chrome.js and friends without copying anything.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "bash",
+          "source": "cd ~/path/to/your-project/docs\nhtml-doc init     # creates _kit symlink + index.html in cwd\n\n# Optional: copy the starter as a blank page\ncp ~/dev/mmdemirbas/html-doc/src/html_doc/templates/starter.json my-page.json\n\ncd ..\nhtml-doc serve    # opens in the browser; synthesizes stubs + manifest in-memory"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "After init, your project has a ",
+            {
+              "kind": "code",
+              "text": "docs/_kit/"
+            },
+            " symlink pointing at the kit repo. Every page references the kit via ",
+            {
+              "kind": "code",
+              "text": "<script src=\"_kit/chrome.js\">"
+            },
+            " and ",
+            {
+              "kind": "code",
+              "text": "<link href=\"_kit/chrome.css\">"
+            },
+            " — no copies, no version drift. Update the kit in one place and every project picks it up."
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "neutral",
+          "title": "kit.json — declare your project",
+          "content": "Each project's docs/kit.json picks which glossary domains to activate, the preferred language, and any project-local glossary or ext-ref overrides. The kit ships starter domains (data-platforms, web, ai-llm) — pick whichever fit. The glossary page covers domain selection in detail."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "anatomy",
+      "title": "Anatomy of a page",
+      "lead": "Every JSON page is rooted at kind:\"page\" and has three pieces: title, meta, blocks.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json\",\n  \"kind\": \"page\",\n  \"schema_version\": 1,\n  \"title\": \"My note\",\n  \"accent\": \"teal\",\n  \"meta\": {\n    \"eyebrow\": \"Notes\",\n    \"subtitle\": \"One-line subtitle below the H1.\",\n    \"date\": \"2026-05-18\",\n    \"order\": 10,\n    \"summary\": \"One-line summary for nav tooltips and llms.txt.\"\n  },\n  \"blocks\": [\n    { \"kind\": \"tldr\", \"summary\": \"...\", \"bullets\": [\"...\"] },\n    { \"kind\": \"section\", \"id\": \"overview\", \"title\": \"Overview\", \"blocks\": [\n      { \"kind\": \"paragraph\", \"content\": \"Plain prose works as a string.\" }\n    ]}\n  ]\n}"
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "top-level",
+          "title": "Top-level fields"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            [
+              {
+                "kind": "code",
+                "text": "kind"
+              },
+              " — must be ",
+              {
+                "kind": "code",
+                "text": "\"page\""
+              },
+              ". The renderer rejects anything else."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "title"
+              },
+              " — required. Becomes the ",
+              {
+                "kind": "code",
+                "text": "<title>"
+              },
+              " and the H1 in the cover."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "accent"
+              },
+              " — optional. Either a named token (",
+              {
+                "kind": "code",
+                "text": "teal"
+              },
+              ", ",
+              {
+                "kind": "code",
+                "text": "amber"
+              },
+              ", ",
+              {
+                "kind": "code",
+                "text": "indigo"
+              },
+              ") or a CSS color value. Overrides the kit default per page."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "meta"
+              },
+              " — optional object. eyebrow, subtitle, audience, date, read_time, order, summary, lang. Each is optional individually."
+            ],
+            [
+              {
+                "kind": "code",
+                "text": "blocks"
+              },
+              " — the content tree. Array of top-level blocks (tldr, kpi-grid, section)."
+            ]
+          ]
+        },
+        {
+          "kind": "info-tip",
+          "summary": "Why summary matters",
+          "content": [
+            {
+              "kind": "paragraph",
+              "content": "meta.summary is surfaced in three places: the page-nav tooltip on hover, the llms.txt sitemap line for AI consumers, and (when present) the Pagefind search excerpt. Keep it one tight sentence focused on what the page contains — not a teaser."
+            }
+          ]
+        }
       ]
     },
     {
@@ -261,19 +399,40 @@
           "kind": "paragraph",
           "content": [
             "Each annotation can also declare ",
-            { "kind": "code", "text": "lines" },
+            {
+              "kind": "code",
+              "text": "lines"
+            },
             " (a 1-based line spec — ",
-            { "kind": "code", "text": "\"3\"" },
+            {
+              "kind": "code",
+              "text": "\"3\""
+            },
             ", ",
-            { "kind": "code", "text": "\"1-3\"" },
+            {
+              "kind": "code",
+              "text": "\"1-3\""
+            },
             ", ",
-            { "kind": "code", "text": "\"1,5-7\"" },
+            {
+              "kind": "code",
+              "text": "\"1,5-7\""
+            },
             ") to mark a range or set, and / or ",
-            { "kind": "code", "text": "match" },
+            {
+              "kind": "code",
+              "text": "match"
+            },
             " (string or array) to highlight specific substrings on hover. When ",
-            { "kind": "code", "text": "lines" },
+            {
+              "kind": "code",
+              "text": "lines"
+            },
             " is set and no inline ",
-            { "kind": "code", "text": "(N)" },
+            {
+              "kind": "code",
+              "text": "(N)"
+            },
             " marker is present, the chip auto-places at the start of the first listed line — the source stays clean."
           ]
         },
@@ -321,31 +480,70 @@
           "kind": "paragraph",
           "content": [
             "Block-level themed note. ",
-            { "kind": "code", "text": "type" },
+            {
+              "kind": "code",
+              "text": "type"
+            },
             " picks the colour band: ",
-            { "kind": "code", "text": "warn" },
+            {
+              "kind": "code",
+              "text": "warn"
+            },
             " / ",
-            { "kind": "code", "text": "warning" },
+            {
+              "kind": "code",
+              "text": "warning"
+            },
             " / ",
-            { "kind": "code", "text": "caution" },
+            {
+              "kind": "code",
+              "text": "caution"
+            },
             " (amber), ",
-            { "kind": "code", "text": "danger" },
+            {
+              "kind": "code",
+              "text": "danger"
+            },
             " (red), ",
-            { "kind": "code", "text": "success" },
+            {
+              "kind": "code",
+              "text": "success"
+            },
             " / ",
-            { "kind": "code", "text": "tip" },
+            {
+              "kind": "code",
+              "text": "tip"
+            },
             " (green), ",
-            { "kind": "code", "text": "info" },
+            {
+              "kind": "code",
+              "text": "info"
+            },
             " / ",
-            { "kind": "code", "text": "note" },
+            {
+              "kind": "code",
+              "text": "note"
+            },
             " (accent blue), ",
-            { "kind": "code", "text": "neutral" },
+            {
+              "kind": "code",
+              "text": "neutral"
+            },
             " (gray, default). Optional ",
-            { "kind": "code", "text": "title" },
+            {
+              "kind": "code",
+              "text": "title"
+            },
             ". ",
-            { "kind": "code", "text": "content" },
+            {
+              "kind": "code",
+              "text": "content"
+            },
             " is richString. Optional ",
-            { "kind": "code", "text": "bind" },
+            {
+              "kind": "code",
+              "text": "bind"
+            },
             " pairs this callout with another block of the same bind key — hovering one flashes the other (see Cross-cutting › Synced hover pairs)."
           ]
         },
@@ -871,17 +1069,35 @@
           "kind": "paragraph",
           "content": [
             "Scope variant — set ",
-            { "kind": "code", "text": "verdict" },
+            {
+              "kind": "code",
+              "text": "verdict"
+            },
             " to ",
-            { "kind": "code", "text": "in" },
+            {
+              "kind": "code",
+              "text": "in"
+            },
             " (green border) or ",
-            { "kind": "code", "text": "out" },
+            {
+              "kind": "code",
+              "text": "out"
+            },
             " (muted), and use ",
-            { "kind": "code", "text": "items" },
+            {
+              "kind": "code",
+              "text": "items"
+            },
             " for a bullet list inside the card. ",
-            { "kind": "code", "text": "content" },
+            {
+              "kind": "code",
+              "text": "content"
+            },
             " and ",
-            { "kind": "code", "text": "items" },
+            {
+              "kind": "code",
+              "text": "items"
+            },
             " can coexist — content renders first, items below."
           ]
         },
@@ -971,27 +1187,60 @@
           "kind": "paragraph",
           "content": [
             "Single primitive, many render modes via the ",
-            { "kind": "code", "text": "type" },
+            {
+              "kind": "code",
+              "text": "type"
+            },
             " field. The Cartesian family (",
-            { "kind": "code", "text": "scatter" },
+            {
+              "kind": "code",
+              "text": "scatter"
+            },
             ", ",
-            { "kind": "code", "text": "line" },
+            {
+              "kind": "code",
+              "text": "line"
+            },
             ", ",
-            { "kind": "code", "text": "area" },
+            {
+              "kind": "code",
+              "text": "area"
+            },
             ", ",
-            { "kind": "code", "text": "bubble" },
+            {
+              "kind": "code",
+              "text": "bubble"
+            },
             ", ",
-            { "kind": "code", "text": "quadrant" },
+            {
+              "kind": "code",
+              "text": "quadrant"
+            },
             ") share an interactive SVG plot with pan / zoom / log axes / PNG export. The bar family (",
-            { "kind": "code", "text": "bar" },
+            {
+              "kind": "code",
+              "text": "bar"
+            },
             ", ",
-            { "kind": "code", "text": "stacked-bar" },
+            {
+              "kind": "code",
+              "text": "stacked-bar"
+            },
             ", ",
-            { "kind": "code", "text": "grouped-bar" },
+            {
+              "kind": "code",
+              "text": "grouped-bar"
+            },
             ") renders horizontal CSS bars. ",
-            { "kind": "code", "text": "donut" },
+            {
+              "kind": "code",
+              "text": "donut"
+            },
             " renders a distribution arc. The renderer dispatches by ",
-            { "kind": "code", "text": "type" },
+            {
+              "kind": "code",
+              "text": "type"
+            },
             " — each mode has its own payload shape; unused fields are ignored."
           ]
         },
@@ -1077,15 +1326,30 @@
           "kind": "paragraph",
           "content": [
             "Row-per-item horizontal bars. Each row carries ",
-            { "kind": "code", "text": "label" },
+            {
+              "kind": "code",
+              "text": "label"
+            },
             ", ",
-            { "kind": "code", "text": "value" },
+            {
+              "kind": "code",
+              "text": "value"
+            },
             ", optional ",
-            { "kind": "code", "text": "display" },
+            {
+              "kind": "code",
+              "text": "display"
+            },
             " (right-hand readout override), and optional ",
-            { "kind": "code", "text": "color" },
+            {
+              "kind": "code",
+              "text": "color"
+            },
             " (accent / warn / danger / success). ",
-            { "kind": "code", "text": "max" },
+            {
+              "kind": "code",
+              "text": "max"
+            },
             " caps the bar full-width; if omitted, the largest row's value sets the scale. Use when you want a label/value comparison without axis chrome."
           ]
         },
@@ -1098,9 +1362,21 @@
           "kind": "chart",
           "type": "bar",
           "rows": [
-            { "label": "Spark", "value": 95, "display": "95 / 100" },
-            { "label": "Flink", "value": 80, "display": "80 / 100" },
-            { "label": "Trino", "value": 75, "display": "75 / 100" }
+            {
+              "label": "Spark",
+              "value": 95,
+              "display": "95 / 100"
+            },
+            {
+              "label": "Flink",
+              "value": 80,
+              "display": "80 / 100"
+            },
+            {
+              "label": "Trino",
+              "value": 75,
+              "display": "75 / 100"
+            }
           ]
         },
         {
@@ -1129,10 +1405,34 @@
               "label": "Daily",
               "color": "accent",
               "data": [
-                { "x": 1, "y": 40 }, { "x": 2, "y": 65 },
-                { "x": 3, "y": 55 }, { "x": 4, "y": 80 },
-                { "x": 5, "y": 95 }, { "x": 6, "y": 110 },
-                { "x": 7, "y": 130 }
+                {
+                  "x": 1,
+                  "y": 40
+                },
+                {
+                  "x": 2,
+                  "y": 65
+                },
+                {
+                  "x": 3,
+                  "y": 55
+                },
+                {
+                  "x": 4,
+                  "y": 80
+                },
+                {
+                  "x": 5,
+                  "y": 95
+                },
+                {
+                  "x": 6,
+                  "y": 110
+                },
+                {
+                  "x": 7,
+                  "y": 130
+                }
               ]
             }
           ]
@@ -1147,7 +1447,10 @@
           "kind": "paragraph",
           "content": [
             "Scatter plot with a third dimension encoded as dot size. Each point gains an optional ",
-            { "kind": "code", "text": "size" },
+            {
+              "kind": "code",
+              "text": "size"
+            },
             " field; the renderer takes its square root so the dot's AREA is proportional to size (eye reads area, not radius). Useful for cost vs. impact vs. confidence-style decision matrices."
           ]
         },
@@ -1167,10 +1470,30 @@
               "label": "Initiatives",
               "color": "accent",
               "data": [
-                { "x": 2, "y": 8, "size": 40, "label": "Search" },
-                { "x": 6, "y": 9, "size": 120, "label": "Auth" },
-                { "x": 4, "y": 4, "size": 80, "label": "Logging" },
-                { "x": 7, "y": 2, "size": 25, "label": "Theme" }
+                {
+                  "x": 2,
+                  "y": 8,
+                  "size": 40,
+                  "label": "Search"
+                },
+                {
+                  "x": 6,
+                  "y": 9,
+                  "size": 120,
+                  "label": "Auth"
+                },
+                {
+                  "x": 4,
+                  "y": 4,
+                  "size": 80,
+                  "label": "Logging"
+                },
+                {
+                  "x": 7,
+                  "y": 2,
+                  "size": 25,
+                  "label": "Theme"
+                }
               ]
             }
           ]
@@ -1185,13 +1508,25 @@
           "kind": "paragraph",
           "content": [
             "Scatter plot split into four regions by two reference lines. Author supplies a ",
-            { "kind": "code", "text": "quadrants" },
+            {
+              "kind": "code",
+              "text": "quadrants"
+            },
             " block with ",
-            { "kind": "code", "text": "x" },
+            {
+              "kind": "code",
+              "text": "x"
+            },
             " (vertical split) + ",
-            { "kind": "code", "text": "y" },
+            {
+              "kind": "code",
+              "text": "y"
+            },
             " (horizontal split) and optionally four corner labels (",
-            { "kind": "code", "text": "[TL, TR, BL, BR]" },
+            {
+              "kind": "code",
+              "text": "[TL, TR, BL, BR]"
+            },
             "). Reads as a 2×2 decision matrix at a glance."
           ]
         },
@@ -1209,17 +1544,38 @@
           "quadrants": {
             "x": 5,
             "y": 5,
-            "labels": ["Quick wins", "Big bets", "Skip", "Re-evaluate"]
+            "labels": [
+              "Quick wins",
+              "Big bets",
+              "Skip",
+              "Re-evaluate"
+            ]
           },
           "series": [
             {
               "label": "Items",
               "color": "accent",
               "data": [
-                { "x": 2, "y": 8, "label": "A" },
-                { "x": 7, "y": 8, "label": "B" },
-                { "x": 2, "y": 3, "label": "C" },
-                { "x": 8, "y": 2, "label": "D" }
+                {
+                  "x": 2,
+                  "y": 8,
+                  "label": "A"
+                },
+                {
+                  "x": 7,
+                  "y": 8,
+                  "label": "B"
+                },
+                {
+                  "x": 2,
+                  "y": 3,
+                  "label": "C"
+                },
+                {
+                  "x": 8,
+                  "y": 2,
+                  "label": "D"
+                }
               ]
             }
           ]
@@ -1234,15 +1590,30 @@
           "kind": "paragraph",
           "content": [
             "Multi-series horizontal bars where each row's series stack into a single bar. Author supplies ",
-            { "kind": "code", "text": "categories" },
+            {
+              "kind": "code",
+              "text": "categories"
+            },
             " (one per row) and ",
-            { "kind": "code", "text": "series" },
+            {
+              "kind": "code",
+              "text": "series"
+            },
             " of ",
-            { "kind": "code", "text": "{label, color, values}" },
+            {
+              "kind": "code",
+              "text": "{label, color, values}"
+            },
             ", with ",
-            { "kind": "code", "text": "values[i]" },
+            {
+              "kind": "code",
+              "text": "values[i]"
+            },
             " aligning to ",
-            { "kind": "code", "text": "categories[i]" },
+            {
+              "kind": "code",
+              "text": "categories[i]"
+            },
             ". The right-hand readout is the row total. Use for breakdown-of-a-total visualisation."
           ]
         },
@@ -1255,11 +1626,39 @@
           "kind": "chart",
           "type": "stacked-bar",
           "title": "Build time by phase",
-          "categories": ["v1.0", "v1.1", "v1.2"],
+          "categories": [
+            "v1.0",
+            "v1.1",
+            "v1.2"
+          ],
           "series": [
-            { "label": "compile", "color": "accent",  "values": [12, 14, 11] },
-            { "label": "test",    "color": "success", "values": [8,  10, 12] },
-            { "label": "package", "color": "warn",    "values": [3,  4,  3] }
+            {
+              "label": "compile",
+              "color": "accent",
+              "values": [
+                12,
+                14,
+                11
+              ]
+            },
+            {
+              "label": "test",
+              "color": "success",
+              "values": [
+                8,
+                10,
+                12
+              ]
+            },
+            {
+              "label": "package",
+              "color": "warn",
+              "values": [
+                3,
+                4,
+                3
+              ]
+            }
           ]
         },
         {
@@ -1281,11 +1680,39 @@
           "kind": "chart",
           "type": "grouped-bar",
           "title": "Latency by region (ms)",
-          "categories": ["p50", "p95", "p99"],
+          "categories": [
+            "p50",
+            "p95",
+            "p99"
+          ],
           "series": [
-            { "label": "EU", "color": "accent",  "values": [40, 110, 220] },
-            { "label": "US", "color": "success", "values": [55, 130, 260] },
-            { "label": "AP", "color": "warn",    "values": [70, 180, 340] }
+            {
+              "label": "EU",
+              "color": "accent",
+              "values": [
+                40,
+                110,
+                220
+              ]
+            },
+            {
+              "label": "US",
+              "color": "success",
+              "values": [
+                55,
+                130,
+                260
+              ]
+            },
+            {
+              "label": "AP",
+              "color": "warn",
+              "values": [
+                70,
+                180,
+                340
+              ]
+            }
           ]
         },
         {
@@ -1298,9 +1725,15 @@
           "kind": "paragraph",
           "content": [
             "Single-ring distribution chart. Each ",
-            { "kind": "code", "text": "slice" },
+            {
+              "kind": "code",
+              "text": "slice"
+            },
             " is a ",
-            { "kind": "code", "text": "{label, value, color?}" },
+            {
+              "kind": "code",
+              "text": "{label, value, color?}"
+            },
             "; the renderer normalises values to percentages of the total, draws an arc per slice, and shows the total + a legend on the side."
           ]
         },
@@ -1314,10 +1747,26 @@
           "type": "donut",
           "title": "Page load breakdown (KB)",
           "slices": [
-            { "label": "HTML",  "value": 12, "color": "accent" },
-            { "label": "CSS",   "value": 28, "color": "success" },
-            { "label": "JS",    "value": 44, "color": "warn" },
-            { "label": "Other", "value": 16, "color": "muted" }
+            {
+              "label": "HTML",
+              "value": 12,
+              "color": "accent"
+            },
+            {
+              "label": "CSS",
+              "value": 28,
+              "color": "success"
+            },
+            {
+              "label": "JS",
+              "value": 44,
+              "color": "warn"
+            },
+            {
+              "label": "Other",
+              "value": 16,
+              "color": "muted"
+            }
           ]
         },
         {
@@ -1388,6 +1837,93 @@
           "kind": "live-snippet",
           "label": "Edit the markup — preview updates live",
           "source": "<style>\n  body { margin:0; height:100vh; display:grid; place-items:center;\n         background: linear-gradient(135deg, #115e59, #2dd4bf);\n         font-family: system-ui; }\n  .box { background:white; padding:20px 28px; border-radius:12px;\n         box-shadow:0 8px 24px rgba(0,0,0,0.15); }\n  h1 { margin:0 0 6px; color:#0f766e; font-size:20px; }\n  p  { margin:0; color:#475569; font-size:14px; }\n</style>\n<div class=\"box\">\n  <h1>Try the snippet</h1>\n  <p>Edit the source on the left.</p>\n</div>"
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "metadata",
+      "title": "Per-page metadata",
+      "lead": "meta drives nav placement, the cover header, the llms.txt sitemap, and search excerpts.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "neutral",
+              "title": "Display fields",
+              "content": [
+                "eyebrow — small label above the H1 (\"Architecture\", \"Notes\"). ",
+                "subtitle — one-paragraph description under the H1. ",
+                "audience — \"Spark+Iceberg team\", \"Personal\", etc. ",
+                "date — ISO date or human string. Shown in cover meta. ",
+                "read_time — like \"~5 min read\". Shown in cover meta."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "Behavior fields",
+              "content": [
+                "order — sort key in the site-tree nav. Lower = earlier. ",
+                "summary — one line. Used in nav tooltips, llms.txt, search. ",
+                "lang — \"en\" or \"tr\" (or any code the kit knows). Overrides the project default. ",
+                "accent (top-level, not under meta) — named token or CSS color."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "info-tip",
+          "summary": "Date conventions",
+          "content": [
+            {
+              "kind": "paragraph",
+              "content": "The kit doesn't parse the date — it's a display string. Use whatever convention you've adopted (ISO 8601, locale date). For consistency across a project, pick one and stick. Sort order in the nav uses meta.order, not the date."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "build",
+      "title": "Build outputs",
+      "lead": "html-doc build produces four artifacts. Authors don't need to run it during dev — the runtime renderer fetches JSON directly — but build is required for search, the standalone single-file mode, and the llms.txt sitemap.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "site-manifest.json",
+              "meta": "<page-nav> reads this",
+              "content": "Page tree consumed by the site-tree sidebar at runtime. Generated from every *.json file in the project."
+            },
+            {
+              "num": "2",
+              "title": "llms.txt",
+              "meta": "AI-consumer sitemap",
+              "content": "One line per page: URL + title + summary. Convention from llmstxt.org. Drop into LLM context to give the model an overview."
+            },
+            {
+              "num": "3",
+              "title": "dist/site/",
+              "meta": "deployable multi-page site",
+              "content": "Every HTML + JSON copied with directory structure preserved. Kit assets bundled at dist/site/_kit/. Drop on any static host."
+            },
+            {
+              "num": "4",
+              "title": "dist/standalone/",
+              "meta": "single-file artifacts",
+              "content": "Every HTML inlined: kit JS, CSS, page JSON, glossary bundle. One self-contained file per page that opens offline — email-as-attachment ready."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "success",
+          "title": "Pagefind search — optional dependency",
+          "content": "If pagefind is on PATH (brew install pagefind, or npx pagefind), build also indexes dist/site/ into dist/site/pagefind/. Soft-fails without it. The search button in the chrome only works on built sites."
         }
       ]
     },
