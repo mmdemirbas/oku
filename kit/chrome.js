@@ -593,13 +593,28 @@ function buildTOC(tocList) {
   // TOC entry, programmatic scroll triggered by the router), we let the
   // existing hash stand for one tick so we don't overwrite it before
   // the smooth scroll lands on the target.
-  var suspendHashUpdate = false;
+  //
+  // Start SUSPENDED: buildTOC is invoked from `html-doc:rendered`,
+  // which fires after the renderer finishes but BEFORE the router has
+  // scrolled to the deep-link section. If we let the first updateActive
+  // fire eagerly it would see scrollY = 0 and clear the section anchor
+  // from the URL — silently losing the deep link the reader pasted.
+  // The 600 ms window matches the router's smooth-scroll budget.
+  var suspendHashUpdate = true;
+  setTimeout(function () { suspendHashUpdate = false; }, 600);
   window.addEventListener('html-doc:hash-routing', function () {
     suspendHashUpdate = true;
     setTimeout(function () { suspendHashUpdate = false; }, 600);
   });
 
   function updateActive() {
+    // After hash-routing, buildTOC re-runs on `html-doc:rendered` and a
+    // fresh scroll-spy is attached. The OLD scroll listener stays bound
+    // to `window` (closure refs the previous page's headings + page).
+    // Gate: only the scroll-spy for the CURRENT page should act —
+    // otherwise the old one races the new one and overwrites the URL
+    // with the previous page's prefix, breaking refresh-restores-page.
+    if (pageForHash !== window.__htmldocCurrentPage) return;
     var y = window.scrollY + 150;
     var current = headings[0];
     for (var k = 0; k < headings.length; k++) {
@@ -617,12 +632,19 @@ function buildTOC(tocList) {
     if (suspendHashUpdate) return;
     var anchorId = current.h3Id || current.sectionId;
     if (!anchorId) return;
-    // At the very top of the page (no scroll yet), don't stamp a hash —
-    // a bare URL is preferable to a permanent #first-section anchor.
+    // The page-prefix part of the hash drives hash-routing (which page
+    // the renderer should fetch). The section part is what the scroll
+    // spy manages. Keep the page-prefix intact across scroll-driven
+    // updates so refreshing on a non-index page brings the reader back
+    // to that page rather than to index.html.
+    var pageBase = (pageForHash && pageForHash !== 'index.html') ? '#' + pageForHash : '';
+    // At the very top of the page (no section in view yet), drop only
+    // the section anchor. On non-index pages, the page-prefix stays;
+    // on index the hash collapses to empty.
     if (window.scrollY < 80) {
-      if (window.location.hash) {
-        try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) { /* ignore */ }
-        lastHash = '';
+      if (window.location.hash !== pageBase) {
+        try { history.replaceState(null, '', window.location.pathname + window.location.search + pageBase); } catch (e) { /* ignore */ }
+        lastHash = pageBase;
       }
       return;
     }
