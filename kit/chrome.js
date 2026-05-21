@@ -4025,10 +4025,17 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         var slot = document.createElement('span');
         slot.className = 'hdc-anno-line-marker';
         slot.setAttribute('aria-hidden', 'true');
-        // Insert BEFORE the line-number cell so the annotation column
-        // is the leftmost gutter cell. The CSS override (below) widens
-        // .hdt-code-line's grid-template-columns to add a 4th column.
-        line.insertBefore(slot, line.firstChild);
+        // Insert BEFORE the code-content cell so the annotation column
+        // sits adjacent to the code (right of the line number + fold).
+        // Final grid order: [num] [fold] [anno] [content]. The CSS
+        // override (below) widens .hdt-code-line's grid-template-columns
+        // to a 4-column layout matching that DOM order.
+        var content = line.querySelector(':scope > .hdt-code-content');
+        if (content) {
+          line.insertBefore(slot, content);
+        } else {
+          line.appendChild(slot);
+        }
       });
       self.classList.add('hdc-anno-gutter-on');
     }

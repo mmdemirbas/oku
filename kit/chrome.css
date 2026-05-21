@@ -1556,14 +1556,14 @@ html-doc-annotated-code > pre {
   outline: none;
 }
 /* Per-line annotation slot for annotated-code. Lives in its OWN grid
-   column (the FIRST column, left of the line number) so the marker
-   no longer overlays the number. Reader scans the gutter once to
-   find every annotated line; no eye-saccade across the code to find
-   a `(N)` mid-line. Tooltip on hover shows the annotation body so
-   the reader can preview without jumping to the list below. */
+   column, placed adjacent to the code (after the line number + fold
+   marker) so the marker reads as "this circle annotates the line on
+   its right" rather than floating in the far gutter. Tooltip on hover
+   shows the annotation body so the reader can preview without jumping
+   to the list below. */
 .hdc-anno-wrap.hdc-anno-gutter-on pre.hdt-line-numbered .hdt-code-line {
-  /* [anno 22px] [num 32px] [fold 14px] [content 1fr] */
-  grid-template-columns: 22px 32px 14px 1fr;
+  /* [num 32px] [fold 14px] [anno 22px] [content 1fr] */
+  grid-template-columns: 32px 14px 22px 1fr;
 }
 .hdc-anno-wrap.hdc-anno-gutter-on .hdc-anno-line-marker {
   position: relative;          /* anchor for absolute tooltip */
@@ -1582,6 +1582,14 @@ html-doc-annotated-code > pre {
   width: 14px; height: 14px;
   font-size: 9px;
   font-weight: 700;
+  /* Centre the marker's vertical mid-line with the line-number's
+     text mid-line. The line-number text sits at row top with
+     line-height ≈ 22px → its visual center is ~11px from the top;
+     the 14px circle's center is 7px from its own top, so a 4px
+     margin-top brings the two centres into alignment. Stays at the
+     row's first visual line when content wraps, so the marker
+     remains attached to the logical line it annotates. */
+  margin-top: 4px;
 }
 /* Tooltip on marker hover/focus. Sits to the right of the marker so
    the slot's narrow containing-block doesn't squeeze content into a

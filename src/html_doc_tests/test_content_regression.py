@@ -459,6 +459,48 @@ class TestChromeKitMarkers:
             "hover-to-show tooltip CSS missing"
         )
 
+    def test_anno_marker_sits_adjacent_to_code(self, repo_root: Path) -> None:
+        """Annotation column is the LAST gutter column (right of the
+        fold marker, immediately left of the code), so the chip reads
+        as belonging to the code on its right rather than floating in
+        the far gutter.
+
+        The 4-column grid order is [num] [fold] [anno] [content];
+        any future change to that order should fail this test loudly.
+        """
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        # Pin the exact column order — 32px line-number, 14px fold,
+        # 22px anno, 1fr content. Changes to widths are fine; column
+        # ORDER (anno third, not first) is the load-bearing rule.
+        assert "grid-template-columns: 32px 14px 22px 1fr" in css, (
+            "annotation gutter column order must be [num] [fold] [anno] [content]"
+        )
+
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # The DOM insertion must put the slot BEFORE the content cell
+        # (third grid child), not as the first child.
+        assert "line.insertBefore(slot, content)" in js, (
+            "annotation slot must be inserted before .hdt-code-content "
+            "so the grid resolves [num] [fold] [anno] [content]"
+        )
+
+    def test_anno_marker_vertically_centered_with_line_number(self, repo_root: Path) -> None:
+        """Marker's vertical centre should align with the line-number
+        text's vertical centre. With a 14px circle at row top, the
+        marker centre is at y=7; the line-number text centre sits
+        near y=11 (half of ~22px line-height), so a 4px margin-top
+        nudges the marker into alignment.
+
+        Earlier the marker sat flush at the top of the row, visibly
+        offset above the line-number digit.
+        """
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        anno_block = css.split(".hdc-anno-wrap.hdc-anno-gutter-on .hdc-anno-line-marker .hdc-anno-marker", 1)[-1].split("}", 1)[0]
+        assert "margin-top: 4px" in anno_block, (
+            "annotation marker must carry margin-top: 4px so its centre "
+            "aligns with the line-number text centre"
+        )
+
     def test_renderer_converts_inline_code_tags_in_strings(self, repo_root: Path) -> None:
         """Renderer auto-converts `<code>…</code>` strings to inline code.
 
