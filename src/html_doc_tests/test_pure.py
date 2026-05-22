@@ -341,6 +341,29 @@ class TestMdToPage:
         assert "intro" in ids, "implicit intro section missing"
         assert "first" in ids, "h2 'First' did not become a section with id='first'"
 
+    def test_indented_blockquote_does_not_hang(self) -> None:
+        """Regression: a `>` line indented (e.g., inside a list item)
+        used to make the main loop never advance, because the dispatcher
+        stripped whitespace before checking for ">" but ``take_blockquote``
+        compared the raw line. Bisected from a real HANDOFF.md in 2026-05.
+        Cap the parse with a soft time budget so a future regression
+        surfaces as a test timeout, not a hung CI run."""
+        import threading
+
+        md = "## H\n- item:\n  > indented quote line\n"
+        result: dict[str, object] = {}
+
+        def go() -> None:
+            result["page"] = cli.md_to_page(md)
+
+        t = threading.Thread(target=go, daemon=True)
+        t.start()
+        t.join(timeout=2.0)
+        assert not t.is_alive(), "md_to_page hung on indented blockquote"
+        page = result["page"]
+        assert isinstance(page, dict)
+        assert page.get("kind") == "page"
+
     def test_md_link_in_paragraph_rewritten_to_html(self) -> None:
         """Live integration — the link rewriter must actually run on
         paragraph content emitted by md_to_page."""

@@ -436,10 +436,15 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
         return j, {"kind": "list", "style": "numbered" if ordered else "bullet", "items": items}
 
     def take_blockquote(start: int) -> tuple[int, dict]:
+        # The main loop dispatches to this consumer on lines whose
+        # *stripped* form starts with ">", so the body must match the
+        # same shape — otherwise a `>` indented by surrounding-list
+        # spacing returns j==start and the outer while-loop never
+        # advances. Strip leading whitespace before checking.
         buf: list = []
         j = start
-        while j < len(lines) and lines[j].startswith(">"):
-            buf.append(lines[j].lstrip("> ").rstrip())
+        while j < len(lines) and lines[j].lstrip().startswith(">"):
+            buf.append(lines[j].lstrip().lstrip("> ").rstrip())
             j += 1
         content = " ".join(buf).strip()
         return j, {"kind": "callout", "type": "note", "content": _md_inline(content)}
