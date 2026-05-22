@@ -285,6 +285,61 @@ class TestCLIInit:
         assert proc.returncode != 0
         assert "_kit" in proc.stderr
 
+    def test_init_materialises_md_pages_to_json(self, tmp_path: Path, repo_root: Path) -> None:
+        # init must write a .json sibling next to every MD page so the
+        # IDE-static-serve workflow can fetch it. Without this step the
+        # renderer hits 404 and the page renders empty.
+        (tmp_path / "guide.md").write_text("# Guide\n\n## Setup\n\nbody\n", encoding="utf-8")
+        (tmp_path / "nested").mkdir()
+        (tmp_path / "nested" / "deep.md").write_text("# Deep\n\n## X\n\nbody\n", encoding="utf-8")
+        proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+        assert proc.returncode == 0, f"init failed:\n{proc.stderr}\n{proc.stdout}"
+        assert (tmp_path / "guide.json").exists()
+        assert (tmp_path / "nested" / "deep.json").exists()
+        data = json.loads((tmp_path / "guide.json").read_text(encoding="utf-8"))
+        assert data["kind"] == "page"
+        assert data["title"] == "Guide"
+        # The materialiser stamps a sentinel so re-runs know which JSONs
+        # are derived (and may be overwritten) vs hand-authored.
+        assert data["meta"]["_materialised_by"] == "html-doc-init"
+
+    def test_init_does_not_overwrite_hand_authored_json(
+        self, tmp_path: Path, repo_root: Path
+    ) -> None:
+        # A hand-authored .json sibling of an .md takes precedence — the
+        # materialiser must not clobber it on init re-run.
+        (tmp_path / "guide.md").write_text("# From MD", encoding="utf-8")
+        hand = {"kind": "page", "title": "Hand-authored", "blocks": []}
+        (tmp_path / "guide.json").write_text(json.dumps(hand), encoding="utf-8")
+        proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+        assert proc.returncode == 0
+        # Hand-authored content must survive.
+        kept = json.loads((tmp_path / "guide.json").read_text(encoding="utf-8"))
+        assert kept["title"] == "Hand-authored"
+
+    def test_init_excludes_project_meta_md(self, tmp_path: Path, repo_root: Path) -> None:
+        # README, CLAUDE, CHANGELOG etc. are forge-displayed meta — init
+        # must NOT materialise them as pages (parity with find_json_pages).
+        for name in ("README.md", "CLAUDE.md", "CHANGELOG.md"):
+            (tmp_path / name).write_text(f"# {name}", encoding="utf-8")
+        # A non-meta MD to confirm the walker still runs.
+        (tmp_path / "real.md").write_text("# Real", encoding="utf-8")
+        proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+        assert proc.returncode == 0
+        for name in ("README.json", "CLAUDE.json", "CHANGELOG.json"):
+            assert not (tmp_path / name).exists(), f"{name} should not have been materialised"
+        assert (tmp_path / "real.json").exists()
+
+    def test_init_materialise_is_idempotent(self, tmp_path: Path, repo_root: Path) -> None:
+        # Running init twice on unchanged MD produces byte-identical
+        # JSON — no VCS churn from a re-run.
+        (tmp_path / "guide.md").write_text("# Guide\n\n## X\n\nbody\n", encoding="utf-8")
+        _run_cli(tmp_path, "init", repo_root=repo_root)
+        first = (tmp_path / "guide.json").read_bytes()
+        _run_cli(tmp_path, "init", repo_root=repo_root)
+        second = (tmp_path / "guide.json").read_bytes()
+        assert first == second
+
 
 class TestCLIHelp:
     def test_no_args_prints_help(self, tmp_path: Path, repo_root: Path) -> None:

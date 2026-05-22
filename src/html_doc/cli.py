@@ -179,6 +179,16 @@ def cmd_init(args: argparse.Namespace) -> int:
         kit_link.symlink_to(KIT_DIR)
         print(f"✓ Linked {kit_link} -> {KIT_DIR}")
 
+    # Materialise the page-JSON for every .md page in the tree BEFORE
+    # writing index.html. The runtime renderer fetches `<page>.json`
+    # for every manifest entry; for MD-sourced pages this file is
+    # otherwise virtual (only `html-doc serve` synthesises it). Without
+    # the on-disk JSON, IDE static servers return 404 and the page
+    # renders empty. Idempotent; overwrites with current MD content.
+    md_count = _materialise_md_pages(root)
+    if md_count:
+        print(f"✓ Materialised {md_count} page-JSON file(s) from Markdown sources")
+
     index_html = root / "index.html"
     title = "Documentation"
     index_json = root / "index.json"
@@ -211,6 +221,60 @@ def cmd_init(args: argparse.Namespace) -> int:
     print("  Open index.html in your IDE, or run `html-doc serve` from the")
     print("  project root for a live-reloading dev server.")
     return 0
+
+
+def _materialise_md_pages(root: Path) -> int:
+    """Write page-JSON next to every .md the walker would discover.
+
+    Mirrors find_json_pages's MD-walking logic exactly so the on-disk
+    JSONs match what the runtime renderer expects. Returns the count of
+    files written.
+
+    Skips:
+    - SKIP_DIRS (dist, _kit, .git, .venv, node_modules, ...).
+    - Repo-root .md files (project meta — README, CHANGELOG, etc.).
+    - Files in _PROJECT_META_MD anywhere in the tree.
+    - .md files whose .json sibling is a hand-authored page-JSON
+      (kind=page) — never clobber author work with a synthesis.
+
+    Output is content-stable: a no-op re-write of the same MD produces
+    byte-identical JSON, so VCS doesn't see spurious churn.
+    """
+    written = 0
+    for md in sorted(root.rglob("*.md")):
+        if any(part in SKIP_DIRS for part in md.parts):
+            continue
+        if md.name in _PROJECT_META_MD:
+            continue
+        json_sibling = md.with_suffix(".json")
+        if json_sibling.exists():
+            # Don't clobber a hand-authored page-JSON sibling. We
+            # distinguish materialised output by a sentinel under
+            # ``meta.source`` (which the schema allows via
+            # ``additionalProperties: true`` on ``meta``). Anything
+            # without the sentinel is treated as author-owned.
+            try:
+                existing = json.loads(json_sibling.read_text(encoding="utf-8"))
+                if isinstance(existing, dict):
+                    meta = existing.get("meta") or {}
+                    if meta.get("_materialised_by") != "html-doc-init":
+                        continue
+            except (json.JSONDecodeError, OSError):
+                # Unreadable sibling — overwrite is fine.
+                pass
+        try:
+            text = md.read_text(encoding="utf-8")
+            page = md_to_page(text, default_title=md.stem)
+        except (OSError, ValueError):
+            continue
+        meta = page.setdefault("meta", {})
+        meta["_materialised_by"] = "html-doc-init"
+        json_sibling.write_text(
+            json.dumps(page, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        written += 1
+    return written
 
 
 # ---------- build ----------
