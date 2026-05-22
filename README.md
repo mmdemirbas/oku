@@ -13,8 +13,10 @@ file copies for offline reading.
 - **Primitives:** paragraph / heading / list / code / annotated-code,
   callout, insight, info-tip, tldr, kpi-grid, table (sort + filter +
   view-switch), compare-grid, step-flow, chart (scatter / line / area
-  / bubble / quadrant / bar / stacked-bar / grouped-bar / donut),
-  diagram (Mermaid), live-snippet, glossary tooltips, citation cards.
+  / bubble / quadrant / bar / stacked-bar / grouped-bar / donut /
+  heatmap / sparkline / waffle / gauge / radar / box-plot / bullet /
+  slope), diagram (Mermaid), live-snippet, glossary tooltips, citation
+  cards.
 - **Chrome:** site-tree sidebar with drag-to-resize + off-canvas drawer
   on mobile, sticky section TOC with scroll-spy, three-mode theme
   cycler (system / light / dark), full-text search (Pagefind),
@@ -129,7 +131,7 @@ each request so source dirs stay clean.
 | `<callout type="note\|tip\|info\|caution\|warn\|danger\|success\|neutral">` | Block-level themed note. |
 | `<insight>` | Pull-quote for a key takeaway. |
 | `kpi-grid` · `compare-grid` · `step-flow` | Layout primitives, all layout-safe by structure. `compare-grid` carries verdict variants `good` / `bad` / `neutral` (quality contrast) and `in` / `out` (scope contrast); cards accept either a rich `content` body, an `items` bullet list, or both. |
-| `<chart type="scatter\|line\|bar">` | Single primitive, three modes. Scatter / line render an interactive SVG with pan / zoom / log scale / hover tooltips / legend toggle / PNG export. Bar renders row-per-item CSS bars (label + track + readout) — no axes, no JS after first paint. |
+| `<chart type="...">` | Single primitive, seventeen render modes. Cartesian family (`scatter`, `line`, `area`, `bubble`, `quadrant`) renders interactive SVG with pan / zoom / log scale / hover tooltips / legend toggle / PNG export. Bar family (`bar`, `stacked-bar`, `grouped-bar`) renders horizontal CSS bars. `donut` is a single-ring distribution. Tier-1 extension family (`heatmap`, `sparkline`, `waffle`, `gauge`, `radar`) covers density / inline trend / dot-matrix / single-metric status / multi-axis comparison. Tier-3 extension family (`box-plot`, `bullet`, `slope`) covers distribution / actual-vs-target / two-time-point change. Every type shares the toolbar (copy data / PNG / lightbox-expand) and theme tokens; no third-party chart library. |
 | `<diagram>` | Mermaid wrapper. Lazy-loads from CDN. Re-renders on theme toggle. Has Copy-source, Copy-SVG, Screenshot buttons. |
 | `<live-snippet>` | Editable HTML/CSS/JS textarea + sandboxed iframe preview. |
 | `annotated-code` | Code block with numbered `(1)`(2) chips that sync with a side panel of annotations. |
