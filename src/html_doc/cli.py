@@ -520,7 +520,12 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
             i += 1
             continue
         if re.match(r"^-{3,}\s*$", line):
-            add_block({"kind": "hr"})
+            # Markdown `---` is a horizontal rule. The kit has no
+            # corresponding block kind — section cards already provide
+            # visual separation between H2s, and within a section an
+            # author hr is usually just prose decoration. Drop it.
+            # Emitting `{"kind": "hr"}` would fail `html-doc check`
+            # against the page schema (no `hr` in the allowed list).
             i += 1
             continue
         if line.startswith("|"):

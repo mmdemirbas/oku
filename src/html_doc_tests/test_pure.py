@@ -341,6 +341,16 @@ class TestMdToPage:
         assert "intro" in ids, "implicit intro section missing"
         assert "first" in ids, "h2 'First' did not become a section with id='first'"
 
+    def test_hr_is_dropped_not_emitted(self) -> None:
+        """Markdown `---` produced `{"kind": "hr"}` which the schema
+        rejects (no `hr` kind) and the renderer ignores. Drop it."""
+        page = cli.md_to_page("## H\n\nbefore\n\n---\n\nafter\n")
+        section = page["blocks"][0]
+        kinds = [b["kind"] for b in section["blocks"]]
+        assert "hr" not in kinds, "hr block leaked into output"
+        # Surrounding paragraphs still present.
+        assert kinds.count("paragraph") == 2
+
     def test_indented_blockquote_does_not_hang(self) -> None:
         """Regression: a `>` line indented (e.g., inside a list item)
         used to make the main loop never advance, because the dispatcher
