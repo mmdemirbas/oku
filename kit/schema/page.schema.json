@@ -410,8 +410,8 @@
       "properties": {
         "kind": { "const": "chart" },
         "type": {
-          "enum": ["scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut"],
-          "description": "Render mode. scatter / line / area / bubble / quadrant — Cartesian SVG using `series` of {x,y} points. bar — horizontal CSS bars from `rows`. stacked-bar / grouped-bar — multi-series horizontal bars using `categories` + `series.values`. donut — single-ring distribution from `slices`."
+          "enum": ["scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope"],
+          "description": "Render mode. scatter / line / area / bubble / quadrant — Cartesian SVG. bar / stacked-bar / grouped-bar — horizontal CSS bars. donut — distribution arc. heatmap — N×M coloured cell grid. sparkline — inline mini line/area/bar. waffle — N×M unit-cell breakdown. gauge — single value 0→max arc. radar — multi-axis comparison polygons. box-plot — quartile + whisker distribution summary. bullet — actual-vs-target horizontal track. slope — two-time-point comparison."
         },
         "title": { "type": "string" },
         "x_label": { "type": "string", "description": "Cartesian only (scatter / line / area / bubble / quadrant)." },
@@ -463,7 +463,7 @@
             }
           }
         },
-        "max": { "type": "number", "description": "Bar / stacked-bar / grouped-bar — full-width value. Defaults to the largest row value (bar) or the largest category total (stacked) / category max (grouped)." },
+        "max": { "type": "number", "description": "Bar / stacked-bar / grouped-bar — full-width value. Gauge — arc end (required). Defaults to the largest row value (bar) or the largest category total (stacked) / category max (grouped)." },
         "categories": {
           "type": "array",
           "description": "stacked-bar / grouped-bar — ordered list of category labels (rows of the chart). Each series.values[] index aligns to this list.",
@@ -501,6 +501,195 @@
             }
           },
           "minItems": 2
+        },
+
+        "cells": {
+          "type": "array",
+          "description": "heatmap only. 2D matrix — outer array is rows, inner array is columns. Length of outer ≥ 1; every inner row must have the same length.",
+          "items": {
+            "type": "array",
+            "items": { "type": "number" }
+          },
+          "minItems": 1
+        },
+        "row_labels": {
+          "type": "array",
+          "description": "heatmap row labels (left edge). Length should match cells.length when supplied.",
+          "items": { "type": "string" }
+        },
+        "col_labels": {
+          "type": "array",
+          "description": "heatmap column labels (top edge). Length should match cells[0].length when supplied.",
+          "items": { "type": "string" }
+        },
+        "scale": {
+          "enum": ["sequential", "diverging"],
+          "description": "heatmap palette family. sequential is one-sided (low → high), diverging is two-sided (negative ← centre → positive).",
+          "default": "sequential"
+        },
+        "domain": {
+          "type": "array",
+          "description": "heatmap value domain [min, max] for the colour mapping. Defaults to the data's own min / max.",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+
+        "values": {
+          "type": "array",
+          "description": "sparkline only. Sequence of numeric values rendered as an inline line / area / bar.",
+          "items": { "type": "number" },
+          "minItems": 1
+        },
+        "variant": {
+          "enum": ["line", "area", "bar"],
+          "description": "sparkline render variant. Defaults to line.",
+          "default": "line"
+        },
+        "end_label": {
+          "type": "string",
+          "description": "sparkline only. Small caption shown to the right of the curve (e.g. ‘62%’, ‘↗’)."
+        },
+
+        "total": {
+          "type": "number",
+          "description": "waffle / bullet — denominator. waffle: cell count when segments don't sum to it. bullet: max value.",
+          "minimum": 1
+        },
+        "grid_rows": {
+          "type": "integer",
+          "description": "waffle grid height (rows). Defaults to 10.",
+          "minimum": 1,
+          "default": 10
+        },
+        "grid_cols": {
+          "type": "integer",
+          "description": "waffle grid width (columns). Defaults to 10.",
+          "minimum": 1,
+          "default": 10
+        },
+        "segments": {
+          "type": "array",
+          "description": "waffle / funnel segments. Each carries a label + count; cells coloured by category.",
+          "items": {
+            "type": "object",
+            "required": ["label", "count"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "count": { "type": "number", "minimum": 0 },
+              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+            }
+          },
+          "minItems": 1
+        },
+
+        "value": {
+          "type": "number",
+          "description": "gauge — current value. Mapped onto a semicircular arc between min and max."
+        },
+        "min": { "type": "number", "description": "gauge — arc start (default 0)." },
+        "target": { "type": "number", "description": "gauge / bullet — optional target tick." },
+        "label": { "type": "string", "description": "gauge / bullet — caption rendered under the value." },
+        "zones": {
+          "type": "array",
+          "description": "gauge / bullet — coloured threshold bands rendered behind the value track.",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "additionalProperties": false,
+            "properties": {
+              "from": { "type": "number" },
+              "to":   { "type": "number" },
+              "tone": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "muted" }
+            }
+          }
+        },
+
+        "axes": {
+          "type": "array",
+          "description": "radar — N spokes radiating from centre. Each carries a label and optional per-axis max.",
+          "items": {
+            "type": "object",
+            "required": ["label"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "max":   { "type": "number", "description": "Per-axis maximum (defaults to scale=shared)." }
+            }
+          },
+          "minItems": 3
+        },
+
+        "boxes": {
+          "type": "array",
+          "description": "box-plot — one box per row. Carries quartiles + whiskers + optional outliers.",
+          "items": {
+            "type": "object",
+            "required": ["label", "q1", "median", "q3", "min", "max"],
+            "additionalProperties": false,
+            "properties": {
+              "label":    { "type": "string" },
+              "min":      { "type": "number" },
+              "q1":       { "type": "number" },
+              "median":   { "type": "number" },
+              "q3":       { "type": "number" },
+              "max":      { "type": "number" },
+              "outliers": { "type": "array", "items": { "type": "number" } },
+              "color":    { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+            }
+          },
+          "minItems": 1
+        },
+
+        "tracks": {
+          "type": "array",
+          "description": "bullet — one row per metric. Each: { label, value, target?, max, zones? }.",
+          "items": {
+            "type": "object",
+            "required": ["label", "value", "max"],
+            "additionalProperties": false,
+            "properties": {
+              "label":  { "type": "string" },
+              "value":  { "type": "number" },
+              "target": { "type": "number" },
+              "max":    { "type": "number" },
+              "color":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" },
+              "zones":  {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["from", "to"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "from": { "type": "number" },
+                    "to":   { "type": "number" },
+                    "tone": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "muted" }
+                  }
+                }
+              }
+            }
+          },
+          "minItems": 1
+        },
+
+        "from_label": { "type": "string", "description": "slope — left-edge label (default ‘Before’)." },
+        "to_label":   { "type": "string", "description": "slope — right-edge label (default ‘After’)." },
+        "items": {
+          "type": "array",
+          "description": "slope — one entity per row, two paired values.",
+          "items": {
+            "type": "object",
+            "required": ["label", "from", "to"],
+            "additionalProperties": false,
+            "properties": {
+              "label":  { "type": "string" },
+              "from":   { "type": "number" },
+              "to":     { "type": "number" },
+              "color":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+            }
+          },
+          "minItems": 1
         }
       },
       "allOf": [
@@ -523,6 +712,38 @@
         {
           "if": { "properties": { "type": { "const": "donut" } }, "required": ["type"] },
           "then": { "required": ["slices"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "heatmap" } }, "required": ["type"] },
+          "then": { "required": ["cells"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "sparkline" } }, "required": ["type"] },
+          "then": { "required": ["values"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "waffle" } }, "required": ["type"] },
+          "then": { "required": ["segments"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "gauge" } }, "required": ["type"] },
+          "then": { "required": ["value", "max"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "radar" } }, "required": ["type"] },
+          "then": { "required": ["axes", "series"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "box-plot" } }, "required": ["type"] },
+          "then": { "required": ["boxes"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "bullet" } }, "required": ["type"] },
+          "then": { "required": ["tracks"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "slope" } }, "required": ["type"] },
+          "then": { "required": ["items"] }
         }
       ]
     },

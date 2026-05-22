@@ -121,6 +121,81 @@ SKIP_DIRS = {
     "_internal",
 }
 
+
+_project_skip_cache: dict[str, frozenset[str]] = {}
+
+
+def project_skip_dirs(root: Path) -> frozenset[str]:
+    """Read kit.json's optional ``skip_dirs`` array. Cached per (resolved)
+    root so repeated find_* calls don't re-parse kit.json.
+
+    Example kit.json fragment::
+
+        {
+          "name": "lakelab",
+          "skip_dirs": ["logs", "build", "tmp", "target"]
+        }
+
+    Authors use this to extend the always-skipped set for project-specific
+    junk dirs (build artefacts, log dumps, large datasets) that don't fit
+    the auto-skip rule (dot-dirs).
+    """
+    key = str(root.resolve())
+    cached = _project_skip_cache.get(key)
+    if cached is not None:
+        return cached
+    extras: set[str] = set()
+    kit_json = root / "kit.json"
+    if kit_json.exists():
+        try:
+            data = json.loads(kit_json.read_text(encoding="utf-8"))
+            raw = data.get("skip_dirs") if isinstance(data, dict) else None
+            if isinstance(raw, list):
+                extras.update(str(x) for x in raw if isinstance(x, str))
+        except (json.JSONDecodeError, OSError):
+            pass
+    result = frozenset(extras)
+    _project_skip_cache[key] = result
+    return result
+
+
+def iter_repo_files(root: Path, suffixes: tuple[str, ...], *, extra_skip: frozenset[str] | None = None):
+    """Yield Path objects under `root` whose name ends with one of `suffixes`,
+    pruning at the directory level so we never descend into junk subtrees.
+
+    What gets skipped:
+
+    - Names in ``SKIP_DIRS`` (the hard-coded set: ``dist``, ``_kit``,
+      ``node_modules``, ``__pycache__``, etc.).
+    - Names in ``extra_skip`` (caller-supplied — typically the kit.json
+      ``skip_dirs`` list resolved via ``project_skip_dirs(root)``).
+    - Any directory whose name starts with ``.`` — covers ``.git`` /
+      ``.venv`` / ``.cache`` / ``.run`` / ``.claude`` / ``.scratch`` /
+      ``.playwright-mcp`` without each having to be enumerated. Hidden
+      dirs are almost never docs.
+
+    Path.rglob has no equivalent prune hook — it walks every subdirectory
+    and forces the caller to filter post-hoc. That's the dominant cost of
+    `html-doc init` on trees with build artefacts (lakelab: 4.6 GB of
+    tasks/<id>/.run/ subtrees got fully walked even though only a handful
+    of .md / .json files were docs). os.walk lets us mutate ``dirnames[:]``
+    in place to skip those subtrees entirely. Symlinks intentionally NOT
+    followed — would re-enter the repo via ``_kit`` → kit/ → … and walk
+    twice.
+    """
+    skip = SKIP_DIRS | (extra_skip or frozenset())
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+        # In-place mutation is the documented way to prune os.walk.
+        dirnames[:] = [
+            d for d in dirnames
+            if d not in skip and not d.startswith(".")
+        ]
+        for fn in filenames:
+            for suf in suffixes:
+                if fn.endswith(suf):
+                    yield Path(dirpath) / fn
+                    break
+
 try:
     import jsonschema as _jsonschema  # type: ignore
 
@@ -241,27 +316,28 @@ def _materialise_md_pages(root: Path) -> int:
     byte-identical JSON, so VCS doesn't see spurious churn.
     """
     written = 0
-    for md in sorted(root.rglob("*.md")):
-        if any(part in SKIP_DIRS for part in md.parts):
-            continue
+    extra = project_skip_dirs(root)
+    for md in sorted(iter_repo_files(root, (".md",), extra_skip=extra)):
         if md.name in _PROJECT_META_MD:
             continue
         json_sibling = md.with_suffix(".json")
+        existing_text: str | None = None
         if json_sibling.exists():
             # Don't clobber a hand-authored page-JSON sibling. We
             # distinguish materialised output by a sentinel under
-            # ``meta.source`` (which the schema allows via
+            # ``meta._materialised_by`` (which the schema allows via
             # ``additionalProperties: true`` on ``meta``). Anything
             # without the sentinel is treated as author-owned.
             try:
-                existing = json.loads(json_sibling.read_text(encoding="utf-8"))
+                existing_text = json_sibling.read_text(encoding="utf-8")
+                existing = json.loads(existing_text)
                 if isinstance(existing, dict):
                     meta = existing.get("meta") or {}
                     if meta.get("_materialised_by") != "html-doc-init":
                         continue
             except (json.JSONDecodeError, OSError):
                 # Unreadable sibling — overwrite is fine.
-                pass
+                existing_text = None
         try:
             text = md.read_text(encoding="utf-8")
             page = md_to_page(text, default_title=md.stem)
@@ -269,10 +345,13 @@ def _materialise_md_pages(root: Path) -> int:
             continue
         meta = page.setdefault("meta", {})
         meta["_materialised_by"] = "html-doc-init"
-        json_sibling.write_text(
-            json.dumps(page, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        new_text = json.dumps(page, ensure_ascii=False, indent=2) + "\n"
+        # Skip the write when the rendered JSON matches what's already
+        # on disk — saves a syscall per MD file AND avoids triggering
+        # IDE / file-watcher reloads on a no-op init.
+        if existing_text == new_text:
+            continue
+        json_sibling.write_text(new_text, encoding="utf-8")
         written += 1
     return written
 
@@ -295,9 +374,8 @@ def find_html_files(root: Path):
     pages in the dist output.
     """
     out = []
-    for p in root.rglob("*.html"):
-        if any(part in SKIP_DIRS for part in p.parts):
-            continue
+    extra = project_skip_dirs(root)
+    for p in iter_repo_files(root, (".html",), extra_skip=extra):
         if not p.is_file():
             continue
         try:
@@ -310,7 +388,7 @@ def find_html_files(root: Path):
     return sorted(out, key=lambda x: str(x).lower())
 
 
-def iter_page_stubs(root: Path):
+def iter_page_stubs(root: Path, json_pages: list | None = None):
     """Yield (html_path, html_text, page_data) for every page in root.
 
     Combines two source styles into one iterable for the build / preview
@@ -332,7 +410,8 @@ def iter_page_stubs(root: Path):
     stubs: dict[Path, tuple[str, dict | None]] = {}
     for p in find_html_files(root):
         stubs[p.resolve()] = (p.read_text(encoding="utf-8"), None)
-    for json_path, page in find_json_pages(root):
+    pages_iter = json_pages if json_pages is not None else find_json_pages(root)
+    for json_path, page in pages_iter:
         stub_path = json_path.with_suffix(".html").resolve()
         if stub_path in stubs:
             continue
@@ -467,6 +546,25 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
         while j < len(lines) and lines[j].strip() != "" and not _is_block_start(lines[j]):
             buf.append(lines[j].strip())
             j += 1
+        if j == start:
+            # Forward-progress guard. _is_block_start strips whitespace
+            # before its pattern checks, but the main loop's dispatch
+            # routes some patterns only when the line starts in column 0
+            # (e.g., ``` fences, pipe-table rows). Result: an indented
+            # ```sql or `    | col | …` inside a list-item continuation
+            # is BLOCK-LOOKING per _is_block_start but UNROUTABLE per
+            # the main loop. take_paragraph then exits at j==start,
+            # main loop calls it again, and parsing hangs forever.
+            # (Caught while parsing lakelab TESTLOG.md, ~9.2 KB in,
+            #  on a `    | _rowKind | id | data |` row indented
+            #  under a numbered-list continuation.)
+            # The safe rule: a paragraph always consumes at least one
+            # line so the outer loop is guaranteed to advance. The
+            # offending line lands as literal text — accurate enough
+            # for indented code or stray table-shape content; the
+            # alternative (silent infinite loop) is far worse.
+            buf.append(lines[start].strip())
+            j = start + 1
         content = _md_inline(" ".join(buf))
         return j, {"kind": "paragraph", "content": content}
 
@@ -648,9 +746,8 @@ def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
     unreadable file would trigger this).
     """
     out: list[tuple[Path, dict]] = []
-    for p in root.rglob("*.md"):
-        if any(part in SKIP_DIRS for part in p.parts):
-            continue
+    extra = project_skip_dirs(root)
+    for p in iter_repo_files(root, (".md",), extra_skip=extra):
         # Repo-root .md files are project meta (README, CLAUDE), not
         # docs pages. Only files under at least one subdir become pages.
         if p.parent == root:
@@ -747,9 +844,12 @@ def find_json_pages(root: Path):
     Returns list of (path, parsed-data) tuples sorted by path.
     """
     pages = []
-    for p in root.rglob("*.json"):
-        if any(part in SKIP_DIRS for part in p.parts):
-            continue
+    real_json: set[Path] = set()
+    extra = project_skip_dirs(root)
+    # Two passes — JSON first so the MD pass can dedupe against real
+    # JSON siblings regardless of os.walk traversal order. Both use the
+    # pruned walker so SKIP_DIRS subtrees are never descended into.
+    for p in iter_repo_files(root, (".json",), extra_skip=extra):
         if p.name in ("kit.json", "site-manifest.json", "package.json", "tsconfig.json"):
             continue
         try:
@@ -758,25 +858,24 @@ def find_json_pages(root: Path):
             continue
         if isinstance(data, dict) and data.get("kind") == "page":
             pages.append((p, data))
+            real_json.add(p)
     # Also walk .md files — convert each into a synthesized page dict
     # via md_to_page. The "path" returned uses .json so consumers that
     # do path.with_suffix(".html") still derive the right stub URL.
     # A small set of well-known project-meta filenames is excluded
     # wherever they appear (a top-level docs/README.md is NOT meta —
     # it's a page the user expects to see in the site tree).
-    for p in root.rglob("*.md"):
-        if any(part in SKIP_DIRS for part in p.parts):
-            continue
+    for p in iter_repo_files(root, (".md",), extra_skip=extra):
         if p.name in _PROJECT_META_MD:
+            continue
+        synth_path = p.with_suffix(".json")
+        # Don't shadow a real .json sibling if both exist.
+        if synth_path in real_json:
             continue
         try:
             text = p.read_text(encoding="utf-8")
             page = md_to_page(text, default_title=p.stem)
         except (OSError, ValueError):
-            continue
-        synth_path = p.with_suffix(".json")
-        # Don't shadow a real .json sibling if both exist.
-        if any(real == synth_path for real, _ in pages):
             continue
         pages.append((synth_path, page))
     return sorted(pages, key=lambda x: str(x[0]).lower())
@@ -801,6 +900,32 @@ def _load_schema():
     return _schema_cache
 
 
+_validator_cache = None
+
+
+def _get_validator():
+    """Build (and cache) a jsonschema validator for the page schema.
+
+    `jsonschema.validate(data, schema)` is the convenience entry point — but
+    it runs `check_schema(schema)` on every call, which dominates validation
+    time when batching many pages (16 pages × ~100ms = 1.6s wasted in
+    `cmd_build`'s profile). Build the validator once, reuse for every page.
+    """
+    global _validator_cache
+    if _validator_cache is not None:
+        return _validator_cache
+    schema = _load_schema()
+    if not schema:
+        return None
+    try:
+        validator_cls = _jsonschema.validators.validator_for(schema)
+        validator_cls.check_schema(schema)
+        _validator_cache = validator_cls(schema)
+    except _jsonschema.SchemaError:
+        _validator_cache = None
+    return _validator_cache
+
+
 def validate_pages(pages) -> list:
     """Validate each parsed page against the schema. Returns a list of
     (path, error_message) tuples. Empty list = clean.
@@ -810,20 +935,18 @@ def validate_pages(pages) -> list:
     """
     if not _HAS_JSONSCHEMA:
         return []
-    schema = _load_schema()
-    if not schema:
+    validator = _get_validator()
+    if validator is None:
         return []
-    errors = []
+    errors: list[tuple[Path, str]] = []
     for p, data in pages:
-        try:
-            _jsonschema.validate(data, schema)
-        except _jsonschema.ValidationError as e:
-            # Trim long paths; report deepest field
-            field = ".".join(str(x) for x in e.absolute_path) or "(root)"
-            errors.append((p, f"{field}: {e.message}"))
-        except _jsonschema.SchemaError:
-            # Schema itself bad — abort validation entirely
-            return []
+        for err in validator.iter_errors(data):
+            field = ".".join(str(x) for x in err.absolute_path) or "(root)"
+            errors.append((p, f"{field}: {err.message}"))
+            # Match the single-error-per-page behaviour the old
+            # `validate()` wrapper had — it raised on the first failure
+            # and never reported the rest. Keeps the report focused.
+            break
     return errors
 
 
@@ -1109,9 +1232,41 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     if not blk.get("slices"):
                         add(p, "error", "chart-donut-missing-slices", where_prefix,
                             "chart with type:donut requires a `slices` array.")
+                elif ctype == "heatmap":
+                    if not blk.get("cells"):
+                        add(p, "error", "chart-heatmap-missing-cells", where_prefix,
+                            "chart with type:heatmap requires a `cells` 2D array.")
+                elif ctype == "sparkline":
+                    if not blk.get("values"):
+                        add(p, "error", "chart-sparkline-missing-values", where_prefix,
+                            "chart with type:sparkline requires a `values` array.")
+                elif ctype == "waffle":
+                    if not blk.get("segments"):
+                        add(p, "error", "chart-waffle-missing-segments", where_prefix,
+                            "chart with type:waffle requires a `segments` array.")
+                elif ctype == "gauge":
+                    if blk.get("value") is None or blk.get("max") is None:
+                        add(p, "error", "chart-gauge-missing-fields", where_prefix,
+                            "chart with type:gauge requires `value` and `max`.")
+                elif ctype == "radar":
+                    if not blk.get("axes") or not blk.get("series"):
+                        add(p, "error", "chart-radar-missing-fields", where_prefix,
+                            "chart with type:radar requires `axes` and `series`.")
+                elif ctype == "box-plot":
+                    if not blk.get("boxes"):
+                        add(p, "error", "chart-boxplot-missing-boxes", where_prefix,
+                            "chart with type:box-plot requires a `boxes` array.")
+                elif ctype == "bullet":
+                    if not blk.get("tracks"):
+                        add(p, "error", "chart-bullet-missing-tracks", where_prefix,
+                            "chart with type:bullet requires a `tracks` array.")
+                elif ctype == "slope":
+                    if not blk.get("items"):
+                        add(p, "error", "chart-slope-missing-items", where_prefix,
+                            "chart with type:slope requires an `items` array.")
                 elif ctype is not None:
                     add(p, "error", "chart-unknown-type", where_prefix,
-                        f"chart type '{ctype}' is not supported. Use scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, or donut.")
+                        f"chart type '{ctype}' is not supported. Known: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, heatmap, sparkline, waffle, gauge, radar, box-plot, bullet, slope.")
 
         # 7. Duplicate section IDs within a page — anchors must be unique.
         seen_ids: dict[str, int] = {}
@@ -1238,14 +1393,19 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
-def compute_manifest(root: Path) -> dict:
+def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
     """Walk JSON pages under root, return the site manifest dict.
 
     Entries: { path, source, title, parent, order?, summary? }. Folder
     hierarchy is implicit in the path; the runtime tree-builder groups
     siblings under their common ancestor path.
+
+    When `pages` is supplied, the walk + parse is skipped — used by
+    cmd_build to avoid re-parsing every JSON page on each manifest /
+    markdown / llms.txt pass.
     """
-    pages = find_json_pages(root)
+    if pages is None:
+        pages = find_json_pages(root)
     entries = []
     for p, data in pages:
         rel = p.relative_to(root)
@@ -1280,7 +1440,7 @@ def compute_manifest(root: Path) -> dict:
     }
 
 
-def build_manifest(root: Path, *, out_dir: Path | None = None) -> Path:
+def build_manifest(root: Path, *, out_dir: Path | None = None, pages: list | None = None) -> Path:
     """Walk root for pages, write site-manifest.json to out_dir
     (defaults to root for legacy / test callsites). The build pipeline
     passes a dist path for out_dir so source dirs stay clean.
@@ -1293,7 +1453,7 @@ def build_manifest(root: Path, *, out_dir: Path | None = None) -> Path:
     fourth fallback for `<script src=site-manifest.js>` setups that
     no template wires anymore.
     """
-    manifest = compute_manifest(root)
+    manifest = compute_manifest(root, pages=pages)
     out_dir = out_dir or root
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "site-manifest.json"
@@ -1549,7 +1709,7 @@ def render_page_markdown(page_json: dict) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def build_markdown_twins(root: Path, dest_root: Path | None = None) -> int:
+def build_markdown_twins(root: Path, dest_root: Path | None = None, *, pages: list | None = None) -> int:
     """For each JSON page under root, emit <name>.md (LLM-readable twin).
 
     By default writes under ``dest_root`` (defaults to ``root`` for
@@ -1560,7 +1720,9 @@ def build_markdown_twins(root: Path, dest_root: Path | None = None) -> int:
     """
     n = 0
     target_root = dest_root if dest_root is not None else root
-    for p, data in find_json_pages(root):
+    if pages is None:
+        pages = find_json_pages(root)
+    for p, data in pages:
         rel = p.relative_to(root)
         out_path = target_root / rel.with_suffix(".md")
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1572,11 +1734,12 @@ def build_markdown_twins(root: Path, dest_root: Path | None = None) -> int:
     return n
 
 
-def compute_llms_txt(root: Path) -> str:
+def compute_llms_txt(root: Path, *, pages: list | None = None) -> str:
     """Return the llms.txt body (llmstxt.org convention) — sitemap for
     LLM consumers. One line per page: link + summary. No body copy
     (HTML is the source of truth)."""
-    pages = find_json_pages(root)
+    if pages is None:
+        pages = find_json_pages(root)
     project_name = root.name
     description = ""
     kit_json = root / "kit.json"
@@ -1618,14 +1781,14 @@ def compute_llms_txt(root: Path) -> str:
     return "\n".join(lines)
 
 
-def build_llms_txt(root: Path, *, out_dir: Path | None = None) -> Path:
+def build_llms_txt(root: Path, *, out_dir: Path | None = None, pages: list | None = None) -> Path:
     """Walk root for pages, write llms.txt to out_dir (defaults to root
     for legacy / test callsites). The build pipeline passes a dist path
     so source dirs stay clean."""
     out_dir = out_dir or root
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "llms.txt"
-    out.write_text(compute_llms_txt(root), encoding="utf-8")
+    out.write_text(compute_llms_txt(root, pages=pages), encoding="utf-8")
     return out
 
 
@@ -1921,8 +2084,11 @@ def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
 
 def cmd_build(args: argparse.Namespace) -> int:
     root = Path.cwd()
-    srcs = iter_page_stubs(root)
+    # Single walk + parse — every downstream consumer (iter_page_stubs,
+    # check, manifest, markdown twins, llms.txt) accepts a pre-computed
+    # pages list. Avoids ~5 redundant rglob-parse passes over the tree.
     json_pages = find_json_pages(root)
+    srcs = iter_page_stubs(root, json_pages=json_pages)
     if not srcs and not json_pages:
         print(f"✗ No .html or page-JSON files found in {root}", file=sys.stderr)
         return 1
@@ -1977,11 +2143,11 @@ def cmd_build(args: argparse.Namespace) -> int:
     rel_docs = docs_dir.relative_to(root)
     rel_display = "" if rel_docs == Path(".") else rel_docs.as_posix() + "/"
 
-    build_manifest(docs_dir, out_dir=site / rel_docs)
+    build_manifest(docs_dir, out_dir=site / rel_docs, pages=json_pages)
     print(f"✓ Wrote dist/site/{rel_display}site-manifest.json ({len(json_pages)} JSON page(s))")
 
-    md_count = build_markdown_twins(docs_dir, dest_root=markdown / rel_docs)
-    build_llms_txt(docs_dir, out_dir=markdown / rel_docs)
+    md_count = build_markdown_twins(docs_dir, dest_root=markdown / rel_docs, pages=json_pages)
+    build_llms_txt(docs_dir, out_dir=markdown / rel_docs, pages=json_pages)
     if md_count:
         print(f"✓ Wrote {md_count} page.md twin(s) + llms.txt under dist/markdown/{rel_display}")
 

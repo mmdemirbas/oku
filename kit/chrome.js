@@ -54,7 +54,10 @@ const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
 const ICON_SYSTEM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
 const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
-const ICON_WIDTH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="3" y2="18"/><line x1="21" y1="6" x2="21" y2="18"/><polyline points="8 8 5 12 8 16"/><polyline points="16 8 19 12 16 16"/></svg>';
+/* Three-segment width indicator. Outline boxes; CSS fills the active
+   segment(s) based on body[data-content-width=...] so the icon doubles
+   as a state readout: 1 box = narrow, 2 = wide, 3 = max. */
+const ICON_WIDTH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect class="w-seg s1" x="3"    y="8" width="5" height="8" rx="1"/><rect class="w-seg s2" x="9.5"  y="8" width="5" height="8" rx="1"/><rect class="w-seg s3" x="16"   y="8" width="5" height="8" rx="1"/></svg>';
 const ICON_CLIPBOARD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>';
 const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
 const ICON_CROSS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
@@ -79,6 +82,7 @@ const ICON_EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 var __htmldocLightbox = (function () {
   var overlay = null;
   var lastFocus = null;
+  var currentOpts = null;
 
   function build() {
     if (overlay) return overlay;
@@ -106,10 +110,13 @@ var __htmldocLightbox = (function () {
   function open(content, opts) {
     var el = build();
     var holder = el.querySelector('.hdt-lightbox-content');
-    holder.innerHTML = '';
+    // Drain any leftover nodes from a previous open() that bypassed close()
+    // (defensive — should not happen in normal flow).
+    while (holder.firstChild) holder.removeChild(holder.firstChild);
     if (content instanceof Node) holder.appendChild(content);
     else holder.innerHTML = String(content || '');
-    if (opts && opts.title) el.setAttribute('aria-label', opts.title);
+    currentOpts = opts || {};
+    if (currentOpts.title) el.setAttribute('aria-label', currentOpts.title);
     lastFocus = document.activeElement;
     el.classList.add('open');
     document.documentElement.classList.add('hdt-lightbox-open');
@@ -121,7 +128,14 @@ var __htmldocLightbox = (function () {
     overlay.classList.remove('open');
     document.documentElement.classList.remove('hdt-lightbox-open');
     var holder = overlay.querySelector('.hdt-lightbox-content');
+    // onClose runs BEFORE innerHTML clear so callers can move their own
+    // nodes back into the page (e.g. table fullscreen). Anything still
+    // in holder after the callback gets wiped.
+    if (currentOpts && typeof currentOpts.onClose === 'function') {
+      try { currentOpts.onClose(holder); } catch (e) {}
+    }
     if (holder) holder.innerHTML = '';
+    currentOpts = null;
     if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
     lastFocus = null;
   }
@@ -366,18 +380,39 @@ try {
  * matrices in particular benefit on wide screens). State lives on
  * `<body data-content-width=...>`; CSS does the rest via --content-width. */
 var WIDTH_MODES = ['narrow', 'wide', 'max'];
+function _widthLabelFor(mode) {
+  return 'Content width: ' + mode + ' — click to cycle (narrow → wide → max)';
+}
+function _syncWidthToggleLabel(mode) {
+  var btn = document.querySelector('.width-toggle');
+  if (!btn) return;
+  var lbl = _widthLabelFor(mode);
+  btn.setAttribute('title', lbl);
+  btn.setAttribute('aria-label', lbl);
+}
 function cycleContentWidth() {
   var current = document.body.getAttribute('data-content-width') || 'narrow';
   var i = WIDTH_MODES.indexOf(current);
   var next = WIDTH_MODES[(i + 1) % WIDTH_MODES.length];
   document.body.setAttribute('data-content-width', next);
   try { localStorage.setItem('htmldoc-content-width', next); } catch (e) {}
+  _syncWidthToggleLabel(next);
 }
 try {
   var savedWidth = localStorage.getItem('htmldoc-content-width');
   if (savedWidth && WIDTH_MODES.indexOf(savedWidth) !== -1) {
     document.addEventListener('DOMContentLoaded', function () {
       document.body.setAttribute('data-content-width', savedWidth);
+      _syncWidthToggleLabel(savedWidth);
+    });
+  } else {
+    document.addEventListener('DOMContentLoaded', function () {
+      // Make the default mode explicit so the indicator + aria-label
+      // line up with reality on first paint.
+      if (!document.body.getAttribute('data-content-width')) {
+        document.body.setAttribute('data-content-width', 'narrow');
+      }
+      _syncWidthToggleLabel(document.body.getAttribute('data-content-width'));
     });
   }
 } catch (e) {}
@@ -1756,63 +1791,39 @@ function initReadingAids() {
       render(); // initial: identity sort, no filter — preserves source order
     }
 
-    // Full-width toggle. Default state is decided by the auto-fit check
-    // below (expand iff the table overflows its column); the first manual
-    // click pins state via wrap.dataset.fitPinned so resize events stop
-    // overriding the user's choice.
+    /* Expand-to-fullscreen. Same affordance as image / chart / diagram:
+       click moves the live wrap into the shared lightbox overlay; close
+       moves it back. The wrap keeps its event listeners, filter state,
+       and selected view, so the lightbox is a roomy mirror of the
+       in-page table, not a static snapshot.
+       Default in-page shape is contained + horizontally scrollable —
+       no auto-bleed (that visual was heavy and clashed with the sidebar
+       grid). The user opts in to fullscreen explicitly via this button. */
     var expBtn = ctrl.querySelector('[data-expand]');
-    function applyExpanded(expanded) {
-      wrap.classList.toggle('expanded', expanded);
-      expBtn.classList.toggle('active', expanded);
-      expBtn.setAttribute('aria-pressed', expanded ? 'true' : 'false');
-    }
-    expBtn.addEventListener('click', function () {
-      wrap.dataset.fitPinned = '1';
-      applyExpanded(!wrap.classList.contains('expanded'));
-    });
-
-    /* Auto-fit: measure once collapsed; if the table's natural width
-       exceeds the column, expand. Re-measure ONLY when the parent
-       column resizes — observing the scroll viewport would create a
-       feedback loop because the expand toggle changes its size, which
-       fires the observer, which re-measures, ...
-       Measurements are rAF-coalesced so a burst of column resizes
-       (e.g. font loading, TOC toggle, window resize) settles to one
-       call. The first call is double-rAF-deferred so initial layout
-       (fonts, sticky headers, edge fades) is in. */
-    var autoFitPending = false;
-    function scheduleAutoFit() {
-      if (autoFitPending) return;
-      autoFitPending = true;
-      requestAnimationFrame(function () {
-        autoFitPending = false;
-        autoFit();
+    if (expBtn) {
+      expBtn.title = 'Expand to fullscreen';
+      expBtn.setAttribute('aria-label', 'Expand to fullscreen');
+      expBtn.addEventListener('click', function () {
+        if (!window.__htmldocLightbox) return;
+        if (wrap.dataset.fullscreen === '1') {
+          // Second click while in lightbox: close it (mirrors the Esc /
+          // backdrop / close-button paths).
+          __htmldocLightbox.close();
+          return;
+        }
+        var placeholder = document.createComment('hdt-table-home');
+        wrap.parentNode.insertBefore(placeholder, wrap);
+        wrap.dataset.fullscreen = '1';
+        __htmldocLightbox.open(wrap, {
+          title: 'Expanded table',
+          onClose: function () {
+            delete wrap.dataset.fullscreen;
+            if (placeholder.parentNode) {
+              placeholder.parentNode.replaceChild(wrap, placeholder);
+            }
+          }
+        });
       });
-    }
-    function autoFit() {
-      if (wrap.dataset.fitPinned === '1') return;
-      // Force collapsed for the measurement; if the scroll viewport
-      // overflows in that state, we need the expanded mode.
-      var wasExpanded = wrap.classList.contains('expanded');
-      if (wasExpanded) wrap.classList.remove('expanded');
-      // 2px hysteresis margin — sub-pixel rounding shouldn't trip the
-      // toggle and re-fire the observer.
-      var overflowing = scroll.scrollWidth - scroll.clientWidth > 2;
-      if (overflowing !== wasExpanded) applyExpanded(overflowing);
-      else if (wasExpanded) wrap.classList.add('expanded');
-    }
-    if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(function () { requestAnimationFrame(autoFit); });
-    } else {
-      setTimeout(autoFit, 0);
-    }
-    if (window.ResizeObserver && wrap.parentElement) {
-      var fitRO = new ResizeObserver(scheduleAutoFit);
-      // Only the column width matters; ignore the wrap's own size so
-      // the toggle's layout effect doesn't loop back into the observer.
-      fitRO.observe(wrap.parentElement);
-    } else {
-      window.addEventListener('resize', scheduleAutoFit);
     }
   });
 
@@ -1972,16 +1983,18 @@ function _hdtWrapCodeLines(code) {
   }
 
   var lines = [makeLine(1)];
-  function activeContent() {
-    return lines[lines.length - 1].querySelector(':scope > .hdt-code-content');
-  }
-
-  function pushChar(s) { activeContent().appendChild(document.createTextNode(s)); }
+  // Cache the content cell of the current line. Refreshed on newline().
+  // Avoids a querySelector per text-segment / token append — which on
+  // a 200-line Prism-tokenised block runs into the thousands of calls.
+  var activeContent = lines[0].lastChild; // the .hdt-code-content node
+  function pushChar(s) { activeContent.appendChild(document.createTextNode(s)); }
   function newline() {
     // Trailing newline lives in the CURRENT line so display:none also
     // hides the blank that would otherwise remain.
-    activeContent().appendChild(document.createTextNode('\n'));
-    lines.push(makeLine(lines.length + 1));
+    activeContent.appendChild(document.createTextNode('\n'));
+    var nextLine = makeLine(lines.length + 1);
+    lines.push(nextLine);
+    activeContent = nextLine.lastChild;
   }
 
   function emit(node) {
@@ -2000,7 +2013,7 @@ function _hdtWrapCodeLines(code) {
       if (full.indexOf('\n') === -1) {
         // Whole element fits one line — move it intact, preserving any
         // descendant tokens Prism created.
-        activeContent().appendChild(node.cloneNode(true));
+        activeContent.appendChild(node.cloneNode(true));
       } else {
         // Multi-line element — split into per-line clones at the same
         // className. The descendants are reduced to plain text in each
@@ -2012,7 +2025,7 @@ function _hdtWrapCodeLines(code) {
           if (segs[s].length) {
             var clone = node.cloneNode(false);
             clone.textContent = segs[s];
-            activeContent().appendChild(clone);
+            activeContent.appendChild(clone);
           }
         }
       }
@@ -2936,11 +2949,22 @@ class HtmlDocChart extends HTMLElement {
     if (dataNode) this.appendChild(dataNode);
     Array.prototype.forEach.call(extrasNodes, function (n) { this.appendChild(n); }, this);
 
-    // Donut takes a separate render path — no Cartesian axes, just
-    // arcs over the `slices` payload. Branches off early so the rest
-    // of connectedCallback (scale derivation, pan/zoom) is unused.
-    if (this._type === 'donut') {
-      this._renderDonut();
+    // Non-Cartesian types branch off here — no axis derivation, no
+    // pan/zoom. Each owns its own SVG layout; the shared toolbar
+    // (copy / screenshot / lightbox) attaches the same way.
+    var nonCartesian = {
+      donut: '_renderDonut',
+      heatmap: '_renderHeatmap',
+      sparkline: '_renderSparkline',
+      waffle: '_renderWaffle',
+      gauge: '_renderGauge',
+      radar: '_renderRadar',
+      'box-plot': '_renderBoxPlot',
+      bullet: '_renderBullet',
+      slope: '_renderSlope'
+    };
+    if (nonCartesian[this._type]) {
+      this[nonCartesian[this._type]]();
       this._attachToolbar();
       return;
     }
@@ -3305,6 +3329,394 @@ class HtmlDocChart extends HTMLElement {
     parts.push('</svg>');
     var svg = document.createRange().createContextualFragment(parts.join(''));
     this.appendChild(svg);
+  }
+
+  /* ---- Tier-1 / Tier-3 extension renderers --------------------- *
+   * Each is a self-contained SVG emitter that reads its payload from
+   * this._extras[<type>], computes a viewBox-sized layout, and appends
+   * the produced SVG fragment to the host. No pan/zoom; the shared
+   * toolbar (copy / screenshot / lightbox) wires up after each.       */
+
+  _renderHeatmap() {
+    var x = (this._extras && this._extras.heatmap) || {};
+    var cells = x.cells || [];
+    if (!cells.length || !cells[0] || !cells[0].length) return;
+    var rows = cells.length, cols = cells[0].length;
+    var vmin = Infinity, vmax = -Infinity;
+    for (var ri = 0; ri < rows; ri++) {
+      for (var ci = 0; ci < cols; ci++) {
+        var v = +cells[ri][ci];
+        if (v < vmin) vmin = v;
+        if (v > vmax) vmax = v;
+      }
+    }
+    if (Array.isArray(x.domain) && x.domain.length === 2) {
+      vmin = +x.domain[0]; vmax = +x.domain[1];
+    }
+    var diverging = x.scale === 'diverging';
+    var cell = 34;
+    var labelLeft = (x.row_labels && x.row_labels.length) ? 96 : 4;
+    var labelTop  = (x.col_labels && x.col_labels.length) ? 56 : 4;
+    var titleTop  = this._title ? 28 : 0;
+    var W = labelLeft + cols * cell + 12;
+    var H = titleTop + labelTop + rows * cell + 12;
+    function tone(v) {
+      if (diverging) return v >= 0 ? 'var(--accent)' : 'var(--danger)';
+      return 'var(--accent)';
+    }
+    function alpha(v) {
+      if (diverging) {
+        var span = Math.max(Math.abs(vmin), Math.abs(vmax)) || 1;
+        return Math.max(0.08, Math.min(1, Math.abs(v) / span));
+      }
+      var span2 = (vmax - vmin) || 1;
+      var t = (v - vmin) / span2;
+      return Math.max(0.08, Math.min(1, t));
+    }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Heatmap') + '" class="hdc-svg hdc-heatmap">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    if (x.col_labels && x.col_labels.length) {
+      for (var c = 0; c < cols; c++) {
+        var cxp = labelLeft + c * cell + cell / 2;
+        var cyp = titleTop + labelTop - 6;
+        parts.push('<text x="' + cxp + '" y="' + cyp + '" text-anchor="end" class="hdc-heatmap-label" transform="rotate(-45 ' + cxp + ',' + cyp + ')">' + escapeXml(String(x.col_labels[c] || '')) + '</text>');
+      }
+    }
+    if (x.row_labels && x.row_labels.length) {
+      for (var r = 0; r < rows; r++) {
+        var ry = titleTop + labelTop + r * cell + cell / 2 + 4;
+        parts.push('<text x="' + (labelLeft - 6) + '" y="' + ry + '" text-anchor="end" class="hdc-heatmap-label">' + escapeXml(String(x.row_labels[r] || '')) + '</text>');
+      }
+    }
+    for (var i = 0; i < rows; i++) {
+      for (var j = 0; j < cols; j++) {
+        var val = +cells[i][j];
+        var px = labelLeft + j * cell;
+        var py = titleTop + labelTop + i * cell;
+        parts.push('<rect x="' + px + '" y="' + py + '" width="' + (cell - 2) + '" height="' + (cell - 2) + '" rx="3" fill="' + tone(val) + '" fill-opacity="' + alpha(val).toFixed(3) + '" class="hdc-heatmap-cell"><title>' + escapeXml(String(val)) + '</title></rect>');
+      }
+    }
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderSparkline() {
+    var x = (this._extras && this._extras.sparkline) || {};
+    var values = (x.values || []).map(Number);
+    if (!values.length) return;
+    var variant = x.variant || 'line';
+    var W = 120, H = 28, pad = 2;
+    var minV = Math.min.apply(null, values);
+    var maxV = Math.max.apply(null, values);
+    if (minV === maxV) { minV -= 1; maxV += 1; }
+    var plotW = W - pad * 2, plotH = H - pad * 2;
+    function px(i) { return pad + (values.length === 1 ? plotW / 2 : (i / (values.length - 1)) * plotW); }
+    function py(v) { return pad + plotH - ((v - minV) / (maxV - minV)) * plotH; }
+    var parts = [];
+    parts.push('<span class="hdc-sparkline-row"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'sparkline') + '" class="hdc-svg hdc-sparkline">');
+    if (variant === 'bar') {
+      var barW = plotW / values.length - 1;
+      for (var bi = 0; bi < values.length; bi++) {
+        var bx = pad + bi * (plotW / values.length);
+        var by = py(values[bi]);
+        parts.push('<rect x="' + bx + '" y="' + by + '" width="' + Math.max(1, barW) + '" height="' + (pad + plotH - by) + '" class="hdc-sparkline-bar"/>');
+      }
+    } else {
+      var d = values.map(function (v, i) { return (i === 0 ? 'M ' : 'L ') + px(i).toFixed(2) + ' ' + py(v).toFixed(2); }).join(' ');
+      if (variant === 'area') {
+        var area = d + ' L ' + px(values.length - 1).toFixed(2) + ' ' + (pad + plotH) + ' L ' + px(0).toFixed(2) + ' ' + (pad + plotH) + ' Z';
+        parts.push('<path d="' + area + '" class="hdc-sparkline-area"/>');
+      }
+      parts.push('<path d="' + d + '" class="hdc-sparkline-line"/>');
+      // Endpoint dot — always on for line/area; bar variant has its own visual.
+      parts.push('<circle cx="' + px(values.length - 1).toFixed(2) + '" cy="' + py(values[values.length - 1]).toFixed(2) + '" r="2.4" class="hdc-sparkline-endpoint"/>');
+    }
+    parts.push('</svg>');
+    if (x.end_label) parts.push('<span class="hdc-sparkline-end-label">' + escapeXml(String(x.end_label)) + '</span>');
+    parts.push('</span>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderWaffle() {
+    var x = (this._extras && this._extras.waffle) || {};
+    var segments = x.segments || [];
+    var gRows = x.grid_rows || 10;
+    var gCols = x.grid_cols || 10;
+    var total = x.total || (gRows * gCols);
+    var totalCells = gRows * gCols;
+    // Build a flat array of [tone] per cell, by walking segments in order.
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var fills = [];
+    segments.forEach(function (seg) {
+      var cells = Math.round((Math.max(0, +seg.count || 0) / total) * totalCells);
+      var color = palette[seg.color] || palette.accent;
+      for (var k = 0; k < cells && fills.length < totalCells; k++) fills.push({ color: color, label: seg.label });
+    });
+    // Pad with empty (muted-tone, very faint) cells.
+    while (fills.length < totalCells) fills.push({ color: palette.muted, label: 'empty', empty: true });
+    var cell = 22, gap = 3;
+    var W = gCols * (cell + gap) + 12 + 160; // grid + legend
+    var H = (this._title ? 28 : 4) + gRows * (cell + gap) + 12;
+    var titleTop = this._title ? 28 : 0;
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Waffle') + '" class="hdc-svg hdc-waffle">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    for (var r = 0; r < gRows; r++) {
+      for (var c = 0; c < gCols; c++) {
+        var idx = r * gCols + c;
+        var item = fills[idx];
+        var rx = 6 + c * (cell + gap);
+        var ry = titleTop + 4 + r * (cell + gap);
+        var op = item.empty ? '0.15' : '1';
+        parts.push('<rect x="' + rx + '" y="' + ry + '" width="' + cell + '" height="' + cell + '" rx="3" fill="' + item.color + '" fill-opacity="' + op + '" class="hdc-waffle-cell"/>');
+      }
+    }
+    // Legend on the right.
+    var lx = gCols * (cell + gap) + 24;
+    segments.forEach(function (seg, idx) {
+      var ly = titleTop + 16 + idx * 22;
+      var color = palette[seg.color] || palette.accent;
+      parts.push('<g class="hdc-waffle-legend"><rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/><text x="' + (lx + 18) + '" y="' + ly + '" class="hdc-waffle-legend-label">' + escapeXml(seg.label || '') + ' · ' + (Math.round((Math.max(0, +seg.count || 0) / total) * 100)) + '%</text></g>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderGauge() {
+    var x = (this._extras && this._extras.gauge) || {};
+    var val = +x.value || 0;
+    var mn = +x.min || 0;
+    var mx = +x.max;
+    if (typeof mx !== 'number' || mx <= mn) return;
+    var W = 320, H = 200;
+    var cx = W / 2, cy = H - 36, r = 110, sr = 88;
+    function angleOf(v) {
+      var t = Math.max(0, Math.min(1, (v - mn) / (mx - mn)));
+      return Math.PI + t * Math.PI; // 180° = mn, 360° = mx (semicircular)
+    }
+    function arcPath(start, end) {
+      var x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start);
+      var x2 = cx + r * Math.cos(end),   y2 = cy + r * Math.sin(end);
+      var ix1 = cx + sr * Math.cos(end), iy1 = cy + sr * Math.sin(end);
+      var ix2 = cx + sr * Math.cos(start), iy2 = cy + sr * Math.sin(start);
+      var sweep = end > start ? 1 : 0;
+      return 'M ' + x1 + ' ' + y1 +
+             ' A ' + r + ' ' + r + ' 0 0 ' + sweep + ' ' + x2 + ' ' + y2 +
+             ' L ' + ix1 + ' ' + iy1 +
+             ' A ' + sr + ' ' + sr + ' 0 0 ' + (1 - sweep) + ' ' + ix2 + ' ' + iy2 + ' Z';
+    }
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Gauge') + ': ' + val + '" class="hdc-svg hdc-gauge">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    // Background arc — full semicircle.
+    parts.push('<path d="' + arcPath(angleOf(mn), angleOf(mx)) + '" fill="var(--surface-soft, rgba(127,127,127,0.18))" class="hdc-gauge-bg"/>');
+    // Zone bands.
+    (x.zones || []).forEach(function (z) {
+      parts.push('<path d="' + arcPath(angleOf(z.from), angleOf(z.to)) + '" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.32" class="hdc-gauge-zone"/>');
+    });
+    // Value arc.
+    parts.push('<path d="' + arcPath(angleOf(mn), angleOf(val)) + '" fill="var(--accent)" class="hdc-gauge-value"/>');
+    // Target tick.
+    if (typeof x.target === 'number') {
+      var ta = angleOf(x.target);
+      var tx1 = cx + (r - 4) * Math.cos(ta), ty1 = cy + (r - 4) * Math.sin(ta);
+      var tx2 = cx + (sr + 4) * Math.cos(ta), ty2 = cy + (sr + 4) * Math.sin(ta);
+      parts.push('<line x1="' + tx1 + '" y1="' + ty1 + '" x2="' + tx2 + '" y2="' + ty2 + '" class="hdc-gauge-target"/>');
+    }
+    // Centre readout.
+    parts.push('<text x="' + cx + '" y="' + (cy - 12) + '" text-anchor="middle" class="hdc-gauge-value-text">' + escapeXml(fmtNum(val)) + '</text>');
+    if (x.label) parts.push('<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" class="hdc-gauge-label">' + escapeXml(x.label) + '</text>');
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderRadar() {
+    var x = (this._extras && this._extras.radar) || {};
+    var axes = x.axes || [];
+    var series = this._series || [];
+    if (axes.length < 3 || !series.length) return;
+    var W = 420, H = 360;
+    var cx = W / 2, cy = (this._title ? 196 : 180), R = 130;
+    // Shared scale: largest value across series + per-axis max (if any).
+    var axMax = axes.map(function (a, i) {
+      var m = +a.max || 0;
+      series.forEach(function (s) { var v = +(s.values || [])[i] || 0; if (v > m) m = v; });
+      return m || 1;
+    });
+    function point(axisIdx, val) {
+      var t = Math.min(1, Math.max(0, val / axMax[axisIdx]));
+      var ang = -Math.PI / 2 + axisIdx * (2 * Math.PI / axes.length);
+      return [cx + Math.cos(ang) * R * t, cy + Math.sin(ang) * R * t];
+    }
+    function axisEnd(i) {
+      var ang = -Math.PI / 2 + i * (2 * Math.PI / axes.length);
+      return [cx + Math.cos(ang) * R, cy + Math.sin(ang) * R];
+    }
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Radar') + '" class="hdc-svg hdc-radar">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    // Concentric rings (25/50/75/100%).
+    for (var k = 1; k <= 4; k++) {
+      var pts = axes.map(function (_, ai) {
+        var ang = -Math.PI / 2 + ai * (2 * Math.PI / axes.length);
+        return (cx + Math.cos(ang) * R * (k / 4)).toFixed(1) + ',' + (cy + Math.sin(ang) * R * (k / 4)).toFixed(1);
+      }).join(' ');
+      parts.push('<polygon points="' + pts + '" class="hdc-radar-ring"/>');
+    }
+    // Axis lines + labels.
+    axes.forEach(function (a, i) {
+      var e = axisEnd(i);
+      parts.push('<line x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) + '" class="hdc-radar-axis"/>');
+      var lx = cx + Math.cos(-Math.PI / 2 + i * (2 * Math.PI / axes.length)) * (R + 18);
+      var ly = cy + Math.sin(-Math.PI / 2 + i * (2 * Math.PI / axes.length)) * (R + 18);
+      parts.push('<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" class="hdc-radar-label">' + escapeXml(a.label || '') + '</text>');
+    });
+    // Series polygons.
+    series.forEach(function (s, si) {
+      var color = palette[s.color] || palette.accent;
+      var pts = (s.values || []).map(function (v, ai) {
+        var p = point(ai, +v || 0);
+        return p[0].toFixed(1) + ',' + p[1].toFixed(1);
+      }).join(' ');
+      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="0.22" stroke="' + color + '" stroke-width="1.6" class="hdc-radar-series" data-series-idx="' + si + '"/>');
+    });
+    // Legend.
+    var lgY = H - 24;
+    series.forEach(function (s, si) {
+      var color = palette[s.color] || palette.accent;
+      var lx = 16 + si * 130;
+      parts.push('<g class="hdc-radar-legend"><rect x="' + lx + '" y="' + (lgY - 8) + '" width="10" height="10" rx="2" fill="' + color + '"/><text x="' + (lx + 16) + '" y="' + lgY + '" class="hdc-radar-legend-label">' + escapeXml(s.label || '') + '</text></g>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderBoxPlot() {
+    var x = (this._extras && this._extras['box-plot']) || {};
+    var boxes = x.boxes || [];
+    if (!boxes.length) return;
+    var W = 640, H = 80 + boxes.length * 56;
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 140, right: 24 };
+    var plotW = W - pad.left - pad.right;
+    var rowH = (H - pad.top - pad.bottom) / boxes.length;
+    var allVals = [];
+    boxes.forEach(function (b) {
+      allVals.push(+b.min, +b.q1, +b.median, +b.q3, +b.max);
+      (b.outliers || []).forEach(function (o) { allVals.push(+o); });
+    });
+    var vmin = Math.min.apply(null, allVals);
+    var vmax = Math.max.apply(null, allVals);
+    if (vmin === vmax) { vmin -= 1; vmax += 1; }
+    var span = vmax - vmin;
+    function sx(v) { return pad.left + ((v - vmin) / span) * plotW; }
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Box plot') + '" class="hdc-svg hdc-boxplot">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    boxes.forEach(function (b, i) {
+      var y = pad.top + i * rowH + rowH / 2;
+      var color = palette[b.color] || palette.accent;
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="hdc-boxplot-label">' + escapeXml(b.label || '') + '</text>');
+      // Whisker.
+      parts.push('<line x1="' + sx(+b.min) + '" y1="' + y + '" x2="' + sx(+b.max) + '" y2="' + y + '" class="hdc-boxplot-whisker"/>');
+      parts.push('<line x1="' + sx(+b.min) + '" y1="' + (y - 7) + '" x2="' + sx(+b.min) + '" y2="' + (y + 7) + '" class="hdc-boxplot-whisker"/>');
+      parts.push('<line x1="' + sx(+b.max) + '" y1="' + (y - 7) + '" x2="' + sx(+b.max) + '" y2="' + (y + 7) + '" class="hdc-boxplot-whisker"/>');
+      // IQR box.
+      parts.push('<rect x="' + sx(+b.q1) + '" y="' + (y - 12) + '" width="' + (sx(+b.q3) - sx(+b.q1)) + '" height="24" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="hdc-boxplot-iqr"/>');
+      // Median line.
+      parts.push('<line x1="' + sx(+b.median) + '" y1="' + (y - 12) + '" x2="' + sx(+b.median) + '" y2="' + (y + 12) + '" stroke="' + color + '" stroke-width="2" class="hdc-boxplot-median"/>');
+      (b.outliers || []).forEach(function (o) {
+        parts.push('<circle cx="' + sx(+o) + '" cy="' + y + '" r="3" fill="' + color + '" class="hdc-boxplot-outlier"><title>' + escapeXml(String(o)) + '</title></circle>');
+      });
+    });
+    // Axis ticks (5).
+    for (var t = 0; t <= 4; t++) {
+      var vv = vmin + (t / 4) * span;
+      var xx = sx(vv);
+      parts.push('<line x1="' + xx + '" y1="' + (H - pad.bottom + 2) + '" x2="' + xx + '" y2="' + (H - pad.bottom + 8) + '" class="hdc-axis"/>');
+      parts.push('<text x="' + xx + '" y="' + (H - pad.bottom + 20) + '" text-anchor="middle" class="hdc-tick">' + escapeXml(fmtNum(vv)) + '</text>');
+    }
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderBullet() {
+    var x = (this._extras && this._extras.bullet) || {};
+    var tracks = x.tracks || [];
+    if (!tracks.length) return;
+    var W = 640;
+    var rowH = 42;
+    var pad = { top: this._title ? 36 : 16, left: 140, right: 80 };
+    var H = pad.top + tracks.length * rowH + 12;
+    var plotW = W - pad.left - pad.right;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Bullet chart') + '" class="hdc-svg hdc-bullet">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    tracks.forEach(function (t, i) {
+      var y = pad.top + i * rowH + 8;
+      var trackMax = +t.max || 100;
+      function sx(v) { return pad.left + (Math.max(0, Math.min(trackMax, +v || 0)) / trackMax) * plotW; }
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 14) + '" text-anchor="end" class="hdc-bullet-label">' + escapeXml(t.label || '') + '</text>');
+      // Background track.
+      parts.push('<rect x="' + pad.left + '" y="' + y + '" width="' + plotW + '" height="22" rx="3" class="hdc-bullet-bg"/>');
+      // Zone bands.
+      (t.zones || []).forEach(function (z) {
+        var zx = sx(z.from), zw = sx(z.to) - sx(z.from);
+        parts.push('<rect x="' + zx + '" y="' + y + '" width="' + zw + '" height="22" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.22" class="hdc-bullet-zone"/>');
+      });
+      // Value bar.
+      var color = palette[t.color] || palette.accent;
+      parts.push('<rect x="' + pad.left + '" y="' + (y + 6) + '" width="' + (sx(t.value) - pad.left) + '" height="10" rx="2" fill="' + color + '" class="hdc-bullet-value"/>');
+      // Target tick.
+      if (typeof t.target === 'number') {
+        var tx = sx(t.target);
+        parts.push('<line x1="' + tx + '" y1="' + (y - 2) + '" x2="' + tx + '" y2="' + (y + 24) + '" class="hdc-bullet-target"/>');
+      }
+      // Value readout right of the track.
+      parts.push('<text x="' + (W - pad.right + 10) + '" y="' + (y + 14) + '" class="hdc-bullet-readout">' + escapeXml(fmtNum(+t.value || 0)) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderSlope() {
+    var x = (this._extras && this._extras.slope) || {};
+    var items = x.items || [];
+    if (!items.length) return;
+    var W = 480, H = 60 + items.length * 12 + 40;
+    if (H < 240) H = 240;
+    var pad = { top: this._title ? 44 : 30, bottom: 30, left: 80, right: 80 };
+    var plotH = H - pad.top - pad.bottom;
+    var allVals = items.reduce(function (acc, it) { acc.push(+it.from || 0, +it.to || 0); return acc; }, []);
+    var vmin = Math.min.apply(null, allVals), vmax = Math.max.apply(null, allVals);
+    if (vmin === vmax) { vmin -= 1; vmax += 1; }
+    function sy(v) { return pad.top + plotH - ((v - vmin) / (vmax - vmin)) * plotH; }
+    var leftX = pad.left, rightX = W - pad.right;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Slope chart') + '" class="hdc-svg hdc-slope">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    // Column labels.
+    parts.push('<text x="' + leftX + '" y="' + (pad.top - 12) + '" text-anchor="middle" class="hdc-slope-col">' + escapeXml(x.from_label || 'Before') + '</text>');
+    parts.push('<text x="' + rightX + '" y="' + (pad.top - 12) + '" text-anchor="middle" class="hdc-slope-col">' + escapeXml(x.to_label || 'After') + '</text>');
+    // Vertical guides.
+    parts.push('<line x1="' + leftX + '" y1="' + pad.top + '" x2="' + leftX + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
+    parts.push('<line x1="' + rightX + '" y1="' + pad.top + '" x2="' + rightX + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
+    items.forEach(function (it) {
+      var fy = sy(+it.from || 0), ty = sy(+it.to || 0);
+      var color = palette[it.color] || (((+it.to || 0) >= (+it.from || 0)) ? palette.success : palette.danger);
+      parts.push('<line x1="' + leftX + '" y1="' + fy.toFixed(1) + '" x2="' + rightX + '" y2="' + ty.toFixed(1) + '" stroke="' + color + '" stroke-width="2" class="hdc-slope-line"/>');
+      parts.push('<circle cx="' + leftX + '" cy="' + fy.toFixed(1) + '" r="4" fill="' + color + '"/>');
+      parts.push('<circle cx="' + rightX + '" cy="' + ty.toFixed(1) + '" r="4" fill="' + color + '"/>');
+      parts.push('<text x="' + (leftX - 8) + '" y="' + (fy + 4).toFixed(1) + '" text-anchor="end" class="hdc-slope-readout">' + escapeXml(fmtNum(+it.from || 0)) + '</text>');
+      parts.push('<text x="' + (rightX + 8) + '" y="' + (ty + 4).toFixed(1) + '" class="hdc-slope-readout">' + escapeXml(fmtNum(+it.to || 0)) + ' · ' + escapeXml(it.label || '') + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
   }
 
   _attachToolbar() {

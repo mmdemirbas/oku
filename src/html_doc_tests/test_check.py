@@ -164,6 +164,80 @@ def test_chart_unknown_type_errors(tmp_path: Path) -> None:
     assert "scatter, line, area, bubble, quadrant" in issues[0]["message"]
 
 
+# ---------- Tier-1 / Tier-3 chart shape sanity ----------
+
+@pytest.mark.parametrize(
+    "ctype, code",
+    [
+        ("heatmap",  "chart-heatmap-missing-cells"),
+        ("sparkline", "chart-sparkline-missing-values"),
+        ("waffle",   "chart-waffle-missing-segments"),
+        ("gauge",    "chart-gauge-missing-fields"),
+        ("radar",    "chart-radar-missing-fields"),
+        ("box-plot", "chart-boxplot-missing-boxes"),
+        ("bullet",   "chart-bullet-missing-tracks"),
+        ("slope",    "chart-slope-missing-items"),
+    ],
+)
+def test_chart_extension_missing_payload_flagged(tmp_path: Path, ctype: str, code: str) -> None:
+    page = {
+        "kind": "page",
+        "title": "T",
+        "blocks": [
+            {
+                "kind": "section",
+                "id": "s",
+                "title": "S",
+                "blocks": [{"kind": "chart", "type": ctype}],
+            }
+        ],
+    }
+    issues = _issues_of(_run(page, tmp_path=tmp_path), code=code)
+    assert len(issues) == 1
+
+
+def test_chart_heatmap_with_cells_passes(tmp_path: Path) -> None:
+    page = {
+        "kind": "page",
+        "title": "T",
+        "blocks": [
+            {
+                "kind": "section",
+                "id": "s",
+                "title": "S",
+                "blocks": [
+                    {
+                        "kind": "chart",
+                        "type": "heatmap",
+                        "cells": [[1, 2], [3, 4]],
+                    }
+                ],
+            }
+        ],
+    }
+    issues = _issues_of(_run(page, tmp_path=tmp_path), code="chart-heatmap-missing-cells")
+    assert len(issues) == 0
+
+
+def test_chart_gauge_with_value_and_max_passes(tmp_path: Path) -> None:
+    page = {
+        "kind": "page",
+        "title": "T",
+        "blocks": [
+            {
+                "kind": "section",
+                "id": "s",
+                "title": "S",
+                "blocks": [
+                    {"kind": "chart", "type": "gauge", "value": 62, "max": 100}
+                ],
+            }
+        ],
+    }
+    issues = _issues_of(_run(page, tmp_path=tmp_path), code="chart-gauge-missing-fields")
+    assert len(issues) == 0
+
+
 # ---------- duplicate anchors ----------
 
 def test_duplicate_section_ids_flagged(tmp_path: Path) -> None:

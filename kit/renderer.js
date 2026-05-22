@@ -45,6 +45,34 @@
       return out;
     }
 
+    /* Inline-markdown split. Mirrors Python's `_md_inline` so an author
+       can write `**bold**`, `*italic*`, `_italic_`, ``code``,
+       `[text](url)` directly inside a content / lead / summary string —
+       same vocabulary as a Markdown-twin source.
+
+       Returns null when the string has no markdown markers (caller
+       short-circuits to a plain text node). Order matters: bold (**)
+       checked before italic (*) so `**a**` doesn't match as italic. */
+    static _splitInlineMd(text) {
+      const re = /\*\*([^*]+?)\*\*|\*([^*\s][^*]*?)\*|__([^_]+?)__|_([^_\s][^_]*?)_|`([^`]+?)`|\[([^\]]+?)\]\(([^)\s]+?)\)/g;
+      const out = [];
+      let pos = 0;
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        if (m.index > pos) out.push(text.slice(pos, m.index));
+        if (m[1] !== undefined)      out.push({ kind: 'strong', text: m[1] });
+        else if (m[2] !== undefined) out.push({ kind: 'em',     text: m[2] });
+        else if (m[3] !== undefined) out.push({ kind: 'strong', text: m[3] });
+        else if (m[4] !== undefined) out.push({ kind: 'em',     text: m[4] });
+        else if (m[5] !== undefined) out.push({ kind: 'code',   text: m[5] });
+        else if (m[6] !== undefined) out.push({ kind: 'link',   text: m[6], href: m[7] });
+        pos = m.index + m[0].length;
+      }
+      if (pos === 0) return null;
+      if (pos < text.length) out.push(text.slice(pos));
+      return out;
+    }
+
     /** Fetch JSON, parse, and render into the host. */
     async renderFromUrl(url, host) {
       let page;
@@ -308,6 +336,28 @@
         d.textContent = JSON.stringify(block.slices);
         el.appendChild(d);
       }
+      // Tier-1/3 extension types — each ships its own payload under
+      // data-extras. The Custom Element switches by `type` in
+      // connectedCallback and reads only the extras its renderer cares
+      // about; unknown extras are ignored so the data shape can grow
+      // without breaking older clients.
+      const extraMap = {
+        heatmap: { cells: block.cells, row_labels: block.row_labels, col_labels: block.col_labels, scale: block.scale, domain: block.domain },
+        sparkline: { values: block.values, variant: block.variant, end_label: block.end_label },
+        waffle: { segments: block.segments, total: block.total, grid_rows: block.grid_rows, grid_cols: block.grid_cols },
+        gauge: { value: block.value, min: block.min, max: block.max, target: block.target, label: block.label, zones: block.zones },
+        radar: { axes: block.axes },
+        'box-plot': { boxes: block.boxes },
+        bullet: { tracks: block.tracks },
+        slope: { items: block.items, from_label: block.from_label, to_label: block.to_label }
+      };
+      if (extraMap[type]) {
+        const x = document.createElement('script');
+        x.type = 'application/json';
+        x.setAttribute('data-extras', type);
+        x.textContent = JSON.stringify(extraMap[type]);
+        el.appendChild(x);
+      }
       return el;
     }
 
@@ -422,6 +472,35 @@
       return p;
     }
 
+    /* Helper for blocks (callout, insight) that may carry richString
+       content. Two shapes survive in the wild:
+
+       - Single rich string OR mixed-inline array — render as ONE <p>.
+       - Array of plain strings (no inline-kind objects) — author meant
+         multiple paragraphs; render as N <p>s. Without this rule
+         authors get a wall of run-together sentences whenever they
+         pass a list of strings into a callout's content.
+
+       The detector is mechanical: an array with at least one item that
+       is itself an inline-kind object (eg {kind:'code',text:'x'}) is
+       inline-shape, so single paragraph. An all-plain-string array of
+       length ≥ 2 is multi-paragraph. */
+    _appendRichAsParagraphs(host, content) {
+      if (content === undefined || content === null) return;
+      if (Array.isArray(content) && content.length > 1 &&
+          content.every(function (it) { return typeof it === 'string'; })) {
+        for (const text of content) {
+          const p = document.createElement('p');
+          p.appendChild(this._renderRich(text));
+          host.appendChild(p);
+        }
+        return;
+      }
+      const p = document.createElement('p');
+      p.appendChild(this._renderRich(content));
+      host.appendChild(p);
+    }
+
     _renderHeading(block) {
       const level = Math.max(3, Math.min(4, block.level || 3));
       const h = document.createElement('h' + level);
@@ -439,9 +518,7 @@
         c.appendChild(h);
       }
       if (block.content !== undefined) {
-        const p = document.createElement('p');
-        p.appendChild(this._renderRich(block.content));
-        c.appendChild(p);
+        this._appendRichAsParagraphs(c, block.content);
       }
       return c;
     }
@@ -449,7 +526,7 @@
     _renderInsight(block) {
       const ins = document.createElement('aside');
       ins.className = 'insight';
-      ins.appendChild(this._renderRich(block.content));
+      this._appendRichAsParagraphs(ins, block.content);
       return ins;
     }
 
@@ -707,23 +784,34 @@
     _renderRich(rich) {
       const frag = document.createDocumentFragment();
       if (rich === undefined || rich === null) return frag;
-      if (typeof rich === 'string') {
-        // Strings authored with `<code>…</code>` (or other simple inline
-        // tags) used to render as literal text. Detect and convert to
-        // inline code/em/strong so authors can write either form. The
-        // detection is intentionally narrow — only the three text-shape
-        // primitives the kit also exposes in the JSON inline schema —
-        // so unrelated angle-bracket text (e.g. element names in
-        // documentation like "<callout>") still renders literally.
-        const pseudoInline = HtmlDocRenderer._splitInlineTags(rich);
-        if (pseudoInline.length > 1) {
-          for (const part of pseudoInline) {
-            if (typeof part === 'string') frag.appendChild(document.createTextNode(part));
-            else { const el = this._renderInline(part); if (el) frag.appendChild(el); }
+      // Common pipeline used by both the plain-string branch and each
+      // string entry inside the array branch: first try pseudo-HTML tag
+      // detection (<code>…</code>), then markdown inline (**bold**,
+      // *italic*, `code`, [text](url)). Either branch may yield nothing
+      // (no matches) — in that case the whole string renders as a text
+      // node.
+      const self = this;
+      const renderString = function (text) {
+        const tags = HtmlDocRenderer._splitInlineTags(text);
+        for (const part of tags) {
+          if (typeof part === 'string') {
+            const mds = HtmlDocRenderer._splitInlineMd(part);
+            if (mds) {
+              for (const sub of mds) {
+                if (typeof sub === 'string') frag.appendChild(document.createTextNode(sub));
+                else { const el = self._renderInline(sub); if (el) frag.appendChild(el); }
+              }
+            } else {
+              frag.appendChild(document.createTextNode(part));
+            }
+          } else {
+            const el = self._renderInline(part);
+            if (el) frag.appendChild(el);
           }
-        } else {
-          frag.appendChild(document.createTextNode(rich));
         }
+      };
+      if (typeof rich === 'string') {
+        renderString(rich);
         return frag;
       }
       if (!Array.isArray(rich)) {
@@ -732,7 +820,7 @@
       }
       for (const item of rich) {
         if (typeof item === 'string') {
-          frag.appendChild(document.createTextNode(item));
+          renderString(item);
         } else if (item && item.kind) {
           const el = this._renderInline(item);
           if (el) frag.appendChild(el);

@@ -1828,6 +1828,237 @@
             }
           ]
         },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-heatmap",
+          "title": "type: heatmap"
+        },
+        {
+          "kind": "paragraph",
+          "content": "N×M cell grid coloured by value. `cells` is a 2D array (outer = rows, inner = columns). Optional `row_labels` / `col_labels` annotate the edges. `scale` picks the palette family: sequential (one-sided ramp on accent) or diverging (accent for positives, danger for negatives). Hover any cell for the raw value."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"heatmap\",\n  \"title\": \"Latency by service × hour\",\n  \"row_labels\": [\"svc-a\", \"svc-b\", \"svc-c\"],\n  \"col_labels\": [\"00\", \"06\", \"12\", \"18\"],\n  \"cells\": [[12,18,42,30],[8,22,36,24],[40,50,28,16]]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "heatmap",
+          "title": "Latency by service × hour",
+          "row_labels": ["svc-a", "svc-b", "svc-c", "svc-d"],
+          "col_labels": ["00", "04", "08", "12", "16", "20"],
+          "cells": [
+            [12, 18, 26, 42, 30, 18],
+            [ 8, 22, 36, 24, 16, 10],
+            [40, 50, 28, 16, 12,  8],
+            [ 6, 12, 18, 24, 38, 50]
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-sparkline",
+          "title": "type: sparkline"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Inline mini line / area / bar. No axes, no chrome — sized for the line height of surrounding prose. `values` is a flat numeric series. `variant` picks line (default), area (filled), or bar (per-value mini-bars). `end_label` renders to the right of the curve as a small caption (`62%`, `↗`, etc.)."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sparkline\",\n  \"values\": [12,14,18,17,22,25,28,31,30,35],\n  \"variant\": \"area\",\n  \"end_label\": \"35\"\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "sparkline",
+          "values": [12, 14, 18, 17, 22, 25, 28, 31, 30, 35, 33, 38],
+          "variant": "area",
+          "end_label": "↗ 38"
+        },
+        {
+          "kind": "chart",
+          "type": "sparkline",
+          "values": [4, 8, 12, 9, 14, 6, 11, 8],
+          "variant": "bar",
+          "end_label": "11 events"
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-waffle",
+          "title": "type: waffle"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Dot-matrix breakdown. Default 10×10 grid (= 100 cells). `segments` is a list of `{label, count, color}`; the renderer fills cells in order, one per unit count. The legend lives to the right of the grid with the percentage of each segment."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"waffle\",\n  \"title\": \"User-status breakdown\",\n  \"segments\": [\n    { \"label\": \"Active\",   \"count\": 40, \"color\": \"success\" },\n    { \"label\": \"Trialing\", \"count\": 25, \"color\": \"accent\" },\n    { \"label\": \"Paused\",   \"count\": 10, \"color\": \"warn\" },\n    { \"label\": \"Churned\",  \"count\": 25, \"color\": \"danger\" }\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "waffle",
+          "title": "User-status breakdown",
+          "segments": [
+            { "label": "Active",   "count": 40, "color": "success" },
+            { "label": "Trialing", "count": 25, "color": "accent"  },
+            { "label": "Paused",   "count": 10, "color": "warn"    },
+            { "label": "Churned",  "count": 25, "color": "danger"  }
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-gauge",
+          "title": "type: gauge"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Semicircular arc, 0 → max, with a needle / fill at the current value and an optional target tick. Use for single-metric status (SLO budget, runway, uptime) where the gap to target is the point. Optional `zones` paint coloured threshold bands behind the value."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"gauge\",\n  \"title\": \"SLO budget\",\n  \"value\": 92,\n  \"max\": 100,\n  \"target\": 80,\n  \"label\": \"of monthly window remaining\",\n  \"zones\": [\n    { \"from\":  0, \"to\": 50, \"tone\": \"danger\"  },\n    { \"from\": 50, \"to\": 80, \"tone\": \"warn\"    },\n    { \"from\": 80, \"to\": 100,\"tone\": \"success\" }\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "gauge",
+          "title": "SLO budget",
+          "value": 92,
+          "max": 100,
+          "target": 80,
+          "label": "of monthly window remaining",
+          "zones": [
+            { "from":  0, "to": 50, "tone": "danger"  },
+            { "from": 50, "to": 80, "tone": "warn"    },
+            { "from": 80, "to": 100, "tone": "success" }
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-radar",
+          "title": "type: radar"
+        },
+        {
+          "kind": "paragraph",
+          "content": "N spokes radiating from centre, one filled polygon per series. Best for 3–8 axes and 1–4 series. `axes[].label` names the spoke; optional `axes[].max` overrides per-axis scaling. `series[].values` array must align with `axes` by index."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"radar\",\n  \"title\": \"Tool shortlist — five criteria\",\n  \"axes\": [\n    { \"label\": \"Speed\"   },\n    { \"label\": \"UX\"      },\n    { \"label\": \"Cost\"    },\n    { \"label\": \"Docs\"    },\n    { \"label\": \"Support\" }\n  ],\n  \"series\": [\n    { \"label\": \"Option A\", \"color\": \"accent\",  \"values\": [8, 9, 6, 7, 8] },\n    { \"label\": \"Option B\", \"color\": \"success\", \"values\": [6, 7, 9, 5, 6] }\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "radar",
+          "title": "Tool shortlist — five criteria",
+          "axes": [
+            { "label": "Speed"   },
+            { "label": "UX"      },
+            { "label": "Cost"    },
+            { "label": "Docs"    },
+            { "label": "Support" }
+          ],
+          "series": [
+            { "label": "Option A", "color": "accent",  "values": [8, 9, 6, 7, 8] },
+            { "label": "Option B", "color": "success", "values": [6, 7, 9, 5, 6] }
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-box-plot",
+          "title": "type: box-plot"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Quartiles + whiskers + optional outliers — one row per `boxes[]` entry. Required: `min`, `q1`, `median`, `q3`, `max`. Optional: `outliers: [Number]` rendered as dots beyond the whiskers."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"box-plot\",\n  \"title\": \"Cold-start latency (ms) per region\",\n  \"boxes\": [\n    { \"label\": \"us-east-1\",  \"min\": 18, \"q1\": 32, \"median\": 48, \"q3\": 60, \"max\": 86, \"outliers\": [120] },\n    { \"label\": \"eu-west-1\",  \"min\": 22, \"q1\": 38, \"median\": 52, \"q3\": 66, \"max\": 92 },\n    { \"label\": \"ap-south-1\", \"min\": 38, \"q1\": 62, \"median\": 78, \"q3\": 96, \"max\": 132, \"outliers\": [180, 210] }\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "box-plot",
+          "title": "Cold-start latency (ms) per region",
+          "boxes": [
+            { "label": "us-east-1",  "min": 18, "q1": 32, "median": 48, "q3": 60, "max": 86, "outliers": [120], "color": "accent"  },
+            { "label": "eu-west-1",  "min": 22, "q1": 38, "median": 52, "q3": 66, "max": 92,                     "color": "success" },
+            { "label": "ap-south-1", "min": 38, "q1": 62, "median": 78, "q3": 96, "max": 132, "outliers": [180, 210], "color": "warn" }
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-bullet",
+          "title": "type: bullet"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Actual-vs-target on a banded horizontal track — Stephen Few's bullet chart. One row per `tracks[]` entry: `label`, `value` (current), `target` (optional vertical tick), `max` (right-edge), optional `zones` painted behind the value."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bullet\",\n  \"title\": \"Quarter at a glance\",\n  \"tracks\": [\n    { \"label\": \"Revenue ($M)\", \"value\": 92, \"target\": 80, \"max\": 120,\n      \"zones\": [{ \"from\":0, \"to\":40, \"tone\":\"danger\" }, { \"from\":40, \"to\":80, \"tone\":\"warn\" }, { \"from\":80, \"to\":120, \"tone\":\"success\" }] },\n    { \"label\": \"NPS\",          \"value\": 58, \"target\": 65, \"max\": 100, \"color\": \"warn\" }\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "bullet",
+          "title": "Quarter at a glance",
+          "tracks": [
+            { "label": "Revenue ($M)", "value": 92, "target": 80, "max": 120, "color": "success",
+              "zones": [{ "from": 0, "to": 40, "tone": "danger" }, { "from": 40, "to": 80, "tone": "warn" }, { "from": 80, "to": 120, "tone": "success" }] },
+            { "label": "NPS",          "value": 58, "target": 65, "max": 100, "color": "warn",
+              "zones": [{ "from": 0, "to": 30, "tone": "danger" }, { "from": 30, "to": 60, "tone": "warn" }, { "from": 60, "to": 100, "tone": "success" }] },
+            { "label": "Churn (%)",    "value":  3, "target":  5, "max": 12,  "color": "success" }
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-slope",
+          "title": "type: slope"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Two-time-point change — left column is `from`, right column is `to`, one slope line per `items[]` entry. The renderer auto-colours rising as success and falling as danger unless an explicit `color` is set. Use this when ‘who went up, who went down’ is the question."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"slope\",\n  \"title\": \"Page-load p95 (ms) — before / after CDN\",\n  \"from_label\": \"Before\",\n  \"to_label\":   \"After\",\n  \"items\": [\n    { \"label\": \"/home\",      \"from\": 1400, \"to\":  680 },\n    { \"label\": \"/dashboard\", \"from\": 2200, \"to\": 1100 },\n    { \"label\": \"/settings\",  \"from\":  900, \"to\": 1500 }\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "slope",
+          "title": "Page-load p95 (ms) — before / after CDN",
+          "from_label": "Before",
+          "to_label": "After",
+          "items": [
+            { "label": "/home",      "from": 1400, "to":  680 },
+            { "label": "/dashboard", "from": 2200, "to": 1100 },
+            { "label": "/settings",  "from":  900, "to": 1500 }
+          ]
+        },
+
         {
           "kind": "heading",
           "level": 3,

@@ -354,6 +354,23 @@ nav.toc, page-toc {
 body[data-content-width="narrow"] { --content-width: 860px; }
 body[data-content-width="wide"]   { --content-width: 1100px; }
 body[data-content-width="max"]    { --content-width: 100vw; }
+
+/* Width-toggle icon doubles as a state readout. The three <rect> segments
+   inside ICON_WIDTH are outline by default; the active count fills:
+     · narrow (default) → s1 filled
+     · wide              → s1 + s2 filled
+     · max               → s1 + s2 + s3 filled
+   So the reader sees at a glance which mode they're in without opening
+   the tooltip. */
+.width-toggle .w-seg { fill: none; }
+.width-toggle .w-seg.s1,
+body[data-content-width="wide"] .width-toggle .w-seg.s2,
+body[data-content-width="max"]  .width-toggle .w-seg.s2,
+body[data-content-width="max"]  .width-toggle .w-seg.s3 { fill: currentColor; }
+/* Explicit narrow override in case a future state-default ever changes. */
+body[data-content-width="narrow"] .width-toggle .w-seg.s2,
+body[data-content-width="narrow"] .width-toggle .w-seg.s3,
+body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
 .back-to-top { bottom: 18px; right: 18px; opacity: 0; pointer-events: none; }
 .back-to-top.visible { opacity: 1; pointer-events: auto; }
 
@@ -720,7 +737,11 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 }
 .hdt-lightbox-frame {
   position: relative;
-  max-width: 92vw; max-height: 92vh;
+  /* Explicit size, not a cap — the frame should always fill the viewport
+     so img/svg/table children have a stable box to stretch into. A
+     max-* alone shrinks the frame to its content, which left small
+     diagrams smaller in the "expanded" view than on the page. */
+  width: 92vw; height: 92vh;
   display: flex; flex-direction: column;
   z-index: 1;
 }
@@ -746,7 +767,9 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   border: 1px solid var(--border-soft);
   border-radius: 12px;
   padding: 12px;
-  max-width: 92vw; max-height: 92vh;
+  flex: 1;
+  width: 100%;
+  min-width: 0; min-height: 0;
   outline: none;
   overflow: auto;
 }
@@ -754,10 +777,25 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 .hdt-lightbox-content > svg,
 .hdt-lightbox-content > .hdt-lightbox-img {
   display: block;
-  max-width: 100%;
-  max-height: 88vh;
-  width: auto; height: auto;
+  width: 100%; height: 100%;
+  max-width: 100%; max-height: 100%;
   object-fit: contain;
+}
+/* Table fullscreen: the moved .hdt-table-wrap stretches to fill the
+   lightbox; its scroll viewport scrolls both axes. Original margin /
+   border-radius look right at body width, not at full-viewport — neutralise. */
+.hdt-lightbox-content > .hdt-table-wrap {
+  width: 100%; height: 100%;
+  margin: 0;
+  display: flex; flex-direction: column;
+}
+.hdt-lightbox-content > .hdt-table-wrap > .hdt-table-scroll,
+.hdt-lightbox-content > .hdt-table-wrap > .hdt-table-cards,
+.hdt-lightbox-content > .hdt-table-wrap > .hdt-table-list,
+.hdt-lightbox-content > .hdt-table-wrap > .hdt-table-board {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* Shared toolbar for diagrams + charts. Lives top-right of the host
@@ -929,15 +967,10 @@ code:not(pre code) {
   border-color: var(--border-soft);
 }
 .hdt-table-wrap .hdt-table-scroll { background: var(--bg); }
-.hdt-table-wrap.expanded {
-  /* Bleed into the available space. With the edge-anchored sidebar
-     (D1), `<main>` is left-aligned in the remaining grid cell, so
-     bleed is asymmetric: a constant 40px on the left (lining up
-     ~24px past the sidebar's right edge) and as far as the right
-     gutter allows on the right, capped to 40px at narrow widths. */
-  margin-left: -40px;
-  margin-right: calc(-1 * max(40px, 100vw - var(--content-width, var(--max-width)) - 368px));
-}
+/* The expand affordance now opens the table in the shared lightbox
+   overlay (same path as image / chart / diagram expand). The old
+   in-place bleed via .hdt-table-wrap.expanded was visually heavy and
+   collided with the sidebar grid — removed. */
 .hdt-table-controls {
   display: flex;
   gap: 4px;
@@ -953,8 +986,7 @@ code:not(pre code) {
   transition: opacity 0.18s ease;
 }
 .hdt-table-wrap:hover .hdt-table-controls,
-.hdt-table-wrap:focus-within .hdt-table-controls,
-.hdt-table-wrap.expanded .hdt-table-controls { opacity: 1; }
+.hdt-table-wrap:focus-within .hdt-table-controls { opacity: 1; }
 .hdt-table-controls button {
   font: 600 11px 'Inter', sans-serif;
   letter-spacing: 0.02em;
@@ -2949,6 +2981,151 @@ html-doc-chart .hdc-donut-legend-label {
   font: 500 12px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
+
+/* ============ Tier-1 / Tier-3 chart variants ============ *
+ * heatmap · sparkline · waffle · gauge · radar · box-plot · bullet · slope.
+ * Visual tokens come from the same accent / warn / danger / success /
+ * muted vocabulary as donut. Each rule scopes inside .hdc-<type> to
+ * isolate the SVG-class space from the Cartesian renderer. */
+
+html-doc-chart .hdc-heatmap .hdc-heatmap-cell {
+  stroke: var(--surface);
+  stroke-width: 0.5;
+  transition: fill-opacity 0.12s ease;
+}
+html-doc-chart .hdc-heatmap .hdc-heatmap-cell:hover { stroke: var(--accent-strong); stroke-width: 1.5; }
+html-doc-chart .hdc-heatmap .hdc-heatmap-label {
+  fill: var(--text-soft);
+  font: 500 11px 'Inter', sans-serif;
+  dominant-baseline: middle;
+}
+
+.hdc-sparkline-row {
+  display: inline-flex; align-items: center; gap: 6px;
+  line-height: 1;
+}
+.hdc-sparkline-row svg.hdc-sparkline {
+  width: 120px; height: 28px;
+  flex: 0 0 auto;
+  /* sparkline inherits theme color; .hdc-sparkline-* classes pick from it. */
+  color: var(--accent);
+}
+.hdc-sparkline-row .hdc-sparkline-end-label {
+  font: 500 12px 'Inter', sans-serif;
+  color: var(--text-soft);
+}
+html-doc-chart .hdc-sparkline .hdc-sparkline-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+html-doc-chart .hdc-sparkline .hdc-sparkline-area {
+  fill: currentColor;
+  fill-opacity: 0.16;
+  stroke: none;
+}
+html-doc-chart .hdc-sparkline .hdc-sparkline-bar { fill: currentColor; }
+html-doc-chart .hdc-sparkline .hdc-sparkline-endpoint {
+  fill: currentColor;
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+
+html-doc-chart .hdc-waffle .hdc-waffle-cell {
+  stroke: var(--surface);
+  stroke-width: 0.6;
+  transition: fill-opacity 0.12s ease;
+}
+html-doc-chart .hdc-waffle .hdc-waffle-cell:hover { stroke: var(--accent-strong); stroke-width: 1.4; }
+html-doc-chart .hdc-waffle .hdc-waffle-legend-label {
+  fill: var(--text);
+  font: 500 12px 'Inter', sans-serif;
+  dominant-baseline: middle;
+}
+
+html-doc-chart .hdc-gauge .hdc-gauge-bg { /* background arc — uses inline fill */ }
+html-doc-chart .hdc-gauge .hdc-gauge-zone { /* zone band — uses inline fill + opacity */ }
+html-doc-chart .hdc-gauge .hdc-gauge-value { /* value arc — accent */ }
+html-doc-chart .hdc-gauge .hdc-gauge-target {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+html-doc-chart .hdc-gauge .hdc-gauge-value-text {
+  fill: var(--text);
+  font: 700 30px 'Inter', sans-serif;
+}
+html-doc-chart .hdc-gauge .hdc-gauge-label {
+  fill: var(--text-soft);
+  font: 500 11.5px 'Inter', sans-serif;
+}
+
+html-doc-chart .hdc-radar .hdc-radar-ring {
+  fill: none;
+  stroke: var(--border-soft);
+  stroke-width: 0.6;
+}
+html-doc-chart .hdc-radar .hdc-radar-axis {
+  stroke: var(--border);
+  stroke-width: 0.6;
+}
+html-doc-chart .hdc-radar .hdc-radar-label {
+  fill: var(--text);
+  font: 500 12px 'Inter', sans-serif;
+  dominant-baseline: middle;
+}
+html-doc-chart .hdc-radar .hdc-radar-series { cursor: default; transition: fill-opacity 0.18s ease; }
+html-doc-chart .hdc-radar .hdc-radar-series:hover { fill-opacity: 0.4; }
+html-doc-chart .hdc-radar .hdc-radar-legend-label {
+  fill: var(--text-soft);
+  font: 500 12px 'Inter', sans-serif;
+  dominant-baseline: middle;
+}
+
+html-doc-chart .hdc-boxplot .hdc-boxplot-label {
+  fill: var(--text);
+  font: 500 12px 'Inter', sans-serif;
+}
+html-doc-chart .hdc-boxplot .hdc-boxplot-whisker {
+  stroke: var(--text-soft);
+  stroke-width: 1.2;
+}
+html-doc-chart .hdc-boxplot .hdc-boxplot-iqr { stroke-width: 1; }
+html-doc-chart .hdc-boxplot .hdc-boxplot-outlier {
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+
+html-doc-chart .hdc-bullet .hdc-bullet-label {
+  fill: var(--text);
+  font: 500 12px 'Inter', sans-serif;
+}
+html-doc-chart .hdc-bullet .hdc-bullet-bg {
+  fill: var(--code-bg, rgba(127,127,127,0.12));
+}
+html-doc-chart .hdc-bullet .hdc-bullet-target {
+  stroke: var(--text);
+  stroke-width: 2.4;
+}
+html-doc-chart .hdc-bullet .hdc-bullet-readout {
+  fill: var(--text);
+  font: 600 12px 'Inter', sans-serif;
+  dominant-baseline: middle;
+}
+
+html-doc-chart .hdc-slope .hdc-slope-col {
+  fill: var(--text-soft);
+  font: 600 12px 'Inter', sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+html-doc-chart .hdc-slope .hdc-slope-readout {
+  fill: var(--text);
+  font: 500 12px 'Inter', sans-serif;
+  dominant-baseline: middle;
+}
+
 html-doc-chart .hdc-dot {
   stroke: var(--surface);
   stroke-width: 1.5;
