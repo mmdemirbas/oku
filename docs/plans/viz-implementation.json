@@ -1,0 +1,304 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Visualization implementation — phased plan",
+  "accent": "teal",
+  "meta": {
+    "eyebrow": "Plan",
+    "subtitle": "Concrete commit-by-commit phasing to ship every Tier 1-3 type from the visualization roadmap.",
+    "audience": "Maintainer",
+    "order": 125,
+    "summary": "Eighteen new viz types, each as its own commit. Each commit lands: schema delta + renderer + reference entry + regression test + browser bounding-box check. Total estimated work: 5-8 focused days. Order: Tier 2 (Mermaid, doc-only) first → Tier 1 (8 in-house SVG, ship-next) → Tier 3 (deferred reopens)."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "Eighteen viz types pending across three tiers. Each commits as a self-contained unit. Mermaid unlock (Tier 2) is doc-only and ships first. The eight Tier 1 in-house SVG types follow in priority order. Tier 3 stays deferred but each has its concrete spec.",
+      "bullets": [
+        "Phase 0 — Tier 2 Mermaid (1 day): docs/reference.json examples for ER, state, class, mindmap, timeline, gitgraph; mark Mermaid as ‘fully supported’.",
+        "Phase 1 — Tier 1 SVG, group A (2-3 days): heatmap, histogram, sparkline, waffle. Smallest renderers, highest reader value.",
+        "Phase 2 — Tier 1 SVG, group B (2-3 days): calendar-heatmap, gauge, radar, treemap. Mid-complexity.",
+        "Phase 3 — Tier 3 active picks (1-2 days each): box-plot, bullet, slope. Ship when a doc page asks.",
+        "Phase 4 — Tier 3 heavies (3+ days each): graph (force-directed) + sankey. Lazy-load d3-force / d3-sankey.",
+        "Phase 5 — Mermaid interactivity polish: pan/zoom on diagram lightbox, fullscreen, copy-as-image."
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "shared-floor",
+      "title": "Cross-cutting floor (applies to every new viz)",
+      "lead": "Carry this checklist into every commit. Each line is testable.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "**Schema:** new `type` enum value on `chart`, plus the new fields, with `additionalProperties: false`. Round-trip validates against `kit/schema/page.schema.json`.",
+            "**Renderer:** new `_renderX` branch on the `html-doc-chart` Custom Element. Lazy: only the active type's renderer runs.",
+            "**Theme tokens:** every fill/stroke pulls from CSS variables; no hardcoded hex. Recompute on `html-doc:theme-changed`.",
+            "**ViewBox-responsive:** scales down to 360 px width without overflow.",
+            "**Toolbar:** copy-data (CSV) + screenshot (PNG) + lightbox-expand. Reuses `hdt-bar` chrome.",
+            "**Data-table fallback:** `<details><summary>Show data</summary><table>…</table></details>` rendered after the SVG for screen-readers + keyboard.",
+            "**Aria label:** `role=\"img\"` + one-sentence summary.",
+            "**Reference entry:** code-sample + live render added to `docs/reference.json`.",
+            "**Regression test:** content-regression that the type validates + rejects misshaped.",
+            "**Browser assertion:** Playwright bounding-box check at desktop AND 360 px (deferred until Playwright surface exists).",
+            "**Skill rule:** `uv run oku check` passes after every JSON edit (already in SKILL.md)."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "phase-0",
+      "title": "Phase 0 — Tier 2 Mermaid unlock (doc-only)",
+      "lead": "Zero renderer code. Author six reference examples; the existing diagram primitive renders them.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Step", "File touched", "What lands"],
+          "rows": [
+            ["1. Reference samples", "docs/reference.json", "ER, state, class, mindmap, timeline, gitgraph — each a heading + live `diagram` block (already done in docs/plans/visualizations.json's Tier 2)"],
+            ["2. Schema description", "kit/schema/page.schema.json", "`diagram.source` description names the supported first-line triggers"],
+            ["3. Docs guide", "docs/reference.json#diagrams", "How to pick between flowchart / ER / state / class / mindmap / timeline / gitgraph"],
+            ["4. check pass", "—", "`oku check` clean"]
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "phase-1",
+      "title": "Phase 1 — Tier 1 SVG, group A",
+      "lead": "Smallest renderers, highest reader value. ~2-3 commits.",
+      "blocks": [
+
+        {
+          "kind": "heading", "level": 3, "id": "p1-heatmap", "title": "heatmap"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Schema: `{ type: \"heatmap\", rows: [String], cols: [String], values: [[Number]], scale: \"sequential\"|\"diverging\", domain?: [min,max], palette?: \"accent\"|\"viridis\"|\"cividis\" }`.",
+            "Renderer: ~150 LoC. SVG `<rect>` grid + token-derived palette function.",
+            "Numeric assertion: rect count == rows.length × cols.length.",
+            "Reference sample: 5×5 correlation matrix with diverging palette."
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "p1-histogram", "title": "histogram"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Schema: `{ type: \"histogram\", bins?: [{lo,hi,count}], values?: [Number], binCount?: 20, density?: Bool }`.",
+            "Renderer: ~100 LoC. Reuses the Cartesian SVG plot (axes, pan, zoom).",
+            "Numeric assertion: bar count == bins.length (or binCount if from raw values).",
+            "Reference sample: 20-bin latency distribution."
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "p1-sparkline", "title": "sparkline"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Schema: `{ type: \"sparkline\", values: [Number], variant: \"line\"|\"area\"|\"bar\", showEndpoint?: Bool, endLabel?: String }`.",
+            "Renderer: ~60 LoC. No axes, sized by parent font metrics.",
+            "Numeric assertion: SVG height ≈ 1.2× line-height.",
+            "Reference sample: inline next to a KPI tile + inside a table cell."
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "p1-waffle", "title": "waffle / dot matrix"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Schema: `{ type: \"waffle\", total?: 100, rows?: 10, cols?: 10, segments: [{label,count,color?}] }`.",
+            "Renderer: ~70 LoC. Flex grid of `<rect>`s + legend.",
+            "Numeric assertion: filled cells == sum(segments.count).",
+            "Reference sample: user-status breakdown (active/trial/paused/churned)."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "phase-2",
+      "title": "Phase 2 — Tier 1 SVG, group B",
+      "lead": "Mid-complexity. ~2-3 commits.",
+      "blocks": [
+
+        {
+          "kind": "heading", "level": 3, "id": "p2-calendar", "title": "calendar-heatmap"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Schema: `{ type: \"calendar-heatmap\", year?: Number, values: { ISO_DATE: Number }, scale?, domain? }`.",
+            "Renderer: ~180 LoC. Date math + reuse heatmap palette.",
+            "Numeric assertion: cell count == days-in-year for the active year.",
+            "Reference sample: 2026 activity calendar."
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "p2-gauge", "title": "gauge"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Schema: `{ type: \"gauge\", value, min?: 0, max, target?, label?, zones?: [{from,to,tone}] }`.",
+            "Renderer: ~120 LoC. SVG arc paths.",
+            "Numeric assertion: needle angle = (value-min)/(max-min) × π.",
+            "Reference sample: SLO budget (92% with target 80%)."
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "p2-radar", "title": "radar"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Schema: `{ type: \"radar\", axes: [{label,max?}], series: [{name,values:[Number]}], scale: \"shared\"|\"per-axis\" }`.",
+            "Renderer: ~150 LoC. Polygon points via centre + r·cos/sin.",
+            "Numeric assertion: polygon vertex count == axes.length per series.",
+            "Reference sample: tool comparison across 5 criteria."
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "p2-treemap", "title": "treemap (flat)"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Schema (flat first): `{ type: \"treemap\", items: [{label,value,color?}] }`. Add `children: [...]` in a follow-up.",
+            "Renderer: ~200 LoC. Squarified treemap layout (no dep).",
+            "Numeric assertion: sum(rect area) == container area (within 1px rounding).",
+            "Reference sample: LoC by language."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "phase-3",
+      "title": "Phase 3 — Tier 3 active picks",
+      "lead": "Each ships when a real doc page asks. Specs ready so the reopen is fast.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Type", "Reopen trigger", "Estimated LoC"],
+          "rows": [
+            ["box-plot", "A page needs distribution quartiles", "~150"],
+            ["ridgeline", "Multi-group distribution comparison", "~180"],
+            ["slope chart", "Two-time-point comparison surface", "~80"],
+            ["bullet chart", "Actual-vs-target horizontal", "~100"],
+            ["funnel chart", "Conversion-stage surface", "~120"]
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "phase-4",
+      "title": "Phase 4 — Heavies",
+      "lead": "Each is its own multi-day commit. Lazy-load the underlying engine.",
+      "blocks": [
+
+        {
+          "kind": "heading", "level": 3, "id": "p4-graph", "title": "graph (force-directed)"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Schema: `{ kind: \"graph\", nodes: [{id,label,group?}], edges: [{from,to,weight?,label?}], layout?: \"force\"|\"layered\" }`.",
+            "Engine: `d3-force` lazy-loaded from CDN. Falls back to static layered SVG if offline.",
+            "Numeric assertion: node count + edge count == input counts; final positions stable after simulation tick budget.",
+            "Reopen trigger: 5+ node mesh visualization needed in a real doc page."
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "p4-sankey", "title": "sankey (in-house)"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Ship Mermaid's `sankey-beta` first; build in-house only if the beta fails.",
+            "Schema: `{ type: \"sankey\", nodes: [{id,label}], links: [{source,target,value}] }`.",
+            "Engine: `d3-sankey` lazy-load OR hand-rolled left-to-right (~300 LoC).",
+            "Numeric assertion: band width ∝ link value; sum(in) == sum(out) per node (modulo source/sink terminals).",
+            "Reopen trigger: Mermaid sankey-beta breaks on a real page (label overlap, non-bipartite)."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "phase-5",
+      "title": "Phase 5 — Mermaid interactivity polish",
+      "lead": "Diagrams already render well. Make them inspect-able.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "**Pan + zoom on lightbox-expanded diagrams.** Re-use the chart's panZoom hook on the cloned SVG when opened in lightbox.",
+            "**Click-a-node-to-highlight.** Mermaid emits class names per node; attach a click handler that toggles `data-hdt-focused` on the clicked node + dims siblings.",
+            "**Copy as PNG** (already exists for charts) — also for diagrams. Same `__htmldocVisualTools.svgToPng` flow.",
+            "**Persistent fullscreen URL** — `#diagram-id:fullscreen` opens the diagram in lightbox on page load (deeplink-able)."
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "commit-shape",
+      "title": "What each commit looks like",
+      "lead": "Use this as the template for every viz commit so the user can ship one per session reliably.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "feat(chart): <type> — <one-line description>\n\n  Schema:\n  - kit/schema/page.schema.json: add `type=\"<type>\"` branch +\n    required + additionalProperties:false.\n\n  Renderer:\n  - kit/chrome.js: _render<Type> in html-doc-chart; theme tokens for\n    fill / stroke; lazy-attached toolbar.\n\n  Reference:\n  - docs/reference.json: code sample + live render under #charts/<type>.\n\n  Tests:\n  - src/html_doc_tests/test_content_regression.py:\n    * accepts <type> with valid payload\n    * rejects <type> with missing required fields\n  - oku check --strict passes\n\n  Verification record:\n  - bounding-box at 1280: SVG dims ≈ <expected>\n  - bounding-box at 360:  SVG dims ≈ <expected>"
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "open-questions",
+      "title": "Open questions",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Question", "Default", "Reopen if"],
+          "rows": [
+            ["Palette: viridis vs accent-derived?", "accent-derived sequential by default; `palette: \"viridis\"|\"cividis\"|\"accent\"` opt-in.", "Colourblind-readability audit flags issue."],
+            ["Sparkline location: inline-node vs block?", "Ship block-level first.", "Real KPI-tile demand for inline sparkline."],
+            ["Treemap: flat or recursive first?", "Flat first; `children` field in follow-up.", "A doc page needs depth > 1."],
+            ["Mermaid version pin", "mermaid@10 (current). Some Tier 2 unlocks need ≥ 10.6.", "Breaking change in 10.x line."],
+            ["Data-table fallback default state", "`<details>` closed (less visual noise).", "Accessibility review prefers always-visible."]
+          ]
+        }
+      ]
+    }
+  ]
+}

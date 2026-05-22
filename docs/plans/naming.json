@@ -1,0 +1,375 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Project naming — DECIDED: oku",
+  "accent": "violet",
+  "meta": {
+    "eyebrow": "Plan · decided",
+    "subtitle": "Maintainer picked ‘oku’ (Turkish ‘read!’ — the imperative). 3 chars, no Latin, no famous-product collision, distinctive token in the global package indexes.",
+    "audience": "Maintainer",
+    "order": 110,
+    "summary": "Decided. ‘oku’ is the new name. Migration plan (CLI binary, skill name, package, repo, kit.json schema URLs, docs references) is a separate follow-up. Round-two exploration kept below for posterity."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "Decision: **oku** (Turkish, imperative of okumak — ‘read!’). Three chars. No Latin. No famous-product collision. Personal-cultural fit. ‘oku build’ / ‘oku init’ scan cleanly. Round-one and round-two artefacts kept below for the record.",
+      "bullets": [
+        "Six directions explored — page/doc compound · essence words · knowledge metaphors · writing tools · short verbs/punch · Turkish roots.",
+        "New front-runners — pith (literal ‘to-the-point’), tome (knowledge body), oku (Turkish ‘read’, 3 chars).",
+        "Kept — pagekit, pageful, crisp from round one.",
+        "Dropped — every Latin/classical name + every collision with a famous product.",
+        "Decision is gated on PyPI / npm / GitHub availability — same as before."
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "directions",
+      "title": "Six naming directions — the design space",
+      "lead": "Each card is a *direction*, not a single candidate. Reading them together shows the space we're working inside; the per-direction picks below are the strongest representatives.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "in",
+              "title": "1. page / doc / kit compound",
+              "items": [
+                "Format-bound roots accepted — they describe the artefact.",
+                "‘kit’ encodes ready-to-use; ‘page’ encodes visual artefact.",
+                "Picks: pagekit, pageful, pagedeck, docink, inkpage.",
+                "Lowest brand-risk because the descriptor is honest."
+              ]
+            },
+            {
+              "verdict": "in",
+              "title": "2. essence / ‘just to the point’",
+              "items": [
+                "Words that ARE the spec — ‘pith’, ‘crisp’, ‘terse’.",
+                "Short, vivid, distinctive. Highest match for the kit's stated philosophy.",
+                "Picks: pith, crisp.",
+                "Risk: ‘crisp’ shares with Crisp.chat; ‘pith’ is uncommon."
+              ]
+            },
+            {
+              "verdict": "in",
+              "title": "3. knowledge metaphor (English, not Latin)",
+              "items": [
+                "Words that name what the kit stores — knowledge.",
+                "‘tome’ (a book), ‘lore’ (body of teachings), ‘saga’ (story-record).",
+                "Picks: tome, lore.",
+                "Strong brand surface; instantly evocative without Latin baggage."
+              ]
+            },
+            {
+              "verdict": "in",
+              "title": "4. writing tool",
+              "items": [
+                "Names that ARE the implement — ‘ink’, ‘quill’, ‘nib’, ‘pen’.",
+                "Tactile + visual + minimalist.",
+                "Picks: ink, quill (nib as variant).",
+                "Risk: ‘ink’ namespace is busy; ‘quill’ shares with the Quill editor."
+              ]
+            },
+            {
+              "verdict": "in",
+              "title": "5. short punchy verb / sound",
+              "items": [
+                "1-syllable, fun-to-say words that scan as CLI verbs.",
+                "‘riff’ (musical improvisation), ‘pep’ (energy), ‘pop’ (generic).",
+                "Picks: riff, pep.",
+                "Risk: tone may read playful, not authoritative."
+              ]
+            },
+            {
+              "verdict": "in",
+              "title": "6. Turkish root (personal-cultural fit)",
+              "items": [
+                "User is Turkish; English isn't the only naming language.",
+                "‘oku’ (read, imperative — ‘read this!’), ‘sayfa’ (page).",
+                "Picks: oku. 3 chars, instantly readable to TR speakers, distinctive abroad.",
+                "Risk: non-TR readers see an unfamiliar token; CLI namespace likely clean."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "scoring",
+      "title": "Expanded scoring matrix",
+      "lead": "All directions, all picks, scored on the same seven criteria. Chip filter on the verdict column.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "Name",
+            "CLI len",
+            "Flow",
+            "AI",
+            "Fun",
+            "Rich",
+            "Ready",
+            "Namespace",
+            { "label": "Verdict", "filter": "chips", "values": ["lead", "strong", "fallback", "risky", "baseline"] }
+          ],
+          "rows": [
+            ["pith",     "4 ✓✓", "‘pith build’ ✓",     "✓",  "✓",   "~",     "~",       "appears clean",                     { "values": ["lead"],   "value": "Lead — literal match" }],
+            ["tome",     "4 ✓✓", "‘tome build’ ✓✓",   "✓",  "✓",   "✓",     "~",       "small uses — likely clean",         { "values": ["lead"],   "value": "Lead — knowledge metaphor" }],
+            ["oku",      "3 ✓✓", "‘oku build’ ✓",      "✓",  "✓",   "~",     "~",       "very clean — Turkish word",         { "values": ["lead"],   "value": "Lead — personal fit" }],
+            ["pagekit",  "7 ✓",  "‘pagekit build’ ✓",  "✓",  "✓",   "✓",     "✓✓",      "small CMS already named pagekit",   { "values": ["strong"], "value": "Strong — compound" }],
+            ["pageful",  "7 ✓",  "‘pageful init’ ~",   "✓",  "✓",   "✓✓",    "✓",       "appears clean",                     { "values": ["strong"], "value": "Strong — rich" }],
+            ["crisp",    "5 ✓",  "‘crisp build’ ✓✓",  "✓",  "✓✓",  "~",     "✓",       "Crisp.chat overlaps",               { "values": ["strong"], "value": "Strong — punchy" }],
+            ["lore",     "4 ✓✓", "‘lore build’ ✓",     "✓",  "✓",   "✓",     "~",       "Lore.fm + gaming usage",            { "values": ["risky"],  "value": "Risky — gaming connotation" }],
+            ["riff",     "4 ✓✓", "‘riff build’ ✓",     "✓",  "✓✓",  "~",     "~",       "appears clean",                     { "values": ["fallback"], "value": "Fallback — fun" }],
+            ["quill",    "5 ✓",  "‘quill build’ ✓",    "✓",  "✓",   "~",     "~",       "Quill editor overlaps",             { "values": ["risky"],  "value": "Risky — editor collision" }],
+            ["nib",      "3 ✓✓", "‘nib build’ ~",      "~",  "✓",   "~",     "~",       "appears clean",                     { "values": ["fallback"], "value": "Fallback — niche" }],
+            ["pep",      "3 ✓✓", "‘pep build’ ✓",      "~",  "✓✓",  "~",     "~",       "Python pep collides culturally",    { "values": ["risky"],  "value": "Risky — Python PEPs" }],
+            ["ink",      "3 ✓✓", "‘ink build’ ✓",      "~",  "✓",   "~",     "~",       "Ink for React + others — crowded",  { "values": ["risky"],  "value": "Risky — busy" }],
+            ["docink",   "5 ✓",  "‘docink build’ ✓",   "✓",  "✓",   "~",     "~",       "appears clean",                     { "values": ["fallback"], "value": "Fallback if ‘ink’ taken" }],
+            ["inkpage",  "7 ✓",  "‘inkpage init’ ✓",   "✓",  "✓",   "~",     "~",       "appears clean",                     { "values": ["fallback"], "value": "Fallback" }],
+            ["pagedeck", "8 ~",  "‘pagedeck build’ ~", "✓",  "~",   "✓",     "✓",       "appears clean",                     { "values": ["fallback"], "value": "Fallback" }],
+            ["htmldoc",  "7+ ~", "‘html-doc build’ ✗", "✓",  "~",   "~",     "~",       "already used",                      { "values": ["baseline"], "value": "Baseline / no-op" }]
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "content": "<small>Legend: ✓✓ = clearly clears the bar · ✓ = clears · ~ = neutral · ✗ = fails.</small>"
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "new-leads",
+      "title": "New front-runners — detail cards",
+      "lead": "The three new picks that rose above last round's compound family. Each has its own flavor — pick by what register you want.",
+      "blocks": [
+        {
+          "kind": "heading", "level": 3, "id": "pith", "title": "pith"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Four characters. English noun: ‘the essential or central part of something’. Literally is the spec — the kit exists to make documentation that's just-to-the-point."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Why it fits",
+              "items": [
+                "Single word that names the kit's stated philosophy — concision, essence.",
+                "Pleasant to type; reads cleanly as a CLI verb.",
+                "Distinctive — no famous-product collision.",
+                "Brand surface: clean wordmark; tiny logo footprint."
+              ]
+            },
+            {
+              "verdict": "bad",
+              "title": "Risks",
+              "items": [
+                "Uncommon English word — some readers won't know the meaning.",
+                "Two-letter combinations ‘ph’ + ‘th’ feel slightly literary.",
+                "Less ‘rich built-in’ vibe than pagekit; ‘pith’ leans toward minimal."
+              ]
+            }
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "tome", "title": "tome"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Four characters. English noun: ‘a large, scholarly book — a volume forming part of a larger work’. Old English / Middle English root (via Greek ‘tomos’, but anglicised long ago — not Latin). Names what the kit produces."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Why it fits",
+              "items": [
+                "Instantly conveys ‘a body of knowledge’ — matches the kit's role.",
+                "Short, distinctive, instantly memorable.",
+                "CLI: ‘tome build’, ‘tome init’ — flows as a sentence (‘build the tome’).",
+                "Reads as a brand, not a description."
+              ]
+            },
+            {
+              "verdict": "bad",
+              "title": "Risks",
+              "items": [
+                "Slight ‘heavy book’ connotation — the kit's tone is lighter.",
+                "Greek root long-anglicised, but some readers may file it next to Latin in spirit.",
+                "Niche existing uses (a Discord bot ‘Tome’, several small libraries) — namespace check needed."
+              ]
+            }
+          ]
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "oku", "title": "oku"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Three characters. Turkish — the imperative of ‘okumak’ (to read). ‘oku!’ = ‘read!’. The literal command form of what the kit asks the reader to do. Distinctive token in non-TR namespaces, instantly meaningful to the maintainer."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Why it fits",
+              "items": [
+                "Three characters — minimum CLI cost.",
+                "Cultural fit — maintainer is Turkish; the kit's identity carries that.",
+                "‘oku build’ — short, punchy, completely distinctive token.",
+                "Namespace likely clean: 3-letter Turkish words rarely collide with English-default tool indexes."
+              ]
+            },
+            {
+              "verdict": "bad",
+              "title": "Risks",
+              "items": [
+                "Non-Turkish readers see an opaque token until they look it up.",
+                "Pronunciation drift in English (‘oh-koo’ vs ‘ah-koo’) needs a tagline ‘oku — Turkish for read’.",
+                "Trademark / SEO: ‘oku’ is also a Yoruba word, a Japanese word, etc. — meaning shifts by language but the spelling is stable."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "cli-feel",
+      "title": "CLI scan test — read each block out loud",
+      "lead": "Same four commands across every front-runner.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "bash",
+          "source": "# pith\npith init   docs/plan.json\npith build\npith serve\npith check\n\n# tome\ntome init   docs/plan.json\ntome build\ntome serve\ntome check\n\n# oku\noku init    docs/plan.json\noku build\noku serve\noku check\n\n# pagekit\npagekit init  docs/plan.json\npagekit build\npagekit serve\npagekit check\n\n# pageful\npageful init  docs/plan.json\npageful build\npageful serve\npageful check\n\n# crisp\ncrisp init    docs/plan.json\ncrisp build\ncrisp serve\ncrisp check\n\n# riff\nriff init     docs/plan.json\nriff build\nriff serve\nriff check\n\n# (baseline — today)\nhtml-doc init docs/plan.json\nhtml-doc build\nhtml-doc serve\nhtml-doc check"
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "What the typing test shows",
+          "content": "‘tome build’ flows the best — full sentence shape. ‘pith build’ is punchy but slightly literary. ‘oku build’ is fastest to type, totally distinctive, with a one-line tagline. ‘pagekit build’ stays as the no-Latin compound option. ‘riff build’ is fun but the tone reads playful, not authoritative. ‘html-doc build’ remains the hyphen-friction baseline."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "rejected",
+      "title": "Rejected — refresher",
+      "lead": "The reject list from round one carries over. Codex, Folio, Vellum, Lectern, etc., still out.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "out",
+              "title": "Latin / classical family",
+              "items": [
+                "Folio, Vellum, Lectern, Codex, Lectorium, Scriptorium, Quire, Recto, Verso, Limn, Imprint, Compendium, Marginalia, Lumen.",
+                "User: ‘not my culture’ — entire family pruned."
+              ]
+            },
+            {
+              "verdict": "out",
+              "title": "Famous-product collisions",
+              "items": [
+                "Codex (OpenAI Codex), Atlas (MongoDB), Stencil (Ionic), Astro, Hugo, Eleventy, Prism (kit dependency!), Slate, Quill (Quill editor).",
+                "Permanent search + conversation tax."
+              ]
+            },
+            {
+              "verdict": "out",
+              "title": "Cute / fragile",
+              "items": [
+                "Foli0, ReadMee, PaPage, htmldøc.",
+                "Reader has to learn the joke before the tool."
+              ]
+            },
+            {
+              "verdict": "out",
+              "title": "Generic single English nouns",
+              "items": [
+                "Read, Page, Doc, Site, Story, Book.",
+                "Too generic to brand or own."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "recommendation",
+      "title": "Recommendation",
+      "lead": "Fork in the road. Each step is a namespace gate.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "1",
+              "title": "Check ‘tome’ on PyPI / npm / GitHub",
+              "content": "Strongest single-word pick. If clean (no big PyPI package, no popular npm), ship as ‘tome’. Best balance of metaphor strength + CLI ergonomics."
+            },
+            {
+              "num": "2",
+              "title": "If tome blocked, check ‘pith’",
+              "content": "Cleanest semantic match for the kit's stated philosophy. Slightly literary; the trade is conceptual fit > brand recognition."
+            },
+            {
+              "num": "3",
+              "title": "If pith blocked, check ‘oku’",
+              "content": "Personal-cultural fit. Three chars, clean namespace (Turkish words rarely collide), needs a one-line tagline."
+            },
+            {
+              "num": "4",
+              "title": "If oku blocked, fall back to ‘pagekit’",
+              "content": "Round-one lead. Compound that says what it is. Safest choice."
+            },
+            {
+              "num": "5",
+              "title": "If pagekit blocked, ‘pageful’ → ‘crisp’ → keep ‘htmldoc’",
+              "content": "The chain from round one still applies. Don't rename for a tied pick — the migration cost only pays out when the new name is meaningfully better than the current."
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "success",
+          "title": "My pick",
+          "content": "tome — short, English, knowledge metaphor, no Latin, no famous collision. Falls back to pith → oku → pagekit. The order is: best metaphor first, best personal fit second, safest compound last."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "open-questions",
+      "title": "Open questions",
+      "lead": "Decide before committing.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Question", "How to answer", "Why it matters"],
+          "rows": [
+            ["Is ‘tome’ taken on PyPI / npm / GitHub?", "pypi.org/project/tome; github.com/tome; npm package ‘tome’", "Three-letter and four-letter names are usually claimed early. Check first; pick second."],
+            ["Does ‘oku’ confuse non-TR readers?", "One-line tagline: ‘oku — Turkish for read; the kit reads your JSON, builds your docs.’", "If the tagline lands, the unfamiliarity becomes an asset (memorable). If not, fall through to ‘tome’."],
+            ["Trademark sanity per finalist", "Quick USPTO TESS + EUIPO search; software class 9 / 42", "Avoid a name already filed in our space. Not for filing — just for due diligence."],
+            ["Pronounceability across the user's daily languages (TR / EN / DE)", "Say each finalist out loud in each language", "‘tome’ reads cleanly everywhere; ‘pith’ has the ‘th’ sound that some non-EN speakers stumble on; ‘oku’ is TR-native, EN-foreign but stable."],
+            ["Logo / wordmark surface", "Sketch a 24-char-wide wordmark for each", "‘tome’ reads as a brand; ‘pith’ as a quote; ‘oku’ as an imperative. Each implies a different visual identity."],
+            ["CLI alias?", "Decide whether to ship a short alias regardless of name (‘pk’ for pagekit, ‘t’ for tome)", "Short alias eliminates the typing-friction argument and lets the long name carry the brand."]
+          ]
+        }
+      ]
+    }
+  ]
+}

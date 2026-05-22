@@ -66,6 +66,12 @@
         {
           "kind": "callout",
           "type": "note",
+          "title": "Where the toggle lives",
+          "content": "Top-right chrome strip, immediately left of the theme button. The icon is three small boxes — the count of filled boxes reflects the current mode (1 = narrow, 2 = wide, 3 = max). Hover shows the full label ‘Content width: <mode> — click to cycle …’."
+        },
+        {
+          "kind": "callout",
+          "type": "note",
           "title": "Effective ceiling on common viewports",
           "content": "On a 1440px monitor with a 280px sidebar, max mode delivers ~1100px — a tie with wide. On 1920+ monitors max widens past 1500px and prose lines become unreadable. The current cap is silently the wrong cap on either side of that boundary."
         }
@@ -118,6 +124,11 @@
           "title": "A — Raise --max-width"
         },
         {
+          "kind": "code",
+          "language": "text",
+          "source": "┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌sidebar─┐┌─main column (now 1500+ px) ───────────────────────┐│\n││        ││  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ││\n││        ││  ▓▓▓ prose lines now ~140 chars — too wide ▓▓▓▓▓▓ ││\n││        ││  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ││\n││        ││                                                    ││\n││        ││  ┌─table — wide IS good for tables─────────────┐  ││\n││        ││  │ A │ B │ C │ D │ E │ F │ G │ H │ I │ J │ K  │  ││\n││        ││  └──────────────────────────────────────────────┘  ││\n│└────────┘└────────────────────────────────────────────────────┘│\n└────────────────────────────────────────────────────────────────┘\n   one rule for prose AND primitives · prose pays the cost"
+        },
+        {
           "kind": "paragraph",
           "content": "Single-line change. Quick to ship, easy to revert. Wrecks prose readability at 1500+. Not viable as the default."
         },
@@ -132,6 +143,11 @@
           "level": 3,
           "id": "option-b",
           "title": "B — Asymmetric bleed (prose locked, primitives bleed)"
+        },
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌sidebar─┐┌─main grid cell ───────────────────────────────────┐│\n││        ││      ▓▓▓ prose 860px (locked at ~80 chars) ▓▓▓     ││\n││        ││      ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓               ││\n││        ││      ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓               ││\n││        ││                                                     ││\n││        ││┌─table BLEEDS to grid cell edge ───────────────────┐││\n││        │││ A │ B │ C │ D │ E │ F │ G │ H │ I │ J │ K       │││\n││        ││└────────────────────────────────────────────────────┘││\n││        ││                                                     ││\n││        ││      ▓▓▓ next paragraph snaps back to prose ▓▓▓     ││\n││        ││      ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                       ││\n│└────────┘└─────────────────────────────────────────────────────┘│\n└────────────────────────────────────────────────────────────────┘\n   two rules: prose narrow, primitives wide · best of both"
         },
         {
           "kind": "paragraph",
@@ -210,6 +226,11 @@
           "title": "C — Right-rail of supporting content"
         },
         {
+          "kind": "code",
+          "language": "text",
+          "source": "┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌sidebar─┐┌─main ──────────────┐┌─right rail ─────────────────┐│\n││page-nav ││ ▓▓▓ prose ▓▓▓     ││ Pinned tooltips             ││\n││+ TOC    ││ ▓▓▓▓▓▓▓▓▓▓▓        ││ ▔▔▔▔▔▔▔▔▔▔▔▔▔▔              ││\n││         ││                    ││  • term1: def…              ││\n││         ││ ┌─table──────────┐ ││  • term2: def…              ││\n││         ││ │                │ ││                             ││\n││         ││ └────────────────┘ ││ Related pages               ││\n││         ││                    ││ ▔▔▔▔▔▔▔▔▔▔▔▔▔▔              ││\n││         ││ ▓▓▓ prose ▓▓▓     ││  ↗ glossary share           ││\n││         ││ ▓▓▓▓▓▓▓▓▓▓▓        ││  ↗ build architecture       ││\n│└─────────┘└────────────────────┘└─────────────────────────────┘│\n└────────────────────────────────────────────────────────────────┘\n   3 columns (280 + 760 + 280) · needs a real second-surface to justify"
+        },
+        {
           "kind": "paragraph",
           "content": "Treat the right gutter as a real surface — anchor permanent panels there: section TOC (currently left-side), pinned glossary tooltips, a related-pages rail derived from shared sections, or a notes pad."
         },
@@ -249,6 +270,11 @@
           "title": "D — Multi-column prose"
         },
         {
+          "kind": "code",
+          "language": "text",
+          "source": "┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌sidebar─┐┌─main column ───────────────────────────────────────┐│\n││        ││ ▓▓ col 1 (scroll DOWN ↓) ▓▓│▓▓ col 2 (scroll UP ↑) ││\n││        ││ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ││\n││        ││ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ││\n││        ││ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ ││\n││        ││                                                    ││\n││        ││ ┌─table — must span both columns ─────────────────┐││\n││        ││ └──────────────────────────────────────────────────┘││\n│└────────┘└────────────────────────────────────────────────────┘│\n└────────────────────────────────────────────────────────────────┘\n   reader saccades break · primitives span weird · no platform does this"
+        },
+        {
           "kind": "paragraph",
           "content": [
             "Use CSS ",
@@ -267,6 +293,11 @@
           "level": 3,
           "id": "option-e",
           "title": "E — Side-by-side comparison view"
+        },
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌sidebar─┐┌─page A ────────────────┐┌─page B ────────────────┐│\n││        ││ ▓ TLDR ▓                ││ ▓ TLDR ▓                ││\n││        ││ ─────────               ││ ─────────               ││\n││        ││ ▓▓▓ prose ▓▓▓          ││ ▓▓▓ prose (diff) ▓▓▓   ││\n││        ││ ▓▓▓▓▓▓▓▓▓▓▓             ││ ▓▓▓▓▓▓▓▓▓▓▓             ││\n││        ││ ┌─table─┐                ││ ┌─table (diff)─┐        ││\n││        ││ │       │                ││ │              │        ││\n││        ││ └───────┘                ││ └──────────────┘        ││\n│└────────┘└─────────────────────────┘└─────────────────────────┘│\n└────────────────────────────────────────────────────────────────┘\n   diff / before-and-after · needs page-pair UX · defer"
         },
         {
           "kind": "paragraph",

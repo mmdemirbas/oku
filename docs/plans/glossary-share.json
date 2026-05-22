@@ -2,149 +2,64 @@
   "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
   "kind": "page",
   "schema_version": 1,
-  "title": "Shareable kit — glossary strategy",
+  "title": "Glossary — system + project layers",
   "accent": "violet",
   "meta": {
     "eyebrow": "Plan",
-    "subtitle": "Separating personal glossary content from the shipped kit so html-doc can be released publicly.",
+    "subtitle": "Two layers only — a well-known system-level config dir + per-project glossaries. No community registry.",
     "audience": "Maintainer",
     "order": 140,
-    "summary": "What stays in the kit, what splits off, what a community-shared registry would look like."
+    "summary": "Replace the bundled-in-kit glossary model with a two-layer setup: system-level (~/.config/html-doc/) shared across all projects, plus per-project glossaries. The existing kit-bundled domain files stay git-tracked in this repo as a personal-config backup, not as a runtime source."
   },
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "The kit currently bundles personal-domain glossaries (adhd, hadith, voice) alongside general-purpose ones (web, data-platforms, ai-llm, doc-tooling). Public release needs the personal ones to live outside the kit while keeping per-project glossary authoring frictionless. The recommended path is three layers: a small built-in default set, a per-project override layer (already exists via kit.json), and a community-shared registry fetched on demand.",
+      "summary": "Two layers, no more: a well-known system-level config dir for the user's personal vocabulary, and per-project glossaries next to kit.json. The runtime loader reads from those two places, in that order. The existing kit/glossary/*.json files in this repo stay git-tracked as a backup of the user's personal config — they're no longer auto-loaded as ‘kit bundled defaults’.",
       "bullets": [
-        "Built-in (ships with kit): general-purpose, generally-useful — keep as defaults.",
-        "Private (lives in personal repos or a private fork): personal-domain glossaries, never published.",
-        "Project override (already works via kit.json + the domains list): users declare which built-ins to load and add their own.",
-        "Community registry (new, optional): fetchable third-party glossary packs — npm-style, but JSON files."
+        "System layer: ~/.config/html-doc/{glossary,extrefs}/*.json — loaded on every page, every project.",
+        "Project layer: kit.json + glossary/ alongside it — overrides system on key collision.",
+        "Bundled-in-this-repo: kit/glossary/*.json stays for git history + personal backup. NOT auto-loaded.",
+        "Drop: community pack registry, packs[] URL list, runtime fetching from CDNs.",
+        "Install path: copy/symlink kit/glossary/ → ~/.config/html-doc/glossary/ on dev setup."
       ]
     },
     {
       "kind": "section",
-      "id": "today",
-      "title": "Today — what ships where",
-      "lead": "Glossary content currently sits inside the kit asset directory. The kit fetches files matching the active domains in kit.json on every page load.",
-      "blocks": [
-        {
-          "kind": "code",
-          "language": "text",
-          "source": "kit/\n├── chrome.css\n├── chrome.js\n├── chrome-boot.js\n├── renderer.js\n├── schema/\n├── glossary/\n│   ├── adhd.json          ← personal\n│   ├── ai-llm.json        ← general\n│   ├── data-platforms.json ← general\n│   ├── doc-tooling.json   ← general\n│   ├── hadith.json        ← personal\n│   ├── voice.json         ← personal\n│   └── web.json           ← general\n└── extrefs/\n    ├── ai-llm.json\n    ├── data-platforms.json\n    ├── doc-tooling.json\n    └── web.json"
-        },
-        {
-          "kind": "callout",
-          "type": "warn",
-          "title": "Why this is a release blocker",
-          "content": "Three of the seven glossary domains (adhd, hadith, voice) are personal — they relate to private notes the maintainer keeps in other repos. Public release of the kit would either expose half-filled personal entries or require contributors to inherit a vocabulary that isn't theirs. Either way the kit can't be the registry."
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "decision-matrix",
-      "title": "Decision matrix per domain",
-      "lead": "Score each existing domain on general usefulness vs personal scope, then pick a destination.",
-      "blocks": [
-        {
-          "kind": "table",
-          "headers": ["Domain", "Useful to whom", "Destination", "Reason"],
-          "rows": [
-            ["doc-tooling", "Anyone using html-doc", "Built-in", "Defines kit's own vocabulary (page-nav, page-toc, primitives, etc.). Ship as default."],
-            ["web", "Web-platform authors", "Built-in (small)", "HTTP, CORS, MIME, etc. Broadly useful, low maintenance."],
-            ["data-platforms", "Iceberg / Spark / lakehouse work", "Optional pack", "Specific niche. Keep as a downloadable pack, not bundled."],
-            ["ai-llm", "AI / agent / SDK work", "Optional pack", "Specific niche. Same treatment as data-platforms."],
-            ["adhd", "Maintainer only", "Private", "Personal-notes vocabulary. Stays in the maintainer's private repos."],
-            ["hadith", "Maintainer only", "Private", "Same."],
-            ["voice", "Maintainer only", "Private", "Same."]
-          ]
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "three-layers",
-      "title": "Three-layer model",
-      "lead": "Each layer answers a different question. Combine cleanly with no override surprise.",
-      "blocks": [
-        {
-          "kind": "step-flow",
-          "steps": [
-            {
-              "num": "1",
-              "title": "Built-in (kit ships it)",
-              "meta": "doc-tooling, web",
-              "content": "Small, general, opinionated. Ships in the kit zip / wheel. Available to every project by default — kit.json.domains can list any of these and chrome.js fetches them from _kit/glossary/."
-            },
-            {
-              "num": "2",
-              "title": "Project (the author writes it)",
-              "meta": "kit.json + glossary_overrides",
-              "content": "kit.json's domains list selects built-ins. The project may also define inline term overrides (already supported) and ship its own glossary files alongside kit.json. The author owns this layer entirely."
-            },
-            {
-              "num": "3",
-              "title": "Community pack (fetched on demand)",
-              "meta": "kit.json.packs",
-              "content": "Third-party glossary bundles. Distributed as JSON files on any CDN / GitHub raw URL. kit.json lists pack URLs; chrome.js fetches and merges them into the registry at load time. Authors can publish their own domain packs without modifying the kit."
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "private-layer",
-      "title": "The private layer — what happens to adhd, hadith, voice",
-      "lead": "These domains live in private projects that depend on the kit. The simplest answer keeps them entirely outside this repo.",
-      "blocks": [
-        {
-          "kind": "list",
-          "style": "bullet",
-          "items": [
-            "Move adhd.json, hadith.json, voice.json out of kit/glossary/ into the projects that actually use them.",
-            "Each consuming project carries the glossary file next to its kit.json — chrome.js's project-glossary path (already in the loader) picks them up.",
-            "Optional: a single private repo (~/.local/share/html-doc-personal/) holds shared personal domains and is referenced via a packs URL in each project's kit.json. Keeps the personal vocabulary in one place across the maintainer's projects without involving the public kit."
-          ]
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "community-registry",
-      "title": "Community registry — design sketch",
-      "lead": "Optional Phase-3 work. Lets contributors publish glossary packs the way they'd publish an npm package — without forking the kit.",
+      "id": "what-changed",
+      "title": "What changed from the previous draft",
+      "lead": "User feedback collapsed the design. Recording the revisions side-by-side.",
       "blocks": [
         {
           "kind": "compare-grid",
           "cards": [
             {
-              "verdict": "in",
-              "title": "Minimum: list of URLs in kit.json",
-              "items": [
-                "kit.json gains a packs: [{ name, url, version? }] array.",
-                "chrome.js fetches each URL on first paint, validates against glossary.schema.json, merges into the per-domain registry under the declared name.",
-                "Zero infrastructure cost — any HTTPS URL works (GitHub raw, jsDelivr, R2, S3).",
-                "Authors publish a pack by pushing a single JSON file to any CDN."
-              ]
-            },
-            {
-              "verdict": "neutral",
-              "title": "Optional: a registry index",
-              "items": [
-                "A central JSON index (registry.html-doc.org or a community GitHub repo) listing known packs with metadata (description, author, version, schema_version).",
-                "Lets html-doc init or a future html-doc search-packs surface available packs.",
-                "Adds curation overhead — needs a maintainer (or a PR-driven update model).",
-                "Not blocking for Phase 1 or 2. Worth doing only if pack count grows beyond what a README can list."
-              ]
-            },
-            {
               "verdict": "out",
-              "title": "Reject: a runtime package manager",
+              "title": "Dropped — community pack registry",
               "items": [
-                "Building html-doc install <pack>, lockfiles, semver resolution, etc. is npm-shaped scope that the use case doesn't justify.",
-                "If pack count grows that much, the community will fork the existing JS/npm ecosystem rather than re-build it in Python."
+                "No packs[] URL list in kit.json.",
+                "No runtime fetch from CDNs / GitHub raw URLs.",
+                "No registry index, no html-doc search-packs CLI.",
+                "Reason: the user doesn't plan to use it. Scope-creep with no consumer."
+              ]
+            },
+            {
+              "verdict": "in",
+              "title": "Kept + refined — two layers",
+              "items": [
+                "System: well-known per-user config directory.",
+                "Project: glossary files alongside kit.json (already supported).",
+                "Loader merges system then project; project wins on key collision.",
+                "Reason: clean, predictable, no network at runtime."
+              ]
+            },
+            {
+              "verdict": "in",
+              "title": "New — bundled files stay in repo",
+              "items": [
+                "kit/glossary/*.json + kit/extrefs/*.json keep their git history.",
+                "Reframed from ‘kit-shipped runtime defaults’ to ‘personal-config backup’.",
+                "Optional install step copies (or symlinks) them into ~/.config/html-doc/.",
+                "Reason: user wants the version history and portability, just not the runtime coupling."
               ]
             }
           ]
@@ -153,58 +68,163 @@
     },
     {
       "kind": "section",
-      "id": "mechanism",
-      "title": "Concrete mechanism — kit.json after the change",
-      "lead": "The schema gets one optional field; everything else stays compatible.",
+      "id": "layers",
+      "title": "Two layers, at a glance",
+      "lead": "Each layer answers a different scope question. The runtime loader merges them in order.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Layer", "Lives at", "Scope", "When loaded", "Wins on collision"],
+          "rows": [
+            ["System", "~/.config/html-doc/{glossary,extrefs}/*.json", "Every project on this user's machine", "Every page render", "No (project wins)"],
+            ["Project", "<project>/glossary/*.json (alongside kit.json)", "This project only", "Every page render of this project", "Yes"]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Why ‘system’, not ‘global’",
+          "content": "‘global’ implies machine-wide / multi-user. The dir is per-user (under HOME). Calling it ‘system’ makes the analogy with .gitconfig / .npmrc — anything in ~/.config/html-doc/ is the user's personal default for every html-doc project they touch."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "layout",
+      "title": "Directory layout after the change",
+      "lead": "What lives where, with the personal repo still git-tracked.",
+      "blocks": [
+        {
+          "kind": "diagram",
+          "caption": "Three places glossary files exist; only two are auto-loaded at runtime.",
+          "source": "flowchart LR\n    classDef sys fill:#ddf3ff,stroke:#0277bd,color:#01579b\n    classDef proj fill:#fff4d6,stroke:#b88600,color:#5b3a00\n    classDef repo fill:#eee,stroke:#888,color:#333\n    classDef runtime fill:#e7f9ee,stroke:#1b8049,color:#0a4424\n\n    subgraph system [\"~/.config/html-doc/\"]\n      sys_g[\"glossary/*.json\"]:::sys\n      sys_e[\"extrefs/*.json\"]:::sys\n    end\n\n    subgraph project [\"&lt;project&gt;/\"]\n      kit_json[\"kit.json\"]:::proj\n      proj_g[\"glossary/*.json\"]:::proj\n      proj_e[\"extrefs/*.json\"]:::proj\n    end\n\n    subgraph repo [\"this repo (html-doc)\"]\n      bundled[\"kit/glossary/*.json\\nkit/extrefs/*.json\"]:::repo\n      note((\"git-tracked\\nbackup\"))\n    end\n\n    chrome[\"chrome.js loader\"]:::runtime\n    sys_g --> chrome\n    sys_e --> chrome\n    proj_g --> chrome\n    proj_e --> chrome\n    bundled -. install / symlink .-> sys_g\n    bundled -. install / symlink .-> sys_e"
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "load-order",
+      "title": "Loader sequence",
+      "lead": "What chrome.js does on every page render. Project wins on collision.",
+      "blocks": [
+        {
+          "kind": "diagram",
+          "caption": "Load system first, project second; merge keys with project winning.",
+          "source": "sequenceDiagram\n    participant Page as Page render\n    participant Chrome as chrome.js\n    participant Sys as System layer<br/>~/.config/html-doc/\n    participant Proj as Project layer<br/>&lt;project&gt;/glossary/\n    participant Reg as Term registry\n\n    Page->>Chrome: render(page)\n    Chrome->>Sys: GET /_system/glossary/&lt;domain&gt;.json\n    Sys-->>Chrome: terms { ... }\n    Chrome->>Proj: GET ./glossary/&lt;domain&gt;.json\n    Proj-->>Chrome: terms { ... }  (optional)\n    Chrome->>Reg: merge(system, project) — project wins\n    Reg-->>Page: tooltips wired"
+        },
+        {
+          "kind": "callout",
+          "type": "success",
+          "title": "Failure handling",
+          "content": "Missing system files: no warning — most projects don't need a personal layer. Missing project files declared in kit.json.domains: surfaced in the existing warning panel with a jump-to-file affordance. No network failure paths to think about — everything is local."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "kit-json",
+      "title": "kit.json after the change",
+      "lead": "Minimal schema change. The packs[] field never landed; domains[] keeps its current meaning, scoped to the project layer only.",
       "blocks": [
         {
           "kind": "code",
           "language": "json",
-          "source": "{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/project-kit.schema.json\",\n  \"name\": \"my-project\",\n  \"description\": \"...\",\n  \"lang\": \"en\",\n\n  // Built-ins that ship with the kit.\n  \"domains\": [\"doc-tooling\", \"web\"],\n\n  // Optional: external packs fetched at runtime.\n  \"packs\": [\n    { \"name\": \"iceberg\", \"url\": \"https://example.com/iceberg-glossary.json\" },\n    { \"name\": \"adhd\",    \"url\": \"file:///Users/md/private/adhd-glossary.json\" }\n  ]\n}"
+          "source": "{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/project-kit.schema.json\",\n  \"name\": \"my-project\",\n  \"description\": \"...\",\n  \"lang\": \"en\",\n\n  // Project-level glossary files to load from <project>/glossary/.\n  // System-level files (~/.config/html-doc/glossary/) are loaded\n  // automatically — they don't appear here.\n  \"domains\": [\"doc-tooling\", \"data-platforms\"]\n}"
         },
         {
-          "kind": "list",
-          "style": "bullet",
-          "items": [
-            "domains keeps its current meaning — names of built-in glossaries shipped under _kit/glossary/.",
-            "packs is new — each entry is fetched at runtime, merged into the per-name registry. Failures soft-fail with a warning (no broken UX if a CDN is down).",
-            "file:// pack URLs work for personal layer when the project is served via html-doc serve (the dev server can resolve them); standalone build inlines them like other glossary data."
+          "kind": "table",
+          "headers": ["Field", "Status", "Notes"],
+          "rows": [
+            ["domains[]", "Kept, semantics narrowed", "Names of project-level files under <project>/glossary/. System files are loaded automatically and don't need to be listed."],
+            ["packs[]", "Dropped", "The CDN-pack design is rolled back; this field never ships."],
+            ["lang", "Kept", "No change."]
           ]
         }
       ]
     },
     {
       "kind": "section",
-      "id": "phased-plan",
-      "title": "Phased plan",
-      "lead": "Each phase is independently shippable. Stop after any phase if the next isn't worth the work.",
+      "id": "serve-resolution",
+      "title": "How serve and build resolve the system layer",
+      "lead": "Browser code can't read ~/.config. The CLI bridges it.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Dev (html-doc serve)",
+              "items": [
+                "Serve mounts ~/.config/html-doc/ at the URL prefix /_system/.",
+                "chrome.js fetches /_system/glossary/*.json + ./glossary/*.json — both are HTTP gets.",
+                "404s from missing system files are silent (system layer is optional).",
+                "No daemon, no watcher needed — system files are re-fetched each page load."
+              ]
+            },
+            {
+              "verdict": "good",
+              "title": "Static (html-doc build)",
+              "items": [
+                "Build reads ~/.config/html-doc/ at build time and inlines into the standalone HTML.",
+                "Embedded as window.__htmldocSystemGlossary = { ... } in the bootstrap block.",
+                "chrome.js prefers inlined data over /_system/ HTTP when present — same code path, different source.",
+                "Build artifact is portable to any browser: no local config dependency."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "Site build (dist/site/)",
+              "items": [
+                "Multi-page HTTP site — chrome.js fetches /_system/glossary/*.json once per session.",
+                "Build copies the resolved system layer into dist/site/_system/ at build time.",
+                "Same kit code path as dev; just static files behind the same URL prefix."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "Personal-repo install",
+              "items": [
+                "Add html-doc install-system command: symlinks (or copies) kit/glossary/ + kit/extrefs/ from this repo into ~/.config/html-doc/.",
+                "Symlink keeps git tracking live — edits in the repo are reflected immediately in every project.",
+                "Copy is for users who clone this repo on a different machine and don't want a symlink."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "phases",
+      "title": "Migration phases",
+      "lead": "Each step independently ships; stop after any one if the next isn't worth doing.",
       "blocks": [
         {
           "kind": "step-flow",
           "steps": [
             {
               "num": "1",
-              "title": "Split private domains out",
-              "meta": "~1 hour, no kit changes",
-              "content": "Move adhd.json, hadith.json, voice.json into private repos. Drop them from kit/glossary/. Update kit.json in each consuming project to load them via the existing project-glossary fallback path (chrome.js already supports this via per-project glossary/ next to kit.json). No JS or schema changes; just file moves."
+              "title": "Add the system-layer loader",
+              "meta": "~half-day chrome.js + serve CLI",
+              "content": "chrome.js fetches /_system/glossary/*.json + /_system/extrefs/*.json before the project layer. html-doc serve mounts ~/.config/html-doc/ at /_system/ with a 404-is-silent policy. No project changes required."
             },
             {
               "num": "2",
-              "title": "Trim built-ins to general-use only",
-              "meta": "decision + small JS change",
-              "content": "Keep doc-tooling + web as built-ins. Move data-platforms + ai-llm out — either as initial community packs hosted on this same repo (separate branch / release artifact) or into the consuming projects' own kit.json. After this phase the public kit ships with a small, general default vocabulary."
+              "title": "Drop the kit-bundled runtime path",
+              "meta": "~hour, chrome.js + tests",
+              "content": "Stop fetching from _kit/glossary/ at runtime. The repo's kit/glossary/*.json files remain in git but are no longer URL-served as runtime glossary sources. Update tests that assumed the kit path."
             },
             {
               "num": "3",
-              "title": "Add packs[] support",
-              "meta": "~half-day kit change + tests",
-              "content": "Extend project-kit.schema.json with the optional packs[] array. Update chrome.js's kit.json loader to fetch each pack URL in parallel, validate, merge into the named registry, surface failures via the warning panel (with jump targets to the pack URL). Add jsonschema validation in html-doc check so a typo'd pack URL fails the build."
+              "title": "Add html-doc install-system",
+              "meta": "~hour, cli.py",
+              "content": "Subcommand that copies or symlinks kit/glossary/ + kit/extrefs/ into ~/.config/html-doc/. Defaults to symlink when the source is the in-repo path (the maintainer's case); copy for everyone else. Idempotent."
             },
             {
               "num": "4",
-              "title": "(optional) Community index",
-              "meta": "deferred",
-              "content": "Curate a community-maintained list of known packs. Could live as a simple JSON file in the kit repo (PR-driven) or a separate site. Reopen the decision once enough packs exist to make a curated list useful (rough threshold: >10 third-party packs)."
+              "title": "Build-time inlining",
+              "meta": "~half-day cli.py + chrome.js",
+              "content": "html-doc build reads ~/.config/html-doc/ and inlines it into the standalone HTML. chrome.js prefers inlined data when present. Distinguish a missing system layer (silent) from a present-but-empty one (no inline emitted)."
             }
           ]
         }
@@ -216,13 +236,14 @@
       "title": "Open questions",
       "blocks": [
         {
-          "kind": "list",
-          "style": "bullet",
-          "items": [
-            "Version pinning. If a pack changes, every project loading it sees the new version on next paint. Add an optional checksum or version field to packs[] entries? Pin by URL is the simplest answer (CDNs version via path) — start there.",
-            "Schema evolution. A pack written against schema_version 1 must keep working when the kit moves to schema_version 2. The current schema has version-tolerant defaults; the packs loader should reject schema_version > current with a clear warning, not silently coerce.",
-            "Trust. Loading arbitrary URLs is a (mild) attack surface — the kit doesn't execute pack JSON as code, but a hostile pack could spoof glossary entries to misinform readers. For initial release, document the trust model (\"only add packs from sources you trust\") and let curation be opt-in.",
-            "Personal-layer ergonomics. The maintainer wants frictionless reuse of adhd / hadith / voice across multiple personal projects. The packs[] file:// path supports this for served pages; standalone builds need the packs inlined (cli.py's build_kit_bundle already inlines glossary; extending to inline packs is straightforward)."
+          "kind": "table",
+          "headers": ["Question", "Default answer", "Reopen if"],
+          "rows": [
+            ["XDG_CONFIG_HOME respected?", "Yes — fall back to ~/.config/html-doc/ if unset.", "Windows support becomes a target (APPDATA differs)."],
+            ["Symlink vs copy by default?", "Symlink when source is this repo, copy otherwise.", "User reports symlinks breaking on a particular dev container or CI image."],
+            ["Domain name collisions between layers?", "Project wins on per-key collision, not per-file.", "A user explicitly wants the system layer to be authoritative for some keys (rare; not designing for it now)."],
+            ["What if the user has two unrelated personal vocabularies?", "Keep both in ~/.config/html-doc/ under different domain filenames.", "User builds a second machine setup where only a subset should load — at that point project-layer overrides are the answer."],
+            ["Hot-reload on system-layer edit?", "No — system files are static between serve restarts.", "Becomes painful in practice; can add a watcher to the serve CLI later."]
           ]
         }
       ]

@@ -1,0 +1,350 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Layout — centered document, wider default, sidebar variants",
+  "accent": "indigo",
+  "meta": {
+    "eyebrow": "Plan",
+    "subtitle": "User wants wider default + a centered-document feel. Five layout options visualised so the right one can be picked.",
+    "audience": "Maintainer",
+    "order": 105,
+    "summary": "Five candidate layouts for the kit's wide-screen + centered-document brief. Each shows wide and narrow viewport mockups, where the sidebar toggle lives, and the trade-offs. Decide one; the others are reject-with-reason."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "Today's narrow column on a wide screen looks cramped. User compared a hand-authored HTML page (MEETING-2026-05-22.html in the lakelab task) and judged the wider, centered layout strictly better. Five candidates here — every layout pushes prose to a wider centered column. The variants differ in how the sidebar lives: in-flow column, edge rail, floating drawer, or hybrid.",
+      "bullets": [
+        "Default content width should grow — narrow 860 → 1080, wide 1100 → 1320, with centered alignment.",
+        "Centered ‘main’ replaces left-aligned ‘main’ — visually balanced regardless of sidebar state.",
+        "Sidebar must remain reachable; five candidate behaviours below.",
+        "Pick one; I'll implement the layout + numeric assertions + tests."
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "today",
+      "title": "Today",
+      "lead": "For reference, the current shape — left sidebar in flow, narrow content cell, left-aligned main.",
+      "blocks": [
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌sidebar (280px)─┐┌─main (max 860px, left-aligned) ─┐               │\n││page-nav        ││ ▓▓▓ prose ▓▓▓                  │ ←empty 780px→ │\n││├─ index        ││ ▓▓▓▓▓▓▓▓▓▓▓                     │               │\n││├─ reference    ││ ▓▓▓▓▓▓▓▓▓▓▓                     │               │\n││├─ plans/       ││                                  │               │\n││  ├ wide-screen ││ ┌─table──────────────────────┐  │               │\n││  ├ naming      ││ │ A │ B │ C │ D │ E         │  │               │\n││  └ …           ││ └────────────────────────────┘  │               │\n│└────────────────┘└──────────────────────────────────┘               │\n└────────────────────────────────────────────────────────────────────┘\n     content hugs the sidebar · 780px of dead space on the right · cramped"
+        },
+        {
+          "kind": "callout",
+          "type": "warn",
+          "title": "What's wrong",
+          "content": "On a 1440-1920 monitor, the 860px content column starts 24px to the right of the sidebar and ends ~720-1000px away from the right viewport edge. Eye scans an off-centre rectangle with a lot of dead space to one side. ‘More cards per row’ in wide mode partially helps but everything is still left-anchored."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "options",
+      "title": "Five layout candidates",
+      "lead": "Each candidate is a complete layout. Pick the one whose trade-offs match how you actually use the kit.",
+      "blocks": [
+
+        {
+          "kind": "heading", "level": 3, "id": "opt-a", "title": "A — In-flow sidebar, wider centered main"
+        },
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "WIDE (≥ 1280):\n┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌sidebar (280px)─┐  ←gutter→ ┌─main (1080-1320, centered) ─┐  ←┐│\n││page-nav        │           │ ▓▓▓ prose ▓▓▓               │   ││\n││├─ index        │           │ ▓▓▓▓▓▓▓▓▓▓▓                  │   ││\n││├─ reference    │           │                              │   ││\n││├─ plans/       │           │ ┌─table───────────────────┐  │   ││\n││  ├ wide-screen │           │ │ A│B│C│D│E│F│G│H        │  │   ││\n││  └ …           │           │ └─────────────────────────┘  │   ││\n│└────────────────┘           │ ▓▓▓ prose continues ▓▓▓     │   ││\n│                             └──────────────────────────────┘   ││\n└────────────────────────────────────────────────────────────────┘\n   sidebar in flow · main grows + is centered in remaining space\n\nNARROW (≤ 768):\n┌─ 360 ──────────────────┐\n│ [☰] ▓ prose ▓          │   drawer over content\n│     ▓▓▓▓▓▓             │\n│ ┌─table──────────────┐ │\n│ └────────────────────┘ │\n└────────────────────────┘"
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Pros",
+              "items": [
+                "Lowest-friction migration — sidebar already exists in flow.",
+                "Main column grows AND centers in the remaining grid cell.",
+                "Sidebar always visible on wide; collapse to 24px rail still works.",
+                "Numeric: main.boundingBox.x = (viewport.width - sidebar.width - main.width) / 2 + sidebar.width."
+              ]
+            },
+            {
+              "verdict": "bad",
+              "title": "Cons",
+              "items": [
+                "‘Centered’ is only centered in the cell-after-sidebar — slightly biased right of geometric center.",
+                "On a 1920 viewport with 280 sidebar + 1320 main, there's still ~320 px of right margin (the centering uses it half-and-half).",
+                "Sidebar collapse changes the centering origin — content shifts when toggled."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Toggle behaviour",
+          "content": "Right-edge handle on sidebar (today's). Resize-drag widens / collapses the sidebar; main re-centers around the new available cell. Toggle lives on the sidebar edge — proximity to what it controls."
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "opt-b", "title": "B — Edge-rail sidebar, viewport-centered main"
+        },
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "WIDE (≥ 1280):\n┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌24┐                ┌─main (1080-1320, viewport-centered)─┐    ┌24┐│\n││▍ │                │ ▓▓▓ prose ▓▓▓                       │    │  ││\n││  │                │ ▓▓▓▓▓▓▓▓▓▓                          │    │▍ ││\n││rl│                │                                      │    │rl││\n││  │                │ ┌─table──────────────────────────┐   │    │  ││\n││▍ │                │ │ A│B│C│D│E│F│G│H│I              │   │    │▍ ││\n│└──┘                │ └────────────────────────────────┘   │    └──┘│\n└────────────────────────────────────────────────────────────────────┘\n   24px rails left + right · main truly viewport-centered · click rail = popout\n\nPOPOUT (after click on left rail):\n┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌─popout (280, overlays)─┐  ┌─main (unchanged, viewport-centered)┐│\n││ page-nav               │  │ ▓▓▓ prose ▓▓▓                      ││\n││ ├─ …                   │  │                                     ││\n│└────────────────────────┘  │ (overlay; content doesn't reflow)   ││\n│                            └─────────────────────────────────────┘│\n└────────────────────────────────────────────────────────────────────┘"
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Pros",
+              "items": [
+                "Main is TRULY viewport-centered — geometric center.",
+                "Two 24-px rails at the edges keep both nav AND a secondary surface (TOC? notes?) discoverable.",
+                "Click rail → drawer slides over main — no reflow disrupts reading.",
+                "Mobile is identical: rail + drawer scales down."
+              ]
+            },
+            {
+              "verdict": "bad",
+              "title": "Cons",
+              "items": [
+                "Popout overlay covers the main column when open — reader must close drawer to keep reading.",
+                "Two rails consume 48 px regardless of viewport — wastes width on narrow screens (rails could be edge-only at < 1024).",
+                "More mechanism than (A) — slide animation, focus trap, backdrop."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Toggle behaviour",
+          "content": "Left rail = nav. Click the rail → popout drawer (page-nav). Right rail = optional secondary surface (page-toc or a future right-rail). Esc / click backdrop / click rail again closes."
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "opt-c", "title": "C — Floating sidebar, full-bleed when collapsed"
+        },
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "WIDE (≥ 1280, collapsed default):\n┌── 1920 viewport ───────────────────────────────────────────────┐\n│ [☰]              ┌─main (1080-1320, viewport-centered)─┐         │\n│                  │ ▓▓▓ prose ▓▓▓                        │         │\n│                  │                                      │         │\n│                  │ ┌─table─────────────────────────────┐ │         │\n│                  │ │ A│B│C│D│E│F│G                   │ │         │\n│                  │ └───────────────────────────────────┘ │         │\n│                  │ ▓▓▓ prose continues ▓▓▓              │         │\n│                  └──────────────────────────────────────┘         │\n└────────────────────────────────────────────────────────────────────┘\n   no rail · just a top-left hamburger · main has the full viewport to center in\n\nWIDE (sidebar open, overlays):\n┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌page-nav (280, floats)─┐┌─main (uncentered now; pushed right)─┐ │\n││ [×] close              ││ ▓▓▓ prose ▓▓▓                      │ │\n││ ├─ index               ││                                     │ │\n││ ├─ …                   ││ ┌─table──────────────────────────┐ │ │\n│└────────────────────────┘└─────────────────────────────────────┘ │\n└────────────────────────────────────────────────────────────────────┘"
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Pros",
+              "items": [
+                "Default state: main is geometric-centered in the full viewport. Maximum reading space.",
+                "Same mechanism on wide AND narrow — one mental model.",
+                "Sidebar is hidden by default — reader sees content first, navigation second.",
+                "Toggle button is the only persistent chrome left in the top corner."
+              ]
+            },
+            {
+              "verdict": "bad",
+              "title": "Cons",
+              "items": [
+                "Site-tree visibility cost: reader has to open the drawer to browse pages — friction for first-time visitors.",
+                "Sidebar reflows main when open (or covers it as overlay) — pick one; either way there's a layout jolt.",
+                "Sticky hamburger is the ONLY navigation cue on first paint; might miss it."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Toggle behaviour",
+          "content": "Hamburger in the top-left chrome cluster (current drawer-toggle, promoted to default on all viewports). Click opens a 280-px overlay (or pushes main right). Esc / backdrop / second-click closes."
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "opt-d", "title": "D — Centered main, sidebar as collapsed icon rail (always visible)"
+        },
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "WIDE (≥ 1280, rail collapsed):\n┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌48─┐         ┌─main (1080-1320, viewport-minus-rail centered) ─┐  │\n││📄 │         │ ▓▓▓ prose ▓▓▓                                   │  │\n││📋 │         │                                                  │  │\n││📊 │         │ ┌─table─────────────────────────────────────┐    │  │\n││🧪 │         │ │ A│B│C│D│E│F│G│H│I│J                       │    │  │\n││📐 │         │ └───────────────────────────────────────────┘    │  │\n││   │         │ ▓▓▓ prose continues ▓▓▓                          │  │\n│└───┘         └──────────────────────────────────────────────────┘  │\n└────────────────────────────────────────────────────────────────────┘\n   48-px icon rail · one icon per top-level page · hover/click expands\n\nWIDE (after hover/click — rail expands inline):\n┌── 1920 viewport ───────────────────────────────────────────────┐\n│┌rail expanded 280───┐┌─main (uncentered now; pushed right) ─┐    │\n││📄 index             ││ ▓▓▓ prose ▓▓▓                       │    │\n││📋 plans  ▾          ││                                      │    │\n││  └ wide-screen      ││ (during expansion, main is left-     │    │\n││  └ naming           ││  shifted by 232 px until rail re-    │    │\n││📊 reference         ││  collapses)                          │    │\n│└─────────────────────┘└──────────────────────────────────────┘    │\n└────────────────────────────────────────────────────────────────────┘"
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Pros",
+              "items": [
+                "Navigation is ALWAYS visible — 48 px icon rail signals the structure on first paint.",
+                "Reader can switch pages with one click without opening anything.",
+                "Main is centered in (viewport - 48 px) — close to geometric center.",
+                "Pattern works the same on narrow viewports (rail becomes a bottom bar)."
+              ]
+            },
+            {
+              "verdict": "bad",
+              "title": "Cons",
+              "items": [
+                "Each top-level page needs a recognisable icon — author maintenance cost.",
+                "Rail-expansion DOES shift main horizontally → some readers find this distracting.",
+                "More chrome to maintain (icons + labels + hover behaviour).",
+                "Doesn't make sense if total page count is small (icons read as decoration)."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Toggle behaviour",
+          "content": "Hover any rail icon → tooltip with page label. Click → expand rail to 280 px (or navigate directly, depending on second-click semantic). Click outside → re-collapse. Always-visible affordance + first-paint discoverability."
+        },
+
+        {
+          "kind": "heading", "level": 3, "id": "opt-e", "title": "E — Static centered, sidebar lives at top (above content)"
+        },
+        {
+          "kind": "code",
+          "language": "text",
+          "source": "WIDE (≥ 1280):\n┌── 1920 viewport ───────────────────────────────────────────────┐\n│         ┌─top nav (pages as horizontal tabs)─────────────────┐    │\n│         │ index │ reference │ plans/wide-screen │ … ▾        │    │\n│         └────────────────────────────────────────────────────┘    │\n│         ┌─main (1080-1320, viewport-centered) ─────────────┐      │\n│         │ ▓▓▓ prose ▓▓▓                                    │      │\n│         │                                                   │      │\n│         │ ┌─table──────────────────────────────────────┐    │      │\n│         │ │ A│B│C│D│E│F│G│H│I│J│K│L                   │    │      │\n│         │ └────────────────────────────────────────────┘    │      │\n│         │ ▓▓▓ prose continues ▓▓▓                           │      │\n│         └───────────────────────────────────────────────────┘      │\n└────────────────────────────────────────────────────────────────────┘\n   horizontal nav · main viewport-centered · no left chrome at all\n\nNARROW (≤ 768):\n┌─ 360 ──────────────────┐\n│ [☰] index │ ref │ …    │  scrollable horizontal nav\n│ ▓ prose ▓              │\n│ ▓▓▓▓▓▓                 │\n│ ┌─table──────────────┐ │\n│ └────────────────────┘ │\n└────────────────────────┘"
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Pros",
+              "items": [
+                "Strongest centered-document feel — no sidebar to compete for attention.",
+                "Main is geometric-centered in the FULL viewport.",
+                "Nav is structural (HTML doc convention) but compact.",
+                "Same shape on narrow + wide → simplest mental model."
+              ]
+            },
+            {
+              "verdict": "bad",
+              "title": "Cons",
+              "items": [
+                "Horizontal nav doesn't scale past ~7 top-level pages without scrolling/overflow.",
+                "Site-tree hierarchy (plans/wide-screen / plans/naming) needs dropdowns or breadcrumbs.",
+                "Loses ‘scroll-spy in sidebar’ — on-page TOC needs its own affordance (right-side mini, or auto-numbered headings).",
+                "Largest deviation from today's layout — most code to rewrite."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "note",
+          "title": "Toggle behaviour",
+          "content": "Top horizontal nav. Click any item → navigate. Dropdowns for nested pages. The on-page TOC (current page outline) lives as a separate small right rail OR a sticky breadcrumb under the top nav."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "axes",
+      "title": "Decision axes — what to weigh",
+      "lead": "Three orthogonal questions resolve the choice.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Question", "If yes →", "If no →"],
+          "rows": [
+            ["Is the site-tree always-visible navigation important to you?", "A · D (B is OK)", "C · E"],
+            ["Should the content be EXACTLY viewport-centered (geometric)?", "B · C · D · E", "A (close but biased)"],
+            ["Are nested pages (plans/wide-screen) common?", "A · B · C · D", "E (horizontal nav strains)"]
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "recommendation",
+      "title": "Recommendation",
+      "lead": "Two strong candidates; pick on the trade between ‘always-visible nav’ vs ‘maximum content focus’.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "verdict": "good",
+              "title": "Pick A if",
+              "items": [
+                "You currently rely on the site-tree to navigate.",
+                "Slight off-centring of main is acceptable.",
+                "You want the smallest code change."
+              ]
+            },
+            {
+              "verdict": "good",
+              "title": "Pick D if",
+              "items": [
+                "You want both always-visible nav AND geometric centering.",
+                "You're willing to author one icon per top-level page.",
+                "The rail-expand shift is acceptable."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "Pick B if",
+              "items": [
+                "Two surfaces (nav + secondary) are useful enough to keep rails always-on.",
+                "Popout-over-content is acceptable.",
+                "You want symmetry (rails both sides)."
+              ]
+            },
+            {
+              "verdict": "neutral",
+              "title": "Pick C if",
+              "items": [
+                "Reading focus > navigation discoverability.",
+                "You usually arrive by URL or search, not browse.",
+                "First-paint speed matters (least chrome painted)."
+              ]
+            },
+            {
+              "verdict": "out",
+              "title": "Avoid E unless",
+              "items": [
+                "You're sure the top-level page count stays small.",
+                "Nested-page navigation can be solved by dropdowns / breadcrumbs.",
+                "You're OK rewriting the most CSS."
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "success",
+          "title": "My pick",
+          "content": "A — incremental change from today, biggest perceived win for least mechanism. Bump narrow → 1080, wide → 1320, change main alignment from left to center. The sidebar stays in flow on wide viewports and remains a drawer on narrow. If after living with it for a week you still want geometric-center, D is the natural follow-up."
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "next",
+      "title": "After you pick",
+      "lead": "What I'll do once the choice is made.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "numbered",
+          "items": [
+            "Change `body[data-content-width=narrow/wide/max]` token values to the new defaults.",
+            "Change `main { margin: 0 auto }` so main is centered in its grid cell (today it's left-aligned in some cases).",
+            "Update the 3-segment width-toggle icon's labels (narrow/wide/max → ‘compact / default / wide’ if labels change).",
+            "Add a numeric assertion test: `main.boundingBox.x` close to expected center within ±2 px on a fixed-width viewport.",
+            "Update the wide-screen.json plan with the chosen layout's CSS + commit notes."
+          ]
+        }
+      ]
+    }
+  ]
+}
