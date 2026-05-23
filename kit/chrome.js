@@ -2961,7 +2961,12 @@ class HtmlDocChart extends HTMLElement {
       radar: '_renderRadar',
       'box-plot': '_renderBoxPlot',
       bullet: '_renderBullet',
-      slope: '_renderSlope'
+      slope: '_renderSlope',
+      histogram: '_renderHistogram',
+      'calendar-heatmap': '_renderCalendarHeatmap',
+      treemap: '_renderTreemap',
+      ridgeline: '_renderRidgeline',
+      funnel: '_renderFunnel'
     };
     if (nonCartesian[this._type]) {
       this[nonCartesian[this._type]]();
@@ -3714,6 +3719,313 @@ class HtmlDocChart extends HTMLElement {
       parts.push('<circle cx="' + rightX + '" cy="' + ty.toFixed(1) + '" r="4" fill="' + color + '"/>');
       parts.push('<text x="' + (leftX - 8) + '" y="' + (fy + 4).toFixed(1) + '" text-anchor="end" class="hdc-slope-readout">' + escapeXml(fmtNum(+it.from || 0)) + '</text>');
       parts.push('<text x="' + (rightX + 8) + '" y="' + (ty + 4).toFixed(1) + '" class="hdc-slope-readout">' + escapeXml(fmtNum(+it.to || 0)) + ' · ' + escapeXml(it.label || '') + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderHistogram() {
+    var x = (this._extras && this._extras.histogram) || {};
+    var bins = x.bins || [];
+    if (!bins.length) return;
+    var W = 640, H = 280;
+    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 48, right: 16 };
+    var plotW = W - pad.left - pad.right;
+    var plotH = H - pad.top - pad.bottom;
+    var lo = +bins[0].lo, hi = +bins[bins.length - 1].hi;
+    var counts = bins.map(function (b) { return +b.count || 0; });
+    var maxCount = Math.max.apply(null, counts);
+    if (maxCount <= 0) maxCount = 1;
+    function sx(v) { return pad.left + ((v - lo) / (hi - lo || 1)) * plotW; }
+    function sy(v) { return pad.top + plotH - (v / maxCount) * plotH; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Histogram') + '" class="hdc-svg hdc-histogram">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    // Y axis + ticks (5).
+    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
+    for (var t = 0; t <= 4; t++) {
+      var v = maxCount * (t / 4);
+      var y = sy(v);
+      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + y + '" x2="' + pad.left + '" y2="' + y + '" class="hdc-axis"/>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (y + 4) + '" text-anchor="end" class="hdc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    }
+    // X axis baseline.
+    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
+    // Bars + x-axis edge ticks.
+    bins.forEach(function (b, i) {
+      var x0 = sx(+b.lo), x1 = sx(+b.hi);
+      var top = sy(+b.count || 0);
+      parts.push('<rect x="' + (x0 + 0.5) + '" y="' + top + '" width="' + (x1 - x0 - 1) + '" height="' + (pad.top + plotH - top) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="hdc-histogram-bar"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
+      if (i === 0 || i === bins.length - 1 || (i % Math.max(1, Math.floor(bins.length / 6))) === 0) {
+        parts.push('<line x1="' + x0 + '" y1="' + (pad.top + plotH) + '" x2="' + x0 + '" y2="' + (pad.top + plotH + 4) + '" class="hdc-axis"/>');
+        parts.push('<text x="' + x0 + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + escapeXml(fmtNum(+b.lo)) + '</text>');
+      }
+    });
+    // Right edge tick (the upper bound of the last bin).
+    var xMax = sx(hi);
+    parts.push('<line x1="' + xMax + '" y1="' + (pad.top + plotH) + '" x2="' + xMax + '" y2="' + (pad.top + plotH + 4) + '" class="hdc-axis"/>');
+    parts.push('<text x="' + xMax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + escapeXml(fmtNum(hi)) + '</text>');
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderCalendarHeatmap() {
+    var x = (this._extras && this._extras['calendar-heatmap']) || {};
+    var dv = x.date_values || {};
+    var keys = Object.keys(dv);
+    if (!keys.length) return;
+    // Year derivation: explicit overrides; otherwise pick the modal year.
+    var year = +x.year || (function () {
+      var counts = {};
+      keys.forEach(function (k) { var y = parseInt(k.slice(0, 4), 10); if (!isNaN(y)) counts[y] = (counts[y] || 0) + 1; });
+      var pick = 0, max = 0;
+      for (var y in counts) if (counts[y] > max) { max = counts[y]; pick = +y; }
+      return pick || (new Date()).getFullYear();
+    })();
+    // Compute value domain.
+    var vmin = Infinity, vmax = -Infinity;
+    keys.forEach(function (k) {
+      var v = +dv[k]; if (isNaN(v)) return;
+      if (v < vmin) vmin = v; if (v > vmax) vmax = v;
+    });
+    if (Array.isArray(x.domain) && x.domain.length === 2) { vmin = +x.domain[0]; vmax = +x.domain[1]; }
+    var diverging = x.scale === 'diverging';
+    function tone(v) {
+      if (diverging) return v >= 0 ? 'var(--accent)' : 'var(--danger)';
+      return 'var(--accent)';
+    }
+    function alpha(v) {
+      if (isNaN(v)) return 0;
+      if (diverging) {
+        var span = Math.max(Math.abs(vmin), Math.abs(vmax)) || 1;
+        return Math.max(0.08, Math.min(1, Math.abs(v) / span));
+      }
+      var span2 = (vmax - vmin) || 1;
+      return Math.max(0.08, Math.min(1, (v - vmin) / span2));
+    }
+    var cell = 14, gap = 2;
+    var dayLabelW = 22, monthLabelH = 18;
+    var titleTop = this._title ? 28 : 4;
+    // 53 columns covers any year (≤ 53 ISO weeks). Render starting Monday.
+    var weekCols = 53;
+    var W = dayLabelW + weekCols * (cell + gap) + 12;
+    var H = titleTop + monthLabelH + 7 * (cell + gap) + 16;
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || ('Activity calendar ' + year)) + '" class="hdc-svg hdc-calendar">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    // Day-of-week labels (Mon, Wed, Fri only — typical convention).
+    var dayLabels = ['Mon', '', 'Wed', '', 'Fri', '', ''];
+    for (var d = 0; d < 7; d++) {
+      if (!dayLabels[d]) continue;
+      var dy = titleTop + monthLabelH + d * (cell + gap) + cell / 2 + 4;
+      parts.push('<text x="' + (dayLabelW - 6) + '" y="' + dy + '" text-anchor="end" class="hdc-calendar-label">' + dayLabels[d] + '</text>');
+    }
+    // Walk the year.
+    var start = new Date(year, 0, 1);
+    var jsDay = start.getDay();   // 0=Sun..6=Sat
+    var dow0 = (jsDay + 6) % 7;   // 0=Mon..6=Sun
+    var msPerDay = 86400000;
+    var cursor = new Date(year, 0, 1);
+    var monthAt = {};
+    var col = 0;
+    var pad2 = function (n) { return n < 10 ? '0' + n : '' + n; };
+    while (cursor.getFullYear() === year) {
+      var dayIso = cursor.getFullYear() + '-' + pad2(cursor.getMonth() + 1) + '-' + pad2(cursor.getDate());
+      var dowJs = cursor.getDay();
+      var row = (dowJs + 6) % 7;
+      var px = dayLabelW + col * (cell + gap);
+      var py = titleTop + monthLabelH + row * (cell + gap);
+      var val = dv[dayIso];
+      var hasVal = (typeof val !== 'undefined') && !isNaN(+val);
+      var rectAlpha = hasVal ? alpha(+val).toFixed(3) : '0.08';
+      var rectFill = hasVal ? tone(+val) : 'var(--text-soft)';
+      parts.push('<rect x="' + px + '" y="' + py + '" width="' + cell + '" height="' + cell + '" rx="2" fill="' + rectFill + '" fill-opacity="' + rectAlpha + '" class="hdc-calendar-cell"><title>' + escapeXml(dayIso + (hasVal ? ' · ' + fmtNum(+val) : '')) + '</title></rect>');
+      // Record the column where a new month begins.
+      var mKey = cursor.getMonth();
+      if (monthAt[mKey] === undefined) monthAt[mKey] = col;
+      // Advance: stepping forward; column increments after Sun (row 6).
+      if (row === 6) col++;
+      cursor = new Date(cursor.getTime() + msPerDay);
+      // Also bump col if we filled the week before EOY — handle in row reset only.
+    }
+    // Month labels at their first columns.
+    var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (var m = 0; m < 12; m++) {
+      if (monthAt[m] === undefined) continue;
+      var mx = dayLabelW + monthAt[m] * (cell + gap);
+      parts.push('<text x="' + mx + '" y="' + (titleTop + 12) + '" class="hdc-calendar-month">' + monthNames[m] + '</text>');
+    }
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    void dow0; // referenced for clarity above; not currently used after refactor
+  }
+
+  _renderTreemap() {
+    var x = (this._extras && this._extras.treemap) || {};
+    var tree = (x.tree || []).slice().sort(function (a, b) { return (+b.value || 0) - (+a.value || 0); });
+    if (!tree.length) return;
+    var total = tree.reduce(function (s, it) { return s + Math.max(0, +it.value || 0); }, 0);
+    if (total <= 0) return;
+    var W = 640, H = this._title ? 360 : 320;
+    var titleTop = this._title ? 28 : 0;
+    var pad = 8;
+    var area = { x: pad, y: titleTop + pad, w: W - pad * 2, h: H - titleTop - pad * 2 };
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    // Squarified treemap — pure JS port. Goal: keep each row's aspect
+    // ratio near 1.
+    function worstRatio(row, w) {
+      var sum = row.reduce(function (s, n) { return s + n; }, 0);
+      var rMin = Math.min.apply(null, row), rMax = Math.max.apply(null, row);
+      var w2 = w * w, s2 = sum * sum;
+      return Math.max((w2 * rMax) / s2, s2 / (w2 * rMin));
+    }
+    var rects = [];
+    function squarify(values, items, rect) {
+      var w = Math.min(rect.w, rect.h);
+      var row = [], rowItems = [];
+      while (values.length) {
+        var v = values[0], it = items[0];
+        var trial = row.concat([v]);
+        if (!row.length || worstRatio(trial, w) <= worstRatio(row, w)) {
+          row.push(v); rowItems.push(it);
+          values.shift(); items.shift();
+        } else {
+          layoutRow(row, rowItems, rect, w);
+          row = []; rowItems = [];
+          w = Math.min(rect.w, rect.h);
+        }
+      }
+      if (row.length) layoutRow(row, rowItems, rect, w);
+    }
+    function layoutRow(row, rowItems, rect, w) {
+      var sum = row.reduce(function (s, n) { return s + n; }, 0);
+      var span = sum / w;
+      if (rect.w >= rect.h) {
+        // Place horizontal column on the left of remaining rect (width=span).
+        var y = rect.y;
+        for (var i = 0; i < row.length; i++) {
+          var h = row[i] / sum * rect.h;
+          rects.push({ x: rect.x, y: y, w: span, h: h, item: rowItems[i] });
+          y += h;
+        }
+        rect.x += span; rect.w -= span;
+      } else {
+        // Horizontal row on top.
+        var x = rect.x;
+        for (var j = 0; j < row.length; j++) {
+          var ww = row[j] / sum * rect.w;
+          rects.push({ x: x, y: rect.y, w: ww, h: span, item: rowItems[j] });
+          x += ww;
+        }
+        rect.y += span; rect.h -= span;
+      }
+    }
+    var areaSize = area.w * area.h;
+    var scaled = tree.map(function (it) { return (Math.max(0, +it.value || 0) / total) * areaSize; });
+    squarify(scaled.slice(), tree.slice(), { x: area.x, y: area.y, w: area.w, h: area.h });
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Treemap') + '" class="hdc-svg hdc-treemap">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    rects.forEach(function (r) {
+      var color = palette[r.item.color] || palette.accent;
+      var labelFits = (r.w > 50 && r.h > 22);
+      parts.push('<g class="hdc-treemap-cell"><rect x="' + r.x.toFixed(1) + '" y="' + r.y.toFixed(1) + '" width="' + r.w.toFixed(1) + '" height="' + r.h.toFixed(1) + '" fill="' + color + '" fill-opacity="0.82"><title>' + escapeXml(r.item.label + ': ' + fmtNum(+r.item.value || 0)) + '</title></rect>');
+      if (labelFits) {
+        parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 18).toFixed(1) + '" class="hdc-treemap-label">' + escapeXml(r.item.label) + '</text>');
+        if (r.h > 38) parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 34).toFixed(1) + '" class="hdc-treemap-value">' + escapeXml(fmtNum(+r.item.value || 0)) + '</text>');
+      }
+      parts.push('</g>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderRidgeline() {
+    var x = (this._extras && this._extras.ridgeline) || {};
+    var distributions = x.distributions || [];
+    if (distributions.length < 2) return;
+    var W = 640;
+    var rowH = 56;
+    var titleTop = this._title ? 36 : 16;
+    var H = titleTop + distributions.length * rowH + 18;
+    var pad = { left: 130, right: 24 };
+    var plotW = W - pad.left - pad.right;
+    // Global domain.
+    var allVals = [];
+    distributions.forEach(function (d) { (d.values || []).forEach(function (v) { allVals.push(+v); }); });
+    var lo = Math.min.apply(null, allVals), hi = Math.max.apply(null, allVals);
+    if (lo === hi) { lo -= 1; hi += 1; }
+    // Each ridge: bin its values into ~30 bins over [lo,hi].
+    var bins = 30, binW = (hi - lo) / bins;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Ridgeline') + '" class="hdc-svg hdc-ridgeline">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    distributions.forEach(function (d, i) {
+      var counts = new Array(bins).fill(0);
+      (d.values || []).forEach(function (v) {
+        var idx = Math.min(bins - 1, Math.max(0, Math.floor(((+v) - lo) / (binW || 1))));
+        counts[idx]++;
+      });
+      var maxC = Math.max.apply(null, counts) || 1;
+      var baseY = titleTop + i * rowH + rowH - 8;
+      var ridgeH = rowH - 14;
+      function sx(bi) { return pad.left + (bi / (bins - 1)) * plotW; }
+      function sy(cnt) { return baseY - (cnt / maxC) * ridgeH; }
+      var color = palette[d.color] || palette.accent;
+      var pathPts = [];
+      pathPts.push('M ' + pad.left + ' ' + baseY);
+      counts.forEach(function (cnt, bi) { pathPts.push('L ' + sx(bi).toFixed(1) + ' ' + sy(cnt).toFixed(1)); });
+      pathPts.push('L ' + (pad.left + plotW) + ' ' + baseY + ' Z');
+      parts.push('<path d="' + pathPts.join(' ') + '" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="hdc-ridgeline-curve"/>');
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (baseY - 2) + '" text-anchor="end" class="hdc-ridgeline-label">' + escapeXml(d.label || '') + '</text>');
+    });
+    // X axis ticks (5).
+    var axisY = titleTop + distributions.length * rowH + 4;
+    for (var t = 0; t <= 4; t++) {
+      var v = lo + (t / 4) * (hi - lo);
+      var ax = pad.left + (t / 4) * plotW;
+      parts.push('<text x="' + ax + '" y="' + axisY + '" text-anchor="middle" class="hdc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    }
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  _renderFunnel() {
+    var x = (this._extras && this._extras.funnel) || {};
+    var stages = x.stages || [];
+    if (stages.length < 2) return;
+    var W = 540;
+    var stageH = 56;
+    var titleTop = this._title ? 36 : 12;
+    var H = titleTop + stages.length * stageH + 12;
+    var maxVal = stages.reduce(function (m, s) { return Math.max(m, +s.value || 0); }, 0);
+    if (maxVal <= 0) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var center = W / 2;
+    var maxW = 360;
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Funnel') + '" class="hdc-svg hdc-funnel">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    stages.forEach(function (st, i) {
+      var v = +st.value || 0;
+      var next = stages[i + 1];
+      var nv = next ? (+next.value || 0) : v;
+      var topW = (v / maxVal) * maxW;
+      var botW = (nv / maxVal) * maxW;
+      var y = titleTop + i * stageH;
+      var nextY = titleTop + (i + 1) * stageH;
+      var color = palette[st.color] || palette.accent;
+      var pts = [
+        (center - topW / 2).toFixed(1) + ',' + y,
+        (center + topW / 2).toFixed(1) + ',' + y,
+        (center + botW / 2).toFixed(1) + ',' + nextY,
+        (center - botW / 2).toFixed(1) + ',' + nextY
+      ].join(' ');
+      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="' + (0.82 - i * 0.08).toFixed(2) + '" class="hdc-funnel-band"><title>' + escapeXml(st.label + ': ' + fmtNum(v)) + '</title></polygon>');
+      var pct = Math.round((v / (+stages[0].value || 1)) * 100);
+      parts.push('<text x="' + (center - topW / 2 - 12) + '" y="' + (y + stageH / 2 + 4) + '" text-anchor="end" class="hdc-funnel-label">' + escapeXml(st.label || '') + '</text>');
+      parts.push('<text x="' + (center + topW / 2 + 12) + '" y="' + (y + stageH / 2 + 4) + '" class="hdc-funnel-readout">' + escapeXml(fmtNum(v)) + ' · ' + pct + '%</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));

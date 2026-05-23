@@ -169,14 +169,19 @@ def test_chart_unknown_type_errors(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "ctype, code",
     [
-        ("heatmap",  "chart-heatmap-missing-cells"),
-        ("sparkline", "chart-sparkline-missing-values"),
-        ("waffle",   "chart-waffle-missing-segments"),
-        ("gauge",    "chart-gauge-missing-fields"),
-        ("radar",    "chart-radar-missing-fields"),
-        ("box-plot", "chart-boxplot-missing-boxes"),
-        ("bullet",   "chart-bullet-missing-tracks"),
-        ("slope",    "chart-slope-missing-items"),
+        ("heatmap",          "chart-heatmap-missing-cells"),
+        ("sparkline",        "chart-sparkline-missing-values"),
+        ("waffle",           "chart-waffle-missing-segments"),
+        ("gauge",            "chart-gauge-missing-fields"),
+        ("radar",            "chart-radar-missing-fields"),
+        ("box-plot",         "chart-boxplot-missing-boxes"),
+        ("bullet",           "chart-bullet-missing-tracks"),
+        ("slope",            "chart-slope-missing-items"),
+        ("histogram",        "chart-histogram-missing-bins"),
+        ("calendar-heatmap", "chart-calendar-missing-date-values"),
+        ("treemap",          "chart-treemap-missing-tree"),
+        ("ridgeline",        "chart-ridgeline-missing-distributions"),
+        ("funnel",           "chart-funnel-missing-stages"),
     ],
 )
 def test_chart_extension_missing_payload_flagged(tmp_path: Path, ctype: str, code: str) -> None:
@@ -235,6 +240,79 @@ def test_chart_gauge_with_value_and_max_passes(tmp_path: Path) -> None:
         ],
     }
     issues = _issues_of(_run(page, tmp_path=tmp_path), code="chart-gauge-missing-fields")
+    assert len(issues) == 0
+
+
+def test_chart_histogram_with_bins_passes(tmp_path: Path) -> None:
+    page = {
+        "kind": "page",
+        "title": "T",
+        "blocks": [
+            {
+                "kind": "section",
+                "id": "s",
+                "title": "S",
+                "blocks": [
+                    {
+                        "kind": "chart",
+                        "type": "histogram",
+                        "bins": [{"lo": 0, "hi": 10, "count": 3}, {"lo": 10, "hi": 20, "count": 7}],
+                    }
+                ],
+            }
+        ],
+    }
+    issues = _issues_of(_run(page, tmp_path=tmp_path), code="chart-histogram-missing-bins")
+    assert len(issues) == 0
+
+
+def test_chart_treemap_with_tree_passes(tmp_path: Path) -> None:
+    page = {
+        "kind": "page",
+        "title": "T",
+        "blocks": [
+            {
+                "kind": "section",
+                "id": "s",
+                "title": "S",
+                "blocks": [
+                    {
+                        "kind": "chart",
+                        "type": "treemap",
+                        "tree": [
+                            {"label": "A", "value": 40},
+                            {"label": "B", "value": 30},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    issues = _issues_of(_run(page, tmp_path=tmp_path), code="chart-treemap-missing-tree")
+    assert len(issues) == 0
+
+
+def test_chart_calendar_heatmap_with_date_values_passes(tmp_path: Path) -> None:
+    page = {
+        "kind": "page",
+        "title": "T",
+        "blocks": [
+            {
+                "kind": "section",
+                "id": "s",
+                "title": "S",
+                "blocks": [
+                    {
+                        "kind": "chart",
+                        "type": "calendar-heatmap",
+                        "year": 2026,
+                        "date_values": {"2026-01-01": 4, "2026-06-15": 9},
+                    }
+                ],
+            }
+        ],
+    }
+    issues = _issues_of(_run(page, tmp_path=tmp_path), code="chart-calendar-missing-date-values")
     assert len(issues) == 0
 
 

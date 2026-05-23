@@ -349,7 +349,12 @@
         radar: { axes: block.axes },
         'box-plot': { boxes: block.boxes },
         bullet: { tracks: block.tracks },
-        slope: { items: block.items, from_label: block.from_label, to_label: block.to_label }
+        slope: { items: block.items, from_label: block.from_label, to_label: block.to_label },
+        histogram: { bins: block.bins },
+        'calendar-heatmap': { date_values: block.date_values, year: block.year, scale: block.scale, domain: block.domain },
+        treemap: { tree: block.tree },
+        ridgeline: { distributions: block.distributions },
+        funnel: { stages: block.stages }
       };
       if (extraMap[type]) {
         const x = document.createElement('script');

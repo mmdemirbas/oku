@@ -2061,6 +2061,148 @@
 
         {
           "kind": "heading",
+          "level": 4,
+          "id": "chart-histogram",
+          "title": "type: histogram"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Frequency by bin. Author supplies the binning (`bins[]` with `{lo, hi, count}`). Contiguous bins read as a connected distribution; gaps are allowed but render with the visible gap. Use for distribution shape, latency tail, time-to-event."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"histogram\",\n  \"title\": \"Request latency (ms)\",\n  \"bins\": [\n    {\"lo\":   0, \"hi\":  20, \"count\":  4},\n    {\"lo\":  20, \"hi\":  40, \"count\": 14},\n    {\"lo\":  40, \"hi\":  60, \"count\": 22},\n    {\"lo\":  60, \"hi\":  80, \"count\": 18},\n    {\"lo\":  80, \"hi\": 100, \"count\":  9},\n    {\"lo\": 100, \"hi\": 120, \"count\":  3}\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "histogram",
+          "title": "Request latency (ms)",
+          "bins": [
+            { "lo":   0, "hi":  20, "count":  4 },
+            { "lo":  20, "hi":  40, "count": 14 },
+            { "lo":  40, "hi":  60, "count": 22 },
+            { "lo":  60, "hi":  80, "count": 18 },
+            { "lo":  80, "hi": 100, "count":  9 },
+            { "lo": 100, "hi": 120, "count":  3 }
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-calendar-heatmap",
+          "title": "type: calendar-heatmap"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Year-in-cells activity grid. `date_values` is a map of ISO date → numeric value; days missing from the map render faintly to show the calendar shape. Mon, Wed, Fri labels along the left; month names along the top at the first cell of each month."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"calendar-heatmap\",\n  \"title\": \"Commits in 2026\",\n  \"year\": 2026,\n  \"date_values\": {\n    \"2026-01-04\": 3, \"2026-01-12\": 9,\n    \"2026-03-22\": 14, \"2026-07-01\": 6,\n    \"2026-11-15\": 11, \"2026-12-30\": 4\n  }\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "calendar-heatmap",
+          "title": "Commits in 2026 (sample)",
+          "year": 2026,
+          "date_values": {
+            "2026-01-04": 3, "2026-01-12": 9, "2026-01-18": 6,
+            "2026-02-03": 8, "2026-02-17": 12, "2026-02-28": 5,
+            "2026-03-08": 14, "2026-03-22": 17, "2026-03-30": 9,
+            "2026-04-11": 6,  "2026-04-25": 10, "2026-05-09": 13,
+            "2026-05-22": 22, "2026-06-15": 8,  "2026-07-04": 4,
+            "2026-08-19": 11, "2026-09-30": 7,  "2026-10-12": 9,
+            "2026-11-15": 16, "2026-11-29": 4,  "2026-12-22": 6
+          }
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-treemap",
+          "title": "type: treemap"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Area-proportional nested rectangles via squarified layout. `tree[]` is a flat list of `{label, value, color?}` leaves; the largest values occupy the largest rectangles. Labels render only when the rectangle is large enough to fit them legibly. Use for composition (LoC by language, spend by category, traffic by route)."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"treemap\",\n  \"title\": \"LoC by language\",\n  \"tree\": [\n    {\"label\": \"JavaScript\", \"value\": 6200, \"color\": \"accent\"},\n    {\"label\": \"CSS\",        \"value\": 2400, \"color\": \"success\"},\n    {\"label\": \"Python\",     \"value\": 2800, \"color\": \"warn\"},\n    {\"label\": \"JSON\",       \"value\":  900, \"color\": \"muted\"},\n    {\"label\": \"Markdown\",   \"value\":  400, \"color\": \"danger\"}\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "treemap",
+          "title": "LoC by language",
+          "tree": [
+            { "label": "JavaScript", "value": 6200, "color": "accent"  },
+            { "label": "CSS",        "value": 2400, "color": "success" },
+            { "label": "Python",     "value": 2800, "color": "warn"    },
+            { "label": "JSON",       "value":  900, "color": "muted"   },
+            { "label": "Markdown",   "value":  400, "color": "danger"  }
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-ridgeline",
+          "title": "type: ridgeline"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Stacked small-distributions, one per row. `distributions[].values` is a flat sample; the renderer bins each sample into ~30 buckets over the global range. Read for shape comparison across groups (per-region latency, per-cohort engagement)."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"ridgeline\",\n  \"title\": \"Per-region latency (ms)\",\n  \"distributions\": [\n    {\"label\": \"us-east-1\",  \"values\": [..raw samples..]},\n    {\"label\": \"eu-west-1\",  \"values\": [..raw samples..]},\n    {\"label\": \"ap-south-1\", \"values\": [..raw samples..]}\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "ridgeline",
+          "title": "Per-region cold-start latency (ms)",
+          "distributions": [
+            { "label": "us-east-1",  "color": "accent",  "values": [22,28,30,34,36,38,40,42,44,46,48,50,52,54,56,60,62,64,68,72,76,82,90] },
+            { "label": "eu-west-1",  "color": "success", "values": [32,38,42,44,46,48,50,52,54,56,58,60,62,64,66,68,72,76,82,90,96] },
+            { "label": "ap-south-1", "color": "warn",    "values": [48,56,62,66,68,72,76,80,84,88,92,96,100,108,116,124,132,140,148,156,168,180,192,206] }
+          ]
+        },
+
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-funnel",
+          "title": "type: funnel"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Conversion-stage drop-off. `stages[]` is an ordered list of `{label, value, color?}`. The renderer draws a tapered band between adjacent stages; the right-hand readout shows the value + percentage of the first stage."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"funnel\",\n  \"title\": \"Signup conversion\",\n  \"stages\": [\n    {\"label\": \"Visitors\",   \"value\": 1000},\n    {\"label\": \"Signed up\",  \"value\":  680},\n    {\"label\": \"Activated\",  \"value\":  430},\n    {\"label\": \"Upgraded\",   \"value\":  180},\n    {\"label\": \"Retained 30d\",\"value\":  120}\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "funnel",
+          "title": "Signup conversion",
+          "stages": [
+            { "label": "Visitors",     "value": 1000, "color": "muted"   },
+            { "label": "Signed up",    "value":  680, "color": "accent"  },
+            { "label": "Activated",    "value":  430, "color": "accent"  },
+            { "label": "Upgraded",     "value":  180, "color": "warn"    },
+            { "label": "Retained 30d", "value":  120, "color": "success" }
+          ]
+        },
+
+        {
+          "kind": "heading",
           "level": 3,
           "id": "diagram",
           "title": "diagram"

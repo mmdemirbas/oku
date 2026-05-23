@@ -3126,6 +3126,71 @@ html-doc-chart .hdc-slope .hdc-slope-readout {
   dominant-baseline: middle;
 }
 
+html-doc-chart .hdc-histogram .hdc-histogram-bar {
+  transition: fill-opacity 0.12s ease;
+}
+html-doc-chart .hdc-histogram .hdc-histogram-bar:hover { fill-opacity: 1; }
+
+html-doc-chart .hdc-calendar .hdc-calendar-cell {
+  stroke: var(--surface);
+  stroke-width: 0.5;
+  transition: fill-opacity 0.12s ease;
+}
+html-doc-chart .hdc-calendar .hdc-calendar-cell:hover { stroke: var(--accent-strong); stroke-width: 1.4; }
+html-doc-chart .hdc-calendar .hdc-calendar-label {
+  fill: var(--text-soft);
+  font: 500 10.5px 'Inter', sans-serif;
+  dominant-baseline: middle;
+}
+html-doc-chart .hdc-calendar .hdc-calendar-month {
+  fill: var(--text-soft);
+  font: 500 10.5px 'Inter', sans-serif;
+  letter-spacing: 0.06em;
+}
+
+html-doc-chart .hdc-treemap .hdc-treemap-cell rect {
+  stroke: var(--surface);
+  stroke-width: 1;
+  transition: fill-opacity 0.12s ease;
+}
+html-doc-chart .hdc-treemap .hdc-treemap-cell:hover rect { fill-opacity: 1; }
+html-doc-chart .hdc-treemap .hdc-treemap-label {
+  fill: var(--surface);
+  font: 700 13px 'Inter', sans-serif;
+  paint-order: stroke fill;
+  stroke: rgba(0,0,0,0.32);
+  stroke-width: 0.6;
+}
+html-doc-chart .hdc-treemap .hdc-treemap-value {
+  fill: var(--surface);
+  font: 500 11.5px 'Inter', sans-serif;
+  fill-opacity: 0.88;
+}
+
+html-doc-chart .hdc-ridgeline .hdc-ridgeline-curve {
+  transition: fill-opacity 0.18s ease;
+}
+html-doc-chart .hdc-ridgeline .hdc-ridgeline-curve:hover { fill-opacity: 0.55; }
+html-doc-chart .hdc-ridgeline .hdc-ridgeline-label {
+  fill: var(--text);
+  font: 600 12px 'Inter', sans-serif;
+}
+
+html-doc-chart .hdc-funnel .hdc-funnel-band {
+  transition: fill-opacity 0.18s ease;
+}
+html-doc-chart .hdc-funnel .hdc-funnel-band:hover { fill-opacity: 1; }
+html-doc-chart .hdc-funnel .hdc-funnel-label {
+  fill: var(--text);
+  font: 500 12px 'Inter', sans-serif;
+  dominant-baseline: middle;
+}
+html-doc-chart .hdc-funnel .hdc-funnel-readout {
+  fill: var(--text-soft);
+  font: 500 12px 'Inter', sans-serif;
+  dominant-baseline: middle;
+}
+
 html-doc-chart .hdc-dot {
   stroke: var(--surface);
   stroke-width: 1.5;

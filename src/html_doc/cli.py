@@ -1264,9 +1264,29 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     if not blk.get("items"):
                         add(p, "error", "chart-slope-missing-items", where_prefix,
                             "chart with type:slope requires an `items` array.")
+                elif ctype == "histogram":
+                    if not blk.get("bins"):
+                        add(p, "error", "chart-histogram-missing-bins", where_prefix,
+                            "chart with type:histogram requires a `bins` array of {lo, hi, count}.")
+                elif ctype == "calendar-heatmap":
+                    if not blk.get("date_values"):
+                        add(p, "error", "chart-calendar-missing-date-values", where_prefix,
+                            "chart with type:calendar-heatmap requires a `date_values` object (YYYY-MM-DD → number).")
+                elif ctype == "treemap":
+                    if not blk.get("tree"):
+                        add(p, "error", "chart-treemap-missing-tree", where_prefix,
+                            "chart with type:treemap requires a `tree` array of {label, value}.")
+                elif ctype == "ridgeline":
+                    if not blk.get("distributions"):
+                        add(p, "error", "chart-ridgeline-missing-distributions", where_prefix,
+                            "chart with type:ridgeline requires a `distributions` array.")
+                elif ctype == "funnel":
+                    if not blk.get("stages"):
+                        add(p, "error", "chart-funnel-missing-stages", where_prefix,
+                            "chart with type:funnel requires a `stages` array.")
                 elif ctype is not None:
                     add(p, "error", "chart-unknown-type", where_prefix,
-                        f"chart type '{ctype}' is not supported. Known: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, heatmap, sparkline, waffle, gauge, radar, box-plot, bullet, slope.")
+                        f"chart type '{ctype}' is not supported. Known: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, heatmap, sparkline, waffle, gauge, radar, box-plot, bullet, slope, histogram, calendar-heatmap, treemap, ridgeline, funnel.")
 
         # 7. Duplicate section IDs within a page — anchors must be unique.
         seen_ids: dict[str, int] = {}

@@ -15,8 +15,9 @@ file copies for offline reading.
   view-switch), compare-grid, step-flow, chart (scatter / line / area
   / bubble / quadrant / bar / stacked-bar / grouped-bar / donut /
   heatmap / sparkline / waffle / gauge / radar / box-plot / bullet /
-  slope), diagram (Mermaid), live-snippet, glossary tooltips, citation
-  cards.
+  slope / histogram / calendar-heatmap / treemap / ridgeline /
+  funnel), diagram (Mermaid), live-snippet, glossary tooltips,
+  citation cards.
 - **Chrome:** site-tree sidebar with drag-to-resize + off-canvas drawer
   on mobile, sticky section TOC with scroll-spy, three-mode theme
   cycler (system / light / dark), full-text search (Pagefind),
@@ -131,7 +132,7 @@ each request so source dirs stay clean.
 | `<callout type="note\|tip\|info\|caution\|warn\|danger\|success\|neutral">` | Block-level themed note. |
 | `<insight>` | Pull-quote for a key takeaway. |
 | `kpi-grid` · `compare-grid` · `step-flow` | Layout primitives, all layout-safe by structure. `compare-grid` carries verdict variants `good` / `bad` / `neutral` (quality contrast) and `in` / `out` (scope contrast); cards accept either a rich `content` body, an `items` bullet list, or both. |
-| `<chart type="...">` | Single primitive, seventeen render modes. Cartesian family (`scatter`, `line`, `area`, `bubble`, `quadrant`) renders interactive SVG with pan / zoom / log scale / hover tooltips / legend toggle / PNG export. Bar family (`bar`, `stacked-bar`, `grouped-bar`) renders horizontal CSS bars. `donut` is a single-ring distribution. Tier-1 extension family (`heatmap`, `sparkline`, `waffle`, `gauge`, `radar`) covers density / inline trend / dot-matrix / single-metric status / multi-axis comparison. Tier-3 extension family (`box-plot`, `bullet`, `slope`) covers distribution / actual-vs-target / two-time-point change. Every type shares the toolbar (copy data / PNG / lightbox-expand) and theme tokens; no third-party chart library. |
+| `<chart type="...">` | Single primitive, twenty-two render modes. Cartesian family (`scatter`, `line`, `area`, `bubble`, `quadrant`) renders interactive SVG with pan / zoom / log scale / hover tooltips / legend toggle / PNG export. Bar family (`bar`, `stacked-bar`, `grouped-bar`) renders horizontal CSS bars. `donut` is a single-ring distribution. Extension family covers density (`heatmap`, `calendar-heatmap`), inline trend (`sparkline`), dot-matrix (`waffle`), single-metric status (`gauge`), multi-axis comparison (`radar`), distribution (`box-plot`, `ridgeline`, `histogram`), actual-vs-target (`bullet`), two-time-point change (`slope`), hierarchy (`treemap`), and conversion (`funnel`). Every type shares the toolbar (copy data / PNG / lightbox-expand) and theme tokens; no third-party chart library. |
 | `<diagram>` | Mermaid wrapper. Lazy-loads from CDN. Re-renders on theme toggle. Has Copy-source, Copy-SVG, Screenshot buttons. |
 | `<live-snippet>` | Editable HTML/CSS/JS textarea + sandboxed iframe preview. |
 | `annotated-code` | Code block with numbered `(1)`(2) chips that sync with a side panel of annotations. |

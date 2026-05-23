@@ -410,8 +410,8 @@
       "properties": {
         "kind": { "const": "chart" },
         "type": {
-          "enum": ["scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope"],
-          "description": "Render mode. scatter / line / area / bubble / quadrant — Cartesian SVG. bar / stacked-bar / grouped-bar — horizontal CSS bars. donut — distribution arc. heatmap — N×M coloured cell grid. sparkline — inline mini line/area/bar. waffle — N×M unit-cell breakdown. gauge — single value 0→max arc. radar — multi-axis comparison polygons. box-plot — quartile + whisker distribution summary. bullet — actual-vs-target horizontal track. slope — two-time-point comparison."
+          "enum": ["scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel"],
+          "description": "Render mode. scatter / line / area / bubble / quadrant — Cartesian SVG. bar / stacked-bar / grouped-bar — horizontal CSS bars. donut — distribution arc. heatmap — N×M coloured cell grid. sparkline — inline mini line/area/bar. waffle — N×M unit-cell breakdown. gauge — single value 0→max arc. radar — multi-axis comparison polygons. box-plot — quartile + whisker distribution summary. bullet — actual-vs-target horizontal track. slope — two-time-point comparison. histogram — frequency by bin. calendar-heatmap — date-of-year × day-of-week activity grid. treemap — nested area-proportional rectangles. ridgeline — stacked small-distributions. funnel — conversion stages with drop-off."
         },
         "title": { "type": "string" },
         "x_label": { "type": "string", "description": "Cartesian only (scatter / line / area / bubble / quadrant)." },
@@ -690,6 +690,80 @@
             }
           },
           "minItems": 1
+        },
+
+        "bins": {
+          "type": "array",
+          "description": "histogram — pre-binned numeric distribution. Each entry: {lo, hi, count}. Bins should be contiguous and sorted by lo.",
+          "items": {
+            "type": "object",
+            "required": ["lo", "hi", "count"],
+            "additionalProperties": false,
+            "properties": {
+              "lo":    { "type": "number" },
+              "hi":    { "type": "number" },
+              "count": { "type": "number", "minimum": 0 }
+            }
+          },
+          "minItems": 1
+        },
+
+        "year": {
+          "type": "integer",
+          "description": "calendar-heatmap — calendar year to render. If absent, derived from the keys of `date_values` (assumes all share the same year)."
+        },
+        "date_values": {
+          "type": "object",
+          "description": "calendar-heatmap — map of ISO date (YYYY-MM-DD) → numeric value. Days absent from the map render as empty cells.",
+          "additionalProperties": { "type": "number" }
+        },
+
+        "tree": {
+          "type": "array",
+          "description": "treemap — flat list of leaves; one rectangle per entry, area proportional to `value`. Nested recursion via optional `children` is reserved for a later schema version.",
+          "items": {
+            "type": "object",
+            "required": ["label", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "value": { "type": "number", "minimum": 0 },
+              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+            }
+          },
+          "minItems": 1
+        },
+
+        "distributions": {
+          "type": "array",
+          "description": "ridgeline — one row per distribution; each is a small histogram-like ridge. `values` is a flat sample (each cell counted with a fixed bin width derived from the global min/max).",
+          "items": {
+            "type": "object",
+            "required": ["label", "values"],
+            "additionalProperties": false,
+            "properties": {
+              "label":  { "type": "string" },
+              "values": { "type": "array", "items": { "type": "number" }, "minItems": 1 },
+              "color":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+            }
+          },
+          "minItems": 2
+        },
+
+        "stages": {
+          "type": "array",
+          "description": "funnel — ordered conversion stages. Each: {label, value, color?}. Drop-off between adjacent stages is shown as a tapered band.",
+          "items": {
+            "type": "object",
+            "required": ["label", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "value": { "type": "number", "minimum": 0 },
+              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+            }
+          },
+          "minItems": 2
         }
       },
       "allOf": [
@@ -744,6 +818,26 @@
         {
           "if": { "properties": { "type": { "const": "slope" } }, "required": ["type"] },
           "then": { "required": ["items"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "histogram" } }, "required": ["type"] },
+          "then": { "required": ["bins"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "calendar-heatmap" } }, "required": ["type"] },
+          "then": { "required": ["date_values"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "treemap" } }, "required": ["type"] },
+          "then": { "required": ["tree"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "ridgeline" } }, "required": ["type"] },
+          "then": { "required": ["distributions"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "funnel" } }, "required": ["type"] },
+          "then": { "required": ["stages"] }
         }
       ]
     },
