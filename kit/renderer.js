@@ -566,21 +566,13 @@
     }
 
     _calloutSymbol(type) {
-      // Single-character glyphs that all renderable on system fonts
-      // without falling back to emoji presentation. CSS does the
-      // colour + sizing per type.
-      switch (type) {
-        case 'info':
-        case 'note':    return 'ⓘ';        // ⓘ
-        case 'tip':     return '✨';        // ✨
-        case 'warn':
-        case 'warning': return '⚠';        // ⚠
-        case 'caution': return '⚠';        // ⚠ (caution shares glyph, differs by colour)
-        case 'danger':  return '⛔';        // ⛔
-        case 'success': return '✔';        // ✔
-        case 'neutral':
-        default:        return '●';        // ●
-      }
+      // Compact line-style glyphs rendered as inline SVG via CSS
+      // background-image (set per-type in chrome.css). The render
+      // here only carries the semantic type so the stylesheet can
+      // swap in the right icon — same trick chrome.js uses for the
+      // chevron / drawer / theme icons. Returning the type keeps
+      // the data-attr small + makes the symbol fully theme-aware.
+      return type;
     }
 
     _renderInsight(block) {

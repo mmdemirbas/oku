@@ -7,7 +7,7 @@
   "meta": {
     "subtitle": "Path from html-doc to oku 1.0 — what's planned, in priority order, with the rationale and the open questions next to each phase.",
     "audience": "Maintainer",
-    "order": 5,
+    "order": 999,
     "summary": "Single source of truth for upcoming work. Tracks vision, phasing, and per-item status."
   },
   "blocks": [

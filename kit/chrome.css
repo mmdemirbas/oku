@@ -563,8 +563,22 @@ pre {
      reserved band so they never overlap the first code line.
      padding-bottom stays smaller — nothing floats at the bottom. */
   padding: 30px 18px 16px;
+  /* Word-wrap by default — long lines fold instead of horizontal-
+     scrolling out of the column. Authors who need single-line code
+     can override with pre.hdt-nowrap (rare). */
   overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   margin: 16px 0;
+}
+pre.hdt-nowrap {
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+pre code {
+  white-space: inherit;
 }
 /* Per-line layout — each .hdt-code-line is a grid row carrying three
    cells: [line-number] [fold-marker] [code-content]. Numbers + fold
@@ -1802,12 +1816,16 @@ html-doc-annotated-code > pre {
    up to max-width based on the annotation body. The line itself is
    highlighted via .hdt-anno-target so the reader can see at a glance
    which row(s) the chip points at. */
+/* Tooltip always renders ABOVE the trigger marker so it never
+   shifts the surrounding code lines downward. The setHover wiring
+   in chrome.js now uses position: fixed + viewport coords so the
+   tooltip escapes the annotated-code wrapper's clipping context
+   and stays visible against the viewport edge. The CSS default
+   stays anchored 'above' for the static (no-JS-positioning) case. */
 .hdc-anno-tip {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: -28px;
+  position: fixed;
   display: none;
-  z-index: 80;
+  z-index: 9999;
   width: max-content;
   max-width: 360px;
   min-width: 220px;
@@ -1824,6 +1842,8 @@ html-doc-annotated-code > pre {
   white-space: normal;
   word-break: normal;
   overflow-wrap: anywhere;
+  transform: translate(-50%, -100%);
+  margin-top: -10px;
 }
 .hdc-anno-tip code {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -1873,11 +1893,10 @@ html-doc-annotated-code > pre {
   line-height: 1;
   border-radius: 50%;
 }
-.hdc-anno-marker:hover + .hdc-anno-tip,
-.hdc-anno-marker:focus + .hdc-anno-tip,
-.hdc-anno-marker.hovered + .hdc-anno-tip {
-  display: block;
-}
+/* JS-positioned: setHover toggles display:block + viewport coords
+   (see _wireInteractivity in chrome.js). The CSS-only hover rule
+   no longer fires because position:fixed without coords would
+   render at (0,0). */
 
 .hdc-anno-list {
   list-style: none;
@@ -1989,36 +2008,51 @@ pre[class*="language-"] {
 /* ============ Callouts ============ */
 .callout {
   position: relative;
-  margin: 22px 0; padding: 18px 22px 18px 56px; border-radius: 10px;
+  margin: 22px 0; padding: 18px 22px 18px 48px; border-radius: 10px;
   border-left: 5px solid var(--accent); background: var(--accent-soft);
 }
-/* Standard semantic symbol per callout type — renderer.js writes the
-   glyph onto data-callout-symbol; CSS positions it as a circular
-   badge on the left so the reader sees the class at a glance. */
+/* Inline-SVG glyph per callout type, masked with the accent colour
+   so it inherits the per-type tint. No circle wrapper — the icon
+   sits flat in the padding gutter like a modern docs callout. */
 .callout::before {
-  content: attr(data-callout-symbol);
+  content: '';
   position: absolute;
   left: 16px;
-  top: 16px;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  line-height: 1;
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--accent-strong);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  top: 18px;
+  width: 20px;
+  height: 20px;
+  background-color: var(--accent-strong);
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 20px 20px;
+  mask-size: 20px 20px;
+  -webkit-mask-image: var(--callout-icon, none);
+  mask-image: var(--callout-icon, none);
 }
+/* Per-type icons — encoded inline so there's no extra HTTP fetch
+   and the kit stays single-file-bootable. Feather-style line icons. */
+.callout.info,
+.callout.note { --callout-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='16' x2='12' y2='12'/><line x1='12' y1='8' x2='12.01' y2='8'/></svg>"); }
+.callout.tip { --callout-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 18h6'/><path d='M10 22h4'/><path d='M12 2a7 7 0 0 0-4 12.7c1 .7 1.5 1.8 1.5 3V17h5v-.7c0-1.2.5-2.3 1.5-3A7 7 0 0 0 12 2z'/></svg>"); }
+.callout.warn,
+.callout.warning,
+.callout.caution { --callout-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/><line x1='12' y1='9' x2='12' y2='13'/><line x1='12' y1='17' x2='12.01' y2='17'/></svg>"); }
+.callout.danger { --callout-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='4.93' y1='4.93' x2='19.07' y2='19.07'/></svg>"); }
+.callout.success { --callout-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 11.08V12a10 10 0 1 1-5.93-9.14'/><polyline points='22 4 12 14.01 9 11.01'/></svg>"); }
+.callout.neutral { --callout-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 11 12 14 22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/></svg>"); }
+/* Per-type tint on the icon — picks up the same colour family as
+   the heading text below it. */
 .callout.warn::before,
 .callout.warning::before,
-.callout.caution::before { color: var(--warning); box-shadow: inset 0 0 0 1px var(--warning); }
-.callout.danger::before  { color: var(--danger);  box-shadow: inset 0 0 0 1px var(--danger); }
+.callout.caution::before { background-color: var(--warning); }
+.callout.danger::before  { background-color: var(--danger); }
 .callout.success::before,
-.callout.tip::before     { color: var(--success); box-shadow: inset 0 0 0 1px var(--success); }
-.callout.neutral::before { color: var(--text-soft); box-shadow: inset 0 0 0 1px var(--text-soft); }
+.callout.tip::before     { background-color: var(--success); }
+.callout.neutral::before { background-color: var(--text-soft); }
+.callout.info::before,
+.callout.note::before    { background-color: var(--accent-strong); }
 /* Note: schema accepts "warn"; ".warning" kept as alias for legacy HTML. */
 .callout.warn,
 .callout.warning,
@@ -3960,12 +3994,18 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
   color: var(--text-soft);
   margin-bottom: 6px;
 }
+/* Source <pre> + the rendered block fill the column. The label sits
+   at the top with a small bottom margin; the body (second flex
+   child) explicitly resets ITS top margin so flex column gaps
+   don't double up against the label. Both columns hit the same
+   visual baseline — no more 'render starts lower' offset. */
 .example-pair .example-code > pre,
-.example-pair .example-render > * {
-  margin: 0;
+.example-pair .example-render > :not(.example-col-label) {
+  margin-top: 0 !important;
   flex: 1;
   min-height: 0;
 }
+.example-pair .example-code > pre { margin-bottom: 0; }
 @media (max-width: 900px) {
   .example-pair { grid-template-columns: 1fr; }
 }

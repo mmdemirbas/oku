@@ -325,7 +325,7 @@ class TestChromeKitMarkers:
 
     def test_callout_symbols_present(self, repo_root: Path) -> None:
         """Renderer writes a per-type symbol onto callouts via
-        data-callout-symbol; CSS positions it as a left badge so
+        data-callout-symbol; CSS picks an inline-SVG mask per type so
         readers see the semantic class at a glance."""
         js = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
@@ -334,10 +334,15 @@ class TestChromeKitMarkers:
         ), "callout symbol helper missing — info/warn/tip have no glyph"
         assert (
             "data-callout-symbol" in js
-        ), "renderer must tag callouts with data-callout-symbol for the CSS badge"
+        ), "renderer must tag callouts with data-callout-symbol for the CSS slot"
+        # Per-type icon is set via the --callout-icon CSS variable; the
+        # ::before pseudo-element uses mask-image to colour it.
         assert (
-            "data-callout-symbol" in css
-        ), "CSS must read data-callout-symbol via attr() to render the badge"
+            "--callout-icon" in css
+        ), "CSS must declare a per-type --callout-icon mask URL"
+        assert (
+            "mask-image" in css and ".callout.warn" in css and ".callout.danger" in css
+        ), "missing per-type SVG icon assignments"
 
     def test_table_supports_pinned_view(self, repo_root: Path) -> None:
         """A table block can declare `view: \"board\"` etc. to pin the
@@ -625,15 +630,22 @@ class TestChromeKitMarkers:
         ), "CSS for the inline substring chip missing — chip will visually crowd the surrounding tokens"
 
     def test_annotated_code_multiline_tooltip_offset(self, repo_root: Path) -> None:
-        """Multi-line annotations: the hover tooltip used to drop below
-        the FIRST highlighted line, covering lines 2..N. setHover now
-        nudges the tooltip down to clear the last covered line."""
+        """Multi-line annotations now render their tooltip ABOVE the
+        highlighted block via position:fixed so the tooltip escapes
+        the wrap's clipping context and is never trimmed by scroll.
+        The setHover positioning code reads the first + last line's
+        bounding rect to anchor the tip at the top centre of the
+        whole block."""
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
-        # The hallmark of the new code path is the offset formula —
-        # compute last.bottom - first.bottom and feed it into top.
-        assert (
-            "last.bottom - first.bottom" in js
-        ), "multi-line tooltip offset formula missing — tooltip will overlap covered lines"
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert "position: fixed" in css and ".hdc-anno-tip" in css, (
+            "tooltip must use position:fixed to escape ancestor clipping"
+        )
+        # JS-driven flip — render above by default, flip below when
+        # there's not enough room.
+        assert "translate(-50%, -100%)" in js, (
+            "multi-line tooltip must default to render ABOVE the anchor"
+        )
 
     def test_compare_grid_accepts_blocks(self, repo_root: Path) -> None:
         """compare-grid card now accepts a `blocks: contentBlock[]`
@@ -913,6 +925,12 @@ class TestChromeKitMarkers:
         numbers, blocking them. Fixed by adding a 4th column to the
         per-line grid for annotated-code. Also added hover preview
         tooltip (`.hdc-anno-tip`).
+
+        Note: the CSS-only hover-show rule was retired in favour of
+        JS-driven positioning (position:fixed + viewport coords) so
+        the tip escapes the wrap's clipping context. The presence of
+        the .hdc-anno-tip class + JS show/hide handlers is the
+        relevant invariant now.
         """
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
@@ -922,9 +940,9 @@ class TestChromeKitMarkers:
         assert ".hdc-anno-wrap.hdc-anno-gutter-on pre.hdt-line-numbered .hdt-code-line" in css, (
             "annotation-mode grid override missing"
         )
-        # Hover/focus shows the tip.
-        assert ".hdc-anno-marker:hover + .hdc-anno-tip" in css, (
-            "hover-to-show tooltip CSS missing"
+        # Tip uses fixed positioning to escape ancestor clipping.
+        assert ".hdc-anno-tip" in css and "position: fixed" in css, (
+            "tip must be position:fixed so scroll doesn't clip it"
         )
 
     def test_anno_marker_sits_adjacent_to_code(self, repo_root: Path) -> None:

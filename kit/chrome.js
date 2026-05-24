@@ -6209,47 +6209,115 @@ class HtmlDocAnnotatedCode extends HTMLElement {
       return btn;
     }
 
-    // Wrap every occurrence of a `match` substring inside the wrapped
-    // code lines in <mark class=hdc-anno-substr data-anno-id=N>. Walks
-    // text nodes only (Prism's tokens survive because we never replace
-    // ancestors). Splits text nodes around each occurrence so the wrap
-    // sits next to the surrounding tokens. Idempotent — re-runs skip
-    // text nodes already inside a .hdc-anno-substr.
+    // Wrap every occurrence of a `match` substring inside the
+    // wrapped code lines in <mark class=hdc-anno-substr
+    // data-anno-id=N>. Works even when Prism has split the needle
+    // across token spans (e.g. ${name} becomes
+    // <span class=interpolation-punct>${</span><span ...>name</span><span ...>}</span>).
+    // Strategy: per line, build a flat character map [char, textNode,
+    // offset]; locate every needle occurrence in the joined text;
+    // for each character range, split the involved text nodes and
+    // re-parent the slices under a single <mark>. Idempotent — slices
+    // already inside an existing .hdc-anno-substr are skipped.
     function injectSubstringMarks() {
       var c = self.querySelector('pre code');
       if (!c) return;
+      var lineEls = c.querySelectorAll(':scope > .hdt-code-line');
+      // Fall back to whole-block when lines aren't wrapped yet.
+      var scopes = lineEls.length ? lineEls : [c];
       annos.forEach(function (a) {
         var id = String(a.id);
         var matches = (annoTargets[id] && annoTargets[id].match) || [];
         if (!matches.length) return;
         matches.forEach(function (needle) {
           if (!needle) return;
-          var walker = document.createTreeWalker(c, NodeFilter.SHOW_TEXT, null);
-          var nodes = [];
-          var n;
-          while ((n = walker.nextNode())) {
-            if (n.parentElement && n.parentElement.closest('.hdc-anno-substr,.hdc-anno-marker')) continue;
-            if (n.nodeValue.indexOf(needle) !== -1) nodes.push(n);
-          }
-          nodes.forEach(function (textNode) {
-            var text = textNode.nodeValue;
-            var frag = document.createDocumentFragment();
-            var i = 0;
-            var idx;
-            while ((idx = text.indexOf(needle, i)) !== -1) {
-              if (idx > i) frag.appendChild(document.createTextNode(text.slice(i, idx)));
-              var mark = document.createElement('mark');
-              mark.className = 'hdc-anno-substr';
-              mark.setAttribute('data-anno-id', id);
-              mark.textContent = needle;
-              frag.appendChild(mark);
-              i = idx + needle.length;
-            }
-            if (i < text.length) frag.appendChild(document.createTextNode(text.slice(i)));
-            textNode.parentNode.replaceChild(frag, textNode);
+          scopes.forEach(function (scope) {
+            markNeedleInScope(scope, needle, id);
           });
         });
       });
+    }
+
+    function markNeedleInScope(scope, needle, id) {
+      // Build [char -> textNode] map, skipping nodes already inside
+      // .hdc-anno-substr (idempotency) and inside marker buttons.
+      var map = [];
+      var nodes = [];
+      var walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
+      var n;
+      while ((n = walker.nextNode())) {
+        if (n.parentElement && n.parentElement.closest('.hdc-anno-substr,.hdc-anno-marker')) continue;
+        nodes.push(n);
+      }
+      if (!nodes.length) return;
+      var joined = '';
+      nodes.forEach(function (node) {
+        for (var i = 0; i < node.nodeValue.length; i++) {
+          map.push({ node: node, offset: i });
+        }
+        joined += node.nodeValue;
+      });
+      // Find every needle occurrence in the joined string; collect
+      // non-overlapping ranges right-to-left so range mutations
+      // don't invalidate earlier indices.
+      var ranges = [];
+      var pos = 0;
+      while (true) {
+        var idx = joined.indexOf(needle, pos);
+        if (idx === -1) break;
+        ranges.push({ start: idx, end: idx + needle.length });
+        pos = idx + needle.length;
+      }
+      if (!ranges.length) return;
+      // Process right-to-left to keep map indices valid.
+      for (var ri = ranges.length - 1; ri >= 0; ri--) {
+        wrapRange(map, ranges[ri].start, ranges[ri].end, id);
+      }
+    }
+
+    function wrapRange(map, start, end, id) {
+      // Walk the involved (node, offset) entries; per text node,
+      // split into [before / matched / after], collect the matched
+      // pieces into a single <mark>, insert in original DOM order.
+      // For a multi-node range we create multiple slices but one
+      // <mark> per CONTIGUOUS run inside a single parent — usually
+      // every slice has its own parent (Prism spans) so we end up
+      // with one <mark> per matched-character-block-within-a-span.
+      // The visual effect is a continuous underline across the
+      // span boundaries because the CSS underline sits on each
+      // <mark> at the same baseline.
+      var perNode = {};
+      for (var i = start; i < end; i++) {
+        var e = map[i];
+        if (!e) continue;
+        var key = nodeKey(e.node);
+        if (!perNode[key]) perNode[key] = { node: e.node, indices: [] };
+        perNode[key].indices.push(e.offset);
+      }
+      Object.keys(perNode).forEach(function (k) {
+        var rec = perNode[k];
+        var lo = Math.min.apply(null, rec.indices);
+        var hi = Math.max.apply(null, rec.indices) + 1;
+        var text = rec.node.nodeValue;
+        var before = text.slice(0, lo);
+        var matched = text.slice(lo, hi);
+        var after = text.slice(hi);
+        var frag = document.createDocumentFragment();
+        if (before) frag.appendChild(document.createTextNode(before));
+        var mark = document.createElement('mark');
+        mark.className = 'hdc-anno-substr';
+        mark.setAttribute('data-anno-id', id);
+        mark.textContent = matched;
+        frag.appendChild(mark);
+        if (after) frag.appendChild(document.createTextNode(after));
+        rec.node.parentNode.replaceChild(frag, rec.node);
+      });
+    }
+
+    function nodeKey(node) {
+      // Stable identifier so the perNode bucket groups by reference.
+      if (!node.__hdcAnnoKey) node.__hdcAnnoKey = '_n' + (Math.random().toString(36).slice(2));
+      return node.__hdcAnnoKey;
     }
 
     function bindSync() {
@@ -6276,27 +6344,62 @@ class HtmlDocAnnotatedCode extends HTMLElement {
           var lineEl = self.querySelector('pre code > .hdt-code-line[data-line="' + n + '"]');
           if (lineEl) lineEl.classList.toggle('hdt-anno-target', on);
         });
-        // Multi-line annotations: nudge the line-marker tooltip down so
-        // it appears BELOW the last covered line rather than under the
-        // first. Without this, the tooltip drops onto lines 2..N of the
-        // highlighted block and obscures the code the chip refers to.
-        // Single-line annotations keep the default CSS position.
-        if (lines.length > 1) {
-          var slotMarker = self.querySelector('.hdc-anno-line-marker .hdc-anno-marker[data-anno-id="' + id + '"]');
-          var tip = slotMarker && slotMarker.parentElement.querySelector(':scope > .hdc-anno-tip');
-          if (tip) {
-            if (on) {
+        // Tooltip positioning. The tip is position:fixed (escapes any
+        // ancestor clipping context), pointing at the centre-top of
+        // the highlighted block. Always renders ABOVE the block so
+        // scroll never clips it; if there isn't room above (block is
+        // near the viewport top) we flip below and clamp.
+        // Substring chips live inline (not in the gutter slot) and
+        // get their tip as a sibling — handle both cases.
+        var slotMarker = self.querySelector('.hdc-anno-line-marker .hdc-anno-marker[data-anno-id="' + id + '"]');
+        var substrChip = self.querySelector('.hdc-anno-marker.hdc-anno-marker-substr[data-anno-id="' + id + '"]');
+        var anchorMarker = slotMarker || substrChip;
+        var tip = anchorMarker && (function () {
+          // Tip is always the immediate next-sibling .hdc-anno-tip
+          // OR a child of the slot — search both.
+          var next = anchorMarker.nextElementSibling;
+          if (next && next.classList.contains('hdc-anno-tip')) return next;
+          var parent = anchorMarker.parentElement;
+          return parent && parent.querySelector(':scope > .hdc-anno-tip');
+        })();
+        if (tip) {
+          if (on) {
+            var anchorRect;
+            if (lines.length) {
               var firstLineEl = self.querySelector('pre code > .hdt-code-line[data-line="' + lines[0] + '"]');
-              var lastLineEl = self.querySelector('pre code > .hdt-code-line[data-line="' + lines[lines.length - 1] + '"]');
+              var lastLineEl  = self.querySelector('pre code > .hdt-code-line[data-line="' + lines[lines.length - 1] + '"]');
               if (firstLineEl && lastLineEl) {
-                var first = firstLineEl.getBoundingClientRect();
-                var last = lastLineEl.getBoundingClientRect();
-                var offset = Math.max(0, last.bottom - first.bottom);
-                tip.style.top = 'calc(100% + 6px + ' + offset + 'px)';
+                var a = firstLineEl.getBoundingClientRect();
+                var b = lastLineEl.getBoundingClientRect();
+                anchorRect = { top: a.top, bottom: b.bottom, left: a.left, right: a.right };
               }
-            } else {
-              tip.style.top = '';
             }
+            if (!anchorRect) {
+              // Substring annotations: anchor on the first matched
+              // <mark>, or fall back to the marker itself.
+              var firstMark = self.querySelector('.hdc-anno-substr[data-anno-id="' + id + '"]');
+              var base = firstMark || anchorMarker;
+              anchorRect = base.getBoundingClientRect();
+            }
+            var anchorMidX = (anchorRect.left + anchorRect.right) / 2;
+            // Render once to measure; reset transform / margin so
+            // we can take a fresh box, then re-apply the flip rule.
+            tip.style.display = 'block';
+            tip.style.left = anchorMidX + 'px';
+            tip.style.top = (anchorRect.top - 10) + 'px';
+            tip.style.transform = 'translate(-50%, -100%)';
+            var tipBox = tip.getBoundingClientRect();
+            // If the tooltip would render above the viewport top,
+            // flip below the anchor block instead.
+            if (tipBox.top < 8) {
+              tip.style.top = (anchorRect.bottom + 10) + 'px';
+              tip.style.transform = 'translate(-50%, 0)';
+            }
+          } else {
+            tip.style.display = '';
+            tip.style.left = '';
+            tip.style.top = '';
+            tip.style.transform = '';
           }
         }
       }
@@ -6355,6 +6458,9 @@ class HtmlDocAnnotatedCode extends HTMLElement {
     function moveMarkersToSlots() {
       var inline = self.querySelectorAll('pre code .hdc-anno-marker');
       Array.prototype.forEach.call(inline, function (btn) {
+        // Substring-anchored chips stay inline next to their match.
+        // Only the line-anchored chips move into the gutter slot.
+        if (btn.classList.contains('hdc-anno-marker-substr')) return;
         var line = btn.closest('.hdt-code-line');
         if (!line) return;
         var slot = line.querySelector(':scope > .hdc-anno-line-marker');
@@ -6373,6 +6479,20 @@ class HtmlDocAnnotatedCode extends HTMLElement {
             slot.appendChild(tip);
           }
         }
+      });
+      // Substring-anchored chips need their own tooltip — but it must
+      // be the only tip per annotation id (otherwise the same body
+      // shows twice). Attach to the chip itself, sibling-style.
+      self.querySelectorAll('pre code .hdc-anno-marker.hdc-anno-marker-substr').forEach(function (btn) {
+        if (btn.nextElementSibling && btn.nextElementSibling.classList.contains('hdc-anno-tip')) return;
+        var id = btn.getAttribute('data-anno-id');
+        var match = self.querySelector('.hdc-anno-item[data-anno-id="' + id + '"] .hdc-anno-body');
+        if (!match) return;
+        var tip = document.createElement('span');
+        tip.className = 'hdc-anno-tip';
+        tip.setAttribute('role', 'tooltip');
+        tip.innerHTML = match.innerHTML;
+        btn.parentNode.insertBefore(tip, btn.nextSibling);
       });
     }
 
