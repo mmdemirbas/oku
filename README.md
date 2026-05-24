@@ -4,6 +4,12 @@
 > the legacy name remains a working alias through the dual-brand
 > window. Both `oku` and `html-doc` install as console scripts and
 > resolve to the same CLI.
+>
+> **Sunset for the html-doc alias:** `html-doc` keeps working
+> without warning through 0.x and 1.0. From 1.1 it prints a
+> deprecation note on every invocation. 2.0 removes the
+> console-script entry entirely. Migrate scripts and shell
+> aliases to `oku` before then.
 
 A documentation kit. Authors write pages in JSON (or Markdown — both
 are first-class); the browser renders them via Custom Elements; the

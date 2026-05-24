@@ -33,6 +33,13 @@ Homepage = "https://github.com/mmdemirbas/html-doc"
 # `uv tool install .` (or `pip install .`) installs this as a console
 # script — both `oku` (preferred, 1.0 forward) and `html-doc`
 # (legacy compatibility) become available on PATH globally.
+#
+# Sunset window for the html-doc alias (locked, see docs/roadmap.json):
+#   * 0.x and 1.0 — both names work, no warning.
+#   * 1.1         — html-doc emits a stderr deprecation note on each
+#                   invocation; the run still succeeds.
+#   * 2.0         — html-doc console-script removed; only `oku` remains.
+# Authors with existing automation should switch to `oku` before 2.0.
 [project.scripts]
 oku = "html_doc.cli:main"
 html-doc = "html_doc.cli:main"

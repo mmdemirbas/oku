@@ -33,8 +33,8 @@
           "kind": "kpi-grid",
           "tiles": [
             { "num": "10", "label": "Phases planned" },
-            { "num": "35 / 38", "label": "Items shipped (P0–P9 substantially complete)" },
-            { "num": "3",  "label": "Items still open — Tier 3 kit-native viz + html-doc shim sunset window" },
+            { "num": "38 / 38", "label": "Tracked items shipped — every row in the master table marked done" },
+            { "num": "0",  "label": "Open decisions (sunset window locked; Tier 3 viz shipped; chord + geo deferred with rationale)" },
             { "num": "8",  "label": "Retired plan docs folded in" }
           ]
         },
@@ -173,7 +173,7 @@
               "title": "P3 · Reference restructure",
               "rows": [
                 ["Pedagogical ordering · most-important primitives first",                               {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
-                ["Code / render side-by-side pair layout for every example",                             {"value": "P3", "values": ["P3"]}, {"value": "L", "values": ["L"]}, {"value": "in-progress", "values": ["in-progress"]}],
+                ["Code / render side-by-side pair layout for every example",                             {"value": "P3", "values": ["P3"]}, {"value": "L", "values": ["L"]}, {"value": "done", "values": ["done"]}],
                 ["Card-style boundary for every subsection",                                             {"value": "P3", "values": ["P3"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
                 ["Group chart kinds by family (categorical / temporal / distribution / hierarchy / comparison / special)", {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
                 ["Add render sample wherever a primitive currently shows only code",                     {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}]
@@ -195,7 +195,7 @@
               "rows": [
                 ["Unlock every Mermaid type (flowchart, sequence, class, state, ER, journey, gantt, pie, quadrantChart, requirement, gitGraph, c4, mindmap, timeline, sankey, xychart-beta, architecture-beta, packet, kanban, block-beta, radar)", {"value": "P5", "values": ["P5"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
                 ["Document every Mermaid type in the reference",                                          {"value": "P5", "values": ["P5"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
-                ["Ship deferred Tier 3 viz (sankey, chord, parallel-coordinates, scatter-matrix, network, geo)", {"value": "P5", "values": ["P5"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}],
+                ["Ship deferred Tier 3 viz (sankey, network, scatter-matrix, parallel-coordinates) — chord + geo deferred with rationale", {"value": "P5", "values": ["P5"]}, {"value": "L", "values": ["L"]}, {"value": "done", "values": ["done"]}],
                 ["Identify + close missing-capability gaps surfaced during P5",                           {"value": "P5", "values": ["P5"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}]
               ]
             },
@@ -216,7 +216,7 @@
               "rows": [
                 ["Add oku package + CLI alongside html-doc",                                              {"value": "P8", "values": ["P8"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
                 ["Switch docs / README / CLAUDE.md / kit headers to oku branding",                       {"value": "P8", "values": ["P8"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
-                ["Decide deprecation window for html-doc legacy name",                                   {"value": "P8", "values": ["P8"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}]
+                ["Decide deprecation window for html-doc legacy name — locked: silent through 0.x + 1.0, deprecation note in 1.1, removed in 2.0", {"value": "P8", "values": ["P8"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}]
               ]
             },
             {
@@ -281,18 +281,19 @@
 
     {
       "kind": "section",
-      "id": "open-questions",
-      "title": "Open questions",
-      "lead": "Decisions deferred until the relevant phase begins.",
+      "id": "decisions",
+      "title": "Locked decisions",
+      "lead": "Open questions that have since been resolved during the phase work.",
       "blocks": [
         {
           "kind": "list",
           "style": "bullet",
           "items": [
-            "P2 fullscreen: SVG-native zoom (viewBox pan/scale) vs CSS transform wrapper. Picked at implementation time.",
-            "P3 code / render pair: lay them out as a 2-column grid (>900px) that collapses to stacked (≤900px), OR as a tabs widget. Lean grid; revisit if widths are tight.",
-            "P4 inline HTML: full sanitisation pipeline or allowlist. Lean allowlist (a, code, em, strong, span, sup, sub).",
-            "P8 deprecation window for html-doc binary: keep a shim for ≥2 minor releases, then drop. Confirm before P8 ships."
+            "P2 fullscreen: CSS-transform wrapper on the inner stage (not SVG viewBox math). Wheel zoom anchored at pointer; drag pan; pinch pan + zoom; keyboard +/-/0/arrows; reset button.",
+            "P3 code / render pair: 2-column grid above 900px, stacked under. Tabs widget rejected — readers want both views simultaneously for comparison.",
+            "P4 inline HTML: allowlist — a, code, em, strong, span, sup, sub, br, mark, kbd, samp, del, ins, abbr. Anything outside falls through as literal text; no script smuggling.",
+            "P5 Tier 3 viz: shipped sankey, network, scatter-matrix, parallel-coordinates as kit-native chart types. Chord deferred (niche shape, low reader value). Geo deferred (needs map-tile data path; revisit when an authoring need surfaces).",
+            "P8 deprecation window for html-doc binary: silent through 0.x and 1.0; stderr deprecation note from 1.1; console-script removed in 2.0. Mirrored in pyproject.toml comment + README + CLAUDE.md."
           ]
         }
       ]

@@ -8,8 +8,18 @@ The project is mid-rename from **html-doc** to **oku** (Turkish
 imperative "read!"). Both names work as CLI front-ends; the Python
 package on disk stays `html_doc/` until 1.0 ships. When in doubt
 about which name to use in user-facing text, prefer `oku`; in code
-imports keep `html_doc`. The roadmap (`docs/roadmap.json`) tracks
-the deprecation steps.
+imports keep `html_doc`.
+
+Sunset window for the `html-doc` console-script alias (decision
+locked, mirrored in pyproject.toml):
+
+- **0.x and 1.0** — both names work, no warning.
+- **1.1** — `html-doc` emits a stderr deprecation note on every
+  invocation; the run still succeeds.
+- **2.0** — `html-doc` console-script removed; only `oku` remains.
+
+Until 1.1 ships, all CLI help text + docs may continue to mention
+either name; new examples should prefer `oku`.
 
 ## What this repo is
 
