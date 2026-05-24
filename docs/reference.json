@@ -421,9 +421,33 @@
           "title": "list"
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{ \"kind\": \"list\", \"style\": \"bullet\", \"items\": [\n  \"Plain string item.\",\n  [\"Or an array with \", { \"kind\": \"code\", \"text\": \"inline\" }, \" nodes.\"]\n] }\n{ \"kind\": \"list\", \"style\": \"numbered\", \"items\": [\"step 1\", \"step 2\"] }"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{ \"kind\": \"list\", \"style\": \"bullet\", \"items\": [\n  \"Plain string item.\",\n  [\"Or an array with \", { \"kind\": \"code\", \"text\": \"inline\" }, \" nodes.\"]\n] }"
+          },
+          "render": {
+            "kind": "list",
+            "style": "bullet",
+            "items": [
+              "Plain string item.",
+              ["Or an array with ", { "kind": "code", "text": "inline" }, " nodes."]
+            ]
+          }
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{ \"kind\": \"list\", \"style\": \"numbered\", \"items\": [\"step 1\", \"step 2\", \"step 3\"] }"
+          },
+          "render": {
+            "kind": "list",
+            "style": "numbered",
+            "items": ["step 1", "step 2", "step 3"]
+          }
         },
         {
           "kind": "heading",
@@ -659,13 +683,16 @@
           "content": "A pull-quote for a key takeaway. Larger and more visually distinct than a paragraph — used to mark the one sentence per section worth slowing down for."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{ \"kind\": \"insight\", \"content\": \"The catalog is the locking primitive. Snapshots are the multi-version mechanism.\" }"
-        },
-        {
-          "kind": "insight",
-          "content": "The catalog is the locking primitive. Snapshots are the multi-version mechanism."
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{ \"kind\": \"insight\", \"content\": \"The catalog is the locking primitive. Snapshots are the multi-version mechanism.\" }"
+          },
+          "render": {
+            "kind": "insight",
+            "content": "The catalog is the locking primitive. Snapshots are the multi-version mechanism."
+          }
         },
         {
           "kind": "heading",
@@ -690,19 +717,22 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"info-tip\",\n  \"summary\": \"How the lock actually works\",\n  \"content\": [\n    { \"kind\": \"paragraph\", \"content\": \"Two writers race ...\" }\n  ]\n}"
-        },
-        {
-          "kind": "info-tip",
-          "summary": "Click to expand a live info-tip",
-          "content": [
-            {
-              "kind": "paragraph",
-              "content": "info-tip is the right primitive when the curious 5% of readers want the full story but the other 95% need to keep moving."
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"info-tip\",\n  \"summary\": \"How the lock actually works\",\n  \"content\": [\n    { \"kind\": \"paragraph\", \"content\": \"Two writers race ...\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "info-tip",
+            "summary": "Click to expand a live info-tip",
+            "content": [
+              {
+                "kind": "paragraph",
+                "content": "info-tip is the right primitive when the curious 5% of readers want the full story but the other 95% need to keep moving."
+              }
+            ]
+          }
         }
       ]
     },
@@ -761,26 +791,20 @@
           "title": "kpi-grid"
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"kpi-grid\",\n  \"tiles\": [\n    { \"num\": \"17\",   \"label\": \"Primitives\" },\n    { \"num\": \"JSON\", \"label\": \"Source\" },\n    { \"num\": \"0\",    \"label\": \"Build steps for content\" }\n  ]\n}"
-        },
-        {
-          "kind": "kpi-grid",
-          "tiles": [
-            {
-              "num": "17",
-              "label": "Primitives"
-            },
-            {
-              "num": "JSON",
-              "label": "Source"
-            },
-            {
-              "num": "0",
-              "label": "Build steps for content"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"kpi-grid\",\n  \"tiles\": [\n    { \"num\": \"17\",   \"label\": \"Primitives\" },\n    { \"num\": \"JSON\", \"label\": \"Source\" },\n    { \"num\": \"0\",    \"label\": \"Build steps for content\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "kpi-grid",
+            "tiles": [
+              { "num": "17",   "label": "Primitives" },
+              { "num": "JSON", "label": "Source" },
+              { "num": "0",    "label": "Build steps for content" }
+            ]
+          }
         },
         {
           "kind": "heading",
