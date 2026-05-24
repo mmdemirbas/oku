@@ -3325,6 +3325,19 @@ html-doc-chart .hdc-funnel .hdc-funnel-label {
   font: 500 12px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
+/* Value + percentage now sit in their own right-anchored columns so
+   digits stack visually. Tabular-nums keeps proportional fonts from
+   wobbling between rows. Same family as labels for visual unity. */
+html-doc-chart .hdc-funnel .hdc-funnel-value,
+html-doc-chart .hdc-funnel .hdc-funnel-pct {
+  fill: var(--text-soft);
+  font: 500 12px 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  dominant-baseline: middle;
+}
+html-doc-chart .hdc-funnel .hdc-funnel-pct { fill: var(--text); }
+/* Legacy readout class — earlier rendering combined value+pct into
+   one cell. Kept so older standalone exports still style cleanly. */
 html-doc-chart .hdc-funnel .hdc-funnel-readout {
   fill: var(--text-soft);
   font: 500 12px 'Inter', sans-serif;

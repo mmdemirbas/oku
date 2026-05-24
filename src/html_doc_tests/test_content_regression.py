@@ -373,6 +373,27 @@ class TestChromeKitMarkers:
             "kanban example in reference.json should pin view: 'board' so the render shows lanes by default"
         )
 
+    def test_funnel_aligns_columns(self, repo_root: Path) -> None:
+        """Funnel labels / values / percentages now live in three
+        fixed right-anchored columns instead of being band-edge
+        anchored. The renderer emits hdc-funnel-value and
+        hdc-funnel-pct text elements separately so the digits stack
+        cleanly across rows."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert (
+            "hdc-funnel-value" in js
+        ), "funnel value class missing — values rendered band-edge anchored, columns will stagger"
+        assert (
+            "hdc-funnel-pct" in js
+        ), "funnel pct class missing — percentages rendered band-edge anchored, columns will stagger"
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert (
+            ".hdc-funnel-value" in css
+        ), "funnel value class has no CSS"
+        assert (
+            "tabular-nums" in css
+        ), "funnel value/pct must use tabular-nums so digits stack across rows"
+
     def test_table_view_toggle_compact(self, repo_root: Path) -> None:
         """The view toggle was widened from word-buttons to a single
         segmented icon-only group. Lock the new shape so a future

@@ -4080,15 +4080,29 @@ class HtmlDocChart extends HTMLElement {
     var x = (this._extras && this._extras.funnel) || {};
     var stages = x.stages || [];
     if (stages.length < 2) return;
-    var W = 540;
-    var stageH = 56;
-    var titleTop = this._title ? 36 : 12;
-    var H = titleTop + stages.length * stageH + 12;
+    // Layout columns (anchored to a fixed grid so every label,
+    // value, and percentage line up — previously each row's label
+    // sat at the band edge, so labels staggered as the funnel
+    // narrowed).
+    //
+    //   [ label-col ]   [ band ]   [ value-col ][ pct-col ]
+    //   right-anchored             right-aligned   right-aligned
+    //
+    // Numbers right-align so the digits stack visually.
+    var labelColRight = 168;          // x where label text ends
+    var bandLeft       = 184;          // x of band's leftmost extent
+    var bandRight      = 184 + 200;    // x of band's rightmost extent
+    var bandMaxW       = bandRight - bandLeft;
+    var valueColRight  = 470;          // value text right-aligned to here
+    var pctColRight    = 528;          // percentage text right-aligned to here
+    var W              = 540;
+    var stageH         = 56;
+    var titleTop       = this._title ? 36 : 12;
+    var H              = titleTop + stages.length * stageH + 12;
     var maxVal = stages.reduce(function (m, s) { return Math.max(m, +s.value || 0); }, 0);
     if (maxVal <= 0) return;
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
-    var center = W / 2;
-    var maxW = 360;
+    var bandCenter = (bandLeft + bandRight) / 2;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Funnel') + '" class="hdc-svg hdc-funnel">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
@@ -4096,21 +4110,27 @@ class HtmlDocChart extends HTMLElement {
       var v = +st.value || 0;
       var next = stages[i + 1];
       var nv = next ? (+next.value || 0) : v;
-      var topW = (v / maxVal) * maxW;
-      var botW = (nv / maxVal) * maxW;
+      var topW = (v / maxVal) * bandMaxW;
+      var botW = (nv / maxVal) * bandMaxW;
       var y = titleTop + i * stageH;
       var nextY = titleTop + (i + 1) * stageH;
       var color = palette[st.color] || palette.accent;
       var pts = [
-        (center - topW / 2).toFixed(1) + ',' + y,
-        (center + topW / 2).toFixed(1) + ',' + y,
-        (center + botW / 2).toFixed(1) + ',' + nextY,
-        (center - botW / 2).toFixed(1) + ',' + nextY
+        (bandCenter - topW / 2).toFixed(1) + ',' + y,
+        (bandCenter + topW / 2).toFixed(1) + ',' + y,
+        (bandCenter + botW / 2).toFixed(1) + ',' + nextY,
+        (bandCenter - botW / 2).toFixed(1) + ',' + nextY
       ].join(' ');
-      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="' + (0.82 - i * 0.08).toFixed(2) + '" class="hdc-funnel-band"><title>' + escapeXml(st.label + ': ' + fmtNum(v)) + '</title></polygon>');
-      var pct = Math.round((v / (+stages[0].value || 1)) * 100);
-      parts.push('<text x="' + (center - topW / 2 - 12) + '" y="' + (y + stageH / 2 + 4) + '" text-anchor="end" class="hdc-funnel-label">' + escapeXml(st.label || '') + '</text>');
-      parts.push('<text x="' + (center + topW / 2 + 12) + '" y="' + (y + stageH / 2 + 4) + '" class="hdc-funnel-readout">' + escapeXml(fmtNum(v)) + ' · ' + pct + '%</text>');
+      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="' + (0.82 - i * 0.08).toFixed(2) + '" class="hdc-funnel-band"><title>' + escapeXml((st.label || '') + ': ' + fmtNum(v)) + '</title></polygon>');
+      var firstVal = +stages[0].value || 1;
+      var pct = Math.round((v / firstVal) * 100);
+      var textY = y + stageH / 2 + 4;
+      // Three fixed columns — labels, values, percentages — all
+      // right-anchored to their column edge so digits stack and
+      // labels line up regardless of band width.
+      parts.push('<text x="' + labelColRight + '" y="' + textY + '" text-anchor="end" class="hdc-funnel-label">' + escapeXml(st.label || '') + '</text>');
+      parts.push('<text x="' + valueColRight + '" y="' + textY + '" text-anchor="end" class="hdc-funnel-value">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + pctColRight + '" y="' + textY + '" text-anchor="end" class="hdc-funnel-pct">' + pct + '%</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
