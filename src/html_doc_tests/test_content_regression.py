@@ -671,28 +671,25 @@ class TestChromeKitMarkers:
             "c.accent" in js
         ), "renderer must read c.accent (taking precedence over verdict)"
 
-    def test_asymmetric_bleed_wide_screen(self, repo_root: Path) -> None:
-        """Wide-screen support — prose blocks clamp to --prose-width
-        (line-length cap), visual primitives bleed to --content-width.
-        Genuine wide screens (>1600px) push content-width up while
-        prose stays put."""
+    def test_wide_screen_uniform_widening(self, repo_root: Path) -> None:
+        """Wide-screen support — every component fills the reader-
+        selected --content-width. Media queries at 1500px and 1900px
+        push the content width up so charts, tables, prose ALL grow
+        in lockstep on bigger monitors. --prose-width remains as a
+        CSS variable for callers that want a per-block line-length
+        cap; the kit itself no longer auto-applies it."""
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        assert "--prose-width" in css, "missing --prose-width token"
-        assert "main > p" in css and "max-width: var(--prose-width" in css, (
-            "prose paragraphs must clamp to --prose-width inside <main>"
-        )
-        # Wide-screen media query bumps content width.
-        assert "min-width: 1600px" in css, (
-            "missing >=1600px media query that widens --content-width on big monitors"
-        )
-        # Visual primitives explicitly opt out of the prose clamp.
+        # The wide-screen bumps are required.
+        assert "min-width: 1500px" in css, "missing 1500px breakpoint"
+        assert "min-width: 1900px" in css, "missing 1900px breakpoint"
+        # Visual primitives don't cap themselves below content-width.
         for selector in (
             "main .hdt-table-wrap",
             "main .kpi-grid",
             "main html-doc-chart",
             "main pre",
         ):
-            assert selector in css, f"visual primitive '{selector}' missing the content-width override"
+            assert selector in css, f"primitive '{selector}' missing the max-width override"
 
     def test_reader_can_cycle_content_width(self, repo_root: Path) -> None:
         """Reader has a chrome button to cycle content width modes (D3).

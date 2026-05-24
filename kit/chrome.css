@@ -386,19 +386,19 @@ nav.toc, page-toc {
 
 /* Content-width modes (D3). The CSS variable wins because <main> reads
    it via max-width; the body attribute is the persisted source of truth. */
-body[data-content-width="narrow"] { --content-width: 860px;  --prose-width: 720px; }
-body[data-content-width="comfortable"] { --content-width: 960px;  --prose-width: 720px; }
-body[data-content-width="wide"]   { --content-width: 1280px; --prose-width: 720px; }
-body[data-content-width="max"]    { --content-width: 100vw;  --prose-width: 720px; }
-/* Genuine wide screens — push content width up so charts, tables,
-   and kpi-grids spread out. Prose stays clamped via --prose-width. */
-@media (min-width: 1600px) {
-  body[data-content-width="comfortable"] { --content-width: 1120px; }
-  body[data-content-width="wide"]        { --content-width: 1480px; }
-}
-@media (min-width: 2000px) {
+body[data-content-width="narrow"]      { --content-width: 860px;  }
+body[data-content-width="comfortable"] { --content-width: 1100px; }
+body[data-content-width="wide"]        { --content-width: 1400px; }
+body[data-content-width="max"]         { --content-width: 100vw;  }
+/* Wide-screen bumps. Comfortable + wide both scale up so the page
+   actually USES the available room on 1600px+ monitors. */
+@media (min-width: 1500px) {
   body[data-content-width="comfortable"] { --content-width: 1240px; }
-  body[data-content-width="wide"]        { --content-width: 1640px; }
+  body[data-content-width="wide"]        { --content-width: 1560px; }
+}
+@media (min-width: 1900px) {
+  body[data-content-width="comfortable"] { --content-width: 1400px; }
+  body[data-content-width="wide"]        { --content-width: 1760px; }
 }
 
 /* Width-toggle icon doubles as a state readout. The three <rect> segments
@@ -4116,37 +4116,18 @@ html-doc-chart .hdc-parcoord .hdc-parcoord-line.hovered {
 }
 
 
-/* ============ Asymmetric bleed — prose narrow, visuals wide ============
- * Rule: prose blocks clamp to --prose-width for line-length
- * (~80 char). Visual primitives stretch up to --content-width
- * unchanged. The rule is scoped to direct children of <main>
- * so nested prose (paragraphs inside a callout, a card, a
- * info-tip body) keeps its container's width.
+/* ============ Symmetric content width ============
+ * Every component — prose AND visuals — fills the reader's
+ * selected content width. Set per the body[data-content-width]
+ * value and the wide-screen @media bumps near the top of this
+ * file. The earlier asymmetric-bleed model (prose clamped to
+ * --prose-width, visuals to --content-width) was retired
+ * because authors expect the width-toggle button to act
+ * uniformly across every block kind. If line-length is a
+ * concern at very wide settings, switch back to 'narrow' mode.
+ * --prose-width remains as a CSS variable for callers who
+ * want to opt back into a line-length cap on their own block.
  * ---------------------------------------------------------------- */
-main > p,
-main > h1, main > h2, main > h3, main > h4,
-main > ul, main > ol,
-main > blockquote,
-main > .callout,
-main > .insight,
-main > details.info-tip,
-main > section > p,
-main > section > h1, main > section > h2, main > section > h3, main > section > h4,
-main > section > ul, main > section > ol,
-main > section > blockquote,
-main > section > .callout,
-main > section > .insight,
-main > section > details.info-tip {
-  max-width: var(--prose-width, 720px);
-}
-/* TLDR is a featured opener — wider than prose, narrower than visuals. */
-main > .tldr,
-main > section > .tldr {
-  max-width: min(var(--content-width, 960px), 860px);
-}
-/* Visual primitives explicitly opt OUT — they fill the content
-   width. Listed redundantly with the inheritance above so an
-   author adding a wrapper around a visual block doesn't clip it. */
 main .hdt-table-wrap,
 main .compare-grid,
 main .kpi-grid,
@@ -4159,7 +4140,7 @@ main html-doc-live-snippet,
 main html-doc-annotated-code,
 main pre,
 main .example-pair {
-  max-width: var(--content-width, 960px);
+  max-width: 100%;
 }
 
 
