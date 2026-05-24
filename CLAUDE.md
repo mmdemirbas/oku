@@ -43,34 +43,36 @@ three single-purpose trees under `dist/`:
 
 | File | Owns |
 |---|---|
-| `chrome.js` | Custom Elements, init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring), Prism/Mermaid lazy loaders, tooltip controller. ~3.9k LoC. |
-| `chrome.css` | All visual tokens (light/dark), layout grid, every primitive's styling. ~2.4k LoC. |
-| `renderer.js` | JSON → DOM mapping. `_renderTable`, `_renderTldr`, etc. ~700 LoC. |
+| `chrome.js` | Custom Elements (chart with 28 render modes, diagram, live-snippet, annotated-code, glossary-term, ext-ref, page-chrome / page-nav / page-toc), init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring, bar-chart hover/click-pin/legend toggle), Prism + Mermaid lazy loaders, glossary tooltip controller, lightbox with pan/zoom/pinch fullscreen. ~7k LoC. |
+| `chrome.css` | All visual tokens (light/dark, --series-1..--series-10, --prose-width), layout grid (asymmetric bleed, four-mode content width), every primitive's styling. ~3k LoC. |
+| `renderer.js` | JSON → DOM mapping. `_renderTable`, `_renderTldr`, `_renderExample`, `_renderBars`, `_renderMultiBars`, inline kinds including `html`. ~1k LoC. |
 | `kit/schema/page.schema.json` | JSON-schema for page sources. Every `docs/*.json` validates against it; the optional `jsonschema` dep makes the check active. |
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
-| `src/html_doc/cli.py` | `html-doc init / build / serve` plus the `_md_block` markdown twin emitter. |
+| `src/html_doc/cli.py` | `oku init / build / clean / check / serve` plus the markdown converter (front-matter, nested lists, footnotes, def-lists, ref-links, sanitised inline HTML) and the `_md_block` markdown twin emitter. |
 | `src/html_doc/templates/` | `starter.{json,html}` — pair to copy when starting a new page. |
-| `bin/html-doc` | PEP 723 shim — runs without install via `uv run bin/html-doc …`. |
-| `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. |
+| `bin/oku`, `bin/html-doc` | PEP 723 shims — run without install via `uv run bin/oku …`. Both point at the same `html_doc.cli:main`. |
+| `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.json` tracks open phases. |
 
 ## Develop / verify
 
 ```bash
 uv sync --extra dev           # pulls pytest, ruff, jsonschema
-html-doc check                # schema + structural lint (the fast verify gate)
-html-doc check --strict       # exit 1 on warnings too
-html-doc build                # writes dist/{standalone,site,markdown}/
-html-doc serve --no-watch     # local server (live-reload on by default)
-uv run pytest -q              # 170+ tests; should all pass
+oku check                     # schema + structural lint (the fast verify gate)
+oku check --strict            # exit 1 on warnings too
+oku build                     # writes dist/{standalone,site,markdown}/
+oku serve --no-watch          # local server (live-reload on by default)
+uv run pytest -q              # 249+ tests; should all pass
 uv run ruff check . && uv run ruff format --check .
 ```
 
-`html-doc check` is the canonical verify step for any doc-content
+`oku check` is the canonical verify step for any doc-content
 change — it runs the schema + a suite of structural checks (deprecated
 kinds, duplicate anchors, unresolved glossary terms / ext-refs,
-forbidden process language, chart shape sanity). Run it before
-calling a doc change done. `html-doc build` invokes the same checks
-internally and refuses to ship if it errors.
+forbidden process language, chart shape sanity per type — including
+the Tier 3 chord / geo / sankey / network / scatter-matrix /
+parallel-coordinates payload shapes). Run it before calling a doc
+change done. `oku build` invokes the same checks internally and
+refuses to ship if it errors.
 
 After ANY change to chrome.js / chrome.css: hard-reload the browser
 (`location.reload(true)` from the page console, or close the tab and

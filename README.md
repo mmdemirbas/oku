@@ -18,22 +18,38 @@ file copies for offline reading.
 
 ## What's in the box
 
-- **Sources:** `*.json` (kit schema) or `*.md`. Markdown files drop in
+- **Sources:** `*.json` (kit schema) or `*.md`. Markdown drops in
   unchanged — relative `.md` links retarget to `.html`, code fences
-  highlight, fenced ` ```mermaid ` becomes a live diagram.
+  highlight, fenced ` ```mermaid ` becomes a live diagram. The
+  converter handles nested lists, footnotes, definition lists,
+  reference-style links, YAML front-matter, and a sanitised inline
+  HTML allowlist.
 - **Primitives:** paragraph / heading / list / code / annotated-code,
-  callout, insight, info-tip, tldr, kpi-grid, table (sort + filter +
-  view-switch), compare-grid, step-flow, chart (scatter / line / area
-  / bubble / quadrant / bar / stacked-bar / grouped-bar / donut /
-  heatmap / sparkline / waffle / gauge / radar / box-plot / bullet /
-  slope / histogram / calendar-heatmap / treemap / ridgeline /
-  funnel), diagram (Mermaid), live-snippet, glossary tooltips,
-  citation cards.
-- **Chrome:** site-tree sidebar with drag-to-resize + off-canvas drawer
-  on mobile, sticky section TOC with scroll-spy, three-mode theme
-  cycler (system / light / dark), full-text search (Pagefind),
-  forward-compat warning indicator, reader-side placeholder
-  personalization.
+  callout (8 types, each with a symbol badge), insight, info-tip,
+  tldr, kpi-grid, table (sort, filter, chip-rack, view-toggle
+  Table / List / Cards / Board with kanban lanes), compare-grid,
+  step-flow (click-targetable card cards), chart (28 render
+  modes — see below), diagram (Mermaid), live-snippet, glossary
+  tooltips, citation cards.
+- **28 chart types in one primitive.** scatter · line · area · bubble
+  · quadrant · bar · stacked-bar · grouped-bar · donut · heatmap ·
+  sparkline · waffle · gauge · radar · box-plot · bullet · slope ·
+  histogram · calendar-heatmap · treemap · ridgeline · funnel ·
+  sankey · network · scatter-matrix · parallel-coordinates · chord
+  · geo (tile cartogram). Every chart shares one hover-tooltip
+  controller (click to pin, Escape to close), expands into a
+  fullscreen pan/zoom overlay, and tracks the light / dark theme
+  tokens.
+- **Chrome:** single left sidebar with site-tree + on-page TOC
+  stacked, drag-to-resize edge handle + off-canvas drawer on
+  mobile, sticky section TOC with scroll-spy, three-mode theme
+  cycler, four-mode content-width cycler (narrow → comfortable →
+  wide → max), full-text search (Pagefind), forward-compat warning
+  indicator, reader-side placeholder personalization.
+- **Wide-screen ready.** Asymmetric bleed — prose blocks clamp at
+  `--prose-width` (720px line length); visual primitives expand
+  to `--content-width`. On screens >1600px the content width
+  widens further so charts and tables breathe.
 - **CLI:** `init` symlinks the kit + writes an index stub; `build`
   emits `dist/site/` (multi-page + Pagefind), `dist/standalone/`
   (single file with inline page JSON), and `dist/markdown/`
@@ -147,7 +163,7 @@ each request so source dirs stay clean.
 | `<callout type="note\|tip\|info\|caution\|warn\|danger\|success\|neutral">` | Block-level themed note. |
 | `<insight>` | Pull-quote for a key takeaway. |
 | `kpi-grid` · `compare-grid` · `step-flow` | Layout primitives, all layout-safe by structure. `compare-grid` carries verdict variants `good` / `bad` / `neutral` (quality contrast) and `in` / `out` (scope contrast); cards accept either a rich `content` body, an `items` bullet list, or both. |
-| `<chart type="...">` | Single primitive, twenty-two render modes. Cartesian family (`scatter`, `line`, `area`, `bubble`, `quadrant`) renders interactive SVG with pan / zoom / log scale / hover tooltips / legend toggle / PNG export. Bar family (`bar`, `stacked-bar`, `grouped-bar`) renders horizontal CSS bars. `donut` is a single-ring distribution. Extension family covers density (`heatmap`, `calendar-heatmap`), inline trend (`sparkline`), dot-matrix (`waffle`), single-metric status (`gauge`), multi-axis comparison (`radar`), distribution (`box-plot`, `ridgeline`, `histogram`), actual-vs-target (`bullet`), two-time-point change (`slope`), hierarchy (`treemap`), and conversion (`funnel`). Every type shares the toolbar (copy data / PNG / lightbox-expand) and theme tokens; no third-party chart library. |
+| `<chart type="...">` | Single primitive, 28 render modes grouped by family: Categorical (bar / stacked-bar / grouped-bar / waffle), Distribution (histogram / box-plot / ridgeline), Time series (line / area / sparkline / slope / calendar-heatmap), Hierarchy (donut / treemap), Relationship (scatter / bubble / quadrant / radar / heatmap), Goal (bullet / gauge), Conversion (funnel), Flow (sankey), Graph (network), Multivariate (scatter-matrix / parallel-coordinates), Circular (chord), Geographic (geo). Shared rich hover tooltip with click-to-pin, click-outside / Esc to close. Cartesian SVG charts add pan / zoom / log scale / legend toggle / PNG export. Every type shares the expand toolbar (copy data / PNG / fullscreen pan + zoom) and the extended series-colour palette (10 distinguishable tokens, light + dark theme); no third-party chart library. |
 | `<diagram>` | Mermaid wrapper. Lazy-loads from CDN. Re-renders on theme toggle. Has Copy-source, Copy-SVG, Screenshot buttons. |
 | `<live-snippet>` | Editable HTML/CSS/JS textarea + sandboxed iframe preview. |
 | `annotated-code` | Code block with numbered `(1)`(2) chips that sync with a side panel of annotations. |
@@ -242,14 +258,17 @@ Click opens a panel listing entries; Dismiss closes it for the session.
 ## Tests
 
 ```bash
-uv run --with pytest --with jsonschema pytest src/html_doc_tests/
+uv run pytest -q                            # ~249 tests, runs in under a second
+uv run html-doc check --strict              # schema + structural + content lint
 ```
 
-61 tests, runs in under a second. Covers pure functions
-(`render_page_markdown`, `_common_docs_dir`, `_pick_open_target`),
-schema validation on every published page, and the build helpers
+Covers the pure converter (Markdown front-matter, nested lists,
+footnotes, definition lists, reference-style links, sanitised inline
+HTML), schema validation on every published page, the build helpers
 (`build_manifest`, `build_llms_txt`, `build_markdown_twins`,
-`extract_page_text`, `inject_pagefind_body`) via `tmp_path` fixtures.
+`extract_page_text`, `inject_pagefind_body`) via `tmp_path`
+fixtures, and content-regression tests that lock the chrome.js /
+chrome.css markers the user has called out as load-bearing.
 
 ## Versioning
 
@@ -259,8 +278,16 @@ CDN consumers should pin to a tag — e.g.
 
 History lives in the git log (`git log --oneline`).
 
+## Roadmap
+
+The project is mid-rename to **oku** for the 1.0 push; see
+`docs/roadmap.json` (or the live page at `docs/index.html#roadmap.html`)
+for the closed-out backlog, locked design decisions, and the small
+amount of follow-up tracked for the 1.1 / 2.0 cuts.
+
 ## Companion files
 
 - `src/html_doc/templates/starter.html` + `src/html_doc/templates/starter.json` — copy to start a new page.
 - `kit/schema/page.schema.json` — the page schema; editors pick this up via the `$schema` field.
 - `docs/` — the project's own docs (built with the kit, dogfood).
+- `docs/roadmap.json` — phase tracker.
