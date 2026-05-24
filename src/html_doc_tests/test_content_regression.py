@@ -339,6 +339,31 @@ class TestChromeKitMarkers:
             "data-callout-symbol" in css
         ), "CSS must read data-callout-symbol via attr() to render the badge"
 
+    def test_annotated_code_substring_chip_autoplace(self, repo_root: Path) -> None:
+        """Pure-substring annotations (no inline (N), no `lines`) now
+        get a numeric chip auto-placed in front of the first highlighted
+        substring. Without this, the user couldn't tell which annotation
+        a highlight referred to."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert (
+            "hdc-anno-marker-substr" in js
+        ), "substring auto-placement helper missing — substring-only annotations have no visible chip"
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert (
+            "hdc-anno-marker-substr" in css
+        ), "CSS for the inline substring chip missing — chip will visually crowd the surrounding tokens"
+
+    def test_annotated_code_multiline_tooltip_offset(self, repo_root: Path) -> None:
+        """Multi-line annotations: the hover tooltip used to drop below
+        the FIRST highlighted line, covering lines 2..N. setHover now
+        nudges the tooltip down to clear the last covered line."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # The hallmark of the new code path is the offset formula —
+        # compute last.bottom - first.bottom and feed it into top.
+        assert (
+            "last.bottom - first.bottom" in js
+        ), "multi-line tooltip offset formula missing — tooltip will overlap covered lines"
+
     def test_compare_grid_accepts_blocks(self, repo_root: Path) -> None:
         """compare-grid card now accepts a `blocks: contentBlock[]`
         payload alongside content / items — the schema and the

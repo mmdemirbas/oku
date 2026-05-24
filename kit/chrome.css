@@ -1714,6 +1714,20 @@ html-doc-annotated-code > pre {
   color: var(--bg);
   border-bottom-color: transparent;
 }
+/* Substring-anchored auto-marker — sits inline immediately before the
+   first highlighted occurrence. Smaller than the gutter chip so it
+   doesn't crowd the surrounding tokens. */
+.hdc-anno-marker.hdc-anno-marker-substr {
+  display: inline-flex;
+  vertical-align: baseline;
+  margin: 0 4px 0 0;
+  height: 1.25em;
+  min-width: 1.25em;
+  padding: 0 4px;
+  font-size: 10.5px;
+  line-height: 1;
+  border-radius: 50%;
+}
 .hdc-anno-marker:hover + .hdc-anno-tip,
 .hdc-anno-marker:focus + .hdc-anno-tip,
 .hdc-anno-marker.hovered + .hdc-anno-tip {

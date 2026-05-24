@@ -5040,6 +5040,25 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         placedIds[id] = true;
       });
 
+      // Pure-substring annotations (no inline (N), no lines) used to
+      // render the substring underline with NO numeric chip — readers
+      // couldn't tell which annotation a highlight belonged to. Now we
+      // auto-place the chip immediately before the FIRST substring
+      // match. The chip sits in flow, so it reads like
+      // "<num>highlighted-substring".
+      annos.forEach(function (a) {
+        var id = String(a.id);
+        if (placedIds[id]) return;
+        var targets = annoTargets[id];
+        if (!targets || !targets.match.length) return;
+        var firstMatch = self.querySelector('pre code .hdc-anno-substr[data-anno-id="' + id + '"]');
+        if (!firstMatch) return;
+        var marker = makeMarker(id);
+        marker.classList.add('hdc-anno-marker-substr');
+        firstMatch.parentNode.insertBefore(marker, firstMatch);
+        placedIds[id] = true;
+      });
+
       bindSync();
     }
 
@@ -5120,6 +5139,29 @@ class HtmlDocAnnotatedCode extends HTMLElement {
           var lineEl = self.querySelector('pre code > .hdt-code-line[data-line="' + n + '"]');
           if (lineEl) lineEl.classList.toggle('hdt-anno-target', on);
         });
+        // Multi-line annotations: nudge the line-marker tooltip down so
+        // it appears BELOW the last covered line rather than under the
+        // first. Without this, the tooltip drops onto lines 2..N of the
+        // highlighted block and obscures the code the chip refers to.
+        // Single-line annotations keep the default CSS position.
+        if (lines.length > 1) {
+          var slotMarker = self.querySelector('.hdc-anno-line-marker .hdc-anno-marker[data-anno-id="' + id + '"]');
+          var tip = slotMarker && slotMarker.parentElement.querySelector(':scope > .hdc-anno-tip');
+          if (tip) {
+            if (on) {
+              var firstLineEl = self.querySelector('pre code > .hdt-code-line[data-line="' + lines[0] + '"]');
+              var lastLineEl = self.querySelector('pre code > .hdt-code-line[data-line="' + lines[lines.length - 1] + '"]');
+              if (firstLineEl && lastLineEl) {
+                var first = firstLineEl.getBoundingClientRect();
+                var last = lastLineEl.getBoundingClientRect();
+                var offset = Math.max(0, last.bottom - first.bottom);
+                tip.style.top = 'calc(100% + 6px + ' + offset + 'px)';
+              }
+            } else {
+              tip.style.top = '';
+            }
+          }
+        }
       }
       self.querySelectorAll('.hdc-anno-marker, .hdc-anno-item').forEach(function (el) {
         var id = el.getAttribute('data-anno-id');
