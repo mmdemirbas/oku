@@ -1,12 +1,17 @@
 [project]
+# Project rename in flight (P8): the public name is "oku" (Turkish
+# imperative "read!"), but the package name on disk remains html_doc
+# until a coordinated 1.0 release ships. The console-script entry
+# below adds an "oku" command alongside "html-doc" so authors can
+# adopt the new name immediately without losing the legacy one.
 name = "html-doc"
 version = "0.2.0"
-description = "Shared HTML chrome kit + CLI. Standalone, theme-aware visual docs without a build step."
+description = "oku — shared HTML chrome kit + CLI. Standalone, theme-aware visual docs without a build step. (Distributed as html-doc until 1.0.)"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Muhammed" }]
 license = { text = "MIT" }
-keywords = ["html", "docs", "static-site", "documentation"]
+keywords = ["oku", "html", "docs", "static-site", "documentation"]
 
 # Runtime stays optional — the script tolerates a missing jsonschema
 # (validation is skipped, build still succeeds). uv-driven invocations
@@ -26,8 +31,10 @@ dev = [
 Homepage = "https://github.com/mmdemirbas/html-doc"
 
 # `uv tool install .` (or `pip install .`) installs this as a console
-# script — `html-doc` becomes available on PATH globally.
+# script — both `oku` (preferred, 1.0 forward) and `html-doc`
+# (legacy compatibility) become available on PATH globally.
 [project.scripts]
+oku = "html_doc.cli:main"
 html-doc = "html_doc.cli:main"
 
 # Hatchling is the modern PEP 517 build backend — smaller surface than

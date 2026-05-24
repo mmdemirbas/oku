@@ -2,10 +2,11 @@
   "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
   "kind": "page",
   "schema_version": 1,
-  "title": "html-doc",
+  "title": "oku",
   "accent": "teal",
   "meta": {
-    "subtitle": "A documentation kit that renders JSON or Markdown pages in the browser. Single-source content, no build step for authoring, multi-page site with full-text search when you want one.",
+    "eyebrow": "Documentation kit · formerly html-doc",
+    "subtitle": "Renders JSON or Markdown pages in the browser. Single-source content, no build step for authoring, multi-page site with full-text search when you want one.",
     "audience": "Author",
     "order": 1,
     "summary": "What the kit is, how it's organised, where the documentation lives."
@@ -116,7 +117,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd path/to/your-project/docs\nhtml-doc init     # creates _kit symlink + index.html\nhtml-doc serve    # http://localhost:9876 with live reload"
+          "source": "cd path/to/your-project/docs\noku init     # creates _kit symlink + index.html\noku serve    # http://localhost:9876 with live reload\n# legacy: `html-doc` still works as an alias"
         },
         {
           "kind": "paragraph",
