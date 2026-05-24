@@ -391,19 +391,25 @@
         wrap.appendChild(h);
       }
       // Legend chip rack at the top — one entry per series.
+      // Each chip carries data-series-idx so chrome.js can wire a
+      // click-toggle that dims the matching .bar-fill[data-series=N].
       if (series.some(s => s.label)) {
         const legend = document.createElement('div');
         legend.className = 'bar-chart-legend';
-        for (const s of series) {
-          if (!s.label) continue;
-          const chip = document.createElement('span');
+        series.forEach((s, si) => {
+          if (!s.label) return;
+          const chip = document.createElement('button');
+          chip.type = 'button';
           chip.className = 'bar-chart-legend-chip ' + (s.color || 'accent');
+          chip.setAttribute('data-series-idx', String(si));
+          chip.setAttribute('aria-pressed', 'false');
+          chip.setAttribute('aria-label', 'Toggle ' + s.label + ' series');
           const sw = document.createElement('span');
           sw.className = 'bar-chart-legend-swatch';
           chip.appendChild(sw);
           chip.appendChild(document.createTextNode(s.label));
           legend.appendChild(chip);
-        }
+        });
         wrap.appendChild(legend);
       }
       // Compute the scale max.

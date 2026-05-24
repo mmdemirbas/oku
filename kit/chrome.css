@@ -53,6 +53,20 @@
   /* Code block fill — clearly separated from the page bg so fenced
      code reads as a distinct surface at a glance. */
   --code-bg:        #eef0f6;
+  /* Extended chart palette — light theme. The 'series-N' tokens are
+     used when authors don't pin a colour on individual series; the
+     chart renderer rotates through them for series 6+ that the
+     5-name palette (accent/warn/danger/success/muted) can't cover. */
+  --series-1: #0f766e;
+  --series-2: #b45309;
+  --series-3: #4338ca;
+  --series-4: #c2410c;
+  --series-5: #15803d;
+  --series-6: #be185d;
+  --series-7: #0369a1;
+  --series-8: #65a30d;
+  --series-9: #7c2d12;
+  --series-10: #4b5563;
 }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] {
@@ -82,6 +96,19 @@
   --line-strong:    #4e4870;
   --scrim:          rgba(0, 0, 0, 0.55);
   --code-bg:        #14121f;
+  /* Extended chart palette — dark theme. Lighter, more saturated
+     versions of the light-theme ramp so contrast against the dark
+     surface stays comfortable. */
+  --series-1: #5eead4;
+  --series-2: #fcd34d;
+  --series-3: #c7d2fe;
+  --series-4: #fdba74;
+  --series-5: #86efac;
+  --series-6: #f9a8d4;
+  --series-7: #7dd3fc;
+  --series-8: #bef264;
+  --series-9: #fca5a5;
+  --series-10: #d1d5db;
   color-scheme: dark;
 }
 
@@ -2099,11 +2126,28 @@ details.info-tip > *:not(summary) p:last-child { margin-bottom: 0; }
   font: 500 12px 'Inter', sans-serif;
   color: var(--text-soft);
 }
+/* Legend chip is now a real <button> so it announces as clickable
+   to screen readers + picks up focus styling. */
 .bar-chart-legend-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease, opacity 0.12s ease;
 }
+.bar-chart-legend-chip:hover { background: var(--surface-2); }
+.bar-chart-legend-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.bar-chart-legend-chip.off { opacity: 0.42; text-decoration: line-through; }
+.bar-chart-legend-chip.off .bar-chart-legend-swatch { opacity: 0.4; }
 .bar-chart-legend-swatch {
   display: inline-block;
   width: 12px;
@@ -2115,6 +2159,12 @@ details.info-tip > *:not(summary) p:last-child { margin-bottom: 0; }
 .bar-chart-legend-chip.danger .bar-chart-legend-swatch  { background: var(--danger); }
 .bar-chart-legend-chip.success .bar-chart-legend-swatch { background: var(--success); }
 .bar-chart-legend-chip.muted .bar-chart-legend-swatch   { background: var(--text-soft); }
+/* Bar-fills toggled off via legend chip dim to faint outlines so
+   the layout doesn't reflow when a series is hidden. */
+.bar-fill.dim {
+  opacity: 0.16;
+  pointer-events: none;
+}
 
 /* Stacked: each series fills its share next to the previous one on
    the same row. No gap between segments so the totals read as a
@@ -4125,4 +4175,24 @@ html-doc-chart .hdc-geo .hdc-geo-legend-tick {
   fill: var(--text-soft);
   font: 500 10.5px 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
+}
+
+
+/* ============ Chart tooltip pin-hint + pinned state ============ */
+.hdc-tooltip .hdc-tt-pin-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  opacity: 0.7;
+}
+.hdc-tooltip.pinned {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft), 0 6px 16px var(--shadow-strong);
+  pointer-events: auto;
+}
+.hdc-tooltip.pinned .hdc-tt-pin-hint::after {
+  content: ' · pinned · Esc to close';
 }

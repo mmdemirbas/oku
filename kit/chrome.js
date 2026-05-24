@@ -3168,6 +3168,29 @@ if (!customElements.get('ext-ref')) customElements.define('ext-ref', ExtRef);
 // semantically-correct HTML element when citing.
 if (!customElements.get('html-doc-cite')) customElements.define('html-doc-cite', class extends ExtRef {});
 
+/* ============ Shared chart palette helper ============
+ * Resolves a series colour from either:
+ *   * a named token (accent / warn / danger / success / muted) that
+ *     maps to a top-level CSS variable, or
+ *   * the rotating --series-N ramp (1..10) when the author didn't
+ *     pin one. Renderers that have many series fall back via
+ *     pickColor(series.color, seriesIdx).
+ * --------------------------------------------------------------- */
+var __htmldocChartPalette = {
+  accent: 'var(--accent)',
+  warn: 'var(--warning)',
+  danger: 'var(--danger)',
+  success: 'var(--success)',
+  muted: 'var(--text-soft)'
+};
+function __htmldocPickColor(name, idx) {
+  if (name && __htmldocChartPalette[name]) return __htmldocChartPalette[name];
+  // Rotate through the 10-series ramp; CSS variables resolve to
+  // the current theme's values at paint time.
+  var i = ((idx || 0) % 10) + 1;
+  return 'var(--series-' + i + ')';
+}
+
 /* ============ <html-doc-chart> Custom Element ============ *
  * Generic data-driven SVG chart. Scatter and line types.
  * Series data lives in a child <script type="application/json">.
@@ -3291,7 +3314,8 @@ class HtmlDocChart extends HTMLElement {
     // Cache the inverse mappings for the pan/zoom logic.
     this._sx = sx; this._sy = sy;
 
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    // Cartesian series colours come from __htmldocPickColor — see
+    // the shared palette helper near the top of the chart section.
 
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + (this._title || (this._type + ' chart')) + '" class="hdc-svg">');
@@ -3369,7 +3393,10 @@ class HtmlDocChart extends HTMLElement {
     var drawsFill = (self._type === 'area');
     var drawsBubble = (self._type === 'bubble');
     this._series.forEach(function (s, i) {
-      var color = palette[s.color] || palette.accent;
+      // Author-named colour wins; otherwise rotate through the
+      // extended --series-N palette so multi-series Cartesian
+      // charts get distinct colours past the 5-name vocabulary.
+      var color = __htmldocPickColor(s.color, i);
       parts.push('<g class="hdc-series" data-series-idx="' + i + '">');
       if (drawsConnector) {
         var data = s.data || [];
@@ -3430,7 +3457,7 @@ class HtmlDocChart extends HTMLElement {
     parts.push('</g>'); // /clip
     // Legend chips sit OUTSIDE the clip so they're always visible.
     this._series.forEach(function (s, i) {
-      var color = palette[s.color] || palette.accent;
+      var color = __htmldocPickColor(s.color, i);
       if (!s.label) return;
       var lx = W - pad.right - 12;
       var ly = pad.top + 14 + i * 18;
@@ -5250,6 +5277,11 @@ class HtmlDocChart extends HTMLElement {
        series) — each renderer below tags its shapes accordingly. The
        tooltip element is the same .hdc-tooltip the dot-tip uses, so
        only one tip is visible at a time. */
+    // Click-pinned anchor state. When set, hover-leave does NOT
+    // hide the tooltip; only another click (on the same anchor or
+    // anywhere outside) unpins it. Lets readers select tooltip
+    // text or follow values without the popup auto-closing.
+    var pinnedAnchor = null;
     function showRich(anchor, payload) {
       var tip = ensureTip();
       var html = '';
@@ -5263,6 +5295,7 @@ class HtmlDocChart extends HTMLElement {
         html += '</dl>';
       }
       if (payload.footer) html += '<div class="hdc-tt-coords">' + escapeXml(payload.footer) + '</div>';
+      html += '<span class="hdc-tt-pin-hint">click to pin</span>';
       tip.innerHTML = html;
       tip.setAttribute('aria-hidden', 'false');
       var hostRect = self.getBoundingClientRect();
@@ -5271,18 +5304,60 @@ class HtmlDocChart extends HTMLElement {
       tip.style.top  = (aRect.top  - hostRect.top  - 8) + 'px';
       tip.classList.add('visible');
     }
-    function hideRich() {
+    function hideRich(force) {
+      if (pinnedAnchor && !force) return;
       var tip = self.querySelector(':scope > .hdc-tooltip');
-      if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
+      if (tip) {
+        tip.classList.remove('visible', 'pinned');
+        tip.setAttribute('aria-hidden', 'true');
+      }
+    }
+    function pinRich(anchor, payload) {
+      pinnedAnchor = anchor;
+      showRich(anchor, payload);
+      var tip = self.querySelector(':scope > .hdc-tooltip');
+      if (tip) tip.classList.add('pinned');
+    }
+    function unpinRich() {
+      pinnedAnchor = null;
+      hideRich(true);
     }
     function rich(selector, payloadFn) {
       self.querySelectorAll(selector).forEach(function (el) {
-        el.addEventListener('mouseenter', function () { showRich(el, payloadFn(el)); });
-        el.addEventListener('mouseleave', function () { hideRich(); });
+        el.addEventListener('mouseenter', function () {
+          if (pinnedAnchor && pinnedAnchor !== el) return;
+          showRich(el, payloadFn(el));
+        });
+        el.addEventListener('mouseleave', function () {
+          if (pinnedAnchor === el) return;
+          hideRich();
+        });
         el.addEventListener('focus',      function () { showRich(el, payloadFn(el)); });
-        el.addEventListener('blur',       function () { hideRich(); });
+        el.addEventListener('blur',       function () {
+          if (pinnedAnchor === el) return;
+          hideRich();
+        });
+        el.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          if (pinnedAnchor === el) {
+            unpinRich();
+          } else {
+            pinRich(el, payloadFn(el));
+          }
+        });
       });
     }
+    // Outside-click + Escape unpin handlers (host-scoped).
+    self.addEventListener('click', function (ev) {
+      if (!pinnedAnchor) return;
+      // Bubble guard — only unpin when the click landed somewhere
+      // OTHER than the pinned anchor (the rich handler already
+      // stops the anchor's own click from reaching here).
+      if (!pinnedAnchor.contains(ev.target)) unpinRich();
+    });
+    self.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && pinnedAnchor) unpinRich();
+    });
     // Donut slices — label, value, share-of-total.
     rich('.hdc-slice', function (el) {
       var label = el.getAttribute('data-slice-label') || '';
@@ -5358,6 +5433,7 @@ function __htmldocEnhanceBarCharts(root) {
       host.appendChild(tip);
       return tip;
     }
+    var pinnedFill = null;
     function show(anchor, payload) {
       var t = ensureTip();
       var html = '';
@@ -5371,6 +5447,7 @@ function __htmldocEnhanceBarCharts(root) {
         html += '</dl>';
       }
       if (payload.footer) html += '<div class="hdc-tt-coords">' + escapeXml(payload.footer) + '</div>';
+      html += '<span class="hdc-tt-pin-hint">click to pin</span>';
       t.innerHTML = html;
       t.setAttribute('aria-hidden', 'false');
       var hostRect = host.getBoundingClientRect();
@@ -5379,8 +5456,12 @@ function __htmldocEnhanceBarCharts(root) {
       t.style.top  = (aRect.top  - hostRect.top  - 8) + 'px';
       t.classList.add('visible');
     }
-    function hide() {
-      if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
+    function hide(force) {
+      if (pinnedFill && !force) return;
+      if (tip) {
+        tip.classList.remove('visible', 'pinned');
+        tip.setAttribute('aria-hidden', 'true');
+      }
     }
     host.querySelectorAll('.bar-fill[data-hover-payload]').forEach(function (fill) {
       // Drop the native tooltip — we render our own.
@@ -5388,11 +5469,52 @@ function __htmldocEnhanceBarCharts(root) {
       var raw = fill.getAttribute('data-hover-payload');
       var payload;
       try { payload = JSON.parse(raw); } catch (e) { payload = { label: raw }; }
-      fill.addEventListener('mouseenter', function () { show(fill, payload); });
-      fill.addEventListener('mouseleave', function () { hide(); });
-      // Bar-fills aren't natively focusable; if a caller wires
-      // keyboard nav we'd respect it here, but for now the hover
-      // tooltip is mouse + touch only.
+      fill.addEventListener('mouseenter', function () {
+        if (pinnedFill && pinnedFill !== fill) return;
+        show(fill, payload);
+      });
+      fill.addEventListener('mouseleave', function () {
+        if (pinnedFill === fill) return;
+        hide();
+      });
+      fill.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (pinnedFill === fill) {
+          pinnedFill = null;
+          hide(true);
+        } else {
+          pinnedFill = fill;
+          show(fill, payload);
+          if (tip) tip.classList.add('pinned');
+        }
+      });
+    });
+    host.addEventListener('click', function (ev) {
+      if (!pinnedFill) return;
+      if (!pinnedFill.contains(ev.target)) {
+        pinnedFill = null;
+        hide(true);
+      }
+    });
+    host.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && pinnedFill) {
+        pinnedFill = null;
+        hide(true);
+      }
+    });
+    // Legend toggle — click a chip to dim the matching series across
+    // every category row. Mirrors the Cartesian chart legend chip
+    // behaviour. State is purely visual (CSS class), no data
+    // recompute — kept simple so the page doesn't repaint heavily.
+    host.querySelectorAll('.bar-chart-legend-chip[data-series-idx]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var idx = chip.getAttribute('data-series-idx');
+        var dimmed = chip.classList.toggle('off');
+        chip.setAttribute('aria-pressed', dimmed ? 'true' : 'false');
+        host.querySelectorAll('.bar-fill[data-series="' + idx + '"]').forEach(function (f) {
+          f.classList.toggle('dim', dimmed);
+        });
+      });
     });
   });
 }

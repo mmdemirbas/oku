@@ -395,6 +395,31 @@ class TestChromeKitMarkers:
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert ".example-pair" in css, "example-pair CSS missing — no two-column layout"
 
+    def test_chart_polish_palette_pin_legend(self, repo_root: Path) -> None:
+        """Chart polish — extended series palette (10 tokens), click-
+        pin on chart + bar tooltips, legend toggle on stacked/grouped
+        bar variants."""
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        # Extended palette tokens (light + dark themes).
+        for n in range(1, 11):
+            assert f"--series-{n}" in css, f"missing --series-{n} chart palette token"
+        # Pin state + hint.
+        assert ".hdc-tooltip.pinned" in css, "missing .hdc-tooltip.pinned CSS"
+        assert ".hdc-tt-pin-hint" in css, "missing pin-hint CSS"
+        # Bar-fill dim for legend toggle.
+        assert ".bar-fill.dim" in css, "missing .bar-fill.dim CSS"
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "__htmldocPickColor" in js, "missing palette helper"
+        assert "pinnedAnchor" in js, "chart tooltip missing click-pin"
+        assert "pinnedFill" in js, "bar enhancer missing click-pin"
+        assert "bar-chart-legend-chip[data-series-idx]" in js, (
+            "bar legend toggle wiring missing"
+        )
+        renderer = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "data-series-idx" in renderer, (
+            "renderer must emit data-series-idx on bar-chart-legend chips for the toggle"
+        )
+
     def test_tier3_chart_types_shipped(self, repo_root: Path) -> None:
         """P5 close-out — all six Tier 3 types (sankey, network,
         scatter-matrix, parallel-coordinates, chord, geo) ship as
