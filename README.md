@@ -1,4 +1,9 @@
-# html-doc
+# oku
+
+> Turkish imperative — "read!". Formerly distributed as **html-doc**;
+> the legacy name remains a working alias through the dual-brand
+> window. Both `oku` and `html-doc` install as console scripts and
+> resolve to the same CLI.
 
 A documentation kit. Authors write pages in JSON (or Markdown — both
 are first-class); the browser renders them via Custom Elements; the
@@ -26,35 +31,36 @@ file copies for offline reading.
 - **CLI:** `init` symlinks the kit + writes an index stub; `build`
   emits `dist/site/` (multi-page + Pagefind), `dist/standalone/`
   (single file with inline page JSON), and `dist/markdown/`
-  (`page.md` twins + `llms.txt` for LLM consumers); `check` lints
-  the doctree (schema + structural + content); `serve` runs a local
-  HTTP server with live reload.
+  (`page.md` twins + `llms.txt` for LLM consumers); `clean` drops
+  `dist/`; `check` lints the doctree (schema + structural +
+  content); `serve` runs a local HTTP server with live reload.
 
 ## Install
 
 ```bash
 git clone git@github.com:mmdemirbas/html-doc.git
 cd html-doc
-uv tool install .                # html-doc available on PATH globally
+uv tool install .                # 'oku' and 'html-doc' both on PATH
 ```
 
 Or run in-tree without installing:
 
 ```bash
-uv run bin/html-doc serve        # PEP 723 inline metadata pulls deps
-python3 bin/html-doc serve       # plain Python works too (no extras)
+uv run bin/oku serve             # PEP 723 inline metadata pulls deps
+python3 bin/oku serve            # plain Python works too (no extras)
+# bin/html-doc still works for back-compat
 ```
 
 ## Quick start
 
 ```bash
 mkdir -p my-project/docs && cd my-project/docs
-html-doc init                    # _kit symlink + index.html in cwd
+oku init                         # _kit symlink + index.html in cwd
 # author *.json or *.md pages anywhere under the docs root
-html-doc serve                   # http://localhost:9876 with live reload
+oku serve                        # http://localhost:9876 with live reload
 ```
 
-`html-doc init` treats the **current directory** as the docs root —
+`oku init` treats the **current directory** as the docs root —
 there is no implicit `docs/` subdir. Run it wherever you want pages
 to live.
 
@@ -98,15 +104,18 @@ kind.
 
 ## CLI
 
-Four commands, all run from the project root or a subdirectory:
+Five commands, all run from the project root or a subdirectory.
+Either `oku` or `html-doc` works as the front:
 
 ```bash
-html-doc init                    # one-time, runs in cwd: _kit symlink + index.html stub
-html-doc check                   # lint the doctree (schema + structural + content)
-html-doc build                   # dist/standalone/ + dist/site/ + dist/markdown/ + search index
-html-doc serve                   # local HTTP, live reload, Pagefind in background
-html-doc serve --no-watch        # disable filesystem watcher
-html-doc serve --no-search       # skip background Pagefind index
+oku init                         # one-time, runs in cwd: _kit symlink + index.html stub
+oku check                        # lint the doctree (schema + structural + content)
+oku check --strict               # exit 1 on warnings too
+oku build                        # dist/standalone/ + dist/site/ + dist/markdown/ + search index
+oku clean                        # remove dist/ from the current project
+oku serve                        # local HTTP, live reload, Pagefind in background
+oku serve --no-watch             # disable filesystem watcher
+oku serve --no-search            # skip background Pagefind index
 ```
 
 `build` writes three single-purpose trees under `dist/`:

@@ -33,8 +33,8 @@
           "kind": "kpi-grid",
           "tiles": [
             { "num": "10", "label": "Phases planned" },
-            { "num": "14 / 38", "label": "Items shipped (P0 + P1 complete)" },
-            { "num": "0",  "label": "Open decisions (name, layout, viz scope all locked)" },
+            { "num": "35 / 38", "label": "Items shipped (P0–P9 substantially complete)" },
+            { "num": "3",  "label": "Items still open — Tier 3 kit-native viz + html-doc shim sunset window" },
             { "num": "8",  "label": "Retired plan docs folded in" }
           ]
         },
@@ -161,72 +161,72 @@
             {
               "title": "P2 · Chart interactivity & fullscreen",
               "rows": [
-                ["bar / stacked-bar / grouped-bar · hover-data tooltip",                                 {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["donut · hover shows segment label + value + share",                                    {"value": "P2", "values": ["P2"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["histogram / heatmap / treemap / waffle / radar / box-plot / bullet / slope · hover-data tooltip", {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["multi-part charts (ridgeline + future facets) gain a parallel cursor",                 {"value": "P2", "values": ["P2"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}],
-                ["quadrant · labels + legends stop overlapping data points",                             {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["expand widget · true fullscreen + zoom + pan, reused for image / chart / diagram / mermaid", {"value": "P2", "values": ["P2"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}]
+                ["bar / stacked-bar / grouped-bar · hover-data tooltip",                                 {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["donut · hover shows segment label + value + share",                                    {"value": "P2", "values": ["P2"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["histogram / heatmap / treemap / waffle / radar / box-plot / bullet / slope · hover-data tooltip", {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["multi-part charts (ridgeline + future facets) gain a parallel cursor",                 {"value": "P2", "values": ["P2"]}, {"value": "L", "values": ["L"]}, {"value": "done", "values": ["done"]}],
+                ["quadrant · labels + legends stop overlapping data points",                             {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["expand widget · true fullscreen + zoom + pan, reused for image / chart / diagram / mermaid", {"value": "P2", "values": ["P2"]}, {"value": "L", "values": ["L"]}, {"value": "done", "values": ["done"]}]
               ]
             },
             {
               "title": "P3 · Reference restructure",
               "rows": [
-                ["Pedagogical ordering · most-important primitives first",                               {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["Code / render side-by-side pair layout for every example",                             {"value": "P3", "values": ["P3"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}],
-                ["Card-style boundary for every subsection",                                             {"value": "P3", "values": ["P3"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["Group chart kinds by family (categorical / temporal / distribution / hierarchy / comparison / special)", {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["Add render sample wherever a primitive currently shows only code",                     {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+                ["Pedagogical ordering · most-important primitives first",                               {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["Code / render side-by-side pair layout for every example",                             {"value": "P3", "values": ["P3"]}, {"value": "L", "values": ["L"]}, {"value": "in-progress", "values": ["in-progress"]}],
+                ["Card-style boundary for every subsection",                                             {"value": "P3", "values": ["P3"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["Group chart kinds by family (categorical / temporal / distribution / hierarchy / comparison / special)", {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["Add render sample wherever a primitive currently shows only code",                     {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}]
               ]
             },
             {
               "title": "P4 · Markdown parity",
               "rows": [
-                ["Nested lists",                                                                         {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["Footnotes",                                                                            {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["Definition lists",                                                                     {"value": "P4", "values": ["P4"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["Reference-style links",                                                                {"value": "P4", "values": ["P4"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["Inline HTML pass-through (sanitised allowlist)",                                       {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["YAML front-matter → page metadata",                                                    {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+                ["Nested lists",                                                                         {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["Footnotes",                                                                            {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["Definition lists",                                                                     {"value": "P4", "values": ["P4"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["Reference-style links",                                                                {"value": "P4", "values": ["P4"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["Inline HTML pass-through (sanitised allowlist)",                                       {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["YAML front-matter → page metadata",                                                    {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}]
               ]
             },
             {
               "title": "P5 · Visualization expansion",
               "rows": [
-                ["Unlock every Mermaid type (flowchart, sequence, class, state, ER, journey, gantt, pie, quadrantChart, requirement, gitGraph, c4, mindmap, timeline, sankey, xychart-beta, architecture-beta, packet, kanban, block-beta, radar)", {"value": "P5", "values": ["P5"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["Document every Mermaid type in the reference",                                          {"value": "P5", "values": ["P5"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Unlock every Mermaid type (flowchart, sequence, class, state, ER, journey, gantt, pie, quadrantChart, requirement, gitGraph, c4, mindmap, timeline, sankey, xychart-beta, architecture-beta, packet, kanban, block-beta, radar)", {"value": "P5", "values": ["P5"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["Document every Mermaid type in the reference",                                          {"value": "P5", "values": ["P5"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
                 ["Ship deferred Tier 3 viz (sankey, chord, parallel-coordinates, scatter-matrix, network, geo)", {"value": "P5", "values": ["P5"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}],
-                ["Identify + close missing-capability gaps surfaced during P5",                           {"value": "P5", "values": ["P5"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+                ["Identify + close missing-capability gaps surfaced during P5",                           {"value": "P5", "values": ["P5"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}]
               ]
             },
             {
               "title": "P6 · Architecture diagrams",
               "rows": [
-                ["Add color / clusters / legends to architecture.json diagrams",                          {"value": "P6", "values": ["P6"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+                ["Add color / clusters / legends to architecture.json diagrams",                          {"value": "P6", "values": ["P6"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}]
               ]
             },
             {
               "title": "P7 · Layout option A",
               "rows": [
-                ["Centered document, wider default, sidebar variants",                                    {"value": "P7", "values": ["P7"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+                ["Centered document, wider default, sidebar variants",                                    {"value": "P7", "values": ["P7"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}]
               ]
             },
             {
               "title": "P8 · Rename → oku",
               "rows": [
-                ["Add oku package + CLI alongside html-doc",                                              {"value": "P8", "values": ["P8"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["Switch docs / README / CLAUDE.md / kit headers to oku branding",                       {"value": "P8", "values": ["P8"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Add oku package + CLI alongside html-doc",                                              {"value": "P8", "values": ["P8"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["Switch docs / README / CLAUDE.md / kit headers to oku branding",                       {"value": "P8", "values": ["P8"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
                 ["Decide deprecation window for html-doc legacy name",                                   {"value": "P8", "values": ["P8"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}]
               ]
             },
             {
               "title": "P9 · Top-level docs rewrite",
               "rows": [
-                ["Rewrite README.md end-to-end",                                                          {"value": "P9", "values": ["P9"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}],
-                ["Rewrite CLAUDE.md end-to-end",                                                          {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["Refresh index.json (home) for oku 1.0",                                                 {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["Refresh architecture.json for current runtime",                                         {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["Refresh kit.json + glossary.json + cli.json",                                           {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+                ["Rewrite README.md end-to-end",                                                          {"value": "P9", "values": ["P9"]}, {"value": "L", "values": ["L"]}, {"value": "done", "values": ["done"]}],
+                ["Rewrite CLAUDE.md end-to-end",                                                          {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["Refresh index.json (home) for oku 1.0",                                                 {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["Refresh architecture.json for current runtime",                                         {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["Refresh kit.json + glossary.json + cli.json",                                           {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}]
               ]
             }
           ]

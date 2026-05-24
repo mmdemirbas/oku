@@ -1,15 +1,23 @@
-# CLAUDE.md — html-doc kit
+# CLAUDE.md — oku (formerly html-doc)
 
 Onboarding notes for a fresh Claude Code session in this repo.
 Read this before touching code. Skip nothing — every rule below was
 the answer to a real bug the user pointed out.
 
+The project is mid-rename from **html-doc** to **oku** (Turkish
+imperative "read!"). Both names work as CLI front-ends; the Python
+package on disk stays `html_doc/` until 1.0 ships. When in doubt
+about which name to use in user-facing text, prefer `oku`; in code
+imports keep `html_doc`. The roadmap (`docs/roadmap.json`) tracks
+the deprecation steps.
+
 ## What this repo is
 
-A shared HTML chrome kit + a Python CLI (`html-doc`) that authors
-single-source JSON pages and renders them in the browser via Custom
-Elements. No build step for content; the kit is loaded as static
-assets and `renderer.js` walks the JSON tree at page load.
+A shared HTML chrome kit + a Python CLI (`oku`, alias `html-doc`)
+that authors single-source JSON pages and renders them in the
+browser via Custom Elements. No build step for content; the kit is
+loaded as static assets and `renderer.js` walks the JSON tree at
+page load.
 
 Authoring shape: `docs/<page>.json` (data) + `docs/<page>.html` (thin
 stub that loads the kit and the page JSON). `html-doc build` produces
