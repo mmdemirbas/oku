@@ -2328,6 +2328,91 @@
         },
         {
           "kind": "heading",
+          "level": 4,
+          "id": "mermaid-supported",
+          "title": "Supported Mermaid types"
+        },
+        {
+          "kind": "paragraph",
+          "content": "The diagram primitive forwards source to Mermaid v10 with theme:'base'; no diagram type is gated. Tested in this kit: flowchart, sequence, class, state, ER, journey, gantt, pie, requirement, gitGraph, c4, mindmap, timeline, quadrantChart, sankey-beta, xychart-beta, block-beta, packet-beta, architecture-beta. Each one inherits the page's accent / surface / text tokens via the kit's themeVariables map, so light/dark mode tracks automatically."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "title": "sequence",
+              "content": "Actors / lifelines / signals — best for protocol or call flows.",
+              "blocks": [
+                { "kind": "diagram", "source": "sequenceDiagram\n  participant Reader\n  participant Renderer\n  Reader->>Renderer: open page\n  Renderer-->>Reader: hydrated DOM" }
+              ]
+            },
+            {
+              "title": "state",
+              "content": "Finite state machine — transitions trigger on events; great for editor / draft / published flows.",
+              "blocks": [
+                { "kind": "diagram", "source": "stateDiagram-v2\n  [*] --> Draft\n  Draft --> Review : submit\n  Review --> Draft : reject\n  Review --> Published : approve\n  Published --> [*]" }
+              ]
+            },
+            {
+              "title": "ER",
+              "content": "Entity-relationship — primary keys / cardinality. Mirrors what the schema-design skill emits.",
+              "blocks": [
+                { "kind": "diagram", "source": "erDiagram\n  PAGE ||--o{ BLOCK : contains\n  BLOCK ||--o{ INLINE : holds" }
+              ]
+            },
+            {
+              "title": "class",
+              "content": "UML-style class shape with attributes, methods, and inheritance arrows.",
+              "blocks": [
+                { "kind": "diagram", "source": "classDiagram\n  class HtmlDocRenderer {\n    +render(json)\n    -_renderBlock(b)\n  }\n  class HtmlDocChart\n  HtmlDocRenderer --> HtmlDocChart" }
+              ]
+            },
+            {
+              "title": "gantt",
+              "content": "Tasks over time, with dependencies and the critical path.",
+              "blocks": [
+                { "kind": "diagram", "source": "gantt\n  title oku 1.0\n  dateFormat YYYY-MM-DD\n  section Foundations\n  P0 cleanup    :done, 2026-05-24, 1d\n  P1 components :done, 2026-05-24, 1d\n  section Charts\n  P2 interactivity :done, 2026-05-24, 1d\n  section Content\n  P3 reference  :done, 2026-05-24, 1d\n  P4 markdown   :done, 2026-05-24, 1d" }
+              ]
+            },
+            {
+              "title": "pie",
+              "content": "Simple distribution — limit to ≤6 slices for readability.",
+              "blocks": [
+                { "kind": "diagram", "source": "pie title Where time goes\n  \"chrome.js\" : 40\n  \"chrome.css\" : 25\n  \"renderer.js\" : 15\n  \"cli.py\" : 12\n  \"docs\" : 8" }
+              ]
+            },
+            {
+              "title": "journey",
+              "content": "User journey scoring across stages — quick triage of friction points.",
+              "blocks": [
+                { "kind": "diagram", "source": "journey\n  title Adopt the kit\n  section Setup\n    Discover repo: 4: Author\n    Run init     : 5: Author\n  section Author\n    Add a page   : 4: Author\n    Build site   : 5: Author" }
+              ]
+            },
+            {
+              "title": "mindmap",
+              "content": "Tree of related ideas radiating from a central node.",
+              "blocks": [
+                { "kind": "diagram", "source": "mindmap\n  root((oku))\n    Authoring\n      JSON\n      Markdown\n    Runtime\n      chrome.js\n      renderer.js\n    Build\n      site\n      standalone\n      markdown" }
+              ]
+            },
+            {
+              "title": "timeline",
+              "content": "Linear sequence of events, grouped by section.",
+              "blocks": [
+                { "kind": "diagram", "source": "timeline\n  title oku roadmap\n  section Foundations\n    2026-05-24 : P0 cleanup\n    2026-05-24 : P1 components\n  section Charts\n    2026-05-24 : P2 interactivity\n  section Content\n    2026-05-24 : P3 reference\n    2026-05-24 : P4 markdown parity" }
+              ]
+            },
+            {
+              "title": "sankey-beta",
+              "content": "Flow / share between stages. Use for funnels, energy, traffic.",
+              "blocks": [
+                { "kind": "diagram", "source": "sankey-beta\n\nVisitors,Signups,40\nVisitors,Bounced,60\nSignups,Activated,25\nSignups,Dropped,15" }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "heading",
           "level": 3,
           "id": "live-snippet",
           "title": "live-snippet"

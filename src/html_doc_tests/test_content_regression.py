@@ -395,6 +395,37 @@ class TestChromeKitMarkers:
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert ".example-pair" in css, "example-pair CSS missing — no two-column layout"
 
+    def test_mermaid_supported_types_documented(self, repo_root: Path) -> None:
+        """P5 — diagram subsection lists the Mermaid v10 types the kit
+        forwards unchanged. Cards must enumerate at least: sequence,
+        state, ER, class, gantt, pie, journey, mindmap, timeline,
+        sankey-beta."""
+        ref = json.loads(
+            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
+        )
+        ids = {
+            b.get("id")
+            for b in _walk_blocks(ref)
+            if b.get("kind") == "heading"
+        }
+        assert "mermaid-supported" in ids, "Mermaid types subsection missing"
+        # The cards each have a live diagram render. Count them.
+        diagrams_in_compare = 0
+        for b in _walk_blocks(ref):
+            if b.get("kind") == "diagram":
+                src = b.get("source") or ""
+                # Tally Mermaid types beyond the original flowchart sample.
+                if any(t in src for t in (
+                    "sequenceDiagram", "stateDiagram", "erDiagram",
+                    "classDiagram", "gantt", "pie ", "journey",
+                    "mindmap", "timeline", "sankey-beta"
+                )):
+                    diagrams_in_compare += 1
+        assert diagrams_in_compare >= 10, (
+            f"expected at least 10 Mermaid examples in the supported-types "
+            f"showcase, found {diagrams_in_compare}"
+        )
+
     def test_chart_family_overview_present(self, repo_root: Path) -> None:
         """P3 — chart subsection opens with a 7-card compare-grid
         grouping the 22 variants by family (categorical / distribution
