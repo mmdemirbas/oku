@@ -360,9 +360,22 @@
           "title": "paragraph"
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{ \"kind\": \"paragraph\", \"content\": \"A plain string works for unadorned prose.\" }\n{ \"kind\": \"paragraph\", \"content\": [\n  \"Or an array mixing \",\n  { \"kind\": \"strong\", \"text\": \"inline nodes\" },\n  \" with strings.\"\n] }"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{ \"kind\": \"paragraph\", \"content\": [\n  \"Plain prose with a \",\n  { \"kind\": \"strong\", \"text\": \"bold token\" },\n  \" and a \",\n  { \"kind\": \"code\", \"text\": \"code\" },\n  \" span.\"\n] }"
+          },
+          "render": {
+            "kind": "paragraph",
+            "content": [
+              "Plain prose with a ",
+              { "kind": "strong", "text": "bold token" },
+              " and a ",
+              { "kind": "code", "text": "code" },
+              " span."
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1309,6 +1322,85 @@
           "type": "info",
           "title": "Library underneath",
           "content": "All modes are kit-native — no third-party chart library. Cartesian + donut modes render as inline SVG drawn by the html-doc-chart Custom Element. The bar family renders as plain HTML + CSS, no JavaScript after first paint."
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-families",
+          "title": "Pick by family"
+        },
+        {
+          "kind": "paragraph",
+          "content": "The 22 chart variants group into seven families. Pick by what you're communicating; the variants inside a family share scaffolding (axes, hover, legend) so swapping between them is a one-field change."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "title": "Categorical",
+              "content": "One value per category. Sort by value for ranking, by name for lookup.",
+              "items": [
+                "<a href=\"#chart-bar\">type: bar</a> — horizontal bars, baseline-zero, supports a display override.",
+                "<a href=\"#chart-stacked\">type: stacked-bar</a> — same row, multiple stacked segments.",
+                "<a href=\"#chart-grouped\">type: grouped-bar</a> — same row, side-by-side mini-bars.",
+                "<a href=\"#chart-waffle\">type: waffle</a> — N×M cell grid; each cell is one unit."
+              ]
+            },
+            {
+              "title": "Distribution",
+              "content": "Shape of one variable. Use when the spread / skew is the story, not a single number.",
+              "items": [
+                "<a href=\"#chart-histogram\">type: histogram</a> — frequency by bin.",
+                "<a href=\"#chart-box-plot\">type: box-plot</a> — quartiles + whiskers.",
+                "<a href=\"#chart-ridgeline\">type: ridgeline</a> — stacked small-distributions with a parallel cursor."
+              ]
+            },
+            {
+              "title": "Time series",
+              "content": "X is time (or any ordered axis). Use line when each x has one y; area when stacking matters.",
+              "items": [
+                "<a href=\"#chart-scatter-line\">type: line</a> — connected y vs x.",
+                "<a href=\"#chart-area\">type: area</a> — line with fill below.",
+                "<a href=\"#chart-sparkline\">type: sparkline</a> — inline mini line/area/bar.",
+                "<a href=\"#chart-slope\">type: slope</a> — two-time-point comparison.",
+                "<a href=\"#chart-calendar-heatmap\">type: calendar-heatmap</a> — day-of-year × day-of-week activity."
+              ]
+            },
+            {
+              "title": "Hierarchy / share",
+              "content": "Parts of a whole. Donut for ≤6 slices; treemap when nesting or many cells beat slices.",
+              "items": [
+                "<a href=\"#chart-donut\">type: donut</a> — distribution arc with centre total.",
+                "<a href=\"#chart-treemap\">type: treemap</a> — squarified area-proportional rectangles."
+              ]
+            },
+            {
+              "title": "Relationship",
+              "content": "Two or more variables interacting. Scatter for raw points; heatmap when density beats individual points.",
+              "items": [
+                "<a href=\"#chart-scatter-line\">type: scatter</a> — y vs x points, optional series.",
+                "<a href=\"#chart-bubble\">type: bubble</a> — scatter with a third (size) variable.",
+                "<a href=\"#chart-quadrant\">type: quadrant</a> — scatter with cross-hair guide + corner labels.",
+                "<a href=\"#chart-radar\">type: radar</a> — multi-axis polygon comparison.",
+                "<a href=\"#chart-heatmap\">type: heatmap</a> — N×M coloured-cell grid."
+              ]
+            },
+            {
+              "title": "Goal / comparison",
+              "content": "Actual vs target — the visual answers 'are we there yet?'",
+              "items": [
+                "<a href=\"#chart-bullet\">type: bullet</a> — single actual against bands.",
+                "<a href=\"#chart-gauge\">type: gauge</a> — single value as a 0→max arc."
+              ]
+            },
+            {
+              "title": "Conversion",
+              "content": "Stage-to-stage drop-off through an ordered pipeline.",
+              "items": [
+                "<a href=\"#chart-funnel\">type: funnel</a> — narrowing bands per stage with aligned label / value / % columns."
+              ]
+            }
+          ]
         },
         {
           "kind": "heading",

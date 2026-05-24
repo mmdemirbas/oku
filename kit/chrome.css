@@ -3848,3 +3848,80 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
   padding: 0 2px;
   border-radius: 2px;
 }
+
+/* ============ Example pair (P3) ============
+ * Two-column code+render layout used to document primitives in
+ * reference.json. Each side gets a small label badge so the reader
+ * knows which is source vs result. Stacks vertically below 900px so
+ * the code stays readable on narrow viewports.
+ * --------------------------------------------------------------- */
+.example-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  margin: 18px 0 26px 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px var(--shadow-soft);
+}
+.example-pair .example-title {
+  grid-column: 1 / -1;
+  font: 600 12px 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-strong);
+}
+.example-pair .example-code,
+.example-pair .example-render {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.example-pair .example-col-label {
+  font: 600 10.5px 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+  margin-bottom: 6px;
+}
+.example-pair .example-code > pre,
+.example-pair .example-render > * {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+}
+@media (max-width: 900px) {
+  .example-pair { grid-template-columns: 1fr; }
+}
+
+/* ============ Section / heading card boundaries (P3) ============
+ * Card-style surround for reference subsections so the eye can
+ * trace where one primitive ends and the next begins. Only applies
+ * inside [data-page-id="reference"] so other pages don't pick up
+ * the chrome by accident.
+ * --------------------------------------------------------------- */
+[data-page-id="reference"] section > h2 + *,
+[data-page-id="reference"] section section {
+  /* No double-card; outer section already gets bookend spacing. */
+}
+[data-page-id="reference"] section section,
+[data-page-id="reference"] section[id] {
+  margin-top: 28px;
+}
+[data-page-id="reference"] section section > h3 {
+  margin-top: 0;
+}
+[data-page-id="reference"] .ref-card {
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 18px 20px 4px;
+  background: var(--surface);
+  margin: 22px 0;
+}
+[data-page-id="reference"] .ref-card > h3:first-child,
+[data-page-id="reference"] .ref-card > h4:first-child {
+  margin-top: 0;
+}

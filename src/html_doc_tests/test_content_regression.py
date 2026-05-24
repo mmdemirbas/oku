@@ -373,6 +373,47 @@ class TestChromeKitMarkers:
             "kanban example in reference.json should pin view: 'board' so the render shows lanes by default"
         )
 
+    def test_example_primitive_wired(self, repo_root: Path) -> None:
+        """P3 — the new `example` primitive ships in schema + renderer +
+        _KNOWN_BLOCK_KINDS, and reference.json uses it for at least one
+        primitive entry (paragraph)."""
+        schema = json.loads(
+            (repo_root / "kit" / "schema" / "page.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        assert "example" in schema["$defs"], "schema is missing the example primitive"
+        renderer = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "_renderExample" in renderer, "renderer is missing _renderExample"
+        cli = (repo_root / "src" / "html_doc" / "cli.py").read_text(encoding="utf-8")
+        assert '"example"' in cli, "cli._KNOWN_BLOCK_KINDS missing 'example'"
+        ref = json.loads(
+            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
+        )
+        examples = [b for b in _walk_blocks(ref) if b.get("kind") == "example"]
+        assert examples, "reference.json should use at least one `example` block"
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert ".example-pair" in css, "example-pair CSS missing — no two-column layout"
+
+    def test_chart_family_overview_present(self, repo_root: Path) -> None:
+        """P3 — chart subsection opens with a 7-card compare-grid
+        grouping the 22 variants by family (categorical / distribution
+        / time series / hierarchy / relationship / goal / conversion).
+        Without it, the reader has to scroll through every variant to
+        find similar ones."""
+        ref = json.loads(
+            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
+        )
+        # Find heading with id 'chart-families'.
+        ids = {
+            b.get("id")
+            for b in _walk_blocks(ref)
+            if b.get("kind") == "heading"
+        }
+        assert (
+            "chart-families" in ids
+        ), "chart family overview heading missing in reference.json"
+
     def test_chart_hover_payloads(self, repo_root: Path) -> None:
         """P2 — bar / stacked / grouped / donut / treemap / funnel emit
         rich hover payloads that chrome.js wires into the shared

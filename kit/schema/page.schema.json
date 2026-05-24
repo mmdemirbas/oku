@@ -112,8 +112,22 @@
         { "$ref": "#/$defs/compare-grid" },
         { "$ref": "#/$defs/chart" },
         { "$ref": "#/$defs/diagram" },
-        { "$ref": "#/$defs/live-snippet" }
+        { "$ref": "#/$defs/live-snippet" },
+        { "$ref": "#/$defs/example" }
       ]
+    },
+
+    "example": {
+      "type": "object",
+      "required": ["kind", "code", "render"],
+      "additionalProperties": false,
+      "description": "Code + rendered-result pair. Renders as a two-column grid (code on the left, live output on the right) on wide screens; collapses to a stacked layout below ~900px. Use to document every primitive in reference.json so the JSON shape and the visible result sit side-by-side.",
+      "properties": {
+        "kind": { "const": "example" },
+        "title": { "type": "string", "description": "Optional small label shown above the pair." },
+        "code": { "$ref": "#/$defs/code" },
+        "render": { "$ref": "#/$defs/contentBlock", "description": "The block that the JSON source produces when run. Schema accepts any contentBlock, so a code example can demonstrate a callout, a chart, a table, etc." }
+      }
     },
 
     "paragraph": {

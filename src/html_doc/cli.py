@@ -977,6 +977,7 @@ _KNOWN_BLOCK_KINDS = {
     "section", "paragraph", "heading", "callout", "insight", "info-tip",
     "list", "code", "annotated-code", "table", "tldr", "kpi-grid",
     "step-flow", "compare-grid", "chart", "diagram", "live-snippet",
+    "example",
 }
 
 _KNOWN_INLINE_KINDS = {"glossary-term", "ext-ref", "code", "em", "strong", "link"}

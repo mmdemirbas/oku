@@ -278,6 +278,7 @@
         case 'list':         el = this._renderList(block); break;
         case 'code':         el = this._renderCode(block); break;
         case 'annotated-code': el = this._renderAnnotatedCode(block); break;
+        case 'example':      el = this._renderExample(block); break;
         case 'table':        el = this._renderTable(block); break;
         case 'tldr':         el = this._renderTldr(block); break;
         case 'kpi-grid':     el = this._renderKpiGrid(block); break;
@@ -716,6 +717,40 @@
         el.appendChild(data);
       }
       return el;
+    }
+
+    _renderExample(block) {
+      // Code + rendered-result pair. Two-column on wide screens (CSS
+      // grid via .example-pair), stacked under ~900px. Each cell gets
+      // its own label so the reader knows which side is which.
+      const wrap = document.createElement('div');
+      wrap.className = 'example-pair';
+      if (block.title) {
+        const t = document.createElement('div');
+        t.className = 'example-title';
+        t.textContent = block.title;
+        wrap.appendChild(t);
+      }
+      const codeCol = document.createElement('div');
+      codeCol.className = 'example-code';
+      const codeLbl = document.createElement('div');
+      codeLbl.className = 'example-col-label';
+      codeLbl.textContent = 'Source';
+      codeCol.appendChild(codeLbl);
+      if (block.code) codeCol.appendChild(this._renderCode(block.code));
+      const renderCol = document.createElement('div');
+      renderCol.className = 'example-render';
+      const renderLbl = document.createElement('div');
+      renderLbl.className = 'example-col-label';
+      renderLbl.textContent = 'Render';
+      renderCol.appendChild(renderLbl);
+      if (block.render) {
+        const renderEl = this._renderContentBlock(block.render);
+        if (renderEl) renderCol.appendChild(renderEl);
+      }
+      wrap.appendChild(codeCol);
+      wrap.appendChild(renderCol);
+      return wrap;
     }
 
     _renderBars(block) {
