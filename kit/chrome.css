@@ -773,6 +773,59 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   outline: none;
   overflow: auto;
 }
+/* Pan / zoom stage — fills the lightbox; its inner is transformed
+   on wheel / drag / pinch. The stage clips overflow so wildly
+   zoomed content stays inside the frame, and the inner uses
+   transform-origin top-left so the math in __htmldocPanZoom is
+   straightforward. */
+.hdt-lightbox-content > .hdt-lightbox-pz {
+  position: relative;
+  flex: 1;
+  width: 100%; height: 100%;
+  overflow: hidden;
+  cursor: grab;
+  display: block;
+  touch-action: none;
+}
+.hdt-lightbox-pz.panning { cursor: grabbing; }
+.hdt-lightbox-pz-inner {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  transform-origin: 0 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.hdt-lightbox-pz-inner > * {
+  max-width: 100%; max-height: 100%;
+  width: auto; height: auto;
+}
+.hdt-lightbox-pz-toolbar {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px var(--shadow-soft);
+  z-index: 5;
+  overflow: hidden;
+}
+.hdt-lightbox-pz-toolbar button {
+  background: none;
+  border: none;
+  width: 32px; height: 32px;
+  font: 600 16px 'Inter', sans-serif;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.hdt-lightbox-pz-toolbar button + button { border-left: 1px solid var(--border); }
+.hdt-lightbox-pz-toolbar button:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
 .hdt-lightbox-content > img,
 .hdt-lightbox-content > svg,
 .hdt-lightbox-content > .hdt-lightbox-img {
@@ -3090,7 +3143,22 @@ html-doc-chart .hdc-quadrant-label {
   font: 600 10.5px 'Inter', sans-serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  opacity: 0.7;
+  opacity: 0.85;
+  /* Paint a halo around the label so data dots drawn underneath
+     don't shred the glyphs. paint-order: stroke fill draws the
+     stroke first so the fill sits on top. */
+  stroke: var(--bg);
+  stroke-width: 4;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+}
+html-doc-chart .hdc-legend {
+  /* Same halo trick for legend chip text — keeps the label readable
+     when a data point happens to scatter under the chip. */
+  stroke: var(--bg);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
 }
 /* Donut chart — slices, centre readout, side legend. */
 html-doc-chart .hdc-donut .hdc-slice {
@@ -3315,6 +3383,19 @@ html-doc-chart .hdc-ridgeline .hdc-ridgeline-label {
   fill: var(--text);
   font: 600 12px 'Inter', sans-serif;
 }
+/* Parallel cursor — vertical line + numeric readout that follows the
+   pointer across every ridge so the reader can compare a given X
+   value across distributions in one glance. */
+html-doc-chart .hdc-ridgeline .hdc-ridge-cursor {
+  stroke: var(--accent-strong);
+  stroke-dasharray: 3 3;
+  opacity: 0.75;
+}
+html-doc-chart .hdc-ridgeline .hdc-ridge-cursor-label {
+  fill: var(--accent-strong);
+  font: 600 11px 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
 
 html-doc-chart .hdc-funnel .hdc-funnel-band {
   transition: fill-opacity 0.18s ease;
@@ -3409,8 +3490,12 @@ html-doc-chart .hdc-series.dim { opacity: 0.15; }
 
 /* Legend chips — clickable, focusable */
 html-doc-chart .hdc-legend-chip { cursor: pointer; }
+/* Legend backdrop. Opaque surface so a data point that lands
+   underneath gets visually masked instead of bleeding through the
+   chip text — fixes the user-reported "legends overlap data". */
 html-doc-chart .hdc-legend-bg {
-  fill: transparent;
+  fill: var(--surface);
+  fill-opacity: 0.94;
   transition: fill 0.12s ease;
 }
 html-doc-chart .hdc-legend-chip:hover .hdc-legend-bg,
@@ -3427,8 +3512,10 @@ html-doc-chart .hdc-legend-chip.off .hdc-legend { fill: var(--text-faint); text-
 
 /* Hover tooltip — chart-local; styling shares the kit's surface tokens
    but doesn't reuse the glossary tooltip controller (no "pin" affordance,
-   no "Learn more" link — wrong shape for a data tooltip). */
-html-doc-chart .hdc-tooltip {
+   no "Learn more" link — wrong shape for a data tooltip). Selector is
+   intentionally bare-class so it works inside html-doc-chart, .bar-chart,
+   .bar-chart-multi, treemap, funnel, and any future host that wants it. */
+.hdc-tooltip {
   position: absolute;
   transform: translate(-50%, -100%);
   background: var(--surface);
@@ -3445,8 +3532,8 @@ html-doc-chart .hdc-tooltip {
   z-index: 5;
   max-width: 260px;
 }
-html-doc-chart .hdc-tooltip.visible { opacity: 1; }
-html-doc-chart .hdc-tooltip .hdc-tt-series {
+.hdc-tooltip.visible { opacity: 1; }
+.hdc-tooltip .hdc-tt-series {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -3454,13 +3541,41 @@ html-doc-chart .hdc-tooltip .hdc-tt-series {
   color: var(--accent-strong);
   margin-bottom: 2px;
 }
-html-doc-chart .hdc-tooltip .hdc-tt-label { font-weight: 600; }
-html-doc-chart .hdc-tooltip .hdc-tt-coords {
+.hdc-tooltip .hdc-tt-label { font-weight: 600; }
+.hdc-tooltip .hdc-tt-coords {
   color: var(--text-soft);
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   margin-top: 2px;
 }
+/* Key/value rows inside the rich tooltip — small two-column grid so
+   "value", "share", "drop-off" lines stack cleanly. */
+.hdc-tooltip .hdc-tt-kv {
+  margin: 4px 0 0 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 10px;
+  row-gap: 1px;
+  font-size: 11.5px;
+}
+.hdc-tooltip .hdc-tt-kv dt {
+  color: var(--text-soft);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10.5px;
+}
+.hdc-tooltip .hdc-tt-kv dd {
+  margin: 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  text-align: right;
+}
+/* The chart wrap (or its outer host) needs relative positioning for
+   the absolute tooltip to anchor correctly. */
+.bar-chart,
+.bar-chart-multi { position: relative; }
 html-doc-chart .hdc-legend {
   fill: var(--text);
   font: 500 11.5px 'Inter', sans-serif;

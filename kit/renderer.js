@@ -419,6 +419,13 @@
         }
       }
       if (scaleMax <= 0) scaleMax = 1;
+      // Per-category row totals — needed both for the readout and
+      // for each fill's hover payload (share-of-category).
+      const rowTotals = categories.map((_, ci) => {
+        let t = 0;
+        for (const s of series) t += (s.values && s.values[ci]) || 0;
+        return t;
+      });
       categories.forEach((cat, ci) => {
         const row = document.createElement('div');
         row.className = 'bar-row';
@@ -428,15 +435,26 @@
         row.appendChild(lab);
         const track = document.createElement('div');
         track.className = 'bar-track';
-        let rowTotal = 0;
+        const rowTotal = rowTotals[ci];
         series.forEach((s, si) => {
           const v = (s.values && s.values[ci]) || 0;
-          rowTotal += v;
           const fill = document.createElement('div');
           fill.className = 'bar-fill ' + (s.color || 'accent');
           fill.setAttribute('data-series', String(si));
           const pct = Math.max(0, Math.min(100, (v / scaleMax) * 100));
           fill.style.width = pct + '%';
+          // Rich hover payload — chrome.js wires .bar-chart-multi
+          // .bar-fill to the shared tooltip controller.
+          const share = rowTotal > 0 ? v / rowTotal : 0;
+          fill.setAttribute('data-hover-payload', JSON.stringify({
+            series: s.label || '',
+            label: cat,
+            kv: [
+              { k: 'value', v: String(v) },
+              { k: 'share', v: Math.round(share * 100) + '%' }
+            ],
+            footer: 'in ' + cat + ' = ' + rowTotal
+          }));
           if (s.label) fill.title = s.label + ': ' + v;
           track.appendChild(fill);
         });
@@ -718,6 +736,8 @@
         h.textContent = block.title;
         wrap.appendChild(h);
       }
+      // Total for share-of-total readouts in hover tooltips.
+      const total = rows.reduce((s, r) => s + (+r.value || 0), 0);
       for (const r of rows) {
         const row = document.createElement('div');
         row.className = 'bar-row';
@@ -730,6 +750,15 @@
         fill.className = 'bar-fill ' + (r.color || 'accent');
         const pct = max > 0 ? Math.max(2, Math.min(100, (r.value / max) * 100)) : 0;
         fill.style.width = pct + '%';
+        const share = total > 0 ? r.value / total : 0;
+        fill.setAttribute('data-hover-payload', JSON.stringify({
+          label: r.label || '',
+          kv: [
+            { k: 'value', v: r.display !== undefined ? String(r.display) : String(r.value) },
+            { k: 'share', v: Math.round(share * 100) + '%' }
+          ],
+          footer: 'of ' + total
+        }));
         track.appendChild(fill);
         const val = document.createElement('span');
         val.className = 'bar-value';

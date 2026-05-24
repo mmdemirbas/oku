@@ -373,6 +373,64 @@ class TestChromeKitMarkers:
             "kanban example in reference.json should pin view: 'board' so the render shows lanes by default"
         )
 
+    def test_chart_hover_payloads(self, repo_root: Path) -> None:
+        """P2 — bar / stacked / grouped / donut / treemap / funnel emit
+        rich hover payloads that chrome.js wires into the shared
+        .hdc-tooltip controller. Each one declares the share / value
+        / drop-off the reader expects."""
+        renderer = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # Bar / multi-bar — payload via data-hover-payload on .bar-fill.
+        assert "data-hover-payload" in renderer, (
+            "bar fills must carry data-hover-payload for the shared chart tooltip"
+        )
+        assert "__htmldocEnhanceBarCharts" in js, (
+            "bar-chart hover enhancer missing — DIV-based bars get no rich tooltip"
+        )
+        # Donut + treemap + funnel — data attributes on the SVG shapes.
+        assert "data-slice-share" in js, "donut slice missing share data attr"
+        assert "data-cell-share" in js, "treemap cell missing share data attr"
+        assert "data-stage-share" in js, "funnel band missing share data attr"
+        assert "data-stage-drop" in js, "funnel band missing drop-off data attr"
+
+    def test_quadrant_label_halo(self, repo_root: Path) -> None:
+        """P2 — quadrant labels and legend text gain a paint-order halo
+        so data points scattering underneath don't shred the glyphs."""
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert (
+            "paint-order: stroke fill" in css
+        ), "quadrant labels need a paint-order halo to survive scatter overlap"
+
+    def test_ridgeline_parallel_cursor(self, repo_root: Path) -> None:
+        """P2 — ridgeline gains a parallel cursor (single vertical line
+        spanning every ridge) wired to pointer movement, so the reader
+        can compare a given X across distributions in one glance."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert "hdc-ridge-cursor" in js, "ridge cursor element missing in renderer"
+        assert "_wireRidgelineCursor" in js, "ridge cursor wiring missing"
+        assert ".hdc-ridge-cursor" in css, "ridge cursor styling missing"
+
+    def test_lightbox_pan_zoom(self, repo_root: Path) -> None:
+        """P2 — lightbox now wraps content in a pan/zoom stage by
+        default. Wheel zoom, drag pan, pinch zoom, double-click reset,
+        +/-/0/arrows keyboard, and a small toolbar. Tables opt out
+        with panZoom:false so cell scroll behaviour is preserved."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert (
+            "__htmldocPanZoom" in js
+        ), "pan-zoom controller missing — fullscreen has no zoom"
+        assert (
+            "hdt-lightbox-pz" in js
+        ), "pan-zoom stage class missing in lightbox open()"
+        assert (
+            ".hdt-lightbox-pz" in css
+        ), "pan-zoom stage has no CSS"
+        assert (
+            "panZoom: false" in js
+        ), "tables must opt out of pan/zoom (cell scroll would conflict)"
+
     def test_funnel_aligns_columns(self, repo_root: Path) -> None:
         """Funnel labels / values / percentages now live in three
         fixed right-anchored columns instead of being band-edge

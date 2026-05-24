@@ -113,9 +113,33 @@ var __htmldocLightbox = (function () {
     // Drain any leftover nodes from a previous open() that bypassed close()
     // (defensive — should not happen in normal flow).
     while (holder.firstChild) holder.removeChild(holder.firstChild);
-    if (content instanceof Node) holder.appendChild(content);
-    else holder.innerHTML = String(content || '');
     currentOpts = opts || {};
+    // Pan/zoom wrapping — when caller asks for it, wrap the content
+    // in a transformable stage with mouse / wheel / touch handlers
+    // and a small inline toolbar (zoom in, zoom out, fit, 1:1). The
+    // wrap is undone on close so the content returns to its origin
+    // unmolested.
+    if (currentOpts.panZoom !== false) {
+      var stage = document.createElement('div');
+      stage.className = 'hdt-lightbox-pz';
+      var inner = document.createElement('div');
+      inner.className = 'hdt-lightbox-pz-inner';
+      if (content instanceof Node) inner.appendChild(content);
+      else inner.innerHTML = String(content || '');
+      stage.appendChild(inner);
+      var toolbar = document.createElement('div');
+      toolbar.className = 'hdt-lightbox-pz-toolbar';
+      toolbar.innerHTML =
+        '<button type="button" data-pz="out"   title="Zoom out (-)"     aria-label="Zoom out">−</button>' +
+        '<button type="button" data-pz="reset" title="Reset / fit (0)"  aria-label="Reset zoom">⤢</button>' +
+        '<button type="button" data-pz="in"    title="Zoom in (+)"      aria-label="Zoom in">+</button>';
+      stage.appendChild(toolbar);
+      holder.appendChild(stage);
+      __htmldocPanZoom.attach(stage, inner, toolbar);
+    } else {
+      if (content instanceof Node) holder.appendChild(content);
+      else holder.innerHTML = String(content || '');
+    }
     if (currentOpts.title) el.setAttribute('aria-label', currentOpts.title);
     lastFocus = document.activeElement;
     el.classList.add('open');
@@ -128,6 +152,16 @@ var __htmldocLightbox = (function () {
     overlay.classList.remove('open');
     document.documentElement.classList.remove('hdt-lightbox-open');
     var holder = overlay.querySelector('.hdt-lightbox-content');
+    // Unwrap pan/zoom stage so the caller's onClose sees the
+    // original content node (and can return it to the page).
+    var stage = holder && holder.querySelector(':scope > .hdt-lightbox-pz');
+    if (stage) {
+      var inner = stage.querySelector('.hdt-lightbox-pz-inner');
+      if (inner) {
+        while (inner.firstChild) holder.appendChild(inner.firstChild);
+      }
+      stage.remove();
+    }
     // onClose runs BEFORE innerHTML clear so callers can move their own
     // nodes back into the page (e.g. table fullscreen). Anything still
     // in holder after the callback gets wiped.
@@ -141,6 +175,133 @@ var __htmldocLightbox = (function () {
   }
 
   return { open: open, close: close };
+})();
+
+/* ============ Pan / zoom controller for the lightbox stage ============ *
+ * Drag to pan. Wheel to zoom (anchored at the pointer so the content
+ * under the cursor stays put). Pinch to zoom on touch. Double-click
+ * resets. Buttons in the stage toolbar provide a discoverable path
+ * for keyboard / mouse-only users. State lives on the stage so each
+ * lightbox open() gets a fresh transform.
+ * --------------------------------------------------------------------- */
+var __htmldocPanZoom = (function () {
+  function attach(stage, inner, toolbar) {
+    var scale = 1, tx = 0, ty = 0;
+    var min = 0.25, max = 12;
+    function apply() {
+      inner.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + scale + ')';
+    }
+    function zoomAt(cx, cy, factor) {
+      var nextScale = Math.max(min, Math.min(max, scale * factor));
+      var r = stage.getBoundingClientRect();
+      var lx = cx - r.left;
+      var ly = cy - r.top;
+      // Anchor zoom so the point under the cursor stays under the cursor.
+      tx = lx - (lx - tx) * (nextScale / scale);
+      ty = ly - (ly - ty) * (nextScale / scale);
+      scale = nextScale;
+      apply();
+    }
+    function reset() { scale = 1; tx = 0; ty = 0; apply(); }
+    // Wheel zoom.
+    stage.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      var factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
+      zoomAt(ev.clientX, ev.clientY, factor);
+    }, { passive: false });
+    // Drag to pan.
+    var dragging = false, lastX = 0, lastY = 0;
+    stage.addEventListener('mousedown', function (ev) {
+      if (ev.button !== 0) return;
+      if (ev.target.closest('.hdt-lightbox-pz-toolbar')) return;
+      dragging = true; lastX = ev.clientX; lastY = ev.clientY;
+      stage.classList.add('panning');
+      ev.preventDefault();
+    });
+    window.addEventListener('mousemove', function (ev) {
+      if (!dragging) return;
+      tx += ev.clientX - lastX;
+      ty += ev.clientY - lastY;
+      lastX = ev.clientX; lastY = ev.clientY;
+      apply();
+    });
+    window.addEventListener('mouseup', function () {
+      if (!dragging) return;
+      dragging = false;
+      stage.classList.remove('panning');
+    });
+    // Touch — single-finger drag, two-finger pinch.
+    var pointers = new Map();
+    var pinchPrevDist = 0;
+    stage.addEventListener('pointerdown', function (ev) {
+      if (ev.pointerType !== 'touch') return;
+      pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pointers.size === 2) {
+        var p = Array.from(pointers.values());
+        var dx = p[1].x - p[0].x, dy = p[1].y - p[0].y;
+        pinchPrevDist = Math.sqrt(dx * dx + dy * dy);
+      }
+    });
+    stage.addEventListener('pointermove', function (ev) {
+      if (ev.pointerType !== 'touch') return;
+      if (!pointers.has(ev.pointerId)) return;
+      var prev = pointers.get(ev.pointerId);
+      pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (pointers.size === 1) {
+        tx += ev.clientX - prev.x;
+        ty += ev.clientY - prev.y;
+        apply();
+      } else if (pointers.size === 2) {
+        var p = Array.from(pointers.values());
+        var dx = p[1].x - p[0].x, dy = p[1].y - p[0].y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (pinchPrevDist > 0) {
+          var cx = (p[0].x + p[1].x) / 2;
+          var cy = (p[0].y + p[1].y) / 2;
+          zoomAt(cx, cy, dist / pinchPrevDist);
+        }
+        pinchPrevDist = dist;
+      }
+    });
+    stage.addEventListener('pointerup', function (ev) {
+      pointers.delete(ev.pointerId);
+      pinchPrevDist = 0;
+    });
+    stage.addEventListener('pointercancel', function (ev) {
+      pointers.delete(ev.pointerId);
+      pinchPrevDist = 0;
+    });
+    // Double-click resets.
+    stage.addEventListener('dblclick', function () { reset(); });
+    // Toolbar buttons.
+    toolbar.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('button[data-pz]');
+      if (!btn) return;
+      var r = stage.getBoundingClientRect();
+      var cx = r.left + r.width / 2;
+      var cy = r.top + r.height / 2;
+      var act = btn.getAttribute('data-pz');
+      if (act === 'in')         zoomAt(cx, cy, 1.4);
+      else if (act === 'out')   zoomAt(cx, cy, 1 / 1.4);
+      else if (act === 'reset') reset();
+    });
+    // Keyboard shortcuts while the stage is focused.
+    stage.tabIndex = 0;
+    stage.addEventListener('keydown', function (ev) {
+      var r = stage.getBoundingClientRect();
+      var cx = r.left + r.width / 2;
+      var cy = r.top + r.height / 2;
+      if (ev.key === '+' || ev.key === '=') { ev.preventDefault(); zoomAt(cx, cy, 1.4); }
+      else if (ev.key === '-')              { ev.preventDefault(); zoomAt(cx, cy, 1 / 1.4); }
+      else if (ev.key === '0')              { ev.preventDefault(); reset(); }
+      else if (ev.key === 'ArrowLeft')      { ev.preventDefault(); tx += 40; apply(); }
+      else if (ev.key === 'ArrowRight')     { ev.preventDefault(); tx -= 40; apply(); }
+      else if (ev.key === 'ArrowUp')        { ev.preventDefault(); ty += 40; apply(); }
+      else if (ev.key === 'ArrowDown')      { ev.preventDefault(); ty -= 40; apply(); }
+    });
+    apply();
+  }
+  return { attach: attach };
 })();
 
 /* ============ Three-mode theme cycler (system → light → dark → system) ============ */
@@ -1862,6 +2023,10 @@ function initReadingAids() {
         wrap.dataset.fullscreen = '1';
         __htmldocLightbox.open(wrap, {
           title: 'Expanded table',
+          // Tables manage their own scroll containers; the pan/zoom
+          // wrapper would conflict with cell selection and sort
+          // headers. Keep the lightbox passive here.
+          panZoom: false,
           onClose: function () {
             delete wrap.dataset.fullscreen;
             if (placeholder.parentNode) {
@@ -3395,7 +3560,11 @@ class HtmlDocChart extends HTMLElement {
               ' Z';
       var color = palette[slice.color] || palette.accent;
       parts.push('<path d="' + d + '" fill="' + color + '" class="hdc-slice"' +
-                 ' data-slice-idx="' + idx + '" data-slice-label="' + escapeXml(slice.label || '') + '"' +
+                 ' data-slice-idx="' + idx + '"' +
+                 ' data-slice-label="' + escapeXml(slice.label || '') + '"' +
+                 ' data-slice-value="' + value + '"' +
+                 ' data-slice-share="' + fraction.toFixed(4) + '"' +
+                 ' data-slice-total="' + total + '"' +
                  ' tabindex="0" role="img" aria-label="' + escapeXml(slice.label || '') + ': ' + fmtNum(value) + ' (' + Math.round(fraction * 100) + '%)"/>');
       angleStart = angleEnd;
     });
@@ -4014,10 +4183,18 @@ class HtmlDocChart extends HTMLElement {
     rects.forEach(function (r) {
       var color = palette[r.item.color] || palette.accent;
       var labelFits = (r.w > 50 && r.h > 22);
-      parts.push('<g class="hdc-treemap-cell"><rect x="' + r.x.toFixed(1) + '" y="' + r.y.toFixed(1) + '" width="' + r.w.toFixed(1) + '" height="' + r.h.toFixed(1) + '" fill="' + color + '" fill-opacity="0.82"><title>' + escapeXml(r.item.label + ': ' + fmtNum(+r.item.value || 0)) + '</title></rect>');
+      var v = +r.item.value || 0;
+      var share = v / total;
+      parts.push('<g class="hdc-treemap-cell"><rect x="' + r.x.toFixed(1) + '" y="' + r.y.toFixed(1) + '" width="' + r.w.toFixed(1) + '" height="' + r.h.toFixed(1) + '" fill="' + color + '" fill-opacity="0.82"' +
+        ' tabindex="0"' +
+        ' data-cell-label="' + escapeXml(r.item.label) + '"' +
+        ' data-cell-value="' + v + '"' +
+        ' data-cell-share="' + share.toFixed(4) + '">' +
+        '<title>' + escapeXml(r.item.label + ': ' + fmtNum(v) + ' (' + Math.round(share * 100) + '%)') + '</title>' +
+      '</rect>');
       if (labelFits) {
         parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 18).toFixed(1) + '" class="hdc-treemap-label">' + escapeXml(r.item.label) + '</text>');
-        if (r.h > 38) parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 34).toFixed(1) + '" class="hdc-treemap-value">' + escapeXml(fmtNum(+r.item.value || 0)) + '</text>');
+        if (r.h > 38) parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 34).toFixed(1) + '" class="hdc-treemap-value">' + escapeXml(fmtNum(v)) + '</text>');
       }
       parts.push('</g>');
     });
@@ -4035,6 +4212,16 @@ class HtmlDocChart extends HTMLElement {
     var H = titleTop + distributions.length * rowH + 18;
     var pad = { left: 130, right: 24 };
     var plotW = W - pad.left - pad.right;
+    // Expose layout for the parallel-cursor wiring (see
+    // _wireRidgelineCursor below). Bin width + plot bounds are
+    // recovered there from these attributes so the cursor knows
+    // which x value the pointer maps to.
+    this.setAttribute('data-ridge-pad-left', pad.left);
+    this.setAttribute('data-ridge-pad-right', pad.right);
+    this.setAttribute('data-ridge-title-top', titleTop);
+    this.setAttribute('data-ridge-row-h', rowH);
+    this.setAttribute('data-ridge-w', W);
+    this.setAttribute('data-ridge-h', H);
     // Global domain.
     var allVals = [];
     distributions.forEach(function (d) { (d.values || []).forEach(function (v) { allVals.push(+v); }); });
@@ -4072,8 +4259,60 @@ class HtmlDocChart extends HTMLElement {
       var ax = pad.left + (t / 4) * plotW;
       parts.push('<text x="' + ax + '" y="' + axisY + '" text-anchor="middle" class="hdc-tick">' + escapeXml(fmtNum(v)) + '</text>');
     }
+    // Parallel cursor — a single vertical line spanning every ridge
+    // that follows the pointer's X position. Sits inside the SVG so
+    // its coordinates use the same viewBox basis as the ridges.
+    parts.push('<line class="hdc-ridge-cursor" x1="0" y1="' + titleTop + '" x2="0" y2="' + (titleTop + distributions.length * rowH) + '" stroke-width="1" pointer-events="none" visibility="hidden"/>');
+    parts.push('<text class="hdc-ridge-cursor-label" x="0" y="' + (titleTop - 8) + '" text-anchor="middle" pointer-events="none" visibility="hidden"></text>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireRidgelineCursor(lo, hi);
+  }
+  /* Parallel cursor for ridgeline charts. Listens to pointer moves
+     on the SVG, projects the pointer's X back into the data domain
+     using the same scale the ridges use, and positions a vertical
+     line that spans every ridge — readers can compare "where is this
+     value across all distributions" in a single glance. */
+  _wireRidgelineCursor(lo, hi) {
+    var self = this;
+    var svg = self.querySelector('svg');
+    if (!svg) return;
+    var cursor = svg.querySelector('.hdc-ridge-cursor');
+    var label = svg.querySelector('.hdc-ridge-cursor-label');
+    if (!cursor || !label) return;
+    var padLeft = +self.getAttribute('data-ridge-pad-left');
+    var padRight = +self.getAttribute('data-ridge-pad-right');
+    var W = +self.getAttribute('data-ridge-w');
+    var plotW = W - padLeft - padRight;
+    function pointerToViewBoxX(ev) {
+      var pt = svg.createSVGPoint();
+      pt.x = ev.clientX; pt.y = ev.clientY;
+      var ctm = svg.getScreenCTM();
+      if (!ctm) return null;
+      return pt.matrixTransform(ctm.inverse()).x;
+    }
+    function move(ev) {
+      var vx = pointerToViewBoxX(ev);
+      if (vx === null) return;
+      if (vx < padLeft || vx > padLeft + plotW) {
+        cursor.setAttribute('visibility', 'hidden');
+        label.setAttribute('visibility', 'hidden');
+        return;
+      }
+      var v = lo + ((vx - padLeft) / plotW) * (hi - lo);
+      cursor.setAttribute('x1', vx);
+      cursor.setAttribute('x2', vx);
+      cursor.setAttribute('visibility', 'visible');
+      label.setAttribute('x', vx);
+      label.setAttribute('visibility', 'visible');
+      label.textContent = fmtNum(v);
+    }
+    function leave() {
+      cursor.setAttribute('visibility', 'hidden');
+      label.setAttribute('visibility', 'hidden');
+    }
+    svg.addEventListener('mousemove', move);
+    svg.addEventListener('mouseleave', leave);
   }
 
   _renderFunnel() {
@@ -4121,9 +4360,20 @@ class HtmlDocChart extends HTMLElement {
         (bandCenter + botW / 2).toFixed(1) + ',' + nextY,
         (bandCenter - botW / 2).toFixed(1) + ',' + nextY
       ].join(' ');
-      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="' + (0.82 - i * 0.08).toFixed(2) + '" class="hdc-funnel-band"><title>' + escapeXml((st.label || '') + ': ' + fmtNum(v)) + '</title></polygon>');
       var firstVal = +stages[0].value || 1;
-      var pct = Math.round((v / firstVal) * 100);
+      var share = v / firstVal;
+      var pct = Math.round(share * 100);
+      // Drop-off vs the previous stage — null on the first stage,
+      // negative shouldn't happen in a funnel (sanity-clamped).
+      var prev = i > 0 ? (+stages[i - 1].value || 0) : null;
+      var drop = (prev !== null && prev > 0) ? Math.max(0, Math.round((1 - v / prev) * 100)) : null;
+      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="' + (0.82 - i * 0.08).toFixed(2) + '" class="hdc-funnel-band"' +
+        ' tabindex="0"' +
+        ' data-stage-label="' + escapeXml(st.label || '') + '"' +
+        ' data-stage-value="' + v + '"' +
+        ' data-stage-share="' + share.toFixed(4) + '"' +
+        (drop !== null ? (' data-stage-drop="' + drop + '"') : '') +
+        '><title>' + escapeXml((st.label || '') + ': ' + fmtNum(v) + ' (' + pct + '%)') + '</title></polygon>');
       var textY = y + stageH / 2 + 4;
       // Three fixed columns — labels, values, percentages — all
       // right-anchored to their column edge so digits stack and
@@ -4452,9 +4702,166 @@ class HtmlDocChart extends HTMLElement {
         }
       });
     });
+
+    /* Rich-tooltip wiring for non-dot chart shapes. Reads the data
+       payload from the element's own attributes (label, value, share,
+       series) — each renderer below tags its shapes accordingly. The
+       tooltip element is the same .hdc-tooltip the dot-tip uses, so
+       only one tip is visible at a time. */
+    function showRich(anchor, payload) {
+      var tip = ensureTip();
+      var html = '';
+      if (payload.series) html += '<div class="hdc-tt-series">' + escapeXml(payload.series) + '</div>';
+      if (payload.label)  html += '<div class="hdc-tt-label">'  + escapeXml(payload.label)  + '</div>';
+      if (payload.kv && payload.kv.length) {
+        html += '<dl class="hdc-tt-kv">';
+        payload.kv.forEach(function (row) {
+          html += '<dt>' + escapeXml(row.k) + '</dt><dd>' + escapeXml(row.v) + '</dd>';
+        });
+        html += '</dl>';
+      }
+      if (payload.footer) html += '<div class="hdc-tt-coords">' + escapeXml(payload.footer) + '</div>';
+      tip.innerHTML = html;
+      tip.setAttribute('aria-hidden', 'false');
+      var hostRect = self.getBoundingClientRect();
+      var aRect = anchor.getBoundingClientRect();
+      tip.style.left = (aRect.left - hostRect.left + aRect.width / 2) + 'px';
+      tip.style.top  = (aRect.top  - hostRect.top  - 8) + 'px';
+      tip.classList.add('visible');
+    }
+    function hideRich() {
+      var tip = self.querySelector(':scope > .hdc-tooltip');
+      if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
+    }
+    function rich(selector, payloadFn) {
+      self.querySelectorAll(selector).forEach(function (el) {
+        el.addEventListener('mouseenter', function () { showRich(el, payloadFn(el)); });
+        el.addEventListener('mouseleave', function () { hideRich(); });
+        el.addEventListener('focus',      function () { showRich(el, payloadFn(el)); });
+        el.addEventListener('blur',       function () { hideRich(); });
+      });
+    }
+    // Donut slices — label, value, share-of-total.
+    rich('.hdc-slice', function (el) {
+      var label = el.getAttribute('data-slice-label') || '';
+      var value = +el.getAttribute('data-slice-value') || 0;
+      var share = +el.getAttribute('data-slice-share') || 0;
+      var total = +el.getAttribute('data-slice-total') || 0;
+      return {
+        label: label,
+        kv: [
+          { k: 'value', v: fmtNum(value) },
+          { k: 'share', v: Math.round(share * 100) + '%' }
+        ],
+        footer: 'of ' + fmtNum(total)
+      };
+    });
+    // Treemap cells — already tagged from renderer.
+    rich('.hdc-treemap-cell rect', function (el) {
+      var label = el.getAttribute('data-cell-label') || '';
+      var value = +el.getAttribute('data-cell-value') || 0;
+      var share = +el.getAttribute('data-cell-share') || 0;
+      return {
+        label: label,
+        kv: [
+          { k: 'value', v: fmtNum(value) },
+          { k: 'share', v: Math.round(share * 100) + '%' }
+        ]
+      };
+    });
+    // Funnel bands — stage value, share-of-first, drop-off to next.
+    rich('.hdc-funnel-band', function (el) {
+      var label = el.getAttribute('data-stage-label') || '';
+      var value = +el.getAttribute('data-stage-value') || 0;
+      var share = +el.getAttribute('data-stage-share') || 0;
+      var dropPct = el.getAttribute('data-stage-drop');
+      var kv = [
+        { k: 'value', v: fmtNum(value) },
+        { k: 'share', v: Math.round(share * 100) + '%' }
+      ];
+      if (dropPct !== null) kv.push({ k: 'drop-off', v: dropPct + '%' });
+      return { label: label, kv: kv };
+    });
+    // Histogram bins, heatmap cells, waffle units — generic
+    // data-hover-payload attribute carrying pre-built JSON. Keeps
+    // future chart types cheap to instrument.
+    rich('[data-hover-payload]', function (el) {
+      try { return JSON.parse(el.getAttribute('data-hover-payload')); }
+      catch (e) { return { label: el.getAttribute('data-hover-payload') }; }
+    });
   }
 }
 if (!customElements.get('html-doc-chart')) customElements.define('html-doc-chart', HtmlDocChart);
+
+/* ============ .bar-chart hover enhancer ============ *
+ * bar / stacked-bar / grouped-bar charts render via renderer.js as
+ * <div class="bar-chart"> (single) or <div class="bar-chart-multi">
+ * (stacked/grouped) — outside the <html-doc-chart> custom-element
+ * lifecycle. This enhancer attaches the same rich tooltip to those
+ * DIV-based charts by walking .bar-fill elements and reading their
+ * data-hover-payload JSON.
+ * --------------------------------------------------------------------- */
+function __htmldocEnhanceBarCharts(root) {
+  var charts = (root || document).querySelectorAll('.bar-chart, .bar-chart-multi');
+  charts.forEach(function (host) {
+    if (host.dataset.hdcBarsBound === '1') return;
+    host.dataset.hdcBarsBound = '1';
+    var tip = null;
+    function ensureTip() {
+      if (tip) return tip;
+      tip = document.createElement('div');
+      tip.className = 'hdc-tooltip';
+      tip.setAttribute('role', 'tooltip');
+      tip.setAttribute('aria-hidden', 'true');
+      host.appendChild(tip);
+      return tip;
+    }
+    function show(anchor, payload) {
+      var t = ensureTip();
+      var html = '';
+      if (payload.series) html += '<div class="hdc-tt-series">' + escapeXml(payload.series) + '</div>';
+      if (payload.label)  html += '<div class="hdc-tt-label">'  + escapeXml(payload.label)  + '</div>';
+      if (payload.kv && payload.kv.length) {
+        html += '<dl class="hdc-tt-kv">';
+        payload.kv.forEach(function (row) {
+          html += '<dt>' + escapeXml(row.k) + '</dt><dd>' + escapeXml(row.v) + '</dd>';
+        });
+        html += '</dl>';
+      }
+      if (payload.footer) html += '<div class="hdc-tt-coords">' + escapeXml(payload.footer) + '</div>';
+      t.innerHTML = html;
+      t.setAttribute('aria-hidden', 'false');
+      var hostRect = host.getBoundingClientRect();
+      var aRect = anchor.getBoundingClientRect();
+      t.style.left = (aRect.left - hostRect.left + aRect.width / 2) + 'px';
+      t.style.top  = (aRect.top  - hostRect.top  - 8) + 'px';
+      t.classList.add('visible');
+    }
+    function hide() {
+      if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
+    }
+    host.querySelectorAll('.bar-fill[data-hover-payload]').forEach(function (fill) {
+      // Drop the native tooltip — we render our own.
+      if (fill.title) { fill.removeAttribute('title'); }
+      var raw = fill.getAttribute('data-hover-payload');
+      var payload;
+      try { payload = JSON.parse(raw); } catch (e) { payload = { label: raw }; }
+      fill.addEventListener('mouseenter', function () { show(fill, payload); });
+      fill.addEventListener('mouseleave', function () { hide(); });
+      // Bar-fills aren't natively focusable; if a caller wires
+      // keyboard nav we'd respect it here, but for now the hover
+      // tooltip is mouse + touch only.
+    });
+  });
+}
+document.addEventListener('DOMContentLoaded', function () {
+  __htmldocEnhanceBarCharts(document);
+});
+// Renderer dispatches html-doc:rendered on window after each async
+// page render; re-enhance then to catch fresh bar-charts.
+window.addEventListener('html-doc:rendered', function () {
+  __htmldocEnhanceBarCharts(document);
+});
 
 function escapeXml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
