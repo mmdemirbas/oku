@@ -422,30 +422,33 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"annotated-code\",\n  \"language\": \"javascript\",\n  \"source\": \"const x = 1; // (1)\\nfunction greet(name) {\\n  return `Hello, ${name}!`;\\n}\",\n  \"annotations\": [\n    { \"id\": 1, \"content\": \"<code>const</code> creates a block-scoped binding.\" },\n    { \"id\": 2, \"content\": \"Function body — highlights lines 2-4.\", \"lines\": \"2-4\" },\n    { \"id\": 3, \"content\": \"Template-literal interpolation.\", \"match\": \"${name}\" }\n  ]\n}"
-        },
-        {
-          "kind": "annotated-code",
-          "language": "javascript",
-          "source": "const x = 1; // (1)\nfunction greet(name) {\n  return `Hello, ${name}!`;\n}",
-          "annotations": [
-            {
-              "id": 1,
-              "content": "<code>const</code> creates a block-scoped binding."
-            },
-            {
-              "id": 2,
-              "content": "Function body — hovering this chip highlights lines 2-4 in the gutter.",
-              "lines": "2-4"
-            },
-            {
-              "id": 3,
-              "content": "Template-literal interpolation — hovering this chip highlights the <code>${name}</code> substring.",
-              "match": "${name}"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"annotated-code\",\n  \"language\": \"javascript\",\n  \"source\": \"const x = 1; // (1)\\nfunction greet(name) {\\n  return `Hello, ${name}!`;\\n}\",\n  \"annotations\": [\n    { \"id\": 1, \"content\": \"<code>const</code> creates a block-scoped binding.\" },\n    { \"id\": 2, \"content\": \"Function body — highlights lines 2-4.\", \"lines\": \"2-4\" },\n    { \"id\": 3, \"content\": \"Template-literal interpolation.\", \"match\": \"${name}\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "annotated-code",
+            "language": "javascript",
+            "source": "const x = 1; // (1)\nfunction greet(name) {\n  return `Hello, ${name}!`;\n}",
+            "annotations": [
+              {
+                "id": 1,
+                "content": "<code>const</code> creates a block-scoped binding."
+              },
+              {
+                "id": 2,
+                "content": "Function body — hovering this chip highlights lines 2-4 in the gutter.",
+                "lines": "2-4"
+              },
+              {
+                "id": 3,
+                "content": "Template-literal interpolation — hovering this chip highlights the <code>${name}</code> substring.",
+                "match": "${name}"
+              }
+            ]
+          }
         }
       ]
     },
@@ -533,15 +536,18 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"warn\",\n  \"title\": \"Watch the lock\",\n  \"content\": \"Compaction holds a metadata lock; long jobs block writers.\"\n}"
-        },
-        {
-          "kind": "callout",
-          "type": "warn",
-          "title": "warn",
-          "content": "Yellow-bordered, used for caveats."
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"warn\",\n  \"title\": \"Watch the lock\",\n  \"content\": \"Compaction holds a metadata lock; long jobs block writers.\"\n}"
+          },
+          "render": {
+            "kind": "callout",
+            "type": "warn",
+            "title": "warn",
+            "content": "Yellow-bordered, used for caveats."
+          }
         },
         {
           "kind": "callout",
@@ -659,19 +665,22 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"tldr\",\n  \"summary\": \"One-sentence essence.\",\n  \"bullets\": [\n    \"Three to five concrete points.\",\n    \"Each bullet may include inline kinds like glossary terms.\"\n  ]\n}"
-        },
-        {
-          "kind": "tldr",
-          "title": "TL;DR (example)",
-          "summary": "One-sentence essence. The summary line is bigger than bullets and reads first.",
-          "bullets": [
-            "Three to five concrete points.",
-            "Each bullet may include inline kinds like glossary terms or links.",
-            "Top-level placement is the canonical use; this one sits inline as a sample."
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"tldr\",\n  \"summary\": \"One-sentence essence.\",\n  \"bullets\": [\n    \"Three to five concrete points.\",\n    \"Each bullet may include inline kinds like glossary terms.\"\n  ]\n}"
+          },
+          "render": {
+            "kind": "tldr",
+            "title": "TL;DR (example)",
+            "summary": "One-sentence essence. The summary line is bigger than bullets and reads first.",
+            "bullets": [
+              "Three to five concrete points.",
+              "Each bullet may include inline kinds like glossary terms or links.",
+              "Top-level placement is the canonical use; this one sits inline as a sample."
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -720,39 +729,42 @@
           "title": "Flat rows"
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\"Stage\", \"Status\", \"Duration\"],\n  \"rows\": [\n    [\"Plan\",  \"done\",         \"1d\"],\n    [\"Build\", \"done\",         \"3d\"],\n    [\"Test\",  \"in-progress\",  \"2d\"],\n    [\"Ship\",  \"queued\",       \"—\"]\n  ]\n}"
-        },
-        {
-          "kind": "table",
-          "headers": [
-            "Stage",
-            "Status",
-            "Duration"
-          ],
-          "rows": [
-            [
-              "Plan",
-              "done",
-              "1d"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\"Stage\", \"Status\", \"Duration\"],\n  \"rows\": [\n    [\"Plan\",  \"done\",         \"1d\"],\n    [\"Build\", \"done\",         \"3d\"],\n    [\"Test\",  \"in-progress\",  \"2d\"],\n    [\"Ship\",  \"queued\",       \"—\"]\n  ]\n}"
+          },
+          "render": {
+            "kind": "table",
+            "headers": [
+              "Stage",
+              "Status",
+              "Duration"
             ],
-            [
-              "Build",
-              "done",
-              "3d"
-            ],
-            [
-              "Test",
-              "in-progress",
-              "2d"
-            ],
-            [
-              "Ship",
-              "queued",
-              "—"
+            "rows": [
+              [
+                "Plan",
+                "done",
+                "1d"
+              ],
+              [
+                "Build",
+                "done",
+                "3d"
+              ],
+              [
+                "Test",
+                "in-progress",
+                "2d"
+              ],
+              [
+                "Ship",
+                "queued",
+                "—"
+              ]
             ]
-          ]
+          }
         },
         {
           "kind": "heading",
@@ -760,54 +772,57 @@
           "title": "Grouped rows with per-group counts"
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\"Engine\", \"Storage\", \"License\"],\n  \"groups\": [\n    { \"title\": \"Lakehouse formats\",\n      \"rows\": [\n        [\"Apache Iceberg\", \"Object store\", \"Apache 2.0\"],\n        [\"Delta Lake\",    \"Object store\", \"Apache 2.0\"]\n      ]\n    },\n    { \"title\": \"Query engines\",\n      \"rows\": [[\"Trino\", \"Pluggable\", \"Apache 2.0\"]]\n    }\n  ]\n}"
-        },
-        {
-          "kind": "table",
-          "headers": [
-            "Engine",
-            "Storage",
-            "License"
-          ],
-          "groups": [
-            {
-              "title": "Lakehouse formats",
-              "rows": [
-                [
-                  "Apache Iceberg",
-                  "Object store",
-                  "Apache 2.0"
-                ],
-                [
-                  "Apache Hudi",
-                  "Object store",
-                  "Apache 2.0"
-                ],
-                [
-                  "Delta Lake",
-                  "Object store",
-                  "Apache 2.0"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\"Engine\", \"Storage\", \"License\"],\n  \"groups\": [\n    { \"title\": \"Lakehouse formats\",\n      \"rows\": [\n        [\"Apache Iceberg\", \"Object store\", \"Apache 2.0\"],\n        [\"Delta Lake\",    \"Object store\", \"Apache 2.0\"]\n      ]\n    },\n    { \"title\": \"Query engines\",\n      \"rows\": [[\"Trino\", \"Pluggable\", \"Apache 2.0\"]]\n    }\n  ]\n}"
+          },
+          "render": {
+            "kind": "table",
+            "headers": [
+              "Engine",
+              "Storage",
+              "License"
+            ],
+            "groups": [
+              {
+                "title": "Lakehouse formats",
+                "rows": [
+                  [
+                    "Apache Iceberg",
+                    "Object store",
+                    "Apache 2.0"
+                  ],
+                  [
+                    "Apache Hudi",
+                    "Object store",
+                    "Apache 2.0"
+                  ],
+                  [
+                    "Delta Lake",
+                    "Object store",
+                    "Apache 2.0"
+                  ]
                 ]
-              ]
-            },
-            {
-              "title": "Query engines",
-              "rows": [
-                [
-                  "Trino",
-                  "Pluggable",
-                  "Apache 2.0"
-                ],
-                [
-                  "Presto",
-                  "Pluggable",
-                  "Apache 2.0"
+              },
+              {
+                "title": "Query engines",
+                "rows": [
+                  [
+                    "Trino",
+                    "Pluggable",
+                    "Apache 2.0"
+                  ],
+                  [
+                    "Presto",
+                    "Pluggable",
+                    "Apache 2.0"
+                  ]
                 ]
-              ]
-            }
-          ]
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -819,138 +834,141 @@
           "content": "Headers can declare a fixed chip set with <code>filter: \"chips\"</code>; cells use the object form <code>{ value, values }</code> to belong to one or more chip values. AND across columns, OR within a column. Combine with the text filter."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\n    \"Engine\",\n    { \"label\": \"Tags\", \"filter\": \"chips\",\n      \"values\": [\"lakehouse\", \"streaming\", \"query\"] },\n    { \"label\": \"Maturity\", \"filter\": \"chips\",\n      \"values\": [\"incubating\", \"ga\", \"experimental\"] }\n  ],\n  \"rows\": [\n    [\"Apache Iceberg\",\n      { \"values\": [\"lakehouse\"] },\n      { \"value\": \"GA\", \"values\": [\"ga\"] }],\n    [\"Apache Paimon\",\n      { \"values\": [\"lakehouse\", \"streaming\"] },\n      { \"value\": \"Incubating\", \"values\": [\"incubating\"] }],\n    [\"Trino\",\n      { \"values\": [\"query\"] },\n      { \"value\": \"GA\", \"values\": [\"ga\"] }]\n  ]\n}"
-        },
-        {
-          "kind": "table",
-          "headers": [
-            "Engine",
-            {
-              "label": "Tags",
-              "filter": "chips",
-              "values": [
-                "lakehouse",
-                "streaming",
-                "query",
-                "metadata"
-              ]
-            },
-            {
-              "label": "Maturity",
-              "filter": "chips",
-              "values": [
-                "incubating",
-                "ga",
-                "experimental"
-              ]
-            }
-          ],
-          "rows": [
-            [
-              "Apache Iceberg",
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\n    \"Engine\",\n    { \"label\": \"Tags\", \"filter\": \"chips\",\n      \"values\": [\"lakehouse\", \"streaming\", \"query\"] },\n    { \"label\": \"Maturity\", \"filter\": \"chips\",\n      \"values\": [\"incubating\", \"ga\", \"experimental\"] }\n  ],\n  \"rows\": [\n    [\"Apache Iceberg\",\n      { \"values\": [\"lakehouse\"] },\n      { \"value\": \"GA\", \"values\": [\"ga\"] }],\n    [\"Apache Paimon\",\n      { \"values\": [\"lakehouse\", \"streaming\"] },\n      { \"value\": \"Incubating\", \"values\": [\"incubating\"] }],\n    [\"Trino\",\n      { \"values\": [\"query\"] },\n      { \"value\": \"GA\", \"values\": [\"ga\"] }]\n  ]\n}"
+          },
+          "render": {
+            "kind": "table",
+            "headers": [
+              "Engine",
               {
+                "label": "Tags",
+                "filter": "chips",
                 "values": [
                   "lakehouse",
-                  "metadata"
-                ]
-              },
-              {
-                "value": "GA",
-                "values": [
-                  "ga"
-                ]
-              }
-            ],
-            [
-              "Apache Hudi",
-              {
-                "values": [
-                  "lakehouse",
-                  "streaming"
-                ]
-              },
-              {
-                "value": "GA",
-                "values": [
-                  "ga"
-                ]
-              }
-            ],
-            [
-              "Delta Lake",
-              {
-                "values": [
-                  "lakehouse"
-                ]
-              },
-              {
-                "value": "GA",
-                "values": [
-                  "ga"
-                ]
-              }
-            ],
-            [
-              "Apache Paimon",
-              {
-                "values": [
-                  "lakehouse",
-                  "streaming"
-                ]
-              },
-              {
-                "value": "Incubating",
-                "values": [
-                  "incubating"
-                ]
-              }
-            ],
-            [
-              "Trino",
-              {
-                "values": [
-                  "query"
-                ]
-              },
-              {
-                "value": "GA",
-                "values": [
-                  "ga"
-                ]
-              }
-            ],
-            [
-              "Apache Flink",
-              {
-                "values": [
-                  "streaming"
-                ]
-              },
-              {
-                "value": "GA",
-                "values": [
-                  "ga"
-                ]
-              }
-            ],
-            [
-              "Pulsar Functions",
-              {
-                "values": [
                   "streaming",
+                  "query",
                   "metadata"
                 ]
               },
               {
-                "value": "Experimental",
+                "label": "Maturity",
+                "filter": "chips",
                 "values": [
+                  "incubating",
+                  "ga",
                   "experimental"
                 ]
               }
+            ],
+            "rows": [
+              [
+                "Apache Iceberg",
+                {
+                  "values": [
+                    "lakehouse",
+                    "metadata"
+                  ]
+                },
+                {
+                  "value": "GA",
+                  "values": [
+                    "ga"
+                  ]
+                }
+              ],
+              [
+                "Apache Hudi",
+                {
+                  "values": [
+                    "lakehouse",
+                    "streaming"
+                  ]
+                },
+                {
+                  "value": "GA",
+                  "values": [
+                    "ga"
+                  ]
+                }
+              ],
+              [
+                "Delta Lake",
+                {
+                  "values": [
+                    "lakehouse"
+                  ]
+                },
+                {
+                  "value": "GA",
+                  "values": [
+                    "ga"
+                  ]
+                }
+              ],
+              [
+                "Apache Paimon",
+                {
+                  "values": [
+                    "lakehouse",
+                    "streaming"
+                  ]
+                },
+                {
+                  "value": "Incubating",
+                  "values": [
+                    "incubating"
+                  ]
+                }
+              ],
+              [
+                "Trino",
+                {
+                  "values": [
+                    "query"
+                  ]
+                },
+                {
+                  "value": "GA",
+                  "values": [
+                    "ga"
+                  ]
+                }
+              ],
+              [
+                "Apache Flink",
+                {
+                  "values": [
+                    "streaming"
+                  ]
+                },
+                {
+                  "value": "GA",
+                  "values": [
+                    "ga"
+                  ]
+                }
+              ],
+              [
+                "Pulsar Functions",
+                {
+                  "values": [
+                    "streaming",
+                    "metadata"
+                  ]
+                },
+                {
+                  "value": "Experimental",
+                  "values": [
+                    "experimental"
+                  ]
+                }
+              ]
             ]
-          ]
+          }
         },
         {
           "kind": "heading",
@@ -962,51 +980,54 @@
           "content": "Set <code>view: \"board\"</code> on the table block to open in kanban lanes by default — rows become cards in one lane per unique value of the group column. Declare <code>boardOrder</code> on the column header to force the lane sequence; without it, lanes appear in first-occurrence order, which rarely matches the kanban flow you want. Values present in row data but missing from <code>boardOrder</code> render at the end so authors can spot the omission. The other views (Table / List / Cards) are still one click away in the view toggle."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"table\",\n  \"view\": \"board\",\n  \"headers\": [\n    \"Item\",\n    { \"label\": \"Status\",\n      \"boardOrder\": [\"queued\", \"in-progress\", \"blocked\", \"done\"] }\n  ],\n  \"rows\": [\n    [\"Cut release tag\",        \"queued\"],\n    [\"Wire CI matrix\",         \"in-progress\"],\n    [\"Vendor security review\", \"blocked\"],\n    [\"Migrate auth layer\",     \"done\"],\n    [\"Draft RFC\",              \"in-progress\"],\n    [\"Update changelog\",       \"queued\"]\n  ]\n}"
-        },
-        {
-          "kind": "table",
-          "view": "board",
-          "headers": [
-            "Item",
-            {
-              "label": "Status",
-              "boardOrder": [
-                "queued",
-                "in-progress",
-                "blocked",
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"table\",\n  \"view\": \"board\",\n  \"headers\": [\n    \"Item\",\n    { \"label\": \"Status\",\n      \"boardOrder\": [\"queued\", \"in-progress\", \"blocked\", \"done\"] }\n  ],\n  \"rows\": [\n    [\"Cut release tag\",        \"queued\"],\n    [\"Wire CI matrix\",         \"in-progress\"],\n    [\"Vendor security review\", \"blocked\"],\n    [\"Migrate auth layer\",     \"done\"],\n    [\"Draft RFC\",              \"in-progress\"],\n    [\"Update changelog\",       \"queued\"]\n  ]\n}"
+          },
+          "render": {
+            "kind": "table",
+            "view": "board",
+            "headers": [
+              "Item",
+              {
+                "label": "Status",
+                "boardOrder": [
+                  "queued",
+                  "in-progress",
+                  "blocked",
+                  "done"
+                ]
+              }
+            ],
+            "rows": [
+              [
+                "Cut release tag",
+                "queued"
+              ],
+              [
+                "Wire CI matrix",
+                "in-progress"
+              ],
+              [
+                "Vendor security review",
+                "blocked"
+              ],
+              [
+                "Migrate auth layer",
                 "done"
+              ],
+              [
+                "Draft RFC",
+                "in-progress"
+              ],
+              [
+                "Update changelog",
+                "queued"
               ]
-            }
-          ],
-          "rows": [
-            [
-              "Cut release tag",
-              "queued"
-            ],
-            [
-              "Wire CI matrix",
-              "in-progress"
-            ],
-            [
-              "Vendor security review",
-              "blocked"
-            ],
-            [
-              "Migrate auth layer",
-              "done"
-            ],
-            [
-              "Draft RFC",
-              "in-progress"
-            ],
-            [
-              "Update changelog",
-              "queued"
             ]
-          ]
+          }
         },
         {
           "kind": "heading",
@@ -1041,24 +1062,27 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"compare-grid\",\n  \"cards\": [\n    { \"verdict\": \"bad\",  \"title\": \"Before\", \"content\": \"...\" },\n    { \"verdict\": \"good\", \"title\": \"After\",  \"content\": \"...\" }\n  ]\n}"
-        },
-        {
-          "kind": "compare-grid",
-          "cards": [
-            {
-              "verdict": "bad",
-              "title": "Authored HTML (v1)",
-              "content": "Hand-written tags. Tree-edits via string ops. AI tooling brittle."
-            },
-            {
-              "verdict": "good",
-              "title": "Authored JSON",
-              "content": "Structured tree. Atomic edits. JSON.parse is the contract."
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"compare-grid\",\n  \"cards\": [\n    { \"verdict\": \"bad\",  \"title\": \"Before\", \"content\": \"...\" },\n    { \"verdict\": \"good\", \"title\": \"After\",  \"content\": \"...\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "compare-grid",
+            "cards": [
+              {
+                "verdict": "bad",
+                "title": "Authored HTML (v1)",
+                "content": "Hand-written tags. Tree-edits via string ops. AI tooling brittle."
+              },
+              {
+                "verdict": "good",
+                "title": "Authored JSON",
+                "content": "Structured tree. Atomic edits. JSON.parse is the contract."
+              }
+            ]
+          }
         },
         {
           "kind": "paragraph",
@@ -1097,34 +1121,37 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"compare-grid\",\n  \"cards\": [\n    { \"verdict\": \"in\",  \"title\": \"v1\",     \"items\": [\"...\"] },\n    { \"verdict\": \"out\", \"title\": \"Future\", \"items\": [\"...\"] }\n  ]\n}"
-        },
-        {
-          "kind": "compare-grid",
-          "cards": [
-            {
-              "verdict": "in",
-              "title": "Ships now",
-              "items": [
-                "JSON-source runtime rendering",
-                "Multi-domain glossary with EN/TR",
-                "Visual Viewport pinch-zoom fix",
-                "Pagefind search on built sites"
-              ]
-            },
-            {
-              "verdict": "out",
-              "title": "Out of scope",
-              "items": [
-                "Markdown authoring path",
-                "Server-side rendering",
-                "Per-user authentication",
-                "Inline glossary editing UI"
-              ]
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"compare-grid\",\n  \"cards\": [\n    { \"verdict\": \"in\",  \"title\": \"v1\",     \"items\": [\"...\"] },\n    { \"verdict\": \"out\", \"title\": \"Future\", \"items\": [\"...\"] }\n  ]\n}"
+          },
+          "render": {
+            "kind": "compare-grid",
+            "cards": [
+              {
+                "verdict": "in",
+                "title": "Ships now",
+                "items": [
+                  "JSON-source runtime rendering",
+                  "Multi-domain glossary with EN/TR",
+                  "Visual Viewport pinch-zoom fix",
+                  "Pagefind search on built sites"
+                ]
+              },
+              {
+                "verdict": "out",
+                "title": "Out of scope",
+                "items": [
+                  "Markdown authoring path",
+                  "Server-side rendering",
+                  "Per-user authentication",
+                  "Inline glossary editing UI"
+                ]
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1137,32 +1164,35 @@
           "content": "Numbered cards for ordered actions, build steps, or migration paths."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"step-flow\",\n  \"steps\": [\n    { \"num\": \"1\", \"title\": \"Init\",  \"meta\": \"~1 min\", \"content\": \"html-doc init\" },\n    { \"num\": \"2\", \"title\": \"Author\", \"content\": \"Write the JSON page.\" }\n  ]\n}"
-        },
-        {
-          "kind": "step-flow",
-          "steps": [
-            {
-              "num": "1",
-              "title": "Init",
-              "meta": "~1 min · one-time per project",
-              "content": "cd into your docs root, then html-doc init scaffolds the _kit symlink and an index.html stub there."
-            },
-            {
-              "num": "2",
-              "title": "Author",
-              "meta": "iterative",
-              "content": "Write a JSON page and an HTML stub side by side; the renderer fetches the JSON at load time."
-            },
-            {
-              "num": "3",
-              "title": "Build",
-              "meta": "before deploy or before sharing standalone",
-              "content": "html-doc build → dist/standalone/ (single-file HTMLs), dist/site/ (shared-asset multi-page + manifest + Pagefind), dist/markdown/ (page.md twins + llms.txt for LLM consumers)."
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"step-flow\",\n  \"steps\": [\n    { \"num\": \"1\", \"title\": \"Init\",  \"meta\": \"~1 min\", \"content\": \"html-doc init\" },\n    { \"num\": \"2\", \"title\": \"Author\", \"content\": \"Write the JSON page.\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "step-flow",
+            "steps": [
+              {
+                "num": "1",
+                "title": "Init",
+                "meta": "~1 min · one-time per project",
+                "content": "cd into your docs root, then html-doc init scaffolds the _kit symlink and an index.html stub there."
+              },
+              {
+                "num": "2",
+                "title": "Author",
+                "meta": "iterative",
+                "content": "Write a JSON page and an HTML stub side by side; the renderer fetches the JSON at load time."
+              },
+              {
+                "num": "3",
+                "title": "Build",
+                "meta": "before deploy or before sharing standalone",
+                "content": "html-doc build → dist/standalone/ (single-file HTMLs), dist/site/ (shared-asset multi-page + manifest + Pagefind), dist/markdown/ (page.md twins + llms.txt for LLM consumers)."
+              }
+            ]
+          }
         }
       ]
     },
@@ -1357,60 +1387,63 @@
           "content": "One or more series of {x, y} points. Per-point label optional (shown on hover). Per-series colour drawn from the accent / warn / danger / success / muted vocabulary. Axes auto-scale; pass x-scale=log / y-scale=log on the element for log axes."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"scatter\",\n  \"title\": \"Cost vs. impact\",\n  \"x_label\": \"Engineering cost\",\n  \"y_label\": \"User impact\",\n  \"series\": [\n    { \"label\": \"Sample series\", \"color\": \"accent\", \"data\": [\n      { \"x\": 4, \"y\": 9, \"label\": \"H3\" },\n      { \"x\": 6, \"y\": 8, \"label\": \"S2-inline\" }\n    ]}\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "scatter",
-          "title": "Chart sample — cost vs. impact",
-          "x_label": "Engineering cost",
-          "y_label": "User impact",
-          "series": [
-            {
-              "label": "Showstoppers + High",
-              "color": "accent",
-              "data": [
-                {
-                  "x": 4,
-                  "y": 9,
-                  "label": "H3"
-                },
-                {
-                  "x": 6,
-                  "y": 8,
-                  "label": "S2-inline"
-                },
-                {
-                  "x": 2,
-                  "y": 5,
-                  "label": "schema-validate"
-                }
-              ]
-            },
-            {
-              "label": "Polish",
-              "color": "warn",
-              "data": [
-                {
-                  "x": 1,
-                  "y": 2,
-                  "label": "L1"
-                },
-                {
-                  "x": 1,
-                  "y": 3,
-                  "label": "L3"
-                },
-                {
-                  "x": 1,
-                  "y": 2,
-                  "label": "isTouch"
-                }
-              ]
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"scatter\",\n  \"title\": \"Cost vs. impact\",\n  \"x_label\": \"Engineering cost\",\n  \"y_label\": \"User impact\",\n  \"series\": [\n    { \"label\": \"Sample series\", \"color\": \"accent\", \"data\": [\n      { \"x\": 4, \"y\": 9, \"label\": \"H3\" },\n      { \"x\": 6, \"y\": 8, \"label\": \"S2-inline\" }\n    ]}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "scatter",
+            "title": "Chart sample — cost vs. impact",
+            "x_label": "Engineering cost",
+            "y_label": "User impact",
+            "series": [
+              {
+                "label": "Showstoppers + High",
+                "color": "accent",
+                "data": [
+                  {
+                    "x": 4,
+                    "y": 9,
+                    "label": "H3"
+                  },
+                  {
+                    "x": 6,
+                    "y": 8,
+                    "label": "S2-inline"
+                  },
+                  {
+                    "x": 2,
+                    "y": 5,
+                    "label": "schema-validate"
+                  }
+                ]
+              },
+              {
+                "label": "Polish",
+                "color": "warn",
+                "data": [
+                  {
+                    "x": 1,
+                    "y": 2,
+                    "label": "L1"
+                  },
+                  {
+                    "x": 1,
+                    "y": 3,
+                    "label": "L3"
+                  },
+                  {
+                    "x": 1,
+                    "y": 2,
+                    "label": "isTouch"
+                  }
+                ]
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1450,30 +1483,33 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bar\",\n  \"rows\": [\n    { \"label\": \"Spark\",  \"value\": 95, \"display\": \"95 / 100\" },\n    { \"label\": \"Flink\",  \"value\": 80 },\n    { \"label\": \"Trino\",  \"value\": 75 }\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "bar",
-          "rows": [
-            {
-              "label": "Spark",
-              "value": 95,
-              "display": "95 / 100"
-            },
-            {
-              "label": "Flink",
-              "value": 80,
-              "display": "80 / 100"
-            },
-            {
-              "label": "Trino",
-              "value": 75,
-              "display": "75 / 100"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bar\",\n  \"rows\": [\n    { \"label\": \"Spark\",  \"value\": 95, \"display\": \"95 / 100\" },\n    { \"label\": \"Flink\",  \"value\": 80 },\n    { \"label\": \"Trino\",  \"value\": 75 }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "bar",
+            "rows": [
+              {
+                "label": "Spark",
+                "value": 95,
+                "display": "95 / 100"
+              },
+              {
+                "label": "Flink",
+                "value": 80,
+                "display": "80 / 100"
+              },
+              {
+                "label": "Trino",
+                "value": 75,
+                "display": "75 / 100"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1486,52 +1522,55 @@
           "content": "Same shape as line — series of {x, y} points — but the curve is filled down to the baseline. Useful for cumulative metrics over time where magnitude matters as much as direction."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"area\",\n  \"x_label\": \"Day\",\n  \"y_label\": \"Active users\",\n  \"series\": [\n    { \"label\": \"Daily\", \"color\": \"accent\", \"data\": [\n      { \"x\": 1, \"y\": 40 }, { \"x\": 2, \"y\": 65 },\n      { \"x\": 3, \"y\": 55 }, { \"x\": 4, \"y\": 80 },\n      { \"x\": 5, \"y\": 95 }, { \"x\": 6, \"y\": 110 },\n      { \"x\": 7, \"y\": 130 }\n    ]}\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "area",
-          "title": "Active users — first week",
-          "x_label": "Day",
-          "y_label": "Active users",
-          "series": [
-            {
-              "label": "Daily",
-              "color": "accent",
-              "data": [
-                {
-                  "x": 1,
-                  "y": 40
-                },
-                {
-                  "x": 2,
-                  "y": 65
-                },
-                {
-                  "x": 3,
-                  "y": 55
-                },
-                {
-                  "x": 4,
-                  "y": 80
-                },
-                {
-                  "x": 5,
-                  "y": 95
-                },
-                {
-                  "x": 6,
-                  "y": 110
-                },
-                {
-                  "x": 7,
-                  "y": 130
-                }
-              ]
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"area\",\n  \"x_label\": \"Day\",\n  \"y_label\": \"Active users\",\n  \"series\": [\n    { \"label\": \"Daily\", \"color\": \"accent\", \"data\": [\n      { \"x\": 1, \"y\": 40 }, { \"x\": 2, \"y\": 65 },\n      { \"x\": 3, \"y\": 55 }, { \"x\": 4, \"y\": 80 },\n      { \"x\": 5, \"y\": 95 }, { \"x\": 6, \"y\": 110 },\n      { \"x\": 7, \"y\": 130 }\n    ]}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "area",
+            "title": "Active users — first week",
+            "x_label": "Day",
+            "y_label": "Active users",
+            "series": [
+              {
+                "label": "Daily",
+                "color": "accent",
+                "data": [
+                  {
+                    "x": 1,
+                    "y": 40
+                  },
+                  {
+                    "x": 2,
+                    "y": 65
+                  },
+                  {
+                    "x": 3,
+                    "y": 55
+                  },
+                  {
+                    "x": 4,
+                    "y": 80
+                  },
+                  {
+                    "x": 5,
+                    "y": 95
+                  },
+                  {
+                    "x": 6,
+                    "y": 110
+                  },
+                  {
+                    "x": 7,
+                    "y": 130
+                  }
+                ]
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1551,48 +1590,51 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bubble\",\n  \"x_label\": \"Cost\",\n  \"y_label\": \"Impact\",\n  \"series\": [\n    { \"label\": \"Initiatives\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"size\": 40,  \"label\": \"Search\" },\n      { \"x\": 6, \"y\": 9, \"size\": 120, \"label\": \"Auth\" },\n      { \"x\": 4, \"y\": 4, \"size\": 80,  \"label\": \"Logging\" },\n      { \"x\": 7, \"y\": 2, \"size\": 25,  \"label\": \"Theme\" }\n    ]}\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "bubble",
-          "title": "Initiatives — cost vs. impact vs. team-size",
-          "x_label": "Cost",
-          "y_label": "Impact",
-          "series": [
-            {
-              "label": "Initiatives",
-              "color": "accent",
-              "data": [
-                {
-                  "x": 2,
-                  "y": 8,
-                  "size": 40,
-                  "label": "Search"
-                },
-                {
-                  "x": 6,
-                  "y": 9,
-                  "size": 120,
-                  "label": "Auth"
-                },
-                {
-                  "x": 4,
-                  "y": 4,
-                  "size": 80,
-                  "label": "Logging"
-                },
-                {
-                  "x": 7,
-                  "y": 2,
-                  "size": 25,
-                  "label": "Theme"
-                }
-              ]
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bubble\",\n  \"x_label\": \"Cost\",\n  \"y_label\": \"Impact\",\n  \"series\": [\n    { \"label\": \"Initiatives\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"size\": 40,  \"label\": \"Search\" },\n      { \"x\": 6, \"y\": 9, \"size\": 120, \"label\": \"Auth\" },\n      { \"x\": 4, \"y\": 4, \"size\": 80,  \"label\": \"Logging\" },\n      { \"x\": 7, \"y\": 2, \"size\": 25,  \"label\": \"Theme\" }\n    ]}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "bubble",
+            "title": "Initiatives — cost vs. impact vs. team-size",
+            "x_label": "Cost",
+            "y_label": "Impact",
+            "series": [
+              {
+                "label": "Initiatives",
+                "color": "accent",
+                "data": [
+                  {
+                    "x": 2,
+                    "y": 8,
+                    "size": 40,
+                    "label": "Search"
+                  },
+                  {
+                    "x": 6,
+                    "y": 9,
+                    "size": 120,
+                    "label": "Auth"
+                  },
+                  {
+                    "x": 4,
+                    "y": 4,
+                    "size": 80,
+                    "label": "Logging"
+                  },
+                  {
+                    "x": 7,
+                    "y": 2,
+                    "size": 25,
+                    "label": "Theme"
+                  }
+                ]
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1627,54 +1669,57 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"quadrant\",\n  \"x_label\": \"Effort\",\n  \"y_label\": \"Value\",\n  \"quadrants\": {\n    \"x\": 5, \"y\": 5,\n    \"labels\": [\"Quick wins\", \"Big bets\", \"Skip\", \"Re-evaluate\"]\n  },\n  \"series\": [\n    { \"label\": \"Items\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"label\": \"A\" },\n      { \"x\": 7, \"y\": 8, \"label\": \"B\" },\n      { \"x\": 2, \"y\": 3, \"label\": \"C\" },\n      { \"x\": 8, \"y\": 2, \"label\": \"D\" }\n    ]}\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "quadrant",
-          "title": "Effort × value — decision matrix",
-          "x_label": "Effort",
-          "y_label": "Value",
-          "quadrants": {
-            "x": 5,
-            "y": 5,
-            "labels": [
-              "Quick wins",
-              "Big bets",
-              "Skip",
-              "Re-evaluate"
-            ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"quadrant\",\n  \"x_label\": \"Effort\",\n  \"y_label\": \"Value\",\n  \"quadrants\": {\n    \"x\": 5, \"y\": 5,\n    \"labels\": [\"Quick wins\", \"Big bets\", \"Skip\", \"Re-evaluate\"]\n  },\n  \"series\": [\n    { \"label\": \"Items\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"label\": \"A\" },\n      { \"x\": 7, \"y\": 8, \"label\": \"B\" },\n      { \"x\": 2, \"y\": 3, \"label\": \"C\" },\n      { \"x\": 8, \"y\": 2, \"label\": \"D\" }\n    ]}\n  ]\n}"
           },
-          "series": [
-            {
-              "label": "Items",
-              "color": "accent",
-              "data": [
-                {
-                  "x": 2,
-                  "y": 8,
-                  "label": "A"
-                },
-                {
-                  "x": 7,
-                  "y": 8,
-                  "label": "B"
-                },
-                {
-                  "x": 2,
-                  "y": 3,
-                  "label": "C"
-                },
-                {
-                  "x": 8,
-                  "y": 2,
-                  "label": "D"
-                }
+          "render": {
+            "kind": "chart",
+            "type": "quadrant",
+            "title": "Effort × value — decision matrix",
+            "x_label": "Effort",
+            "y_label": "Value",
+            "quadrants": {
+              "x": 5,
+              "y": 5,
+              "labels": [
+                "Quick wins",
+                "Big bets",
+                "Skip",
+                "Re-evaluate"
               ]
-            }
-          ]
+            },
+            "series": [
+              {
+                "label": "Items",
+                "color": "accent",
+                "data": [
+                  {
+                    "x": 2,
+                    "y": 8,
+                    "label": "A"
+                  },
+                  {
+                    "x": 7,
+                    "y": 8,
+                    "label": "B"
+                  },
+                  {
+                    "x": 2,
+                    "y": 3,
+                    "label": "C"
+                  },
+                  {
+                    "x": 8,
+                    "y": 2,
+                    "label": "D"
+                  }
+                ]
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1714,48 +1759,51 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"stacked-bar\",\n  \"title\": \"Build time by phase\",\n  \"categories\": [\"v1.0\", \"v1.1\", \"v1.2\"],\n  \"series\": [\n    { \"label\": \"compile\", \"color\": \"accent\",  \"values\": [12, 14, 11] },\n    { \"label\": \"test\",    \"color\": \"success\", \"values\": [8,  10, 12] },\n    { \"label\": \"package\", \"color\": \"warn\",    \"values\": [3,  4,  3] }\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "stacked-bar",
-          "title": "Build time by phase",
-          "categories": [
-            "v1.0",
-            "v1.1",
-            "v1.2"
-          ],
-          "series": [
-            {
-              "label": "compile",
-              "color": "accent",
-              "values": [
-                12,
-                14,
-                11
-              ]
-            },
-            {
-              "label": "test",
-              "color": "success",
-              "values": [
-                8,
-                10,
-                12
-              ]
-            },
-            {
-              "label": "package",
-              "color": "warn",
-              "values": [
-                3,
-                4,
-                3
-              ]
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"stacked-bar\",\n  \"title\": \"Build time by phase\",\n  \"categories\": [\"v1.0\", \"v1.1\", \"v1.2\"],\n  \"series\": [\n    { \"label\": \"compile\", \"color\": \"accent\",  \"values\": [12, 14, 11] },\n    { \"label\": \"test\",    \"color\": \"success\", \"values\": [8,  10, 12] },\n    { \"label\": \"package\", \"color\": \"warn\",    \"values\": [3,  4,  3] }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "stacked-bar",
+            "title": "Build time by phase",
+            "categories": [
+              "v1.0",
+              "v1.1",
+              "v1.2"
+            ],
+            "series": [
+              {
+                "label": "compile",
+                "color": "accent",
+                "values": [
+                  12,
+                  14,
+                  11
+                ]
+              },
+              {
+                "label": "test",
+                "color": "success",
+                "values": [
+                  8,
+                  10,
+                  12
+                ]
+              },
+              {
+                "label": "package",
+                "color": "warn",
+                "values": [
+                  3,
+                  4,
+                  3
+                ]
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1768,48 +1816,51 @@
           "content": "Same payload as stacked-bar, but each series renders as its own thin sub-bar within the row rather than stacking. Use for direct comparison across series within the same category."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"grouped-bar\",\n  \"title\": \"Latency by region\",\n  \"categories\": [\"p50\", \"p95\", \"p99\"],\n  \"series\": [\n    { \"label\": \"EU\", \"color\": \"accent\",  \"values\": [40, 110, 220] },\n    { \"label\": \"US\", \"color\": \"success\", \"values\": [55, 130, 260] },\n    { \"label\": \"AP\", \"color\": \"warn\",    \"values\": [70, 180, 340] }\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "grouped-bar",
-          "title": "Latency by region (ms)",
-          "categories": [
-            "p50",
-            "p95",
-            "p99"
-          ],
-          "series": [
-            {
-              "label": "EU",
-              "color": "accent",
-              "values": [
-                40,
-                110,
-                220
-              ]
-            },
-            {
-              "label": "US",
-              "color": "success",
-              "values": [
-                55,
-                130,
-                260
-              ]
-            },
-            {
-              "label": "AP",
-              "color": "warn",
-              "values": [
-                70,
-                180,
-                340
-              ]
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"grouped-bar\",\n  \"title\": \"Latency by region\",\n  \"categories\": [\"p50\", \"p95\", \"p99\"],\n  \"series\": [\n    { \"label\": \"EU\", \"color\": \"accent\",  \"values\": [40, 110, 220] },\n    { \"label\": \"US\", \"color\": \"success\", \"values\": [55, 130, 260] },\n    { \"label\": \"AP\", \"color\": \"warn\",    \"values\": [70, 180, 340] }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "grouped-bar",
+            "title": "Latency by region (ms)",
+            "categories": [
+              "p50",
+              "p95",
+              "p99"
+            ],
+            "series": [
+              {
+                "label": "EU",
+                "color": "accent",
+                "values": [
+                  40,
+                  110,
+                  220
+                ]
+              },
+              {
+                "label": "US",
+                "color": "success",
+                "values": [
+                  55,
+                  130,
+                  260
+                ]
+              },
+              {
+                "label": "AP",
+                "color": "warn",
+                "values": [
+                  70,
+                  180,
+                  340
+                ]
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1834,36 +1885,39 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"donut\",\n  \"title\": \"Page load breakdown\",\n  \"slices\": [\n    { \"label\": \"HTML\",  \"value\": 12, \"color\": \"accent\" },\n    { \"label\": \"CSS\",   \"value\": 28, \"color\": \"success\" },\n    { \"label\": \"JS\",    \"value\": 44, \"color\": \"warn\" },\n    { \"label\": \"Other\", \"value\": 16, \"color\": \"muted\" }\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "donut",
-          "title": "Page load breakdown (KB)",
-          "slices": [
-            {
-              "label": "HTML",
-              "value": 12,
-              "color": "accent"
-            },
-            {
-              "label": "CSS",
-              "value": 28,
-              "color": "success"
-            },
-            {
-              "label": "JS",
-              "value": 44,
-              "color": "warn"
-            },
-            {
-              "label": "Other",
-              "value": 16,
-              "color": "muted"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"donut\",\n  \"title\": \"Page load breakdown\",\n  \"slices\": [\n    { \"label\": \"HTML\",  \"value\": 12, \"color\": \"accent\" },\n    { \"label\": \"CSS\",   \"value\": 28, \"color\": \"success\" },\n    { \"label\": \"JS\",    \"value\": 44, \"color\": \"warn\" },\n    { \"label\": \"Other\", \"value\": 16, \"color\": \"muted\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "donut",
+            "title": "Page load breakdown (KB)",
+            "slices": [
+              {
+                "label": "HTML",
+                "value": 12,
+                "color": "accent"
+              },
+              {
+                "label": "CSS",
+                "value": 28,
+                "color": "success"
+              },
+              {
+                "label": "JS",
+                "value": 44,
+                "color": "warn"
+              },
+              {
+                "label": "Other",
+                "value": 16,
+                "color": "muted"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1876,62 +1930,65 @@
           "content": "N×M cell grid coloured by value. `cells` is a 2D array (outer = rows, inner = columns). Optional `row_labels` / `col_labels` annotate the edges. `scale` picks the palette family: sequential (one-sided ramp on accent) or diverging (accent for positives, danger for negatives). Hover any cell for the raw value."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"heatmap\",\n  \"title\": \"Latency by service × hour\",\n  \"row_labels\": [\"svc-a\", \"svc-b\", \"svc-c\"],\n  \"col_labels\": [\"00\", \"06\", \"12\", \"18\"],\n  \"cells\": [[12,18,42,30],[8,22,36,24],[40,50,28,16]]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "heatmap",
-          "title": "Latency by service × hour",
-          "row_labels": [
-            "svc-a",
-            "svc-b",
-            "svc-c",
-            "svc-d"
-          ],
-          "col_labels": [
-            "00",
-            "04",
-            "08",
-            "12",
-            "16",
-            "20"
-          ],
-          "cells": [
-            [
-              12,
-              18,
-              26,
-              42,
-              30,
-              18
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"heatmap\",\n  \"title\": \"Latency by service × hour\",\n  \"row_labels\": [\"svc-a\", \"svc-b\", \"svc-c\"],\n  \"col_labels\": [\"00\", \"06\", \"12\", \"18\"],\n  \"cells\": [[12,18,42,30],[8,22,36,24],[40,50,28,16]]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "heatmap",
+            "title": "Latency by service × hour",
+            "row_labels": [
+              "svc-a",
+              "svc-b",
+              "svc-c",
+              "svc-d"
             ],
-            [
-              8,
-              22,
-              36,
-              24,
-              16,
-              10
+            "col_labels": [
+              "00",
+              "04",
+              "08",
+              "12",
+              "16",
+              "20"
             ],
-            [
-              40,
-              50,
-              28,
-              16,
-              12,
-              8
-            ],
-            [
-              6,
-              12,
-              18,
-              24,
-              38,
-              50
+            "cells": [
+              [
+                12,
+                18,
+                26,
+                42,
+                30,
+                18
+              ],
+              [
+                8,
+                22,
+                36,
+                24,
+                16,
+                10
+              ],
+              [
+                40,
+                50,
+                28,
+                16,
+                12,
+                8
+              ],
+              [
+                6,
+                12,
+                18,
+                24,
+                38,
+                50
+              ]
             ]
-          ]
+          }
         },
         {
           "kind": "heading",
@@ -1944,29 +2001,32 @@
           "content": "Inline mini line / area / bar. No axes, no chrome — sized for the line height of surrounding prose. `values` is a flat numeric series. `variant` picks line (default), area (filled), or bar (per-value mini-bars). `end_label` renders to the right of the curve as a small caption (`62%`, `↗`, etc.)."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sparkline\",\n  \"values\": [12,14,18,17,22,25,28,31,30,35],\n  \"variant\": \"area\",\n  \"end_label\": \"35\"\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "sparkline",
-          "values": [
-            12,
-            14,
-            18,
-            17,
-            22,
-            25,
-            28,
-            31,
-            30,
-            35,
-            33,
-            38
-          ],
-          "variant": "area",
-          "end_label": "↗ 38"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sparkline\",\n  \"values\": [12,14,18,17,22,25,28,31,30,35],\n  \"variant\": \"area\",\n  \"end_label\": \"35\"\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "sparkline",
+            "values": [
+              12,
+              14,
+              18,
+              17,
+              22,
+              25,
+              28,
+              31,
+              30,
+              35,
+              33,
+              38
+            ],
+            "variant": "area",
+            "end_label": "↗ 38"
+          }
         },
         {
           "kind": "chart",
@@ -1995,36 +2055,39 @@
           "content": "Dot-matrix breakdown. Default 10×10 grid (= 100 cells). `segments` is a list of `{label, count, color}`; the renderer fills cells in order, one per unit count. The legend lives to the right of the grid with the percentage of each segment."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"waffle\",\n  \"title\": \"User-status breakdown\",\n  \"segments\": [\n    { \"label\": \"Active\",   \"count\": 40, \"color\": \"success\" },\n    { \"label\": \"Trialing\", \"count\": 25, \"color\": \"accent\" },\n    { \"label\": \"Paused\",   \"count\": 10, \"color\": \"warn\" },\n    { \"label\": \"Churned\",  \"count\": 25, \"color\": \"danger\" }\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "waffle",
-          "title": "User-status breakdown",
-          "segments": [
-            {
-              "label": "Active",
-              "count": 40,
-              "color": "success"
-            },
-            {
-              "label": "Trialing",
-              "count": 25,
-              "color": "accent"
-            },
-            {
-              "label": "Paused",
-              "count": 10,
-              "color": "warn"
-            },
-            {
-              "label": "Churned",
-              "count": 25,
-              "color": "danger"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"waffle\",\n  \"title\": \"User-status breakdown\",\n  \"segments\": [\n    { \"label\": \"Active\",   \"count\": 40, \"color\": \"success\" },\n    { \"label\": \"Trialing\", \"count\": 25, \"color\": \"accent\" },\n    { \"label\": \"Paused\",   \"count\": 10, \"color\": \"warn\" },\n    { \"label\": \"Churned\",  \"count\": 25, \"color\": \"danger\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "waffle",
+            "title": "User-status breakdown",
+            "segments": [
+              {
+                "label": "Active",
+                "count": 40,
+                "color": "success"
+              },
+              {
+                "label": "Trialing",
+                "count": 25,
+                "color": "accent"
+              },
+              {
+                "label": "Paused",
+                "count": 10,
+                "color": "warn"
+              },
+              {
+                "label": "Churned",
+                "count": 25,
+                "color": "danger"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2037,35 +2100,38 @@
           "content": "Semicircular arc, 0 → max, with a needle / fill at the current value and an optional target tick. Use for single-metric status (SLO budget, runway, uptime) where the gap to target is the point. Optional `zones` paint coloured threshold bands behind the value."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"gauge\",\n  \"title\": \"SLO budget\",\n  \"value\": 92,\n  \"max\": 100,\n  \"target\": 80,\n  \"label\": \"of monthly window remaining\",\n  \"zones\": [\n    { \"from\":  0, \"to\": 50, \"tone\": \"danger\"  },\n    { \"from\": 50, \"to\": 80, \"tone\": \"warn\"    },\n    { \"from\": 80, \"to\": 100,\"tone\": \"success\" }\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "gauge",
-          "title": "SLO budget",
-          "value": 92,
-          "max": 100,
-          "target": 80,
-          "label": "of monthly window remaining",
-          "zones": [
-            {
-              "from": 0,
-              "to": 50,
-              "tone": "danger"
-            },
-            {
-              "from": 50,
-              "to": 80,
-              "tone": "warn"
-            },
-            {
-              "from": 80,
-              "to": 100,
-              "tone": "success"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"gauge\",\n  \"title\": \"SLO budget\",\n  \"value\": 92,\n  \"max\": 100,\n  \"target\": 80,\n  \"label\": \"of monthly window remaining\",\n  \"zones\": [\n    { \"from\":  0, \"to\": 50, \"tone\": \"danger\"  },\n    { \"from\": 50, \"to\": 80, \"tone\": \"warn\"    },\n    { \"from\": 80, \"to\": 100,\"tone\": \"success\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "gauge",
+            "title": "SLO budget",
+            "value": 92,
+            "max": 100,
+            "target": 80,
+            "label": "of monthly window remaining",
+            "zones": [
+              {
+                "from": 0,
+                "to": 50,
+                "tone": "danger"
+              },
+              {
+                "from": 50,
+                "to": 80,
+                "tone": "warn"
+              },
+              {
+                "from": 80,
+                "to": 100,
+                "tone": "success"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2078,55 +2144,58 @@
           "content": "N spokes radiating from centre, one filled polygon per series. Best for 3–8 axes and 1–4 series. `axes[].label` names the spoke; optional `axes[].max` overrides per-axis scaling. `series[].values` array must align with `axes` by index."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"radar\",\n  \"title\": \"Tool shortlist — five criteria\",\n  \"axes\": [\n    { \"label\": \"Speed\"   },\n    { \"label\": \"UX\"      },\n    { \"label\": \"Cost\"    },\n    { \"label\": \"Docs\"    },\n    { \"label\": \"Support\" }\n  ],\n  \"series\": [\n    { \"label\": \"Option A\", \"color\": \"accent\",  \"values\": [8, 9, 6, 7, 8] },\n    { \"label\": \"Option B\", \"color\": \"success\", \"values\": [6, 7, 9, 5, 6] }\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "radar",
-          "title": "Tool shortlist — five criteria",
-          "axes": [
-            {
-              "label": "Speed"
-            },
-            {
-              "label": "UX"
-            },
-            {
-              "label": "Cost"
-            },
-            {
-              "label": "Docs"
-            },
-            {
-              "label": "Support"
-            }
-          ],
-          "series": [
-            {
-              "label": "Option A",
-              "color": "accent",
-              "values": [
-                8,
-                9,
-                6,
-                7,
-                8
-              ]
-            },
-            {
-              "label": "Option B",
-              "color": "success",
-              "values": [
-                6,
-                7,
-                9,
-                5,
-                6
-              ]
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"radar\",\n  \"title\": \"Tool shortlist — five criteria\",\n  \"axes\": [\n    { \"label\": \"Speed\"   },\n    { \"label\": \"UX\"      },\n    { \"label\": \"Cost\"    },\n    { \"label\": \"Docs\"    },\n    { \"label\": \"Support\" }\n  ],\n  \"series\": [\n    { \"label\": \"Option A\", \"color\": \"accent\",  \"values\": [8, 9, 6, 7, 8] },\n    { \"label\": \"Option B\", \"color\": \"success\", \"values\": [6, 7, 9, 5, 6] }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "radar",
+            "title": "Tool shortlist — five criteria",
+            "axes": [
+              {
+                "label": "Speed"
+              },
+              {
+                "label": "UX"
+              },
+              {
+                "label": "Cost"
+              },
+              {
+                "label": "Docs"
+              },
+              {
+                "label": "Support"
+              }
+            ],
+            "series": [
+              {
+                "label": "Option A",
+                "color": "accent",
+                "values": [
+                  8,
+                  9,
+                  6,
+                  7,
+                  8
+                ]
+              },
+              {
+                "label": "Option B",
+                "color": "success",
+                "values": [
+                  6,
+                  7,
+                  9,
+                  5,
+                  6
+                ]
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2139,50 +2208,53 @@
           "content": "Quartiles + whiskers + optional outliers — one row per `boxes[]` entry. Required: `min`, `q1`, `median`, `q3`, `max`. Optional: `outliers: [Number]` rendered as dots beyond the whiskers."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"box-plot\",\n  \"title\": \"Cold-start latency (ms) per region\",\n  \"boxes\": [\n    { \"label\": \"us-east-1\",  \"min\": 18, \"q1\": 32, \"median\": 48, \"q3\": 60, \"max\": 86, \"outliers\": [120] },\n    { \"label\": \"eu-west-1\",  \"min\": 22, \"q1\": 38, \"median\": 52, \"q3\": 66, \"max\": 92 },\n    { \"label\": \"ap-south-1\", \"min\": 38, \"q1\": 62, \"median\": 78, \"q3\": 96, \"max\": 132, \"outliers\": [180, 210] }\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "box-plot",
-          "title": "Cold-start latency (ms) per region",
-          "boxes": [
-            {
-              "label": "us-east-1",
-              "min": 18,
-              "q1": 32,
-              "median": 48,
-              "q3": 60,
-              "max": 86,
-              "outliers": [
-                120
-              ],
-              "color": "accent"
-            },
-            {
-              "label": "eu-west-1",
-              "min": 22,
-              "q1": 38,
-              "median": 52,
-              "q3": 66,
-              "max": 92,
-              "color": "success"
-            },
-            {
-              "label": "ap-south-1",
-              "min": 38,
-              "q1": 62,
-              "median": 78,
-              "q3": 96,
-              "max": 132,
-              "outliers": [
-                180,
-                210
-              ],
-              "color": "warn"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"box-plot\",\n  \"title\": \"Cold-start latency (ms) per region\",\n  \"boxes\": [\n    { \"label\": \"us-east-1\",  \"min\": 18, \"q1\": 32, \"median\": 48, \"q3\": 60, \"max\": 86, \"outliers\": [120] },\n    { \"label\": \"eu-west-1\",  \"min\": 22, \"q1\": 38, \"median\": 52, \"q3\": 66, \"max\": 92 },\n    { \"label\": \"ap-south-1\", \"min\": 38, \"q1\": 62, \"median\": 78, \"q3\": 96, \"max\": 132, \"outliers\": [180, 210] }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "box-plot",
+            "title": "Cold-start latency (ms) per region",
+            "boxes": [
+              {
+                "label": "us-east-1",
+                "min": 18,
+                "q1": 32,
+                "median": 48,
+                "q3": 60,
+                "max": 86,
+                "outliers": [
+                  120
+                ],
+                "color": "accent"
+              },
+              {
+                "label": "eu-west-1",
+                "min": 22,
+                "q1": 38,
+                "median": 52,
+                "q3": 66,
+                "max": 92,
+                "color": "success"
+              },
+              {
+                "label": "ap-south-1",
+                "min": 38,
+                "q1": 62,
+                "median": 78,
+                "q3": 96,
+                "max": 132,
+                "outliers": [
+                  180,
+                  210
+                ],
+                "color": "warn"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2195,71 +2267,74 @@
           "content": "Actual-vs-target on a banded horizontal track — Stephen Few's bullet chart. One row per `tracks[]` entry: `label`, `value` (current), `target` (optional vertical tick), `max` (right-edge), optional `zones` painted behind the value."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bullet\",\n  \"title\": \"Quarter at a glance\",\n  \"tracks\": [\n    { \"label\": \"Revenue ($M)\", \"value\": 92, \"target\": 80, \"max\": 120,\n      \"zones\": [{ \"from\":0, \"to\":40, \"tone\":\"danger\" }, { \"from\":40, \"to\":80, \"tone\":\"warn\" }, { \"from\":80, \"to\":120, \"tone\":\"success\" }] },\n    { \"label\": \"NPS\",          \"value\": 58, \"target\": 65, \"max\": 100, \"color\": \"warn\" }\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "bullet",
-          "title": "Quarter at a glance",
-          "tracks": [
-            {
-              "label": "Revenue ($M)",
-              "value": 92,
-              "target": 80,
-              "max": 120,
-              "color": "success",
-              "zones": [
-                {
-                  "from": 0,
-                  "to": 40,
-                  "tone": "danger"
-                },
-                {
-                  "from": 40,
-                  "to": 80,
-                  "tone": "warn"
-                },
-                {
-                  "from": 80,
-                  "to": 120,
-                  "tone": "success"
-                }
-              ]
-            },
-            {
-              "label": "NPS",
-              "value": 58,
-              "target": 65,
-              "max": 100,
-              "color": "warn",
-              "zones": [
-                {
-                  "from": 0,
-                  "to": 30,
-                  "tone": "danger"
-                },
-                {
-                  "from": 30,
-                  "to": 60,
-                  "tone": "warn"
-                },
-                {
-                  "from": 60,
-                  "to": 100,
-                  "tone": "success"
-                }
-              ]
-            },
-            {
-              "label": "Churn (%)",
-              "value": 3,
-              "target": 5,
-              "max": 12,
-              "color": "success"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bullet\",\n  \"title\": \"Quarter at a glance\",\n  \"tracks\": [\n    { \"label\": \"Revenue ($M)\", \"value\": 92, \"target\": 80, \"max\": 120,\n      \"zones\": [{ \"from\":0, \"to\":40, \"tone\":\"danger\" }, { \"from\":40, \"to\":80, \"tone\":\"warn\" }, { \"from\":80, \"to\":120, \"tone\":\"success\" }] },\n    { \"label\": \"NPS\",          \"value\": 58, \"target\": 65, \"max\": 100, \"color\": \"warn\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "bullet",
+            "title": "Quarter at a glance",
+            "tracks": [
+              {
+                "label": "Revenue ($M)",
+                "value": 92,
+                "target": 80,
+                "max": 120,
+                "color": "success",
+                "zones": [
+                  {
+                    "from": 0,
+                    "to": 40,
+                    "tone": "danger"
+                  },
+                  {
+                    "from": 40,
+                    "to": 80,
+                    "tone": "warn"
+                  },
+                  {
+                    "from": 80,
+                    "to": 120,
+                    "tone": "success"
+                  }
+                ]
+              },
+              {
+                "label": "NPS",
+                "value": 58,
+                "target": 65,
+                "max": 100,
+                "color": "warn",
+                "zones": [
+                  {
+                    "from": 0,
+                    "to": 30,
+                    "tone": "danger"
+                  },
+                  {
+                    "from": 30,
+                    "to": 60,
+                    "tone": "warn"
+                  },
+                  {
+                    "from": 60,
+                    "to": 100,
+                    "tone": "success"
+                  }
+                ]
+              },
+              {
+                "label": "Churn (%)",
+                "value": 3,
+                "target": 5,
+                "max": 12,
+                "color": "success"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2272,33 +2347,36 @@
           "content": "Two-time-point change — left column is `from`, right column is `to`, one slope line per `items[]` entry. The renderer auto-colours rising as success and falling as danger unless an explicit `color` is set. Use this when ‘who went up, who went down’ is the question."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"slope\",\n  \"title\": \"Page-load p95 (ms) — before / after CDN\",\n  \"from_label\": \"Before\",\n  \"to_label\":   \"After\",\n  \"items\": [\n    { \"label\": \"/home\",      \"from\": 1400, \"to\":  680 },\n    { \"label\": \"/dashboard\", \"from\": 2200, \"to\": 1100 },\n    { \"label\": \"/settings\",  \"from\":  900, \"to\": 1500 }\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "slope",
-          "title": "Page-load p95 (ms) — before / after CDN",
-          "from_label": "Before",
-          "to_label": "After",
-          "items": [
-            {
-              "label": "/home",
-              "from": 1400,
-              "to": 680
-            },
-            {
-              "label": "/dashboard",
-              "from": 2200,
-              "to": 1100
-            },
-            {
-              "label": "/settings",
-              "from": 900,
-              "to": 1500
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"slope\",\n  \"title\": \"Page-load p95 (ms) — before / after CDN\",\n  \"from_label\": \"Before\",\n  \"to_label\":   \"After\",\n  \"items\": [\n    { \"label\": \"/home\",      \"from\": 1400, \"to\":  680 },\n    { \"label\": \"/dashboard\", \"from\": 2200, \"to\": 1100 },\n    { \"label\": \"/settings\",  \"from\":  900, \"to\": 1500 }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "slope",
+            "title": "Page-load p95 (ms) — before / after CDN",
+            "from_label": "Before",
+            "to_label": "After",
+            "items": [
+              {
+                "label": "/home",
+                "from": 1400,
+                "to": 680
+              },
+              {
+                "label": "/dashboard",
+                "from": 2200,
+                "to": 1100
+              },
+              {
+                "label": "/settings",
+                "from": 900,
+                "to": 1500
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2311,46 +2389,49 @@
           "content": "Frequency by bin. Author supplies the binning (`bins[]` with `{lo, hi, count}`). Contiguous bins read as a connected distribution; gaps are allowed but render with the visible gap. Use for distribution shape, latency tail, time-to-event."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"histogram\",\n  \"title\": \"Request latency (ms)\",\n  \"bins\": [\n    {\"lo\":   0, \"hi\":  20, \"count\":  4},\n    {\"lo\":  20, \"hi\":  40, \"count\": 14},\n    {\"lo\":  40, \"hi\":  60, \"count\": 22},\n    {\"lo\":  60, \"hi\":  80, \"count\": 18},\n    {\"lo\":  80, \"hi\": 100, \"count\":  9},\n    {\"lo\": 100, \"hi\": 120, \"count\":  3}\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "histogram",
-          "title": "Request latency (ms)",
-          "bins": [
-            {
-              "lo": 0,
-              "hi": 20,
-              "count": 4
-            },
-            {
-              "lo": 20,
-              "hi": 40,
-              "count": 14
-            },
-            {
-              "lo": 40,
-              "hi": 60,
-              "count": 22
-            },
-            {
-              "lo": 60,
-              "hi": 80,
-              "count": 18
-            },
-            {
-              "lo": 80,
-              "hi": 100,
-              "count": 9
-            },
-            {
-              "lo": 100,
-              "hi": 120,
-              "count": 3
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"histogram\",\n  \"title\": \"Request latency (ms)\",\n  \"bins\": [\n    {\"lo\":   0, \"hi\":  20, \"count\":  4},\n    {\"lo\":  20, \"hi\":  40, \"count\": 14},\n    {\"lo\":  40, \"hi\":  60, \"count\": 22},\n    {\"lo\":  60, \"hi\":  80, \"count\": 18},\n    {\"lo\":  80, \"hi\": 100, \"count\":  9},\n    {\"lo\": 100, \"hi\": 120, \"count\":  3}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "histogram",
+            "title": "Request latency (ms)",
+            "bins": [
+              {
+                "lo": 0,
+                "hi": 20,
+                "count": 4
+              },
+              {
+                "lo": 20,
+                "hi": 40,
+                "count": 14
+              },
+              {
+                "lo": 40,
+                "hi": 60,
+                "count": 22
+              },
+              {
+                "lo": 60,
+                "hi": 80,
+                "count": 18
+              },
+              {
+                "lo": 80,
+                "hi": 100,
+                "count": 9
+              },
+              {
+                "lo": 100,
+                "hi": 120,
+                "count": 3
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2363,37 +2444,40 @@
           "content": "Year-in-cells activity grid. `date_values` is a map of ISO date → numeric value; days missing from the map render faintly to show the calendar shape. Mon, Wed, Fri labels along the left; month names along the top at the first cell of each month."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"calendar-heatmap\",\n  \"title\": \"Commits in 2026\",\n  \"year\": 2026,\n  \"date_values\": {\n    \"2026-01-04\": 3, \"2026-01-12\": 9,\n    \"2026-03-22\": 14, \"2026-07-01\": 6,\n    \"2026-11-15\": 11, \"2026-12-30\": 4\n  }\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "calendar-heatmap",
-          "title": "Commits in 2026 (sample)",
-          "year": 2026,
-          "date_values": {
-            "2026-01-04": 3,
-            "2026-01-12": 9,
-            "2026-01-18": 6,
-            "2026-02-03": 8,
-            "2026-02-17": 12,
-            "2026-02-28": 5,
-            "2026-03-08": 14,
-            "2026-03-22": 17,
-            "2026-03-30": 9,
-            "2026-04-11": 6,
-            "2026-04-25": 10,
-            "2026-05-09": 13,
-            "2026-05-22": 22,
-            "2026-06-15": 8,
-            "2026-07-04": 4,
-            "2026-08-19": 11,
-            "2026-09-30": 7,
-            "2026-10-12": 9,
-            "2026-11-15": 16,
-            "2026-11-29": 4,
-            "2026-12-22": 6
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"calendar-heatmap\",\n  \"title\": \"Commits in 2026\",\n  \"year\": 2026,\n  \"date_values\": {\n    \"2026-01-04\": 3, \"2026-01-12\": 9,\n    \"2026-03-22\": 14, \"2026-07-01\": 6,\n    \"2026-11-15\": 11, \"2026-12-30\": 4\n  }\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "calendar-heatmap",
+            "title": "Commits in 2026 (sample)",
+            "year": 2026,
+            "date_values": {
+              "2026-01-04": 3,
+              "2026-01-12": 9,
+              "2026-01-18": 6,
+              "2026-02-03": 8,
+              "2026-02-17": 12,
+              "2026-02-28": 5,
+              "2026-03-08": 14,
+              "2026-03-22": 17,
+              "2026-03-30": 9,
+              "2026-04-11": 6,
+              "2026-04-25": 10,
+              "2026-05-09": 13,
+              "2026-05-22": 22,
+              "2026-06-15": 8,
+              "2026-07-04": 4,
+              "2026-08-19": 11,
+              "2026-09-30": 7,
+              "2026-10-12": 9,
+              "2026-11-15": 16,
+              "2026-11-29": 4,
+              "2026-12-22": 6
+            }
           }
         },
         {
@@ -2407,41 +2491,44 @@
           "content": "Area-proportional nested rectangles via squarified layout. `tree[]` is a flat list of `{label, value, color?}` leaves; the largest values occupy the largest rectangles. Labels render only when the rectangle is large enough to fit them legibly. Use for composition (LoC by language, spend by category, traffic by route)."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"treemap\",\n  \"title\": \"LoC by language\",\n  \"tree\": [\n    {\"label\": \"JavaScript\", \"value\": 6200, \"color\": \"accent\"},\n    {\"label\": \"CSS\",        \"value\": 2400, \"color\": \"success\"},\n    {\"label\": \"Python\",     \"value\": 2800, \"color\": \"warn\"},\n    {\"label\": \"JSON\",       \"value\":  900, \"color\": \"muted\"},\n    {\"label\": \"Markdown\",   \"value\":  400, \"color\": \"danger\"}\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "treemap",
-          "title": "LoC by language",
-          "tree": [
-            {
-              "label": "JavaScript",
-              "value": 6200,
-              "color": "accent"
-            },
-            {
-              "label": "CSS",
-              "value": 2400,
-              "color": "success"
-            },
-            {
-              "label": "Python",
-              "value": 2800,
-              "color": "warn"
-            },
-            {
-              "label": "JSON",
-              "value": 900,
-              "color": "muted"
-            },
-            {
-              "label": "Markdown",
-              "value": 400,
-              "color": "danger"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"treemap\",\n  \"title\": \"LoC by language\",\n  \"tree\": [\n    {\"label\": \"JavaScript\", \"value\": 6200, \"color\": \"accent\"},\n    {\"label\": \"CSS\",        \"value\": 2400, \"color\": \"success\"},\n    {\"label\": \"Python\",     \"value\": 2800, \"color\": \"warn\"},\n    {\"label\": \"JSON\",       \"value\":  900, \"color\": \"muted\"},\n    {\"label\": \"Markdown\",   \"value\":  400, \"color\": \"danger\"}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "treemap",
+            "title": "LoC by language",
+            "tree": [
+              {
+                "label": "JavaScript",
+                "value": 6200,
+                "color": "accent"
+              },
+              {
+                "label": "CSS",
+                "value": 2400,
+                "color": "success"
+              },
+              {
+                "label": "Python",
+                "value": 2800,
+                "color": "warn"
+              },
+              {
+                "label": "JSON",
+                "value": 900,
+                "color": "muted"
+              },
+              {
+                "label": "Markdown",
+                "value": 400,
+                "color": "danger"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2454,102 +2541,105 @@
           "content": "Stacked small-distributions, one per row. `distributions[].values` is a flat sample; the renderer bins each sample into ~30 buckets over the global range. Read for shape comparison across groups (per-region latency, per-cohort engagement)."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"ridgeline\",\n  \"title\": \"Per-region latency (ms)\",\n  \"distributions\": [\n    {\"label\": \"us-east-1\",  \"values\": [..raw samples..]},\n    {\"label\": \"eu-west-1\",  \"values\": [..raw samples..]},\n    {\"label\": \"ap-south-1\", \"values\": [..raw samples..]}\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "ridgeline",
-          "title": "Per-region cold-start latency (ms)",
-          "distributions": [
-            {
-              "label": "us-east-1",
-              "color": "accent",
-              "values": [
-                22,
-                28,
-                30,
-                34,
-                36,
-                38,
-                40,
-                42,
-                44,
-                46,
-                48,
-                50,
-                52,
-                54,
-                56,
-                60,
-                62,
-                64,
-                68,
-                72,
-                76,
-                82,
-                90
-              ]
-            },
-            {
-              "label": "eu-west-1",
-              "color": "success",
-              "values": [
-                32,
-                38,
-                42,
-                44,
-                46,
-                48,
-                50,
-                52,
-                54,
-                56,
-                58,
-                60,
-                62,
-                64,
-                66,
-                68,
-                72,
-                76,
-                82,
-                90,
-                96
-              ]
-            },
-            {
-              "label": "ap-south-1",
-              "color": "warn",
-              "values": [
-                48,
-                56,
-                62,
-                66,
-                68,
-                72,
-                76,
-                80,
-                84,
-                88,
-                92,
-                96,
-                100,
-                108,
-                116,
-                124,
-                132,
-                140,
-                148,
-                156,
-                168,
-                180,
-                192,
-                206
-              ]
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"ridgeline\",\n  \"title\": \"Per-region latency (ms)\",\n  \"distributions\": [\n    {\"label\": \"us-east-1\",  \"values\": [..raw samples..]},\n    {\"label\": \"eu-west-1\",  \"values\": [..raw samples..]},\n    {\"label\": \"ap-south-1\", \"values\": [..raw samples..]}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "ridgeline",
+            "title": "Per-region cold-start latency (ms)",
+            "distributions": [
+              {
+                "label": "us-east-1",
+                "color": "accent",
+                "values": [
+                  22,
+                  28,
+                  30,
+                  34,
+                  36,
+                  38,
+                  40,
+                  42,
+                  44,
+                  46,
+                  48,
+                  50,
+                  52,
+                  54,
+                  56,
+                  60,
+                  62,
+                  64,
+                  68,
+                  72,
+                  76,
+                  82,
+                  90
+                ]
+              },
+              {
+                "label": "eu-west-1",
+                "color": "success",
+                "values": [
+                  32,
+                  38,
+                  42,
+                  44,
+                  46,
+                  48,
+                  50,
+                  52,
+                  54,
+                  56,
+                  58,
+                  60,
+                  62,
+                  64,
+                  66,
+                  68,
+                  72,
+                  76,
+                  82,
+                  90,
+                  96
+                ]
+              },
+              {
+                "label": "ap-south-1",
+                "color": "warn",
+                "values": [
+                  48,
+                  56,
+                  62,
+                  66,
+                  68,
+                  72,
+                  76,
+                  80,
+                  84,
+                  88,
+                  92,
+                  96,
+                  100,
+                  108,
+                  116,
+                  124,
+                  132,
+                  140,
+                  148,
+                  156,
+                  168,
+                  180,
+                  192,
+                  206
+                ]
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2562,41 +2652,44 @@
           "content": "Conversion-stage drop-off. `stages[]` is an ordered list of `{label, value, color?}`. The renderer draws a tapered band between adjacent stages; the right-hand readout shows the value + percentage of the first stage."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"funnel\",\n  \"title\": \"Signup conversion\",\n  \"stages\": [\n    {\"label\": \"Visitors\",   \"value\": 1000},\n    {\"label\": \"Signed up\",  \"value\":  680},\n    {\"label\": \"Activated\",  \"value\":  430},\n    {\"label\": \"Upgraded\",   \"value\":  180},\n    {\"label\": \"Retained 30d\",\"value\":  120}\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "funnel",
-          "title": "Signup conversion",
-          "stages": [
-            {
-              "label": "Visitors",
-              "value": 1000,
-              "color": "muted"
-            },
-            {
-              "label": "Signed up",
-              "value": 680,
-              "color": "accent"
-            },
-            {
-              "label": "Activated",
-              "value": 430,
-              "color": "accent"
-            },
-            {
-              "label": "Upgraded",
-              "value": 180,
-              "color": "warn"
-            },
-            {
-              "label": "Retained 30d",
-              "value": 120,
-              "color": "success"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"funnel\",\n  \"title\": \"Signup conversion\",\n  \"stages\": [\n    {\"label\": \"Visitors\",   \"value\": 1000},\n    {\"label\": \"Signed up\",  \"value\":  680},\n    {\"label\": \"Activated\",  \"value\":  430},\n    {\"label\": \"Upgraded\",   \"value\":  180},\n    {\"label\": \"Retained 30d\",\"value\":  120}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "funnel",
+            "title": "Signup conversion",
+            "stages": [
+              {
+                "label": "Visitors",
+                "value": 1000,
+                "color": "muted"
+              },
+              {
+                "label": "Signed up",
+                "value": 680,
+                "color": "accent"
+              },
+              {
+                "label": "Activated",
+                "value": 430,
+                "color": "accent"
+              },
+              {
+                "label": "Upgraded",
+                "value": 180,
+                "color": "warn"
+              },
+              {
+                "label": "Retained 30d",
+                "value": 120,
+                "color": "success"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2609,88 +2702,91 @@
           "content": "Flow between stages with curved ribbons sized by link value. <code>nodes[]</code> is <code>{id, label?, color?}</code>; <code>links[]</code> is <code>{source, target, value}</code> referencing node ids. The renderer derives the left-to-right column placement from the link graph (BFS depth), stacks nodes within each column by their incoming-or-outgoing total, and routes a cubic-Bezier ribbon between every pair."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sankey\",\n  \"title\": \"Where time goes\",\n  \"nodes\": [\n    {\"id\": \"source\",  \"label\": \"Working hours\", \"color\": \"muted\"},\n    {\"id\": \"build\",   \"label\": \"Shipping\",   \"color\": \"accent\"},\n    {\"id\": \"plan\",    \"label\": \"Planning\",   \"color\": \"accent\"},\n    {\"id\": \"meet\",    \"label\": \"Meetings\",   \"color\": \"warn\"},\n    {\"id\": \"code\",    \"label\": \"Code\",       \"color\": \"success\"},\n    {\"id\": \"review\",  \"label\": \"Review\",     \"color\": \"success\"},\n    {\"id\": \"docs\",    \"label\": \"Docs\",       \"color\": \"accent\"}\n  ],\n  \"links\": [\n    {\"source\": \"source\", \"target\": \"build\",  \"value\": 24},\n    {\"source\": \"source\", \"target\": \"plan\",   \"value\":  9},\n    {\"source\": \"source\", \"target\": \"meet\",   \"value\":  7},\n    {\"source\": \"build\",  \"target\": \"code\",   \"value\": 14},\n    {\"source\": \"build\",  \"target\": \"review\", \"value\":  6},\n    {\"source\": \"build\",  \"target\": \"docs\",   \"value\":  4},\n    {\"source\": \"plan\",   \"target\": \"docs\",   \"value\":  3}\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "sankey",
-          "title": "Where time goes",
-          "nodes": [
-            {
-              "id": "source",
-              "label": "Working hours",
-              "color": "muted"
-            },
-            {
-              "id": "build",
-              "label": "Shipping",
-              "color": "accent"
-            },
-            {
-              "id": "plan",
-              "label": "Planning",
-              "color": "accent"
-            },
-            {
-              "id": "meet",
-              "label": "Meetings",
-              "color": "warn"
-            },
-            {
-              "id": "code",
-              "label": "Code",
-              "color": "success"
-            },
-            {
-              "id": "review",
-              "label": "Review",
-              "color": "success"
-            },
-            {
-              "id": "docs",
-              "label": "Docs",
-              "color": "accent"
-            }
-          ],
-          "links": [
-            {
-              "source": "source",
-              "target": "build",
-              "value": 24
-            },
-            {
-              "source": "source",
-              "target": "plan",
-              "value": 9
-            },
-            {
-              "source": "source",
-              "target": "meet",
-              "value": 7
-            },
-            {
-              "source": "build",
-              "target": "code",
-              "value": 14
-            },
-            {
-              "source": "build",
-              "target": "review",
-              "value": 6
-            },
-            {
-              "source": "build",
-              "target": "docs",
-              "value": 4
-            },
-            {
-              "source": "plan",
-              "target": "docs",
-              "value": 3
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sankey\",\n  \"title\": \"Where time goes\",\n  \"nodes\": [\n    {\"id\": \"source\",  \"label\": \"Working hours\", \"color\": \"muted\"},\n    {\"id\": \"build\",   \"label\": \"Shipping\",   \"color\": \"accent\"},\n    {\"id\": \"plan\",    \"label\": \"Planning\",   \"color\": \"accent\"},\n    {\"id\": \"meet\",    \"label\": \"Meetings\",   \"color\": \"warn\"},\n    {\"id\": \"code\",    \"label\": \"Code\",       \"color\": \"success\"},\n    {\"id\": \"review\",  \"label\": \"Review\",     \"color\": \"success\"},\n    {\"id\": \"docs\",    \"label\": \"Docs\",       \"color\": \"accent\"}\n  ],\n  \"links\": [\n    {\"source\": \"source\", \"target\": \"build\",  \"value\": 24},\n    {\"source\": \"source\", \"target\": \"plan\",   \"value\":  9},\n    {\"source\": \"source\", \"target\": \"meet\",   \"value\":  7},\n    {\"source\": \"build\",  \"target\": \"code\",   \"value\": 14},\n    {\"source\": \"build\",  \"target\": \"review\", \"value\":  6},\n    {\"source\": \"build\",  \"target\": \"docs\",   \"value\":  4},\n    {\"source\": \"plan\",   \"target\": \"docs\",   \"value\":  3}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "sankey",
+            "title": "Where time goes",
+            "nodes": [
+              {
+                "id": "source",
+                "label": "Working hours",
+                "color": "muted"
+              },
+              {
+                "id": "build",
+                "label": "Shipping",
+                "color": "accent"
+              },
+              {
+                "id": "plan",
+                "label": "Planning",
+                "color": "accent"
+              },
+              {
+                "id": "meet",
+                "label": "Meetings",
+                "color": "warn"
+              },
+              {
+                "id": "code",
+                "label": "Code",
+                "color": "success"
+              },
+              {
+                "id": "review",
+                "label": "Review",
+                "color": "success"
+              },
+              {
+                "id": "docs",
+                "label": "Docs",
+                "color": "accent"
+              }
+            ],
+            "links": [
+              {
+                "source": "source",
+                "target": "build",
+                "value": 24
+              },
+              {
+                "source": "source",
+                "target": "plan",
+                "value": 9
+              },
+              {
+                "source": "source",
+                "target": "meet",
+                "value": 7
+              },
+              {
+                "source": "build",
+                "target": "code",
+                "value": 14
+              },
+              {
+                "source": "build",
+                "target": "review",
+                "value": 6
+              },
+              {
+                "source": "build",
+                "target": "docs",
+                "value": 4
+              },
+              {
+                "source": "plan",
+                "target": "docs",
+                "value": 3
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2703,68 +2799,71 @@
           "content": "Node-link diagram with a small Fruchterman-Reingold-ish force relaxation (~60 iterations on each render). Best for graphs up to ~50 nodes — bigger structures need a real graph-viz library. <code>nodes[]</code> + <code>links[]</code> share the same shape as <code>sankey</code>. Node radius scales with degree; hovering a node surfaces its label + degree in the tooltip."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"network\",\n  \"title\": \"Pages link graph\",\n  \"nodes\": [\n    {\"id\": \"index\"},     {\"id\": \"reference\"},  {\"id\": \"glossary\"},\n    {\"id\": \"architecture\"}, {\"id\": \"cli\"},   {\"id\": \"roadmap\"}\n  ],\n  \"links\": [\n    {\"source\": \"index\", \"target\": \"reference\"},\n    {\"source\": \"index\", \"target\": \"glossary\"},\n    {\"source\": \"index\", \"target\": \"architecture\"},\n    {\"source\": \"index\", \"target\": \"cli\"},\n    {\"source\": \"index\", \"target\": \"roadmap\"},\n    {\"source\": \"reference\", \"target\": \"glossary\"},\n    {\"source\": \"reference\", \"target\": \"architecture\"},\n    {\"source\": \"architecture\", \"target\": \"cli\"}\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "network",
-          "title": "Pages link graph",
-          "nodes": [
-            {
-              "id": "index"
-            },
-            {
-              "id": "reference"
-            },
-            {
-              "id": "glossary"
-            },
-            {
-              "id": "architecture"
-            },
-            {
-              "id": "cli"
-            },
-            {
-              "id": "roadmap"
-            }
-          ],
-          "links": [
-            {
-              "source": "index",
-              "target": "reference"
-            },
-            {
-              "source": "index",
-              "target": "glossary"
-            },
-            {
-              "source": "index",
-              "target": "architecture"
-            },
-            {
-              "source": "index",
-              "target": "cli"
-            },
-            {
-              "source": "index",
-              "target": "roadmap"
-            },
-            {
-              "source": "reference",
-              "target": "glossary"
-            },
-            {
-              "source": "reference",
-              "target": "architecture"
-            },
-            {
-              "source": "architecture",
-              "target": "cli"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"network\",\n  \"title\": \"Pages link graph\",\n  \"nodes\": [\n    {\"id\": \"index\"},     {\"id\": \"reference\"},  {\"id\": \"glossary\"},\n    {\"id\": \"architecture\"}, {\"id\": \"cli\"},   {\"id\": \"roadmap\"}\n  ],\n  \"links\": [\n    {\"source\": \"index\", \"target\": \"reference\"},\n    {\"source\": \"index\", \"target\": \"glossary\"},\n    {\"source\": \"index\", \"target\": \"architecture\"},\n    {\"source\": \"index\", \"target\": \"cli\"},\n    {\"source\": \"index\", \"target\": \"roadmap\"},\n    {\"source\": \"reference\", \"target\": \"glossary\"},\n    {\"source\": \"reference\", \"target\": \"architecture\"},\n    {\"source\": \"architecture\", \"target\": \"cli\"}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "network",
+            "title": "Pages link graph",
+            "nodes": [
+              {
+                "id": "index"
+              },
+              {
+                "id": "reference"
+              },
+              {
+                "id": "glossary"
+              },
+              {
+                "id": "architecture"
+              },
+              {
+                "id": "cli"
+              },
+              {
+                "id": "roadmap"
+              }
+            ],
+            "links": [
+              {
+                "source": "index",
+                "target": "reference"
+              },
+              {
+                "source": "index",
+                "target": "glossary"
+              },
+              {
+                "source": "index",
+                "target": "architecture"
+              },
+              {
+                "source": "index",
+                "target": "cli"
+              },
+              {
+                "source": "index",
+                "target": "roadmap"
+              },
+              {
+                "source": "reference",
+                "target": "glossary"
+              },
+              {
+                "source": "reference",
+                "target": "architecture"
+              },
+              {
+                "source": "architecture",
+                "target": "cli"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2777,106 +2876,109 @@
           "content": "N×N grid of mini scatter plots for multivariate correlation reading. <code>variables[]</code> defines each axis; <code>records[]</code> is a flat list of objects keyed by variable id. The diagonal cells show the variable name; off-diagonal cells plot var-col vs var-row. Domains auto-derive from the records unless declared explicitly."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"scatter-matrix\",\n  \"title\": \"Page metrics\",\n  \"variables\": [\n    {\"key\": \"lines\",   \"label\": \"Lines\"},\n    {\"key\": \"images\",  \"label\": \"Images\"},\n    {\"key\": \"charts\",  \"label\": \"Charts\"},\n    {\"key\": \"reads\",   \"label\": \"Reads\"}\n  ],\n  \"records\": [\n    {\"lines\":  320, \"images\":  4, \"charts\":  2, \"reads\":  120},\n    {\"lines\":  180, \"images\":  2, \"charts\":  0, \"reads\":   60},\n    ... 20 more rows ...\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "scatter-matrix",
-          "title": "Page metrics",
-          "variables": [
-            {
-              "key": "lines",
-              "label": "Lines"
-            },
-            {
-              "key": "images",
-              "label": "Images"
-            },
-            {
-              "key": "charts",
-              "label": "Charts"
-            },
-            {
-              "key": "reads",
-              "label": "Reads"
-            }
-          ],
-          "records": [
-            {
-              "lines": 320,
-              "images": 4,
-              "charts": 2,
-              "reads": 120
-            },
-            {
-              "lines": 180,
-              "images": 2,
-              "charts": 0,
-              "reads": 60
-            },
-            {
-              "lines": 540,
-              "images": 7,
-              "charts": 5,
-              "reads": 210
-            },
-            {
-              "lines": 90,
-              "images": 1,
-              "charts": 0,
-              "reads": 40
-            },
-            {
-              "lines": 410,
-              "images": 5,
-              "charts": 3,
-              "reads": 160
-            },
-            {
-              "lines": 260,
-              "images": 3,
-              "charts": 2,
-              "reads": 90
-            },
-            {
-              "lines": 720,
-              "images": 9,
-              "charts": 8,
-              "reads": 310
-            },
-            {
-              "lines": 150,
-              "images": 1,
-              "charts": 1,
-              "reads": 55
-            },
-            {
-              "lines": 380,
-              "images": 4,
-              "charts": 3,
-              "reads": 140
-            },
-            {
-              "lines": 510,
-              "images": 6,
-              "charts": 4,
-              "reads": 180
-            },
-            {
-              "lines": 220,
-              "images": 2,
-              "charts": 1,
-              "reads": 80
-            },
-            {
-              "lines": 470,
-              "images": 5,
-              "charts": 4,
-              "reads": 190
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"scatter-matrix\",\n  \"title\": \"Page metrics\",\n  \"variables\": [\n    {\"key\": \"lines\",   \"label\": \"Lines\"},\n    {\"key\": \"images\",  \"label\": \"Images\"},\n    {\"key\": \"charts\",  \"label\": \"Charts\"},\n    {\"key\": \"reads\",   \"label\": \"Reads\"}\n  ],\n  \"records\": [\n    {\"lines\":  320, \"images\":  4, \"charts\":  2, \"reads\":  120},\n    {\"lines\":  180, \"images\":  2, \"charts\":  0, \"reads\":   60},\n    ... 20 more rows ...\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "scatter-matrix",
+            "title": "Page metrics",
+            "variables": [
+              {
+                "key": "lines",
+                "label": "Lines"
+              },
+              {
+                "key": "images",
+                "label": "Images"
+              },
+              {
+                "key": "charts",
+                "label": "Charts"
+              },
+              {
+                "key": "reads",
+                "label": "Reads"
+              }
+            ],
+            "records": [
+              {
+                "lines": 320,
+                "images": 4,
+                "charts": 2,
+                "reads": 120
+              },
+              {
+                "lines": 180,
+                "images": 2,
+                "charts": 0,
+                "reads": 60
+              },
+              {
+                "lines": 540,
+                "images": 7,
+                "charts": 5,
+                "reads": 210
+              },
+              {
+                "lines": 90,
+                "images": 1,
+                "charts": 0,
+                "reads": 40
+              },
+              {
+                "lines": 410,
+                "images": 5,
+                "charts": 3,
+                "reads": 160
+              },
+              {
+                "lines": 260,
+                "images": 3,
+                "charts": 2,
+                "reads": 90
+              },
+              {
+                "lines": 720,
+                "images": 9,
+                "charts": 8,
+                "reads": 310
+              },
+              {
+                "lines": 150,
+                "images": 1,
+                "charts": 1,
+                "reads": 55
+              },
+              {
+                "lines": 380,
+                "images": 4,
+                "charts": 3,
+                "reads": 140
+              },
+              {
+                "lines": 510,
+                "images": 6,
+                "charts": 4,
+                "reads": 180
+              },
+              {
+                "lines": 220,
+                "images": 2,
+                "charts": 1,
+                "reads": 80
+              },
+              {
+                "lines": 470,
+                "images": 5,
+                "charts": 4,
+                "reads": 190
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2889,76 +2991,79 @@
           "content": "One vertical axis per variable; each record draws a polyline crossing all axes at its scaled position. Best for spotting multi-variable clusters (lines that bunch together) or outliers (lines that diverge). Optional <code>_label</code> and <code>_color</code> on each record tag it visually."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"parallel-coordinates\",\n  \"title\": \"Build performance\",\n  \"variables\": [\n    {\"key\": \"pages\",     \"label\": \"Pages\"},\n    {\"key\": \"size_kb\",   \"label\": \"Total KB\"},\n    {\"key\": \"build_ms\",  \"label\": \"Build ms\"},\n    {\"key\": \"lighthouse\",\"label\": \"Lighthouse\"}\n  ],\n  \"records\": [\n    {\"pages\":  10, \"size_kb\":  240, \"build_ms\":  900, \"lighthouse\": 96, \"_color\": \"success\"},\n    {\"pages\":  25, \"size_kb\":  540, \"build_ms\": 1400, \"lighthouse\": 94, \"_color\": \"accent\"},\n    ...\n  ]\n}"
-        },
-        {
-          "kind": "chart",
-          "type": "parallel-coordinates",
-          "title": "Build performance",
-          "variables": [
-            {
-              "key": "pages",
-              "label": "Pages"
-            },
-            {
-              "key": "size_kb",
-              "label": "Total KB"
-            },
-            {
-              "key": "build_ms",
-              "label": "Build ms"
-            },
-            {
-              "key": "lighthouse",
-              "label": "Lighthouse"
-            }
-          ],
-          "records": [
-            {
-              "pages": 10,
-              "size_kb": 240,
-              "build_ms": 900,
-              "lighthouse": 96,
-              "_color": "success"
-            },
-            {
-              "pages": 25,
-              "size_kb": 540,
-              "build_ms": 1400,
-              "lighthouse": 94,
-              "_color": "accent"
-            },
-            {
-              "pages": 40,
-              "size_kb": 920,
-              "build_ms": 2300,
-              "lighthouse": 91,
-              "_color": "accent"
-            },
-            {
-              "pages": 60,
-              "size_kb": 1500,
-              "build_ms": 3800,
-              "lighthouse": 88,
-              "_color": "warn"
-            },
-            {
-              "pages": 90,
-              "size_kb": 2400,
-              "build_ms": 6500,
-              "lighthouse": 82,
-              "_color": "warn"
-            },
-            {
-              "pages": 130,
-              "size_kb": 3800,
-              "build_ms": 11200,
-              "lighthouse": 74,
-              "_color": "danger"
-            }
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"parallel-coordinates\",\n  \"title\": \"Build performance\",\n  \"variables\": [\n    {\"key\": \"pages\",     \"label\": \"Pages\"},\n    {\"key\": \"size_kb\",   \"label\": \"Total KB\"},\n    {\"key\": \"build_ms\",  \"label\": \"Build ms\"},\n    {\"key\": \"lighthouse\",\"label\": \"Lighthouse\"}\n  ],\n  \"records\": [\n    {\"pages\":  10, \"size_kb\":  240, \"build_ms\":  900, \"lighthouse\": 96, \"_color\": \"success\"},\n    {\"pages\":  25, \"size_kb\":  540, \"build_ms\": 1400, \"lighthouse\": 94, \"_color\": \"accent\"},\n    ...\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "parallel-coordinates",
+            "title": "Build performance",
+            "variables": [
+              {
+                "key": "pages",
+                "label": "Pages"
+              },
+              {
+                "key": "size_kb",
+                "label": "Total KB"
+              },
+              {
+                "key": "build_ms",
+                "label": "Build ms"
+              },
+              {
+                "key": "lighthouse",
+                "label": "Lighthouse"
+              }
+            ],
+            "records": [
+              {
+                "pages": 10,
+                "size_kb": 240,
+                "build_ms": 900,
+                "lighthouse": 96,
+                "_color": "success"
+              },
+              {
+                "pages": 25,
+                "size_kb": 540,
+                "build_ms": 1400,
+                "lighthouse": 94,
+                "_color": "accent"
+              },
+              {
+                "pages": 40,
+                "size_kb": 920,
+                "build_ms": 2300,
+                "lighthouse": 91,
+                "_color": "accent"
+              },
+              {
+                "pages": 60,
+                "size_kb": 1500,
+                "build_ms": 3800,
+                "lighthouse": 88,
+                "_color": "warn"
+              },
+              {
+                "pages": 90,
+                "size_kb": 2400,
+                "build_ms": 6500,
+                "lighthouse": 82,
+                "_color": "warn"
+              },
+              {
+                "pages": 130,
+                "size_kb": 3800,
+                "build_ms": 11200,
+                "lighthouse": 74,
+                "_color": "danger"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -2983,14 +3088,17 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"diagram\",\n  \"caption\": \"Optional caption below the diagram.\",\n  \"source\": \"flowchart LR\\n  A[JSON page] --> B(renderer)\\n  B --> C[DOM]\"\n}"
-        },
-        {
-          "kind": "diagram",
-          "caption": "Build pipeline at a glance.",
-          "source": "flowchart LR\n    JSON[*.json pages] --> RJ[renderer.js]\n    RJ --> DOM[Custom Element DOM]\n    KIT[kit.json + glossary] --> CJ[chrome.js]\n    CJ --> DOM"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"diagram\",\n  \"caption\": \"Optional caption below the diagram.\",\n  \"source\": \"flowchart LR\\n  A[JSON page] --> B(renderer)\\n  B --> C[DOM]\"\n}"
+          },
+          "render": {
+            "kind": "diagram",
+            "caption": "Build pipeline at a glance.",
+            "source": "flowchart LR\n    JSON[*.json pages] --> RJ[renderer.js]\n    RJ --> DOM[Custom Element DOM]\n    KIT[kit.json + glossary] --> CJ[chrome.js]\n    CJ --> DOM"
+          }
         },
         {
           "kind": "heading",
@@ -3135,14 +3243,17 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"live-snippet\",\n  \"label\": \"Edit the gradient and message\",\n  \"source\": \"<style>...</style>\\n<div>...</div>\"\n}"
-        },
-        {
-          "kind": "live-snippet",
-          "label": "Edit the markup — preview updates live",
-          "source": "<style>\n  body { margin:0; height:100vh; display:grid; place-items:center;\n         background: linear-gradient(135deg, #115e59, #2dd4bf);\n         font-family: system-ui; }\n  .box { background:white; padding:20px 28px; border-radius:12px;\n         box-shadow:0 8px 24px rgba(0,0,0,0.15); }\n  h1 { margin:0 0 6px; color:#0f766e; font-size:20px; }\n  p  { margin:0; color:#475569; font-size:14px; }\n</style>\n<div class=\"box\">\n  <h1>Try the snippet</h1>\n  <p>Edit the source on the left.</p>\n</div>"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"live-snippet\",\n  \"label\": \"Edit the gradient and message\",\n  \"source\": \"<style>...</style>\\n<div>...</div>\"\n}"
+          },
+          "render": {
+            "kind": "live-snippet",
+            "label": "Edit the markup — preview updates live",
+            "source": "<style>\n  body { margin:0; height:100vh; display:grid; place-items:center;\n         background: linear-gradient(135deg, #115e59, #2dd4bf);\n         font-family: system-ui; }\n  .box { background:white; padding:20px 28px; border-radius:12px;\n         box-shadow:0 8px 24px rgba(0,0,0,0.15); }\n  h1 { margin:0 0 6px; color:#0f766e; font-size:20px; }\n  p  { margin:0; color:#475569; font-size:14px; }\n</style>\n<div class=\"box\">\n  <h1>Try the snippet</h1>\n  <p>Edit the source on the left.</p>\n</div>"
+          }
         }
       ]
     },
