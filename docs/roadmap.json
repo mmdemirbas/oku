@@ -33,7 +33,7 @@
           "kind": "kpi-grid",
           "tiles": [
             { "num": "10", "label": "Phases planned" },
-            { "num": "38", "label": "Tracked items" },
+            { "num": "14 / 38", "label": "Items shipped (P0 + P1 complete)" },
             { "num": "0",  "label": "Open decisions (name, layout, viz scope all locked)" },
             { "num": "8",  "label": "Retired plan docs folded in" }
           ]
@@ -137,25 +137,25 @@
             {
               "title": "P0 · Cleanup",
               "rows": [
-                ["Delete docs/plans/*.json (incorporated)",                                              {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["Drop _PROJECT_META_MD exclusion · include all .md by default",                         {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["index.json · 5 CLI subcommands (was 4)",                                               {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["index.json · step-flow cards click-targetable, drop 'Open X.html'",                    {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["Retire 'Not in the converter' card-text (real fix lands in P4)",                       {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}]
+                ["Delete docs/plans/*.json (incorporated)",                                              {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["Drop _PROJECT_META_MD exclusion · include all .md by default",                         {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["index.json · 5 CLI subcommands (was 4)",                                               {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["index.json · step-flow cards click-targetable, drop 'Open X.html'",                    {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["Retire 'Not in the converter' card-text (real fix lands in P4)",                       {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}]
               ]
             },
             {
               "title": "P1 · Component bugs",
               "rows": [
-                ["ext-ref renders as <a target=_blank> in addition to the tooltip",                       {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["annotated-code · multi-line tooltip stops overlapping the covered lines",              {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["annotated-code · substring annotation renders its number marker + tooltip",            {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["table · 'Board view: kanban' example actually renders as kanban",                      {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["heading · reference section shows the rendered heading next to the JSON",              {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["view-toggle · compact form (icons / segmented control / dropdown)",                    {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["info / warning / tip callouts use standard symbol set",                                {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
-                ["funnel · labels, numbers, percentages aligned in a single grid",                       {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
-                ["compare-grid · loosen item constraints, verdict optional",                             {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+                ["ext-ref renders as <a target=_blank> in addition to the tooltip",                       {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["annotated-code · multi-line tooltip stops overlapping the covered lines",              {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["annotated-code · substring annotation renders its number marker + tooltip",            {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["table · 'Board view: kanban' example actually renders as kanban",                      {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["heading · reference section shows the rendered heading next to the JSON",              {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["view-toggle · compact form (icons / segmented control / dropdown)",                    {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["info / warning / tip callouts use standard symbol set",                                {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}, {"value": "done", "values": ["done"]}],
+                ["funnel · labels, numbers, percentages aligned in a single grid",                       {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}],
+                ["compare-grid · loosen item constraints, verdict optional",                             {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "done", "values": ["done"]}]
               ]
             },
             {
