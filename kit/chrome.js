@@ -1121,6 +1121,54 @@ function initReadingAids() {
     if (table.closest('.hdt-table-scroll, .html-doc-tooltip, html-doc-chart, html-doc-diagram')) return;
     table.setAttribute('data-hdt-bound', '1');
 
+    // Column-resize handles. Each <th> in the thead gets a thin
+    // right-edge grabber; on drag we apply explicit widths via a
+    // <colgroup> + switch the table to table-layout: fixed so the
+    // browser honours them. Auto-layout stays until the FIRST drag
+    // — pages where the natural sizing is fine never pay the cost.
+    (function wireColResize() {
+      var ths = Array.prototype.slice.call(table.querySelectorAll('thead th'));
+      if (!ths.length) return;
+      // Build colgroup so dragged widths have a stable place to live.
+      var existingColgroup = table.querySelector('colgroup');
+      if (!existingColgroup) {
+        var cg = document.createElement('colgroup');
+        ths.forEach(function () { cg.appendChild(document.createElement('col')); });
+        table.insertBefore(cg, table.firstChild);
+      }
+      ths.forEach(function (th, idx) {
+        if (th.querySelector(':scope > .hdt-col-resize')) return;
+        // Make th a positioning context for the absolute handle.
+        if (getComputedStyle(th).position === 'static') th.style.position = 'relative';
+        var handle = document.createElement('span');
+        handle.className = 'hdt-col-resize';
+        handle.setAttribute('aria-hidden', 'true');
+        th.appendChild(handle);
+        var dragging = false, startX = 0, startW = 0, col;
+        handle.addEventListener('mousedown', function (ev) {
+          ev.preventDefault();
+          dragging = true;
+          startX = ev.clientX;
+          startW = th.getBoundingClientRect().width;
+          col = table.querySelectorAll('colgroup col')[idx];
+          table.classList.add('hdt-table-resizing');
+          table.style.tableLayout = 'fixed';
+          if (col && !col.style.width) col.style.width = startW + 'px';
+        });
+        window.addEventListener('mousemove', function (ev) {
+          if (!dragging) return;
+          var dx = ev.clientX - startX;
+          var w = Math.max(48, startW + dx);
+          if (col) col.style.width = w + 'px';
+        });
+        window.addEventListener('mouseup', function () {
+          if (!dragging) return;
+          dragging = false;
+          table.classList.remove('hdt-table-resizing');
+        });
+      });
+    })();
+
     var headers = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) { return th.innerHTML; });
     var colCount = headers.length || (function () {
       var fr = table.querySelector('tr');

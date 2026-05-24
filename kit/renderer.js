@@ -31,16 +31,49 @@
        a content array. Match is non-greedy + restricted to three known
        tags so element-name documentation like "<callout>" stays literal. */
     static _splitInlineTags(text) {
-      const re = /<(code|em|strong)>([\s\S]*?)<\/\1>/g;
+      // Two distinct passes:
+      //   1) Plain tags (code / em / strong / kbd / samp / mark) that
+      //      carry only text content. Cheap regex.
+      //   2) Anchor tags (<a href="...">text</a>) — emit a link
+      //      inline node so the kit's standard link styling applies.
+      //   3) Anything else from the allowlist (span / sup / sub /
+      //      br / del / ins / abbr) becomes an html-pass-through.
+      //
+      // The pass walks left-to-right and picks the FIRST matching
+      // tag at each position so nested tags inside an outer
+      // pass-through render via innerHTML rather than double-
+      // processing.
+      const plainRe = /<(code|em|strong|kbd|samp|mark)>([\s\S]*?)<\/\1>/g;
+      const anchorRe = /<a\s+(?:[^>]*?\s+)?href=(?:"([^"]*)"|'([^']*)')(?:\s+[^>]*)?>([\s\S]*?)<\/a>/g;
+      const passRe = /<(span|sup|sub|del|ins|abbr)(?:\s+[^>]*)?>([\s\S]*?)<\/\1>|<br\s*\/?>/g;
+      const tokens = [];
+      function addMatches(re, makeNode) {
+        re.lastIndex = 0;
+        let mm;
+        while ((mm = re.exec(text)) !== null) {
+          tokens.push({ start: mm.index, end: mm.index + mm[0].length, node: makeNode(mm) });
+        }
+      }
+      addMatches(plainRe, function (mm) { return { kind: mm[1], text: mm[2] }; });
+      addMatches(anchorRe, function (mm) { return { kind: 'link', text: mm[3], href: mm[1] || mm[2] }; });
+      addMatches(passRe,   function (mm) { return { kind: 'html', text: mm[0] }; });
+      // Sort by start, drop overlaps (later matches inside an earlier match get skipped).
+      tokens.sort(function (a, b) { return a.start - b.start; });
+      const filtered = [];
+      let cursor = 0;
+      tokens.forEach(function (t) {
+        if (t.start < cursor) return;
+        filtered.push(t);
+        cursor = t.end;
+      });
+      if (!filtered.length) return [text];
       const out = [];
       let pos = 0;
-      let m;
-      while ((m = re.exec(text)) !== null) {
-        if (m.index > pos) out.push(text.slice(pos, m.index));
-        out.push({ kind: m[1], text: m[2] });
-        pos = m.index + m[0].length;
-      }
-      if (pos === 0) return [text];     // no matches — single string
+      filtered.forEach(function (t) {
+        if (t.start > pos) out.push(text.slice(pos, t.start));
+        out.push(t.node);
+        pos = t.end;
+      });
       if (pos < text.length) out.push(text.slice(pos));
       return out;
     }

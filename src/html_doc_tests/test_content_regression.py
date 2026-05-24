@@ -984,22 +984,25 @@ class TestChromeKitMarkers:
             "aligns with the line-number text centre"
         )
 
-    def test_renderer_converts_inline_code_tags_in_strings(self, repo_root: Path) -> None:
-        """Renderer auto-converts `<code>…</code>` strings to inline code.
+    def test_renderer_converts_inline_html_tags_in_strings(self, repo_root: Path) -> None:
+        """Renderer auto-converts whitelisted inline HTML in strings.
 
-        Regression: authored callouts/paragraphs contained literal
-        `<code>...</code>` strings in `content`. The renderer used to
-        HTML-escape them, showing the angle-bracket tag as text instead
-        of a code element. Added _splitInlineTags to detect + convert
-        the three text-shape primitives (code, em, strong) so either
-        authoring form works.
+        Original regression: authored callouts/paragraphs carried
+        literal `<code>...</code>` strings in `content`; the renderer
+        used to HTML-escape them. Extended after user feedback to also
+        cover anchors (`<a href="...">link</a>`), other text-shape
+        tags (kbd, samp, mark), and a safe pass-through set
+        (span, sup, sub, br, del, ins, abbr). Documentation tags like
+        `<callout>` (not on the allowlist) still render literal so the
+        kit can document itself without self-eating.
         """
         js = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
         assert "_splitInlineTags" in js, "inline-tag converter missing"
-        # Regex targets only code / em / strong — not arbitrary tags
-        # (otherwise documentation like "<callout>" gets eaten).
-        assert "(code|em|strong)" in js, (
-            "_splitInlineTags regex must restrict to code/em/strong tags"
+        assert "(code|em|strong|kbd|samp|mark)" in js, (
+            "_splitInlineTags must cover the text-shape tags"
+        )
+        assert "anchorRe" in js or "<a\\s+" in js, (
+            "_splitInlineTags must detect anchors so inline links render"
         )
 
     def test_source_dirs_stay_clean_of_generated_files(self, repo_root: Path) -> None:

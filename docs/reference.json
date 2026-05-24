@@ -1283,7 +1283,7 @@
         },
         {
           "kind": "paragraph",
-          "content": "The 22 chart variants group into seven families. Pick by what you're communicating; the variants inside a family share scaffolding (axes, hover, legend) so swapping between them is a one-field change."
+          "content": "Twenty-eight chart variants grouped by intent. Each card shows a tiny live render so you can compare visual shape at a glance; pick the family that fits what you're communicating, then click through to the variant for the full payload."
         },
         {
           "kind": "compare-grid",
@@ -1291,101 +1291,187 @@
             {
               "title": "Categorical",
               "content": "One value per category. Sort by value for ranking, by name for lookup.",
+              "blocks": [
+                { "kind": "chart", "type": "bar", "rows": [
+                  { "label": "alpha", "value": 14 },
+                  { "label": "beta",  "value": 22 },
+                  { "label": "gamma", "value":  9 },
+                  { "label": "delta", "value": 17 }
+                ] }
+              ],
               "items": [
-                "<a href=\"#chart-bar\">type: bar</a> — horizontal bars, baseline-zero, supports a display override.",
-                "<a href=\"#chart-stacked\">type: stacked-bar</a> — same row, multiple stacked segments.",
-                "<a href=\"#chart-grouped\">type: grouped-bar</a> — same row, side-by-side mini-bars.",
-                "<a href=\"#chart-waffle\">type: waffle</a> — N×M cell grid; each cell is one unit."
+                "<a href=\"#chart-bar\">type: bar</a>, <a href=\"#chart-stacked\">stacked-bar</a>, <a href=\"#chart-grouped\">grouped-bar</a>, <a href=\"#chart-waffle\">waffle</a>"
               ]
             },
             {
               "title": "Distribution",
               "content": "Shape of one variable. Use when the spread / skew is the story, not a single number.",
+              "blocks": [
+                { "kind": "chart", "type": "histogram", "bins": [
+                  { "lo":  0, "hi": 10, "count":  3 },
+                  { "lo": 10, "hi": 20, "count":  9 },
+                  { "lo": 20, "hi": 30, "count": 14 },
+                  { "lo": 30, "hi": 40, "count": 11 },
+                  { "lo": 40, "hi": 50, "count":  5 },
+                  { "lo": 50, "hi": 60, "count":  2 }
+                ] }
+              ],
               "items": [
-                "<a href=\"#chart-histogram\">type: histogram</a> — frequency by bin.",
-                "<a href=\"#chart-box-plot\">type: box-plot</a> — quartiles + whiskers.",
-                "<a href=\"#chart-ridgeline\">type: ridgeline</a> — stacked small-distributions with a parallel cursor."
+                "<a href=\"#chart-histogram\">histogram</a>, <a href=\"#chart-box-plot\">box-plot</a>, <a href=\"#chart-ridgeline\">ridgeline</a>"
               ]
             },
             {
               "title": "Time series",
-              "content": "X is time (or any ordered axis). Use line when each x has one y; area when stacking matters.",
+              "content": "X is time (or any ordered axis). Line when each x has one y; area when stacking matters.",
+              "blocks": [
+                { "kind": "chart", "type": "sparkline", "values": [3, 5, 4, 8, 6, 10, 7, 12, 11, 14, 13, 16] }
+              ],
               "items": [
-                "<a href=\"#chart-scatter-line\">type: line</a> — connected y vs x.",
-                "<a href=\"#chart-area\">type: area</a> — line with fill below.",
-                "<a href=\"#chart-sparkline\">type: sparkline</a> — inline mini line/area/bar.",
-                "<a href=\"#chart-slope\">type: slope</a> — two-time-point comparison.",
-                "<a href=\"#chart-calendar-heatmap\">type: calendar-heatmap</a> — day-of-year × day-of-week activity."
+                "<a href=\"#chart-scatter-line\">line</a>, <a href=\"#chart-area\">area</a>, <a href=\"#chart-sparkline\">sparkline</a>, <a href=\"#chart-slope\">slope</a>, <a href=\"#chart-calendar-heatmap\">calendar-heatmap</a>"
               ]
             },
             {
               "title": "Hierarchy / share",
               "content": "Parts of a whole. Donut for ≤6 slices; treemap when nesting or many cells beat slices.",
+              "blocks": [
+                { "kind": "chart", "type": "donut", "slices": [
+                  { "label": "alpha", "value": 40, "color": "accent" },
+                  { "label": "beta",  "value": 25, "color": "warn"   },
+                  { "label": "gamma", "value": 20, "color": "success"},
+                  { "label": "delta", "value": 15, "color": "muted"  }
+                ] }
+              ],
               "items": [
-                "<a href=\"#chart-donut\">type: donut</a> — distribution arc with centre total.",
-                "<a href=\"#chart-treemap\">type: treemap</a> — squarified area-proportional rectangles."
+                "<a href=\"#chart-donut\">donut</a>, <a href=\"#chart-treemap\">treemap</a>"
               ]
             },
             {
               "title": "Relationship",
               "content": "Two or more variables interacting. Scatter for raw points; heatmap when density beats individual points.",
+              "blocks": [
+                { "kind": "chart", "type": "scatter", "series": [
+                  { "label": "A", "color": "accent", "data": [
+                    {"x": 1, "y": 4}, {"x": 2, "y": 5}, {"x": 3, "y": 7}, {"x": 4, "y": 6}, {"x": 5, "y": 9}, {"x": 6, "y": 8}
+                  ]}
+                ] }
+              ],
               "items": [
-                "<a href=\"#chart-scatter-line\">type: scatter</a> — y vs x points, optional series.",
-                "<a href=\"#chart-bubble\">type: bubble</a> — scatter with a third (size) variable.",
-                "<a href=\"#chart-quadrant\">type: quadrant</a> — scatter with cross-hair guide + corner labels.",
-                "<a href=\"#chart-radar\">type: radar</a> — multi-axis polygon comparison.",
-                "<a href=\"#chart-heatmap\">type: heatmap</a> — N×M coloured-cell grid."
+                "<a href=\"#chart-scatter-line\">scatter</a>, <a href=\"#chart-bubble\">bubble</a>, <a href=\"#chart-quadrant\">quadrant</a>, <a href=\"#chart-radar\">radar</a>, <a href=\"#chart-heatmap\">heatmap</a>"
               ]
             },
             {
               "title": "Goal / comparison",
               "content": "Actual vs target — the visual answers 'are we there yet?'",
+              "blocks": [
+                { "kind": "chart", "type": "gauge", "value": 72, "min": 0, "max": 100, "target": 80, "label": "OKR" }
+              ],
               "items": [
-                "<a href=\"#chart-bullet\">type: bullet</a> — single actual against bands.",
-                "<a href=\"#chart-gauge\">type: gauge</a> — single value as a 0→max arc."
+                "<a href=\"#chart-bullet\">bullet</a>, <a href=\"#chart-gauge\">gauge</a>"
               ]
             },
             {
               "title": "Conversion",
               "content": "Stage-to-stage drop-off through an ordered pipeline.",
+              "blocks": [
+                { "kind": "chart", "type": "funnel", "stages": [
+                  { "label": "visited",   "value": 1000 },
+                  { "label": "engaged",   "value":  620 },
+                  { "label": "signed-up", "value":  280 },
+                  { "label": "retained",  "value":  140 }
+                ] }
+              ],
               "items": [
-                "<a href=\"#chart-funnel\">type: funnel</a> — narrowing bands per stage with aligned label / value / % columns."
+                "<a href=\"#chart-funnel\">funnel</a>"
               ]
             },
             {
               "title": "Flow",
               "content": "Where the flow goes — links between nodes carry magnitude.",
+              "blocks": [
+                { "kind": "chart", "type": "sankey",
+                  "nodes": [
+                    {"id": "src", "label": "in",   "color": "muted"},
+                    {"id": "a",   "label": "work", "color": "accent"},
+                    {"id": "b",   "label": "out1"},
+                    {"id": "c",   "label": "out2"}
+                  ],
+                  "links": [
+                    {"source": "src", "target": "a", "value": 12},
+                    {"source": "a",   "target": "b", "value":  7},
+                    {"source": "a",   "target": "c", "value":  5}
+                  ]
+                }
+              ],
               "items": [
-                "<a href=\"#chart-sankey\">type: sankey</a> — left-to-right ribbons sized by link value, with column-stacked nodes."
+                "<a href=\"#chart-sankey\">sankey</a>"
               ]
             },
             {
               "title": "Graph",
               "content": "Connections between entities. Node degree drives circle radius.",
+              "blocks": [
+                { "kind": "chart", "type": "network",
+                  "nodes": [
+                    {"id": "A"}, {"id": "B"}, {"id": "C"}, {"id": "D"}, {"id": "E"}
+                  ],
+                  "links": [
+                    {"source": "A", "target": "B"},
+                    {"source": "A", "target": "C"},
+                    {"source": "B", "target": "D"},
+                    {"source": "C", "target": "D"},
+                    {"source": "D", "target": "E"}
+                  ]
+                }
+              ],
               "items": [
-                "<a href=\"#chart-network\">type: network</a> — force-relaxed node-link diagram for small graphs (≤ ~50 nodes)."
+                "<a href=\"#chart-network\">network</a>"
               ]
             },
             {
               "title": "Multivariate",
               "content": "Many variables at once — when the story lives in correlations, not totals.",
+              "blocks": [
+                { "kind": "chart", "type": "parallel-coordinates",
+                  "variables": [
+                    {"key": "x", "label": "x"}, {"key": "y", "label": "y"}, {"key": "z", "label": "z"}
+                  ],
+                  "records": [
+                    {"x": 1, "y": 4, "z": 2}, {"x": 3, "y": 6, "z": 5}, {"x": 2, "y": 2, "z": 4}, {"x": 5, "y": 3, "z": 6}
+                  ]
+                }
+              ],
               "items": [
-                "<a href=\"#chart-scatter-matrix\">type: scatter-matrix</a> — N×N grid of mini scatters; diagonal labels each axis.",
-                "<a href=\"#chart-parallel-coordinates\">type: parallel-coordinates</a> — one vertical axis per variable; each record draws a polyline crossing them."
+                "<a href=\"#chart-scatter-matrix\">scatter-matrix</a>, <a href=\"#chart-parallel-coordinates\">parallel-coordinates</a>"
               ]
             },
             {
-              "title": "Relationship · circular",
+              "title": "Circular relationship",
               "content": "Pairwise flow / affinity between a small group of entities.",
+              "blocks": [
+                { "kind": "chart", "type": "chord",
+                  "groups": [
+                    {"id": "A", "color": "accent"},
+                    {"id": "B", "color": "warn"},
+                    {"id": "C", "color": "success"}
+                  ],
+                  "matrix": [[0, 5, 3], [4, 0, 6], [2, 5, 0]]
+                }
+              ],
               "items": [
-                "<a href=\"#chart-chord\">type: chord</a> — perimeter arcs sized by total flow, ribbons through the middle for each pair."
+                "<a href=\"#chart-chord\">chord</a>"
               ]
             },
             {
               "title": "Geographic",
               "content": "Country / region comparison without map-tile data.",
+              "blocks": [
+                { "kind": "chart", "type": "geo", "regions": [
+                  { "id": "US", "value": 80 }, { "id": "GB", "value": 30 }, { "id": "DE", "value": 40 },
+                  { "id": "IN", "value": 60 }, { "id": "BR", "value": 25 }, { "id": "JP", "value": 35 }
+                ] }
+              ],
               "items": [
-                "<a href=\"#chart-geo\">type: geo</a> — tile cartogram with one cell per ISO region code, coloured by value, scaled in a sequential ramp."
+                "<a href=\"#chart-geo\">geo</a>"
               ]
             }
           ]

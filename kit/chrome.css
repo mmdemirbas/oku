@@ -2345,8 +2345,49 @@ table thead th {
   top: 0;
   z-index: 2;
 }
-table td { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+  /* Word-wrap by default so long cell content folds inside the
+     column instead of forcing horizontal scroll. Tables that want
+     single-line cells can opt out per-row via the hdt-nowrap class. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+table tr.hdt-nowrap td,
+table.hdt-nowrap td { white-space: nowrap; overflow-wrap: normal; }
 table tr:hover td { background: var(--surface-2); }
+/* Column-resize grabber — thin right-edge strip on every thead <th>.
+   Invisible until hovered, then a 3px accent line + ew-resize
+   cursor. While dragging, the table gains .hdt-table-resizing to
+   silence pointer events on body text and force the resize cursor
+   across the whole document. */
+.hdt-col-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 3;
+  user-select: none;
+}
+.hdt-col-resize::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 2px;
+  bottom: 6px;
+  width: 2px;
+  background: transparent;
+  border-radius: 1px;
+  transition: background 0.12s ease;
+}
+.hdt-col-resize:hover::after { background: var(--accent); }
+.hdt-table-resizing,
+.hdt-table-resizing * { cursor: ew-resize !important; user-select: none !important; }
 
 .pill {
   display: inline-block; padding: 3px 10px; border-radius: 14px;
