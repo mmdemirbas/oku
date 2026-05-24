@@ -953,6 +953,16 @@
             "text": { "type": "string" },
             "href": { "type": "string" }
           }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "text"],
+          "additionalProperties": false,
+          "description": "Sanitised inline HTML pass-through. The Markdown converter emits this for tags inside the small allowlist (a, code, em, strong, span, sup, sub, br, mark, kbd, samp, del, ins, abbr); the renderer drops the text into an inline span via innerHTML. Authors writing JSON pages should prefer the typed inline kinds — html is the markdown escape hatch, not a recommended primitive.",
+          "properties": {
+            "kind": { "const": "html" },
+            "text": { "type": "string" }
+          }
         }
       ]
     }

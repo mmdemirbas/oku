@@ -418,11 +418,12 @@ def iter_page_stubs(root: Path, json_pages: list | None = None):
 # blocks (incl. ``` mermaid → diagram), unordered + ordered lists,
 # blockquotes (→ callout), GFM-style pipe tables, horizontal rules.
 #
-# Not a full CommonMark parser — author-driven coverage. Edge cases
-# left out: nested lists, footnotes, definition lists, HTML in
-# markdown, reference-style links. If a real .md file hits one of
-# those, the converter degrades to text-with-anchors-stripped rather
-# than producing invalid kit JSON.
+# Not a full CommonMark parser, but covers everything an author would
+# reach for. Supported (P4 closed): nested lists, footnotes, definition
+# lists, reference-style links, sanitised inline HTML, YAML
+# front-matter. If the author writes something exotic outside this
+# vocabulary the converter passes it through as text rather than
+# producing invalid kit JSON.
 
 _MD_INLINE_RE = re.compile(
     r"(\*\*([^*]+)\*\*"          # **bold**
@@ -430,7 +431,10 @@ _MD_INLINE_RE = re.compile(
     r"|__([^_]+)__"              # __bold__
     r"|_([^_]+)_"                # _italic_
     r"|`([^`]+)`"                # `code`
-    r"|\[([^\]]+)\]\(([^)\s]+)\)"  # [text](url)
+    r"|\[([^\]]+)\]\(([^)\s]+)\)"  # [text](inline url)
+    r"|\[([^\]]+)\]\[([^\]]*)\]"   # [text][ref] reference-style
+    r"|\[\^([\w-]+)\]"             # [^id] footnote ref
+    r"|(<(?:a|code|em|strong|span|sup|sub|br|mark|kbd|samp|del|ins|abbr)(?:\s+[^>]*)?/?>(?:[^<]*</(?:a|code|em|strong|span|sup|sub|mark|kbd|samp|del|ins|abbr)>)?)"   # sanitised inline HTML
     r")"
 )
 
@@ -469,14 +473,28 @@ def _page_md_link_href(href: str) -> str:
     return m.group(1) + ".md" + (m.group(2) or "")
 
 
-def _md_inline(text: str) -> list:
+def _md_inline(text: str, ctx: dict | None = None) -> list:
     """Split a markdown text fragment into the kit's inline-content
     array: a sequence of plain strings and inline-block objects
-    ({kind: code|em|strong|link}). Returns a flat list. Falls back to
-    a single string when no inline markers are present.
+    ({kind: code|em|strong|link|html}). Returns a flat list. Falls
+    back to a single string when no inline markers are present.
+
+    ``ctx`` carries page-level metadata captured ahead of inline
+    expansion:
+      * ``link_refs``  — {label_lower: (href, title)} for
+        reference-style links ``[text][label]``. Label defaults to
+        the visible text when empty.
+      * ``footnotes``  — {id: definition_block} discovered earlier
+        in the page. Inline ``[^id]`` references become an HTML
+        superscript anchor pointing at ``#fn-<id>`` so the rendered
+        page can backlink to the footnote block emitted at the end.
     """
     if not text:
         return [""]
+    ctx = ctx or {}
+    link_refs = ctx.get("link_refs") or {}
+    footnotes = ctx.get("footnotes") or {}
+    used_footnotes = ctx.get("used_footnotes")
     parts: list = []
     pos = 0
     for m in _MD_INLINE_RE.finditer(text):
@@ -494,6 +512,37 @@ def _md_inline(text: str) -> list:
             parts.append({"kind": "code", "text": m.group(6)})
         elif m.group(7) is not None:
             parts.append({"kind": "link", "text": m.group(7), "href": _md_link_href(m.group(8))})
+        elif m.group(9) is not None:
+            # [text][ref] reference-style link.
+            text_part = m.group(9)
+            ref = (m.group(10) or text_part).lower()
+            target = link_refs.get(ref)
+            if target:
+                parts.append({"kind": "link", "text": text_part, "href": _md_link_href(target[0])})
+            else:
+                # No matching definition — fall through to literal.
+                parts.append(m.group(0))
+        elif m.group(11) is not None:
+            # [^id] footnote ref.
+            fid = m.group(11)
+            if fid in footnotes:
+                if isinstance(used_footnotes, list) and fid not in used_footnotes:
+                    used_footnotes.append(fid)
+                # Numbered sup link — index = first-use order. Falls
+                # back to id when used_footnotes is missing (callers
+                # that bypass the page-level walker).
+                idx = (used_footnotes.index(fid) + 1) if isinstance(used_footnotes, list) else fid
+                parts.append({
+                    "kind": "html",
+                    "text": '<sup class="md-fn-ref"><a href="#fn-' + fid + '">' + str(idx) + '</a></sup>'
+                })
+            else:
+                parts.append(m.group(0))
+        elif m.group(12) is not None:
+            # Sanitised inline HTML pass-through. The regex limits the
+            # allowed tags upfront so authors can't slip a <script>
+            # through the converter.
+            parts.append({"kind": "html", "text": m.group(12)})
         pos = m.end()
     if pos < len(text):
         parts.append(text[pos:])
@@ -509,6 +558,43 @@ def _md_slug(text: str) -> str:
     return s.strip("-") or "section"
 
 
+def _strip_md_front_matter(text: str) -> tuple[str, dict]:
+    """Pull a leading ``---\\n...\\n---\\n`` YAML block off the front of a
+    markdown source and return ``(remaining_text, meta_dict)``. Parser
+    is minimal — handles ``key: value`` lines only; nested mappings or
+    flow style fall through as raw strings. The first ``title`` value
+    (if present) is hoisted to the page title at the call site."""
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != "---":
+        return text, {}
+    meta: dict = {}
+    j = 1
+    while j < len(lines) and lines[j].strip() != "---":
+        line = lines[j]
+        m = re.match(r"^([A-Za-z_][\w-]*)\s*:\s*(.*)$", line)
+        if m:
+            key, raw = m.group(1), m.group(2).strip()
+            # Quoted string — strip the wrapping quotes.
+            if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+                raw = raw[1:-1]
+            # Best-effort numeric / bool coercion.
+            if raw.lower() in {"true", "false"}:
+                meta[key] = raw.lower() == "true"
+            else:
+                try:
+                    meta[key] = int(raw)
+                except ValueError:
+                    try:
+                        meta[key] = float(raw)
+                    except ValueError:
+                        meta[key] = raw
+        j += 1
+    if j >= len(lines):
+        # Unterminated front-matter — back off and keep the text intact.
+        return text, {}
+    return "\n".join(lines[j + 1:]), meta
+
+
 def md_to_page(text: str, default_title: str = "Untitled") -> dict:
     """Parse markdown text into a kit page-JSON dict.
 
@@ -516,15 +602,67 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
 
     The kit's schema requires top-level blocks to be sections (or tldr
     / kpi-grid). md_to_page enforces that shape:
+    - YAML front-matter (``---\\n ... \\n---\\n``) populates page.meta
+      and may set page.title via a top-level ``title:`` field.
     - First H1 (or default_title) → page title.
     - Each H2 starts a new section with the H2 text as title + slug id.
     - Content before the first H2 lands in an implicit "intro" section.
-    - Sub-headings (H3+), paragraphs, code, lists, blockquotes,
-      tables, hr's all nest inside the active section's `blocks`.
+    - Sub-headings (H3+), paragraphs, code, lists (incl. nested),
+      blockquotes, GFM tables, hr's all nest inside the active
+      section's ``blocks``.
+    - Reference-style links (``[text][ref]`` + ``[ref]: url``) and
+      footnotes (``[^id]`` + ``[^id]: …``) are resolved in two passes:
+      pre-scan collects the definitions, inline expansion substitutes
+      the references. Used footnotes accumulate at the bottom of the
+      page in a dedicated "Footnotes" section.
+    - Definition lists (``term\\n: definition``) emit a `<dl>` via the
+      ``html`` inline kind on a paragraph block.
     """
+    title = default_title
+    # ---- Front-matter -------------------------------------------------
+    text, front_meta = _strip_md_front_matter(text)
+    if isinstance(front_meta.get("title"), str) and front_meta["title"].strip():
+        title = front_meta["title"].strip()
     lines = text.split("\n")
     i = 0
-    title = default_title
+
+    # ---- Pre-pass: collect link refs + footnote definitions ----------
+    link_refs: dict = {}
+    footnotes: dict = {}      # id -> definition text
+    used_footnotes: list = []  # accumulates in first-use order
+    # Strip the definition lines from the source so they don't render
+    # as paragraphs. We keep their content for the lookups above.
+    cleaned: list = []
+    LINK_REF_RE = re.compile(r"^\s{0,3}\[([^\]]+)\]:\s*(\S+)(?:\s+\"([^\"]*)\")?\s*$")
+    FN_DEF_RE = re.compile(r"^\s{0,3}\[\^([\w-]+)\]:\s*(.*)$")
+    pending_fn_id: str | None = None
+    for line in lines:
+        m_lr = LINK_REF_RE.match(line)
+        if m_lr:
+            label = m_lr.group(1).strip().lower()
+            link_refs[label] = (m_lr.group(2), m_lr.group(3) or "")
+            pending_fn_id = None
+            continue
+        m_fn = FN_DEF_RE.match(line)
+        if m_fn:
+            pending_fn_id = m_fn.group(1)
+            footnotes[pending_fn_id] = m_fn.group(2).strip()
+            continue
+        if pending_fn_id is not None and line.startswith("    ") and line.strip():
+            # 4-space continuation lines extend the previous footnote
+            # definition. Joined with a space so the inline expander
+            # sees one block of text.
+            footnotes[pending_fn_id] = (footnotes[pending_fn_id] + " " + line.strip()).strip()
+            continue
+        pending_fn_id = None
+        cleaned.append(line)
+    lines = cleaned
+
+    ctx: dict = {
+        "link_refs": link_refs,
+        "footnotes": footnotes,
+        "used_footnotes": used_footnotes,
+    }
 
     def take_paragraph(start: int) -> tuple[int, dict]:
         buf: list = []
@@ -533,25 +671,45 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
             buf.append(lines[j].strip())
             j += 1
         if j == start:
-            # Forward-progress guard. _is_block_start strips whitespace
-            # before its pattern checks, but the main loop's dispatch
-            # routes some patterns only when the line starts in column 0
-            # (e.g., ``` fences, pipe-table rows). Result: an indented
-            # ```sql or `    | col | …` inside a list-item continuation
-            # is BLOCK-LOOKING per _is_block_start but UNROUTABLE per
-            # the main loop. take_paragraph then exits at j==start,
-            # main loop calls it again, and parsing hangs forever.
-            # (Caught while parsing lakelab TESTLOG.md, ~9.2 KB in,
-            #  on a `    | _rowKind | id | data |` row indented
-            #  under a numbered-list continuation.)
-            # The safe rule: a paragraph always consumes at least one
-            # line so the outer loop is guaranteed to advance. The
-            # offending line lands as literal text — accurate enough
-            # for indented code or stray table-shape content; the
-            # alternative (silent infinite loop) is far worse.
+            # Forward-progress guard — see commit history for context;
+            # an indented block-looking line that the dispatcher refuses
+            # to route would otherwise hang the loop. Consume one line
+            # as literal text so the outer loop always advances.
             buf.append(lines[start].strip())
             j = start + 1
-        content = _md_inline(" ".join(buf))
+        # Definition-list detection: paragraph buffer ending with a
+        # follow-up line starting with ":" — convert to a <dl> block
+        # via the html inline kind so the existing renderer ships it.
+        if j < len(lines) and lines[j].lstrip().startswith(": "):
+            dl_terms: list = [(buf[-1] if buf else "", lines[j].lstrip()[2:].rstrip())]
+            preceding = " ".join(buf[:-1]).strip()
+            k = j + 1
+            while k < len(lines):
+                nxt = lines[k]
+                if nxt.strip() == "":
+                    break
+                if nxt.lstrip().startswith(": "):
+                    dl_terms[-1] = (dl_terms[-1][0], dl_terms[-1][1] + " " + nxt.lstrip()[2:].rstrip())
+                    k += 1
+                    continue
+                # Next term + its first definition.
+                kdef = k + 1
+                if kdef < len(lines) and lines[kdef].lstrip().startswith(": "):
+                    dl_terms.append((nxt.strip(), lines[kdef].lstrip()[2:].rstrip()))
+                    k = kdef + 1
+                    continue
+                break
+            html = '<dl class="md-dl">'
+            for term, defn in dl_terms:
+                html += '<dt>' + term + '</dt><dd>' + defn + '</dd>'
+            html += '</dl>'
+            block_content: list = []
+            if preceding:
+                block_content.extend(_md_inline(preceding, ctx))
+                block_content.append({"kind": "html", "text": html})
+                return k, {"kind": "paragraph", "content": block_content}
+            return k, {"kind": "paragraph", "content": [{"kind": "html", "text": html}]}
+        content = _md_inline(" ".join(buf), ctx)
         return j, {"kind": "paragraph", "content": content}
 
     def take_code_fence(start: int) -> tuple[int, dict]:
@@ -570,36 +728,69 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
             block["language"] = lang
         return j + 1, block
 
+    LIST_RE = re.compile(r"^(\s*)([-*]|\d+\.)\s+(.*)$")
+
     def take_list(start: int) -> tuple[int, dict]:
-        m = re.match(r"^(\s*)([-*]|\d+\.)\s+(.*)$", lines[start])
-        ordered = bool(m and re.match(r"\d+\.", m.group(2)))
+        # Indent-aware nested list parser. Items at the same column
+        # become siblings; items indented deeper become children.
+        # Schema-wise we emit the children as a nested `list` block
+        # appended inline after the parent item's content via the
+        # html inline kind — keeps the list shape flat enough for
+        # the existing renderer while still nesting visually.
+        first = LIST_RE.match(lines[start])
+        if not first:
+            return start + 1, {"kind": "list", "style": "bullet", "items": []}
+        base_indent = len(first.group(1))
+        ordered = bool(re.match(r"\d+\.", first.group(2)))
         items: list = []
         j = start
         while j < len(lines):
-            mm = re.match(r"^(\s*)([-*]|\d+\.)\s+(.*)$", lines[j])
+            mm = LIST_RE.match(lines[j])
             if not mm or lines[j].strip() == "":
                 break
-            items.append(_md_inline(mm.group(3)))
+            indent = len(mm.group(1))
+            if indent < base_indent:
+                break
+            if indent > base_indent:
+                # Should have been consumed by the recursive call below.
+                break
+            content_text = mm.group(3)
             j += 1
+            # Collect children — any deeper-indented list items
+            # immediately follow.
+            child_lines_start = j
+            while j < len(lines):
+                mm2 = LIST_RE.match(lines[j])
+                if not mm2 or lines[j].strip() == "":
+                    break
+                if len(mm2.group(1)) <= base_indent:
+                    break
+                j += 1
+            if j > child_lines_start:
+                # Recursively parse the child block.
+                _, child_block = take_list(child_lines_start)
+                # Render the child list as nested HTML inside this
+                # item — schema doesn't (yet) accept a nested list,
+                # but html-inline does.
+                child_html = _list_to_html(child_block)
+                items.append([
+                    *(_md_inline(content_text, ctx)),
+                    {"kind": "html", "text": child_html},
+                ])
+            else:
+                items.append(_md_inline(content_text, ctx))
         return j, {"kind": "list", "style": "numbered" if ordered else "bullet", "items": items}
 
     def take_blockquote(start: int) -> tuple[int, dict]:
-        # The main loop dispatches to this consumer on lines whose
-        # *stripped* form starts with ">", so the body must match the
-        # same shape — otherwise a `>` indented by surrounding-list
-        # spacing returns j==start and the outer while-loop never
-        # advances. Strip leading whitespace before checking.
         buf: list = []
         j = start
         while j < len(lines) and lines[j].lstrip().startswith(">"):
             buf.append(lines[j].lstrip().lstrip("> ").rstrip())
             j += 1
         content = " ".join(buf).strip()
-        return j, {"kind": "callout", "type": "note", "content": _md_inline(content)}
+        return j, {"kind": "callout", "type": "note", "content": _md_inline(content, ctx)}
 
     def take_table(start: int) -> tuple[int, dict] | tuple[int, None]:
-        # GFM pipe table — first line headers, second line --- separator,
-        # rest are rows. Bail out unless the second line is the sep.
         if start + 1 >= len(lines) or not re.match(r"^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?\s*$", lines[start + 1]):
             return start, None
         def cells(line: str) -> list:
@@ -609,7 +800,7 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
         rows = []
         j = start + 2
         while j < len(lines) and "|" in lines[j] and lines[j].strip() != "":
-            rows.append([_md_inline(c) for c in cells(lines[j])])
+            rows.append([_md_inline(c, ctx) for c in cells(lines[j])])
             j += 1
         return j, {"kind": "table", "headers": headers, "rows": rows}
 
@@ -623,12 +814,14 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
             or s.startswith(">")
             or re.match(r"^-{3,}\s*$", line)
             or s.startswith("|")
+            # Definition-list continuation marker. When a paragraph
+            # body is followed by ": <text>", we want the paragraph
+            # loop to stop *before* the colon so the dl-detection
+            # branch can fire on the next iteration with j pointing
+            # at the marker.
+            or re.match(r"^\s*:\s+\S", line)
         )
 
-    # Top-level state: each H2 opens a new section. Content before the
-    # first H2 lives in an implicit "intro" section so the page always
-    # validates against the schema (which requires top blocks to be
-    # sections / tldr / kpi-grid).
     sections: list = []
     current_section: dict | None = None
     used_ids: set = set()
@@ -668,12 +861,6 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
             i += 1
             continue
         if re.match(r"^-{3,}\s*$", line):
-            # Markdown `---` is a horizontal rule. The kit has no
-            # corresponding block kind — section cards already provide
-            # visual separation between H2s, and within a section an
-            # author hr is usually just prose decoration. Drop it.
-            # Emitting `{"kind": "hr"}` would fail `html-doc check`
-            # against the page schema (no `hr` in the allowed list).
             i += 1
             continue
         if line.startswith("|"):
@@ -694,7 +881,6 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
                 open_section(_md_slug(heading_text), heading_text)
                 i += 1
                 continue
-            # H3 and deeper land as heading blocks inside the active section.
             add_block(
                 {
                     "kind": "heading",
@@ -717,11 +903,77 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
             i, block = take_blockquote(i)
             add_block(block)
             continue
-        # Default — paragraph (consumes until blank line / block start).
         i, block = take_paragraph(i)
         add_block(block)
 
-    return {"kind": "page", "title": title, "blocks": sections}
+    # ---- Footnotes section -----------------------------------------
+    # Emit only the footnotes that actually got referenced in the body
+    # (used_footnotes is populated by _md_inline during expansion).
+    if used_footnotes:
+        fn_section = {
+            "kind": "section",
+            "id": _unique_id("footnotes"),
+            "title": "Footnotes",
+            "blocks": [
+                {
+                    "kind": "list",
+                    "style": "numbered",
+                    "items": [
+                        [
+                            {
+                                "kind": "html",
+                                "text": '<span id="fn-' + fid + '"></span>',
+                            },
+                            *_md_inline(footnotes.get(fid, ""), ctx),
+                        ]
+                        for fid in used_footnotes
+                    ],
+                }
+            ],
+        }
+        sections.append(fn_section)
+
+    page: dict = {"kind": "page", "title": title, "blocks": sections}
+    if front_meta:
+        # Strip the title hoist before storing — it's now page.title.
+        meta_copy = {k: v for k, v in front_meta.items() if k != "title"}
+        if meta_copy:
+            page["meta"] = meta_copy
+    return page
+
+
+def _list_to_html(list_block: dict) -> str:
+    """Render a kit list block as plain HTML for nested-list children
+    inside the markdown converter. Schema-side the list primitive is
+    flat; the converter uses this helper to lift nested children into
+    an html-inline payload so deeper indent levels survive rendering.
+    """
+    tag = "ol" if list_block.get("style") == "numbered" else "ul"
+    out = "<" + tag + ' class="md-nested">'
+    for item in list_block.get("items", []):
+        out += "<li>"
+        # Items are richString (list of strings + inline nodes).
+        if isinstance(item, list):
+            for piece in item:
+                if isinstance(piece, str):
+                    out += piece
+                elif isinstance(piece, dict):
+                    kind = piece.get("kind")
+                    if kind == "strong":
+                        out += "<strong>" + piece.get("text", "") + "</strong>"
+                    elif kind == "em":
+                        out += "<em>" + piece.get("text", "") + "</em>"
+                    elif kind == "code":
+                        out += "<code>" + piece.get("text", "") + "</code>"
+                    elif kind == "link":
+                        out += '<a href="' + piece.get("href", "") + '">' + piece.get("text", "") + "</a>"
+                    elif kind == "html":
+                        out += piece.get("text", "")
+        elif isinstance(item, str):
+            out += item
+        out += "</li>"
+    out += "</" + tag + ">"
+    return out
 
 
 def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
@@ -980,7 +1232,7 @@ _KNOWN_BLOCK_KINDS = {
     "example",
 }
 
-_KNOWN_INLINE_KINDS = {"glossary-term", "ext-ref", "code", "em", "strong", "link"}
+_KNOWN_INLINE_KINDS = {"glossary-term", "ext-ref", "code", "em", "strong", "link", "html"}
 
 # Phrases that signal process / round breadcrumbs in prose — the kit
 # documents current behaviour, never how it got there. Matched

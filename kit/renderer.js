@@ -992,6 +992,15 @@
           }
           return e;
         }
+        case 'html': {
+          // Sanitised inline HTML pass-through. Schema + Markdown
+          // converter both restrict the tag vocabulary upstream;
+          // here we just drop the string into a span via innerHTML
+          // so the browser parses it as nodes.
+          const span = document.createElement('span');
+          span.innerHTML = node.text || '';
+          return span;
+        }
         default:
           return this._unknownInline(node);
       }

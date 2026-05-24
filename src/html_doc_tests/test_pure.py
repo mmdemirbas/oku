@@ -396,6 +396,92 @@ class TestMdToPage:
         assert found["href"] == "notes/details.html#thing"
 
 
+# ---------- P4 — Markdown parity additions ----------
+
+
+class TestMdParityP4:
+    """P4 closed the long-running 'Not in the converter' gaps. These
+    tests lock the new behaviours so a future refactor can't quietly
+    regress them."""
+
+    @staticmethod
+    def _walk(node):
+        if isinstance(node, dict):
+            yield node
+            for v in node.values():
+                yield from TestMdParityP4._walk(v)
+        elif isinstance(node, list):
+            for it in node:
+                yield from TestMdParityP4._walk(it)
+
+    def test_yaml_front_matter_hoists_title_and_meta(self) -> None:
+        md = "---\ntitle: Hand-picked\naudience: Author\norder: 7\n---\n\n# Ignored\n\n## S\n\nbody"
+        page = cli.md_to_page(md, default_title="default-x")
+        assert page["title"] == "Hand-picked"
+        meta = page.get("meta") or {}
+        assert meta.get("audience") == "Author"
+        assert meta.get("order") == 7
+
+    def test_reference_style_links_resolve(self) -> None:
+        md = "# X\n\n## S\n\nSee [the spec][refspec] for more.\n\n[refspec]: https://example.org/spec\n"
+        page = cli.md_to_page(md)
+        link = next(
+            (n for n in self._walk(page) if isinstance(n, dict) and n.get("kind") == "link"),
+            None,
+        )
+        assert link is not None, "reference-style link not resolved"
+        assert link["href"] == "https://example.org/spec"
+        assert link["text"] == "the spec"
+
+    def test_footnote_ref_emits_sup_and_section(self) -> None:
+        md = (
+            "# X\n\n## S\n\nA claim with a footnote.[^1]\n\n"
+            "[^1]: The supporting note.\n"
+        )
+        page = cli.md_to_page(md)
+        # Footnote ref renders as a `html` inline node.
+        html_inlines = [
+            n for n in self._walk(page)
+            if isinstance(n, dict) and n.get("kind") == "html" and "fn-1" in (n.get("text") or "")
+        ]
+        assert html_inlines, "inline footnote ref missing"
+        # Footnotes section appears at end.
+        sections = page.get("blocks") or []
+        assert sections[-1].get("title") == "Footnotes", "footnotes section missing"
+
+    def test_inline_html_passthrough_allowlist(self) -> None:
+        md = "# X\n\n## S\n\nMix <kbd>Ctrl</kbd> + C to copy.\n"
+        page = cli.md_to_page(md)
+        html_inlines = [
+            n for n in self._walk(page)
+            if isinstance(n, dict) and n.get("kind") == "html" and "<kbd>" in (n.get("text") or "")
+        ]
+        assert html_inlines, "inline HTML allowlisted tag (kbd) was dropped"
+
+    def test_nested_lists_emit_child_html(self) -> None:
+        md = "# X\n\n## S\n\n- top\n  - child a\n  - child b\n- top 2\n"
+        page = cli.md_to_page(md)
+        # The first top-level item carries a nested html node for its children.
+        for node in self._walk(page):
+            if isinstance(node, dict) and node.get("kind") == "list":
+                items = node.get("items", [])
+                # Search for any item whose payload includes an html node.
+                for it in items:
+                    if isinstance(it, list):
+                        for piece in it:
+                            if isinstance(piece, dict) and piece.get("kind") == "html" and "<ul" in piece.get("text", ""):
+                                return
+        raise AssertionError("nested list children did not emit an html-inline payload")
+
+    def test_definition_list_renders_dl(self) -> None:
+        md = "# X\n\n## S\n\nAtom\n:   Indivisible particle of a JSON page.\n\nMolecule\n:   Composition of atoms.\n"
+        page = cli.md_to_page(md)
+        for node in self._walk(page):
+            if isinstance(node, dict) and node.get("kind") == "html" and "<dl" in node.get("text", ""):
+                return
+        raise AssertionError("definition list did not emit a <dl> html-inline payload")
+
+
 # ---------- find_json_pages / .md walk ----------
 
 
