@@ -1,0 +1,301 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
+  "kind": "page",
+  "schema_version": 1,
+  "title": "Roadmap",
+  "accent": "amber",
+  "meta": {
+    "subtitle": "Path from html-doc to oku 1.0 — what's planned, in priority order, with the rationale and the open questions next to each phase.",
+    "audience": "Maintainer",
+    "order": 5,
+    "summary": "Single source of truth for upcoming work. Tracks vision, phasing, and per-item status."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "summary": "The project is being renamed oku (Turkish 'read!'). The 1.0 push is ten phases — first the cheap cleanups already decided, then component bugs, chart interactivity, the reference rewrite, the Markdown converter parity push, the visualization expansion, the architecture / layout / rename work, and the top-level docs rewrite that closes the loop.",
+      "bullets": [
+        "P0–P1 are quick wins: retire stale plan docs, drop the project-meta exclusion, fix the small component bugs the user has called out.",
+        "P2–P3 are the biggest authoring lift: chart interactivity (hover, shared cursor, true fullscreen), reference page restructure (pedagogical order, code/render side-by-side, viz grouped by family).",
+        "P4 closes every Markdown gap so 'Not in the converter' can come down. P5 unlocks every Mermaid type and ships the deferred Tier 3 visualizations.",
+        "P6–P8 are systemic: better architecture diagrams, layout option A, the html-doc → oku rename across CLI / packaging / branding.",
+        "P9 rewrites README + CLAUDE.md + index.json once the rest has shipped, so the docs reflect oku 1.0 rather than the migration."
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "snapshot",
+      "title": "Snapshot",
+      "lead": "Where the project stands going into oku 1.0.",
+      "blocks": [
+        {
+          "kind": "kpi-grid",
+          "tiles": [
+            { "num": "10", "label": "Phases planned" },
+            { "num": "38", "label": "Tracked items" },
+            { "num": "0",  "label": "Open decisions (name, layout, viz scope all locked)" },
+            { "num": "8",  "label": "Retired plan docs folded in" }
+          ]
+        },
+        {
+          "kind": "insight",
+          "content": "Vision · oku 1.0: a documentation kit that authors single-source JSON or Markdown pages and renders them in the browser with no build step. Visual-first primitives — kpi-grid, table-with-chips, charts, mermaid, annotated-code — make long-form pages scannable. A single LEFT sidebar hosts both the site tree and on-page TOC. Multi-page sites get Pagefind search; standalone single-file output works offline. The Markdown converter accepts everything reasonable; no hidden information. The reference reads top-down by importance, grouped by family."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "phases",
+      "title": "Phases",
+      "lead": "Each phase ships as its own commit chain. Phases are ordered by readiness; the top ones are cheap and well-defined, the lower ones need design calls first.",
+      "blocks": [
+        {
+          "kind": "step-flow",
+          "steps": [
+            {
+              "num": "P0",
+              "title": "Cleanup",
+              "meta": "quick · decided",
+              "content": "Retire docs/plans/*.json (incorporated). Drop the project-meta .md exclusion (include everything by default). Fix the index.json CLI count (5 commands, not 4) and remove 'Open X.html' links — cards become click-targetable instead. Delete naming.json references."
+            },
+            {
+              "num": "P1",
+              "title": "Component bugs",
+              "meta": "medium · per-bug commits",
+              "content": "ext-ref renders as a real <a> in addition to the tooltip. annotated-code: multi-line annotations stop overlapping the tooltip; substring annotations actually render. Kanban board view renders as kanban, not as a fallback table. Heading section gains its missing render result. View-toggle buttons become compact. Info / warning / tip callouts get standard symbols. Funnel labels and percentages align in a single grid. compare-grid loosens its item constraints and stops requiring a verdict."
+            },
+            {
+              "num": "P2",
+              "title": "Chart interactivity + fullscreen",
+              "meta": "large · runtime",
+              "content": "One chart-tooltip controller for every chart kind: bar, stacked-bar, grouped-bar, donut, histogram, heatmap, treemap, waffle, radar, box-plot, bullet, slope, funnel. Multi-part charts (ridgeline, faceted) gain a shared parallel cursor. Quadrant chart labels and legends stop overlapping the data. Expand widget becomes a true fullscreen overlay with pinch / wheel zoom and drag pan, reused across image / chart / diagram / mermaid."
+            },
+            {
+              "num": "P3",
+              "title": "Reference restructure",
+              "meta": "large · content",
+              "content": "reference.json reorders pedagogically — most-important first. Every primitive shows its JSON source AND its rendered result, side-by-side, in matching boundaries. Subsections gain card-style borders. The 19 chart kinds regroup into families (categorical, temporal, distribution, hierarchy, comparison, special) so similar ones sit together. Every missing render sample gets filled."
+            },
+            {
+              "num": "P4",
+              "title": "Markdown parity",
+              "meta": "large · converter",
+              "content": "Close every gap currently listed under 'Not in the converter': nested lists, footnotes, definition lists, reference-style links, inline HTML pass-through, YAML front-matter (becomes per-page metadata). Once shipped, the 'Not in the converter' card goes away."
+            },
+            {
+              "num": "P5",
+              "title": "Visualization expansion",
+              "meta": "large · runtime + docs",
+              "content": "Unlock every Mermaid diagram type and document it. Ship the deferred Tier 3 visualizations from viz-implementation.json (sankey, chord, parallel-coordinates, scatter-matrix, network, geo). Identify and complete missing capabilities discovered along the way."
+            },
+            {
+              "num": "P6",
+              "title": "Architecture diagrams",
+              "meta": "medium · authoring",
+              "content": "architecture.json's diagrams gain color, clusters, legends, hover affordances — bringing them up to the same visual standard as the rest of the kit."
+            },
+            {
+              "num": "P7",
+              "title": "Layout option A",
+              "meta": "medium · runtime + css",
+              "content": "Centered document with a wider default body. Sidebar variants per the layout plan (Option A), without breaking the single-LEFT-sidebar invariant."
+            },
+            {
+              "num": "P8",
+              "title": "Rename → oku",
+              "meta": "medium · packaging",
+              "content": "Introduce the oku package and CLI alongside html-doc. Switch the docs / README / kit headers / CLAUDE.md to the new brand. Decide on the deprecation window for the legacy name."
+            },
+            {
+              "num": "P9",
+              "title": "Top-level docs rewrite",
+              "meta": "large · content",
+              "content": "Once P1–P8 land, rewrite README.md, CLAUDE.md, index.json, architecture.json, kit.json end-to-end. Single voice, no historical breadcrumbs, no redundant parts, every section earns its keep."
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "items",
+      "title": "Tracked items",
+      "lead": "Filter by phase, effort, or status. Each row maps to a commit.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": [
+            "Item",
+            { "label": "Phase",  "filter": "chips", "values": ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9"] },
+            { "label": "Effort", "filter": "chips", "values": ["S", "M", "L"] },
+            { "label": "Status", "filter": "chips", "values": ["open", "in-progress", "done"] }
+          ],
+          "groups": [
+            {
+              "title": "P0 · Cleanup",
+              "rows": [
+                ["Delete docs/plans/*.json (incorporated)",                                              {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["Drop _PROJECT_META_MD exclusion · include all .md by default",                         {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["index.json · 5 CLI subcommands (was 4)",                                               {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["index.json · step-flow cards click-targetable, drop 'Open X.html'",                    {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["Retire 'Not in the converter' card-text (real fix lands in P4)",                       {"value": "P0", "values": ["P0"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}]
+              ]
+            },
+            {
+              "title": "P1 · Component bugs",
+              "rows": [
+                ["ext-ref renders as <a target=_blank> in addition to the tooltip",                       {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["annotated-code · multi-line tooltip stops overlapping the covered lines",              {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["annotated-code · substring annotation renders its number marker + tooltip",            {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["table · 'Board view: kanban' example actually renders as kanban",                      {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["heading · reference section shows the rendered heading next to the JSON",              {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["view-toggle · compact form (icons / segmented control / dropdown)",                    {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["info / warning / tip callouts use standard symbol set",                                {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["funnel · labels, numbers, percentages aligned in a single grid",                       {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["compare-grid · loosen item constraints, verdict optional",                             {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+              ]
+            },
+            {
+              "title": "P2 · Chart interactivity & fullscreen",
+              "rows": [
+                ["bar / stacked-bar / grouped-bar · hover-data tooltip",                                 {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["donut · hover shows segment label + value + share",                                    {"value": "P2", "values": ["P2"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["histogram / heatmap / treemap / waffle / radar / box-plot / bullet / slope · hover-data tooltip", {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["multi-part charts (ridgeline + future facets) gain a parallel cursor",                 {"value": "P2", "values": ["P2"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}],
+                ["quadrant · labels + legends stop overlapping data points",                             {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["expand widget · true fullscreen + zoom + pan, reused for image / chart / diagram / mermaid", {"value": "P2", "values": ["P2"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}]
+              ]
+            },
+            {
+              "title": "P3 · Reference restructure",
+              "rows": [
+                ["Pedagogical ordering · most-important primitives first",                               {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Code / render side-by-side pair layout for every example",                             {"value": "P3", "values": ["P3"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}],
+                ["Card-style boundary for every subsection",                                             {"value": "P3", "values": ["P3"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["Group chart kinds by family (categorical / temporal / distribution / hierarchy / comparison / special)", {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Add render sample wherever a primitive currently shows only code",                     {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+              ]
+            },
+            {
+              "title": "P4 · Markdown parity",
+              "rows": [
+                ["Nested lists",                                                                         {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Footnotes",                                                                            {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Definition lists",                                                                     {"value": "P4", "values": ["P4"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["Reference-style links",                                                                {"value": "P4", "values": ["P4"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["Inline HTML pass-through (sanitised allowlist)",                                       {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["YAML front-matter → page metadata",                                                    {"value": "P4", "values": ["P4"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+              ]
+            },
+            {
+              "title": "P5 · Visualization expansion",
+              "rows": [
+                ["Unlock every Mermaid type (flowchart, sequence, class, state, ER, journey, gantt, pie, quadrantChart, requirement, gitGraph, c4, mindmap, timeline, sankey, xychart-beta, architecture-beta, packet, kanban, block-beta, radar)", {"value": "P5", "values": ["P5"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}],
+                ["Document every Mermaid type in the reference",                                          {"value": "P5", "values": ["P5"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Ship deferred Tier 3 viz (sankey, chord, parallel-coordinates, scatter-matrix, network, geo)", {"value": "P5", "values": ["P5"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}],
+                ["Identify + close missing-capability gaps surfaced during P5",                           {"value": "P5", "values": ["P5"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+              ]
+            },
+            {
+              "title": "P6 · Architecture diagrams",
+              "rows": [
+                ["Add color / clusters / legends to architecture.json diagrams",                          {"value": "P6", "values": ["P6"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+              ]
+            },
+            {
+              "title": "P7 · Layout option A",
+              "rows": [
+                ["Centered document, wider default, sidebar variants",                                    {"value": "P7", "values": ["P7"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+              ]
+            },
+            {
+              "title": "P8 · Rename → oku",
+              "rows": [
+                ["Add oku package + CLI alongside html-doc",                                              {"value": "P8", "values": ["P8"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Switch docs / README / CLAUDE.md / kit headers to oku branding",                       {"value": "P8", "values": ["P8"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Decide deprecation window for html-doc legacy name",                                   {"value": "P8", "values": ["P8"]}, {"value": "S", "values": ["S"]}, {"value": "open", "values": ["open"]}]
+              ]
+            },
+            {
+              "title": "P9 · Top-level docs rewrite",
+              "rows": [
+                ["Rewrite README.md end-to-end",                                                          {"value": "P9", "values": ["P9"]}, {"value": "L", "values": ["L"]}, {"value": "open", "values": ["open"]}],
+                ["Rewrite CLAUDE.md end-to-end",                                                          {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Refresh index.json (home) for oku 1.0",                                                 {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Refresh architecture.json for current runtime",                                         {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}],
+                ["Refresh kit.json + glossary.json + cli.json",                                           {"value": "P9", "values": ["P9"]}, {"value": "M", "values": ["M"]}, {"value": "open", "values": ["open"]}]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "principles",
+      "title": "Principles driving the rewrite",
+      "lead": "Rules the maintainer has set down. Every phase honours these.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "Single LEFT sidebar — TOC + site tree stacked. No right TOC, no mid-edge tab.",
+            "Visual-first authoring. Pros/cons → comparison-cards, metrics → kpi-grid, trade-offs → table-with-chips. Paragraph + bullets is the fallback, not the default.",
+            "Plans, scratch, working files live under docs/ — never under _internal/ or in the repo root.",
+            "Every fix pairs with a regression test. Browser-level fixes ship with a Playwright assertion or, at minimum, a numeric bounding-box check.",
+            "Numbers in counters / badges only — no English words baked into the kit.",
+            "No demo sibling pages. Every example for a primitive lives in reference.json next to its heading.",
+            "No process / round / historical references in docs — the docs describe current behaviour, not how it got there."
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "retired-plans",
+      "title": "Retired plan docs",
+      "lead": "Folded into this roadmap (and into the code that already shipped). Removed from docs/plans/ in P0.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Plan file", "Disposition"],
+          "rows": [
+            ["plans/build-architecture.json", "Shipped — described in architecture.json."],
+            ["plans/cli-restructure.json",    "Shipped — src/html_doc/ is the package root."],
+            ["plans/glossary-share.json",     "Shipped — kit/glossary + kit/extrefs."],
+            ["plans/layout.json",             "Decision logged here (Option A). Implementation tracked in P7."],
+            ["plans/naming.json",             "Decision logged here (name = oku). Implementation tracked in P8."],
+            ["plans/visualizations.json",     "Folded into P5 in this roadmap."],
+            ["plans/viz-implementation.json", "Folded into P5 in this roadmap."],
+            ["plans/wide-screen.json",        "Folded into P7 in this roadmap (option A satisfies wide-screen)."]
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "open-questions",
+      "title": "Open questions",
+      "lead": "Decisions deferred until the relevant phase begins.",
+      "blocks": [
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "P2 fullscreen: SVG-native zoom (viewBox pan/scale) vs CSS transform wrapper. Picked at implementation time.",
+            "P3 code / render pair: lay them out as a 2-column grid (>900px) that collapses to stacked (≤900px), OR as a tabs widget. Lean grid; revisit if widths are tight.",
+            "P4 inline HTML: full sanitisation pipeline or allowlist. Lean allowlist (a, code, em, strong, span, sup, sub).",
+            "P8 deprecation window for html-doc binary: keep a shim for ≥2 minor releases, then drop. Confirm before P8 ships."
+          ]
+        }
+      ]
+    }
+  ]
+}
