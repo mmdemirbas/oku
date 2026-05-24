@@ -2331,6 +2331,23 @@ footer {
 .html-doc-extref[data-cite-type="blog"]    { border-bottom-color: var(--warning); }
 .html-doc-extref[data-cite-type="other"]   { border-bottom-color: var(--accent); }
 
+/* When an ext-ref carries a resolved link, swap the help-cursor for a
+   pointer and append a tiny "↗" so the reader sees this one is
+   actionable. The hover background already comes from the rule above. */
+.html-doc-extref.html-doc-extref-link { cursor: pointer; }
+.html-doc-extref.html-doc-extref-link::after {
+  content: '\2197';
+  font-size: 0.8em;
+  margin-left: 0.1em;
+  color: var(--text-soft);
+  vertical-align: super;
+  line-height: 1;
+}
+.html-doc-extref.html-doc-extref-link:hover::after,
+.html-doc-extref.html-doc-extref-link:focus-visible::after {
+  color: var(--accent-strong);
+}
+
 /* The citation card itself — rendered inside the tooltip body. */
 .hdt-cite {
   display: grid;

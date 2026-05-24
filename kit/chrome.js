@@ -2894,7 +2894,10 @@ class ExtRef extends HTMLElement {
         // theme the inline cite-text (different underline per type).
         var type = __htmldocCiteType(r.hit, self);
         self.setAttribute('data-cite-type', type);
-        if (r.hit.link) self.setAttribute('data-link', r.hit.link);
+        if (r.hit.link) {
+          self.setAttribute('data-link', r.hit.link);
+          __htmldocExtRefMakeClickable(self, r.hit.link);
+        }
         __htmldocTooltip.attach(self);
       } else if (__htmldocStandalone()) {
         self.classList.remove('html-doc-extref');
@@ -2908,6 +2911,42 @@ class ExtRef extends HTMLElement {
       }
     });
   }
+}
+
+/**
+ * Make an ext-ref / cite element behave like a link: open `link` in a
+ * new tab on click (left-button or middle-button), reachable by Tab,
+ * activated by Enter / Space. The hover tooltip continues to work in
+ * parallel — moving the pointer over the element shows the citation
+ * card, clicking it (or Cmd/Ctrl-clicking) navigates.
+ *
+ * Modifier keys passthrough where the browser would normally honor
+ * them: Cmd / Ctrl / Shift / middle-click all forward to window.open
+ * via target=_blank semantics, so background-tab opening keeps
+ * working.
+ */
+function __htmldocExtRefMakeClickable(el, link) {
+  el.classList.add('html-doc-extref-link');
+  el.setAttribute('role', 'link');
+  if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+  el.setAttribute('data-link-href', link);
+  // Click — left button or middle. We don't preventDefault on middle
+  // because the browser already opens a background tab natively for
+  // anchor elements; but ext-ref isn't an anchor, so we replicate.
+  el.addEventListener('click', function (ev) {
+    if (ev.button !== 0 && ev.button !== 1) return;
+    ev.preventDefault();
+    // Always open citations in a new tab — yanking the reader away
+    // from the doc to chase a reference is rude. Modifier keys
+    // don't change this; they all land at "new tab".
+    window.open(link, '_blank', 'noopener');
+  });
+  el.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter' || ev.key === ' ' || ev.code === 'Space') {
+      ev.preventDefault();
+      window.open(link, '_blank', 'noopener');
+    }
+  });
 }
 if (!customElements.get('ext-ref')) customElements.define('ext-ref', ExtRef);
 // "<cite>" alias — same behavior as <ext-ref> so authors can use the

@@ -307,6 +307,22 @@ class TestChromeKitMarkers:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "sidebar-collapsed" in src, "sidebar collapse class wiring missing"
 
+    def test_chrome_extref_clickable(self, repo_root: Path) -> None:
+        """ext-ref with a resolved link wraps the inline text in
+        click + keyboard handlers that open a new tab. The pointer
+        and arrow affordance come from CSS class extref-link."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert (
+            "__htmldocExtRefMakeClickable" in js
+        ), "ext-ref clickability helper missing — links won't open on click"
+        assert (
+            "html-doc-extref-link" in css
+        ), "CSS class for clickable ext-ref missing — no pointer / arrow affordance"
+        assert (
+            "html-doc-extref-link" in js
+        ), "ext-ref clickable helper should add the html-doc-extref-link class"
+
     def test_reader_can_cycle_content_width(self, repo_root: Path) -> None:
         """Reader has a chrome button to cycle content width modes (D3).
 
