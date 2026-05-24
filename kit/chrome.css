@@ -31,11 +31,13 @@
   --success: #15803d;
   --success-soft: #dcfce7;
   --on-accent: #ffffff;
-  --max-width: 860px;
-  /* Reader-controlled content width (D3). Default narrow (= --max-width)
-     is the optimal reading line length. Wide / max are opt-in via the
-     top-right chrome button; choice persists to localStorage. */
-  --content-width: 860px;
+  --max-width: 960px;
+  /* Reader-controlled content width (D3 + P7). The default is the
+     'comfortable' reading width — a hair wider than the prior 860px
+     so visual primitives (kpi-grid, charts, tables) don't crowd at
+     full-token zoom. Narrow / wide / max are picked via the top-right
+     chrome button and persist to localStorage. */
+  --content-width: 960px;
   --shadow-strong: rgba(30, 27, 41, 0.18);
   --shadow-soft:   rgba(30, 27, 41, 0.06);
   --ctrl-bg:        rgba(255, 255, 255, 0.85);
@@ -352,24 +354,29 @@ nav.toc, page-toc {
 /* Content-width modes (D3). The CSS variable wins because <main> reads
    it via max-width; the body attribute is the persisted source of truth. */
 body[data-content-width="narrow"] { --content-width: 860px; }
-body[data-content-width="wide"]   { --content-width: 1100px; }
+body[data-content-width="comfortable"] { --content-width: 960px; }
+body[data-content-width="wide"]   { --content-width: 1180px; }
 body[data-content-width="max"]    { --content-width: 100vw; }
 
 /* Width-toggle icon doubles as a state readout. The three <rect> segments
    inside ICON_WIDTH are outline by default; the active count fills:
-     · narrow (default) → s1 filled
-     · wide              → s1 + s2 filled
-     · max               → s1 + s2 + s3 filled
+     · narrow              → s1 filled
+     · comfortable (default) → s1 + half s2 (s2 muted)
+     · wide                → s1 + s2 filled
+     · max                 → s1 + s2 + s3 filled
    So the reader sees at a glance which mode they're in without opening
    the tooltip. */
 .width-toggle .w-seg { fill: none; }
 .width-toggle .w-seg.s1,
+body[data-content-width="comfortable"] .width-toggle .w-seg.s2,
 body[data-content-width="wide"] .width-toggle .w-seg.s2,
 body[data-content-width="max"]  .width-toggle .w-seg.s2,
 body[data-content-width="max"]  .width-toggle .w-seg.s3 { fill: currentColor; }
-/* Explicit narrow override in case a future state-default ever changes. */
+body[data-content-width="comfortable"] .width-toggle .w-seg.s2 { opacity: 0.5; }
+/* Explicit overrides — keep filled segments stable across mode changes. */
 body[data-content-width="narrow"] .width-toggle .w-seg.s2,
 body[data-content-width="narrow"] .width-toggle .w-seg.s3,
+body[data-content-width="comfortable"] .width-toggle .w-seg.s3,
 body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
 .back-to-top { bottom: 18px; right: 18px; opacity: 0; pointer-events: none; }
 .back-to-top.visible { opacity: 1; pointer-events: auto; }

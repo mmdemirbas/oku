@@ -609,7 +609,9 @@ class TestChromeKitMarkers:
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "--content-width" in css, "missing --content-width CSS variable"
-        for mode in ("narrow", "wide", "max"):
+        # P7 — default expanded to four modes; comfortable is now the
+        # boot default and sits between narrow and wide.
+        for mode in ("narrow", "comfortable", "wide", "max"):
             assert f'body[data-content-width="{mode}"]' in css, (
                 f"missing CSS rule for width mode '{mode}'"
             )
@@ -626,9 +628,8 @@ class TestChromeKitMarkers:
         assert "htmldoc-content-width" in js, (
             "localStorage key for the width-mode preference missing"
         )
-        assert "WIDTH_MODES" in js and "'narrow'" in js and "'wide'" in js and "'max'" in js, (
-            "WIDTH_MODES list must enumerate the three modes"
-        )
+        for mode in ("'narrow'", "'comfortable'", "'wide'", "'max'"):
+            assert mode in js, f"WIDTH_MODES list must include {mode}"
         assert ".width-toggle" in js, (
             "PageChrome must inject a .width-toggle button"
         )

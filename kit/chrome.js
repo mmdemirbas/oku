@@ -540,9 +540,15 @@ try {
  * row, still readable prose); max = fill the grid cell (tables, code,
  * matrices in particular benefit on wide screens). State lives on
  * `<body data-content-width=...>`; CSS does the rest via --content-width. */
-var WIDTH_MODES = ['narrow', 'wide', 'max'];
+// P7 — Layout Option A. Default mode is the new 'comfortable' band
+// (960px) — narrow stays available for prose-heavy reading; wide /
+// max are opt-ins for tables, charts, and matrices. Cycle order
+// goes narrow → comfortable → wide → max so a single tap moves up
+// one notch each time.
+var WIDTH_MODES = ['narrow', 'comfortable', 'wide', 'max'];
+var DEFAULT_WIDTH = 'comfortable';
 function _widthLabelFor(mode) {
-  return 'Content width: ' + mode + ' — click to cycle (narrow → wide → max)';
+  return 'Content width: ' + mode + ' — click to cycle (narrow → comfortable → wide → max)';
 }
 function _syncWidthToggleLabel(mode) {
   var btn = document.querySelector('.width-toggle');
@@ -552,7 +558,7 @@ function _syncWidthToggleLabel(mode) {
   btn.setAttribute('aria-label', lbl);
 }
 function cycleContentWidth() {
-  var current = document.body.getAttribute('data-content-width') || 'narrow';
+  var current = document.body.getAttribute('data-content-width') || DEFAULT_WIDTH;
   var i = WIDTH_MODES.indexOf(current);
   var next = WIDTH_MODES[(i + 1) % WIDTH_MODES.length];
   document.body.setAttribute('data-content-width', next);
@@ -568,10 +574,8 @@ try {
     });
   } else {
     document.addEventListener('DOMContentLoaded', function () {
-      // Make the default mode explicit so the indicator + aria-label
-      // line up with reality on first paint.
       if (!document.body.getAttribute('data-content-width')) {
-        document.body.setAttribute('data-content-width', 'narrow');
+        document.body.setAttribute('data-content-width', DEFAULT_WIDTH);
       }
       _syncWidthToggleLabel(document.body.getAttribute('data-content-width'));
     });
@@ -608,7 +612,7 @@ class PageChrome extends HTMLElement {
     var skipLabel = this.getAttribute('skip-label') || 'Skip to content';
     var drawerLabel = this.getAttribute('drawer-label') || 'Open navigation';
     var themeLabel = this.getAttribute('theme-label') || 'Cycle theme (system / light / dark)';
-    var widthLabel = this.getAttribute('width-label') || 'Cycle content width (narrow / wide / max)';
+    var widthLabel = this.getAttribute('width-label') || 'Cycle content width (narrow / comfortable / wide / max)';
     var topLabel = this.getAttribute('top-label') || 'Back to top';
 
     // .drawer-toggle is hidden via CSS on wide viewports — the right-
