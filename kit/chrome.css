@@ -38,6 +38,12 @@
      full-token zoom. Narrow / wide / max are picked via the top-right
      chrome button and persist to localStorage. */
   --content-width: 960px;
+  /* Asymmetric bleed (wide-screen support). Prose primitives clamp
+     to --prose-width for readable line length; visual primitives
+     (table, chart, kpi-grid, compare-grid, step-flow, diagram, code,
+     annotated-code) bleed to --content-width. Reader picks the
+     content width via the chrome button; prose stays put. */
+  --prose-width: 720px;
   --shadow-strong: rgba(30, 27, 41, 0.18);
   --shadow-soft:   rgba(30, 27, 41, 0.06);
   --ctrl-bg:        rgba(255, 255, 255, 0.85);
@@ -353,10 +359,20 @@ nav.toc, page-toc {
 
 /* Content-width modes (D3). The CSS variable wins because <main> reads
    it via max-width; the body attribute is the persisted source of truth. */
-body[data-content-width="narrow"] { --content-width: 860px; }
-body[data-content-width="comfortable"] { --content-width: 960px; }
-body[data-content-width="wide"]   { --content-width: 1180px; }
-body[data-content-width="max"]    { --content-width: 100vw; }
+body[data-content-width="narrow"] { --content-width: 860px;  --prose-width: 720px; }
+body[data-content-width="comfortable"] { --content-width: 960px;  --prose-width: 720px; }
+body[data-content-width="wide"]   { --content-width: 1280px; --prose-width: 720px; }
+body[data-content-width="max"]    { --content-width: 100vw;  --prose-width: 720px; }
+/* Genuine wide screens — push content width up so charts, tables,
+   and kpi-grids spread out. Prose stays clamped via --prose-width. */
+@media (min-width: 1600px) {
+  body[data-content-width="comfortable"] { --content-width: 1120px; }
+  body[data-content-width="wide"]        { --content-width: 1480px; }
+}
+@media (min-width: 2000px) {
+  body[data-content-width="comfortable"] { --content-width: 1240px; }
+  body[data-content-width="wide"]        { --content-width: 1640px; }
+}
 
 /* Width-toggle icon doubles as a state readout. The three <rect> segments
    inside ICON_WIDTH are outline by default; the active count fills:
@@ -4007,4 +4023,51 @@ html-doc-chart .hdc-parcoord .hdc-parcoord-line:hover,
 html-doc-chart .hdc-parcoord .hdc-parcoord-line.hovered {
   stroke-opacity: 1;
   stroke-width: 2.4;
+}
+
+
+/* ============ Asymmetric bleed — prose narrow, visuals wide ============
+ * Rule: prose blocks clamp to --prose-width for line-length
+ * (~80 char). Visual primitives stretch up to --content-width
+ * unchanged. The rule is scoped to direct children of <main>
+ * so nested prose (paragraphs inside a callout, a card, a
+ * info-tip body) keeps its container's width.
+ * ---------------------------------------------------------------- */
+main > p,
+main > h1, main > h2, main > h3, main > h4,
+main > ul, main > ol,
+main > blockquote,
+main > .callout,
+main > .insight,
+main > details.info-tip,
+main > section > p,
+main > section > h1, main > section > h2, main > section > h3, main > section > h4,
+main > section > ul, main > section > ol,
+main > section > blockquote,
+main > section > .callout,
+main > section > .insight,
+main > section > details.info-tip {
+  max-width: var(--prose-width, 720px);
+}
+/* TLDR is a featured opener — wider than prose, narrower than visuals. */
+main > .tldr,
+main > section > .tldr {
+  max-width: min(var(--content-width, 960px), 860px);
+}
+/* Visual primitives explicitly opt OUT — they fill the content
+   width. Listed redundantly with the inheritance above so an
+   author adding a wrapper around a visual block doesn't clip it. */
+main .hdt-table-wrap,
+main .compare-grid,
+main .kpi-grid,
+main .step-cards,
+main .bar-chart,
+main .bar-chart-multi,
+main html-doc-chart,
+main html-doc-diagram,
+main html-doc-live-snippet,
+main html-doc-annotated-code,
+main pre,
+main .example-pair {
+  max-width: var(--content-width, 960px);
 }

@@ -629,6 +629,29 @@ class TestChromeKitMarkers:
             "c.accent" in js
         ), "renderer must read c.accent (taking precedence over verdict)"
 
+    def test_asymmetric_bleed_wide_screen(self, repo_root: Path) -> None:
+        """Wide-screen support — prose blocks clamp to --prose-width
+        (line-length cap), visual primitives bleed to --content-width.
+        Genuine wide screens (>1600px) push content-width up while
+        prose stays put."""
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert "--prose-width" in css, "missing --prose-width token"
+        assert "main > p" in css and "max-width: var(--prose-width" in css, (
+            "prose paragraphs must clamp to --prose-width inside <main>"
+        )
+        # Wide-screen media query bumps content width.
+        assert "min-width: 1600px" in css, (
+            "missing >=1600px media query that widens --content-width on big monitors"
+        )
+        # Visual primitives explicitly opt out of the prose clamp.
+        for selector in (
+            "main .hdt-table-wrap",
+            "main .kpi-grid",
+            "main html-doc-chart",
+            "main pre",
+        ):
+            assert selector in css, f"visual primitive '{selector}' missing the content-width override"
+
     def test_reader_can_cycle_content_width(self, repo_root: Path) -> None:
         """Reader has a chrome button to cycle content width modes (D3).
 
