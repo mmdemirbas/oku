@@ -1829,9 +1829,37 @@ pre[class*="language-"] {
 
 /* ============ Callouts ============ */
 .callout {
-  margin: 22px 0; padding: 18px 22px; border-radius: 10px;
+  position: relative;
+  margin: 22px 0; padding: 18px 22px 18px 56px; border-radius: 10px;
   border-left: 5px solid var(--accent); background: var(--accent-soft);
 }
+/* Standard semantic symbol per callout type — renderer.js writes the
+   glyph onto data-callout-symbol; CSS positions it as a circular
+   badge on the left so the reader sees the class at a glance. */
+.callout::before {
+  content: attr(data-callout-symbol);
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.callout.warn::before,
+.callout.warning::before,
+.callout.caution::before { color: var(--warning); box-shadow: inset 0 0 0 1px var(--warning); }
+.callout.danger::before  { color: var(--danger);  box-shadow: inset 0 0 0 1px var(--danger); }
+.callout.success::before,
+.callout.tip::before     { color: var(--success); box-shadow: inset 0 0 0 1px var(--success); }
+.callout.neutral::before { color: var(--text-soft); box-shadow: inset 0 0 0 1px var(--text-soft); }
 /* Note: schema accepts "warn"; ".warning" kept as alias for legacy HTML. */
 .callout.warn,
 .callout.warning,
@@ -2149,14 +2177,24 @@ table tr:hover td { background: var(--surface-2); }
   transform: translateY(-2px);
   box-shadow: 0 6px 16px var(--shadow-soft);
 }
-.compare-card.bad  { border-top: 4px solid var(--danger); }
-.compare-card.bad:hover  { border-color: var(--danger); }
-.compare-card.good { border-top: 4px solid var(--success); }
-.compare-card.good:hover { border-color: var(--success); }
+.compare-card.bad,
+.compare-card.danger  { border-top: 4px solid var(--danger); }
+.compare-card.bad:hover,
+.compare-card.danger:hover  { border-color: var(--danger); }
+.compare-card.good,
+.compare-card.success { border-top: 4px solid var(--success); }
+.compare-card.good:hover,
+.compare-card.success:hover { border-color: var(--success); }
 .compare-card.in   { border-top: 4px solid var(--success); }
 .compare-card.in:hover   { border-color: var(--success); }
-.compare-card.out  { border-top: 4px solid var(--text-soft); }
-.compare-card.out:hover  { border-color: var(--text-soft); }
+.compare-card.out,
+.compare-card.muted { border-top: 4px solid var(--text-soft); }
+.compare-card.out:hover,
+.compare-card.muted:hover  { border-color: var(--text-soft); }
+.compare-card.warn { border-top: 4px solid var(--warning); }
+.compare-card.warn:hover { border-color: var(--warning); }
+.compare-card.accent { border-top: 4px solid var(--accent); }
+.compare-card.accent:hover { border-color: var(--accent); }
 .compare-card.in h4  { color: var(--success); }
 .compare-card.out h4 { color: var(--text-soft); }
 .compare-card h4 { margin: 0 0 12px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--text); }

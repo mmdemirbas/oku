@@ -323,6 +323,46 @@ class TestChromeKitMarkers:
             "html-doc-extref-link" in js
         ), "ext-ref clickable helper should add the html-doc-extref-link class"
 
+    def test_callout_symbols_present(self, repo_root: Path) -> None:
+        """Renderer writes a per-type symbol onto callouts via
+        data-callout-symbol; CSS positions it as a left badge so
+        readers see the semantic class at a glance."""
+        js = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert (
+            "_calloutSymbol" in js
+        ), "callout symbol helper missing — info/warn/tip have no glyph"
+        assert (
+            "data-callout-symbol" in js
+        ), "renderer must tag callouts with data-callout-symbol for the CSS badge"
+        assert (
+            "data-callout-symbol" in css
+        ), "CSS must read data-callout-symbol via attr() to render the badge"
+
+    def test_compare_grid_accepts_blocks(self, repo_root: Path) -> None:
+        """compare-grid card now accepts a `blocks: contentBlock[]`
+        payload alongside content / items — the schema and the
+        renderer must agree."""
+        schema = json.loads(
+            (repo_root / "kit" / "schema" / "page.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        card = schema["$defs"]["compare-grid"]["properties"]["cards"]["items"]
+        assert "blocks" in card["properties"], (
+            "compare-grid card lost its `blocks` field — restore the loose-content payload"
+        )
+        assert "accent" in card["properties"], (
+            "compare-grid card lost its `accent` field — restore the token-aligned alias for verdict"
+        )
+        js = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert (
+            "c.blocks" in js
+        ), "renderer must read c.blocks for the new compare-grid block payload"
+        assert (
+            "c.accent" in js
+        ), "renderer must read c.accent (taking precedence over verdict)"
+
     def test_reader_can_cycle_content_width(self, repo_root: Path) -> None:
         """Reader has a chrome button to cycle content width modes (D3).
 

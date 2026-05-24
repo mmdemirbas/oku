@@ -393,6 +393,16 @@
         },
         {
           "kind": "heading",
+          "level": 4,
+          "id": "heading-sample",
+          "title": "Live heading sample — this row is the rendered result"
+        },
+        {
+          "kind": "paragraph",
+          "content": "The heading immediately above is the actual rendered output of the JSON example below — same size, weight, anchor affordance, and id-based permalink the kit emits everywhere. The chevron appears on hover."
+        },
+        {
+          "kind": "heading",
           "level": 3,
           "id": "list",
           "title": "list"

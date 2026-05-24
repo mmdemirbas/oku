@@ -375,7 +375,7 @@
       "type": "object",
       "required": ["kind", "cards"],
       "additionalProperties": false,
-      "description": "N-card comparison grid. Use verdict to colour each card; mix `content` (rich text body) and/or `items` (bullet list) freely. The verdict vocabulary covers both quality contrasts (good/bad/neutral) and scope contrasts (in/out) — the kit renders in/out cards with the same border vocabulary scope-grid used previously.",
+      "description": "N-card comparison grid. Pick the card accent via verdict (or accent — alias). Mix content (rich text body), items (bullet list), and blocks (any contentBlock — callouts, code, charts, tables) freely; they render in source order. Both verdict and accent are optional and default to neutral.",
       "properties": {
         "kind": { "const": "compare-grid" },
         "cards": {
@@ -388,14 +388,23 @@
               "verdict": {
                 "enum": ["good", "bad", "neutral", "in", "out"],
                 "default": "neutral",
-                "description": "Card accent: good (success border), bad (danger), neutral (default), in (success — was scope-grid status:in), out (muted — was scope-grid status:out)."
+                "description": "Quality / scope shorthand: good (success border), bad (danger), in (success — was scope-grid status:in), out (muted), neutral (default). Use `accent` instead when you need to match the broader kit token vocabulary; both fields are honoured but accent wins on conflict."
+              },
+              "accent": {
+                "enum": ["accent", "warn", "danger", "success", "muted", "neutral"],
+                "description": "Card accent in the kit's standard color tokens. Wins over verdict if both are set. Use this when verdict's good/bad/in/out feels too arbitrary — accent maps directly to the same colour vocabulary as charts and callouts."
               },
               "title": { "type": "string" },
-              "content": { "$ref": "#/$defs/richString", "description": "Rich-text body. Combine with items, or use either alone." },
+              "content": { "$ref": "#/$defs/richString", "description": "Rich-text body. Combine with items / blocks, or use any subset alone." },
               "items": {
                 "type": "array",
                 "items": { "$ref": "#/$defs/richString" },
-                "description": "Bullet list inside the card. Renders below `content` when both are present."
+                "description": "Bullet list inside the card. Renders below content when both are present."
+              },
+              "blocks": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/contentBlock" },
+                "description": "Rich block content inside the card — callouts, code samples, tables, charts, anything from contentBlock. Renders after items. Use blocks when a card needs a worked example or a structured comparison; use items for a plain bullet list."
               }
             }
           }

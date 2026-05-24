@@ -516,7 +516,13 @@
 
     _renderCallout(block) {
       const c = document.createElement('div');
-      c.className = 'callout ' + (block.type || 'neutral');
+      const type = block.type || 'neutral';
+      c.className = 'callout ' + type;
+      // Standard symbol per callout type so the reader sees the
+      // semantic class at a glance, not just a colored border. The
+      // CSS applies the symbol via ::before on .callout, keyed by
+      // the type class — no DOM symbol needed here.
+      c.setAttribute('data-callout-symbol', this._calloutSymbol(type));
       if (block.title) {
         const h = document.createElement('h4');
         h.textContent = block.title;
@@ -526,6 +532,24 @@
         this._appendRichAsParagraphs(c, block.content);
       }
       return c;
+    }
+
+    _calloutSymbol(type) {
+      // Single-character glyphs that all renderable on system fonts
+      // without falling back to emoji presentation. CSS does the
+      // colour + sizing per type.
+      switch (type) {
+        case 'info':
+        case 'note':    return 'ⓘ';        // ⓘ
+        case 'tip':     return '✨';        // ✨
+        case 'warn':
+        case 'warning': return '⚠';        // ⚠
+        case 'caution': return '⚠';        // ⚠ (caution shares glyph, differs by colour)
+        case 'danger':  return '⛔';        // ⛔
+        case 'success': return '✔';        // ✔
+        case 'neutral':
+        default:        return '●';        // ●
+      }
     }
 
     _renderInsight(block) {
@@ -756,18 +780,22 @@
 
     _renderCompareGrid(block) {
       // Unified comparison grid. Each card can carry:
-      //   verdict: good | bad | neutral | in | out
-      //     good/in render with a success-coloured top border;
-      //     bad/out render with danger / muted respectively.
+      //   verdict: good | bad | neutral | in | out (legacy shorthand)
+      //   accent:  accent | warn | danger | success | muted | neutral
+      //     accent wins over verdict when both are present.
       //   content: rich-string body
       //   items:   array of rich-strings rendered as a <ul> inside the card
-      // Either field is optional. When both are present, content appears
-      // first, then the items list.
+      //   blocks:  array of contentBlock — rich blocks (callouts,
+      //            code, charts, tables) rendered after items.
+      // Every payload field is optional. Order on the card is:
+      // title → content → items → blocks.
       const grid = document.createElement('div');
       grid.className = 'compare-grid';
       for (const c of (block.cards || [])) {
         const card = document.createElement('div');
-        card.className = 'compare-card ' + (c.verdict || 'neutral');
+        // accent wins over verdict. Fall through to neutral.
+        const styleKey = c.accent || c.verdict || 'neutral';
+        card.className = 'compare-card ' + styleKey;
         if (c.title) {
           const h = document.createElement('h4');
           h.textContent = c.title;
@@ -786,6 +814,12 @@
             ul.appendChild(li);
           }
           card.appendChild(ul);
+        }
+        if (Array.isArray(c.blocks) && c.blocks.length) {
+          for (const sub of c.blocks) {
+            const el = this._renderContentBlock(sub);
+            if (el) card.appendChild(el);
+          }
         }
         grid.appendChild(card);
       }
