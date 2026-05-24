@@ -3220,7 +3220,11 @@ class HtmlDocChart extends HTMLElement {
       'calendar-heatmap': '_renderCalendarHeatmap',
       treemap: '_renderTreemap',
       ridgeline: '_renderRidgeline',
-      funnel: '_renderFunnel'
+      funnel: '_renderFunnel',
+      sankey: '_renderSankey',
+      network: '_renderNetwork',
+      'scatter-matrix': '_renderScatterMatrix',
+      'parallel-coordinates': '_renderParallelCoordinates'
     };
     if (nonCartesian[this._type]) {
       this[nonCartesian[this._type]]();
@@ -4385,6 +4389,322 @@ class HtmlDocChart extends HTMLElement {
       parts.push('<text x="' + labelColRight + '" y="' + textY + '" text-anchor="end" class="hdc-funnel-label">' + escapeXml(st.label || '') + '</text>');
       parts.push('<text x="' + valueColRight + '" y="' + textY + '" text-anchor="end" class="hdc-funnel-value">' + escapeXml(fmtNum(v)) + '</text>');
       parts.push('<text x="' + pctColRight + '" y="' + textY + '" text-anchor="end" class="hdc-funnel-pct">' + pct + '%</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Tier 3 — sankey ----------------
+     Layered left→right flow. Column = BFS depth from any source
+     node; height in each column is proportional to the node's
+     incoming-or-outgoing total flow. Links draw as cubic Bezier
+     ribbons whose thickness matches link.value. */
+  _renderSankey() {
+    var x = (this._extras && this._extras.sankey) || {};
+    var nodes = (x.nodes || []).slice();
+    var links = (x.links || []).slice();
+    if (nodes.length < 2 || !links.length) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    // Index nodes by id; compute incoming/outgoing totals.
+    var byId = {};
+    nodes.forEach(function (n) { n._in = 0; n._out = 0; n._adj = []; byId[n.id] = n; });
+    links.forEach(function (l) {
+      var s = byId[l.source], t = byId[l.target];
+      if (!s || !t) return;
+      var v = +l.value || 1;
+      s._out += v; t._in += v;
+      s._adj.push(l);
+    });
+    // BFS columns from any node with no incoming edges (sources).
+    nodes.forEach(function (n) { n._col = (n._in === 0 && n._out > 0) ? 0 : -1; });
+    var queue = nodes.filter(function (n) { return n._col === 0; });
+    while (queue.length) {
+      var n = queue.shift();
+      n._adj.forEach(function (l) {
+        var t = byId[l.target];
+        if (t && (t._col === -1 || t._col < n._col + 1)) {
+          t._col = n._col + 1;
+          queue.push(t);
+        }
+      });
+    }
+    // Sinks without any outgoing — put them at last column.
+    var maxCol = 0;
+    nodes.forEach(function (n) { if (n._col > maxCol) maxCol = n._col; });
+    nodes.forEach(function (n) { if (n._col === -1) n._col = maxCol; });
+    // Layout: equally-spaced columns; within a column, stack by total flow.
+    var W = 640, H = this._title ? 360 : 320;
+    var titleTop = this._title ? 28 : 12;
+    var pad = { left: 12, right: 12, top: titleTop, bottom: 12 };
+    var plotW = W - pad.left - pad.right;
+    var plotH = H - pad.top - pad.bottom;
+    var nodeW = 14;
+    var gap = 6;
+    var cols = [];
+    for (var c = 0; c <= maxCol; c++) cols.push([]);
+    nodes.forEach(function (n) { cols[n._col].push(n); });
+    var colX = function (c) {
+      if (cols.length <= 1) return pad.left + plotW / 2 - nodeW / 2;
+      return pad.left + (c / (cols.length - 1)) * (plotW - nodeW);
+    };
+    cols.forEach(function (col) {
+      var totalFlow = col.reduce(function (s, n) { return s + Math.max(n._in, n._out, 1); }, 0);
+      var avail = plotH - (col.length - 1) * gap;
+      var y = pad.top;
+      col.forEach(function (n) {
+        n._h = Math.max(8, (Math.max(n._in, n._out, 1) / totalFlow) * avail);
+        n._y = y;
+        y += n._h + gap;
+      });
+    });
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Sankey') + '" class="hdc-svg hdc-sankey">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    // Track running source/target heights so concurrent links stack.
+    nodes.forEach(function (n) { n._srcUsed = 0; n._tgtUsed = 0; });
+    // Ribbons — draw before nodes so the rectangles cap the band edges.
+    links.forEach(function (l) {
+      var s = byId[l.source], t = byId[l.target];
+      if (!s || !t) return;
+      var v = +l.value || 1;
+      var sH = Math.max(1, (v / Math.max(s._out, 1)) * s._h);
+      var tH = Math.max(1, (v / Math.max(t._in, 1)) * t._h);
+      var sx = colX(s._col) + nodeW;
+      var tx = colX(t._col);
+      var sy = s._y + s._srcUsed;
+      var ty = t._y + t._tgtUsed;
+      s._srcUsed += sH;
+      t._tgtUsed += tH;
+      var mx = (sx + tx) / 2;
+      var d = 'M ' + sx + ' ' + sy +
+              ' C ' + mx + ' ' + sy + ', ' + mx + ' ' + ty + ', ' + tx + ' ' + ty +
+              ' L ' + tx + ' ' + (ty + tH) +
+              ' C ' + mx + ' ' + (ty + tH) + ', ' + mx + ' ' + (sy + sH) + ', ' + sx + ' ' + (sy + sH) +
+              ' Z';
+      var color = palette[s.color] || palette.accent;
+      var payload = JSON.stringify({
+        label: (l.label || (s.label || s.id) + ' → ' + (t.label || t.id)),
+        kv: [{ k: 'flow', v: fmtNum(v) }]
+      });
+      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.32" class="hdc-sankey-link" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((l.label || (s.label || s.id) + ' → ' + (t.label || t.id)) + ': ' + fmtNum(v)) + '</title></path>');
+    });
+    // Node rectangles + labels.
+    nodes.forEach(function (n) {
+      var nx = colX(n._col);
+      var color = palette[n.color] || palette.accent;
+      parts.push('<rect x="' + nx + '" y="' + n._y + '" width="' + nodeW + '" height="' + n._h + '" fill="' + color + '" class="hdc-sankey-node"><title>' + escapeXml((n.label || n.id) + ': ' + fmtNum(Math.max(n._in, n._out))) + '</title></rect>');
+      var labelX = nx + (n._col === cols.length - 1 ? -6 : nodeW + 6);
+      var anchor = n._col === cols.length - 1 ? 'end' : 'start';
+      parts.push('<text x="' + labelX + '" y="' + (n._y + n._h / 2 + 4) + '" text-anchor="' + anchor + '" class="hdc-sankey-label">' + escapeXml(n.label || n.id) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Tier 3 — network ----------------
+     Force-relaxed node-link diagram. Initial layout = ring; we then
+     run a small number of spring-relaxation iterations (Fruchterman-
+     Reingold-ish) so connected nodes attract and all nodes repel.
+     Cheap enough for tens of nodes; not intended for production
+     graph-viz of thousands. */
+  _renderNetwork() {
+    var x = (this._extras && this._extras.network) || {};
+    var nodes = (x.nodes || []).slice();
+    var links = (x.links || []).slice();
+    if (nodes.length < 2 || !links.length) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var W = 640, H = this._title ? 460 : 420;
+    var titleTop = this._title ? 28 : 12;
+    var byId = {};
+    var cx = W / 2, cy = (titleTop + H) / 2;
+    var R = Math.min(W, H) / 2 - 60;
+    nodes.forEach(function (n, i) {
+      var a = (i / nodes.length) * Math.PI * 2;
+      n._x = cx + R * Math.cos(a);
+      n._y = cy + R * Math.sin(a);
+      byId[n.id] = n;
+    });
+    // Build neighbour map for the attraction step.
+    var adj = {};
+    nodes.forEach(function (n) { adj[n.id] = []; });
+    links.forEach(function (l) {
+      if (!byId[l.source] || !byId[l.target]) return;
+      adj[l.source].push(l.target);
+      adj[l.target].push(l.source);
+    });
+    // Fruchterman-Reingold-ish — k = ideal distance.
+    var area = (W - 80) * (H - 80);
+    var k = Math.sqrt(area / nodes.length);
+    var iterations = 60;
+    var temp = R / 3;
+    for (var step = 0; step < iterations; step++) {
+      // Repulsion.
+      nodes.forEach(function (a) { a._dx = 0; a._dy = 0; });
+      for (var i = 0; i < nodes.length; i++) {
+        for (var j = i + 1; j < nodes.length; j++) {
+          var a = nodes[i], b = nodes[j];
+          var dx = a._x - b._x, dy = a._y - b._y;
+          var dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+          var f = (k * k) / dist;
+          var ux = dx / dist, uy = dy / dist;
+          a._dx += ux * f; a._dy += uy * f;
+          b._dx -= ux * f; b._dy -= uy * f;
+        }
+      }
+      // Attraction (only along edges).
+      links.forEach(function (l) {
+        var a = byId[l.source], b = byId[l.target];
+        if (!a || !b) return;
+        var dx = a._x - b._x, dy = a._y - b._y;
+        var dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        var f = (dist * dist) / k;
+        var ux = dx / dist, uy = dy / dist;
+        a._dx -= ux * f; a._dy -= uy * f;
+        b._dx += ux * f; b._dy += uy * f;
+      });
+      // Apply, clamp to viewbox.
+      nodes.forEach(function (n) {
+        var disp = Math.sqrt(n._dx * n._dx + n._dy * n._dy) || 0.01;
+        n._x += (n._dx / disp) * Math.min(disp, temp);
+        n._y += (n._dy / disp) * Math.min(disp, temp);
+        n._x = Math.max(40, Math.min(W - 40, n._x));
+        n._y = Math.max(titleTop + 20, Math.min(H - 20, n._y));
+      });
+      temp *= 0.92;
+    }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Network') + '" class="hdc-svg hdc-network">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    // Edges first (drawn under nodes).
+    links.forEach(function (l) {
+      var a = byId[l.source], b = byId[l.target];
+      if (!a || !b) return;
+      parts.push('<line x1="' + a._x.toFixed(1) + '" y1="' + a._y.toFixed(1) + '" x2="' + b._x.toFixed(1) + '" y2="' + b._y.toFixed(1) + '" class="hdc-network-edge"/>');
+    });
+    nodes.forEach(function (n) {
+      var color = palette[n.color] || palette.accent;
+      var deg = adj[n.id].length;
+      var r = 6 + Math.min(8, deg);
+      parts.push('<g class="hdc-network-node" tabindex="0" data-hover-payload="' + escapeXml(JSON.stringify({label: n.label || n.id, kv: [{k: 'degree', v: String(deg)}]})) + '">' +
+        '<circle cx="' + n._x.toFixed(1) + '" cy="' + n._y.toFixed(1) + '" r="' + r + '" fill="' + color + '"/>' +
+        '<text x="' + n._x.toFixed(1) + '" y="' + (n._y - r - 4).toFixed(1) + '" text-anchor="middle" class="hdc-network-label">' + escapeXml(n.label || n.id) + '</text>' +
+        '<title>' + escapeXml((n.label || n.id) + ' · degree ' + deg) + '</title>' +
+        '</g>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Tier 3 — scatter-matrix ----------------
+     N×N grid of mini scatter plots for multivariate correlation
+     reading. Diagonal cells show the variable name; off-diagonal
+     cells plot var-col vs var-row. Domain auto-derived per variable
+     unless the schema declares one. */
+  _renderScatterMatrix() {
+    var x = (this._extras && this._extras['scatter-matrix']) || {};
+    var vars = (x.variables || []).slice();
+    var records = (x.records || []).slice();
+    if (vars.length < 2 || records.length < 2) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var n = vars.length;
+    var W = 640, H = 640;
+    var titleTop = this._title ? 28 : 12;
+    var pad = 10;
+    var grid = W - pad * 2;
+    var cell = grid / n;
+    // Compute per-variable domains.
+    vars.forEach(function (v) {
+      if (Array.isArray(v.domain) && v.domain.length === 2) { v._lo = v.domain[0]; v._hi = v.domain[1]; return; }
+      var vs = records.map(function (r) { return +r[v.key]; }).filter(function (x) { return !isNaN(x); });
+      v._lo = vs.length ? Math.min.apply(null, vs) : 0;
+      v._hi = vs.length ? Math.max.apply(null, vs) : 1;
+      if (v._lo === v._hi) { v._lo -= 1; v._hi += 1; }
+    });
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + (titleTop + H + 12) + '" role="img" aria-label="' + escapeXml(this._title || 'Scatter matrix') + '" class="hdc-svg hdc-scatter-matrix">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    for (var i = 0; i < n; i++) {
+      for (var j = 0; j < n; j++) {
+        var cx = pad + j * cell;
+        var cy = titleTop + i * cell;
+        // Frame.
+        parts.push('<rect x="' + cx + '" y="' + cy + '" width="' + cell + '" height="' + cell + '" class="hdc-sm-cell"/>');
+        if (i === j) {
+          // Diagonal: variable label.
+          parts.push('<text x="' + (cx + cell / 2) + '" y="' + (cy + cell / 2 + 4) + '" text-anchor="middle" class="hdc-sm-label">' + escapeXml(vars[i].label || vars[i].key) + '</text>');
+          continue;
+        }
+        var vx = vars[j], vy = vars[i];
+        var rangeX = (vx._hi - vx._lo) || 1;
+        var rangeY = (vy._hi - vy._lo) || 1;
+        records.forEach(function (r) {
+          var xv = +r[vx.key], yv = +r[vy.key];
+          if (isNaN(xv) || isNaN(yv)) return;
+          var px = cx + ((xv - vx._lo) / rangeX) * (cell - 6) + 3;
+          var py = cy + cell - ((yv - vy._lo) / rangeY) * (cell - 6) - 3;
+          var color = palette[r._color] || palette.accent;
+          parts.push('<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="1.6" fill="' + color + '" fill-opacity="0.7"/>');
+        });
+      }
+    }
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Tier 3 — parallel-coordinates ----------------
+     Multi-axis polyline per record. Each variable becomes a vertical
+     axis; each record draws a polyline crossing all axes at its
+     scaled position. Lines coloured by record._color when set.
+     Hovering a polyline highlights it. */
+  _renderParallelCoordinates() {
+    var x = (this._extras && this._extras['parallel-coordinates']) || {};
+    var vars = (x.variables || []).slice();
+    var records = (x.records || []).slice();
+    if (vars.length < 2 || records.length < 1) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var W = 720, H = 360;
+    var titleTop = this._title ? 28 : 12;
+    var pad = { left: 40, right: 40, top: titleTop + 20, bottom: 40 };
+    var plotW = W - pad.left - pad.right;
+    var plotH = H - pad.top - pad.bottom;
+    vars.forEach(function (v) {
+      if (Array.isArray(v.domain) && v.domain.length === 2) { v._lo = v.domain[0]; v._hi = v.domain[1]; return; }
+      var vs = records.map(function (r) { return +r[v.key]; }).filter(function (x) { return !isNaN(x); });
+      v._lo = vs.length ? Math.min.apply(null, vs) : 0;
+      v._hi = vs.length ? Math.max.apply(null, vs) : 1;
+      if (v._lo === v._hi) { v._lo -= 1; v._hi += 1; }
+    });
+    var axisX = function (i) {
+      if (vars.length <= 1) return pad.left + plotW / 2;
+      return pad.left + (i / (vars.length - 1)) * plotW;
+    };
+    var scaleY = function (v, val) {
+      var range = (v._hi - v._lo) || 1;
+      return pad.top + plotH - ((val - v._lo) / range) * plotH;
+    };
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Parallel coordinates') + '" class="hdc-svg hdc-parcoord">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    // Axes.
+    vars.forEach(function (v, i) {
+      var ax = axisX(i);
+      parts.push('<line x1="' + ax + '" y1="' + pad.top + '" x2="' + ax + '" y2="' + (pad.top + plotH) + '" class="hdc-parcoord-axis"/>');
+      parts.push('<text x="' + ax + '" y="' + (pad.top - 8) + '" text-anchor="middle" class="hdc-parcoord-label">' + escapeXml(v.label || v.key) + '</text>');
+      parts.push('<text x="' + ax + '" y="' + (pad.top - 22) + '" text-anchor="middle" class="hdc-tick">' + fmtNum(v._hi) + '</text>');
+      parts.push('<text x="' + ax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + fmtNum(v._lo) + '</text>');
+    });
+    // Polylines.
+    records.forEach(function (r, ri) {
+      var pts = [];
+      for (var i = 0; i < vars.length; i++) {
+        var v = vars[i];
+        var val = +r[v.key];
+        if (isNaN(val)) val = (v._lo + v._hi) / 2;
+        pts.push(axisX(i).toFixed(1) + ',' + scaleY(v, val).toFixed(1));
+      }
+      var color = palette[r._color] || palette.accent;
+      var payload = JSON.stringify({ label: r._label || ('record ' + (ri + 1)), kv: vars.map(function (v) { return { k: v.label || v.key, v: fmtNum(+r[v.key]) }; }) });
+      parts.push('<polyline points="' + pts.join(' ') + '" stroke="' + color + '" class="hdc-parcoord-line" data-hover-payload="' + escapeXml(payload) + '"/>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));

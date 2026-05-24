@@ -1540,9 +1540,17 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     if not blk.get("stages"):
                         add(p, "error", "chart-funnel-missing-stages", where_prefix,
                             "chart with type:funnel requires a `stages` array.")
+                elif ctype in ("sankey", "network"):
+                    if not blk.get("nodes") or not blk.get("links"):
+                        add(p, "error", "chart-graph-missing-payload", where_prefix,
+                            f"chart with type:{ctype} requires both `nodes` and `links` arrays.")
+                elif ctype in ("scatter-matrix", "parallel-coordinates"):
+                    if not blk.get("variables") or not blk.get("records"):
+                        add(p, "error", "chart-multivariate-missing-payload", where_prefix,
+                            f"chart with type:{ctype} requires both `variables` and `records` arrays.")
                 elif ctype is not None:
                     add(p, "error", "chart-unknown-type", where_prefix,
-                        f"chart type '{ctype}' is not supported. Known: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, heatmap, sparkline, waffle, gauge, radar, box-plot, bullet, slope, histogram, calendar-heatmap, treemap, ridgeline, funnel.")
+                        f"chart type '{ctype}' is not supported. Known: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, heatmap, sparkline, waffle, gauge, radar, box-plot, bullet, slope, histogram, calendar-heatmap, treemap, ridgeline, funnel, sankey, network, scatter-matrix, parallel-coordinates.")
 
         # 7. Duplicate section IDs within a page — anchors must be unique.
         seen_ids: dict[str, int] = {}

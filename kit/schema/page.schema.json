@@ -438,8 +438,8 @@
       "properties": {
         "kind": { "const": "chart" },
         "type": {
-          "enum": ["scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel"],
-          "description": "Render mode. scatter / line / area / bubble / quadrant — Cartesian SVG. bar / stacked-bar / grouped-bar — horizontal CSS bars. donut — distribution arc. heatmap — N×M coloured cell grid. sparkline — inline mini line/area/bar. waffle — N×M unit-cell breakdown. gauge — single value 0→max arc. radar — multi-axis comparison polygons. box-plot — quartile + whisker distribution summary. bullet — actual-vs-target horizontal track. slope — two-time-point comparison. histogram — frequency by bin. calendar-heatmap — date-of-year × day-of-week activity grid. treemap — nested area-proportional rectangles. ridgeline — stacked small-distributions. funnel — conversion stages with drop-off."
+          "enum": ["scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates"],
+          "description": "Render mode. scatter / line / area / bubble / quadrant — Cartesian SVG. bar / stacked-bar / grouped-bar — horizontal CSS bars. donut — distribution arc. heatmap — N×M coloured cell grid. sparkline — inline mini line/area/bar. waffle — N×M unit-cell breakdown. gauge — single value 0→max arc. radar — multi-axis comparison polygons. box-plot — quartile + whisker distribution summary. bullet — actual-vs-target horizontal track. slope — two-time-point comparison. histogram — frequency by bin. calendar-heatmap — date-of-year × day-of-week activity grid. treemap — nested area-proportional rectangles. ridgeline — stacked small-distributions. funnel — conversion stages with drop-off. sankey — flow / share between stages with curved ribbons. network — node-link force-relaxed graph. scatter-matrix — N×N grid of mini scatters for multivariate correlation. parallel-coordinates — multi-axis polyline per record."
         },
         "title": { "type": "string" },
         "x_label": { "type": "string", "description": "Cartesian only (scatter / line / area / bubble / quadrant)." },
@@ -792,6 +792,67 @@
             }
           },
           "minItems": 2
+        },
+
+        "nodes": {
+          "type": "array",
+          "description": "sankey / network — node list. Each: {id (string, unique), label?, color?}. For sankey, the renderer derives left-to-right column placement from the link graph (BFS depth). For network, position is force-relaxed at render time from the link adjacency.",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": false,
+            "properties": {
+              "id":    { "type": "string" },
+              "label": { "type": "string" },
+              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+            }
+          },
+          "minItems": 2
+        },
+        "links": {
+          "type": "array",
+          "description": "sankey / network — directed link list. Each: {source, target, value?, label?}. source and target reference node ids. value drives the ribbon thickness (sankey) or edge weight (network).",
+          "items": {
+            "type": "object",
+            "required": ["source", "target"],
+            "additionalProperties": false,
+            "properties": {
+              "source": { "type": "string" },
+              "target": { "type": "string" },
+              "value":  { "type": "number", "minimum": 0 },
+              "label":  { "type": "string" }
+            }
+          },
+          "minItems": 1
+        },
+        "variables": {
+          "type": "array",
+          "description": "scatter-matrix / parallel-coordinates — variable definitions. Each: {key, label?, domain?: [lo, hi]}. domain is optional — when omitted the renderer derives it from records.",
+          "items": {
+            "type": "object",
+            "required": ["key"],
+            "additionalProperties": false,
+            "properties": {
+              "key":    { "type": "string" },
+              "label":  { "type": "string" },
+              "domain": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": { "type": "number" }
+              }
+            }
+          },
+          "minItems": 2
+        },
+        "records": {
+          "type": "array",
+          "description": "scatter-matrix / parallel-coordinates — record list. Each record is an object keyed by variable id. Optional `_label` and `_color` (one of accent / warn / danger / success / muted) tag the record visually.",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "minItems": 2
         }
       },
       "allOf": [
@@ -866,6 +927,14 @@
         {
           "if": { "properties": { "type": { "const": "funnel" } }, "required": ["type"] },
           "then": { "required": ["stages"] }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["sankey", "network"] } }, "required": ["type"] },
+          "then": { "required": ["nodes", "links"] }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["scatter-matrix", "parallel-coordinates"] } }, "required": ["type"] },
+          "then": { "required": ["variables", "records"] }
         }
       ]
     },

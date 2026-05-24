@@ -355,7 +355,11 @@
         'calendar-heatmap': { date_values: block.date_values, year: block.year, scale: block.scale, domain: block.domain },
         treemap: { tree: block.tree },
         ridgeline: { distributions: block.distributions },
-        funnel: { stages: block.stages }
+        funnel: { stages: block.stages },
+        sankey: { nodes: block.nodes, links: block.links },
+        network: { nodes: block.nodes, links: block.links },
+        'scatter-matrix': { variables: block.variables, records: block.records },
+        'parallel-coordinates': { variables: block.variables, records: block.records }
       };
       if (extraMap[type]) {
         const x = document.createElement('script');

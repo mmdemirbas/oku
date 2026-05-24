@@ -1399,6 +1399,28 @@
               "items": [
                 "<a href=\"#chart-funnel\">type: funnel</a> — narrowing bands per stage with aligned label / value / % columns."
               ]
+            },
+            {
+              "title": "Flow",
+              "content": "Where the flow goes — links between nodes carry magnitude.",
+              "items": [
+                "<a href=\"#chart-sankey\">type: sankey</a> — left-to-right ribbons sized by link value, with column-stacked nodes."
+              ]
+            },
+            {
+              "title": "Graph",
+              "content": "Connections between entities. Node degree drives circle radius.",
+              "items": [
+                "<a href=\"#chart-network\">type: network</a> — force-relaxed node-link diagram for small graphs (≤ ~50 nodes)."
+              ]
+            },
+            {
+              "title": "Multivariate",
+              "content": "Many variables at once — when the story lives in correlations, not totals.",
+              "items": [
+                "<a href=\"#chart-scatter-matrix\">type: scatter-matrix</a> — N×N grid of mini scatters; diagonal labels each axis.",
+                "<a href=\"#chart-parallel-coordinates\">type: parallel-coordinates</a> — one vertical axis per variable; each record draws a polyline crossing them."
+              ]
             }
           ]
         },
@@ -2291,6 +2313,152 @@
             { "label": "Activated",    "value":  430, "color": "accent"  },
             { "label": "Upgraded",     "value":  180, "color": "warn"    },
             { "label": "Retained 30d", "value":  120, "color": "success" }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-sankey",
+          "title": "type: sankey"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Flow between stages with curved ribbons sized by link value. <code>nodes[]</code> is <code>{id, label?, color?}</code>; <code>links[]</code> is <code>{source, target, value}</code> referencing node ids. The renderer derives the left-to-right column placement from the link graph (BFS depth), stacks nodes within each column by their incoming-or-outgoing total, and routes a cubic-Bezier ribbon between every pair."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sankey\",\n  \"title\": \"Where time goes\",\n  \"nodes\": [\n    {\"id\": \"source\",  \"label\": \"Working hours\", \"color\": \"muted\"},\n    {\"id\": \"build\",   \"label\": \"Shipping\",   \"color\": \"accent\"},\n    {\"id\": \"plan\",    \"label\": \"Planning\",   \"color\": \"accent\"},\n    {\"id\": \"meet\",    \"label\": \"Meetings\",   \"color\": \"warn\"},\n    {\"id\": \"code\",    \"label\": \"Code\",       \"color\": \"success\"},\n    {\"id\": \"review\",  \"label\": \"Review\",     \"color\": \"success\"},\n    {\"id\": \"docs\",    \"label\": \"Docs\",       \"color\": \"accent\"}\n  ],\n  \"links\": [\n    {\"source\": \"source\", \"target\": \"build\",  \"value\": 24},\n    {\"source\": \"source\", \"target\": \"plan\",   \"value\":  9},\n    {\"source\": \"source\", \"target\": \"meet\",   \"value\":  7},\n    {\"source\": \"build\",  \"target\": \"code\",   \"value\": 14},\n    {\"source\": \"build\",  \"target\": \"review\", \"value\":  6},\n    {\"source\": \"build\",  \"target\": \"docs\",   \"value\":  4},\n    {\"source\": \"plan\",   \"target\": \"docs\",   \"value\":  3}\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "sankey",
+          "title": "Where time goes",
+          "nodes": [
+            { "id": "source", "label": "Working hours", "color": "muted"   },
+            { "id": "build",  "label": "Shipping",      "color": "accent"  },
+            { "id": "plan",   "label": "Planning",      "color": "accent"  },
+            { "id": "meet",   "label": "Meetings",      "color": "warn"    },
+            { "id": "code",   "label": "Code",          "color": "success" },
+            { "id": "review", "label": "Review",        "color": "success" },
+            { "id": "docs",   "label": "Docs",          "color": "accent"  }
+          ],
+          "links": [
+            { "source": "source", "target": "build",  "value": 24 },
+            { "source": "source", "target": "plan",   "value":  9 },
+            { "source": "source", "target": "meet",   "value":  7 },
+            { "source": "build",  "target": "code",   "value": 14 },
+            { "source": "build",  "target": "review", "value":  6 },
+            { "source": "build",  "target": "docs",   "value":  4 },
+            { "source": "plan",   "target": "docs",   "value":  3 }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-network",
+          "title": "type: network"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Node-link diagram with a small Fruchterman-Reingold-ish force relaxation (~60 iterations on each render). Best for graphs up to ~50 nodes — bigger structures need a real graph-viz library. <code>nodes[]</code> + <code>links[]</code> share the same shape as <code>sankey</code>. Node radius scales with degree; hovering a node surfaces its label + degree in the tooltip."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"network\",\n  \"title\": \"Pages link graph\",\n  \"nodes\": [\n    {\"id\": \"index\"},     {\"id\": \"reference\"},  {\"id\": \"glossary\"},\n    {\"id\": \"architecture\"}, {\"id\": \"cli\"},   {\"id\": \"roadmap\"}\n  ],\n  \"links\": [\n    {\"source\": \"index\", \"target\": \"reference\"},\n    {\"source\": \"index\", \"target\": \"glossary\"},\n    {\"source\": \"index\", \"target\": \"architecture\"},\n    {\"source\": \"index\", \"target\": \"cli\"},\n    {\"source\": \"index\", \"target\": \"roadmap\"},\n    {\"source\": \"reference\", \"target\": \"glossary\"},\n    {\"source\": \"reference\", \"target\": \"architecture\"},\n    {\"source\": \"architecture\", \"target\": \"cli\"}\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "network",
+          "title": "Pages link graph",
+          "nodes": [
+            { "id": "index" }, { "id": "reference" }, { "id": "glossary" },
+            { "id": "architecture" }, { "id": "cli" }, { "id": "roadmap" }
+          ],
+          "links": [
+            { "source": "index", "target": "reference" },
+            { "source": "index", "target": "glossary" },
+            { "source": "index", "target": "architecture" },
+            { "source": "index", "target": "cli" },
+            { "source": "index", "target": "roadmap" },
+            { "source": "reference", "target": "glossary" },
+            { "source": "reference", "target": "architecture" },
+            { "source": "architecture", "target": "cli" }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-scatter-matrix",
+          "title": "type: scatter-matrix"
+        },
+        {
+          "kind": "paragraph",
+          "content": "N×N grid of mini scatter plots for multivariate correlation reading. <code>variables[]</code> defines each axis; <code>records[]</code> is a flat list of objects keyed by variable id. The diagonal cells show the variable name; off-diagonal cells plot var-col vs var-row. Domains auto-derive from the records unless declared explicitly."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"scatter-matrix\",\n  \"title\": \"Page metrics\",\n  \"variables\": [\n    {\"key\": \"lines\",   \"label\": \"Lines\"},\n    {\"key\": \"images\",  \"label\": \"Images\"},\n    {\"key\": \"charts\",  \"label\": \"Charts\"},\n    {\"key\": \"reads\",   \"label\": \"Reads\"}\n  ],\n  \"records\": [\n    {\"lines\":  320, \"images\":  4, \"charts\":  2, \"reads\":  120},\n    {\"lines\":  180, \"images\":  2, \"charts\":  0, \"reads\":   60},\n    ... 20 more rows ...\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "scatter-matrix",
+          "title": "Page metrics",
+          "variables": [
+            { "key": "lines",  "label": "Lines"  },
+            { "key": "images", "label": "Images" },
+            { "key": "charts", "label": "Charts" },
+            { "key": "reads",  "label": "Reads"  }
+          ],
+          "records": [
+            { "lines": 320, "images": 4, "charts": 2, "reads": 120 },
+            { "lines": 180, "images": 2, "charts": 0, "reads":  60 },
+            { "lines": 540, "images": 7, "charts": 5, "reads": 210 },
+            { "lines":  90, "images": 1, "charts": 0, "reads":  40 },
+            { "lines": 410, "images": 5, "charts": 3, "reads": 160 },
+            { "lines": 260, "images": 3, "charts": 2, "reads":  90 },
+            { "lines": 720, "images": 9, "charts": 8, "reads": 310 },
+            { "lines": 150, "images": 1, "charts": 1, "reads":  55 },
+            { "lines": 380, "images": 4, "charts": 3, "reads": 140 },
+            { "lines": 510, "images": 6, "charts": 4, "reads": 180 },
+            { "lines": 220, "images": 2, "charts": 1, "reads":  80 },
+            { "lines": 470, "images": 5, "charts": 4, "reads": 190 }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-parallel-coordinates",
+          "title": "type: parallel-coordinates"
+        },
+        {
+          "kind": "paragraph",
+          "content": "One vertical axis per variable; each record draws a polyline crossing all axes at its scaled position. Best for spotting multi-variable clusters (lines that bunch together) or outliers (lines that diverge). Optional <code>_label</code> and <code>_color</code> on each record tag it visually."
+        },
+        {
+          "kind": "code",
+          "language": "json",
+          "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"parallel-coordinates\",\n  \"title\": \"Build performance\",\n  \"variables\": [\n    {\"key\": \"pages\",     \"label\": \"Pages\"},\n    {\"key\": \"size_kb\",   \"label\": \"Total KB\"},\n    {\"key\": \"build_ms\",  \"label\": \"Build ms\"},\n    {\"key\": \"lighthouse\",\"label\": \"Lighthouse\"}\n  ],\n  \"records\": [\n    {\"pages\":  10, \"size_kb\":  240, \"build_ms\":  900, \"lighthouse\": 96, \"_color\": \"success\"},\n    {\"pages\":  25, \"size_kb\":  540, \"build_ms\": 1400, \"lighthouse\": 94, \"_color\": \"accent\"},\n    ...\n  ]\n}"
+        },
+        {
+          "kind": "chart",
+          "type": "parallel-coordinates",
+          "title": "Build performance",
+          "variables": [
+            { "key": "pages",      "label": "Pages"      },
+            { "key": "size_kb",    "label": "Total KB"   },
+            { "key": "build_ms",   "label": "Build ms"   },
+            { "key": "lighthouse", "label": "Lighthouse" }
+          ],
+          "records": [
+            { "pages":  10, "size_kb":  240, "build_ms":  900, "lighthouse": 96, "_color": "success" },
+            { "pages":  25, "size_kb":  540, "build_ms": 1400, "lighthouse": 94, "_color": "accent"  },
+            { "pages":  40, "size_kb":  920, "build_ms": 2300, "lighthouse": 91, "_color": "accent"  },
+            { "pages":  60, "size_kb": 1500, "build_ms": 3800, "lighthouse": 88, "_color": "warn"    },
+            { "pages":  90, "size_kb": 2400, "build_ms": 6500, "lighthouse": 82, "_color": "warn"    },
+            { "pages": 130, "size_kb": 3800, "build_ms":11200, "lighthouse": 74, "_color": "danger"  }
           ]
         },
 

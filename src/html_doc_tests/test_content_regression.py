@@ -395,6 +395,46 @@ class TestChromeKitMarkers:
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert ".example-pair" in css, "example-pair CSS missing — no two-column layout"
 
+    def test_tier3_chart_types_shipped(self, repo_root: Path) -> None:
+        """P5 close-out — sankey, network, scatter-matrix, and
+        parallel-coordinates ship as kit-native chart types: schema
+        enum + chrome.js renderer + reference example."""
+        schema = json.loads(
+            (repo_root / "kit" / "schema" / "page.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        chart_def = schema["$defs"]["chart"]
+        enum = chart_def["properties"]["type"]["enum"]
+        for t in ("sankey", "network", "scatter-matrix", "parallel-coordinates"):
+            assert t in enum, f"chart enum missing tier-3 type {t!r}"
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        for fn in (
+            "_renderSankey",
+            "_renderNetwork",
+            "_renderScatterMatrix",
+            "_renderParallelCoordinates",
+        ):
+            assert fn in js, f"chrome.js missing tier-3 renderer {fn}"
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        for cls in (".hdc-sankey", ".hdc-network", ".hdc-scatter-matrix", ".hdc-parcoord"):
+            assert cls in css, f"chart css missing class {cls}"
+        ref = json.loads(
+            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
+        )
+        ids = {
+            b.get("id")
+            for b in _walk_blocks(ref)
+            if b.get("kind") == "heading"
+        }
+        for hid in (
+            "chart-sankey",
+            "chart-network",
+            "chart-scatter-matrix",
+            "chart-parallel-coordinates",
+        ):
+            assert hid in ids, f"reference missing heading id {hid}"
+
     def test_mermaid_supported_types_documented(self, repo_root: Path) -> None:
         """P5 — diagram subsection lists the Mermaid v10 types the kit
         forwards unchanged. Cards must enumerate at least: sequence,
