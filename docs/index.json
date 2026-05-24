@@ -26,7 +26,7 @@
       "kind": "section",
       "id": "docs",
       "title": "Documentation",
-      "lead": "Five pages. Cards link straight to each — Reference is the place to start.",
+      "lead": "Eight pages. Cards link straight to each — Reference covers core primitives; Charts / Tables / Diagrams break out the heavy ones; Glossary / Architecture / CLI go deeper.",
       "blocks": [
         {
           "kind": "step-flow",
@@ -34,33 +34,54 @@
             {
               "num": "1",
               "title": "Reference",
-              "meta": "start here",
+              "meta": "start here · prose, layout, inline",
               "href": "reference.html",
-              "content": "Project setup, page anatomy, Markdown sources, every primitive with its JSON shape and a live example, per-page metadata, build outputs."
+              "content": "Project setup, page anatomy, Markdown sources, the prose / emphasis / structured-layout primitives, per-page metadata, build outputs."
             },
             {
               "num": "2",
+              "title": "Charts",
+              "meta": "28 variants · families",
+              "href": "charts.html",
+              "content": "Every chart variant with a tiny live sample, grouped by intent (categorical / distribution / time series / hierarchy / relationship / multivariate / flow / graph / geographic) plus the rich-hover + click-to-pin + pan/zoom fullscreen behaviour shared across them."
+            },
+            {
+              "num": "3",
+              "title": "Tables",
+              "meta": "flat · grouped · chips · board",
+              "href": "tables.html",
+              "content": "table primitive — flat rows, grouped rows, chip filters, board / kanban view, sticky headers, drag-resize columns, word-wrap by default."
+            },
+            {
+              "num": "4",
+              "title": "Diagrams",
+              "meta": "Mermaid catalog",
+              "href": "diagrams.html",
+              "content": "diagram primitive + every Mermaid v10 type the kit forwards (flowchart, sequence, state, ER, class, gantt, pie, journey, mindmap, timeline, sankey-beta, ...). Theme tokens flow through."
+            },
+            {
+              "num": "5",
               "title": "Glossary & ext-refs",
-              "meta": "how the multi-domain registry works",
+              "meta": "multi-domain registry",
               "href": "glossary.html",
               "content": "File layout, multi-language entries, project overrides, disambiguation syntax, resolution algorithm."
             },
             {
-              "num": "3",
+              "num": "6",
               "title": "Architecture",
               "meta": "internals · developer audience",
               "href": "architecture.html",
               "content": "How the kit fits together at runtime — render flow, tooltip controller, kit loader, build pipeline, standalone bundle. Read this when extending or debugging the kit itself."
             },
             {
-              "num": "4",
+              "num": "7",
               "title": "CLI reference",
               "meta": "init · build · clean · check · serve",
               "href": "cli.html",
               "content": "Five commands. What each does, what output to expect, the doctree linter's severity table, the optional Pagefind and jsonschema dependencies."
             },
             {
-              "num": "5",
+              "num": "8",
               "title": "Roadmap",
               "meta": "what's next · oku 1.0",
               "href": "roadmap.html",

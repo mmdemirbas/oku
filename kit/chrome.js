@@ -3738,7 +3738,13 @@ class HtmlDocChart extends HTMLElement {
         var val = +cells[i][j];
         var px = labelLeft + j * cell;
         var py = titleTop + labelTop + i * cell;
-        parts.push('<rect x="' + px + '" y="' + py + '" width="' + (cell - 2) + '" height="' + (cell - 2) + '" rx="3" fill="' + tone(val) + '" fill-opacity="' + alpha(val).toFixed(3) + '" class="hdc-heatmap-cell"><title>' + escapeXml(String(val)) + '</title></rect>');
+        var rowLabel = (x.row_labels && x.row_labels[i]) || ('row ' + (i + 1));
+        var colLabel = (x.col_labels && x.col_labels[j]) || ('col ' + (j + 1));
+        var payload = JSON.stringify({
+          label: rowLabel + ' × ' + colLabel,
+          kv: [{ k: 'value', v: fmtNum(val) }]
+        });
+        parts.push('<rect x="' + px + '" y="' + py + '" width="' + (cell - 2) + '" height="' + (cell - 2) + '" rx="3" fill="' + tone(val) + '" fill-opacity="' + alpha(val).toFixed(3) + '" class="hdc-heatmap-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(rowLabel + ' × ' + colLabel + ': ' + fmtNum(val)) + '</title></rect>');
       }
     }
     parts.push('</svg>');
@@ -3813,7 +3819,14 @@ class HtmlDocChart extends HTMLElement {
         var rx = 6 + c * (cell + gap);
         var ry = titleTop + 4 + r * (cell + gap);
         var op = item.empty ? '0.15' : '1';
-        parts.push('<rect x="' + rx + '" y="' + ry + '" width="' + cell + '" height="' + cell + '" rx="3" fill="' + item.color + '" fill-opacity="' + op + '" class="hdc-waffle-cell"/>');
+        var wpay = JSON.stringify({
+          label: item.label || (item.empty ? 'empty' : 'segment'),
+          kv: [
+            { k: 'cell',    v: (idx + 1) + ' / ' + totalCells },
+            { k: 'percent', v: (Math.round(((idx + 1) / totalCells) * 100)) + '%' }
+          ]
+        });
+        parts.push('<rect x="' + rx + '" y="' + ry + '" width="' + cell + '" height="' + cell + '" rx="3" fill="' + item.color + '" fill-opacity="' + op + '" class="hdc-waffle-cell" tabindex="0" data-hover-payload="' + escapeXml(wpay) + '"><title>' + escapeXml((item.label || 'cell') + ' · cell ' + (idx + 1) + '/' + totalCells) + '</title></rect>');
       }
     }
     // Legend on the right.
@@ -4094,7 +4107,11 @@ class HtmlDocChart extends HTMLElement {
     bins.forEach(function (b, i) {
       var x0 = sx(+b.lo), x1 = sx(+b.hi);
       var top = sy(+b.count || 0);
-      parts.push('<rect x="' + (x0 + 0.5) + '" y="' + top + '" width="' + (x1 - x0 - 1) + '" height="' + (pad.top + plotH - top) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="hdc-histogram-bar"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
+      var payload = JSON.stringify({
+        label: '[' + fmtNum(+b.lo) + ', ' + fmtNum(+b.hi) + ')',
+        kv: [{ k: 'count', v: fmtNum(+b.count || 0) }]
+      });
+      parts.push('<rect x="' + (x0 + 0.5) + '" y="' + top + '" width="' + (x1 - x0 - 1) + '" height="' + (pad.top + plotH - top) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="hdc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
       if (i === 0 || i === bins.length - 1 || (i % Math.max(1, Math.floor(bins.length / 6))) === 0) {
         parts.push('<line x1="' + x0 + '" y1="' + (pad.top + plotH) + '" x2="' + x0 + '" y2="' + (pad.top + plotH + 4) + '" class="hdc-axis"/>');
         parts.push('<text x="' + x0 + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + escapeXml(fmtNum(+b.lo)) + '</text>');
@@ -4178,7 +4195,11 @@ class HtmlDocChart extends HTMLElement {
       var hasVal = (typeof val !== 'undefined') && !isNaN(+val);
       var rectAlpha = hasVal ? alpha(+val).toFixed(3) : '0.08';
       var rectFill = hasVal ? tone(+val) : 'var(--text-soft)';
-      parts.push('<rect x="' + px + '" y="' + py + '" width="' + cell + '" height="' + cell + '" rx="2" fill="' + rectFill + '" fill-opacity="' + rectAlpha + '" class="hdc-calendar-cell"><title>' + escapeXml(dayIso + (hasVal ? ' · ' + fmtNum(+val) : '')) + '</title></rect>');
+      var calPayload = JSON.stringify({
+        label: dayIso,
+        kv: hasVal ? [{ k: 'value', v: fmtNum(+val) }] : [{ k: 'value', v: 'no data' }]
+      });
+      parts.push('<rect x="' + px + '" y="' + py + '" width="' + cell + '" height="' + cell + '" rx="2" fill="' + rectFill + '" fill-opacity="' + rectAlpha + '" class="hdc-calendar-cell" tabindex="0" data-hover-payload="' + escapeXml(calPayload) + '"><title>' + escapeXml(dayIso + (hasVal ? ' · ' + fmtNum(+val) : '')) + '</title></rect>');
       // Record the column where a new month begins.
       var mKey = cursor.getMonth();
       if (monthAt[mKey] === undefined) monthAt[mKey] = col;

@@ -23,7 +23,20 @@ import pytest
 
 @pytest.fixture(scope="module")
 def reference(repo_root: Path) -> dict:
-    return json.loads((repo_root / "docs" / "reference.json").read_text(encoding="utf-8"))
+    """Combined view of the kit's own docs — every JSON page under
+    docs/ folded into one virtual page with an aggregated blocks
+    array. Lets the existing 'walk for kind X' tests work after the
+    reference was split into reference.json + charts.json +
+    diagrams.json + tables.json + roadmap.json, etc."""
+    combined: dict = {"kind": "page", "title": "all docs", "blocks": []}
+    for p in sorted((repo_root / "docs").glob("*.json")):
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(d, dict) and isinstance(d.get("blocks"), list):
+            combined["blocks"].extend(d["blocks"])
+    return combined
 
 
 def _walk_blocks(node: dict | list) -> Iterator[dict]:
@@ -251,18 +264,30 @@ class TestRoadmapAndCleanup:
             )
 
     def test_reference_no_longer_lists_converter_gaps(
-        self, reference: dict
+        self, repo_root: Path
     ) -> None:
         """The 'Not in the converter' card text is retired in P0; the
         gaps it described will land as fixes in P4. Same for the
-        project-meta-excluded callout."""
-        ref_text = json.dumps(reference)
-        assert (
-            "Not in the converter" not in ref_text
-        ), "'Not in the converter' text should be retired (P0)"
-        assert (
-            "Project-meta files excluded" not in ref_text
-        ), "'Project-meta files excluded' text should be retired (P0)"
+        project-meta-excluded callout. Scope: the primitive-reference
+        pages only — the roadmap legitimately mentions the phrase in
+        the historical narrative."""
+        primitive_docs = (
+            "reference.json",
+            "charts.json",
+            "diagrams.json",
+            "tables.json",
+        )
+        for name in primitive_docs:
+            path = repo_root / "docs" / name
+            if not path.exists():
+                continue
+            text = path.read_text(encoding="utf-8")
+            assert (
+                "Not in the converter" not in text
+            ), f"'Not in the converter' must be retired from {name} (P0)"
+            assert (
+                "Project-meta files excluded" not in text
+            ), f"'Project-meta files excluded' must be retired from {name} (P0)"
 
     def test_cli_section_counts_five_commands(self, index_json: dict) -> None:
         sections = [
@@ -366,16 +391,18 @@ class TestChromeKitMarkers:
         assert (
             "data-default-view" in js
         ), "chrome.js must read data-default-view to seed the toggle"
-        ref = json.loads(
-            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
-        )
-        rendered = [
-            b
-            for b in _walk_blocks(ref)
-            if b.get("kind") == "table" and b.get("view") == "board"
-        ]
+        rendered = []
+        for p in sorted((repo_root / "docs").glob("*.json")):
+            try:
+                d = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            rendered.extend(
+                b for b in _walk_blocks(d)
+                if isinstance(b, dict) and b.get("kind") == "table" and b.get("view") == "board"
+            )
         assert rendered, (
-            "kanban example in reference.json should pin view: 'board' so the render shows lanes by default"
+            "kanban example should pin view: 'board' so the render shows lanes by default (now lives in tables.json)"
         )
 
     def test_example_primitive_wired(self, repo_root: Path) -> None:
@@ -392,11 +419,14 @@ class TestChromeKitMarkers:
         assert "_renderExample" in renderer, "renderer is missing _renderExample"
         cli = (repo_root / "src" / "html_doc" / "cli.py").read_text(encoding="utf-8")
         assert '"example"' in cli, "cli._KNOWN_BLOCK_KINDS missing 'example'"
-        ref = json.loads(
-            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
-        )
-        examples = [b for b in _walk_blocks(ref) if b.get("kind") == "example"]
-        assert examples, "reference.json should use at least one `example` block"
+        examples = []
+        for p in sorted((repo_root / "docs").glob("*.json")):
+            try:
+                d = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            examples.extend(b for b in _walk_blocks(d) if isinstance(b, dict) and b.get("kind") == "example")
+        assert examples, "kit docs should use at least one `example` block"
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert ".example-pair" in css, "example-pair CSS missing — no two-column layout"
 
@@ -452,14 +482,15 @@ class TestChromeKitMarkers:
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         for cls in (".hdc-sankey", ".hdc-network", ".hdc-scatter-matrix", ".hdc-parcoord", ".hdc-chord", ".hdc-geo"):
             assert cls in css, f"chart css missing class {cls}"
-        ref = json.loads(
-            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
-        )
-        ids = {
-            b.get("id")
-            for b in _walk_blocks(ref)
-            if b.get("kind") == "heading"
-        }
+        ids = set()
+        for p in sorted((repo_root / "docs").glob("*.json")):
+            try:
+                d = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            for b in _walk_blocks(d):
+                if isinstance(b, dict) and b.get("kind") == "heading":
+                    ids.add(b.get("id"))
         for hid in (
             "chart-sankey",
             "chart-network",
@@ -475,50 +506,54 @@ class TestChromeKitMarkers:
         forwards unchanged. Cards must enumerate at least: sequence,
         state, ER, class, gantt, pie, journey, mindmap, timeline,
         sankey-beta."""
-        ref = json.loads(
-            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
-        )
-        ids = {
-            b.get("id")
-            for b in _walk_blocks(ref)
-            if b.get("kind") == "heading"
-        }
+        ids = set()
+        for p in sorted((repo_root / "docs").glob("*.json")):
+            try:
+                d = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            for b in _walk_blocks(d):
+                if isinstance(b, dict) and b.get("kind") == "heading":
+                    ids.add(b.get("id"))
         assert "mermaid-supported" in ids, "Mermaid types subsection missing"
-        # The cards each have a live diagram render. Count them.
+        # The cards each have a live diagram render. Count them across
+        # all docs (catalog now lives in docs/diagrams.json).
         diagrams_in_compare = 0
-        for b in _walk_blocks(ref):
-            if b.get("kind") == "diagram":
-                src = b.get("source") or ""
-                # Tally Mermaid types beyond the original flowchart sample.
-                if any(t in src for t in (
-                    "sequenceDiagram", "stateDiagram", "erDiagram",
-                    "classDiagram", "gantt", "pie ", "journey",
-                    "mindmap", "timeline", "sankey-beta"
-                )):
-                    diagrams_in_compare += 1
+        for p in sorted((repo_root / "docs").glob("*.json")):
+            try:
+                d = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            for b in _walk_blocks(d):
+                if isinstance(b, dict) and b.get("kind") == "diagram":
+                    src = b.get("source") or ""
+                    if any(t in src for t in (
+                        "sequenceDiagram", "stateDiagram", "erDiagram",
+                        "classDiagram", "gantt", "pie ", "journey",
+                        "mindmap", "timeline", "sankey-beta"
+                    )):
+                        diagrams_in_compare += 1
         assert diagrams_in_compare >= 10, (
             f"expected at least 10 Mermaid examples in the supported-types "
             f"showcase, found {diagrams_in_compare}"
         )
 
     def test_chart_family_overview_present(self, repo_root: Path) -> None:
-        """P3 — chart subsection opens with a 7-card compare-grid
-        grouping the 22 variants by family (categorical / distribution
-        / time series / hierarchy / relationship / goal / conversion).
-        Without it, the reader has to scroll through every variant to
-        find similar ones."""
-        ref = json.loads(
-            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
+        """P3 — chart subsection opens with a compare-grid grouping
+        the 28 variants by intent. The catalog now lives in
+        docs/charts.json after the reference split."""
+        charts = json.loads(
+            (repo_root / "docs" / "charts.json").read_text(encoding="utf-8")
         )
         # Find heading with id 'chart-families'.
         ids = {
             b.get("id")
-            for b in _walk_blocks(ref)
+            for b in _walk_blocks(charts)
             if b.get("kind") == "heading"
         }
         assert (
             "chart-families" in ids
-        ), "chart family overview heading missing in reference.json"
+        ), "chart family overview heading missing in charts.json"
 
     def test_chart_hover_payloads(self, repo_root: Path) -> None:
         """P2 — bar / stacked / grouped / donut / treemap / funnel emit
@@ -1472,22 +1507,26 @@ class TestChromeKitMarkers:
             "ordered string array"
         )
 
-        reference = json.loads(
-            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
-        )
         demo_seen = False
-        for block in _walk_blocks(reference):
-            if block.get("kind") != "table":
+        for p in sorted((repo_root / "docs").glob("*.json")):
+            try:
+                d = json.loads(p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
                 continue
-            for h in block.get("headers", []):
-                if isinstance(h, dict) and isinstance(h.get("boardOrder"), list):
-                    demo_seen = True
+            for block in _walk_blocks(d):
+                if not isinstance(block, dict) or block.get("kind") != "table":
+                    continue
+                for h in block.get("headers", []):
+                    if isinstance(h, dict) and isinstance(h.get("boardOrder"), list):
+                        demo_seen = True
+                        break
+                if demo_seen:
                     break
             if demo_seen:
                 break
         assert demo_seen, (
-            "docs/reference.json must demonstrate a boardOrder header "
-            "so authors see how to drive kanban lane ordering"
+            "the docs must demonstrate a boardOrder header so authors "
+            "see how to drive kanban lane ordering (now in tables.json)"
         )
 
     def test_table_has_board_view(self, repo_root: Path) -> None:
