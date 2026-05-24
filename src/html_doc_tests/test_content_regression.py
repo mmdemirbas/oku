@@ -396,9 +396,10 @@ class TestChromeKitMarkers:
         assert ".example-pair" in css, "example-pair CSS missing — no two-column layout"
 
     def test_tier3_chart_types_shipped(self, repo_root: Path) -> None:
-        """P5 close-out — sankey, network, scatter-matrix, and
-        parallel-coordinates ship as kit-native chart types: schema
-        enum + chrome.js renderer + reference example."""
+        """P5 close-out — all six Tier 3 types (sankey, network,
+        scatter-matrix, parallel-coordinates, chord, geo) ship as
+        kit-native chart types: schema enum + chrome.js renderer +
+        reference example."""
         schema = json.loads(
             (repo_root / "kit" / "schema" / "page.schema.json").read_text(
                 encoding="utf-8"
@@ -406,7 +407,7 @@ class TestChromeKitMarkers:
         )
         chart_def = schema["$defs"]["chart"]
         enum = chart_def["properties"]["type"]["enum"]
-        for t in ("sankey", "network", "scatter-matrix", "parallel-coordinates"):
+        for t in ("sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo"):
             assert t in enum, f"chart enum missing tier-3 type {t!r}"
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         for fn in (
@@ -414,10 +415,12 @@ class TestChromeKitMarkers:
             "_renderNetwork",
             "_renderScatterMatrix",
             "_renderParallelCoordinates",
+            "_renderChord",
+            "_renderGeo",
         ):
             assert fn in js, f"chrome.js missing tier-3 renderer {fn}"
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        for cls in (".hdc-sankey", ".hdc-network", ".hdc-scatter-matrix", ".hdc-parcoord"):
+        for cls in (".hdc-sankey", ".hdc-network", ".hdc-scatter-matrix", ".hdc-parcoord", ".hdc-chord", ".hdc-geo"):
             assert cls in css, f"chart css missing class {cls}"
         ref = json.loads(
             (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
@@ -432,6 +435,8 @@ class TestChromeKitMarkers:
             "chart-network",
             "chart-scatter-matrix",
             "chart-parallel-coordinates",
+            "chart-chord",
+            "chart-geo",
         ):
             assert hid in ids, f"reference missing heading id {hid}"
 

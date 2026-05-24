@@ -438,8 +438,8 @@
       "properties": {
         "kind": { "const": "chart" },
         "type": {
-          "enum": ["scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates"],
-          "description": "Render mode. scatter / line / area / bubble / quadrant — Cartesian SVG. bar / stacked-bar / grouped-bar — horizontal CSS bars. donut — distribution arc. heatmap — N×M coloured cell grid. sparkline — inline mini line/area/bar. waffle — N×M unit-cell breakdown. gauge — single value 0→max arc. radar — multi-axis comparison polygons. box-plot — quartile + whisker distribution summary. bullet — actual-vs-target horizontal track. slope — two-time-point comparison. histogram — frequency by bin. calendar-heatmap — date-of-year × day-of-week activity grid. treemap — nested area-proportional rectangles. ridgeline — stacked small-distributions. funnel — conversion stages with drop-off. sankey — flow / share between stages with curved ribbons. network — node-link force-relaxed graph. scatter-matrix — N×N grid of mini scatters for multivariate correlation. parallel-coordinates — multi-axis polyline per record."
+          "enum": ["scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo"],
+          "description": "Render mode. scatter / line / area / bubble / quadrant — Cartesian SVG. bar / stacked-bar / grouped-bar — horizontal CSS bars. donut — distribution arc. heatmap — N×M coloured cell grid. sparkline — inline mini line/area/bar. waffle — N×M unit-cell breakdown. gauge — single value 0→max arc. radar — multi-axis comparison polygons. box-plot — quartile + whisker distribution summary. bullet — actual-vs-target horizontal track. slope — two-time-point comparison. histogram — frequency by bin. calendar-heatmap — date-of-year × day-of-week activity grid. treemap — nested area-proportional rectangles. ridgeline — stacked small-distributions. funnel — conversion stages with drop-off. sankey — flow / share between stages with curved ribbons. network — node-link force-relaxed graph. scatter-matrix — N×N grid of mini scatters for multivariate correlation. parallel-coordinates — multi-axis polyline per record. chord — circular relationship diagram with arcs around the perimeter and ribbons between. geo — simplified tile cartogram (one cell per region, coloured by value) using ISO-style region codes laid out in a rough world grid."
         },
         "title": { "type": "string" },
         "x_label": { "type": "string", "description": "Cartesian only (scatter / line / area / bubble / quadrant)." },
@@ -853,6 +853,42 @@
             "additionalProperties": true
           },
           "minItems": 2
+        },
+        "groups": {
+          "type": "array",
+          "description": "chord — node list (each row + column in the flow matrix). Each: {id, label?, color?}. Order in this array defines the perimeter sequence going clockwise from 12 o'clock.",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": false,
+            "properties": {
+              "id":    { "type": "string" },
+              "label": { "type": "string" },
+              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+            }
+          },
+          "minItems": 2
+        },
+        "matrix": {
+          "type": "array",
+          "description": "chord — N×N flow matrix. Row i carries the outgoing flows from groups[i]; matrix[i][j] is the flow from groups[i] to groups[j]. Cells default to 0 when omitted.",
+          "items": { "type": "array", "items": { "type": "number" } },
+          "minItems": 2
+        },
+        "regions": {
+          "type": "array",
+          "description": "geo — region values. Each: {id (region code), value, label?}. The renderer looks each id up in its built-in tile cartogram (Alpha-2 country codes plus the synthetic 'OTH' bucket for uncovered regions).",
+          "items": {
+            "type": "object",
+            "required": ["id", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "id":    { "type": "string", "description": "ISO 3166-1 Alpha-2 country code (US, GB, DE, BR, ...) or one of the kit's synthetic region tokens." },
+              "value": { "type": "number" },
+              "label": { "type": "string" }
+            }
+          },
+          "minItems": 1
         }
       },
       "allOf": [
@@ -935,6 +971,14 @@
         {
           "if": { "properties": { "type": { "enum": ["scatter-matrix", "parallel-coordinates"] } }, "required": ["type"] },
           "then": { "required": ["variables", "records"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "chord" } }, "required": ["type"] },
+          "then": { "required": ["groups", "matrix"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "geo" } }, "required": ["type"] },
+          "then": { "required": ["regions"] }
         }
       ]
     },

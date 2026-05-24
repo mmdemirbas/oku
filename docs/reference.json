@@ -1373,6 +1373,20 @@
                 "<a href=\"#chart-scatter-matrix\">type: scatter-matrix</a> — N×N grid of mini scatters; diagonal labels each axis.",
                 "<a href=\"#chart-parallel-coordinates\">type: parallel-coordinates</a> — one vertical axis per variable; each record draws a polyline crossing them."
               ]
+            },
+            {
+              "title": "Relationship · circular",
+              "content": "Pairwise flow / affinity between a small group of entities.",
+              "items": [
+                "<a href=\"#chart-chord\">type: chord</a> — perimeter arcs sized by total flow, ribbons through the middle for each pair."
+              ]
+            },
+            {
+              "title": "Geographic",
+              "content": "Country / region comparison without map-tile data.",
+              "items": [
+                "<a href=\"#chart-geo\">type: geo</a> — tile cartogram with one cell per ISO region code, coloured by value, scaled in a sequential ramp."
+              ]
             }
           ]
         },
@@ -3062,6 +3076,90 @@
                 "lighthouse": 74,
                 "_color": "danger"
               }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-chord",
+          "title": "type: chord"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Circular relationship diagram. <code>groups[]</code> defines the perimeter sequence (clockwise from 12 o'clock); <code>matrix</code> is an N×N flow matrix where <code>matrix[i][j]</code> is the flow from <code>groups[i]</code> to <code>groups[j]</code>. Each group occupies an outer arc sized by its total in+out flow; ribbons through the centre carry the pairwise flows."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"chord\",\n  \"title\": \"Cross-team handoffs (this week)\",\n  \"groups\": [\n    {\"id\": \"design\",  \"color\": \"accent\"},\n    {\"id\": \"eng\",     \"color\": \"success\"},\n    {\"id\": \"product\", \"color\": \"warn\"},\n    {\"id\": \"docs\",    \"color\": \"muted\"}\n  ],\n  \"matrix\": [\n    [0, 8, 3, 2],\n    [4, 0, 5, 6],\n    [2, 7, 0, 1],\n    [3, 4, 1, 0]\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "chord",
+            "title": "Cross-team handoffs (this week)",
+            "groups": [
+              { "id": "design",  "color": "accent"  },
+              { "id": "eng",     "color": "success" },
+              { "id": "product", "color": "warn"    },
+              { "id": "docs",    "color": "muted"   }
+            ],
+            "matrix": [
+              [0, 8, 3, 2],
+              [4, 0, 5, 6],
+              [2, 7, 0, 1],
+              [3, 4, 1, 0]
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-geo",
+          "title": "type: geo"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Tile cartogram. <code>regions[]</code> is a list of <code>{id, value, label?}</code> where <code>id</code> is an ISO 3166-1 Alpha-2 country code (US, GB, DE, BR, ...) or the synthetic <code>OTH</code> bucket. The kit ships a fixed tile grid (~60 cells) that approximates a flat world map; absent regions render as faint placeholder outlines so the geography stays visible. Cell fill scales with value in a single-hue sequential ramp."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"geo\",\n  \"title\": \"Site traffic by country (k visits)\",\n  \"regions\": [\n    {\"id\": \"US\", \"value\":  82, \"label\": \"United States\"},\n    {\"id\": \"GB\", \"value\":  18, \"label\": \"United Kingdom\"},\n    {\"id\": \"DE\", \"value\":  24, \"label\": \"Germany\"},\n    {\"id\": \"FR\", \"value\":  11, \"label\": \"France\"},\n    {\"id\": \"BR\", \"value\":  14, \"label\": \"Brazil\"},\n    {\"id\": \"IN\", \"value\":  38, \"label\": \"India\"},\n    {\"id\": \"JP\", \"value\":  21, \"label\": \"Japan\"},\n    {\"id\": \"AU\", \"value\":   9, \"label\": \"Australia\"},\n    {\"id\": \"OTH\",\"value\":  47, \"label\": \"Other\"}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "geo",
+            "title": "Site traffic by country (k visits)",
+            "regions": [
+              { "id": "US",  "value": 82, "label": "United States"  },
+              { "id": "CA",  "value":  6, "label": "Canada"         },
+              { "id": "MX",  "value":  4, "label": "Mexico"         },
+              { "id": "BR",  "value": 14, "label": "Brazil"         },
+              { "id": "AR",  "value":  3, "label": "Argentina"      },
+              { "id": "GB",  "value": 18, "label": "United Kingdom" },
+              { "id": "FR",  "value": 11, "label": "France"         },
+              { "id": "DE",  "value": 24, "label": "Germany"        },
+              { "id": "ES",  "value":  8, "label": "Spain"          },
+              { "id": "IT",  "value":  7, "label": "Italy"          },
+              { "id": "NL",  "value":  5, "label": "Netherlands"    },
+              { "id": "SE",  "value":  4, "label": "Sweden"         },
+              { "id": "PL",  "value":  6, "label": "Poland"         },
+              { "id": "TR",  "value":  9, "label": "Türkiye"        },
+              { "id": "RU",  "value":  4, "label": "Russia"         },
+              { "id": "IN",  "value": 38, "label": "India"          },
+              { "id": "CN",  "value": 22, "label": "China"          },
+              { "id": "JP",  "value": 21, "label": "Japan"          },
+              { "id": "KR",  "value": 12, "label": "South Korea"    },
+              { "id": "ID",  "value":  7, "label": "Indonesia"      },
+              { "id": "AU",  "value":  9, "label": "Australia"      },
+              { "id": "ZA",  "value":  3, "label": "South Africa"   },
+              { "id": "NG",  "value":  4, "label": "Nigeria"        },
+              { "id": "OTH", "value": 47, "label": "Other / unmapped" }
             ]
           }
         },

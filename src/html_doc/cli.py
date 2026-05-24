@@ -1548,9 +1548,17 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     if not blk.get("variables") or not blk.get("records"):
                         add(p, "error", "chart-multivariate-missing-payload", where_prefix,
                             f"chart with type:{ctype} requires both `variables` and `records` arrays.")
+                elif ctype == "chord":
+                    if not blk.get("groups") or not blk.get("matrix"):
+                        add(p, "error", "chart-chord-missing-payload", where_prefix,
+                            "chart with type:chord requires both `groups` and `matrix` (N×N flow matrix).")
+                elif ctype == "geo":
+                    if not blk.get("regions"):
+                        add(p, "error", "chart-geo-missing-regions", where_prefix,
+                            "chart with type:geo requires a `regions` array of {id, value, label?}.")
                 elif ctype is not None:
                     add(p, "error", "chart-unknown-type", where_prefix,
-                        f"chart type '{ctype}' is not supported. Known: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, heatmap, sparkline, waffle, gauge, radar, box-plot, bullet, slope, histogram, calendar-heatmap, treemap, ridgeline, funnel, sankey, network, scatter-matrix, parallel-coordinates.")
+                        f"chart type '{ctype}' is not supported. Known: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, heatmap, sparkline, waffle, gauge, radar, box-plot, bullet, slope, histogram, calendar-heatmap, treemap, ridgeline, funnel, sankey, network, scatter-matrix, parallel-coordinates, chord, geo.")
 
         # 7. Duplicate section IDs within a page — anchors must be unique.
         seen_ids: dict[str, int] = {}

@@ -4071,3 +4071,58 @@ main pre,
 main .example-pair {
   max-width: var(--content-width, 960px);
 }
+
+
+/* ============ Tier 3 — chord + geo ============ */
+html-doc-chart .hdc-chord .hdc-chord-arc {
+  stroke: var(--bg);
+  stroke-width: 1.5;
+  transition: filter 0.18s ease;
+}
+html-doc-chart .hdc-chord .hdc-chord-arc:hover { filter: brightness(1.05); }
+html-doc-chart .hdc-chord .hdc-chord-ribbon {
+  transition: fill-opacity 0.18s ease;
+  cursor: pointer;
+}
+html-doc-chart .hdc-chord .hdc-chord-ribbon:hover { fill-opacity: 0.55; }
+html-doc-chart .hdc-chord .hdc-chord-label {
+  fill: var(--text);
+  font: 600 11px 'Inter', sans-serif;
+}
+
+html-doc-chart .hdc-geo .hdc-geo-cell-on rect {
+  stroke: var(--border);
+  stroke-width: 0.5;
+  cursor: pointer;
+  transition: filter 0.15s ease, stroke-width 0.15s ease;
+}
+html-doc-chart .hdc-geo .hdc-geo-cell-on:hover rect,
+html-doc-chart .hdc-geo .hdc-geo-cell-on:focus-visible rect {
+  filter: brightness(1.1);
+  stroke: var(--accent-strong);
+  stroke-width: 1.5;
+}
+html-doc-chart .hdc-geo .hdc-geo-cell-off {
+  fill: var(--surface-2);
+  stroke: var(--border-soft);
+  stroke-width: 0.5;
+}
+html-doc-chart .hdc-geo .hdc-geo-code {
+  fill: var(--text);
+  font: 700 11.5px 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.04em;
+}
+html-doc-chart .hdc-geo .hdc-geo-value {
+  fill: var(--text);
+  font: 500 10px 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+html-doc-chart .hdc-geo .hdc-geo-code-off {
+  fill: var(--text-faint);
+  font: 500 10px 'JetBrains Mono', ui-monospace, monospace;
+}
+html-doc-chart .hdc-geo .hdc-geo-legend-tick {
+  fill: var(--text-soft);
+  font: 500 10.5px 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}

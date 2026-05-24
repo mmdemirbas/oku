@@ -359,7 +359,9 @@
         sankey: { nodes: block.nodes, links: block.links },
         network: { nodes: block.nodes, links: block.links },
         'scatter-matrix': { variables: block.variables, records: block.records },
-        'parallel-coordinates': { variables: block.variables, records: block.records }
+        'parallel-coordinates': { variables: block.variables, records: block.records },
+        chord: { groups: block.groups, matrix: block.matrix },
+        geo: { regions: block.regions }
       };
       if (extraMap[type]) {
         const x = document.createElement('script');

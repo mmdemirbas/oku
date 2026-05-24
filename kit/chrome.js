@@ -3224,7 +3224,9 @@ class HtmlDocChart extends HTMLElement {
       sankey: '_renderSankey',
       network: '_renderNetwork',
       'scatter-matrix': '_renderScatterMatrix',
-      'parallel-coordinates': '_renderParallelCoordinates'
+      'parallel-coordinates': '_renderParallelCoordinates',
+      chord: '_renderChord',
+      geo: '_renderGeo'
     };
     if (nonCartesian[this._type]) {
       this[nonCartesian[this._type]]();
@@ -4706,6 +4708,222 @@ class HtmlDocChart extends HTMLElement {
       var payload = JSON.stringify({ label: r._label || ('record ' + (ri + 1)), kv: vars.map(function (v) { return { k: v.label || v.key, v: fmtNum(+r[v.key]) }; }) });
       parts.push('<polyline points="' + pts.join(' ') + '" stroke="' + color + '" class="hdc-parcoord-line" data-hover-payload="' + escapeXml(payload) + '"/>');
     });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Tier 3 — chord ----------------
+     Circular relationship diagram. Each group occupies an arc on
+     the perimeter sized by its total in+out flow; ribbons between
+     groups draw as cubic Bezier curves through the centre.
+     Input: groups[] (N entries — order = clockwise sequence from
+     12 o'clock) + matrix (N×N, where matrix[i][j] is flow from
+     groups[i] to groups[j]). */
+  _renderChord() {
+    var x = (this._extras && this._extras.chord) || {};
+    var groups = (x.groups || []).slice();
+    var matrix = x.matrix || [];
+    if (groups.length < 2 || !matrix.length) return;
+    var n = groups.length;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    // Total flow per group (in + out).
+    var totals = new Array(n).fill(0);
+    for (var i = 0; i < n; i++) {
+      for (var j = 0; j < n; j++) {
+        var v = (matrix[i] && +matrix[i][j]) || 0;
+        totals[i] += v;
+        if (i !== j) totals[j] += v;
+      }
+    }
+    var grand = totals.reduce(function (s, v) { return s + v; }, 0);
+    if (grand <= 0) return;
+    // Geometry — outer arc radius, inner ribbon radius, gap between arcs.
+    var W = 560, H = 560;
+    var titleTop = this._title ? 28 : 12;
+    var cx = W / 2, cy = (titleTop + H) / 2 - 8;
+    var rOuter = 220, rInner = 200;
+    var gap = (Math.PI / 180) * 2; // 2 degrees gap between arcs
+    var totalGap = n * gap;
+    var avail = Math.PI * 2 - totalGap;
+    var startAngle = -Math.PI / 2; // start at 12 o'clock, clockwise
+    var arcs = [];
+    groups.forEach(function (g, i) {
+      var span = (totals[i] / grand) * avail;
+      var a0 = startAngle;
+      var a1 = startAngle + span;
+      arcs.push({ start: a0, end: a1, group: g, idx: i });
+      startAngle = a1 + gap;
+    });
+    // Compute per-(i,j) start/end angles within each arc — cells
+    // stack by matrix-column order within the source arc, by row
+    // order within the target arc. Symmetric so undirected flows
+    // (matrix[i][j] == matrix[j][i]) read as one ribbon visually.
+    function point(r, a) { return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+    var srcCursor = new Array(n).fill(0);
+    var tgtCursor = new Array(n).fill(0);
+    var ribbons = [];
+    for (var i = 0; i < n; i++) {
+      for (var j = 0; j < n; j++) {
+        var flow = (matrix[i] && +matrix[i][j]) || 0;
+        if (flow <= 0 || i === j) continue;
+        var sArc = arcs[i];
+        var tArc = arcs[j];
+        var sSpan = (flow / totals[i]) * (sArc.end - sArc.start);
+        var tSpan = (flow / totals[j]) * (tArc.end - tArc.start);
+        var sA0 = sArc.start + srcCursor[i];
+        var sA1 = sA0 + sSpan;
+        var tA0 = tArc.start + tgtCursor[j];
+        var tA1 = tA0 + tSpan;
+        srcCursor[i] += sSpan;
+        tgtCursor[j] += tSpan;
+        ribbons.push({ sA0: sA0, sA1: sA1, tA0: tA0, tA1: tA1, source: i, target: j, value: flow });
+      }
+    }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Chord') + '" class="hdc-svg hdc-chord">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    // Ribbons first (drawn under arcs).
+    ribbons.forEach(function (r) {
+      var s0 = point(rInner, r.sA0), s1 = point(rInner, r.sA1);
+      var t0 = point(rInner, r.tA0), t1 = point(rInner, r.tA1);
+      // Use the centre as the Bezier control to bend ribbons through
+      // the middle of the chart.
+      var d =
+        'M ' + s0[0].toFixed(1) + ' ' + s0[1].toFixed(1) +
+        ' A ' + rInner + ' ' + rInner + ' 0 0 1 ' + s1[0].toFixed(1) + ' ' + s1[1].toFixed(1) +
+        ' Q ' + cx + ' ' + cy + ' ' + t0[0].toFixed(1) + ' ' + t0[1].toFixed(1) +
+        ' A ' + rInner + ' ' + rInner + ' 0 0 1 ' + t1[0].toFixed(1) + ' ' + t1[1].toFixed(1) +
+        ' Q ' + cx + ' ' + cy + ' ' + s0[0].toFixed(1) + ' ' + s0[1].toFixed(1) +
+        ' Z';
+      var sg = groups[r.source];
+      var tg = groups[r.target];
+      var color = palette[sg.color] || palette.accent;
+      var payload = JSON.stringify({
+        label: (sg.label || sg.id) + ' → ' + (tg.label || tg.id),
+        kv: [{ k: 'flow', v: fmtNum(r.value) }]
+      });
+      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.28" class="hdc-chord-ribbon" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((sg.label || sg.id) + ' → ' + (tg.label || tg.id) + ': ' + fmtNum(r.value)) + '</title></path>');
+    });
+    // Outer arcs (group perimeter).
+    arcs.forEach(function (a) {
+      var p0 = point(rOuter, a.start), p1 = point(rOuter, a.end);
+      var ip0 = point(rInner, a.start), ip1 = point(rInner, a.end);
+      var largeArc = (a.end - a.start) > Math.PI ? 1 : 0;
+      var d =
+        'M ' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) +
+        ' A ' + rOuter + ' ' + rOuter + ' 0 ' + largeArc + ' 1 ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1) +
+        ' L ' + ip1[0].toFixed(1) + ' ' + ip1[1].toFixed(1) +
+        ' A ' + rInner + ' ' + rInner + ' 0 ' + largeArc + ' 0 ' + ip0[0].toFixed(1) + ' ' + ip0[1].toFixed(1) +
+        ' Z';
+      var color = palette[a.group.color] || palette.accent;
+      parts.push('<path d="' + d + '" fill="' + color + '" class="hdc-chord-arc"><title>' + escapeXml((a.group.label || a.group.id) + ': ' + fmtNum(totals[a.idx])) + '</title></path>');
+      // Label outside the arc.
+      var mid = (a.start + a.end) / 2;
+      var lp = point(rOuter + 14, mid);
+      var anchor = Math.cos(mid) < -0.2 ? 'end' : (Math.cos(mid) > 0.2 ? 'start' : 'middle');
+      parts.push('<text x="' + lp[0].toFixed(1) + '" y="' + lp[1].toFixed(1) + '" text-anchor="' + anchor + '" dominant-baseline="middle" class="hdc-chord-label">' + escapeXml(a.group.label || a.group.id) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Tier 3 — geo ----------------
+     Tile cartogram. Each region gets a uniformly-sized cell in a
+     grid that approximates world geography. Cell fill scales with
+     value via a sequential colour ramp. Designed for "country / market
+     comparison" charts without dragging in real map tile data — keeps
+     the kit's no-build ethos intact.
+     The tile grid is fixed and ships ~60 regions (US, EU, BR, IN, CN,
+     ...) at hardcoded (col, row) positions. Authors pass {id, value}
+     for the regions they care about; cells for absent regions render
+     as faint outlines. */
+  _renderGeo() {
+    var x = (this._extras && this._extras.geo) || {};
+    var regions = (x.regions || []).slice();
+    if (!regions.length) return;
+    var values = regions.map(function (r) { return +r.value; }).filter(function (v) { return !isNaN(v); });
+    if (!values.length) return;
+    var vMin = Math.min.apply(null, values);
+    var vMax = Math.max.apply(null, values);
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    // Tile grid — (col, row) per region. 11 columns × 7 rows; roughly
+    // matches a flattened world (Americas left, Europe + Africa middle,
+    // Asia + Oceania right). Coordinates picked to be readable rather
+    // than geographically exact.
+    var TILES = {
+      // North America
+      CA: [1, 1], US: [1, 2], MX: [1, 3],
+      // South America
+      CO: [2, 3], BR: [2, 4], AR: [2, 5], CL: [2, 5], PE: [1, 4],
+      // Europe (col 4-5)
+      IS: [4, 1], GB: [4, 2], IE: [3, 2], NO: [5, 1], SE: [5, 1], FI: [6, 1],
+      PT: [3, 3], ES: [4, 3], FR: [4, 3], NL: [5, 2], BE: [4, 2], DE: [5, 2], DK: [5, 1], PL: [6, 2],
+      IT: [5, 3], CH: [4, 3], AT: [5, 3], CZ: [6, 3], SK: [6, 3], HU: [6, 3], RO: [6, 3], GR: [5, 4],
+      UA: [7, 2], RU: [8, 1],
+      // Middle East + Africa
+      TR: [6, 4], IL: [5, 4], SA: [6, 5], AE: [7, 5], IR: [7, 4], EG: [5, 5],
+      ZA: [5, 6], NG: [4, 5], KE: [5, 5], ET: [6, 5], MA: [4, 4],
+      // Asia
+      IN: [7, 4], PK: [7, 3], BD: [8, 4], CN: [8, 3], JP: [9, 3], KR: [9, 3], TW: [9, 4],
+      VN: [9, 4], TH: [8, 5], MY: [9, 5], SG: [9, 5], ID: [9, 6], PH: [10, 5],
+      // Oceania
+      AU: [10, 6], NZ: [10, 7],
+      // Synthetic bucket for everything else
+      OTH: [0, 0]
+    };
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var cellW = 54, cellH = 36, cellGap = 4;
+    var maxCol = 10, maxRow = 7;
+    var W = (maxCol + 1) * (cellW + cellGap) + 40;
+    var H = (maxRow + 1) * (cellH + cellGap) + 80;
+    var titleTop = this._title ? 28 : 12;
+    var legendY = H - 36;
+    var byId = {};
+    regions.forEach(function (r) { byId[r.id] = r; });
+    function fillFor(value) {
+      // Linear interpolation in the accent ramp via fill-opacity 0.2 → 1.
+      var t = Math.max(0, Math.min(1, (value - vMin) / (vMax - vMin)));
+      return { color: palette.accent, opacity: 0.2 + t * 0.8 };
+    }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Geo cartogram') + '" class="hdc-svg hdc-geo">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    // Render every tile in the grid — present regions get colour;
+    // absent get a faint placeholder outline so the geography reads.
+    Object.keys(TILES).forEach(function (id) {
+      var pos = TILES[id];
+      var col = pos[0], row = pos[1];
+      var px = 20 + col * (cellW + cellGap);
+      var py = titleTop + 12 + row * (cellH + cellGap);
+      var r = byId[id];
+      var attrs;
+      if (r) {
+        var f = fillFor(+r.value);
+        var payload = JSON.stringify({
+          label: r.label || id,
+          kv: [{ k: 'value', v: fmtNum(+r.value) }, { k: 'region', v: id }]
+        });
+        attrs = ' fill="' + f.color + '" fill-opacity="' + f.opacity.toFixed(2) + '" data-hover-payload="' + escapeXml(payload) + '"';
+        parts.push('<g class="hdc-geo-cell hdc-geo-cell-on" tabindex="0">');
+        parts.push('<rect x="' + px + '" y="' + py + '" width="' + cellW + '" height="' + cellH + '" rx="3"' + attrs + '/>');
+        parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 - 2) + '" text-anchor="middle" class="hdc-geo-code">' + escapeXml(id) + '</text>');
+        parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 + 12) + '" text-anchor="middle" class="hdc-geo-value">' + escapeXml(fmtNum(+r.value)) + '</text>');
+        parts.push('<title>' + escapeXml((r.label || id) + ': ' + fmtNum(+r.value)) + '</title>');
+        parts.push('</g>');
+      } else {
+        parts.push('<rect x="' + px + '" y="' + py + '" width="' + cellW + '" height="' + cellH + '" rx="3" class="hdc-geo-cell-off"/>');
+        parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 + 4) + '" text-anchor="middle" class="hdc-geo-code-off">' + escapeXml(id) + '</text>');
+      }
+    });
+    // Legend — value scale band at the bottom.
+    var lgW = 240, lgX = (W - lgW) / 2, lgH = 12;
+    var stops = 12;
+    for (var s = 0; s < stops; s++) {
+      var t = s / (stops - 1);
+      parts.push('<rect x="' + (lgX + s * (lgW / stops)).toFixed(1) + '" y="' + legendY + '" width="' + (lgW / stops + 0.5).toFixed(2) + '" height="' + lgH + '" fill="' + palette.accent + '" fill-opacity="' + (0.2 + t * 0.8).toFixed(2) + '"/>');
+    }
+    parts.push('<text x="' + lgX + '" y="' + (legendY + lgH + 14) + '" class="hdc-geo-legend-tick">' + escapeXml(fmtNum(vMin)) + '</text>');
+    parts.push('<text x="' + (lgX + lgW) + '" y="' + (legendY + lgH + 14) + '" text-anchor="end" class="hdc-geo-legend-tick">' + escapeXml(fmtNum(vMax)) + '</text>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
   }
