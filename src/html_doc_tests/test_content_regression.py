@@ -339,6 +339,56 @@ class TestChromeKitMarkers:
             "data-callout-symbol" in css
         ), "CSS must read data-callout-symbol via attr() to render the badge"
 
+    def test_table_supports_pinned_view(self, repo_root: Path) -> None:
+        """A table block can declare `view: \"board\"` etc. to pin the
+        initial view. Renderer surfaces it as data-default-view on the
+        <table>; chrome.js reads that and seeds the view-toggle. The
+        kanban example uses this so the board renders by default
+        (instead of a flat table the reader has to re-pivot)."""
+        schema = json.loads(
+            (repo_root / "kit" / "schema" / "page.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        assert "view" in schema["$defs"]["table"]["properties"], (
+            "schema lost the pinned-view field — table.view"
+        )
+        renderer = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert (
+            "data-default-view" in renderer
+        ), "renderer must surface block.view as data-default-view"
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert (
+            "data-default-view" in js
+        ), "chrome.js must read data-default-view to seed the toggle"
+        ref = json.loads(
+            (repo_root / "docs" / "reference.json").read_text(encoding="utf-8")
+        )
+        rendered = [
+            b
+            for b in _walk_blocks(ref)
+            if b.get("kind") == "table" and b.get("view") == "board"
+        ]
+        assert rendered, (
+            "kanban example in reference.json should pin view: 'board' so the render shows lanes by default"
+        )
+
+    def test_table_view_toggle_compact(self, repo_root: Path) -> None:
+        """The view toggle was widened from word-buttons to a single
+        segmented icon-only group. Lock the new shape so a future
+        refactor doesn't quietly bring the word buttons back."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert (
+            "hdt-view-group" in js
+        ), "view-toggle group wrapper missing (compact form not applied)"
+        assert (
+            "hdt-view-btn" in js
+        ), "view buttons missing the compact class"
+        assert (
+            ".hdt-view-group" in css
+        ), "view-toggle group has no CSS — falls back to default button chrome"
+
     def test_annotated_code_substring_chip_autoplace(self, repo_root: Path) -> None:
         """Pure-substring annotations (no inline (N), no `lines`) now
         get a numeric chip auto-placed in front of the first highlighted
@@ -1193,7 +1243,11 @@ class TestChromeKitMarkers:
         """
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        assert 'data-view="board"' in js, "Board toggle button missing in toolbar"
+        # The view buttons may be emitted via a helper (viewBtnHTML)
+        # or inline; either way the 'board' key must be there.
+        assert (
+            'viewBtnHTML(\'board\'' in js or 'data-view="board"' in js
+        ), "Board toggle button missing in toolbar"
         assert "renderBoard" in js, "renderBoard function missing"
         assert "hdt-table-board" in js, "board container missing"
         assert ".hdt-board-lane" in css, "lane styling missing"

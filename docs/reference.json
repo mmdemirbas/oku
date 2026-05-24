@@ -1024,15 +1024,16 @@
         },
         {
           "kind": "paragraph",
-          "content": "Switch any table to <em>Board</em> view (the fourth view toggle) and pick a column to group by &mdash; rows become cards in lanes, one lane per unique value. Declare <code>boardOrder</code> on the column header to force the lane sequence; without it, lanes appear in first-occurrence order, which rarely matches the kanban flow you want. Values present in row data but missing from <code>boardOrder</code> render at the end so authors can spot the omission."
+          "content": "Set <code>view: \"board\"</code> on the table block to open in kanban lanes by default — rows become cards in one lane per unique value of the group column. Declare <code>boardOrder</code> on the column header to force the lane sequence; without it, lanes appear in first-occurrence order, which rarely matches the kanban flow you want. Values present in row data but missing from <code>boardOrder</code> render at the end so authors can spot the omission. The other views (Table / List / Cards) are still one click away in the view toggle."
         },
         {
           "kind": "code",
           "language": "json",
-          "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\n    \"Item\",\n    { \"label\": \"Status\",\n      \"boardOrder\": [\"queued\", \"in-progress\", \"blocked\", \"done\"] }\n  ],\n  \"rows\": [\n    [\"Cut release tag\",        \"queued\"],\n    [\"Wire CI matrix\",         \"in-progress\"],\n    [\"Vendor security review\", \"blocked\"],\n    [\"Migrate auth layer\",     \"done\"],\n    [\"Draft RFC\",              \"in-progress\"],\n    [\"Update changelog\",       \"queued\"]\n  ]\n}"
+          "source": "{\n  \"kind\": \"table\",\n  \"view\": \"board\",\n  \"headers\": [\n    \"Item\",\n    { \"label\": \"Status\",\n      \"boardOrder\": [\"queued\", \"in-progress\", \"blocked\", \"done\"] }\n  ],\n  \"rows\": [\n    [\"Cut release tag\",        \"queued\"],\n    [\"Wire CI matrix\",         \"in-progress\"],\n    [\"Vendor security review\", \"blocked\"],\n    [\"Migrate auth layer\",     \"done\"],\n    [\"Draft RFC\",              \"in-progress\"],\n    [\"Update changelog\",       \"queued\"]\n  ]\n}"
         },
         {
           "kind": "table",
+          "view": "board",
           "headers": [
             "Item",
             {

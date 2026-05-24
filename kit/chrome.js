@@ -1079,11 +1079,34 @@ function initReadingAids() {
           '<select class="hdt-groupby-select" aria-label="Group by column">' + opts.join('') + '</select>' +
         '</label>';
     }
+    // Compact icon-only view toggle. Each button keeps its accessible
+    // label (aria-label + title) so screen readers and tooltips
+    // describe what each pivot does — only the visual chrome is
+    // tighter, freeing horizontal space the older Table / List /
+    // Cards / Board word-buttons consumed on narrow viewports.
+    var VIEW_ICONS = {
+      // Table: classic grid rows + cols.
+      table: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="1.5"/><line x1="2" y1="6" x2="14" y2="6"/><line x1="2" y1="10" x2="14" y2="10"/><line x1="8" y1="2" x2="8" y2="14"/></svg>',
+      // List: stacked horizontal lines (with bullet dots).
+      list:  '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="3" cy="4" r="1" fill="currentColor"/><line x1="6" y1="4" x2="14" y2="4"/><circle cx="3" cy="8" r="1" fill="currentColor"/><line x1="6" y1="8" x2="14" y2="8"/><circle cx="3" cy="12" r="1" fill="currentColor"/><line x1="6" y1="12" x2="14" y2="12"/></svg>',
+      // Cards: 2×2 grid of soft-rounded tiles.
+      cards: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="2" width="5.5" height="5.5" rx="1"/><rect x="2" y="8.5" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1"/></svg>',
+      // Board: three vertical lanes (kanban).
+      board: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="3.5" height="12" rx="1"/><rect x="6.25" y="2" width="3.5" height="9" rx="1"/><rect x="10.5" y="2" width="3.5" height="6" rx="1"/></svg>',
+    };
+    function viewBtnHTML(key, label, isActive) {
+      return '<button data-view="' + key + '" type="button" class="hdt-view-btn' +
+        (isActive ? ' active' : '') + '" aria-pressed="' + (isActive ? 'true' : 'false') +
+        '" aria-label="' + label + ' view" title="' + label + ' view">' +
+        VIEW_ICONS[key] + '</button>';
+    }
     var viewBtns = canPivot ? (
-      '<button data-view="table" type="button" class="active" aria-pressed="true">Table</button>' +
-      '<button data-view="list"  type="button" aria-pressed="false">List</button>' +
-      '<button data-view="cards" type="button" aria-pressed="false">Cards</button>' +
-      '<button data-view="board" type="button" aria-pressed="false">Board</button>' +
+      '<span class="hdt-view-group" role="group" aria-label="View">' +
+        viewBtnHTML('table', 'Table', true) +
+        viewBtnHTML('list',  'List',  false) +
+        viewBtnHTML('cards', 'Cards', false) +
+        viewBtnHTML('board', 'Board', false) +
+      '</span>' +
       '<span class="hdt-ctrl-sep" aria-hidden="true"></span>'
     ) : '';
     ctrl.innerHTML =
@@ -1776,17 +1799,40 @@ function initReadingAids() {
       }
 
       // View-toggle handler — CSS-driven via wrap.dataset.view.
+      function setView(view) {
+        wrap.dataset.view = view;
+        ctrl.querySelectorAll('[data-view]').forEach(function (b) {
+          var active = b.getAttribute('data-view') === view;
+          b.classList.toggle('active', active);
+          b.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+      }
       ctrl.querySelectorAll('[data-view]').forEach(function (btn) {
         btn.addEventListener('click', function () {
-          var view = btn.getAttribute('data-view');
-          wrap.dataset.view = view;
-          ctrl.querySelectorAll('[data-view]').forEach(function (b) {
-            var active = b === btn;
-            b.classList.toggle('active', active);
-            b.setAttribute('aria-pressed', active ? 'true' : 'false');
-          });
+          setView(btn.getAttribute('data-view'));
         });
       });
+      // Author-pinned initial view via `block.view` → table[data-default-view].
+      // Only honoured when the requested view is one of the valid options.
+      var pinned = table.getAttribute('data-default-view');
+      if (pinned && ctrl.querySelector('[data-view="' + pinned + '"]')) {
+        setView(pinned);
+        // Board view needs a group column to be meaningful; when the
+        // table didn't author groups but has a column with
+        // data-board-order, pivot on that column automatically.
+        // Without this, the board collapses to a single "All" lane
+        // and the boardOrder declaration is dead weight.
+        if (pinned === 'board' && groupByCol === 'none') {
+          var ths = table.querySelectorAll('thead th');
+          for (var ti = 0; ti < ths.length; ti++) {
+            if (ths[ti].getAttribute('data-board-order')) {
+              groupByCol = String(ti);
+              if (groupBySelect) groupBySelect.value = groupByCol;
+              break;
+            }
+          }
+        }
+      }
 
       render(); // initial: identity sort, no filter — preserves source order
     }

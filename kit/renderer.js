@@ -603,7 +603,12 @@
       // and cell object form `{ value, values: [...] }` are surfaced as
       // `data-filter` / `data-values` attributes so chrome.js can build
       // the chip rack without re-reading the JSON.
+      //
+      // Optional block.view ∈ {table, list, cards, board}: pins the
+      // initial view shown by the table-chrome view toggle. Falls
+      // through to 'table' when unset (the historical default).
       const table = document.createElement('table');
+      if (block.view) table.setAttribute('data-default-view', block.view);
       const headers = block.headers || [];
       if (headers.length) {
         const thead = document.createElement('thead');

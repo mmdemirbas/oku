@@ -208,6 +208,10 @@
       "additionalProperties": false,
       "properties": {
         "kind":    { "const": "table" },
+        "view": {
+          "enum": ["table", "list", "cards", "board"],
+          "description": "Pin the initial view shown by the table-chrome view toggle. Defaults to 'table'. Use 'board' on tables whose primary point is the kanban grouping — otherwise the reader sees a flat table by default and the kanban shape stays one click away."
+        },
         "headers": {
           "type": "array",
           "items": { "$ref": "#/$defs/tableHeader" }
