@@ -19,14 +19,14 @@
       "kind": "tldr",
       "summary": "Set up a project once, then write JSON pages. Every page is a tree of kind-tagged blocks; this page documents the kinds (inline, prose, emphasis, layout, visual), how to thread them together, per-page metadata, and the build outputs.",
       "bullets": [
-        "Setup · html-doc init creates _kit symlink + an index.html stub. One-time per project.",
+        "Setup · oku init creates _kit symlink + an index.html stub. One-time per project.",
         "Page · kind:\"page\" → title + meta + blocks; blocks are sections (which contain content blocks) or top-level tldr / kpi-grid.",
         "Inline · glossary-term, ext-ref, code, em, strong, link",
         "Prose · paragraph, heading, list, code, annotated-code",
         "Emphasis · callout, insight, info-tip",
         "Layout · tldr, kpi-grid, table, compare-grid, step-flow",
         "Visual · chart (scatter / line / area / bubble / quadrant / bar / stacked-bar / grouped-bar / donut), diagram, live-snippet",
-        "Build · html-doc build → dist/standalone/, dist/site/ (+ Pagefind), dist/markdown/ (page.md twins + llms.txt)"
+        "Build · oku build → dist/standalone/, dist/site/ (+ Pagefind), dist/markdown/ (page.md twins + llms.txt)"
       ]
     },
     {
@@ -38,7 +38,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd path/to/your-project/docs\nhtml-doc init     # creates _kit symlink + index.html in cwd\n\n# Optional: drop a starter page into the docs root\n# (The starter pair ships inside the html_doc package — for a\n# git checkout it lives at src/html_doc/templates/starter.json.)\n\ncd ..\nhtml-doc serve    # http://localhost:9876 with live reload"
+          "source": "cd path/to/your-project/docs\noku init     # creates _kit symlink + index.html in cwd\n\n# Optional: drop a starter page into the docs root\n# (The starter pair ships inside the html_doc package — for a\n# git checkout it lives at src/html_doc/templates/starter.json.)\n\ncd ..\noku serve    # http://localhost:9876 with live reload"
         },
         {
           "kind": "paragraph",
@@ -179,7 +179,7 @@
             " files anywhere under the docs root are first-class pages — they appear in the site tree, render with the kit's TOC + chrome, and survive ",
             {
               "kind": "code",
-              "text": "html-doc check / build / serve"
+              "text": "oku check / build / serve"
             },
             " alongside JSON pages. You don't have to convert anything before adopting the kit; existing Markdown documentation drops in unchanged."
           ]
@@ -852,7 +852,7 @@
           "code": {
             "kind": "code",
             "language": "json",
-            "source": "{\n  \"kind\": \"step-flow\",\n  \"steps\": [\n    { \"num\": \"1\", \"title\": \"Init\",  \"meta\": \"~1 min\", \"content\": \"html-doc init\" },\n    { \"num\": \"2\", \"title\": \"Author\", \"content\": \"Write the JSON page.\" }\n  ]\n}"
+            "source": "{\n  \"kind\": \"step-flow\",\n  \"steps\": [\n    { \"num\": \"1\", \"title\": \"Init\",  \"meta\": \"~1 min\", \"content\": \"oku init\" },\n    { \"num\": \"2\", \"title\": \"Author\", \"content\": \"Write the JSON page.\" }\n  ]\n}"
           },
           "render": {
             "kind": "step-flow",
@@ -861,7 +861,7 @@
                 "num": "1",
                 "title": "Init",
                 "meta": "~1 min · one-time per project",
-                "content": "cd into your docs root, then html-doc init scaffolds the _kit symlink and an index.html stub there."
+                "content": "cd into your docs root, then oku init scaffolds the _kit symlink and an index.html stub there."
               },
               {
                 "num": "2",
@@ -873,7 +873,7 @@
                 "num": "3",
                 "title": "Build",
                 "meta": "before deploy or before sharing standalone",
-                "content": "html-doc build → dist/standalone/ (single-file HTMLs), dist/site/ (shared-asset multi-page + manifest + Pagefind), dist/markdown/ (page.md twins + llms.txt for LLM consumers)."
+                "content": "oku build → dist/standalone/ (single-file HTMLs), dist/site/ (shared-asset multi-page + manifest + Pagefind), dist/markdown/ (page.md twins + llms.txt for LLM consumers)."
               }
             ]
           }
@@ -1110,7 +1110,7 @@
       "kind": "section",
       "id": "build",
       "title": "Build outputs",
-      "lead": "html-doc build produces three trees under dist/, one per audience. Authors don't need to run it during dev — the runtime renderer fetches JSON directly — but build is required for search, the standalone single-file mode, and the llms.txt sitemap.",
+      "lead": "oku build produces three trees under dist/, one per audience. Authors don't need to run it during dev — the runtime renderer fetches JSON directly — but build is required for search, the standalone single-file mode, and the llms.txt sitemap.",
       "blocks": [
         {
           "kind": "step-flow",

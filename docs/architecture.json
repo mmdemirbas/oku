@@ -34,7 +34,7 @@
         {
           "kind": "diagram",
           "caption": "Author → kit → build at a single glance.",
-          "source": "flowchart TB\n    subgraph A[Authoring layer]\n      direction LR\n      JSON[\"📄 docs/*.json\"]:::auth\n      MD[\"📝 docs/*.md\"]:::auth\n      KITJ[\"⚙ kit.json\"]:::auth\n    end\n    subgraph R[Kit runtime — single _kit/ symlink]\n      direction TB\n      RND[\"renderer.js<br/>tree walker · ~1k LoC\"]:::rt\n      CHR[\"chrome.js<br/>Custom Elements + chrome · ~6k LoC\"]:::rt\n      CSS[\"chrome.css<br/>tokens + every primitive\"]:::rt\n      REG[\"glossary / extrefs<br/>per-domain JSON\"]:::reg\n    end\n    subgraph O[Build outputs — three trees]\n      direction LR\n      STA[\"📦 dist/standalone/<br/>self-contained\"]:::out\n      SIT[\"🌍 dist/site/<br/>multi-page + Pagefind\"]:::out\n      MDT[\"📝 dist/markdown/<br/>page.md + llms.txt\"]:::out\n    end\n    JSON --> RND\n    MD --> RND\n    KITJ --> CHR\n    REG --> CHR\n    RND -.dispatch html-doc:rendered.-> CHR\n    CSS --> CHR\n    A ==html-doc build==> O\n    classDef auth fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a\n    classDef rt fill:#ccfbf1,stroke:#0f766e,color:#115e59,stroke-width:2px\n    classDef reg fill:#e0e7ff,stroke:#4338ca,color:#312e81\n    classDef out fill:#dcfce7,stroke:#15803d,color:#14532d"
+          "source": "flowchart TB\n    subgraph A[Authoring layer]\n      direction LR\n      JSON[\"📄 docs/*.json\"]:::auth\n      MD[\"📝 docs/*.md\"]:::auth\n      KITJ[\"⚙ kit.json\"]:::auth\n    end\n    subgraph R[Kit runtime — single _kit/ symlink]\n      direction TB\n      RND[\"renderer.js<br/>tree walker · ~1k LoC\"]:::rt\n      CHR[\"chrome.js<br/>Custom Elements + chrome · ~6k LoC\"]:::rt\n      CSS[\"chrome.css<br/>tokens + every primitive\"]:::rt\n      REG[\"glossary / extrefs<br/>per-domain JSON\"]:::reg\n    end\n    subgraph O[Build outputs — three trees]\n      direction LR\n      STA[\"📦 dist/standalone/<br/>self-contained\"]:::out\n      SIT[\"🌍 dist/site/<br/>multi-page + Pagefind\"]:::out\n      MDT[\"📝 dist/markdown/<br/>page.md + llms.txt\"]:::out\n    end\n    JSON --> RND\n    MD --> RND\n    KITJ --> CHR\n    REG --> CHR\n    RND -.dispatch html-doc:rendered.-> CHR\n    CSS --> CHR\n    A ==oku build==> O\n    classDef auth fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a\n    classDef rt fill:#ccfbf1,stroke:#0f766e,color:#115e59,stroke-width:2px\n    classDef reg fill:#e0e7ff,stroke:#4338ca,color:#312e81\n    classDef out fill:#dcfce7,stroke:#15803d,color:#14532d"
         }
       ]
     },
@@ -47,7 +47,7 @@
         {
           "kind": "code",
           "language": "text",
-          "source": "html-doc/\n├── bin/html-doc                  # Python CLI — init, build, serve\n├── src/html_doc/                 # CLI implementation\n│   └── templates/                # starter page pair for `html-doc init`\n├── src/html_doc_tests/           # pytest suite\n├── kit/                          # chrome.{js,css}, chrome-boot.js, renderer.js,\n│                                 # schema/, glossary/, extrefs/\n├── docs/                         # this site — JSON-only sources + _kit symlink\n├── examples/                     # tour pages — same shape as docs/\n└── README.md, CLAUDE.md"
+          "source": "html-doc/\n├── bin/html-doc                  # Python CLI — init, build, serve\n├── src/html_doc/                 # CLI implementation\n│   └── templates/                # starter page pair for `oku init`\n├── src/html_doc_tests/           # pytest suite\n├── kit/                          # chrome.{js,css}, chrome-boot.js, renderer.js,\n│                                 # schema/, glossary/, extrefs/\n├── docs/                         # this site — JSON-only sources + _kit symlink\n├── examples/                     # tour pages — same shape as docs/\n└── README.md, CLAUDE.md"
         },
         {
           "kind": "info-tip",
@@ -269,12 +269,12 @@
       "kind": "section",
       "id": "build",
       "title": "Build pipeline",
-      "lead": "bin/html-doc build walks the project and emits three single-purpose dist/ trees, one per audience. Soft-fails on optional dependencies (Pagefind, jsonschema) so the kit doesn't acquire hard requirements.",
+      "lead": "bin/oku build walks the project and emits three single-purpose dist/ trees, one per audience. Soft-fails on optional dependencies (Pagefind, jsonschema) so the kit doesn't acquire hard requirements.",
       "blocks": [
         {
           "kind": "diagram",
           "caption": "Build inputs and the three dist trees. Colour codes: blue = author content; teal = kit runtime; green = build outputs; amber = optional dependency.",
-          "source": "flowchart LR\n    subgraph IN[Project source]\n      direction TB\n      P[\"📄 *.json + *.md pages\"]:::content\n      H[\"🌐 *.html stubs\"]:::content\n      KJ[\"⚙ kit.json\"]:::content\n    end\n    subgraph K[Kit — symlinked _kit/]\n      direction TB\n      KIT[\"🎨 chrome.css/js, renderer.js\"]:::kit\n      G[\"📖 glossary/*.json\"]:::kit\n      E[\"🔗 extrefs/*.json\"]:::kit\n    end\n    BUILD([\"⚒ html-doc build\"]):::builder\n    P --> BUILD\n    H --> BUILD\n    KJ --> BUILD\n    G --> BUILD\n    E --> BUILD\n    KIT --> BUILD\n    BUILD --> S[\"📦 dist/standalone/<br/>self-contained HTML\"]:::output\n    BUILD --> SI[\"🌍 dist/site/<br/>multi-page + manifest\"]:::output\n    BUILD --> MD[\"📝 dist/markdown/<br/>page.md + llms.txt\"]:::output\n    BUILD -.-> PF[\"🔍 dist/site/pagefind/\"]:::optional\n    classDef content fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a\n    classDef kit fill:#ccfbf1,stroke:#0f766e,color:#115e59\n    classDef builder fill:#fef3c7,stroke:#b45309,color:#78350f,stroke-width:2px\n    classDef output fill:#dcfce7,stroke:#15803d,color:#14532d\n    classDef optional fill:#fef3c7,stroke:#b45309,color:#92400e,stroke-dasharray: 5 3"
+          "source": "flowchart LR\n    subgraph IN[Project source]\n      direction TB\n      P[\"📄 *.json + *.md pages\"]:::content\n      H[\"🌐 *.html stubs\"]:::content\n      KJ[\"⚙ kit.json\"]:::content\n    end\n    subgraph K[Kit — symlinked _kit/]\n      direction TB\n      KIT[\"🎨 chrome.css/js, renderer.js\"]:::kit\n      G[\"📖 glossary/*.json\"]:::kit\n      E[\"🔗 extrefs/*.json\"]:::kit\n    end\n    BUILD([\"⚒ oku build\"]):::builder\n    P --> BUILD\n    H --> BUILD\n    KJ --> BUILD\n    G --> BUILD\n    E --> BUILD\n    KIT --> BUILD\n    BUILD --> S[\"📦 dist/standalone/<br/>self-contained HTML\"]:::output\n    BUILD --> SI[\"🌍 dist/site/<br/>multi-page + manifest\"]:::output\n    BUILD --> MD[\"📝 dist/markdown/<br/>page.md + llms.txt\"]:::output\n    BUILD -.-> PF[\"🔍 dist/site/pagefind/\"]:::optional\n    classDef content fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a\n    classDef kit fill:#ccfbf1,stroke:#0f766e,color:#115e59\n    classDef builder fill:#fef3c7,stroke:#b45309,color:#78350f,stroke-width:2px\n    classDef output fill:#dcfce7,stroke:#15803d,color:#14532d\n    classDef optional fill:#fef3c7,stroke:#b45309,color:#92400e,stroke-dasharray: 5 3"
         },
         {
           "kind": "list",
@@ -341,13 +341,13 @@
           "kind": "callout",
           "type": "note",
           "title": "Kit assets resolver",
-          "content": "Two valid asset layouts now: development (chrome.{css,js} at repo root) and installed (chrome.{css,js} inside <code>html_doc/assets/</code> in the wheel). <code>cli._kit_assets_dir()</code> picks whichever exists, so <code>html-doc init</code> works from a clone OR from <code>uv tool install .</code>. Hatchling <code>force-include</code> in pyproject packs the assets into the right place at wheel build time."
+          "content": "Two valid asset layouts now: development (chrome.{css,js} at repo root) and installed (chrome.{css,js} inside <code>html_doc/assets/</code> in the wheel). <code>cli._kit_assets_dir()</code> picks whichever exists, so <code>oku init</code> works from a clone OR from <code>uv tool install .</code>. Hatchling <code>force-include</code> in pyproject packs the assets into the right place at wheel build time."
         },
         {
           "kind": "callout",
           "type": "note",
           "title": "Generated artifacts live under dist/, never source",
-          "content": "<code>html-doc build</code> writes site-manifest.json (dist/site/), llms.txt (dist/markdown/), and page.md twins (dist/markdown/) at the closest common parent of JSON pages — picked by <code>_common_docs_dir(root, pages)</code> in cli.py, typically <code>docs/</code>. <code>html-doc serve</code> doesn't write at all — it synthesizes site-manifest.json and llms.txt in memory on each request so source dirs stay authored-content-only."
+          "content": "<code>oku build</code> writes site-manifest.json (dist/site/), llms.txt (dist/markdown/), and page.md twins (dist/markdown/) at the closest common parent of JSON pages — picked by <code>_common_docs_dir(root, pages)</code> in cli.py, typically <code>docs/</code>. <code>oku serve</code> doesn't write at all — it synthesizes site-manifest.json and llms.txt in memory on each request so source dirs stay authored-content-only."
         },
         {
           "kind": "callout",
