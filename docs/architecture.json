@@ -83,6 +83,16 @@
       "lead": "renderer.js is a tree walker. It maps each JSON node's kind to a Custom Element instantiation (for interactive primitives) or directly to a styled DOM subtree (for prose primitives). The renderer is ~500 lines of straightforward code.",
       "blocks": [
         {
+          "kind": "diagram",
+          "caption": "Custom Element class layout. Renderer instantiates these by tag; chrome.js owns their lifecycles.",
+          "source": "classDiagram\n  class HTMLElement\n  class HtmlDocChart {\n    +type, +title\n    +_extras\n    -_renderScatter() -_renderBar() -_renderDonut()\n    -_renderHeatmap() -_renderRidgeline() -_renderTreemap()\n    -_renderSankey() -_renderNetwork() -_renderChord()\n    -_renderGeo() -_renderScatterMatrix() -_renderParallelCoordinates()\n    -_wireInteractivity()\n    -_attachToolbar()\n  }\n  class HtmlDocDiagram {\n    -_loadMermaid()\n    -_render()\n    -_attachToolbar()\n  }\n  class HtmlDocLiveSnippet {\n    -iframe, -textarea\n    -_debouncedRender()\n  }\n  class HtmlDocAnnotatedCode {\n    -_injectMarkers()\n    -_injectSubstringMarks()\n    -_bindSync()\n    -_moveMarkersToSlots()\n  }\n  class GlossaryTerm\n  class ExtRef\n  class PageChrome\n  class PageNav\n  class PageToc\n  HTMLElement <|-- HtmlDocChart\n  HTMLElement <|-- HtmlDocDiagram\n  HTMLElement <|-- HtmlDocLiveSnippet\n  HTMLElement <|-- HtmlDocAnnotatedCode\n  HTMLElement <|-- GlossaryTerm\n  HTMLElement <|-- ExtRef\n  HTMLElement <|-- PageChrome\n  HTMLElement <|-- PageNav\n  HTMLElement <|-- PageToc"
+        },
+        {
+          "kind": "diagram",
+          "caption": "Renderer state — single pass over the tree; emits a CustomEvent at the end so chrome.js post-processors can pick up the new DOM.",
+          "source": "stateDiagram-v2\n  [*] --> WaitDOM : autoBoot()\n  WaitDOM --> Fetching : DOMContentLoaded\n  Fetching --> Parsing : page JSON arrives\n  Parsing --> Walking : kind == 'page'\n  Parsing --> Failed : schema mismatch\n  Walking --> Walking : _renderContentBlock(block)\n  Walking --> Emit : tree exhausted\n  Emit --> Done : dispatch html-doc:rendered\n  Failed --> Done : warning fired\n  Done --> [*]"
+        },
+        {
           "kind": "list",
           "style": "bullet",
           "items": [
@@ -131,6 +141,11 @@
       "title": "Tooltip controller",
       "lead": "Single global controller, attached to both glossary-term and ext-ref elements. ~150 lines.",
       "blocks": [
+        {
+          "kind": "diagram",
+          "caption": "Tooltip lifecycle. Hover and click paths are explicit; pinned is a sticky state with two exits.",
+          "source": "stateDiagram-v2\n  [*] --> Hidden\n  Hidden --> Showing : mouseenter\n  Showing --> Visible : 120ms delay elapsed\n  Showing --> Hidden : mouseleave (before delay)\n  Visible --> Hiding : mouseleave\n  Hiding --> Visible : mouse enters tooltip DOM (bridge)\n  Hiding --> Hidden : 300ms timer fires\n  Visible --> Pinned : click on trigger\n  Pinned --> Hidden : click outside | Esc | re-click trigger\n  Pinned --> Pinned : hover stays on, no auto-hide"
+        },
         {
           "kind": "step-flow",
           "steps": [
