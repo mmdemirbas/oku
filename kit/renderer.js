@@ -717,8 +717,18 @@
       const wrap = document.createElement('div');
       wrap.className = 'step-cards';
       (block.steps || []).forEach((s, i) => {
-        const card = document.createElement('div');
-        card.className = 'step-card';
+        // When href is set, the entire card becomes a single anchor so
+        // it is keyboard-reachable AND clickable anywhere inside —
+        // matching the visual cue that "this card opens that page".
+        const card = document.createElement(s.href ? 'a' : 'div');
+        card.className = 'step-card' + (s.href ? ' step-card-link' : '');
+        if (s.href) {
+          card.setAttribute('href', s.href);
+          if (/^https?:/i.test(s.href)) {
+            card.setAttribute('target', '_blank');
+            card.setAttribute('rel', 'noopener');
+          }
+        }
         const num = document.createElement('span');
         num.className = 'step-num';
         num.textContent = String(s.num !== undefined ? s.num : i + 1);

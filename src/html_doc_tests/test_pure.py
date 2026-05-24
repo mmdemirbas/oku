@@ -396,12 +396,13 @@ class TestMdToPage:
         assert found["href"] == "notes/details.html#thing"
 
 
-# ---------- find_json_pages / project-meta exclusion ----------
+# ---------- find_json_pages / .md walk ----------
 
 
 class TestFindJsonPagesMd:
     """Markdown files anywhere under the docs root become first-class
-    pages, except a small set of well-known project-meta filenames."""
+    pages — including README / CHANGELOG / CLAUDE / LICENSE. Earlier
+    revisions filtered those out; the policy is now include-by-default."""
 
     def test_md_under_root_included(self, tmp_path: Path) -> None:
         (tmp_path / "overview.md").write_text("# Overview\n\nbody", encoding="utf-8")
@@ -412,15 +413,18 @@ class TestFindJsonPagesMd:
         assert "overview.json" in paths, "top-level overview.md was not surfaced as a page"
         assert "notes/details.json" in paths
 
-    def test_well_known_project_meta_excluded(self, tmp_path: Path) -> None:
+    def test_repo_meta_md_included(self, tmp_path: Path) -> None:
+        """README / CLAUDE / CHANGELOG / LICENSE are surfaced as pages
+        just like any other Markdown file. Authors who want them
+        hidden should put them under a SKIP_DIRS subdir."""
         for name in ("README.md", "CLAUDE.md", "CHANGELOG.md", "LICENSE.md"):
             (tmp_path / name).write_text(f"# {name}", encoding="utf-8")
         (tmp_path / "real.md").write_text("# Real", encoding="utf-8")
         pages = cli.find_json_pages(tmp_path)
         paths = {str(p.relative_to(tmp_path)) for p, _ in pages}
         for name in ("README.md", "CLAUDE.md", "CHANGELOG.md", "LICENSE.md"):
-            assert name.replace(".md", ".json") not in paths, (
-                f"{name} should be excluded as project meta"
+            assert name.replace(".md", ".json") in paths, (
+                f"{name} should now be surfaced as a page (include-by-default)"
             )
         assert "real.json" in paths
 

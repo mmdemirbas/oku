@@ -2048,6 +2048,35 @@ details.info-tip > *:not(summary) p:last-child { margin-bottom: 0; }
   line-height: 1.55;
   color: var(--text);
 }
+/* When the step card is itself an <a> (href on the step), reset
+   anchor styling so the card chrome wins — only the hover affordance
+   below differentiates it from a static card. */
+a.step-card,
+a.step-card:visited {
+  color: inherit;
+  text-decoration: none;
+}
+a.step-card.step-card-link { cursor: pointer; }
+a.step-card.step-card-link::after {
+  content: '→';
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  font-size: 14px;
+  color: var(--text-soft);
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+a.step-card.step-card-link { position: relative; }
+a.step-card.step-card-link:hover::after,
+a.step-card.step-card-link:focus-visible::after {
+  opacity: 1;
+  transform: translateX(2px);
+}
+a.step-card.step-card-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 .callout.danger h4 { color: var(--danger); }
 .callout.success h4,

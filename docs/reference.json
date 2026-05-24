@@ -196,16 +196,6 @@
                 "GFM-style pipe table → table",
                 "Horizontal rule (---) → hr"
               ]
-            },
-            {
-              "verdict": "out",
-              "title": "Not in the converter",
-              "items": [
-                "Nested lists (rendered flat)",
-                "Footnotes, definition lists, reference-style links",
-                "Inline HTML inside Markdown (stripped to text)",
-                "Front-matter YAML (treat per-page metadata via a sibling .json page if you need it)"
-              ]
             }
           ]
         },
@@ -218,8 +208,8 @@
         {
           "kind": "callout",
           "type": "neutral",
-          "title": "Project-meta files excluded",
-          "content": "README.md, CHANGELOG.md, CLAUDE.md, AGENTS.md, LICENSE.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md are skipped wherever they appear in the tree. The kit treats them as repo metadata, not documentation pages. Any other .md is included automatically."
+          "title": "Every Markdown file is a page by default",
+          "content": "README.md, CHANGELOG.md, CLAUDE.md, AGENTS.md, LICENSE.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md and any other <code>.md</code> the walker reaches all surface as pages. Hide one by moving it under a SKIP_DIRS subdirectory (<code>dist/</code>, <code>_kit/</code>, <code>.git/</code>, <code>.venv/</code>, <code>node_modules/</code>, <code>templates/</code>, <code>_internal/</code>). Missing Markdown features (nested lists, footnotes, definition lists, reference-style links, inline HTML pass-through, YAML front-matter) are tracked in P4 of the <a href=\"roadmap.html\">roadmap</a>."
         }
       ]
     },

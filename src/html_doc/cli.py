@@ -99,16 +99,6 @@ def _kit_version() -> int:
         if mt > latest:
             latest = mt
     return int(latest)
-# Project-meta filenames excluded from the .md-as-page walk. These
-# carry README / CHANGELOG / LICENSE-style content that the package
-# manager / forge displays separately; pulling them into the site tree
-# would surface noise (and often paths that don't render cleanly).
-_PROJECT_META_MD = {
-    "README.md", "CLAUDE.md", "CHANGELOG.md", "AGENTS.md",
-    "LICENSE.md", "LICENCE.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md",
-    "SECURITY.md",
-}
-
 SKIP_DIRS = {
     "dist", "_kit", "node_modules", ".git", "venv", ".venv",
     "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".idea",
@@ -307,8 +297,6 @@ def _materialise_md_pages(root: Path) -> int:
 
     Skips:
     - SKIP_DIRS (dist, _kit, .git, .venv, node_modules, ...).
-    - Repo-root .md files (project meta — README, CHANGELOG, etc.).
-    - Files in _PROJECT_META_MD anywhere in the tree.
     - .md files whose .json sibling is a hand-authored page-JSON
       (kind=page) — never clobber author work with a synthesis.
 
@@ -318,8 +306,6 @@ def _materialise_md_pages(root: Path) -> int:
     written = 0
     extra = project_skip_dirs(root)
     for md in sorted(iter_repo_files(root, (".md",), extra_skip=extra)):
-        if md.name in _PROJECT_META_MD:
-            continue
         json_sibling = md.with_suffix(".json")
         existing_text: str | None = None
         if json_sibling.exists():
@@ -741,22 +727,23 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
 def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
     """Walk *.md files under root, return (md_path, synthesized_page_dict).
 
-    Skips README.md and anything under SKIP_DIRS. Files that fail to
-    convert are silently omitted (the converter is permissive — only an
-    unreadable file would trigger this).
+    Skips SKIP_DIRS. Every .md the walker reaches becomes a page —
+    including repo-root files (README, CHANGELOG, CLAUDE, …) which
+    earlier revisions filtered out as "project meta". Files that fail
+    to convert are silently omitted (the converter is permissive —
+    only an unreadable file would trigger this).
     """
     out: list[tuple[Path, dict]] = []
     extra = project_skip_dirs(root)
     for p in iter_repo_files(root, (".md",), extra_skip=extra):
-        # Repo-root .md files are project meta (README, CLAUDE), not
-        # docs pages. Only files under at least one subdir become pages.
-        if p.parent == root:
-            continue
         try:
             text = p.read_text(encoding="utf-8")
             page = md_to_page(text, default_title=p.stem)
         except (OSError, ValueError):
             continue
+        meta = page.setdefault("meta", {})
+        if isinstance(meta, dict):
+            meta.setdefault("_materialised_by", "html-doc-init")
         out.append((p, page))
     return sorted(out, key=lambda x: str(x[0]).lower())
 
@@ -862,12 +849,11 @@ def find_json_pages(root: Path):
     # Also walk .md files — convert each into a synthesized page dict
     # via md_to_page. The "path" returned uses .json so consumers that
     # do path.with_suffix(".html") still derive the right stub URL.
-    # A small set of well-known project-meta filenames is excluded
-    # wherever they appear (a top-level docs/README.md is NOT meta —
-    # it's a page the user expects to see in the site tree).
+    # Every .md the walker reaches becomes a page — README, CHANGELOG,
+    # CLAUDE.md, AGENTS.md and friends included. Authors who don't
+    # want a given file in the site tree should put it under a
+    # SKIP_DIRS-matching subdirectory.
     for p in iter_repo_files(root, (".md",), extra_skip=extra):
-        if p.name in _PROJECT_META_MD:
-            continue
         synth_path = p.with_suffix(".json")
         # Don't shadow a real .json sibling if both exist.
         if synth_path in real_json:
@@ -877,6 +863,11 @@ def find_json_pages(root: Path):
             page = md_to_page(text, default_title=p.stem)
         except (OSError, ValueError):
             continue
+        # Tag md-synth pages so the linter can scope rules that only
+        # apply to hand-authored JSON (e.g. process-breadcrumb).
+        meta = page.setdefault("meta", {})
+        if isinstance(meta, dict):
+            meta.setdefault("_materialised_by", "html-doc-init")
         pages.append((synth_path, page))
     return sorted(pages, key=lambda x: str(x[0]).lower())
 
@@ -1173,24 +1164,36 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
     for p, page in pages:
         page_blocks = page.get("blocks") or []
 
+        # Pages materialised from a sibling .md by `html-doc init`
+        # carry author-owned prose verbatim (README, CHANGELOG, CLAUDE
+        # and friends); the process-breadcrumb rule is meant for
+        # hand-authored kit pages, so skip it for materialised ones.
+        # The check is still applied to deprecated kinds, unknown
+        # kinds, chart shape, etc. — only the prose-rule scope shrinks.
+        is_materialised = (
+            isinstance(page.get("meta"), dict)
+            and page["meta"].get("_materialised_by") == "html-doc-init"
+        )
+
         # 3. Forbidden prose / process breadcrumbs — applies to every
-        # rich-string in the page.
+        # rich-string in the page (hand-authored pages only).
         for blk_path, blk in _walk_blocks(page_blocks):
             where_prefix = "/".join(str(x) for x in blk_path) + f":kind={blk.get('kind','?')}"
-            for key in ("lead", "title", "summary", "content"):
-                v = blk.get(key)
-                if v is None:
-                    continue
-                text = _flatten_text(v) if not isinstance(v, str) else v
-                for pat in _FORBIDDEN_PROSE_PATTERNS:
-                    m = pat.search(text)
-                    if m:
-                        add(p, "warning", "process-breadcrumb",
-                            where_prefix + f".{key}",
-                            f"Prose contains process/history reference {m.group(0)!r}; the kit documents current behaviour only.")
-                        # One issue per (block, key) is enough — overlapping
-                        # patterns would otherwise pile up on the same line.
-                        break
+            if not is_materialised:
+                for key in ("lead", "title", "summary", "content"):
+                    v = blk.get(key)
+                    if v is None:
+                        continue
+                    text = _flatten_text(v) if not isinstance(v, str) else v
+                    for pat in _FORBIDDEN_PROSE_PATTERNS:
+                        m = pat.search(text)
+                        if m:
+                            add(p, "warning", "process-breadcrumb",
+                                where_prefix + f".{key}",
+                                f"Prose contains process/history reference {m.group(0)!r}; the kit documents current behaviour only.")
+                            # One issue per (block, key) is enough — overlapping
+                            # patterns would otherwise pile up on the same line.
+                            break
 
             # 4. Deprecated kinds — flag with migration pointer.
             kind = blk.get("kind")

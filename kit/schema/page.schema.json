@@ -363,7 +363,8 @@
               "num": { "type": ["string", "number"] },
               "title": { "type": "string" },
               "meta": { "type": "string", "description": "Small meta line (estimate, files, risk)." },
-              "content": { "$ref": "#/$defs/richString" }
+              "content": { "$ref": "#/$defs/richString" },
+              "href": { "type": "string", "description": "Optional. When set, the entire step card is wrapped in an anchor pointing here — keyboard reachable, click-targetable, no 'Open X' link text needed in content." }
             }
           }
         }

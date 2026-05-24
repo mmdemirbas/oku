@@ -25,7 +25,7 @@
       "kind": "section",
       "id": "docs",
       "title": "Documentation",
-      "lead": "Four pages. Read the Reference first; the others go deeper on their topics.",
+      "lead": "Five pages. Cards link straight to each — Reference is the place to start.",
       "blocks": [
         {
           "kind": "step-flow",
@@ -34,37 +34,36 @@
               "num": "1",
               "title": "Reference",
               "meta": "start here",
-              "content": [
-                "Project setup, page anatomy, Markdown sources, every primitive with its JSON shape and a live example, per-page metadata, build outputs. ",
-                { "kind": "link", "text": "Open reference.html", "href": "reference.html" }
-              ]
+              "href": "reference.html",
+              "content": "Project setup, page anatomy, Markdown sources, every primitive with its JSON shape and a live example, per-page metadata, build outputs."
             },
             {
               "num": "2",
               "title": "Glossary & ext-refs",
               "meta": "how the multi-domain registry works",
-              "content": [
-                "File layout, multi-language entries, project overrides, disambiguation syntax, resolution algorithm. ",
-                { "kind": "link", "text": "Open glossary.html", "href": "glossary.html" }
-              ]
+              "href": "glossary.html",
+              "content": "File layout, multi-language entries, project overrides, disambiguation syntax, resolution algorithm."
             },
             {
               "num": "3",
               "title": "Architecture",
               "meta": "internals · developer audience",
-              "content": [
-                "How the kit fits together at runtime — render flow, tooltip controller, kit loader, build pipeline, standalone bundle. Read this when extending or debugging the kit itself. ",
-                { "kind": "link", "text": "Open architecture.html", "href": "architecture.html" }
-              ]
+              "href": "architecture.html",
+              "content": "How the kit fits together at runtime — render flow, tooltip controller, kit loader, build pipeline, standalone bundle. Read this when extending or debugging the kit itself."
             },
             {
               "num": "4",
               "title": "CLI reference",
-              "meta": "init, build, check, serve",
-              "content": [
-                "Four commands. What each does, what output to expect, the doctree linter's severity table, the optional Pagefind and jsonschema dependencies. ",
-                { "kind": "link", "text": "Open cli.html", "href": "cli.html" }
-              ]
+              "meta": "init · build · clean · check · serve",
+              "href": "cli.html",
+              "content": "Five commands. What each does, what output to expect, the doctree linter's severity table, the optional Pagefind and jsonschema dependencies."
+            },
+            {
+              "num": "5",
+              "title": "Roadmap",
+              "meta": "what's next · oku 1.0",
+              "href": "roadmap.html",
+              "content": "Ten phases, every tracked item, the principles driving the rewrite, and the open questions still on the table."
             }
           ]
         }
@@ -74,27 +73,37 @@
       "kind": "section",
       "id": "shape",
       "title": "What a page looks like",
-      "lead": "The same page authored two ways — JSON for kit-native content, Markdown for existing docs that should drop in unchanged.",
+      "lead": "Two source formats produce the same rendered page. Pick whichever fits the content — JSON for kit-native authoring, Markdown for prose that should drop in unchanged.",
       "blocks": [
         {
-          "kind": "compare-grid",
-          "cards": [
-            {
-              "verdict": "neutral",
-              "title": "JSON source",
-              "content": "Hand-authored or AI-emitted. Every block declares its kind explicitly; nothing has to be guessed."
-            },
-            {
-              "verdict": "neutral",
-              "title": "Markdown source",
-              "content": "Drop existing .md files into the docs root. ATX headings, code fences (mermaid included), lists, tables, blockquotes, inline formatting all convert. Relative .md links retarget to .html."
-            }
-          ]
+          "kind": "heading",
+          "level": 3,
+          "id": "shape-json",
+          "title": "JSON source"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Hand-authored or AI-emitted. Every block declares its kind explicitly; nothing has to be guessed. Validated against the kit schema before it ships."
         },
         {
           "kind": "code",
           "language": "json",
-          "source": "{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json\",\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"blocks\": [\n    { \"kind\": \"section\", \"id\": \"overview\", \"title\": \"Overview\", \"blocks\": [\n      { \"kind\": \"paragraph\", \"content\": \"Plain prose works as a string.\" }\n    ]}\n  ]\n}"
+          "source": "{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json\",\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"blocks\": [\n    { \"kind\": \"section\", \"id\": \"overview\", \"title\": \"Overview\", \"blocks\": [\n      { \"kind\": \"paragraph\", \"content\": \"Plain prose works as a string.\" },\n      { \"kind\": \"callout\", \"type\": \"info\", \"content\": \"Use callouts, kpi-grid, charts, tables and the other primitives in the reference.\" }\n    ]}\n  ]\n}"
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "shape-md",
+          "title": "Markdown source"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Drop existing .md files into the docs root. ATX headings, code fences (mermaid included), lists, tables, blockquotes, inline formatting all convert. Relative .md links retarget to .html. README / CHANGELOG / CLAUDE.md and friends are surfaced as pages too — keep them at the root or under a subdirectory exactly where you want them in the site tree."
+        },
+        {
+          "kind": "code",
+          "language": "markdown",
+          "source": "# My note\n\n## Overview\n\nPlain prose works as a paragraph.\n\n- bullets render as a list\n- *emphasis* and **strong** and `code` work inline\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n> A blockquote becomes a neutral callout.\n"
         }
       ]
     },

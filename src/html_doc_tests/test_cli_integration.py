@@ -317,18 +317,18 @@ class TestCLIInit:
         kept = json.loads((tmp_path / "guide.json").read_text(encoding="utf-8"))
         assert kept["title"] == "Hand-authored"
 
-    def test_init_excludes_project_meta_md(self, tmp_path: Path, repo_root: Path) -> None:
-        # README, CLAUDE, CHANGELOG etc. are forge-displayed meta — init
-        # must NOT materialise them as pages (parity with find_json_pages).
+    def test_init_includes_repo_meta_md(self, tmp_path: Path, repo_root: Path) -> None:
+        # README, CLAUDE, CHANGELOG etc. are surfaced as pages just
+        # like any other .md (parity with find_json_pages — the
+        # include-by-default policy). Authors who don't want them in
+        # the site put them under a SKIP_DIRS subdir.
         for name in ("README.md", "CLAUDE.md", "CHANGELOG.md"):
             (tmp_path / name).write_text(f"# {name}", encoding="utf-8")
-        # A non-meta MD to confirm the walker still runs.
         (tmp_path / "real.md").write_text("# Real", encoding="utf-8")
         proc = _run_cli(tmp_path, "init", repo_root=repo_root)
         assert proc.returncode == 0
-        for name in ("README.json", "CLAUDE.json", "CHANGELOG.json"):
-            assert not (tmp_path / name).exists(), f"{name} should not have been materialised"
-        assert (tmp_path / "real.json").exists()
+        for name in ("README.json", "CLAUDE.json", "CHANGELOG.json", "real.json"):
+            assert (tmp_path / name).exists(), f"{name} should have been materialised"
 
     def test_init_materialise_is_idempotent(self, tmp_path: Path, repo_root: Path) -> None:
         # Running init twice on unchanged MD produces byte-identical

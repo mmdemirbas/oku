@@ -192,6 +192,98 @@ class TestNoStrayDemoPages:
         ).exists(), "table-demo.json should live inside reference, not as a separate doc"
 
 
+# ---------- P0 cleanup invariants ----------
+
+
+class TestRoadmapAndCleanup:
+    """P0 cleanup landed the roadmap, retired the plans/ tree, switched
+    the docs-card flow to href cards, and dropped the 'Not in the
+    converter' / 'project-meta files excluded' text. These tests are the
+    regression net."""
+
+    @pytest.fixture(scope="class")
+    def index_json(self, repo_root: Path) -> dict:
+        return json.loads(
+            (repo_root / "docs" / "index.json").read_text(encoding="utf-8")
+        )
+
+    @pytest.fixture(scope="class")
+    def roadmap_json(self, repo_root: Path) -> dict:
+        return json.loads(
+            (repo_root / "docs" / "roadmap.json").read_text(encoding="utf-8")
+        )
+
+    def test_plans_directory_retired(self, repo_root: Path) -> None:
+        assert not (
+            repo_root / "docs" / "plans"
+        ).exists(), (
+            "docs/plans/ retired in P0 — content folded into docs/roadmap.json"
+        )
+
+    def test_roadmap_page_present_and_routable(
+        self, repo_root: Path, roadmap_json: dict
+    ) -> None:
+        assert roadmap_json.get("kind") == "page"
+        assert roadmap_json.get("title") == "Roadmap"
+        manifest_html = (repo_root / "docs" / "index.html").read_text(encoding="utf-8")
+        assert (
+            "roadmap.html" in manifest_html
+        ), "roadmap.json missing from the page manifest in docs/index.html"
+
+    def test_docs_step_flow_cards_use_href(self, index_json: dict) -> None:
+        """Every step in the docs/index.json 'Documentation' section
+        carries an href — the cards are click-targetable instead of
+        embedding 'Open X.html' link text in the body."""
+        sections = [
+            b
+            for b in index_json.get("blocks", [])
+            if b.get("kind") == "section" and b.get("id") == "docs"
+        ]
+        assert sections, "docs/index.json missing the 'docs' section"
+        sf = next(
+            (b for b in sections[0].get("blocks", []) if b.get("kind") == "step-flow"),
+            None,
+        )
+        assert sf is not None, "documentation section missing the step-flow"
+        for step in sf.get("steps", []):
+            assert step.get("href"), (
+                f"step {step.get('title')!r} has no href — restore card click target"
+            )
+
+    def test_reference_no_longer_lists_converter_gaps(
+        self, reference: dict
+    ) -> None:
+        """The 'Not in the converter' card text is retired in P0; the
+        gaps it described will land as fixes in P4. Same for the
+        project-meta-excluded callout."""
+        ref_text = json.dumps(reference)
+        assert (
+            "Not in the converter" not in ref_text
+        ), "'Not in the converter' text should be retired (P0)"
+        assert (
+            "Project-meta files excluded" not in ref_text
+        ), "'Project-meta files excluded' text should be retired (P0)"
+
+    def test_cli_section_counts_five_commands(self, index_json: dict) -> None:
+        sections = [
+            b
+            for b in index_json.get("blocks", [])
+            if b.get("kind") == "section" and b.get("id") == "docs"
+        ]
+        sf = sections[0]["blocks"][0]
+        cli_step = next(
+            (s for s in sf.get("steps", []) if s.get("title") == "CLI reference"),
+            None,
+        )
+        assert cli_step is not None, "CLI reference step missing from docs section"
+        # The meta line should enumerate all five commands.
+        meta = cli_step.get("meta", "")
+        for name in ("init", "build", "clean", "check", "serve"):
+            assert (
+                name in meta
+            ), f"CLI step meta should mention '{name}'; got: {meta!r}"
+
+
 # ---------- chrome.js / chrome.css regression markers ----------
 
 
