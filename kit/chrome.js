@@ -5324,6 +5324,14 @@ class OkuChart extends HTMLElement {
           svg.removeAttribute('height');
           svg.style.width = '100%';
           svg.style.height = 'auto';
+          // The tooltip card stays in the chart host but renders
+          // above the lightbox overlay because `.okc-tooltip` is
+          // `position: fixed` with z-index 1100 (lightbox is ~1000).
+          // No node move needed; viewport-relative position math in
+          // showTip / showRich already uses
+          // `dot.getBoundingClientRect()` so the tooltip lands at
+          // the dot's current screen position whether the SVG is
+          // inline or fullscreen.
           __okuLightbox.open(svg, {
             title: chartTitle,
             onClose: function () {
@@ -5538,12 +5546,13 @@ class OkuChart extends HTMLElement {
       html += '<div class="okc-tt-coords">(' + fmtNum(parseFloat(x)) + ', ' + fmtNum(parseFloat(y)) + ')</div>';
       tip.innerHTML = html;
       tip.setAttribute('aria-hidden', 'false');
-      var hostRect = self.getBoundingClientRect();
-      var dotRect  = dot.getBoundingClientRect();
-      var left = (dotRect.left - hostRect.left) + dotRect.width / 2;
-      var top  = (dotRect.top  - hostRect.top)  - 8;
-      tip.style.left = left + 'px';
-      tip.style.top  = top  + 'px';
+      // `position: fixed` tooltip — anchor at viewport coords so the
+      // tip lands consistently whether it lives inside the chart
+      // host or temporarily inside the lightbox content (chart
+      // fullscreen).
+      var dotRect = dot.getBoundingClientRect();
+      tip.style.left = (dotRect.left + dotRect.width / 2) + 'px';
+      tip.style.top  = (dotRect.top - 8) + 'px';
       tip.classList.add('visible');
     }
     function hideTip() {
@@ -5630,10 +5639,12 @@ class OkuChart extends HTMLElement {
       html += '<span class="okc-tt-pin-hint">click to pin</span>';
       tip.innerHTML = html;
       tip.setAttribute('aria-hidden', 'false');
-      var hostRect = self.getBoundingClientRect();
+      // Viewport-relative position (tooltip is `position: fixed`).
+      // Robust across "tooltip in chart host" and "tooltip moved
+      // into lightbox content during chart-fullscreen" paths.
       var aRect = anchor.getBoundingClientRect();
-      tip.style.left = (aRect.left - hostRect.left + aRect.width / 2) + 'px';
-      tip.style.top  = (aRect.top  - hostRect.top  - 8) + 'px';
+      tip.style.left = (aRect.left + aRect.width / 2) + 'px';
+      tip.style.top  = (aRect.top - 8) + 'px';
       tip.classList.add('visible');
     }
     function hideRich(force) {

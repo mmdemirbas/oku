@@ -3708,7 +3708,11 @@ oku-chart .okc-legend-chip.off .okc-legend { fill: var(--text-faint); text-decor
    intentionally bare-class so it works inside oku-chart, .bar-chart,
    .bar-chart-multi, treemap, funnel, and any future host that wants it. */
 .okc-tooltip {
-  position: absolute;
+  /* `position: fixed` so the tooltip can render above the lightbox
+     overlay when a chart is expanded. Position math in chrome.js
+     uses viewport coords (dot.getBoundingClientRect()), so no host
+     ancestor needs to be a positioning context. */
+  position: fixed;
   transform: translate(-50%, -100%);
   background: var(--surface);
   border: 1px solid var(--line-strong);
@@ -3721,7 +3725,7 @@ oku-chart .okc-legend-chip.off .okc-legend { fill: var(--text-faint); text-decor
   transition: opacity 0.12s ease;
   box-shadow: 0 6px 16px var(--shadow-strong);
   white-space: nowrap;
-  z-index: 5;
+  z-index: 1100;
   max-width: 260px;
 }
 .okc-tooltip.visible { opacity: 1; }
