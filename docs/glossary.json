@@ -33,7 +33,7 @@
         {
           "kind": "code",
           "language": "text",
-          "source": "html-doc/                          # the kit repo\n├── glossary/\n│   ├── data-platforms.json\n│   ├── web.json\n│   ├── ai-llm.json\n│   ├── adhd.json    (structural stub — populate as needed)\n│   ├── hadith.json\n│   └── voice.json\n├── extrefs/\n│   ├── doc-tooling.json\n│   ├── data-platforms.json\n│   ├── web.json\n│   └── ai-llm.json\n└── ...\n\nyour-project/\n└── docs/\n    ├── _kit -> /path/to/html-doc   # symlink\n    ├── kit.json                    # active domains + overrides\n    ├── page-a.html / page-a.json\n    └── ...\n"
+          "source": "oku/                          # the kit repo\n├── glossary/\n│   ├── data-platforms.json\n│   ├── web.json\n│   ├── ai-llm.json\n│   ├── adhd.json    (structural stub — populate as needed)\n│   ├── hadith.json\n│   └── voice.json\n├── extrefs/\n│   ├── doc-tooling.json\n│   ├── data-platforms.json\n│   ├── web.json\n│   └── ai-llm.json\n└── ...\n\nyour-project/\n└── docs/\n    ├── _kit -> /path/to/oku   # symlink\n    ├── kit.json                    # active domains + overrides\n    ├── page-a.html / page-a.json\n    └── ...\n"
         }
       ]
     },

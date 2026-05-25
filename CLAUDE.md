@@ -4,32 +4,24 @@ Onboarding notes for a fresh Claude Code session in this repo.
 Read this before touching code. Skip nothing — every rule below was
 the answer to a real bug the user pointed out.
 
-The project is **oku** (Turkish imperative "read!"). The rename from
-the legacy "html-doc" name now reaches into every layer — package
-(src/oku/), kit CSS prefixes (okt- / okc- / okd-), JS globals
-(__oku*), event names (oku:*), data-attrs (data-oku-*), and custom
-elements (oku-chart, oku-snippet, oku-diagram, oku-annotated-code,
-oku-cite). The legacy `html-doc` CLI alias still resolves through
-the 1.x sunset window so existing automation keeps working; new
-references read `oku`.
+The project is **oku** (Turkish imperative "read!"). Every layer
+reads `oku`: the Python package (src/oku/), the CSS prefixes
+(okt- / okc- / okd-), the JS globals (__oku*), the custom-event
+names (oku:*), the data-attrs (data-oku-*), and the custom-element
+tag names (oku-chart, oku-snippet, oku-diagram, oku-annotated-code,
+oku-cite).
 
-GitHub remote stays at `github.com/mmdemirbas/html-doc` — the schema
-URL, this repo's directory name, and external links keep pointing
-there until the upstream rename happens.
-
-Sunset window for the legacy `html-doc` console-script alias
-(locked, mirrored in pyproject.toml):
-
-- **1.0** — both names work, no warning.
-- **1.1** — `html-doc` emits a stderr deprecation note on every
-  invocation; the run still succeeds.
-- **2.0** — `html-doc` console-script removed; only `oku` remains.
+The only remaining mention of the legacy name "html-doc" is the
+GitHub remote URL itself (`github.com/mmdemirbas/html-doc`) — used
+by the schema `$id`, the `git clone` example, and the jsdelivr CDN
+URL. Rename the GitHub repo and flip those when convenient; this
+file is the catalog of the one exception.
 
 ## What this repo is
 
-A shared HTML chrome kit + a Python CLI (`oku`, legacy alias
-`html-doc`) that authors single-source JSON pages and renders them
-in the browser via Custom Elements. No build step for content; the
+A shared HTML chrome kit + a Python CLI (`oku`) that authors
+single-source JSON pages and renders them in the browser via Custom
+Elements. No build step for content; the
 kit is loaded as static assets and `renderer.js` walks the JSON
 tree at page load.
 
@@ -54,7 +46,7 @@ three single-purpose trees under `dist/`:
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
 | `src/oku/cli.py` | `oku init / build / clean / check / serve` plus the markdown converter (front-matter, nested lists, footnotes, def-lists, ref-links, sanitised inline HTML) and the `_md_block` markdown twin emitter. |
 | `src/oku/templates/` | `starter.{json,html}` — pair to copy when starting a new page. |
-| `bin/oku`, `bin/html-doc` | PEP 723 shims — run without install via `uv run bin/oku …`. Both point at the same `oku.cli:main`. |
+| `bin/oku` | PEP 723 shim — run without install via `uv run bin/oku …`. Points at `oku.cli:main`. |
 | `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.json` tracks open phases. |
 
 ## Develop / verify

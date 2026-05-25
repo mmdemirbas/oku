@@ -36,7 +36,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd ~/path/to/your-project/docs\nhtml-doc init\n\n# ✓ Linked /path/to/your-project/docs/_kit -> /path/to/html-doc/kit\n# ✓ Created /path/to/your-project/docs/index.html\n#\n#   Author pages as <name>.json (or .md) next to index.html.\n#   Open index.html in your IDE, or run `oku serve` from the\n#   project root for a live-reloading dev server."
+          "source": "cd ~/path/to/your-project/docs\noku init\n\n# ✓ Linked /path/to/your-project/docs/_kit -> /path/to/oku/kit\n# ✓ Created /path/to/your-project/docs/index.html\n#\n#   Author pages as <name>.json (or .md) next to index.html.\n#   Open index.html in your IDE, or run `oku serve` from the\n#   project root for a live-reloading dev server."
         },
         {
           "kind": "callout",
@@ -55,7 +55,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd ~/path/to/your-project\nhtml-doc build\n\n# ✓ Doctree check: 6 page(s) clean\n# ✓ Wrote dist/site/docs/site-manifest.json (6 JSON page(s))\n# ✓ Wrote 6 page.md twin(s) + llms.txt under dist/markdown/docs/\n# ✓ Synthesized 6 stub(s) for pages without on-disk .html\n# ✓ Pagefind index built: dist/site/pagefind/\n# ✓ Built 6 HTML file(s):\n#\n#   standalone (inline, send-as-file):\n#                file:///.../dist/standalone/docs/index.html\n#                ...\n#\n#   site (shared assets, multi-page):\n#   site root:   file:///.../dist/site\n#                ...\n#\n#   markdown (LLM twins + llms.txt):\n#   markdown root: file:///.../dist/markdown"
+          "source": "cd ~/path/to/your-project\noku build\n\n# ✓ Doctree check: 6 page(s) clean\n# ✓ Wrote dist/site/docs/site-manifest.json (6 JSON page(s))\n# ✓ Wrote 6 page.md twin(s) + llms.txt under dist/markdown/docs/\n# ✓ Synthesized 6 stub(s) for pages without on-disk .html\n# ✓ Pagefind index built: dist/site/pagefind/\n# ✓ Built 6 HTML file(s):\n#\n#   standalone (inline, send-as-file):\n#                file:///.../dist/standalone/docs/index.html\n#                ...\n#\n#   site (shared assets, multi-page):\n#   site root:   file:///.../dist/site\n#                ...\n#\n#   markdown (LLM twins + llms.txt):\n#   markdown root: file:///.../dist/markdown"
         },
         {
           "kind": "step-flow",
@@ -109,7 +109,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "oku clean\n\n# ✓ Removed /path/to/your-project/dist\n\n# Second run, nothing left:\nhtml-doc clean\n\n# ✓ Nothing to clean — /path/to/your-project/dist does not exist."
+          "source": "oku clean\n\n# ✓ Removed /path/to/your-project/dist\n\n# Second run, nothing left:\noku clean\n\n# ✓ Nothing to clean — /path/to/your-project/dist does not exist."
         },
         {
           "kind": "list",
@@ -324,7 +324,7 @@
         },
         {
           "kind": "paragraph",
-          "content": "<code>bin/html-doc</code> is a thin shim that adds <code>src/</code> to sys.path and runs <code>html_doc.cli.main()</code>. PEP 723 inline metadata pulls jsonschema into an ephemeral venv when invoked via uv."
+          "content": "<code>bin/oku</code> is a thin shim that adds <code>src/</code> to sys.path and runs <code>html_doc.cli.main()</code>. PEP 723 inline metadata pulls jsonschema into an ephemeral venv when invoked via uv."
         }
       ]
     }

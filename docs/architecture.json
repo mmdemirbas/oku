@@ -34,7 +34,7 @@
         {
           "kind": "diagram",
           "caption": "Author → kit → build at a single glance.",
-          "source": "flowchart TB\n    subgraph A[Authoring layer]\n      direction LR\n      JSON[\"docs/*.json\"]:::auth\n      MD[\"docs/*.md\"]:::auth\n      KITJ[\"kit.json\"]:::auth\n    end\n    subgraph R[Kit runtime — single _kit/ symlink]\n      direction TB\n      RND[\"renderer.js — tree walker, ~1k LoC\"]:::rt\n      CHR[\"chrome.js — Custom Elements + chrome, ~6k LoC\"]:::rt\n      CSS[\"chrome.css — tokens + every primitive\"]:::rt\n      REG[\"glossary / extrefs — per-domain JSON\"]:::reg\n    end\n    subgraph O[Build outputs — three trees]\n      direction LR\n      STA[\"dist/standalone/ — self-contained\"]:::out\n      SIT[\"dist/site/ — multi-page + Pagefind\"]:::out\n      MDT[\"dist/markdown/ — page.md + llms.txt\"]:::out\n    end\n    JSON --> RND\n    MD --> RND\n    KITJ --> CHR\n    REG --> CHR\n    RND -->|html-doc rendered event| CHR\n    CSS --> CHR\n    A -->|oku build| O\n    classDef auth fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a\n    classDef rt fill:#ccfbf1,stroke:#0f766e,color:#115e59,stroke-width:2px\n    classDef reg fill:#e0e7ff,stroke:#4338ca,color:#312e81\n    classDef out fill:#dcfce7,stroke:#15803d,color:#14532d"
+          "source": "flowchart TB\n    subgraph A[Authoring layer]\n      direction LR\n      JSON[\"docs/*.json\"]:::auth\n      MD[\"docs/*.md\"]:::auth\n      KITJ[\"kit.json\"]:::auth\n    end\n    subgraph R[Kit runtime — single _kit/ symlink]\n      direction TB\n      RND[\"renderer.js — tree walker, ~1k LoC\"]:::rt\n      CHR[\"chrome.js — Custom Elements + chrome, ~6k LoC\"]:::rt\n      CSS[\"chrome.css — tokens + every primitive\"]:::rt\n      REG[\"glossary / extrefs — per-domain JSON\"]:::reg\n    end\n    subgraph O[Build outputs — three trees]\n      direction LR\n      STA[\"dist/standalone/ — self-contained\"]:::out\n      SIT[\"dist/site/ — multi-page + Pagefind\"]:::out\n      MDT[\"dist/markdown/ — page.md + llms.txt\"]:::out\n    end\n    JSON --> RND\n    MD --> RND\n    KITJ --> CHR\n    REG --> CHR\n    RND -->|oku rendered event| CHR\n    CSS --> CHR\n    A -->|oku build| O\n    classDef auth fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a\n    classDef rt fill:#ccfbf1,stroke:#0f766e,color:#115e59,stroke-width:2px\n    classDef reg fill:#e0e7ff,stroke:#4338ca,color:#312e81\n    classDef out fill:#dcfce7,stroke:#15803d,color:#14532d"
         }
       ]
     },
@@ -47,7 +47,7 @@
         {
           "kind": "code",
           "language": "text",
-          "source": "html-doc/\n├── bin/html-doc                  # Python CLI — init, build, serve\n├── src/html_doc/                 # CLI implementation\n│   └── templates/                # starter page pair for `oku init`\n├── src/html_doc_tests/           # pytest suite\n├── kit/                          # chrome.{js,css}, chrome-boot.js, renderer.js,\n│                                 # schema/, glossary/, extrefs/\n├── docs/                         # this site — JSON-only sources + _kit symlink\n├── examples/                     # tour pages — same shape as docs/\n└── README.md, CLAUDE.md"
+          "source": "oku/\n├── bin/oku                  # Python CLI — init, build, serve\n├── src/html_doc/                 # CLI implementation\n│   └── templates/                # starter page pair for `oku init`\n├── src/html_doc_tests/           # pytest suite\n├── kit/                          # chrome.{js,css}, chrome-boot.js, renderer.js,\n│                                 # schema/, glossary/, extrefs/\n├── docs/                         # this site — JSON-only sources + _kit symlink\n├── examples/                     # tour pages — same shape as docs/\n└── README.md, CLAUDE.md"
         },
         {
           "kind": "info-tip",
@@ -72,7 +72,7 @@
         {
           "kind": "diagram",
           "caption": "Lifecycle of a page load.",
-          "source": "sequenceDiagram\n    autonumber\n    participant B as Browser\n    participant H as HTML stub\n    participant Boot as chrome-boot.js\n    participant C as chrome.js\n    participant R as renderer.js\n    participant K as kit.json + glossary/*\n\n    B->>H: GET page.html\n    H-->>B: 1KB stub\n    B->>Boot: synchronous — set data-theme pre-paint\n    Note over B: paint cover + chrome buttons (no FOUC)\n    B->>C: defer-load chrome.js\n    B->>R: defer-load renderer.js\n    C->>K: fetch kit.json (DOMContentLoaded)\n    K-->>C: domains, lang, overrides\n    C->>K: fetch glossary/<domain>.json (parallel)\n    K-->>C: domain entries\n    H->>R: autoBoot()\n    R->>B: fetch page.json\n    B-->>R: page tree\n    R->>B: emit Custom Element DOM\n    R->>C: dispatch html-doc:rendered\n    C->>B: build TOC + init reading aids\n    B->>C: each <glossary-term>.connectedCallback resolves data-def\n    Note over B: tooltips ready, search button visible"
+          "source": "sequenceDiagram\n    autonumber\n    participant B as Browser\n    participant H as HTML stub\n    participant Boot as chrome-boot.js\n    participant C as chrome.js\n    participant R as renderer.js\n    participant K as kit.json + glossary/*\n\n    B->>H: GET page.html\n    H-->>B: 1KB stub\n    B->>Boot: synchronous — set data-theme pre-paint\n    Note over B: paint cover + chrome buttons (no FOUC)\n    B->>C: defer-load chrome.js\n    B->>R: defer-load renderer.js\n    C->>K: fetch kit.json (DOMContentLoaded)\n    K-->>C: domains, lang, overrides\n    C->>K: fetch glossary/<domain>.json (parallel)\n    K-->>C: domain entries\n    H->>R: autoBoot()\n    R->>B: fetch page.json\n    B-->>R: page tree\n    R->>B: emit Custom Element DOM\n    R->>C: dispatch oku:rendered\n    C->>B: build TOC + init reading aids\n    B->>C: each <glossary-term>.connectedCallback resolves data-def\n    Note over B: tooltips ready, search button visible"
         }
       ]
     },
@@ -90,7 +90,7 @@
         {
           "kind": "diagram",
           "caption": "Renderer state — single pass over the tree; emits a CustomEvent at the end so chrome.js post-processors can pick up the new DOM.",
-          "source": "stateDiagram-v2\n  [*] --> WaitDOM : autoBoot()\n  WaitDOM --> Fetching : DOMContentLoaded\n  Fetching --> Parsing : page JSON arrives\n  Parsing --> Walking : kind is page\n  Parsing --> Failed : schema mismatch\n  Walking --> Walking : _renderContentBlock(block)\n  Walking --> Emit : tree exhausted\n  Emit --> Done : dispatch html-doc rendered event\n  Failed --> Done : warning fired\n  Done --> [*]"
+          "source": "stateDiagram-v2\n  [*] --> WaitDOM : autoBoot()\n  WaitDOM --> Fetching : DOMContentLoaded\n  Fetching --> Parsing : page JSON arrives\n  Parsing --> Walking : kind is page\n  Parsing --> Failed : schema mismatch\n  Walking --> Walking : _renderContentBlock(block)\n  Walking --> Emit : tree exhausted\n  Emit --> Done : dispatch oku rendered event\n  Failed --> Done : warning fired\n  Done --> [*]"
         },
         {
           "kind": "list",

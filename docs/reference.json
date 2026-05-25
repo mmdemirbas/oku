@@ -1254,7 +1254,7 @@
                 "kind": "code",
                 "text": "<page-toc>"
               },
-              " — section-TOC stacked under the site tree inside the same left sidebar. Heading reflects the current page title; the list is built from main > section > h2/h3 after the renderer fires html-doc:rendered."
+              " — section-TOC stacked under the site tree inside the same left sidebar. Heading reflects the current page title; the list is built from main > section > h2/h3 after the renderer fires oku:rendered."
             ]
           ]
         },

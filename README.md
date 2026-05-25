@@ -1,15 +1,11 @@
 # oku
 
-> Turkish imperative — "read!". Formerly distributed as **html-doc**;
-> the legacy name remains a working alias through the dual-brand
-> window. Both `oku` and `html-doc` install as console scripts and
-> resolve to the same CLI.
->
-> **Sunset for the html-doc alias:** `html-doc` keeps working
-> without warning through 0.x and 1.0. From 1.1 it prints a
-> deprecation note on every invocation. 2.0 removes the
-> console-script entry entirely. Migrate scripts and shell
-> aliases to `oku` before then.
+> Turkish imperative — "read!". A documentation kit that emits
+> visual-first HTML artifacts from JSON or Markdown sources. Pages
+> render in the browser via Custom Elements (no build step for
+> content); the CLI builds a deployable multi-page site, a search
+> index, standalone single-file copies for offline reading, and a
+> Markdown sitemap for LLM consumers.
 
 A documentation kit. Authors write pages in JSON (or Markdown — both
 are first-class); the browser renders them via Custom Elements; the
@@ -60,9 +56,9 @@ file copies for offline reading.
 ## Install
 
 ```bash
-git clone git@github.com:mmdemirbas/html-doc.git
+git clone git@github.com:mmdemirbas/html-doc.git    # repo URL still legacy upstream
 cd html-doc
-uv tool install .                # 'oku' and 'html-doc' both on PATH
+uv tool install .                                   # `oku` on PATH
 ```
 
 Or run in-tree without installing:
@@ -70,7 +66,6 @@ Or run in-tree without installing:
 ```bash
 uv run bin/oku serve             # PEP 723 inline metadata pulls deps
 python3 bin/oku serve            # plain Python works too (no extras)
-# bin/html-doc still works for back-compat
 ```
 
 ## Quick start
@@ -126,8 +121,7 @@ kind.
 
 ## CLI
 
-Five commands, all run from the project root or a subdirectory.
-Either `oku` or `html-doc` works as the front:
+Five commands, all run from the project root or a subdirectory:
 
 ```bash
 oku init                         # one-time, runs in cwd: _kit symlink + index.html stub

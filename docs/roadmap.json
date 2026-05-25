@@ -13,12 +13,12 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "oku 1.0 is substantially shipped — 28 chart variants, full Markdown parity, asymmetric-friendly wide-screen layout, three-tree build (standalone / site / markdown), a chip-filtered + kanban-able table, a Mermaid catalog, and a per-page accent system. Open work is concentrated in two themes: chart interactivity reach (hover / pin / cross-series highlight across the long tail of chart types) and the html-doc → oku rename now landing across the package, kit CSS prefixes, JS globals, and event names.",
+      "summary": "oku 1.0 is substantially shipped — 28 chart variants, full Markdown parity, asymmetric-friendly wide-screen layout, three-tree build (standalone / site / markdown), a chip-filtered + kanban-able table, a Mermaid catalog, and a per-page accent system. Open work concentrates on chart interactivity reach (hover / pin / cross-series highlight across the long tail of chart types), mermaid quality, and tables per-column wrap.",
       "bullets": [
         "Charts — interactivity reach: 12/28 variants have full tooltip + click-pin + hover-highlight today. The tier-2 / tier-3 long tail (donut, sparkline, gauge, radar, box-plot, bullet, slope, calendar-heatmap, ridgeline, sankey, network, scatter-matrix, parallel-coordinates, chord, geo) is the next batch.",
         "Charts — visual quality: grouped-bar palette cycling, bubble legend deconfliction, quadrant label deconfliction, heatmap label / cell overlap, parallel-coordinates line thickness — all queued.",
         "Charts — catalog: add a real line example (renderer already supports it), a classic pie type, multi-series defaults on the sparse single-series examples, and the 'Pick by family' rewrite with mini-renders per variant + intent-based family grouping.",
-        "Rename — locked aggressive (now shipped): the package, kit CSS prefixes, JS globals, custom event names, data-attrs, and custom element names all moved off the legacy 'html-doc' branding to read 'oku'. The bin/html-doc + html-doc console-script aliases keep working through the 1.x sunset window so existing automation doesn't break.",
+        "Rename — locked aggressive (now shipped): every layer reads `oku` — package, kit CSS prefixes, JS globals, custom event names, data-attrs, and custom-element tag names. The GitHub remote URL is the one remaining surface still on the legacy name.",
         "Mermaid — quality pass: trim cases on wide diagrams, font auto-fit for cramped layouts, font-color audit for explicit fill:# rules (dark-mode legibility).",
         "Tables — per-column wrap: true config so long-content columns render multi-line instead of horizontal-scrolling."
       ]
@@ -170,13 +170,13 @@
           "style": "bullet",
           "items": [
             "ext-ref host is no longer a navigation link — clicking pins the tooltip, period. The destination URL is a proper clickable domain inside the citation card; the duplicate Learn-more footer is hidden when the cite card already exposes its own link.",
-            "live-snippet enhancement guards · the four `closest()` selectors that previously read `html-doc-live-snippet` (a name the registry never used) now read `html-doc-snippet`. The copy / wrap / language-pill / line-number passes no longer overlap the snippet's shadow pre.",
+            "live-snippet enhancement guards · the copy / wrap / language-pill / line-number passes now correctly skip the snippet's shadow pre (the `closest()` selectors previously named a tag that didn't exist).",
             "Source / render columns inside .example-pair align — render-side first-child gains a 24px top margin to match the 30px the source-side pre reserves for its language pill.",
             "Pagefind via PyPI — `oku check` runs `python -m pagefind` first (bundled binary from the `pagefind[bin]` extra), falls back to system pagefind / npx. brew / npm install no longer required.",
             "Diagrams + Tables · per-type and per-style headings promoted to h3 so they appear in page-toc (which walks h2 / h3 only).",
             "Per-page metadata · run-on `compare-grid` rewritten as a chip-filtered table (Field / Group / Meaning) — one field per row, three filter chips for Display / Behavior / Top-level.",
             "Last-updated demo · a live example block now sits alongside the JSON snippet so the reader actually sees the quiet italic meta line the prose describes.",
-            "Skill relocation · the previously-user-scoped html-doc skill now lives at ./skill/ in the repo, registered as `oku` via symlink to ~/.claude/skills/oku.",
+            "Skill relocation · the Claude Code skill now lives at ./skill/ in the repo, registered as `oku` via symlink to ~/.claude/skills/oku.",
             "Reference split · charts.json, tables.json, diagrams.json nested under reference via meta.parent.",
             "Tier 3 charts · sankey, network, scatter-matrix, parallel-coordinates, chord, geo.",
             "Markdown parity · YAML front-matter, footnotes, definition lists, reference-style links, nested lists, sanitised inline HTML allowlist (a, code, em, strong, span, sup, sub, br, mark, kbd, samp, del, ins, abbr).",
@@ -199,9 +199,8 @@
           "kind": "list",
           "style": "bullet",
           "items": [
-            "Project name = oku (Turkish 'read!'). The rename now reaches into the on-disk package (src/oku/), kit CSS prefixes (okt- / okc- / okd-), JS globals (__oku*), event names (oku:*) and data-attrs (data-oku-*) — not just the front-of-house CLI.",
-            "Legacy `html-doc` console-script: silent through 1.0 (still resolves); stderr deprecation note from 1.1; console-script removed in 2.0. Existing automation gets a sunset window; new references read `oku`.",
-            "GitHub remote stays at github.com/mmdemirbas/html-doc — the schema URL, the repo dir name, and external links keep pointing there until the upstream rename happens. The project, CLI, kit prefixes, and skill all read `oku`.",
+            "Project name = oku (Turkish 'read!'). Every layer reads `oku`: package (src/oku/), kit CSS prefixes (okt- / okc- / okd-), JS globals (__oku*), event names (oku:*), data-attrs (data-oku-*), and custom-element tag names.",
+            "GitHub remote URL (github.com/mmdemirbas/html-doc) is the one remaining surface still using the legacy name — the schema $id, the git-clone example, and the jsdelivr CDN URL all point there. Renaming the remote on GitHub will let those flip too.",
             "Layout = option A (centered document, four-mode content-width cycle: narrow / comfortable / wide / max).",
             "Wide-screen widening is symmetric — every primitive follows --content-width. The earlier asymmetric prose clamp was retired.",
             "Fullscreen uses CSS-transform pan/zoom on the inner stage (wheel zoom anchored at cursor, drag pan, pinch on touch, keyboard +/-/0/arrows). Not SVG-viewBox math.",

@@ -5,7 +5,7 @@
   "title": "oku",
   "accent": "teal",
   "meta": {
-    "eyebrow": "Documentation kit · formerly html-doc",
+    "eyebrow": "Documentation kit · oku",
     "subtitle": "Renders JSON or Markdown pages in the browser. Single-source content, no build step for authoring, multi-page site with full-text search when you want one.",
     "audience": "Author",
     "order": 1,
@@ -138,7 +138,7 @@
         {
           "kind": "code",
           "language": "bash",
-          "source": "cd path/to/your-project/docs\noku init     # creates _kit symlink + index.html\noku serve    # http://localhost:9876 with live reload\n# legacy: `html-doc` still works as an alias"
+          "source": "cd path/to/your-project/docs\noku init     # creates _kit symlink + index.html\noku serve    # http://localhost:9876 with live reload"
         },
         {
           "kind": "paragraph",

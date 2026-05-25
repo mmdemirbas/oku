@@ -12,9 +12,8 @@ description: >
   file with consistent chrome (top-left TOC toggle, top-right theme
   toggle), light/dark theme that respects prefers-color-scheme,
   auto-built scroll-spy TOC, and a reusable kit of visual components.
-  Project + CLI + skill all read "oku" now; the GitHub repository
-  still lives at https://github.com/mmdemirbas/html-doc (the rename
-  hasn't moved the remote).
+  Companion repo: https://github.com/mmdemirbas/html-doc (remote URL
+  still on the legacy name).
 ---
 
 # oku Skill
@@ -79,9 +78,10 @@ After ANY edit to a `docs/*.json` page (or any kit schema), run:
 oku check
 ```
 
-— from the repo root (`~/dev/mmdemirbas/html-doc/`). The directory
-name still reads "html-doc" because the GitHub remote hasn't been
-renamed; the *project* and CLI are `oku`. `oku check` validates every
+— from the repo root (the local directory name happens to be
+`html-doc/` because the GitHub remote is still on that URL; the
+project, CLI, and skill itself all read `oku`). `oku check`
+validates every
 page against `kit/schema/page.schema.json` and runs the structural /
 content lint. Exit code is the only signal that matters; parse the
 output for the offending file + path when non-zero.
@@ -118,11 +118,6 @@ Failure recovery rules:
 For the strict gate before delivery, use `oku check --strict`
 (exits 1 on warnings too). For partial passes during iteration, plain
 `oku check` is enough.
-
-The legacy `html-doc <verb>` console-script alias still resolves
-through the 1.x sunset window (silent in 1.0; stderr deprecation
-note in 1.1; removed in 2.0). Existing automation keeps working;
-new references should read `oku`.
 
 ## Workflow
 

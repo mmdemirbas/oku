@@ -1,7 +1,7 @@
-"""End-to-end test of the html-doc CLI as a subprocess.
+"""End-to-end test of the oku CLI as a subprocess.
 
 Most of the suite tests pure-function units; this file drives the actual
-``bin/html-doc`` shim against a synthetic project and asserts on the
+``bin/oku`` shim against a synthetic project and asserts on the
 file-system output. It catches plumbing regressions that unit tests
 can't see — argparse wiring, the chdir flow, build orchestration order.
 
@@ -22,11 +22,11 @@ import pytest
 
 
 def _run_cli(cwd: Path, *args: str, repo_root: Path) -> subprocess.CompletedProcess[str]:
-    """Run bin/html-doc as a subprocess. We use the in-tree shim rather
+    """Run bin/oku as a subprocess. We use the in-tree shim rather
     than an installed binary so the test stays portable — works against
     any clone, no pre-install step required."""
     proc = subprocess.run(
-        [sys.executable, str(repo_root / "bin" / "html-doc"), *args],
+        [sys.executable, str(repo_root / "bin" / "oku"), *args],
         cwd=cwd,
         capture_output=True,
         text=True,

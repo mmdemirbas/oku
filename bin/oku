@@ -7,8 +7,10 @@
 # ///
 """bin/oku — thin shim that runs oku.cli.main() without install.
 
-Preferred name. Same payload as the legacy bin/html-doc shim kept
-for back-compat through the 1.x sunset window.
+For ad-hoc invocations from a clone of the repo when no install has
+happened: `uv run bin/oku serve` or plain `python3 bin/oku serve`
+both work. PEP 723 metadata pulls jsonschema into the ephemeral venv
+when invoked via uv.
 """
 
 import sys

@@ -89,7 +89,7 @@
           "kind": "callout",
           "type": "info",
           "title": "Library underneath",
-          "content": "All modes are kit-native — no third-party chart library. Cartesian + donut modes render as inline SVG drawn by the html-doc-chart Custom Element. The bar family renders as plain HTML + CSS, no JavaScript after first paint."
+          "content": "All modes are kit-native — no third-party chart library. Cartesian + donut modes render as inline SVG drawn by the oku-chart Custom Element. The bar family renders as plain HTML + CSS, no JavaScript after first paint."
         },
         {
           "kind": "heading",

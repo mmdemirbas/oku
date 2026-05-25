@@ -1,7 +1,6 @@
 [project]
-# Project name is `oku` (Turkish imperative "read!"). Package lives at
-# src/oku/; the legacy `html-doc` console-script alias is preserved
-# through the 1.x sunset window so existing automation keeps working.
+# Project name is `oku` (Turkish imperative "read!"). Package lives
+# at src/oku/.
 name = "oku"
 version = "0.3.0"
 description = "oku — shared HTML chrome kit + CLI. Standalone, theme-aware visual docs without a build step."
@@ -35,18 +34,9 @@ dev = [
 Homepage = "https://github.com/mmdemirbas/html-doc"
 
 # `uv tool install .` (or `pip install .`) installs this as a console
-# script — both `oku` (preferred) and `html-doc` (legacy alias)
-# become available on PATH globally.
-#
-# Sunset window for the html-doc alias (locked, see docs/roadmap.json):
-#   * 1.0 — both names work, no warning.
-#   * 1.1 — html-doc emits a stderr deprecation note on each
-#           invocation; the run still succeeds.
-#   * 2.0 — html-doc console-script removed; only `oku` remains.
-# Authors with existing automation should switch to `oku` before 2.0.
+# script — `oku` becomes available on PATH globally.
 [project.scripts]
 oku = "oku.cli:main"
-html-doc = "oku.cli:main"
 
 # Hatchling is the modern PEP 517 build backend — smaller surface than
 # setuptools, no implicit globbing, fast wheel builds. Build-time only;
@@ -75,7 +65,6 @@ packages = ["src/oku"]
 include = [
     "src/oku",
     "bin/oku",
-    "bin/html-doc",
     "kit/",
     "README.md",
 ]
