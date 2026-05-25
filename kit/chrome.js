@@ -6310,7 +6310,6 @@ class HtmlDocAnnotatedCode extends HTMLElement {
     function markNeedleInScope(scope, needle, id) {
       // Build [char -> textNode] map, skipping nodes already inside
       // .hdc-anno-substr (idempotency) and inside marker buttons.
-      var map = [];
       var nodes = [];
       var walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
       var n;
@@ -6319,6 +6318,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         nodes.push(n);
       }
       if (!nodes.length) return;
+      var map = [];
       var joined = '';
       nodes.forEach(function (node) {
         for (var i = 0; i < node.nodeValue.length; i++) {
@@ -6326,9 +6326,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         }
         joined += node.nodeValue;
       });
-      // Find every needle occurrence in the joined string; collect
-      // non-overlapping ranges right-to-left so range mutations
-      // don't invalidate earlier indices.
+      // Find every needle occurrence in the joined string.
       var ranges = [];
       var pos = 0;
       while (true) {
@@ -6338,49 +6336,54 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         pos = idx + needle.length;
       }
       if (!ranges.length) return;
-      // Process right-to-left to keep map indices valid.
-      for (var ri = ranges.length - 1; ri >= 0; ri--) {
-        wrapRange(map, ranges[ri].start, ranges[ri].end, id);
-      }
-    }
-
-    function wrapRange(map, start, end, id) {
-      // Walk the involved (node, offset) entries; per text node,
-      // split into [before / matched / after], collect the matched
-      // pieces into a single <mark>, insert in original DOM order.
-      // For a multi-node range we create multiple slices but one
-      // <mark> per CONTIGUOUS run inside a single parent — usually
-      // every slice has its own parent (Prism spans) so we end up
-      // with one <mark> per matched-character-block-within-a-span.
-      // The visual effect is a continuous underline across the
-      // span boundaries because the CSS underline sits on each
-      // <mark> at the same baseline.
+      // Collect every (node, offset) the ranges hit. Group by node so
+      // we can do ONE replaceChild per text node — multiple matches
+      // inside the same text node (e.g. "ACID is great because ACID")
+      // would previously break the second pass because the first pass
+      // had detached the original node. Single per-node pass fixes it.
       var perNode = {};
-      for (var i = start; i < end; i++) {
-        var e = map[i];
-        if (!e) continue;
-        var key = nodeKey(e.node);
-        if (!perNode[key]) perNode[key] = { node: e.node, indices: [] };
-        perNode[key].indices.push(e.offset);
-      }
+      ranges.forEach(function (rng) {
+        for (var i = rng.start; i < rng.end; i++) {
+          var e = map[i];
+          if (!e) continue;
+          var key = nodeKey(e.node);
+          if (!perNode[key]) perNode[key] = { node: e.node, hits: new Set() };
+          perNode[key].hits.add(e.offset);
+        }
+      });
       Object.keys(perNode).forEach(function (k) {
         var rec = perNode[k];
-        var lo = Math.min.apply(null, rec.indices);
-        var hi = Math.max.apply(null, rec.indices) + 1;
-        var text = rec.node.nodeValue;
-        var before = text.slice(0, lo);
-        var matched = text.slice(lo, hi);
-        var after = text.slice(hi);
-        var frag = document.createDocumentFragment();
-        if (before) frag.appendChild(document.createTextNode(before));
-        var mark = document.createElement('mark');
-        mark.className = 'hdc-anno-substr';
-        mark.setAttribute('data-anno-id', id);
-        mark.textContent = matched;
-        frag.appendChild(mark);
-        if (after) frag.appendChild(document.createTextNode(after));
-        rec.node.parentNode.replaceChild(frag, rec.node);
+        replaceNodeWithSegments(rec.node, rec.hits, id);
       });
+    }
+
+    function replaceNodeWithSegments(node, hits, id) {
+      // hits is a Set<int> of character offsets to wrap inside this
+      // text node's content. Build a fragment of alternating
+      // text-node + <mark> elements covering [0, length) in order.
+      var text = node.nodeValue;
+      var frag = document.createDocumentFragment();
+      var i = 0;
+      while (i < text.length) {
+        if (hits.has(i)) {
+          // Extend the matched run while consecutive offsets are hits.
+          var j = i;
+          while (j < text.length && hits.has(j)) j++;
+          var mark = document.createElement('mark');
+          mark.className = 'hdc-anno-substr';
+          mark.setAttribute('data-anno-id', id);
+          mark.textContent = text.slice(i, j);
+          frag.appendChild(mark);
+          i = j;
+        } else {
+          // Plain text up to the next hit (or end).
+          var k = i;
+          while (k < text.length && !hits.has(k)) k++;
+          frag.appendChild(document.createTextNode(text.slice(i, k)));
+          i = k;
+        }
+      }
+      if (node.parentNode) node.parentNode.replaceChild(frag, node);
     }
 
     function nodeKey(node) {
