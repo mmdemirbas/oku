@@ -1,19 +1,19 @@
 """
-html-doc · CLI for the shared HTML chrome kit.
+oku · CLI for the shared HTML chrome kit.
 
 This module is the canonical CLI implementation. Two ways to invoke:
 
-- `uv tool install .` puts `html-doc` on PATH; subsequent `html-doc
+- `uv tool install .` puts `oku` on PATH; subsequent `oku
   serve` etc. just work from anywhere.
-- `bin/html-doc serve` (the PEP 723-annotated shim) runs `main()` from
+- `bin/oku serve` (the PEP 723-annotated shim) runs `main()` from
   here without any install — handy for in-tree work.
 
 Commands:
-  html-doc init    — create docs/_kit symlink to the kit repo in the current project
-  html-doc build   — build all HTMLs in current dir into
+  oku init    — create docs/_kit symlink to the kit repo in the current project
+  oku build   — build all HTMLs in current dir into
                      dist/{standalone,site,markdown}/
-  html-doc clean   — remove dist/ from the current project
-  html-doc serve   — start a local HTTP server in the project root so symlinked
+  oku clean   — remove dist/ from the current project
+  oku serve   — start a local HTTP server in the project root so symlinked
                      kit assets load (file:// has browser-specific restrictions)
 
 All commands take zero flags. Output paths are printed with file:// or http://
@@ -43,7 +43,7 @@ def _kit_assets_dir() -> Path:
 
     - **Installed** (uv tool install / pip install): hatchling's
       force-include packs everything into
-      ``<site-packages>/html_doc/assets/`` — chrome.{css,js},
+      ``<site-packages>/oku/assets/`` — chrome.{css,js},
       chrome-boot.js, renderer.js, plus schema/, glossary/, extrefs/.
     - **Development** (cloned repo, no install): the same shape lives
       at ``<repo>/kit/``. Walk up from ``cli.py`` until we find a
@@ -58,7 +58,7 @@ def _kit_assets_dir() -> Path:
             return ancestor / "kit"
     raise RuntimeError(
         "Could not locate kit assets — expected kit/chrome.css + kit/schema "
-        "at the repo root, or html_doc/assets/ from a wheel install."
+        "at the repo root, or oku/assets/ from a wheel install."
     )
 
 
@@ -72,7 +72,7 @@ _DEFAULT_STUB_BODY_RE = re.compile(r'<body\s*>\s*</body>', re.IGNORECASE)
 def _is_default_shaped_stub(content: str) -> bool:
     """True if the stub looks like one we generated — empty <body>.
 
-    `html-doc init` re-writes default-shaped stubs to refresh the kit
+    `oku init` re-writes default-shaped stubs to refresh the kit
     cache-buster. Anything an author has added inside <body> counts as
     customisation and means the stub stays untouched.
     """
@@ -102,8 +102,8 @@ def _kit_version() -> int:
 SKIP_DIRS = {
     "dist", "_kit", "node_modules", ".git", "venv", ".venv",
     "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".idea",
-    # templates/ ships the starter pair for `html-doc init` (now under
-    # src/html_doc/templates/). Walking it earlier produced stray
+    # templates/ ships the starter pair for `oku init` (now under
+    # src/oku/templates/). Walking it earlier produced stray
     # starter.{md,html} pages in every build.
     "templates",
     # _internal/ holds session / scratch docs the user explicitly keeps
@@ -166,7 +166,7 @@ def iter_repo_files(root: Path, suffixes: tuple[str, ...], *, extra_skip: frozen
 
     Path.rglob has no equivalent prune hook — it walks every subdirectory
     and forces the caller to filter post-hoc. That's the dominant cost of
-    `html-doc init` on trees with build artefacts (lakelab: 4.6 GB of
+    `oku init` on trees with build artefacts (lakelab: 4.6 GB of
     tasks/<id>/.run/ subtrees got fully walked even though only a handful
     of .md / .json files were docs). os.walk lets us mutate ``dirnames[:]``
     in place to skip those subtrees entirely. Symlinks intentionally NOT
@@ -218,7 +218,7 @@ def cmd_init(args: argparse.Namespace) -> int:
       rely on the dev server's in-memory synthesis.
 
     Run this in whichever directory you treat as your docs root —
-    typically ``cd docs && html-doc init``. The command never creates
+    typically ``cd docs && oku init``. The command never creates
     or descends into a "docs" subdir; cwd IS the docs root.
     """
     root = Path.cwd()
@@ -247,7 +247,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     # Materialise the page-JSON for every .md page in the tree BEFORE
     # writing index.html. The runtime renderer fetches `<page>.json`
     # for every manifest entry; for MD-sourced pages this file is
-    # otherwise virtual (only `html-doc serve` synthesises it). Without
+    # otherwise virtual (only `oku serve` synthesises it). Without
     # the on-disk JSON, IDE static servers return 404 and the page
     # renders empty. Idempotent; overwrites with current MD content.
     md_count = _materialise_md_pages(root)
@@ -283,7 +283,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"✓ Created {index_html}")
     print()
     print("  Author pages as <name>.json (or .md) next to index.html.")
-    print("  Open index.html in your IDE, or run `html-doc serve` from the")
+    print("  Open index.html in your IDE, or run `oku serve` from the")
     print("  project root for a live-reloading dev server.")
     return 0
 
@@ -319,7 +319,7 @@ def _materialise_md_pages(root: Path) -> int:
                 existing = json.loads(existing_text)
                 if isinstance(existing, dict):
                     meta = existing.get("meta") or {}
-                    if meta.get("_materialised_by") != "html-doc-init":
+                    if meta.get("_materialised_by") != "oku-init":
                         continue
             except (json.JSONDecodeError, OSError):
                 # Unreadable sibling — overwrite is fine.
@@ -330,7 +330,7 @@ def _materialise_md_pages(root: Path) -> int:
         except (OSError, ValueError):
             continue
         meta = page.setdefault("meta", {})
-        meta["_materialised_by"] = "html-doc-init"
+        meta["_materialised_by"] = "oku-init"
         new_text = json.dumps(page, ensure_ascii=False, indent=2) + "\n"
         # Skip the write when the rendered JSON matches what's already
         # on disk — saves a syscall per MD file AND avoids triggering
@@ -995,13 +995,13 @@ def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
             continue
         meta = page.setdefault("meta", {})
         if isinstance(meta, dict):
-            meta.setdefault("_materialised_by", "html-doc-init")
+            meta.setdefault("_materialised_by", "oku-init")
         out.append((p, page))
     return sorted(out, key=lambda x: str(x[0]).lower())
 
 
 def _stub_for(title: str, *, inline_manifest: dict | None = None) -> str:
-    """Minimal HTML stub for a page. Authored on disk by `html-doc init`
+    """Minimal HTML stub for a page. Authored on disk by `oku init`
     (for the entry stub), synthesized in-memory by the dev server, and
     written to dist/ by the build.
 
@@ -1011,7 +1011,7 @@ def _stub_for(title: str, *, inline_manifest: dict | None = None) -> str:
     authors who customise it have little to read or maintain.
 
     When ``inline_manifest`` is supplied, the dict is embedded as a
-    ``window.__htmldocManifest`` script before the kit loads — so the
+    ``window.__okuManifest`` script before the kit loads — so the
     site-tree sidebar populates even when the page is opened via a
     static file server (IDE, file://) that can't reach the dev-time
     manifest synthesis.
@@ -1020,7 +1020,7 @@ def _stub_for(title: str, *, inline_manifest: dict | None = None) -> str:
     manifest_block = ""
     if inline_manifest is not None:
         manifest_json = json.dumps(inline_manifest, ensure_ascii=False, separators=(',', ':'))
-        manifest_block = f'<script>window.__htmldocManifest={manifest_json};</script>\n'
+        manifest_block = f'<script>window.__okuManifest={manifest_json};</script>\n'
     return (
         '<!DOCTYPE html>\n'
         '<html lang="en">\n<head>\n'
@@ -1042,7 +1042,7 @@ def _init_time_manifest(root: Path) -> dict:
     Drops ``generated_at`` (which would otherwise differ on every run
     and trigger a needless re-write) and trims to the fields the
     runtime sidebar actually consumes. The result is what gets
-    embedded as window.__htmldocManifest in docs/index.html.
+    embedded as window.__okuManifest in docs/index.html.
     """
     manifest = compute_manifest(root)
     manifest.pop("generated_at", None)
@@ -1119,7 +1119,7 @@ def find_json_pages(root: Path):
         # apply to hand-authored JSON (e.g. process-breadcrumb).
         meta = page.setdefault("meta", {})
         if isinstance(meta, dict):
-            meta.setdefault("_materialised_by", "html-doc-init")
+            meta.setdefault("_materialised_by", "oku-init")
         pages.append((synth_path, page))
     return sorted(pages, key=lambda x: str(x[0]).lower())
 
@@ -1193,7 +1193,7 @@ def validate_pages(pages) -> list:
     return errors
 
 
-# ---------- html-doc check (doctree linter) ----------
+# ---------- oku check (doctree linter) ----------
 #
 # A single pass over every page-JSON the project owns, surfacing problems
 # at three severities:
@@ -1208,7 +1208,7 @@ def validate_pages(pages) -> list:
 #   info     — opinion / quality nudges (no title on a chart, etc.).
 #
 # Output is human-readable by default; --json emits a machine-parseable
-# stream for the html-doc skill's auto-verify step.
+# stream for the oku skill's auto-verify step.
 #
 # The function is also the right entry point for tests: it returns the
 # list of issues so unit tests can assert against shapes rather than
@@ -1417,7 +1417,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
     for p, page in pages:
         page_blocks = page.get("blocks") or []
 
-        # Pages materialised from a sibling .md by `html-doc init`
+        # Pages materialised from a sibling .md by `oku init`
         # carry author-owned prose verbatim (README, CHANGELOG, CLAUDE
         # and friends); the process-breadcrumb rule is meant for
         # hand-authored kit pages, so skip it for materialised ones.
@@ -1425,7 +1425,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         # kinds, chart shape, etc. — only the prose-rule scope shrinks.
         is_materialised = (
             isinstance(page.get("meta"), dict)
-            and page["meta"].get("_materialised_by") == "html-doc-init"
+            and page["meta"].get("_materialised_by") == "oku-init"
         )
 
         # 3. Forbidden prose / process breadcrumbs — applies to every
@@ -1616,12 +1616,12 @@ def _format_issue(issue: dict, root: Path) -> str:
 
 
 def cmd_check(args: argparse.Namespace) -> int:
-    """`html-doc check` — comprehensive doctree lint.
+    """`oku check` — comprehensive doctree lint.
 
     Runs schema validation plus a suite of structural / content checks
     (deprecated kinds, duplicate anchors, glossary + ext-ref resolution,
     forbidden process language, chart shape sanity, …). Fast — designed
-    to be the html-doc skill's auto-verify step.
+    to be the oku skill's auto-verify step.
 
     Exit codes:
       0 — clean (no errors; warnings allowed unless --strict).
@@ -1743,7 +1743,7 @@ def build_manifest(root: Path, *, out_dir: Path | None = None, pages: list | Non
     passes a dist path for out_dir so source dirs stay clean.
 
     The runtime loader has three resolution paths (chrome.js
-    `loadManifest`): inline `window.__htmldocManifest` first
+    `loadManifest`): inline `window.__okuManifest` first
     (standalone HTMLs ship this), then `fetch('site-manifest.json')`
     (the site build's sidecar), then a final inline fallback. The
     historical `.js` companion file is no longer emitted — it was a
@@ -2385,13 +2385,13 @@ def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
         if data_text:
             # Escape </script in the JSON to be safe inside an inline script.
             safe = data_text.replace("</script", "<\\/script")
-            inline = f'<script type="application/json" id="__htmldoc_page__">{safe}</script>'
+            inline = f'<script type="application/json" id="__oku_page__">{safe}</script>'
             # Inline the kit bundle (project kit.json + active domain
             # glossary/extref entries) so tooltips work offline.
             if kit_bundle:
                 safe_bundle = kit_bundle.replace("</script", "<\\/script")
                 inline += (
-                    f'\n<script type="application/json" id="__htmldoc_kit_bundle__">{safe_bundle}</script>'
+                    f'\n<script type="application/json" id="__oku_kit_bundle__">{safe_bundle}</script>'
                 )
             # Lambda replacement avoids re.sub interpreting \n in the JSON
             # content as a backslash escape and turning it into a newline.
@@ -2422,7 +2422,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     docs_dir = _common_docs_dir(root, json_pages)
 
     # Schema validation + structural lint — runs the same checks as
-    # `html-doc check` so the build never produces a doctree that the
+    # `oku check` so the build never produces a doctree that the
     # standalone linter would have rejected. Soft-fails without
     # jsonschema (the structural checks still run).
     if json_pages:
@@ -2434,7 +2434,7 @@ def cmd_build(args: argparse.Namespace) -> int:
             for it in errors:
                 print(_format_issue(it, root))
         elif warnings:
-            print(f"✓ Doctree check: {len(json_pages)} page(s) clean (errors); {len(warnings)} warning(s) — run `html-doc check` for the full report.")
+            print(f"✓ Doctree check: {len(json_pages)} page(s) clean (errors); {len(warnings)} warning(s) — run `oku check` for the full report.")
         else:
             print(f"✓ Doctree check: {len(json_pages)} page(s) clean")
         if not _HAS_JSONSCHEMA:
@@ -2458,7 +2458,7 @@ def cmd_build(args: argparse.Namespace) -> int:
 
     # Each tree carries only what its audience needs:
     #   standalone/  humans, file:// — every HTML inlines its own
-    #                window.__htmldocManifest, so no sidecar is needed.
+    #                window.__okuManifest, so no sidecar is needed.
     #   site/        humans, HTTP — chrome.js fetches site-manifest.json
     #                from the docs root.
     #   markdown/    AI / LLM consumers — page.md twins + llms.txt.
@@ -2549,7 +2549,7 @@ def _common_docs_dir(root: Path, pages: list[tuple[Path, dict]]) -> Path:
 def _build_serve_search_index(root: Path) -> bool:
     """Build a Pagefind index against the current docs and link it into
     the docs root so chrome.js's existing search-loader picks it up
-    without needing a full ``html-doc build`` first.
+    without needing a full ``oku build`` first.
 
     Best-effort: returns False (silently) if pagefind isn't on PATH or
     if any step fails. The user gets a notice; the rest of serve still
@@ -2579,7 +2579,7 @@ def _build_serve_search_index(root: Path) -> bool:
     if not pagefind_index(target):
         return False
     # Surface the index at <docs-dir>/pagefind/ via symlink so the
-    # runtime path __htmldocDocsRoot + 'pagefind/pagefind.js' resolves.
+    # runtime path __okuDocsRoot + 'pagefind/pagefind.js' resolves.
     pf_src = target / "pagefind"
     pf_link = docs_dir / "pagefind"
     if pf_src.exists():
@@ -2642,7 +2642,7 @@ def _watcher_loop(root: Path, stop: threading.Event) -> None:
     """Polling watcher (no external deps). Detects adds/deletes/modifies
     every ~400ms, debounces bursts within 200ms, rebuilds site-manifest +
     llms.txt, then broadcasts to SSE clients. Uses os.stat — light enough
-    for the kinds of repo sizes html-doc targets (≤ a few hundred files)."""
+    for the kinds of repo sizes oku targets (≤ a few hundred files)."""
     last = _snapshot_tree(root)
     while not stop.is_set():
         if stop.wait(0.4):
@@ -2676,7 +2676,7 @@ def _make_serve_handler(root: Path):
             if self.path == "/__reload":
                 self._serve_reload_stream()
                 return
-            # Synthesize stubs / JSON on the fly so `html-doc serve` previews
+            # Synthesize stubs / JSON on the fly so `oku serve` previews
             # markdown- and json-authored sources without a build step:
             #   /<name>.html  + .md sibling  → md→page→stub
             #   /<name>.json  + .md sibling  → md→page JSON
@@ -2919,7 +2919,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
     # Source dirs stay clean: site-manifest.{json,js} and llms.txt are
     # synthesized in memory by _serve_generated_artifact on each request.
     # Markdown twins, the build's pagefind index, and dist outputs all
-    # land under dist/ via `html-doc build`.
+    # land under dist/ via `oku build`.
 
     htmls = sorted(
         p for p in root.rglob("*.html")
@@ -2927,11 +2927,11 @@ def cmd_serve(args: argparse.Namespace) -> int:
     )
 
     # Serve-time Pagefind index (background, best-effort) so search works
-    # without requiring the user to run `html-doc build` first.
+    # without requiring the user to run `oku build` first.
     search_enabled = not getattr(args, "no_search", False)
     if search_enabled:
         threading.Thread(
-            target=_build_serve_search_index, args=(root,), name="html-doc-search", daemon=True
+            target=_build_serve_search_index, args=(root,), name="oku-search", daemon=True
         ).start()
 
     # Filesystem watcher → SSE broadcast → in-browser reload.
@@ -2942,7 +2942,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
         watcher_thread = threading.Thread(
             target=_watcher_loop,
             args=(root, watcher_stop),
-            name="html-doc-watcher",
+            name="oku-watcher",
             daemon=True,
         )
         watcher_thread.start()
@@ -2977,7 +2977,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 # ---------- main ----------
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="html-doc",
+        prog="oku",
         description="Shared HTML chrome kit. Init projects, build artifacts, serve locally.",
     )
     sub = parser.add_subparsers(dest="cmd")
@@ -2996,7 +2996,7 @@ def main() -> int:
     check_parser.add_argument(
         "--json",
         action="store_true",
-        help="emit issues as a JSON stream (for the html-doc skill's auto-verify step)",
+        help="emit issues as a JSON stream (for the oku skill's auto-verify step)",
     )
     check_parser.add_argument(
         "--verbose",

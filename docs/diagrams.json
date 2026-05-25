@@ -144,11 +144,11 @@
           "code": {
             "kind": "code",
             "language": "mermaid",
-            "source": "classDiagram\n  class HtmlDocRenderer {\n    +render(json)\n    -_renderBlock(b)\n  }\n  class HtmlDocChart\n  HtmlDocRenderer --> HtmlDocChart"
+            "source": "classDiagram\n  class OkuRenderer {\n    +render(json)\n    -_renderBlock(b)\n  }\n  class OkuChart\n  OkuRenderer --> OkuChart"
           },
           "render": {
             "kind": "diagram",
-            "source": "classDiagram\n  class HtmlDocRenderer {\n    +render(json)\n    -_renderBlock(b)\n  }\n  class HtmlDocChart\n  HtmlDocRenderer --> HtmlDocChart"
+            "source": "classDiagram\n  class OkuRenderer {\n    +render(json)\n    -_renderBlock(b)\n  }\n  class OkuChart\n  OkuRenderer --> OkuChart"
           }
         },
         {

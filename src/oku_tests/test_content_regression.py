@@ -320,7 +320,7 @@ class TestChromeKitMarkers:
 
     def test_chrome_has_groupby_picker(self, repo_root: Path) -> None:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
-        assert "hdt-groupby-select" in src, "table group-by picker source markers missing"
+        assert "okt-groupby-select" in src, "table group-by picker source markers missing"
 
     def test_chrome_has_fold_handler(self, repo_root: Path) -> None:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
@@ -335,7 +335,7 @@ class TestChromeKitMarkers:
     def test_chrome_extref_link_in_tooltip(self, repo_root: Path) -> None:
         """ext-ref hosts are NOT navigation links — clicking them only
         pins the tooltip. The destination URL lives as a clickable
-        domain anchor inside the citation card (hdt-cite-domain),
+        domain anchor inside the citation card (okt-cite-domain),
         rendered by the citation builder when hit.link is present.
         Earlier behavior (host click → window.open) made the host
         ambiguous: a single click both pinned the tooltip AND opened
@@ -344,16 +344,16 @@ class TestChromeKitMarkers:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert (
-            "__htmldocExtRefMakeClickable" not in js
+            "__okuExtRefMakeClickable" not in js
         ), "ext-ref host should NOT be a navigation link — helper must stay deleted"
         assert (
-            "html-doc-extref-link" not in css
+            "oku-extref-link" not in css
         ), "CSS class for clickable host must stay deleted — clicking pins, not navigates"
         assert (
-            'a class="hdt-cite-domain"' in js
+            'a class="okt-cite-domain"' in js
         ), "citation card must render the domain as an <a>, not a code chip"
         assert (
-            ".html-doc-tooltip:has(.hdt-cite) .hdt-link" in css
+            ".oku-tooltip:has(.okt-cite) .okt-link" in css
         ), "duplicate Learn-more footer must be hidden when cite card has its own link"
 
     def test_callout_symbols_present(self, repo_root: Path) -> None:
@@ -425,7 +425,7 @@ class TestChromeKitMarkers:
         assert "example" in schema["$defs"], "schema is missing the example primitive"
         renderer = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
         assert "_renderExample" in renderer, "renderer is missing _renderExample"
-        cli = (repo_root / "src" / "html_doc" / "cli.py").read_text(encoding="utf-8")
+        cli = (repo_root / "src" / "oku" / "cli.py").read_text(encoding="utf-8")
         assert '"example"' in cli, "cli._KNOWN_BLOCK_KINDS missing 'example'"
         examples = []
         for p in sorted((repo_root / "docs").glob("*.json")):
@@ -447,12 +447,12 @@ class TestChromeKitMarkers:
         for n in range(1, 11):
             assert f"--series-{n}" in css, f"missing --series-{n} chart palette token"
         # Pin state + hint.
-        assert ".hdc-tooltip.pinned" in css, "missing .hdc-tooltip.pinned CSS"
-        assert ".hdc-tt-pin-hint" in css, "missing pin-hint CSS"
+        assert ".okc-tooltip.pinned" in css, "missing .okc-tooltip.pinned CSS"
+        assert ".okc-tt-pin-hint" in css, "missing pin-hint CSS"
         # Bar-fill dim for legend toggle.
         assert ".bar-fill.dim" in css, "missing .bar-fill.dim CSS"
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
-        assert "__htmldocPickColor" in js, "missing palette helper"
+        assert "__okuPickColor" in js, "missing palette helper"
         assert "pinnedAnchor" in js, "chart tooltip missing click-pin"
         assert "pinnedFill" in js, "bar enhancer missing click-pin"
         assert "bar-chart-legend-chip[data-series-idx]" in js, (
@@ -488,7 +488,7 @@ class TestChromeKitMarkers:
         ):
             assert fn in js, f"chrome.js missing tier-3 renderer {fn}"
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        for cls in (".hdc-sankey", ".hdc-network", ".hdc-scatter-matrix", ".hdc-parcoord", ".hdc-chord", ".hdc-geo"):
+        for cls in (".okc-sankey", ".okc-network", ".okc-scatter-matrix", ".okc-parcoord", ".okc-chord", ".okc-geo"):
             assert cls in css, f"chart css missing class {cls}"
         ids = set()
         for p in sorted((repo_root / "docs").glob("*.json")):
@@ -566,7 +566,7 @@ class TestChromeKitMarkers:
     def test_chart_hover_payloads(self, repo_root: Path) -> None:
         """P2 — bar / stacked / grouped / donut / treemap / funnel emit
         rich hover payloads that chrome.js wires into the shared
-        .hdc-tooltip controller. Each one declares the share / value
+        .okc-tooltip controller. Each one declares the share / value
         / drop-off the reader expects."""
         renderer = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
@@ -574,7 +574,7 @@ class TestChromeKitMarkers:
         assert "data-hover-payload" in renderer, (
             "bar fills must carry data-hover-payload for the shared chart tooltip"
         )
-        assert "__htmldocEnhanceBarCharts" in js, (
+        assert "__okuEnhanceBarCharts" in js, (
             "bar-chart hover enhancer missing — DIV-based bars get no rich tooltip"
         )
         # Donut + treemap + funnel — data attributes on the SVG shapes.
@@ -597,9 +597,9 @@ class TestChromeKitMarkers:
         can compare a given X across distributions in one glance."""
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        assert "hdc-ridge-cursor" in js, "ridge cursor element missing in renderer"
+        assert "okc-ridge-cursor" in js, "ridge cursor element missing in renderer"
         assert "_wireRidgelineCursor" in js, "ridge cursor wiring missing"
-        assert ".hdc-ridge-cursor" in css, "ridge cursor styling missing"
+        assert ".okc-ridge-cursor" in css, "ridge cursor styling missing"
 
     def test_lightbox_pan_zoom(self, repo_root: Path) -> None:
         """P2 — lightbox now wraps content in a pan/zoom stage by
@@ -609,13 +609,13 @@ class TestChromeKitMarkers:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert (
-            "__htmldocPanZoom" in js
+            "__okuPanZoom" in js
         ), "pan-zoom controller missing — fullscreen has no zoom"
         assert (
-            "hdt-lightbox-pz" in js
+            "okt-lightbox-pz" in js
         ), "pan-zoom stage class missing in lightbox open()"
         assert (
-            ".hdt-lightbox-pz" in css
+            ".okt-lightbox-pz" in css
         ), "pan-zoom stage has no CSS"
         assert (
             "panZoom: false" in js
@@ -624,19 +624,19 @@ class TestChromeKitMarkers:
     def test_funnel_aligns_columns(self, repo_root: Path) -> None:
         """Funnel labels / values / percentages now live in three
         fixed right-anchored columns instead of being band-edge
-        anchored. The renderer emits hdc-funnel-value and
-        hdc-funnel-pct text elements separately so the digits stack
+        anchored. The renderer emits okc-funnel-value and
+        okc-funnel-pct text elements separately so the digits stack
         cleanly across rows."""
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert (
-            "hdc-funnel-value" in js
+            "okc-funnel-value" in js
         ), "funnel value class missing — values rendered band-edge anchored, columns will stagger"
         assert (
-            "hdc-funnel-pct" in js
+            "okc-funnel-pct" in js
         ), "funnel pct class missing — percentages rendered band-edge anchored, columns will stagger"
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert (
-            ".hdc-funnel-value" in css
+            ".okc-funnel-value" in css
         ), "funnel value class has no CSS"
         assert (
             "tabular-nums" in css
@@ -649,13 +649,13 @@ class TestChromeKitMarkers:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert (
-            "hdt-view-group" in js
+            "okt-view-group" in js
         ), "view-toggle group wrapper missing (compact form not applied)"
         assert (
-            "hdt-view-btn" in js
+            "okt-view-btn" in js
         ), "view buttons missing the compact class"
         assert (
-            ".hdt-view-group" in css
+            ".okt-view-group" in css
         ), "view-toggle group has no CSS — falls back to default button chrome"
 
     def test_annotated_code_substring_chip_autoplace(self, repo_root: Path) -> None:
@@ -665,11 +665,11 @@ class TestChromeKitMarkers:
         a highlight referred to."""
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert (
-            "hdc-anno-marker-substr" in js
+            "okc-anno-marker-substr" in js
         ), "substring auto-placement helper missing — substring-only annotations have no visible chip"
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert (
-            "hdc-anno-marker-substr" in css
+            "okc-anno-marker-substr" in css
         ), "CSS for the inline substring chip missing — chip will visually crowd the surrounding tokens"
 
     def test_annotated_code_multiline_tooltip_offset(self, repo_root: Path) -> None:
@@ -681,7 +681,7 @@ class TestChromeKitMarkers:
         whole block."""
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        assert "position: fixed" in css and ".hdc-anno-tip" in css, (
+        assert "position: fixed" in css and ".okc-anno-tip" in css, (
             "tooltip must use position:fixed to escape ancestor clipping"
         )
         # JS-driven flip — render above by default, flip below when
@@ -727,9 +727,9 @@ class TestChromeKitMarkers:
         assert "min-width: 1900px" in css, "missing 1900px breakpoint"
         # Visual primitives don't cap themselves below content-width.
         for selector in (
-            "main .hdt-table-wrap",
+            "main .okt-table-wrap",
             "main .kpi-grid",
-            "main html-doc-chart",
+            "main oku-chart",
             "main pre",
         ):
             assert selector in css, f"primitive '{selector}' missing the max-width override"
@@ -888,15 +888,15 @@ class TestChromeKitMarkers:
         made the pill change color and border, signaling "click me" when
         it's actually pointer-events: none. The user wanted a static
         label flush to the top-left edge. Lock in:
-        - No `pre:hover > .hdt-code-lang` rule.
+        - No `pre:hover > .okt-code-lang` rule.
         - top: 0, left: 0 (corner-flush, not 7px / 10px inset).
         - border-radius drops corner-rounding except the inner one.
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        assert "pre:hover > .hdt-code-lang" not in css, (
+        assert "pre:hover > .okt-code-lang" not in css, (
             "lang pill must not have a hover state — it's a label, not a button"
         )
-        m = re.search(r"pre\s*>\s*\.hdt-code-lang\s*\{([^}]+)\}", css)
+        m = re.search(r"pre\s*>\s*\.okt-code-lang\s*\{([^}]+)\}", css)
         assert m, "base lang pill rule missing"
         block = m.group(1)
         top_match = re.search(r"top:\s*(-?\d+)(?:px)?", block)
@@ -914,7 +914,7 @@ class TestChromeKitMarkers:
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         m = re.search(
-            r"pre\.hdt-line-numbered\s+\.hdt-code-line\s*\{([^}]+)\}",
+            r"pre\.okt-line-numbered\s+\.okt-code-line\s*\{([^}]+)\}",
             css,
         )
         assert m, "per-line grid rule missing"
@@ -942,13 +942,13 @@ class TestChromeKitMarkers:
         no longer matched the line they labeled.
 
         Architecture fix: per-line grid replaces the absolute gutter.
-        Verify the .hdt-code-line uses display: grid and
+        Verify the .okt-code-line uses display: grid and
         `align-items: start` so cells anchor to the row top while
         content can grow to wrapped height.
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         m = re.search(
-            r"pre\.hdt-line-numbered\s+\.hdt-code-line\s*\{([^}]+)\}",
+            r"pre\.okt-line-numbered\s+\.okt-code-line\s*\{([^}]+)\}",
             css,
         )
         assert m, "per-line grid rule missing"
@@ -964,24 +964,24 @@ class TestChromeKitMarkers:
         Regression: markers previously sat at the same x as line
         numbers, blocking them. Fixed by adding a 4th column to the
         per-line grid for annotated-code. Also added hover preview
-        tooltip (`.hdc-anno-tip`).
+        tooltip (`.okc-anno-tip`).
 
         Note: the CSS-only hover-show rule was retired in favour of
         JS-driven positioning (position:fixed + viewport coords) so
         the tip escapes the wrap's clipping context. The presence of
-        the .hdc-anno-tip class + JS show/hide handlers is the
+        the .okc-anno-tip class + JS show/hide handlers is the
         relevant invariant now.
         """
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         # JS attaches the tooltip with the annotation body.
-        assert "hdc-anno-tip" in js, "annotation tooltip injection missing"
+        assert "okc-anno-tip" in js, "annotation tooltip injection missing"
         # CSS: 4-column grid override for annotated-code line.
-        assert ".hdc-anno-wrap.hdc-anno-gutter-on pre.hdt-line-numbered .hdt-code-line" in css, (
+        assert ".okc-anno-wrap.okc-anno-gutter-on pre.okt-line-numbered .okt-code-line" in css, (
             "annotation-mode grid override missing"
         )
         # Tip uses fixed positioning to escape ancestor clipping.
-        assert ".hdc-anno-tip" in css and "position: fixed" in css, (
+        assert ".okc-anno-tip" in css and "position: fixed" in css, (
             "tip must be position:fixed so scroll doesn't clip it"
         )
 
@@ -1006,7 +1006,7 @@ class TestChromeKitMarkers:
         # The DOM insertion must put the slot BEFORE the content cell
         # (third grid child), not as the first child.
         assert "line.insertBefore(slot, content)" in js, (
-            "annotation slot must be inserted before .hdt-code-content "
+            "annotation slot must be inserted before .okt-code-content "
             "so the grid resolves [num] [fold] [anno] [content]"
         )
 
@@ -1021,7 +1021,7 @@ class TestChromeKitMarkers:
         offset above the line-number digit.
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        anno_block = css.split(".hdc-anno-wrap.hdc-anno-gutter-on .hdc-anno-line-marker .hdc-anno-marker", 1)[-1].split("}", 1)[0]
+        anno_block = css.split(".okc-anno-wrap.okc-anno-gutter-on .okc-anno-line-marker .okc-anno-marker", 1)[-1].split("}", 1)[0]
         assert "margin-top: 4px" in anno_block, (
             "annotation marker must carry margin-top: 4px so its centre "
             "aligns with the line-number text centre"
@@ -1053,11 +1053,11 @@ class TestChromeKitMarkers:
         llms.txt, page.md twins, and .html stubs are generated artifacts
         and must never be written into source.
 
-        The dev server synthesizes them in memory; `html-doc build`
+        The dev server synthesizes them in memory; `oku build`
         writes them under dist/{site,standalone}/. Source stays as
         .json / .md (+ a single optional kit.json for project config).
         """
-        cli_src = (repo_root / "src" / "html_doc" / "cli.py").read_text(encoding="utf-8")
+        cli_src = (repo_root / "src" / "oku" / "cli.py").read_text(encoding="utf-8")
         assert "_write_source_stubs" not in cli_src, (
             "no source-side stub writer — that pollutes the source dir"
         )
@@ -1077,7 +1077,7 @@ class TestChromeKitMarkers:
                 if cand.exists():
                     offenders.append(str(cand.relative_to(repo_root)))
         # Stubs: any .html under docs/ or examples/ is an offender,
-        # EXCEPT docs/index.html — `html-doc init` writes that single
+        # EXCEPT docs/index.html — `oku init` writes that single
         # entry stub on purpose so IDE-served workflows work without
         # the dev server running.
         for d in (repo_root / "docs", repo_root / "examples"):
@@ -1097,9 +1097,9 @@ class TestChromeKitMarkers:
         """Dev server returns site-manifest.json / llms.txt fresh on
         each request — keyed by the URL's parent dir as the docs
         root. The .js companion was retired (every standalone HTML
-        already inlines window.__htmldocManifest; the site fetches
+        already inlines window.__okuManifest; the site fetches
         the .json variant)."""
-        cli_src = (repo_root / "src" / "html_doc" / "cli.py").read_text(encoding="utf-8")
+        cli_src = (repo_root / "src" / "oku" / "cli.py").read_text(encoding="utf-8")
         assert "compute_manifest" in cli_src, "compute_manifest helper missing"
         assert "compute_llms_txt" in cli_src, "llms.txt synthesis helper missing"
         assert '"site-manifest.json"' in cli_src, (
@@ -1111,7 +1111,7 @@ class TestChromeKitMarkers:
         assert '"llms.txt"' in cli_src, "synthesis must handle llms.txt"
 
     def test_serve_synthesizes_md_and_json_pages(self, repo_root: Path) -> None:
-        """`html-doc serve` synthesizes .html / .json on the fly (D5).
+        """`oku serve` synthesizes .html / .json on the fly (D5).
 
         Three synthesis paths:
           /name.html + name.md   sibling → md→page→stub
@@ -1121,7 +1121,7 @@ class TestChromeKitMarkers:
         The .json-sibling case (added in D5) lets authors author only
         the .json content — the source dir doesn't need an .html stub.
         """
-        cli_src = (repo_root / "src" / "html_doc" / "cli.py").read_text(encoding="utf-8")
+        cli_src = (repo_root / "src" / "oku" / "cli.py").read_text(encoding="utf-8")
         assert "_serve_synthesized" in cli_src, "synthesis handler missing"
         m = re.search(
             r"def do_GET\(self\)[\s\S]*?if self\._serve_synthesized\(\)",
@@ -1386,7 +1386,7 @@ class TestChromeKitMarkers:
         blocks (mermaid → diagram), lists → list blocks, inline
         emphasis/links survive into the content array.
         """
-        from html_doc.cli import md_to_page  # noqa: PLC0415
+        from oku.cli import md_to_page  # noqa: PLC0415
 
         sample = repo_root / "examples" / "markdown-demo.md"
         if not sample.exists():
@@ -1438,10 +1438,10 @@ class TestChromeKitMarkers:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         # Find the diagram custom element's _attachToolbar block.
         m = re.search(
-            r"class\s+HtmlDocDiagram[\s\S]*?_attachToolbar\(\)\s*\{[\s\S]*?makeToolbar\(this,\s*\[([\s\S]*?)\]\)",
+            r"class\s+OkuDiagram[\s\S]*?_attachToolbar\(\)\s*\{[\s\S]*?makeToolbar\(this,\s*\[([\s\S]*?)\]\)",
             js,
         )
-        assert m, "HtmlDocDiagram._attachToolbar block not found"
+        assert m, "OkuDiagram._attachToolbar block not found"
         toolbar = m.group(1)
         assert "Copy diagram source" in toolbar, (
             "Copy action missing from diagram toolbar"
@@ -1459,18 +1459,18 @@ class TestChromeKitMarkers:
         """
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        assert "__htmldocLightbox" in js, "lightbox module missing"
-        assert ".hdt-lightbox" in css, "lightbox CSS missing"
+        assert "__okuLightbox" in js, "lightbox module missing"
+        assert ".okt-lightbox" in css, "lightbox CSS missing"
         assert "ICON_EXPAND" in js, "expand icon constant missing"
         # Chart + diagram custom elements get the expand action in their
-        # toolbars; both call into __htmldocLightbox.open.
+        # toolbars; both call into __okuLightbox.open.
         chart_expand = re.search(
             r"makeToolbar\(this,\s*\[[\s\S]*?Expand to fullscreen[\s\S]*?\]\)",
             js,
         )
         assert chart_expand, "Expand action missing from a custom element toolbar"
         # Backdrop + Escape close paths.
-        assert "hdt-lightbox-backdrop" in js, "backdrop close target missing"
+        assert "okt-lightbox-backdrop" in js, "backdrop close target missing"
         assert "e.key === 'Escape'" in js, "Escape close path missing"
 
     def test_table_board_view_honors_board_order(self, repo_root: Path) -> None:
@@ -1545,11 +1545,11 @@ class TestChromeKitMarkers:
         Lock in:
 
         - JS toolbar emits a `data-view="board"` button.
-        - JS has a `renderBoard` function and a `.hdt-table-board`
+        - JS has a `renderBoard` function and a `.okt-table-board`
           container.
-        - CSS view-toggle hides `.hdt-table-board` for the three
+        - CSS view-toggle hides `.okt-table-board` for the three
           non-active views and hides it by default (no data-view attr).
-        - CSS provides `.hdt-board-lane` styling.
+        - CSS provides `.okt-board-lane` styling.
         """
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
@@ -1559,8 +1559,8 @@ class TestChromeKitMarkers:
             'viewBtnHTML(\'board\'' in js or 'data-view="board"' in js
         ), "Board toggle button missing in toolbar"
         assert "renderBoard" in js, "renderBoard function missing"
-        assert "hdt-table-board" in js, "board container missing"
-        assert ".hdt-board-lane" in css, "lane styling missing"
+        assert "okt-table-board" in js, "board container missing"
+        assert ".okt-board-lane" in css, "lane styling missing"
         assert '[data-view="board"]' in css, "board active-view rule missing"
 
     def test_list_view_items_visually_separated(self, repo_root: Path) -> None:
@@ -1571,7 +1571,7 @@ class TestChromeKitMarkers:
         triples the gap and swaps the outer border from --border-soft to
         --line, with a box-shadow to lift each card off the page.
 
-        Enforce by checking the .hdt-table-list / .hdt-list-card block
+        Enforce by checking the .okt-table-list / .okt-list-card block
         carries (a) a meaningful gap (≥16px), (b) a non-soft outer border
         token, and (c) a box-shadow declaration.
         """
@@ -1579,11 +1579,11 @@ class TestChromeKitMarkers:
         # Match the BASE list rule (the data-view variants are display:none
         # and don't carry layout). Anchor on the unique `display: flex` shape.
         list_rule = re.search(
-            r"\.hdt-table-list\s*\{[^}]*display:\s*flex[^}]*\}", css
+            r"\.okt-table-list\s*\{[^}]*display:\s*flex[^}]*\}", css
         )
-        card_rule = re.search(r"\.hdt-list-card\s*\{([^}]*)\}", css)
-        assert list_rule, ".hdt-table-list base rule (display:flex) missing"
-        assert card_rule, ".hdt-list-card rule missing"
+        card_rule = re.search(r"\.okt-list-card\s*\{([^}]*)\}", css)
+        assert list_rule, ".okt-table-list base rule (display:flex) missing"
+        assert card_rule, ".okt-list-card rule missing"
         list_block = list_rule.group(0)
         card_block = card_rule.group(1)
         # Gap >= 16px (was 10px; user couldn't tell items apart).
@@ -1616,42 +1616,42 @@ class TestChromeKitMarkers:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "ICON_WRAP" in js, "wrap button needs a dedicated icon constant"
-        assert "hdt-wrap-btn" in js, "wrap button must be created in chrome.js"
-        assert ".hdt-wrap-btn" in css, "wrap button styling missing"
+        assert "okt-wrap-btn" in js, "wrap button must be created in chrome.js"
+        assert ".okt-wrap-btn" in css, "wrap button styling missing"
         # Toggled state must flip white-space on the inner <code>.
-        assert "pre.hdt-wrap" in css, "wrap state class missing"
+        assert "pre.okt-wrap" in css, "wrap state class missing"
         assert "white-space: pre-wrap" in css, (
             "wrap state must flip white-space to pre-wrap so long lines wrap"
         )
 
     def test_copy_wrap_buttons_attach_to_non_scrolling_host(self, repo_root: Path) -> None:
-        """Copy + wrap buttons must live on .hdt-pre-host, not inside
+        """Copy + wrap buttons must live on .okt-pre-host, not inside
         the scrolling <pre>.
 
         Regression: when buttons were appended to <pre> directly, a
         horizontal scroll of the pre's content pushed the buttons
         off-screen with the content (the buttons are children of the
         scroll viewport). Wrapping every <pre> in a non-scrolling
-        .hdt-pre-host keeps the buttons pinned at the host's edges.
+        .okt-pre-host keeps the buttons pinned at the host's edges.
         """
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         # Host must exist as a CSS class with position: relative.
-        host_rule = re.search(r"\.hdt-pre-host\s*\{([^}]*)\}", css)
-        assert host_rule, ".hdt-pre-host CSS rule missing"
+        host_rule = re.search(r"\.okt-pre-host\s*\{([^}]*)\}", css)
+        assert host_rule, ".okt-pre-host CSS rule missing"
         assert "position: relative" in host_rule.group(1), (
-            ".hdt-pre-host must be position: relative — it's the buttons' anchor"
+            ".okt-pre-host must be position: relative — it's the buttons' anchor"
         )
         # Buttons are appended to the host, not pre.
         assert "host.appendChild(btn)" in js, (
-            "copy / wrap buttons must be appended to the .hdt-pre-host, "
+            "copy / wrap buttons must be appended to the .okt-pre-host, "
             "not the scrolling <pre>"
         )
         # Hover-reveal selectors target the host.
-        assert ".hdt-pre-host:hover .copy-btn" in css, (
+        assert ".okt-pre-host:hover .copy-btn" in css, (
             "hover-reveal must trigger from the host, not from pre"
         )
-        assert ".hdt-pre-host:hover .hdt-wrap-btn" in css, (
+        assert ".okt-pre-host:hover .okt-wrap-btn" in css, (
             "wrap-btn hover-reveal must trigger from the host"
         )
 

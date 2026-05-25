@@ -41,7 +41,7 @@ def sample_project(tmp_path: Path, repo_root: Path) -> Path:
     a _kit symlink back to the repo root. Returns the project root."""
     docs = tmp_path / "docs"
     docs.mkdir()
-    # _kit symlink — what `html-doc init` would have created.
+    # _kit symlink — what `oku init` would have created.
     (docs / "_kit").symlink_to(repo_root)
     # Source is JSON-only; build synthesizes the .html stub into dist.
     for stem, title in (("index", "Index"), ("about", "About")):
@@ -80,11 +80,11 @@ class TestCLIBuild:
         assert (docs / "dist" / "site" / "_kit" / "chrome.css").exists()
         # site-manifest.json lives under dist/site/ only — chrome.js
         # fetches it at runtime when serving over HTTP. Standalone HTMLs
-        # inline window.__htmldocManifest directly, so they don't need
+        # inline window.__okuManifest directly, so they don't need
         # a sidecar.
         assert (docs / "dist" / "site" / "site-manifest.json").exists()
         assert not (docs / "dist" / "standalone" / "site-manifest.json").exists()
-        # The historical .js companion (set window.__htmldocManifest
+        # The historical .js companion (set window.__okuManifest
         # via <script src>) is no longer emitted in either tree.
         assert not (docs / "dist" / "site" / "site-manifest.js").exists()
         assert not (docs / "dist" / "standalone" / "site-manifest.js").exists()
@@ -113,7 +113,7 @@ class TestCLIBuild:
         assert 'href="_kit/chrome.css"' not in body
         assert 'src="_kit/chrome.js"' not in body
         # JSON content inlined for autoBoot.
-        assert 'id="__htmldoc_page__"' in body
+        assert 'id="__oku_page__"' in body
         # The page body text shows up in the inlined JSON.
         assert "Body of Index" in body
 
@@ -188,7 +188,7 @@ class TestCLIInit:
     def test_init_creates_index_html_in_cwd(self, tmp_path: Path, repo_root: Path) -> None:
         # The on-disk stub at cwd/index.html is what makes IDE-served
         # workflows work (IntelliJ's HTTP server, Live Server, etc.)
-        # — without it, only `html-doc serve` can render pages.
+        # — without it, only `oku serve` can render pages.
         proc = _run_cli(tmp_path, "init", repo_root=repo_root)
         assert proc.returncode == 0, f"init failed:\n{proc.stderr}\n{proc.stdout}"
         index = tmp_path / "index.html"
@@ -217,7 +217,7 @@ class TestCLIInit:
 
     def test_init_does_not_overwrite_existing_index_html(self, tmp_path: Path, repo_root: Path) -> None:
         # Idempotency for index.html: a user-edited stub must survive
-        # a re-run of `html-doc init`. "User-edited" = anything inside
+        # a re-run of `oku init`. "User-edited" = anything inside
         # <body> (the default stub leaves it empty).
         custom = "<!doctype html><html><body>HANDS OFF</body></html>"
         (tmp_path / "index.html").write_text(custom, encoding="utf-8")
@@ -301,7 +301,7 @@ class TestCLIInit:
         assert data["title"] == "Guide"
         # The materialiser stamps a sentinel so re-runs know which JSONs
         # are derived (and may be overwritten) vs hand-authored.
-        assert data["meta"]["_materialised_by"] == "html-doc-init"
+        assert data["meta"]["_materialised_by"] == "oku-init"
 
     def test_init_does_not_overwrite_hand_authored_json(
         self, tmp_path: Path, repo_root: Path

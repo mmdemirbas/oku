@@ -1,10 +1,10 @@
-/* html-doc · chrome.js
+/* oku · chrome.js
  * Web Components, theme cycler, TOC builder, scroll-spy, reading aids.
  * Loaded with defer; chrome-boot.js handles pre-paint state.
  */
 
 /* ──────────────────────────────────────────────────────────────────
- * html-doc · chrome.js
+ * oku · chrome.js
  *
  *   Web Components, theme cycler, TOC builder, scroll-spy, tooltips,
  *   site nav, charts, diagrams, snippets, warnings, search.
@@ -27,9 +27,9 @@
  *     kit.json + glossary loader             ~513
  *     <glossary-term>                        ~685
  *     <ext-ref>                              ~725
- *     <html-doc-chart>                       ~756
- *     <html-doc-diagram> (Mermaid)           ~874
- *     <html-doc-snippet>                     ~971
+ *     <oku-chart>                       ~756
+ *     <oku-diagram> (Mermaid)           ~874
+ *     <oku-snippet>                     ~971
  *     <page-nav>                            ~1013
  *     Forward-compat warning indicator      ~1187
  *     Pagefind search                       ~1275
@@ -37,14 +37,14 @@
  *
  *   Conventions:
  *     - Custom Element classes:  class FooBar extends HTMLElement { ... }
- *     - Shared controllers:      var __htmldocFoo = (function () { ... })();
+ *     - Shared controllers:      var __okuFoo = (function () { ... })();
  *     - Public helpers:          plain top-level function
  *     - Internal helpers:        nested inside their controller IIFE
  * ────────────────────────────────────────────────────────────────── */
 
 /* ============ Kit version ============ *
  * Surfaced in the sidebar footer (dimmed) so a reader can see at a
- * glance which build of html-doc rendered the page. Bump in lockstep
+ * glance which build of oku rendered the page. Bump in lockstep
  * with pyproject.toml's [project] version. */
 const KIT_VERSION = '0.2.0';
 
@@ -74,12 +74,12 @@ const ICON_EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 
 /* ============ Lightbox / fullscreen overlay ============ *
  * A single shared overlay used by image, chart, diagram, and mermaid
- * expand buttons. Open with __htmldocLightbox.open(content, { title })
+ * expand buttons. Open with __okuLightbox.open(content, { title })
  * where `content` is an Element or HTML string. Returns immediately;
  * the overlay traps focus until closed via Escape, the close button,
  * or backdrop click. Same affordance everywhere — one mental model.
  * ---------------------------------------------------------------- */
-var __htmldocLightbox = (function () {
+var __okuLightbox = (function () {
   var overlay = null;
   var lastFocus = null;
   var currentOpts = null;
@@ -87,19 +87,19 @@ var __htmldocLightbox = (function () {
   function build() {
     if (overlay) return overlay;
     overlay = document.createElement('div');
-    overlay.className = 'hdt-lightbox';
+    overlay.className = 'okt-lightbox';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'Expanded view');
     overlay.innerHTML =
-      '<div class="hdt-lightbox-backdrop"></div>' +
-      '<div class="hdt-lightbox-frame">' +
-      '  <button type="button" class="hdt-lightbox-close" aria-label="Close" title="Close (Esc)">' + ICON_CROSS + '</button>' +
-      '  <div class="hdt-lightbox-content" tabindex="-1"></div>' +
+      '<div class="okt-lightbox-backdrop"></div>' +
+      '<div class="okt-lightbox-frame">' +
+      '  <button type="button" class="okt-lightbox-close" aria-label="Close" title="Close (Esc)">' + ICON_CROSS + '</button>' +
+      '  <div class="okt-lightbox-content" tabindex="-1"></div>' +
       '</div>';
     document.body.appendChild(overlay);
-    overlay.querySelector('.hdt-lightbox-backdrop').addEventListener('click', close);
-    overlay.querySelector('.hdt-lightbox-close').addEventListener('click', close);
+    overlay.querySelector('.okt-lightbox-backdrop').addEventListener('click', close);
+    overlay.querySelector('.okt-lightbox-close').addEventListener('click', close);
     document.addEventListener('keydown', function (e) {
       if (!overlay.classList.contains('open')) return;
       if (e.key === 'Escape') { e.preventDefault(); close(); }
@@ -109,7 +109,7 @@ var __htmldocLightbox = (function () {
 
   function open(content, opts) {
     var el = build();
-    var holder = el.querySelector('.hdt-lightbox-content');
+    var holder = el.querySelector('.okt-lightbox-content');
     // Drain any leftover nodes from a previous open() that bypassed close()
     // (defensive — should not happen in normal flow).
     while (holder.firstChild) holder.removeChild(holder.firstChild);
@@ -121,21 +121,21 @@ var __htmldocLightbox = (function () {
     // unmolested.
     if (currentOpts.panZoom !== false) {
       var stage = document.createElement('div');
-      stage.className = 'hdt-lightbox-pz';
+      stage.className = 'okt-lightbox-pz';
       var inner = document.createElement('div');
-      inner.className = 'hdt-lightbox-pz-inner';
+      inner.className = 'okt-lightbox-pz-inner';
       if (content instanceof Node) inner.appendChild(content);
       else inner.innerHTML = String(content || '');
       stage.appendChild(inner);
       var toolbar = document.createElement('div');
-      toolbar.className = 'hdt-lightbox-pz-toolbar';
+      toolbar.className = 'okt-lightbox-pz-toolbar';
       toolbar.innerHTML =
         '<button type="button" data-pz="out"   title="Zoom out (-)"     aria-label="Zoom out">−</button>' +
         '<button type="button" data-pz="reset" title="Reset / fit (0)"  aria-label="Reset zoom">⤢</button>' +
         '<button type="button" data-pz="in"    title="Zoom in (+)"      aria-label="Zoom in">+</button>';
       stage.appendChild(toolbar);
       holder.appendChild(stage);
-      __htmldocPanZoom.attach(stage, inner, toolbar);
+      __okuPanZoom.attach(stage, inner, toolbar);
     } else {
       if (content instanceof Node) holder.appendChild(content);
       else holder.innerHTML = String(content || '');
@@ -143,20 +143,20 @@ var __htmldocLightbox = (function () {
     if (currentOpts.title) el.setAttribute('aria-label', currentOpts.title);
     lastFocus = document.activeElement;
     el.classList.add('open');
-    document.documentElement.classList.add('hdt-lightbox-open');
+    document.documentElement.classList.add('okt-lightbox-open');
     setTimeout(function () { holder.focus(); }, 0);
   }
 
   function close() {
     if (!overlay) return;
     overlay.classList.remove('open');
-    document.documentElement.classList.remove('hdt-lightbox-open');
-    var holder = overlay.querySelector('.hdt-lightbox-content');
+    document.documentElement.classList.remove('okt-lightbox-open');
+    var holder = overlay.querySelector('.okt-lightbox-content');
     // Unwrap pan/zoom stage so the caller's onClose sees the
     // original content node (and can return it to the page).
-    var stage = holder && holder.querySelector(':scope > .hdt-lightbox-pz');
+    var stage = holder && holder.querySelector(':scope > .okt-lightbox-pz');
     if (stage) {
-      var inner = stage.querySelector('.hdt-lightbox-pz-inner');
+      var inner = stage.querySelector('.okt-lightbox-pz-inner');
       if (inner) {
         while (inner.firstChild) holder.appendChild(inner.firstChild);
       }
@@ -184,7 +184,7 @@ var __htmldocLightbox = (function () {
  * for keyboard / mouse-only users. State lives on the stage so each
  * lightbox open() gets a fresh transform.
  * --------------------------------------------------------------------- */
-var __htmldocPanZoom = (function () {
+var __okuPanZoom = (function () {
   function attach(stage, inner, toolbar) {
     var scale = 1, tx = 0, ty = 0;
     var min = 0.25, max = 12;
@@ -213,7 +213,7 @@ var __htmldocPanZoom = (function () {
     var dragging = false, lastX = 0, lastY = 0;
     stage.addEventListener('mousedown', function (ev) {
       if (ev.button !== 0) return;
-      if (ev.target.closest('.hdt-lightbox-pz-toolbar')) return;
+      if (ev.target.closest('.okt-lightbox-pz-toolbar')) return;
       dragging = true; lastX = ev.clientX; lastY = ev.clientY;
       stage.classList.add('panning');
       ev.preventDefault();
@@ -325,8 +325,8 @@ function cycleTheme() {
   var current = getThemeMode();
   var next = current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system';
   applyTheme(next, true);
-  // Notify subscribers (e.g., <html-doc-diagram> rerenders Mermaid).
-  window.dispatchEvent(new CustomEvent('html-doc:theme-changed', {
+  // Notify subscribers (e.g., <oku-diagram> rerenders Mermaid).
+  window.dispatchEvent(new CustomEvent('oku:theme-changed', {
     detail: { mode: next, theme: document.documentElement.getAttribute('data-theme') }
   }));
 }
@@ -373,7 +373,7 @@ document.addEventListener('keydown', function (e) {
 });
 
 /* ============ Hash-based SPA navigation ========================== *
- * `html-doc init` only writes docs/index.html on disk. Sub-pages
+ * `oku init` only writes docs/index.html on disk. Sub-pages
  * (architecture.html, etc.) live as JSON sources with no .html
  * sibling. For the sidebar to navigate AND for refresh + middle-
  * click + copy-link to all stay robust under static file servers
@@ -394,7 +394,7 @@ document.addEventListener('keydown', function (e) {
  * ------------------------------------------------------------------- */
 
 // Parse "<pagePath>" or "<pagePath>:<anchor>" out of a raw hash string.
-function __htmldocParseHash(rawHash) {
+function __okuParseHash(rawHash) {
   var raw = (rawHash || '').replace(/^#/, '');
   if (!raw) return { page: null, anchor: null };
   var sep = raw.indexOf(':');
@@ -408,7 +408,7 @@ function __htmldocParseHash(rawHash) {
   return { page: page, anchor: anchor || null };
 }
 
-function __htmldocScrollToAnchor(anchor) {
+function __okuScrollToAnchor(anchor) {
   if (!anchor) { window.scrollTo(0, 0); return; }
   requestAnimationFrame(function () {
     var target = document.getElementById(anchor) || document.querySelector('[id="' + anchor + '"]');
@@ -416,48 +416,48 @@ function __htmldocScrollToAnchor(anchor) {
   });
 }
 
-function __htmldocRenderHash() {
-  if (typeof HtmlDocRenderer === 'undefined') return Promise.reject(new Error('renderer not loaded'));
-  var parsed = __htmldocParseHash(window.location.hash);
-  var current = window.__htmldocCurrentPage;
+function __okuRenderHash() {
+  if (typeof OkuRenderer === 'undefined') return Promise.reject(new Error('renderer not loaded'));
+  var parsed = __okuParseHash(window.location.hash);
+  var current = window.__okuCurrentPage;
   // Anchor-only change while parked on a page (e.g., page-toc click on
   // a non-index page): the user wants to scroll within the current
   // page, NOT navigate back to index.
   if (!parsed.page) {
     if (current) {
-      __htmldocScrollToAnchor(parsed.anchor);
+      __okuScrollToAnchor(parsed.anchor);
       return Promise.resolve();
     }
     // No current page (cold boot with anchor-only hash) → render index
     // and scroll. autoBoot also covers the same case; this branch
     // mostly catches Back-button into a pre-page state.
-    return __htmldocFetchAndRender('index.html', parsed.anchor);
+    return __okuFetchAndRender('index.html', parsed.anchor);
   }
   // Same page, new anchor → scroll without re-render.
   if (current === parsed.page) {
-    __htmldocScrollToAnchor(parsed.anchor);
+    __okuScrollToAnchor(parsed.anchor);
     return Promise.resolve();
   }
-  return __htmldocFetchAndRender(parsed.page, parsed.anchor);
+  return __okuFetchAndRender(parsed.page, parsed.anchor);
 }
 
-function __htmldocFetchAndRender(pagePath, anchor) {
-  var wa = (window.__htmldocWithAuth || function (u) { return u; });
-  var jsonUrl = wa(__htmldocDocsRoot + pagePath.replace(/\.html$/, '.json'));
+function __okuFetchAndRender(pagePath, anchor) {
+  var wa = (window.__okuWithAuth || function (u) { return u; });
+  var jsonUrl = wa(__okuDocsRoot + pagePath.replace(/\.html$/, '.json'));
   return fetch(jsonUrl, { cache: 'no-cache' })
     .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function (page) {
-      // Set BEFORE calling render so the html-doc:rendered handlers
+      // Set BEFORE calling render so the oku:rendered handlers
       // (buildTOC, etc.) see the right "current page" when they fire
       // — they need it to namespace TOC hrefs.
-      window.__htmldocCurrentPage = pagePath;
-      new HtmlDocRenderer({}).render(page);
-      __htmldocRefreshActiveLink(pagePath);
-      __htmldocScrollToAnchor(anchor);
+      window.__okuCurrentPage = pagePath;
+      new OkuRenderer({}).render(page);
+      __okuRefreshActiveLink(pagePath);
+      __okuScrollToAnchor(anchor);
     });
 }
 
-function __htmldocRefreshActiveLink(pagePath) {
+function __okuRefreshActiveLink(pagePath) {
   document.querySelectorAll('page-nav .page-nav-item.active').forEach(function (li) {
     li.classList.remove('active');
     var a = li.querySelector('a');
@@ -465,7 +465,7 @@ function __htmldocRefreshActiveLink(pagePath) {
   });
   document.querySelectorAll('page-nav a[href]').forEach(function (a) {
     var href = a.getAttribute('href') || '';
-    var ref = __htmldocParseHash(href);
+    var ref = __okuParseHash(href);
     var hrefPage = ref.page || '';
     var match = hrefPage === pagePath || (!hrefPage && pagePath === 'index.html');
     if (match) {
@@ -483,9 +483,9 @@ function __htmldocRefreshActiveLink(pagePath) {
 window.addEventListener('hashchange', function () {
   // Tell the scroll-spy to pause its replaceState writes for a tick —
   // otherwise the scroll-driven hash update fights the click-driven one.
-  try { window.dispatchEvent(new Event('html-doc:hash-routing')); } catch (e) { /* ignore */ }
-  __htmldocRenderHash().catch(function (err) {
-    console.warn('[html-doc] hash navigation failed', err);
+  try { window.dispatchEvent(new Event('oku:hash-routing')); } catch (e) { /* ignore */ }
+  __okuRenderHash().catch(function (err) {
+    console.warn('[oku] hash navigation failed', err);
   });
   document.body.classList.remove('drawer-open');
 });
@@ -510,7 +510,7 @@ document.addEventListener('click', function (e) {
   if (!url.pathname.endsWith('.html')) return;
   // Compute pagePath relative to the docs root.
   var docsRootPath;
-  try { docsRootPath = new URL(__htmldocDocsRoot, window.location.origin).pathname; } catch (e2) { docsRootPath = '/'; }
+  try { docsRootPath = new URL(__okuDocsRoot, window.location.origin).pathname; } catch (e2) { docsRootPath = '/'; }
   var pagePath = url.pathname.indexOf(docsRootPath) === 0
     ? url.pathname.slice(docsRootPath.length)
     : url.pathname;
@@ -519,7 +519,7 @@ document.addEventListener('click', function (e) {
   var newHash = '#' + pagePath + (anchor ? ':' + anchor : '');
   if (window.location.hash === newHash) {
     // Same target — re-render anyway (scroll to top).
-    __htmldocRenderHash().catch(function () {});
+    __okuRenderHash().catch(function () {});
   } else {
     window.location.hash = newHash; // fires hashchange
   }
@@ -654,7 +654,7 @@ class PageToc extends HTMLElement {
     // "On this page" and gives the reader a label when the sidebar is
     // visible on wide screens. Falls back to a custom attribute or
     // document.title if the renderer hasn't filled in either yet; an
-    // html-doc:rendered listener below refreshes once the page mounts.
+    // oku:rendered listener below refreshes once the page mounts.
     var override = this.getAttribute('title');
     var initial = override || document.title || '';
     this.innerHTML =
@@ -672,10 +672,10 @@ class PageToc extends HTMLElement {
       var pageH1 = document.querySelector('main header.cover h1, main h1');
       heading.textContent = (pageH1 && pageH1.textContent.trim()) || document.title || '';
     }
-    // The renderer dispatches html-doc:rendered on window after every
+    // The renderer dispatches oku:rendered on window after every
     // render (initial + each hash-nav re-render), which is exactly
     // when document.title and main's h1 are fresh.
-    window.addEventListener('html-doc:rendered', refreshTitle);
+    window.addEventListener('oku:rendered', refreshTitle);
     window.addEventListener('hashchange', function () {
       // Defensive: if a flow path swaps <main> faster than the
       // rendered event fires, the next microtask still picks up the
@@ -683,7 +683,7 @@ class PageToc extends HTMLElement {
       setTimeout(refreshTitle, 0);
     });
     // If <main> already has section content (pre-rendered HTML), build
-    // the TOC now. For renderer-driven pages, html-doc:rendered will
+    // the TOC now. For renderer-driven pages, oku:rendered will
     // trigger the build later — avoid the wasted empty first pass.
     if (document.querySelector('main > section')) {
       var list = self.querySelector('.toc-list');
@@ -703,7 +703,7 @@ function slugify(text) {
 function appendPermalink(heading, id, label) {
   if (heading.querySelector('.permalink')) return;
   // Page-aware so copy-link gives a URL that fully restores state.
-  var current = window.__htmldocCurrentPage;
+  var current = window.__okuCurrentPage;
   var prefix = (current && current !== 'index.html') ? '#' + current + ':' : '#';
   var a = document.createElement('a');
   a.className = 'permalink';
@@ -724,7 +724,7 @@ function buildTOC(tocList) {
   // each TOC entry to "<currentPage>:<sec-id>" keeps the page context
   // intact and makes copy-link work correctly. For index.html (no
   // current page or explicit index), the bare "#sec-id" is fine.
-  var current = window.__htmldocCurrentPage;
+  var current = window.__okuCurrentPage;
   var hashPrefix = (current && current !== 'index.html') ? '#' + current + ':' : '#';
 
   // Count TOC-eligible sections separately so the numbering doesn't
@@ -817,7 +817,7 @@ function buildTOC(tocList) {
   // Page-aware hash prefix matches buildTOC above — so an in-flight
   // scroll past a section stamps a URL that fully restores state on
   // refresh / paste.
-  var pageForHash = window.__htmldocCurrentPage;
+  var pageForHash = window.__okuCurrentPage;
   var hashPrefix = (pageForHash && pageForHash !== 'index.html') ? '#' + pageForHash + ':' : '#';
   var lastHash = null;
   // While the user is interacting with a hash-routed link (click on a
@@ -825,7 +825,7 @@ function buildTOC(tocList) {
   // existing hash stand for one tick so we don't overwrite it before
   // the smooth scroll lands on the target.
   //
-  // Start SUSPENDED: buildTOC is invoked from `html-doc:rendered`,
+  // Start SUSPENDED: buildTOC is invoked from `oku:rendered`,
   // which fires after the renderer finishes but BEFORE the router has
   // scrolled to the deep-link section. If we let the first updateActive
   // fire eagerly it would see scrollY = 0 and clear the section anchor
@@ -833,19 +833,19 @@ function buildTOC(tocList) {
   // The 600 ms window matches the router's smooth-scroll budget.
   var suspendHashUpdate = true;
   setTimeout(function () { suspendHashUpdate = false; }, 600);
-  window.addEventListener('html-doc:hash-routing', function () {
+  window.addEventListener('oku:hash-routing', function () {
     suspendHashUpdate = true;
     setTimeout(function () { suspendHashUpdate = false; }, 600);
   });
 
   function updateActive() {
-    // After hash-routing, buildTOC re-runs on `html-doc:rendered` and a
+    // After hash-routing, buildTOC re-runs on `oku:rendered` and a
     // fresh scroll-spy is attached. The OLD scroll listener stays bound
     // to `window` (closure refs the previous page's headings + page).
     // Gate: only the scroll-spy for the CURRENT page should act —
     // otherwise the old one races the new one and overwrites the URL
     // with the previous page's prefix, breaking refresh-restores-page.
-    if (pageForHash !== window.__htmldocCurrentPage) return;
+    if (pageForHash !== window.__okuCurrentPage) return;
     var y = window.scrollY + 150;
     var current = headings[0];
     for (var k = 0; k < headings.length; k++) {
@@ -911,11 +911,11 @@ function buildTOC(tocList) {
 // for new <pre> blocks needing copy buttons. Without this guard, every
 // renderer-rendered event would attach a duplicate scroll + keydown
 // closure that can't be removed.
-var __htmldocAidsInited = false;
+var __okuAidsInited = false;
 
 function initReadingAids() {
-  if (!__htmldocAidsInited) {
-    __htmldocAidsInited = true;
+  if (!__okuAidsInited) {
+    __okuAidsInited = true;
 
     /* Progress bar + back-to-top */
     (function () {
@@ -944,7 +944,7 @@ function initReadingAids() {
     });
   }
 
-  /* Wrap every <pre> in an .hdt-pre-host. The host is the non-scrolling
+  /* Wrap every <pre> in an .okt-pre-host. The host is the non-scrolling
      containing block for the copy / wrap buttons; without it the
      buttons live INSIDE the scrolling pre, so a horizontal scroll
      pushes them off-screen with the content. Run before either button
@@ -952,12 +952,12 @@ function initReadingAids() {
   function _hdtEnsurePreHost(pre) {
     if (!pre || !pre.parentNode) return pre.parentNode;
     var parent = pre.parentNode;
-    if (parent.classList && parent.classList.contains('hdt-pre-host')) return parent;
+    if (parent.classList && parent.classList.contains('okt-pre-host')) return parent;
     // Skip pres that belong to a Custom Element rendering its own
     // toolbar (charts, diagrams, snippets, tooltip popovers).
-    if (pre.closest('html-doc-chart, html-doc-diagram, html-doc-snippet, .html-doc-tooltip')) return parent;
+    if (pre.closest('oku-chart, oku-diagram, oku-snippet, .oku-tooltip')) return parent;
     var host = document.createElement('div');
-    host.className = 'hdt-pre-host';
+    host.className = 'okt-pre-host';
     parent.insertBefore(host, pre);
     host.appendChild(pre);
     return host;
@@ -1006,21 +1006,21 @@ function initReadingAids() {
      overlay. Skip images inside hosts that own their own expand path
      (charts, diagrams, tooltips, custom snippets). */
   (function () {
-    if (!window.__htmldocLightbox) return;
+    if (!window.__okuLightbox) return;
     var main = document.querySelector('#main-content') || document.body;
     main.querySelectorAll('img').forEach(function (img) {
       if (img.dataset.hdtExpandBound === '1') return;
-      if (img.closest('html-doc-chart, html-doc-diagram, html-doc-snippet, .html-doc-tooltip, .hdt-lightbox, page-chrome, page-nav, page-toc')) return;
+      if (img.closest('oku-chart, oku-diagram, oku-snippet, .oku-tooltip, .okt-lightbox, page-chrome, page-nav, page-toc')) return;
       if (img.width && img.width < 80) return;   // skip tiny inline glyphs
       img.dataset.hdtExpandBound = '1';
       // Wrap the image in a host so the chip can absolute-position over it.
       var host = document.createElement('span');
-      host.className = 'hdt-img-host';
+      host.className = 'okt-img-host';
       img.parentNode.insertBefore(host, img);
       host.appendChild(img);
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'hdt-img-expand';
+      btn.className = 'okt-img-expand';
       btn.innerHTML = ICON_EXPAND;
       btn.title = 'Expand image';
       btn.setAttribute('aria-label', 'Expand image');
@@ -1029,14 +1029,14 @@ function initReadingAids() {
         var big = document.createElement('img');
         big.src = img.currentSrc || img.src;
         big.alt = img.alt || '';
-        big.className = 'hdt-lightbox-img';
-        __htmldocLightbox.open(big, { title: img.alt || 'Expanded image' });
+        big.className = 'okt-lightbox-img';
+        __okuLightbox.open(big, { title: img.alt || 'Expanded image' });
       });
     });
   })();
 
   /* Wrap toggle on every <pre> — same shape as copy button, sits to its
-     left. Toggles a per-block .hdt-wrap class on the <pre>; CSS flips
+     left. Toggles a per-block .okt-wrap class on the <pre>; CSS flips
      white-space: pre → pre-wrap and the horizontal scrollbar away.
      State is per-block on purpose: wrapping a 200-character SQL query
      to read it shouldn't also wrap a tight CSS sample on the same page. */
@@ -1044,12 +1044,12 @@ function initReadingAids() {
     document.querySelectorAll('pre').forEach(function (pre) {
       // Skip blocks inside hosts that own their own toolbar (charts,
       // diagrams, live snippets, tooltips).
-      if (pre.closest('html-doc-chart, html-doc-diagram, html-doc-snippet, .html-doc-tooltip')) return;
+      if (pre.closest('oku-chart, oku-diagram, oku-snippet, .oku-tooltip')) return;
       var host = _hdtEnsurePreHost(pre);
       if (!host) return;
-      if (host.querySelector(':scope > .hdt-wrap-btn')) return;
+      if (host.querySelector(':scope > .okt-wrap-btn')) return;
       var btn = document.createElement('button');
-      btn.className = 'hdt-wrap-btn';
+      btn.className = 'okt-wrap-btn';
       btn.type = 'button';
       btn.innerHTML = ICON_WRAP;
       btn.title = 'Toggle line wrapping';
@@ -1057,7 +1057,7 @@ function initReadingAids() {
       btn.setAttribute('aria-pressed', 'false');
       host.appendChild(btn);
       btn.addEventListener('click', function () {
-        var wrapped = pre.classList.toggle('hdt-wrap');
+        var wrapped = pre.classList.toggle('okt-wrap');
         btn.classList.toggle('active', wrapped);
         btn.setAttribute('aria-pressed', wrapped ? 'true' : 'false');
       });
@@ -1079,9 +1079,9 @@ function initReadingAids() {
      <code>, so Prism's token rewriting (which touches <code>.innerHTML
      only) doesn't disturb it. user-select:none + pointer-events:none
      keep numbers out of copy-paste and out of click flow. Idempotent
-     via data-hdt-numbered. */
-  document.querySelectorAll('pre:not([data-hdt-numbered])').forEach(function (pre) {
-    if (pre.closest('.html-doc-tooltip, html-doc-chart, html-doc-diagram, html-doc-snippet')) return;
+     via data-okt-numbered. */
+  document.querySelectorAll('pre:not([data-okt-numbered])').forEach(function (pre) {
+    if (pre.closest('.oku-tooltip, oku-chart, oku-diagram, oku-snippet')) return;
     var code = pre.querySelector(':scope > code');
     if (!code) return;
     var text = code.textContent || '';
@@ -1089,8 +1089,8 @@ function initReadingAids() {
     if (text.endsWith('\n')) text = text.slice(0, -1);
     var lineCount = text.length ? text.split('\n').length : 1;
     if (lineCount < 1) return;
-    pre.setAttribute('data-hdt-numbered', '1');
-    pre.classList.add('hdt-line-numbered');
+    pre.setAttribute('data-okt-numbered', '1');
+    pre.classList.add('okt-line-numbered');
     // No standalone gutter element — number + fold cells are injected
     // into each per-line span by _hdtWrapCodeLines. This makes line
     // numbers ride along with their code line when word-wrap is on
@@ -1101,12 +1101,12 @@ function initReadingAids() {
   // match anything brace-shaped that lands in them. Defer to the next
   // tick so the gutter pass above has finished attaching.
   setTimeout(function () {
-    document.querySelectorAll('pre.hdt-line-numbered:not([data-hdt-lines-wrapped])').forEach(function (pre) {
+    document.querySelectorAll('pre.okt-line-numbered:not([data-okt-lines-wrapped])').forEach(function (pre) {
       var code = pre.querySelector(':scope > code');
       if (!code) return;
       // Skip blocks Prism is responsible for — the hook will handle them.
       if (/language-[\w-]+/.test(code.className)) return;
-      pre.setAttribute('data-hdt-lines-wrapped', '1');
+      pre.setAttribute('data-okt-lines-wrapped', '1');
       _hdtWrapCodeLines(code);
     });
   }, 0);
@@ -1117,9 +1117,9 @@ function initReadingAids() {
      alone. Tables inside tooltips, callouts or chart/diagram elements
      are skipped. Cards and List views are only generated when the table
      has a <thead> to source keys from. */
-  document.querySelectorAll('table:not([data-hdt-bound])').forEach(function (table) {
-    if (table.closest('.hdt-table-scroll, .html-doc-tooltip, html-doc-chart, html-doc-diagram')) return;
-    table.setAttribute('data-hdt-bound', '1');
+  document.querySelectorAll('table:not([data-okt-bound])').forEach(function (table) {
+    if (table.closest('.okt-table-scroll, .oku-tooltip, oku-chart, oku-diagram')) return;
+    table.setAttribute('data-okt-bound', '1');
 
     // Column-resize handles. Each <th> in the thead gets a thin
     // right-edge grabber; on drag we apply explicit widths via a
@@ -1137,11 +1137,11 @@ function initReadingAids() {
         table.insertBefore(cg, table.firstChild);
       }
       ths.forEach(function (th, idx) {
-        if (th.querySelector(':scope > .hdt-col-resize')) return;
+        if (th.querySelector(':scope > .okt-col-resize')) return;
         // Make th a positioning context for the absolute handle.
         if (getComputedStyle(th).position === 'static') th.style.position = 'relative';
         var handle = document.createElement('span');
-        handle.className = 'hdt-col-resize';
+        handle.className = 'okt-col-resize';
         handle.setAttribute('aria-hidden', 'true');
         th.appendChild(handle);
         var dragging = false, startX = 0, startW = 0, col;
@@ -1151,7 +1151,7 @@ function initReadingAids() {
           startX = ev.clientX;
           startW = th.getBoundingClientRect().width;
           col = table.querySelectorAll('colgroup col')[idx];
-          table.classList.add('hdt-table-resizing');
+          table.classList.add('okt-table-resizing');
           table.style.tableLayout = 'fixed';
           if (col && !col.style.width) col.style.width = startW + 'px';
         });
@@ -1164,7 +1164,7 @@ function initReadingAids() {
         window.addEventListener('mouseup', function () {
           if (!dragging) return;
           dragging = false;
-          table.classList.remove('hdt-table-resizing');
+          table.classList.remove('okt-table-resizing');
         });
       });
     })();
@@ -1258,23 +1258,23 @@ function initReadingAids() {
     // Start narrow — auto-fit logic below toggles `expanded` only when the
     // table's natural width overflows the column. The first manual click
     // on the expand button pins state and stops auto-toggling.
-    wrap.className = 'hdt-table-wrap';
+    wrap.className = 'okt-table-wrap';
     wrap.dataset.view = 'table';
 
     var ctrl = document.createElement('div');
-    ctrl.className = 'hdt-table-controls';
+    ctrl.className = 'okt-table-controls';
     // Filter input on the left, stats counter immediately after it
     // (the two are read together: "I filtered, here is what remains").
     // View order: Table → List → Cards. Stats text is purely numeric
     // ("5" or "3/5") so the visual language stays neutral across doc
     // languages.
     var filterInputHTML = canPivot ? (
-      '<label class="hdt-filter">' +
+      '<label class="okt-filter">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6"/></svg>' +
         '<input type="search" placeholder="Filter…" aria-label="Filter table rows">' +
       '</label>'
     ) : '';
-    var statsHTML = canPivot ? '<span class="hdt-stats" aria-live="polite"></span>' : '';
+    var statsHTML = canPivot ? '<span class="okt-stats" aria-live="polite"></span>' : '';
     var groupByHTML = '';
     if (canPivot && headers.length > 1) {
       // Strip HTML tags from header text for the picker option label
@@ -1290,8 +1290,8 @@ function initReadingAids() {
       // "— no grouping —" and the aria-label gives screen readers
       // the context. Saves toolbar width on narrow viewports.
       groupByHTML =
-        '<label class="hdt-groupby">' +
-          '<select class="hdt-groupby-select" aria-label="Group by column">' + opts.join('') + '</select>' +
+        '<label class="okt-groupby">' +
+          '<select class="okt-groupby-select" aria-label="Group by column">' + opts.join('') + '</select>' +
         '</label>';
     }
     // Compact icon-only view toggle. Each button keeps its accessible
@@ -1310,26 +1310,26 @@ function initReadingAids() {
       board: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="3.5" height="12" rx="1"/><rect x="6.25" y="2" width="3.5" height="9" rx="1"/><rect x="10.5" y="2" width="3.5" height="6" rx="1"/></svg>',
     };
     function viewBtnHTML(key, label, isActive) {
-      return '<button data-view="' + key + '" type="button" class="hdt-view-btn' +
+      return '<button data-view="' + key + '" type="button" class="okt-view-btn' +
         (isActive ? ' active' : '') + '" aria-pressed="' + (isActive ? 'true' : 'false') +
         '" aria-label="' + label + ' view" title="' + label + ' view">' +
         VIEW_ICONS[key] + '</button>';
     }
     var viewBtns = canPivot ? (
-      '<span class="hdt-view-group" role="group" aria-label="View">' +
+      '<span class="okt-view-group" role="group" aria-label="View">' +
         viewBtnHTML('table', 'Table', true) +
         viewBtnHTML('list',  'List',  false) +
         viewBtnHTML('cards', 'Cards', false) +
         viewBtnHTML('board', 'Board', false) +
       '</span>' +
-      '<span class="hdt-ctrl-sep" aria-hidden="true"></span>'
+      '<span class="okt-ctrl-sep" aria-hidden="true"></span>'
     ) : '';
     // Order: filter → stats → view-toggle → expand → groupby.
     // Wrapping break-points follow DOM order, so when the toolbar
     // is too narrow to fit everything on one line, groupby is the
     // last item and breaks to the second line first. View-toggle +
     // expand stay on the first line, right-aligned via
-    // justify-content: flex-end on .hdt-table-controls.
+    // justify-content: flex-end on .okt-table-controls.
     ctrl.innerHTML =
       filterInputHTML +
       statsHTML +
@@ -1340,7 +1340,7 @@ function initReadingAids() {
       groupByHTML;
 
     var scroll = document.createElement('div');
-    scroll.className = 'hdt-table-scroll';
+    scroll.className = 'okt-table-scroll';
 
     table.parentNode.insertBefore(wrap, table);
     scroll.appendChild(table);
@@ -1368,13 +1368,13 @@ function initReadingAids() {
 
       // Cards + List + Board containers (rebuilt by render()).
       var cards = document.createElement('div');
-      cards.className = 'hdt-table-cards';
+      cards.className = 'okt-table-cards';
       wrap.appendChild(cards);
       var list = document.createElement('div');
-      list.className = 'hdt-table-list';
+      list.className = 'okt-table-list';
       wrap.appendChild(list);
       var board = document.createElement('div');
-      board.className = 'hdt-table-board';
+      board.className = 'okt-table-board';
       wrap.appendChild(board);
 
       // State
@@ -1563,10 +1563,10 @@ function initReadingAids() {
         if (!tr) return;
         var cell = tr.querySelector(':scope > th, :scope > td');
         if (!cell) return;
-        var chev = cell.querySelector(':scope > .hdt-group-chevron');
+        var chev = cell.querySelector(':scope > .okt-group-chevron');
         if (!chev) {
           chev = document.createElement('span');
-          chev.className = 'hdt-group-chevron';
+          chev.className = 'okt-group-chevron';
           chev.setAttribute('role', 'button');
           chev.setAttribute('aria-label', 'Toggle group');
           chev.setAttribute('tabindex', '0');
@@ -1576,24 +1576,24 @@ function initReadingAids() {
           chev.addEventListener('keydown', function (ev) {
             if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleGroup(e); }
           });
-          tr.classList.add('hdt-collapsible');
+          tr.classList.add('okt-collapsible');
           tr.addEventListener('click', function (ev) {
             // Avoid double-fire when the chevron itself was the target.
-            if (ev.target.closest('.hdt-group-chevron')) return;
+            if (ev.target.closest('.okt-group-chevron')) return;
             toggleGroup(e);
           });
         }
         // Count badge sits between chevron and the author title so the
         // numbers line up at the same x across all group rows.
-        var badge = cell.querySelector(':scope > .hdt-group-count');
+        var badge = cell.querySelector(':scope > .okt-group-count');
         if (!badge) {
           badge = document.createElement('span');
-          badge.className = 'hdt-group-count';
+          badge.className = 'okt-group-count';
           cell.insertBefore(badge, chev.nextSibling);
         }
         badge.textContent = fmtGroupCount(n);
         var collapsed = isGroupCollapsed(e);
-        tr.classList.toggle('hdt-collapsed', collapsed);
+        tr.classList.toggle('okt-collapsed', collapsed);
         chev.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
       }
 
@@ -1616,18 +1616,18 @@ function initReadingAids() {
 
       function makeGroupHeader(tag, cls, e, count) {
         var h = document.createElement(tag);
-        h.className = cls + ' hdt-collapsible';
+        h.className = cls + ' okt-collapsible';
         var chev = document.createElement('span');
-        chev.className = 'hdt-group-chevron';
+        chev.className = 'okt-group-chevron';
         chev.setAttribute('role', 'button');
         chev.setAttribute('aria-label', 'Toggle group');
         chev.setAttribute('tabindex', '0');
         chev.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>';
         var title = document.createElement('span');
-        title.className = 'hdt-group-title';
+        title.className = 'okt-group-title';
         title.innerHTML = e.title;
         var badge = document.createElement('span');
-        badge.className = 'hdt-group-count';
+        badge.className = 'okt-group-count';
         badge.textContent = fmtGroupCount(count);
         // Count badge sits second (chevron, count, title) so the
         // numbers line up at the same x across rows in cards/list view.
@@ -1635,14 +1635,14 @@ function initReadingAids() {
         h.appendChild(badge);
         h.appendChild(title);
         var collapsed = isGroupCollapsed(e);
-        h.classList.toggle('hdt-collapsed', collapsed);
+        h.classList.toggle('okt-collapsed', collapsed);
         chev.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
         chev.addEventListener('click', function (ev) { ev.stopPropagation(); toggleGroup(e); });
         chev.addEventListener('keydown', function (ev) {
           if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggleGroup(e); }
         });
         h.addEventListener('click', function (ev) {
-          if (ev.target.closest('.hdt-group-chevron')) return;
+          if (ev.target.closest('.okt-group-chevron')) return;
           toggleGroup(e);
         });
         return h;
@@ -1653,21 +1653,21 @@ function initReadingAids() {
         var skip = false;
         visible.forEach(function (e) {
           if (e.type === 'group') {
-            cards.appendChild(makeGroupHeader('div', 'hdt-cards-group', e, counts.perGroup.get(e) || 0));
+            cards.appendChild(makeGroupHeader('div', 'okt-cards-group', e, counts.perGroup.get(e) || 0));
             skip = isGroupCollapsed(e);
             return;
           }
           if (skip) return;
           var card = document.createElement(e.iv.href ? 'a' : 'div');
-          card.className = 'hdt-card';
+          card.className = 'okt-card';
           applyRowInteractivity(card, e.iv);
           e.cells.forEach(function (cell, i) {
             if (!headers[i]) return;
             var r = document.createElement('div');
-            r.className = 'hdt-card-row';
+            r.className = 'okt-card-row';
             r.innerHTML =
-              '<span class="hdt-card-key">' + headers[i] + '</span>' +
-              '<span class="hdt-card-val">' + cell + '</span>';
+              '<span class="okt-card-key">' + headers[i] + '</span>' +
+              '<span class="okt-card-val">' + cell + '</span>';
             card.appendChild(r);
           });
           cards.appendChild(card);
@@ -1679,17 +1679,17 @@ function initReadingAids() {
         var skip = false;
         visible.forEach(function (e) {
           if (e.type === 'group') {
-            list.appendChild(makeGroupHeader('h4', 'hdt-list-group', e, counts.perGroup.get(e) || 0));
+            list.appendChild(makeGroupHeader('h4', 'okt-list-group', e, counts.perGroup.get(e) || 0));
             skip = isGroupCollapsed(e);
             return;
           }
           if (skip) return;
-          /* Each row becomes its own 2-col <table class="hdt-list-card">.
+          /* Each row becomes its own 2-col <table class="okt-list-card">.
              First column = header (<th scope="row">), second column = cell
              value (<td>). Makes the list view literally tabular per item
              rather than a styled definition list. */
           var inner = document.createElement('table');
-          inner.className = 'hdt-list-card';
+          inner.className = 'okt-list-card';
           var tb = document.createElement('tbody');
           e.cells.forEach(function (cell, i) {
             if (!headers[i]) return;
@@ -1706,19 +1706,19 @@ function initReadingAids() {
           inner.appendChild(tb);
           if (e.iv.href) {
             var a = document.createElement('a');
-            a.className = 'hdt-list-row';
+            a.className = 'okt-list-row';
             applyRowInteractivity(a, e.iv);
             a.appendChild(inner);
             list.appendChild(a);
           } else if (e.iv.onclick || e.iv.role === 'button') {
             var btn = document.createElement('div');
-            btn.className = 'hdt-list-row';
+            btn.className = 'okt-list-row';
             applyRowInteractivity(btn, e.iv);
             btn.appendChild(inner);
             list.appendChild(btn);
           } else {
             var wrapEl = document.createElement('div');
-            wrapEl.className = 'hdt-list-row hdt-list-row-static';
+            wrapEl.className = 'okt-list-row okt-list-row-static';
             wrapEl.appendChild(inner);
             list.appendChild(wrapEl);
           }
@@ -1780,32 +1780,32 @@ function initReadingAids() {
           var key = entry[0];
           var rows = entry[1];
           var lane = document.createElement('div');
-          lane.className = 'hdt-board-lane';
+          lane.className = 'okt-board-lane';
           var head = document.createElement('div');
-          head.className = 'hdt-board-lane-head';
+          head.className = 'okt-board-lane-head';
           if (key === '__all__') {
-            head.innerHTML = '<span class="hdt-board-lane-title">All</span>' +
-                             '<span class="hdt-board-lane-count">' + rows.length + '</span>';
+            head.innerHTML = '<span class="okt-board-lane-title">All</span>' +
+                             '<span class="okt-board-lane-count">' + rows.length + '</span>';
           } else {
             var title = (key.label || key.title || key.key || '').toString();
             head.innerHTML =
-              '<span class="hdt-board-lane-title">' + escapeXml(title) + '</span>' +
-              '<span class="hdt-board-lane-count">' + rows.length + '</span>';
+              '<span class="okt-board-lane-title">' + escapeXml(title) + '</span>' +
+              '<span class="okt-board-lane-count">' + rows.length + '</span>';
           }
           lane.appendChild(head);
           var laneBody = document.createElement('div');
-          laneBody.className = 'hdt-board-lane-body';
+          laneBody.className = 'okt-board-lane-body';
           rows.forEach(function (e) {
             var card = document.createElement(e.iv.href ? 'a' : 'div');
-            card.className = 'hdt-board-card';
+            card.className = 'okt-board-card';
             applyRowInteractivity(card, e.iv);
             e.cells.forEach(function (cell, i) {
               if (!headers[i]) return;
               var r = document.createElement('div');
-              r.className = 'hdt-board-card-row';
+              r.className = 'okt-board-card-row';
               r.innerHTML =
-                '<span class="hdt-board-card-key">' + headers[i] + '</span>' +
-                '<span class="hdt-board-card-val">' + cell + '</span>';
+                '<span class="okt-board-card-key">' + headers[i] + '</span>' +
+                '<span class="okt-board-card-val">' + cell + '</span>';
               card.appendChild(r);
             });
             laneBody.appendChild(card);
@@ -1818,7 +1818,7 @@ function initReadingAids() {
       /* Stats element lives in the controls bar (right side). Updated on
          every render(); content depends on whether a filter (text or
          chips) is currently narrowing the result set. */
-      var statsEl = ctrl.querySelector('.hdt-stats');
+      var statsEl = ctrl.querySelector('.okt-stats');
       function updateStats(counts) {
         if (!statsEl) return;
         var n = counts.visibleRows;
@@ -1828,11 +1828,11 @@ function initReadingAids() {
         // without touching the kit.
         if (!filtering) {
           statsEl.textContent = String(n);
-          statsEl.classList.remove('hdt-stats-filtered', 'hdt-stats-empty');
+          statsEl.classList.remove('okt-stats-filtered', 'okt-stats-empty');
         } else {
           statsEl.textContent = n + '/' + rowCount;
-          statsEl.classList.add('hdt-stats-filtered');
-          statsEl.classList.toggle('hdt-stats-empty', n === 0);
+          statsEl.classList.add('okt-stats-filtered');
+          statsEl.classList.toggle('okt-stats-empty', n === 0);
         }
       }
 
@@ -1841,10 +1841,10 @@ function initReadingAids() {
         for (var i = 0; i < ths.length; i++) {
           var th = ths[i];
           th.removeAttribute('aria-sort');
-          th.classList.remove('hdt-sort-asc', 'hdt-sort-desc');
+          th.classList.remove('okt-sort-asc', 'okt-sort-desc');
           if (i === sortCol) {
-            if (sortDir === 1)  { th.classList.add('hdt-sort-asc');  th.setAttribute('aria-sort', 'ascending'); }
-            if (sortDir === -1) { th.classList.add('hdt-sort-desc'); th.setAttribute('aria-sort', 'descending'); }
+            if (sortDir === 1)  { th.classList.add('okt-sort-asc');  th.setAttribute('aria-sort', 'ascending'); }
+            if (sortDir === -1) { th.classList.add('okt-sort-desc'); th.setAttribute('aria-sort', 'descending'); }
           }
         }
       }
@@ -1870,7 +1870,7 @@ function initReadingAids() {
       var chipsRack = null;
       if (hasChipCols) {
         chipsRack = document.createElement('div');
-        chipsRack.className = 'hdt-chips';
+        chipsRack.className = 'okt-chips';
         Object.keys(chipCols)
           .sort(function (a, b) { return (+a) - (+b); })
           .forEach(function (colS) {
@@ -1880,26 +1880,26 @@ function initReadingAids() {
                the parent grid lay them out as a clean two-column table
                regardless of how many chips a column declares. */
             var grp = document.createElement('div');
-            grp.className = 'hdt-chip-group';
+            grp.className = 'okt-chip-group';
             grp.dataset.col = colS;
             var lbl = document.createElement('span');
-            lbl.className = 'hdt-chip-label';
+            lbl.className = 'okt-chip-label';
             lbl.textContent = chipColLabels[col] + ':';
             grp.appendChild(lbl);
             var row = document.createElement('div');
-            row.className = 'hdt-chip-row';
+            row.className = 'okt-chip-row';
             grp.appendChild(row);
             chipCols[col].values.forEach(function (v) {
               var btn = document.createElement('button');
               btn.type = 'button';
-              btn.className = 'hdt-chip';
+              btn.className = 'okt-chip';
               btn.dataset.value = v;
               btn.setAttribute('aria-pressed', 'false');
               var valSpan = document.createElement('span');
-              valSpan.className = 'hdt-chip-val';
+              valSpan.className = 'okt-chip-val';
               valSpan.textContent = v;
               var cntSpan = document.createElement('span');
-              cntSpan.className = 'hdt-chip-count';
+              cntSpan.className = 'okt-chip-count';
               btn.appendChild(valSpan);
               btn.appendChild(cntSpan);
               btn.addEventListener('click', function () {
@@ -1922,12 +1922,12 @@ function initReadingAids() {
             // only while any chip in the column is active.
             var clr = document.createElement('button');
             clr.type = 'button';
-            clr.className = 'hdt-chip-clear';
+            clr.className = 'okt-chip-clear';
             clr.textContent = '×';
             clr.setAttribute('aria-label', 'Clear');
             clr.addEventListener('click', function () {
               chipsState[col].clear();
-              grp.querySelectorAll('.hdt-chip').forEach(function (b) {
+              grp.querySelectorAll('.okt-chip').forEach(function (b) {
                 b.classList.remove('active');
                 b.setAttribute('aria-pressed', 'false');
               });
@@ -1946,9 +1946,9 @@ function initReadingAids() {
         // Chip counts always reflect the underlying flat row population,
         // independent of the current grouping choice — switching how
         // rows are bucketed shouldn't change what each chip represents.
-        chipsRack.querySelectorAll('.hdt-chip-group').forEach(function (grp) {
+        chipsRack.querySelectorAll('.okt-chip-group').forEach(function (grp) {
           var col = +grp.dataset.col;
-          grp.querySelectorAll('.hdt-chip').forEach(function (btn) {
+          grp.querySelectorAll('.okt-chip').forEach(function (btn) {
             var v = btn.dataset.value;
             var count = 0;
             for (var i = 0; i < flatRows.length; i++) {
@@ -1973,9 +1973,9 @@ function initReadingAids() {
               var vals = cellValuesFor(e, col);
               if (vals.indexOf(v) !== -1) count++;
             }
-            var cnt = btn.querySelector('.hdt-chip-count');
+            var cnt = btn.querySelector('.okt-chip-count');
             if (cnt) cnt.textContent = String(count);
-            btn.classList.toggle('hdt-chip-empty', count === 0);
+            btn.classList.toggle('okt-chip-empty', count === 0);
           });
         });
       }
@@ -1983,7 +1983,7 @@ function initReadingAids() {
       // Bind sort on every <th> in <thead>.
       var ths = table.querySelectorAll('thead th');
       Array.prototype.forEach.call(ths, function (th, idx) {
-        th.classList.add('hdt-sortable');
+        th.classList.add('okt-sortable');
         if (!th.hasAttribute('tabindex')) th.setAttribute('tabindex', '0');
         if (!th.hasAttribute('role'))     th.setAttribute('role', 'button');
         function toggleSort() {
@@ -1999,7 +1999,7 @@ function initReadingAids() {
       });
 
       // Bind filter input.
-      var filterInput = ctrl.querySelector('.hdt-filter input');
+      var filterInput = ctrl.querySelector('.okt-filter input');
       if (filterInput) {
         filterInput.addEventListener('input', function () {
           filterText = filterInput.value;
@@ -2008,7 +2008,7 @@ function initReadingAids() {
       }
 
       // Group-by select.
-      var groupBySelect = ctrl.querySelector('.hdt-groupby-select');
+      var groupBySelect = ctrl.querySelector('.okt-groupby-select');
       if (groupBySelect) {
         groupBySelect.addEventListener('change', function () {
           groupByCol = groupBySelect.value;
@@ -2071,17 +2071,17 @@ function initReadingAids() {
       expBtn.title = 'Expand to fullscreen';
       expBtn.setAttribute('aria-label', 'Expand to fullscreen');
       expBtn.addEventListener('click', function () {
-        if (!window.__htmldocLightbox) return;
+        if (!window.__okuLightbox) return;
         if (wrap.dataset.fullscreen === '1') {
           // Second click while in lightbox: close it (mirrors the Esc /
           // backdrop / close-button paths).
-          __htmldocLightbox.close();
+          __okuLightbox.close();
           return;
         }
-        var placeholder = document.createComment('hdt-table-home');
+        var placeholder = document.createComment('okt-table-home');
         wrap.parentNode.insertBefore(placeholder, wrap);
         wrap.dataset.fullscreen = '1';
-        __htmldocLightbox.open(wrap, {
+        __okuLightbox.open(wrap, {
           title: 'Expanded table',
           // Tables manage their own scroll containers; the pan/zoom
           // wrapper would conflict with cell selection and sort
@@ -2125,16 +2125,16 @@ function initReadingAids() {
 /* Build stamp for debugging. Bump KIT_BUILD any time chrome.js gains a
    compatibility-affecting change so users can verify in DevTools that
    their browser/IDE isn't serving a stale cached copy:
-       console look for: [html-doc] kit boot · build=...
+       console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __htmldocKitBuild = '2026-05-18-r10';
+var __okuKitBuild = '2026-05-18-r10';
 
-var __htmldocDocsRoot = (function () {
+var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
   // canonical docs/ tree (internal triage, examples, sandbox) but want
   // to share the same site-manifest / kit.json / glossary as the docs.
   // Value is resolved against the page URL so relative paths work.
-  var metaOverride = document.querySelector('meta[name="html-doc-docs-root"]');
+  var metaOverride = document.querySelector('meta[name="oku-docs-root"]');
   if (metaOverride && metaOverride.getAttribute('content')) {
     try {
       var resolved = new URL(metaOverride.getAttribute('content'), window.location.href).href;
@@ -2158,9 +2158,9 @@ var __htmldocDocsRoot = (function () {
    _ijt token propagation is active. */
 try {
   console.info(
-    '[html-doc] kit boot · build=' + __htmldocKitBuild +
-    ' · docsRoot=' + __htmldocDocsRoot +
-    ' · authToken=' + (window.__htmldocWithAuth && window.__htmldocWithAuth('x') !== 'x' ? 'yes' : 'no')
+    '[oku] kit boot · build=' + __okuKitBuild +
+    ' · docsRoot=' + __okuDocsRoot +
+    ' · authToken=' + (window.__okuWithAuth && window.__okuWithAuth('x') !== 'x' ? 'yes' : 'no')
   );
 } catch (e) { /* ignore */ }
 
@@ -2175,14 +2175,14 @@ function _hdtAfterPrismHighlight(env) {
   var code = env.element;
   var pre = code.parentElement;
   if (!pre || pre.tagName !== 'PRE') return;
-  if (!pre.classList.contains('hdt-line-numbered')) return;
-  if (code.querySelector(':scope > .hdt-code-line')) return; // already wrapped, intact
+  if (!pre.classList.contains('okt-line-numbered')) return;
+  if (code.querySelector(':scope > .okt-code-line')) return; // already wrapped, intact
   _hdtWrapCodeLines(code);
-  pre.setAttribute('data-hdt-lines-wrapped', '1');
+  pre.setAttribute('data-okt-lines-wrapped', '1');
   // Clear any stale fold-marker state inside per-line cells so a fresh
   // detection pass attaches handlers to the current line's marker.
-  Array.prototype.forEach.call(code.querySelectorAll(':scope > .hdt-code-line > .hdt-fold-marker'), function (marker) {
-    marker.classList.remove('hdt-foldable', 'hdt-folded');
+  Array.prototype.forEach.call(code.querySelectorAll(':scope > .okt-code-line > .okt-fold-marker'), function (marker) {
+    marker.classList.remove('okt-foldable', 'okt-folded');
     marker.removeAttribute('role');
     marker.removeAttribute('tabindex');
     marker.removeAttribute('aria-expanded');
@@ -2194,10 +2194,10 @@ function _hdtAfterPrismHighlight(env) {
   // dialect they're looking at. Idempotent — re-runs replace the text
   // rather than appending duplicates.
   if (lang && lang !== 'plaintext' && lang !== 'text' && lang !== 'none') {
-    var pill = pre.querySelector(':scope > .hdt-code-lang');
+    var pill = pre.querySelector(':scope > .okt-code-lang');
     if (!pill) {
       pill = document.createElement('span');
-      pill.className = 'hdt-code-lang';
+      pill.className = 'okt-code-lang';
       pill.setAttribute('aria-hidden', 'true');
       pre.appendChild(pill);
     }
@@ -2211,7 +2211,7 @@ function _hdtAfterPrismHighlight(env) {
 
 /* ============ Code-block line wrap + brace fold (module scope) ============ *
  * After Prism highlights, we walk the <code>'s child tree and group
- * everything by newlines into one <span class="hdt-code-line"> per
+ * everything by newlines into one <span class="okt-code-line"> per
  * source line. Each line includes its own trailing '\n' so collapsing
  * a line via display:none also removes the blank gap it would leave
  * behind. Prism's token spans survive: tokens entirely within a line
@@ -2220,8 +2220,8 @@ function _hdtAfterPrismHighlight(env) {
  * preserves coloring across the split.
  * ------------------------------------------------------------------- */
 function _hdtWrapCodeLines(code) {
-  // Each .hdt-code-line is a grid row with three cells:
-  //   [.hdt-code-ln (number)]  [.hdt-fold-marker]  [.hdt-code-content]
+  // Each .okt-code-line is a grid row with three cells:
+  //   [.okt-code-ln (number)]  [.okt-fold-marker]  [.okt-code-content]
   //
   // Numbers + fold markers ride with their code line — when word-wrap
   // is enabled and a logical line spans multiple visual rows, the
@@ -2231,10 +2231,10 @@ function _hdtWrapCodeLines(code) {
   // at the same y while wrapped content pushed code below).
   function makeLine(lineIdx) {
     var line = document.createElement('span');
-    line.className = 'hdt-code-line';
+    line.className = 'okt-code-line';
     line.setAttribute('data-line', String(lineIdx));
     var num = document.createElement('span');
-    num.className = 'hdt-code-ln';
+    num.className = 'okt-code-ln';
     // Number rendered via ::before { content: attr(data-ln) } so it
     // does NOT contribute to code.textContent. Prism's autoloader can
     // fire `complete` twice (once before the language module arrives,
@@ -2243,10 +2243,10 @@ function _hdtWrapCodeLines(code) {
     num.setAttribute('data-ln', String(lineIdx));
     num.setAttribute('aria-hidden', 'true');
     var fold = document.createElement('span');
-    fold.className = 'hdt-fold-marker';
+    fold.className = 'okt-fold-marker';
     fold.setAttribute('aria-hidden', 'true');
     var content = document.createElement('span');
-    content.className = 'hdt-code-content';
+    content.className = 'okt-code-content';
     line.appendChild(num);
     line.appendChild(fold);
     line.appendChild(content);
@@ -2257,7 +2257,7 @@ function _hdtWrapCodeLines(code) {
   // Cache the content cell of the current line. Refreshed on newline().
   // Avoids a querySelector per text-segment / token append — which on
   // a 200-line Prism-tokenised block runs into the thousands of calls.
-  var activeContent = lines[0].lastChild; // the .hdt-code-content node
+  var activeContent = lines[0].lastChild; // the .okt-code-content node
   function pushChar(s) { activeContent.appendChild(document.createTextNode(s)); }
   function newline() {
     // Trailing newline lives in the CURRENT line so display:none also
@@ -2315,7 +2315,7 @@ function _hdtWrapCodeLines(code) {
    we target (JS / TS / JSON / CSS) and avoids the cost of a full
    tokeniser. */
 function _hdtDetectBraceFolds(code) {
-  var lines = code.querySelectorAll('.hdt-code-line');
+  var lines = code.querySelectorAll('.okt-code-line');
   if (lines.length < 3) return [];
   var folds = [];
   var stack = [];
@@ -2347,13 +2347,13 @@ function _hdtDetectBraceFolds(code) {
    re-highlight (which can replace <code>.innerHTML mid-flight) doesn't
    leave dangling handlers attached to detached line spans. */
 function _hdtApplyFolds(pre, code, folds) {
-  var lines = code.querySelectorAll(':scope > .hdt-code-line');
+  var lines = code.querySelectorAll(':scope > .okt-code-line');
   folds.forEach(function (f) {
     var line = lines[f.start];
     if (!line) return;
-    var marker = line.querySelector(':scope > .hdt-fold-marker');
+    var marker = line.querySelector(':scope > .okt-fold-marker');
     if (!marker) return;
-    marker.classList.add('hdt-foldable');
+    marker.classList.add('okt-foldable');
     marker.setAttribute('role', 'button');
     marker.setAttribute('tabindex', '0');
     marker.setAttribute('aria-expanded', 'true');
@@ -2363,27 +2363,27 @@ function _hdtApplyFolds(pre, code, folds) {
   if (pre.dataset.hdtFoldDelegated === '1') return;
   pre.dataset.hdtFoldDelegated = '1';
   function handle(target) {
-    if (!target.classList.contains('hdt-foldable')) return;
+    if (!target.classList.contains('okt-foldable')) return;
     var start = +target.dataset.foldStart;
     var end = +target.dataset.foldEnd;
     if (!(end > start)) return;
-    var willCollapse = !target.classList.contains('hdt-folded');
-    target.classList.toggle('hdt-folded', willCollapse);
+    var willCollapse = !target.classList.contains('okt-folded');
+    target.classList.toggle('okt-folded', willCollapse);
     target.setAttribute('aria-expanded', willCollapse ? 'false' : 'true');
     var liveCode = pre.querySelector(':scope > code');
-    var liveLines = liveCode ? liveCode.querySelectorAll(':scope > .hdt-code-line') : [];
+    var liveLines = liveCode ? liveCode.querySelectorAll(':scope > .okt-code-line') : [];
     for (var i = start + 1; i < end; i++) {
-      if (liveLines[i]) liveLines[i].classList.toggle('hdt-line-hidden', willCollapse);
+      if (liveLines[i]) liveLines[i].classList.toggle('okt-line-hidden', willCollapse);
     }
-    pre.classList.toggle('hdt-has-folds', !!pre.querySelector('.hdt-fold-marker.hdt-folded'));
+    pre.classList.toggle('okt-has-folds', !!pre.querySelector('.okt-fold-marker.okt-folded'));
   }
   code.addEventListener('click', function (e) {
-    var t = e.target.closest('.hdt-fold-marker.hdt-foldable');
+    var t = e.target.closest('.okt-fold-marker.okt-foldable');
     if (t) handle(t);
   });
   code.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter' && e.key !== ' ') return;
-    var t = e.target.closest('.hdt-fold-marker.hdt-foldable');
+    var t = e.target.closest('.okt-fold-marker.okt-foldable');
     if (t) { e.preventDefault(); handle(t); }
   });
 }
@@ -2484,7 +2484,7 @@ function escapeHTML(s) {
     window.visualViewport.addEventListener('scroll', update);
   }
   // Renderer can swap layout mid-flight (JSON pages); rerun then.
-  window.addEventListener('html-doc:rendered', update);
+  window.addEventListener('oku:rendered', update);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', attach);
@@ -2510,8 +2510,8 @@ function escapeHTML(s) {
  * --------------------------------------------------------------------- */
 (function () {
   if (typeof document === 'undefined') return;
-  if (document.__htmldocBindAttached) return;
-  document.__htmldocBindAttached = true;
+  if (document.__okuBindAttached) return;
+  document.__okuBindAttached = true;
 
   function flash(key, on) {
     if (!key) return;
@@ -2557,7 +2557,7 @@ function escapeHTML(s) {
   });
 })();
 
-/* ============ Live-reload (only when served via `html-doc serve`) ============ *
+/* ============ Live-reload (only when served via `oku serve`) ============ *
  * Opens an EventSource against /__reload — a Server-Sent Events stream
  * that the dev server pushes a message into whenever a watched file
  * changes. On message, the tab reloads. Only attempted when the page is
@@ -2567,8 +2567,8 @@ function escapeHTML(s) {
   if (typeof window === 'undefined') return;
   var h = window.location && window.location.hostname;
   if (h !== 'localhost' && h !== '127.0.0.1' && h !== '::1') return;
-  if (window.__htmldocReloadAttached) return;
-  window.__htmldocReloadAttached = true;
+  if (window.__okuReloadAttached) return;
+  window.__okuReloadAttached = true;
   try {
     var es = new EventSource('/__reload');
     es.addEventListener('message', function () {
@@ -2581,7 +2581,7 @@ function escapeHTML(s) {
 })();
 
 /* ============ Tooltip controller (used by <glossary-term> + <ext-ref>) ============ */
-var __htmldocTooltip = (function () {
+var __okuTooltip = (function () {
   var HIDE_DELAY = 300;
   var SHOW_DELAY = 120;
   // Re-evaluate on every attach so input-mode changes (e.g., user
@@ -2639,11 +2639,11 @@ var __htmldocTooltip = (function () {
     var link = trigger.getAttribute('data-link');
     var lang = trigger.getAttribute('data-lang-shown');
     var t = document.createElement('div');
-    t.className = 'html-doc-tooltip';
-    var html = '<div class="hdt-body">' + body + '</div>';
-    if (lang) html += '<span class="hdt-lang">' + lang + '</span>';
-    if (link) html += '<div class="hdt-link"><a href="' + link + '" target="_blank" rel="noopener">Learn more →</a></div>';
-    html += '<span class="hdt-pin-hint">click to pin</span>';
+    t.className = 'oku-tooltip';
+    var html = '<div class="okt-body">' + body + '</div>';
+    if (lang) html += '<span class="okt-lang">' + lang + '</span>';
+    if (link) html += '<div class="okt-link"><a href="' + link + '" target="_blank" rel="noopener">Learn more →</a></div>';
+    html += '<span class="okt-pin-hint">click to pin</span>';
     t.innerHTML = html;
     return t;
   }
@@ -2696,7 +2696,7 @@ var __htmldocTooltip = (function () {
   }
 
   document.addEventListener('click', function (e) {
-    if (!e.target.closest('.html-doc-tooltip, [data-html-doc-tooltip-trigger]')) hideImmediate();
+    if (!e.target.closest('.oku-tooltip, [data-oku-tooltip-trigger]')) hideImmediate();
   });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && active && active.pinned) hideImmediate();
@@ -2706,7 +2706,7 @@ var __htmldocTooltip = (function () {
 })();
 
 /* ============ kit.json loader (multi-domain glossary + ext-refs) ============ */
-var __htmldocKit = (function () {
+var __okuKit = (function () {
   var kit = { glossary: {}, extrefs: {}, lang: 'en', lang_fallback: ['en'], domains: [], personalization: [] };
   var loaded = false;
   var waiters = [];
@@ -2714,7 +2714,7 @@ var __htmldocKit = (function () {
   function load() {
     if (loaded) return Promise.resolve(kit);
     // Standalone build — if the build inlined a kit bundle, hydrate from it.
-    var bundleTag = document.getElementById('__htmldoc_kit_bundle__');
+    var bundleTag = document.getElementById('__oku_kit_bundle__');
     if (bundleTag) {
       try {
         var bundle = JSON.parse(bundleTag.textContent || '{}');
@@ -2745,15 +2745,15 @@ var __htmldocKit = (function () {
       return Promise.resolve(kit);
     }
     // Standalone without a kit bundle: degrade silently.
-    if (document.getElementById('__htmldoc_page__')) {
+    if (document.getElementById('__oku_page__')) {
       loaded = true;
       waiters.forEach(function (w) { w(kit); });
       waiters = [];
       return Promise.resolve(kit);
     }
     // Project config lives at the docs root; domain files live in _kit/.
-    var wa = (window.__htmldocWithAuth || function (u) { return u; });
-    return fetch(wa(__htmldocDocsRoot + 'kit.json'), { cache: 'no-cache' })
+    var wa = (window.__okuWithAuth || function (u) { return u; });
+    return fetch(wa(__okuDocsRoot + 'kit.json'), { cache: 'no-cache' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; })
       .then(function (data) {
@@ -2766,13 +2766,13 @@ var __htmldocKit = (function () {
         // Load each domain file in parallel
         var promises = kit.domains.flatMap(function (d) {
           return [
-            fetch(wa(__htmldocDocsRoot + '_kit/glossary/' + d + '.json'), { cache: 'no-cache' })
+            fetch(wa(__okuDocsRoot + '_kit/glossary/' + d + '.json'), { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
                 if (j && j.entries) kit.glossary[d] = j.entries;
               }),
-            fetch(wa(__htmldocDocsRoot + '_kit/extrefs/' + d + '.json'), { cache: 'no-cache' })
+            fetch(wa(__okuDocsRoot + '_kit/extrefs/' + d + '.json'), { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
@@ -2800,8 +2800,8 @@ var __htmldocKit = (function () {
           // keys, chrome.js renders the gear button + swaps {{key}} at
           // runtime. Hand-off to the personalization module so it can
           // attach its UI once the kit data is settled.
-          if (typeof __htmldocPersonalization !== 'undefined') {
-            try { __htmldocPersonalization.init((data && data.personalization) || kit.personalization || []); }
+          if (typeof __okuPersonalization !== 'undefined') {
+            try { __okuPersonalization.init((data && data.personalization) || kit.personalization || []); }
             catch (e) { /* ignore */ }
           }
           waiters.forEach(function (w) { w(kit); });
@@ -2897,19 +2897,19 @@ var __htmldocKit = (function () {
  *
  * When present, chrome.js renders a gear icon in the top-right chrome
  * cluster. Clicking opens a small panel with text inputs for each key.
- * Values persist in localStorage under html-doc-personalization. Code
+ * Values persist in localStorage under oku-personalization. Code
  * blocks (and anywhere else the reader expects swap-in) get {{key}}
- * substrings replaced at runtime with <span class="hdc-personalized">
+ * substrings replaced at runtime with <span class="okc-personalized">
  * wrappers. Hovering a personalized span shows which key it came from.
  *
  * Why this matters: Mintlify pioneered "set apiKey once, every snippet
  * on every page swaps to your values" — massively reduces tutorial
- * copy-paste friction. html-doc's no-build constraint means we do this
+ * copy-paste friction. oku's no-build constraint means we do this
  * at runtime, not at build time; the localStorage-backed state is the
  * full extent of personalization (no accounts, no server, no SaaS).
  * --------------------------------------------------------------------- */
-var __htmldocPersonalization = (function () {
-  var STORAGE_KEY = 'html-doc-personalization';
+var __okuPersonalization = (function () {
+  var STORAGE_KEY = 'oku-personalization';
   var keys = [];       // [{ key, label, default, type? }]
   var values = {};     // { key: currentValue }
   var btn = null;
@@ -2936,13 +2936,13 @@ var __htmldocPersonalization = (function () {
 
   function applyAll() {
     // Update spans already wrapped, then look for new {{key}} occurrences.
-    document.querySelectorAll('.hdc-personalized').forEach(function (span) {
+    document.querySelectorAll('.okc-personalized').forEach(function (span) {
       var k = span.getAttribute('data-key');
       span.textContent = get(k);
     });
     // Walk likely containers — code blocks, snippets, kbd, and a generic
-    // .hdc-personalize-target opt-in for prose passages.
-    var roots = document.querySelectorAll('pre, code, kbd, .hdc-personalize-target');
+    // .okc-personalize-target opt-in for prose passages.
+    var roots = document.querySelectorAll('pre, code, kbd, .okc-personalize-target');
     var pattern = /\{\{(\w+)\}\}/g;
     roots.forEach(function (root) {
       var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
@@ -2967,7 +2967,7 @@ var __htmldocPersonalization = (function () {
           if (!keys.some(function (x) { return x.key === m[1]; })) continue;
           if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
           var span = document.createElement('span');
-          span.className = 'hdc-personalized';
+          span.className = 'okc-personalized';
           span.setAttribute('data-key', m[1]);
           span.title = 'Personalized: ' + m[1];
           span.textContent = get(m[1]);
@@ -3040,7 +3040,7 @@ var __htmldocPersonalization = (function () {
     });
     if (!btn) buildButton();
     applyAll();
-    window.addEventListener('html-doc:rendered', applyAll);
+    window.addEventListener('oku:rendered', applyAll);
   }
 
   return { init: init, get: get, set: set, applyAll: applyAll };
@@ -3048,36 +3048,36 @@ var __htmldocPersonalization = (function () {
 // Standalone builds inline the page but not the glossary; in that mode
 // we render the term inline without a tooltip rather than mark every
 // term as "unknown". Detected via the inline page-data script.
-var __htmldocStandalone = function () {
-  return !!document.getElementById('__htmldoc_page__');
+var __okuStandalone = function () {
+  return !!document.getElementById('__oku_page__');
 };
 
 class GlossaryTerm extends HTMLElement {
   connectedCallback() {
     var self = this;
-    this.setAttribute('data-html-doc-tooltip-trigger', '');
-    this.classList.add('html-doc-gloss');
-    __htmldocKit.whenReady().then(function () {
+    this.setAttribute('data-oku-tooltip-trigger', '');
+    this.classList.add('oku-gloss');
+    __okuKit.whenReady().then(function () {
       var term = self.getAttribute('term') || self.textContent;
       var opts = { in: self.getAttribute('in') || undefined, lang: self.getAttribute('lang') || undefined };
-      var r = __htmldocKit.resolveGlossary(term, opts);
+      var r = __okuKit.resolveGlossary(term, opts);
       if (r) {
         self.setAttribute('data-def', r.hit.def || '');
         if (r.hit.link) self.setAttribute('data-link', r.hit.link);
-        if (r.lang !== (opts.lang || __htmldocKit.state().lang)) {
+        if (r.lang !== (opts.lang || __okuKit.state().lang)) {
           self.setAttribute('data-lang-shown', 'lang: ' + r.lang);
         }
-        __htmldocTooltip.attach(self);
-      } else if (__htmldocStandalone()) {
+        __okuTooltip.attach(self);
+      } else if (__okuStandalone()) {
         // Standalone mode without inline glossary data — render text only.
-        self.classList.remove('html-doc-gloss');
+        self.classList.remove('oku-gloss');
       } else {
         self.setAttribute('data-def', '<em>Unknown term:</em> ' + term);
         self.classList.add('unknown');
-        window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+        window.dispatchEvent(new CustomEvent('oku:warnings', {
           detail: [{ code: 'unknown-glossary-term', msg: 'No entry for "' + term + '"', level: 'warn' }]
         }));
-        __htmldocTooltip.attach(self);
+        __okuTooltip.attach(self);
       }
     });
   }
@@ -3098,7 +3098,7 @@ if (!customElements.get('glossary-term')) customElements.define('glossary-term',
  *   <ext-ref name="..." type="paper" author="..." published="2024">
  * --------------------------------------------------------------------- */
 
-var __htmldocCiteIcons = {
+var __okuCiteIcons = {
   paper:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
   rfc:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
   release: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>',
@@ -3106,7 +3106,7 @@ var __htmldocCiteIcons = {
   other:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
 };
 
-function __htmldocCiteDomain(link) {
+function __okuCiteDomain(link) {
   if (!link) return '';
   try {
     var u = new URL(link, window.location.href);
@@ -3114,11 +3114,11 @@ function __htmldocCiteDomain(link) {
   } catch (e) { return ''; }
 }
 
-function __htmldocCiteType(hit, element) {
+function __okuCiteType(hit, element) {
   var type = (element.getAttribute('type') || hit.type || '').toLowerCase();
-  if (__htmldocCiteIcons[type]) return type;
+  if (__okuCiteIcons[type]) return type;
   // Infer from the link domain if not declared.
-  var dom = __htmldocCiteDomain(hit.link || '');
+  var dom = __okuCiteDomain(hit.link || '');
   if (/arxiv|doi\.org|acm\.org|springer|sciencedirect|nature\.com|ieee/.test(dom)) return 'paper';
   if (/datatracker\.ietf|w3\.org|rfc-editor|tc39|whatwg/.test(dom))               return 'rfc';
   if (/github\.com\/.+\/releases|releases\.|changelog/.test((hit.link || '')))    return 'release';
@@ -3126,17 +3126,17 @@ function __htmldocCiteType(hit, element) {
   return 'other';
 }
 
-function __htmldocBuildCitationBody(hit, name, element) {
-  var type = __htmldocCiteType(hit, element);
-  var icon = __htmldocCiteIcons[type] || __htmldocCiteIcons.other;
-  var domain = __htmldocCiteDomain(hit.link || '');
+function __okuBuildCitationBody(hit, name, element) {
+  var type = __okuCiteType(hit, element);
+  var icon = __okuCiteIcons[type] || __okuCiteIcons.other;
+  var domain = __okuCiteDomain(hit.link || '');
   var author = element.getAttribute('author') || hit.author || hit.authors || '';
   var published = element.getAttribute('published') || hit.published || hit.date || '';
 
-  var html = '<div class="hdt-cite" data-cite-type="' + type + '">';
-  html +=   '<div class="hdt-cite-head">';
-  html +=     '<span class="hdt-cite-icon">' + icon + '</span>';
-  html +=     '<span class="hdt-cite-title">' + escapeXml(hit.name || name) + '</span>';
+  var html = '<div class="okt-cite" data-cite-type="' + type + '">';
+  html +=   '<div class="okt-cite-head">';
+  html +=     '<span class="okt-cite-icon">' + icon + '</span>';
+  html +=     '<span class="okt-cite-title">' + escapeXml(hit.name || name) + '</span>';
   html +=   '</div>';
   if (domain) {
     // Render the domain as a clickable link when a destination URL is
@@ -3145,19 +3145,19 @@ function __htmldocBuildCitationBody(hit, name, element) {
     // doubled the click affordances. One link, clearly styled, is
     // enough.
     if (hit.link) {
-      html += '<a class="hdt-cite-domain" href="' + escapeXml(hit.link) +
+      html += '<a class="okt-cite-domain" href="' + escapeXml(hit.link) +
               '" target="_blank" rel="noopener">' + escapeXml(domain) + ' ↗</a>';
     } else {
-      html += '<div class="hdt-cite-domain">' + escapeXml(domain) + '</div>';
+      html += '<div class="okt-cite-domain">' + escapeXml(domain) + '</div>';
     }
   }
   if (author || published) {
-    html += '<div class="hdt-cite-meta">';
-    if (author)    html += '<span class="hdt-cite-author">' + escapeXml(author) + '</span>';
-    if (published) html += '<span class="hdt-cite-date">' + escapeXml(published) + '</span>';
+    html += '<div class="okt-cite-meta">';
+    if (author)    html += '<span class="okt-cite-author">' + escapeXml(author) + '</span>';
+    if (published) html += '<span class="okt-cite-date">' + escapeXml(published) + '</span>';
     html += '</div>';
   }
-  if (hit.summary) html += '<div class="hdt-cite-summary">' + hit.summary + '</div>';
+  if (hit.summary) html += '<div class="okt-cite-summary">' + hit.summary + '</div>';
   html += '</div>';
   return html;
 }
@@ -3165,36 +3165,36 @@ function __htmldocBuildCitationBody(hit, name, element) {
 class ExtRef extends HTMLElement {
   connectedCallback() {
     var self = this;
-    this.setAttribute('data-html-doc-tooltip-trigger', '');
-    this.classList.add('html-doc-extref');
-    __htmldocKit.whenReady().then(function () {
+    this.setAttribute('data-oku-tooltip-trigger', '');
+    this.classList.add('oku-extref');
+    __okuKit.whenReady().then(function () {
       var name = self.getAttribute('name') || self.textContent;
       var opts = { in: self.getAttribute('in') || undefined, lang: self.getAttribute('lang') || undefined };
-      var r = __htmldocKit.resolveExtRef(name, opts);
+      var r = __okuKit.resolveExtRef(name, opts);
       if (r) {
-        self.setAttribute('data-def', __htmldocBuildCitationBody(r.hit, name, self));
+        self.setAttribute('data-def', __okuBuildCitationBody(r.hit, name, self));
         // Tag the element itself with the resolved type so authors can
         // theme the inline cite-text (different underline per type).
-        var type = __htmldocCiteType(r.hit, self);
+        var type = __okuCiteType(r.hit, self);
         self.setAttribute('data-cite-type', type);
         // The destination URL is surfaced as a clickable link inside the
-        // tooltip's citation card (see __htmldocBuildCitationBody). The
+        // tooltip's citation card (see __okuBuildCitationBody). The
         // host <ext-ref> element itself is NOT a link — clicking it pins
         // the tooltip; the link inside the tooltip opens the source. A
         // single click action per element keeps the affordance honest.
         if (r.hit.link) {
           self.setAttribute('data-link', r.hit.link);
         }
-        __htmldocTooltip.attach(self);
-      } else if (__htmldocStandalone()) {
-        self.classList.remove('html-doc-extref');
+        __okuTooltip.attach(self);
+      } else if (__okuStandalone()) {
+        self.classList.remove('oku-extref');
       } else {
         self.setAttribute('data-def', '<em>Unknown reference:</em> ' + name);
         self.classList.add('unknown');
-        window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+        window.dispatchEvent(new CustomEvent('oku:warnings', {
           detail: [{ code: 'unknown-ext-ref', msg: 'No entry for "' + name + '"', level: 'warn' }]
         }));
-        __htmldocTooltip.attach(self);
+        __okuTooltip.attach(self);
       }
     });
   }
@@ -3203,7 +3203,7 @@ class ExtRef extends HTMLElement {
 if (!customElements.get('ext-ref')) customElements.define('ext-ref', ExtRef);
 // "<cite>" alias — same behavior as <ext-ref> so authors can use the
 // semantically-correct HTML element when citing.
-if (!customElements.get('html-doc-cite')) customElements.define('html-doc-cite', class extends ExtRef {});
+if (!customElements.get('oku-cite')) customElements.define('oku-cite', class extends ExtRef {});
 
 /* ============ Shared chart palette helper ============
  * Resolves a series colour from either:
@@ -3213,28 +3213,28 @@ if (!customElements.get('html-doc-cite')) customElements.define('html-doc-cite',
  *     pin one. Renderers that have many series fall back via
  *     pickColor(series.color, seriesIdx).
  * --------------------------------------------------------------- */
-var __htmldocChartPalette = {
+var __okuChartPalette = {
   accent: 'var(--accent)',
   warn: 'var(--warning)',
   danger: 'var(--danger)',
   success: 'var(--success)',
   muted: 'var(--text-soft)'
 };
-function __htmldocPickColor(name, idx) {
-  if (name && __htmldocChartPalette[name]) return __htmldocChartPalette[name];
+function __okuPickColor(name, idx) {
+  if (name && __okuChartPalette[name]) return __okuChartPalette[name];
   // Rotate through the 10-series ramp; CSS variables resolve to
   // the current theme's values at paint time.
   var i = ((idx || 0) % 10) + 1;
   return 'var(--series-' + i + ')';
 }
 
-/* ============ <html-doc-chart> Custom Element ============ *
+/* ============ <oku-chart> Custom Element ============ *
  * Generic data-driven SVG chart. Scatter and line types.
  * Series data lives in a child <script type="application/json">.
  * For row-per-item horizontal bars, use the bar-chart block instead
  * (handled directly by the renderer for layout-stability reasons).
  * --------------------------------------------------------------- */
-class HtmlDocChart extends HTMLElement {
+class OkuChart extends HTMLElement {
   connectedCallback() {
     var dataNode = this.querySelector('script[type="application/json"]:not([data-extras])');
     var extrasNodes = this.querySelectorAll('script[data-extras]');
@@ -3351,19 +3351,19 @@ class HtmlDocChart extends HTMLElement {
     // Cache the inverse mappings for the pan/zoom logic.
     this._sx = sx; this._sy = sy;
 
-    // Cartesian series colours come from __htmldocPickColor — see
+    // Cartesian series colours come from __okuPickColor — see
     // the shared palette helper near the top of the chart section.
 
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + (this._title || (this._type + ' chart')) + '" class="hdc-svg">');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + (this._title || (this._type + ' chart')) + '" class="okc-svg">');
     // Clip rect so the plot doesn't bleed into the chrome when zoomed.
-    parts.push('<defs><clipPath id="hdc-clip"><rect x="' + pad.left + '" y="' + pad.top + '" width="' + plotW + '" height="' + plotH + '"/></clipPath></defs>');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<defs><clipPath id="okc-clip"><rect x="' + pad.left + '" y="' + pad.top + '" width="' + plotW + '" height="' + plotH + '"/></clipPath></defs>');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Axes
-    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
-    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
-    if (this._xLabel) parts.push('<text x="' + (pad.left + plotW / 2) + '" y="' + (H - 14) + '" text-anchor="middle" class="hdc-axis-label">' + escapeXml(this._xLabel) + (xLog ? ' (log)' : '') + '</text>');
-    if (this._yLabel) parts.push('<text x="' + 14 + '" y="' + (pad.top + plotH / 2) + '" text-anchor="middle" class="hdc-axis-label" transform="rotate(-90 14,' + (pad.top + plotH / 2) + ')">' + escapeXml(this._yLabel) + (yLog ? ' (log)' : '') + '</text>');
+    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    if (this._xLabel) parts.push('<text x="' + (pad.left + plotW / 2) + '" y="' + (H - 14) + '" text-anchor="middle" class="okc-axis-label">' + escapeXml(this._xLabel) + (xLog ? ' (log)' : '') + '</text>');
+    if (this._yLabel) parts.push('<text x="' + 14 + '" y="' + (pad.top + plotH / 2) + '" text-anchor="middle" class="okc-axis-label" transform="rotate(-90 14,' + (pad.top + plotH / 2) + ')">' + escapeXml(this._yLabel) + (yLog ? ' (log)' : '') + '</text>');
     // Ticks — log uses powers; linear uses 5 evenly-spaced.
     function logTicks(min, max) {
       var ticks = [];
@@ -3391,13 +3391,13 @@ class HtmlDocChart extends HTMLElement {
       (function () { var r = []; for (var i = 0; i <= 4; i++) r.push(v.yMin + (i / 4) * (v.yMax - v.yMin)); return r; })();
     xTicks.forEach(function (val) {
       var pos = sx(val);
-      parts.push('<line x1="' + pos + '" y1="' + (pad.top + plotH) + '" x2="' + pos + '" y2="' + (pad.top + plotH + 4) + '" class="hdc-axis"/>');
-      parts.push('<text x="' + pos + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + fmtNum(val) + '</text>');
+      parts.push('<line x1="' + pos + '" y1="' + (pad.top + plotH) + '" x2="' + pos + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
+      parts.push('<text x="' + pos + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + fmtNum(val) + '</text>');
     });
     yTicks.forEach(function (val) {
       var pos = sy(val);
-      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + pos + '" x2="' + pad.left + '" y2="' + pos + '" class="hdc-axis"/>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (pos + 4) + '" text-anchor="end" class="hdc-tick">' + fmtNum(val) + '</text>');
+      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + pos + '" x2="' + pad.left + '" y2="' + pos + '" class="okc-axis"/>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (pos + 4) + '" text-anchor="end" class="okc-tick">' + fmtNum(val) + '</text>');
     });
 
     // Quadrant overlay: two reference lines + optional corner labels.
@@ -3406,11 +3406,11 @@ class HtmlDocChart extends HTMLElement {
       var q = self._extras.quadrants;
       if (typeof q.x === 'number') {
         var qx = sx(q.x);
-        parts.push('<line x1="' + qx + '" y1="' + pad.top + '" x2="' + qx + '" y2="' + (pad.top + plotH) + '" class="hdc-quadrant"/>');
+        parts.push('<line x1="' + qx + '" y1="' + pad.top + '" x2="' + qx + '" y2="' + (pad.top + plotH) + '" class="okc-quadrant"/>');
       }
       if (typeof q.y === 'number') {
         var qy = sy(q.y);
-        parts.push('<line x1="' + pad.left + '" y1="' + qy + '" x2="' + (W - pad.right) + '" y2="' + qy + '" class="hdc-quadrant"/>');
+        parts.push('<line x1="' + pad.left + '" y1="' + qy + '" x2="' + (W - pad.right) + '" y2="' + qy + '" class="okc-quadrant"/>');
       }
       if (Array.isArray(q.labels)) {
         var ql = q.labels;
@@ -3424,8 +3424,8 @@ class HtmlDocChart extends HTMLElement {
           var charW = 6.2;
           var w = Math.min(180, text.length * charW + padX * 2);
           var rx = anchor === 'end' ? x - w : x;
-          parts.push('<rect x="' + rx + '" y="' + (y - 11) + '" width="' + w + '" height="16" rx="3" class="hdc-quadrant-label-pill"/>');
-          parts.push('<text x="' + (anchor === 'end' ? x - padX : x + padX) + '" y="' + (y + 1) + '" text-anchor="' + (anchor === 'end' ? 'end' : 'start') + '" class="hdc-quadrant-label">' + escapeXml(text) + '</text>');
+          parts.push('<rect x="' + rx + '" y="' + (y - 11) + '" width="' + w + '" height="16" rx="3" class="okc-quadrant-label-pill"/>');
+          parts.push('<text x="' + (anchor === 'end' ? x - padX : x + padX) + '" y="' + (y + 1) + '" text-anchor="' + (anchor === 'end' ? 'end' : 'start') + '" class="okc-quadrant-label">' + escapeXml(text) + '</text>');
         }
         if (ql[0]) pillLabel(ql[0], pad.left + 6,           pad.top + 16,            'start');
         if (ql[1]) pillLabel(ql[1], W - pad.right - 6,      pad.top + 16,            'end');
@@ -3436,7 +3436,7 @@ class HtmlDocChart extends HTMLElement {
 
     // Plot region (clipped). All series + their dots / labels live here so
     // points that scroll past the axes don't leak.
-    parts.push('<g clip-path="url(#hdc-clip)">');
+    parts.push('<g clip-path="url(#okc-clip)">');
     var plotMidX = pad.left + plotW / 2;
     var drawsConnector = (self._type === 'line' || self._type === 'area');
     var drawsFill = (self._type === 'area');
@@ -3445,8 +3445,8 @@ class HtmlDocChart extends HTMLElement {
       // Author-named colour wins; otherwise rotate through the
       // extended --series-N palette so multi-series Cartesian
       // charts get distinct colours past the 5-name vocabulary.
-      var color = __htmldocPickColor(s.color, i);
-      parts.push('<g class="hdc-series" data-series-idx="' + i + '">');
+      var color = __okuPickColor(s.color, i);
+      parts.push('<g class="okc-series" data-series-idx="' + i + '">');
       if (drawsConnector) {
         var data = s.data || [];
         if (data.length) {
@@ -3460,9 +3460,9 @@ class HtmlDocChart extends HTMLElement {
             var baseY = (v.yMin <= 0 && v.yMax >= 0) ? sy(0) : sy(v.yMin);
             var firstX = sx(data[0].x), lastX = sx(data[data.length - 1].x);
             var areaD = d + ' L ' + lastX + ' ' + baseY + ' L ' + firstX + ' ' + baseY + ' Z';
-            parts.push('<path d="' + areaD + '" fill="' + color + '" fill-opacity="0.18" stroke="none" class="hdc-area"/>');
+            parts.push('<path d="' + areaD + '" fill="' + color + '" fill-opacity="0.18" stroke="none" class="okc-area"/>');
           }
-          parts.push('<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" class="hdc-line"/>');
+          parts.push('<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" class="okc-line"/>');
         }
       }
       (s.data || []).forEach(function (p, j) {
@@ -3481,7 +3481,7 @@ class HtmlDocChart extends HTMLElement {
         parts.push(
           '<circle cx="' + px + '" cy="' + py + '" r="' + r + '" fill="' + color +
           (drawsBubble ? '" fill-opacity="0.55' : '') +
-          '" class="hdc-dot"' +
+          '" class="okc-dot"' +
           ' data-point-key="' + key + '" data-x="' + p.x + '" data-y="' + p.y +
           '" data-point-label="' + dotLabel + '" data-series-label="' + seriesLbl + '"' +
           ' tabindex="0" role="img" aria-label="' +
@@ -3496,7 +3496,7 @@ class HtmlDocChart extends HTMLElement {
           parts.push(
             '<text x="' + lx + '" y="' + (py + 4) +
             '" text-anchor="' + anchor + '"' +
-            ' class="hdc-point-label" data-point-key="' + key + '" tabindex="0">' +
+            ' class="okc-point-label" data-point-key="' + key + '" tabindex="0">' +
             escapeXml(p.label) + '</text>'
           );
         }
@@ -3506,22 +3506,22 @@ class HtmlDocChart extends HTMLElement {
     parts.push('</g>'); // /clip
     // Legend chips sit OUTSIDE the clip so they're always visible.
     this._series.forEach(function (s, i) {
-      var color = __htmldocPickColor(s.color, i);
+      var color = __okuPickColor(s.color, i);
       if (!s.label) return;
       var lx = W - pad.right - 12;
       var ly = pad.top + 14 + i * 18;
       parts.push(
-        '<g class="hdc-legend-chip" data-series-idx="' + i + '" tabindex="0" role="button" ' +
+        '<g class="okc-legend-chip" data-series-idx="' + i + '" tabindex="0" role="button" ' +
         'aria-label="Toggle ' + escapeXml(s.label) + ' series">' +
-          '<rect x="' + (lx - 116) + '" y="' + (ly - 12) + '" width="120" height="20" rx="4" class="hdc-legend-bg"/>' +
-          '<rect x="' + (lx - 110) + '" y="' + (ly - 9) + '" width="14" height="14" rx="2" fill="' + color + '" class="hdc-legend-swatch"/>' +
-          '<text x="' + (lx - 92) + '" y="' + (ly + 2) + '" class="hdc-legend">' + escapeXml(s.label) + '</text>' +
+          '<rect x="' + (lx - 116) + '" y="' + (ly - 12) + '" width="120" height="20" rx="4" class="okc-legend-bg"/>' +
+          '<rect x="' + (lx - 110) + '" y="' + (ly - 9) + '" width="14" height="14" rx="2" fill="' + color + '" class="okc-legend-swatch"/>' +
+          '<text x="' + (lx - 92) + '" y="' + (ly + 2) + '" class="okc-legend">' + escapeXml(s.label) + '</text>' +
         '</g>'
       );
     });
     parts.push('</svg>');
 
-    var oldSvg = this.querySelector(':scope > .hdc-svg');
+    var oldSvg = this.querySelector(':scope > .okc-svg');
     if (oldSvg) oldSvg.remove();
     this.insertAdjacentHTML('beforeend', parts.join(''));
     this._wireInteractivity();
@@ -3536,13 +3536,13 @@ class HtmlDocChart extends HTMLElement {
      (too many neighbors), hide it — the existing dot-hover sync brings
      it back via the `.hovered` reveal rule in CSS. */
   _deconflictLabels() {
-    var svg = this.querySelector(':scope > .hdc-svg');
+    var svg = this.querySelector(':scope > .okc-svg');
     if (!svg) return;
-    var labels = Array.prototype.slice.call(svg.querySelectorAll('.hdc-point-label'));
+    var labels = Array.prototype.slice.call(svg.querySelectorAll('.okc-point-label'));
     if (labels.length < 2) return;
     // Reset any prior adjustments (re-render path: zoom/pan).
     labels.forEach(function (l) {
-      l.classList.remove('hdc-label-hidden', 'hdc-label-shifted');
+      l.classList.remove('okc-label-hidden', 'okc-label-shifted');
       if (l.dataset.origY) l.setAttribute('y', l.dataset.origY);
       else l.dataset.origY = l.getAttribute('y');
     });
@@ -3588,13 +3588,13 @@ class HtmlDocChart extends HTMLElement {
         if (found !== 0) {
           var oy0 = parseFloat(box.el.dataset.origY) || parseFloat(box.el.getAttribute('y')) || 0;
           box.el.setAttribute('y', oy0 + found);
-          box.el.classList.add('hdc-label-shifted');
+          box.el.classList.add('okc-label-shifted');
         }
         placed.push({ x1: box.x1, x2: box.x2, y1: box.y1 + found, y2: box.y2 + found });
       } else {
         // Too crowded — hide. The existing dot-hover sync (.hovered)
         // reveals it on demand via the CSS reveal rule.
-        box.el.classList.add('hdc-label-hidden');
+        box.el.classList.add('okc-label-hidden');
       }
     });
   }
@@ -3621,8 +3621,8 @@ class HtmlDocChart extends HTMLElement {
     var cx = 140, cy = H / 2;
     var rOuter = 110, rInner = 64;
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Donut chart') + '" class="hdc-svg hdc-donut">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Donut chart') + '" class="okc-svg okc-donut">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
 
     var angleStart = -Math.PI / 2; // 12 o'clock
     slices.forEach(function (slice, idx) {
@@ -3645,7 +3645,7 @@ class HtmlDocChart extends HTMLElement {
               ' A ' + rInner + ' ' + rInner + ' 0 ' + largeArc + ' 0 ' + ix2 + ' ' + iy2 +
               ' Z';
       var color = palette[slice.color] || palette.accent;
-      parts.push('<path d="' + d + '" fill="' + color + '" class="hdc-slice"' +
+      parts.push('<path d="' + d + '" fill="' + color + '" class="okc-slice"' +
                  ' data-slice-idx="' + idx + '"' +
                  ' data-slice-label="' + escapeXml(slice.label || '') + '"' +
                  ' data-slice-value="' + value + '"' +
@@ -3656,8 +3656,8 @@ class HtmlDocChart extends HTMLElement {
     });
 
     // Centre readout — total + a small caption.
-    parts.push('<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" class="hdc-donut-total">' + escapeXml(fmtNum(total)) + '</text>');
-    parts.push('<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" class="hdc-donut-caption">total</text>');
+    parts.push('<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" class="okc-donut-total">' + escapeXml(fmtNum(total)) + '</text>');
+    parts.push('<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" class="okc-donut-caption">total</text>');
 
     // Legend on the right side, one row per slice.
     var lx = 280;
@@ -3665,9 +3665,9 @@ class HtmlDocChart extends HTMLElement {
       var color = palette[slice.color] || palette.accent;
       var ly = 64 + idx * 22;
       var pct = Math.round((Math.max(0, +slice.value || 0) / total) * 100);
-      parts.push('<g class="hdc-donut-legend" data-slice-idx="' + idx + '">' +
+      parts.push('<g class="okc-donut-legend" data-slice-idx="' + idx + '">' +
                  '<rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/>' +
-                 '<text x="' + (lx + 18) + '" y="' + ly + '" class="hdc-donut-legend-label">' +
+                 '<text x="' + (lx + 18) + '" y="' + ly + '" class="okc-donut-legend-label">' +
                    escapeXml(slice.label || '') + ' · ' + pct + '%' +
                  '</text></g>');
     });
@@ -3719,19 +3719,19 @@ class HtmlDocChart extends HTMLElement {
       return Math.max(0.08, Math.min(1, t));
     }
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Heatmap') + '" class="hdc-svg hdc-heatmap">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Heatmap') + '" class="okc-svg okc-heatmap">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     if (x.col_labels && x.col_labels.length) {
       for (var c = 0; c < cols; c++) {
         var cxp = labelLeft + c * cell + cell / 2;
         var cyp = titleTop + labelTop - 6;
-        parts.push('<text x="' + cxp + '" y="' + cyp + '" text-anchor="end" class="hdc-heatmap-label" transform="rotate(-45 ' + cxp + ',' + cyp + ')">' + escapeXml(String(x.col_labels[c] || '')) + '</text>');
+        parts.push('<text x="' + cxp + '" y="' + cyp + '" text-anchor="end" class="okc-heatmap-label" transform="rotate(-45 ' + cxp + ',' + cyp + ')">' + escapeXml(String(x.col_labels[c] || '')) + '</text>');
       }
     }
     if (x.row_labels && x.row_labels.length) {
       for (var r = 0; r < rows; r++) {
         var ry = titleTop + labelTop + r * cell + cell / 2 + 4;
-        parts.push('<text x="' + (labelLeft - 6) + '" y="' + ry + '" text-anchor="end" class="hdc-heatmap-label">' + escapeXml(String(x.row_labels[r] || '')) + '</text>');
+        parts.push('<text x="' + (labelLeft - 6) + '" y="' + ry + '" text-anchor="end" class="okc-heatmap-label">' + escapeXml(String(x.row_labels[r] || '')) + '</text>');
       }
     }
     for (var i = 0; i < rows; i++) {
@@ -3745,7 +3745,7 @@ class HtmlDocChart extends HTMLElement {
           label: rowLabel + ' × ' + colLabel,
           kv: [{ k: 'value', v: fmtNum(val) }]
         });
-        parts.push('<rect x="' + px + '" y="' + py + '" width="' + (cell - 2) + '" height="' + (cell - 2) + '" rx="3" fill="' + tone(val) + '" fill-opacity="' + alpha(val).toFixed(3) + '" class="hdc-heatmap-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(rowLabel + ' × ' + colLabel + ': ' + fmtNum(val)) + '</title></rect>');
+        parts.push('<rect x="' + px + '" y="' + py + '" width="' + (cell - 2) + '" height="' + (cell - 2) + '" rx="3" fill="' + tone(val) + '" fill-opacity="' + alpha(val).toFixed(3) + '" class="okc-heatmap-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(rowLabel + ' × ' + colLabel + ': ' + fmtNum(val)) + '</title></rect>');
       }
     }
     parts.push('</svg>');
@@ -3765,41 +3765,41 @@ class HtmlDocChart extends HTMLElement {
     function px(i) { return pad + (values.length === 1 ? plotW / 2 : (i / (values.length - 1)) * plotW); }
     function py(v) { return pad + plotH - ((v - minV) / (maxV - minV)) * plotH; }
     var parts = [];
-    parts.push('<span class="hdc-sparkline-row"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'sparkline') + '" class="hdc-svg hdc-sparkline">');
+    parts.push('<span class="okc-sparkline-row"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'sparkline') + '" class="okc-svg okc-sparkline">');
     if (variant === 'bar') {
       var barW = plotW / values.length - 1;
       for (var bi = 0; bi < values.length; bi++) {
         var bx = pad + bi * (plotW / values.length);
         var by = py(values[bi]);
-        parts.push('<rect x="' + bx + '" y="' + by + '" width="' + Math.max(1, barW) + '" height="' + (pad + plotH - by) + '" class="hdc-sparkline-bar"/>');
+        parts.push('<rect x="' + bx + '" y="' + by + '" width="' + Math.max(1, barW) + '" height="' + (pad + plotH - by) + '" class="okc-sparkline-bar"/>');
       }
     } else {
       var d = values.map(function (v, i) { return (i === 0 ? 'M ' : 'L ') + px(i).toFixed(2) + ' ' + py(v).toFixed(2); }).join(' ');
       if (variant === 'area') {
         var area = d + ' L ' + px(values.length - 1).toFixed(2) + ' ' + (pad + plotH) + ' L ' + px(0).toFixed(2) + ' ' + (pad + plotH) + ' Z';
-        parts.push('<path d="' + area + '" class="hdc-sparkline-area"/>');
+        parts.push('<path d="' + area + '" class="okc-sparkline-area"/>');
       }
-      parts.push('<path d="' + d + '" class="hdc-sparkline-line"/>');
+      parts.push('<path d="' + d + '" class="okc-sparkline-line"/>');
       // Endpoint dot — always on for line/area; bar variant has its own visual.
-      parts.push('<circle cx="' + px(values.length - 1).toFixed(2) + '" cy="' + py(values[values.length - 1]).toFixed(2) + '" r="2.4" class="hdc-sparkline-endpoint"/>');
+      parts.push('<circle cx="' + px(values.length - 1).toFixed(2) + '" cy="' + py(values[values.length - 1]).toFixed(2) + '" r="2.4" class="okc-sparkline-endpoint"/>');
     }
     // Parallel cursor + per-point readout — same pattern as
     // ridgeline. Pointer moves over the svg; the closest point gets
     // a highlight ring + tooltip.
-    parts.push('<line class="hdc-sparkline-cursor" x1="0" y1="' + pad + '" x2="0" y2="' + (pad + plotH) + '" visibility="hidden" pointer-events="none"/>');
-    parts.push('<circle class="hdc-sparkline-cursor-dot" cx="0" cy="0" r="3" visibility="hidden" pointer-events="none"/>');
+    parts.push('<line class="okc-sparkline-cursor" x1="0" y1="' + pad + '" x2="0" y2="' + (pad + plotH) + '" visibility="hidden" pointer-events="none"/>');
+    parts.push('<circle class="okc-sparkline-cursor-dot" cx="0" cy="0" r="3" visibility="hidden" pointer-events="none"/>');
     parts.push('</svg>');
-    if (x.end_label) parts.push('<span class="hdc-sparkline-end-label">' + escapeXml(String(x.end_label)) + '</span>');
+    if (x.end_label) parts.push('<span class="okc-sparkline-end-label">' + escapeXml(String(x.end_label)) + '</span>');
     parts.push('</span>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
     this._wireSparklineCursor(values, pad, plotW, plotH, px, py);
   }
   _wireSparklineCursor(values, pad, plotW, plotH, px, py) {
     var self = this;
-    var svg = self.querySelector('svg.hdc-sparkline');
+    var svg = self.querySelector('svg.okc-sparkline');
     if (!svg) return;
-    var cursor = svg.querySelector('.hdc-sparkline-cursor');
-    var dot = svg.querySelector('.hdc-sparkline-cursor-dot');
+    var cursor = svg.querySelector('.okc-sparkline-cursor');
+    var dot = svg.querySelector('.okc-sparkline-cursor-dot');
     if (!cursor || !dot) return;
     function pointerToViewBoxX(ev) {
       var pt = svg.createSVGPoint();
@@ -3859,8 +3859,8 @@ class HtmlDocChart extends HTMLElement {
     var H = (this._title ? 28 : 4) + gRows * (cell + gap) + 12;
     var titleTop = this._title ? 28 : 0;
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Waffle') + '" class="hdc-svg hdc-waffle">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Waffle') + '" class="okc-svg okc-waffle">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     for (var r = 0; r < gRows; r++) {
       for (var c = 0; c < gCols; c++) {
         var idx = r * gCols + c;
@@ -3875,7 +3875,7 @@ class HtmlDocChart extends HTMLElement {
             { k: 'percent', v: (Math.round(((idx + 1) / totalCells) * 100)) + '%' }
           ]
         });
-        parts.push('<rect x="' + rx + '" y="' + ry + '" width="' + cell + '" height="' + cell + '" rx="3" fill="' + item.color + '" fill-opacity="' + op + '" class="hdc-waffle-cell" tabindex="0" data-hover-payload="' + escapeXml(wpay) + '"><title>' + escapeXml((item.label || 'cell') + ' · cell ' + (idx + 1) + '/' + totalCells) + '</title></rect>');
+        parts.push('<rect x="' + rx + '" y="' + ry + '" width="' + cell + '" height="' + cell + '" rx="3" fill="' + item.color + '" fill-opacity="' + op + '" class="okc-waffle-cell" tabindex="0" data-hover-payload="' + escapeXml(wpay) + '"><title>' + escapeXml((item.label || 'cell') + ' · cell ' + (idx + 1) + '/' + totalCells) + '</title></rect>');
       }
     }
     // Legend on the right.
@@ -3883,7 +3883,7 @@ class HtmlDocChart extends HTMLElement {
     segments.forEach(function (seg, idx) {
       var ly = titleTop + 16 + idx * 22;
       var color = palette[seg.color] || palette.accent;
-      parts.push('<g class="hdc-waffle-legend"><rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/><text x="' + (lx + 18) + '" y="' + ly + '" class="hdc-waffle-legend-label">' + escapeXml(seg.label || '') + ' · ' + (Math.round((Math.max(0, +seg.count || 0) / total) * 100)) + '%</text></g>');
+      parts.push('<g class="okc-waffle-legend"><rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/><text x="' + (lx + 18) + '" y="' + ly + '" class="okc-waffle-legend-label">' + escapeXml(seg.label || '') + ' · ' + (Math.round((Math.max(0, +seg.count || 0) / total) * 100)) + '%</text></g>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -3914,13 +3914,13 @@ class HtmlDocChart extends HTMLElement {
     }
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Gauge') + ': ' + val + '" class="hdc-svg hdc-gauge">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Gauge') + ': ' + val + '" class="okc-svg okc-gauge">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Background arc — full semicircle.
-    parts.push('<path d="' + arcPath(angleOf(mn), angleOf(mx)) + '" fill="var(--surface-soft, rgba(127,127,127,0.18))" class="hdc-gauge-bg"/>');
+    parts.push('<path d="' + arcPath(angleOf(mn), angleOf(mx)) + '" fill="var(--surface-soft, rgba(127,127,127,0.18))" class="okc-gauge-bg"/>');
     // Zone bands.
     (x.zones || []).forEach(function (z) {
-      parts.push('<path d="' + arcPath(angleOf(z.from), angleOf(z.to)) + '" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.32" class="hdc-gauge-zone"/>');
+      parts.push('<path d="' + arcPath(angleOf(z.from), angleOf(z.to)) + '" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.32" class="okc-gauge-zone"/>');
     });
     // Value arc — rich hover surfaces value / target / range.
     var gaugePayload = JSON.stringify({
@@ -3930,17 +3930,17 @@ class HtmlDocChart extends HTMLElement {
         { k: 'range', v: fmtNum(mn) + ' – ' + fmtNum(mx) }
       ].concat(typeof x.target === 'number' ? [{ k: 'target', v: fmtNum(x.target) }] : [])
     });
-    parts.push('<path d="' + arcPath(angleOf(mn), angleOf(val)) + '" fill="var(--accent)" class="hdc-gauge-value" tabindex="0" data-hover-payload="' + escapeXml(gaugePayload) + '"><title>' + escapeXml((x.label ? x.label + ': ' : '') + fmtNum(val) + ' (range ' + fmtNum(mn) + '–' + fmtNum(mx) + ')') + '</title></path>');
+    parts.push('<path d="' + arcPath(angleOf(mn), angleOf(val)) + '" fill="var(--accent)" class="okc-gauge-value" tabindex="0" data-hover-payload="' + escapeXml(gaugePayload) + '"><title>' + escapeXml((x.label ? x.label + ': ' : '') + fmtNum(val) + ' (range ' + fmtNum(mn) + '–' + fmtNum(mx) + ')') + '</title></path>');
     // Target tick.
     if (typeof x.target === 'number') {
       var ta = angleOf(x.target);
       var tx1 = cx + (r - 4) * Math.cos(ta), ty1 = cy + (r - 4) * Math.sin(ta);
       var tx2 = cx + (sr + 4) * Math.cos(ta), ty2 = cy + (sr + 4) * Math.sin(ta);
-      parts.push('<line x1="' + tx1 + '" y1="' + ty1 + '" x2="' + tx2 + '" y2="' + ty2 + '" class="hdc-gauge-target"/>');
+      parts.push('<line x1="' + tx1 + '" y1="' + ty1 + '" x2="' + tx2 + '" y2="' + ty2 + '" class="okc-gauge-target"/>');
     }
     // Centre readout.
-    parts.push('<text x="' + cx + '" y="' + (cy - 12) + '" text-anchor="middle" class="hdc-gauge-value-text">' + escapeXml(fmtNum(val)) + '</text>');
-    if (x.label) parts.push('<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" class="hdc-gauge-label">' + escapeXml(x.label) + '</text>');
+    parts.push('<text x="' + cx + '" y="' + (cy - 12) + '" text-anchor="middle" class="okc-gauge-value-text">' + escapeXml(fmtNum(val)) + '</text>');
+    if (x.label) parts.push('<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" class="okc-gauge-label">' + escapeXml(x.label) + '</text>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
   }
@@ -3969,23 +3969,23 @@ class HtmlDocChart extends HTMLElement {
     }
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Radar') + '" class="hdc-svg hdc-radar">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Radar') + '" class="okc-svg okc-radar">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Concentric rings (25/50/75/100%).
     for (var k = 1; k <= 4; k++) {
       var pts = axes.map(function (_, ai) {
         var ang = -Math.PI / 2 + ai * (2 * Math.PI / axes.length);
         return (cx + Math.cos(ang) * R * (k / 4)).toFixed(1) + ',' + (cy + Math.sin(ang) * R * (k / 4)).toFixed(1);
       }).join(' ');
-      parts.push('<polygon points="' + pts + '" class="hdc-radar-ring"/>');
+      parts.push('<polygon points="' + pts + '" class="okc-radar-ring"/>');
     }
     // Axis lines + labels.
     axes.forEach(function (a, i) {
       var e = axisEnd(i);
-      parts.push('<line x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) + '" class="hdc-radar-axis"/>');
+      parts.push('<line x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) + '" class="okc-radar-axis"/>');
       var lx = cx + Math.cos(-Math.PI / 2 + i * (2 * Math.PI / axes.length)) * (R + 18);
       var ly = cy + Math.sin(-Math.PI / 2 + i * (2 * Math.PI / axes.length)) * (R + 18);
-      parts.push('<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" class="hdc-radar-label">' + escapeXml(a.label || '') + '</text>');
+      parts.push('<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" class="okc-radar-label">' + escapeXml(a.label || '') + '</text>');
     });
     // Series polygons — each carries a rich-hover payload listing
     // its per-axis values so the reader can compare a series'
@@ -4003,14 +4003,14 @@ class HtmlDocChart extends HTMLElement {
         series: s.label || ('Series ' + (si + 1)),
         kv: kv
       });
-      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="0.22" stroke="' + color + '" stroke-width="1.6" class="hdc-radar-series" data-series-idx="' + si + '" tabindex="0" data-hover-payload="' + escapeXml(radarPayload) + '"><title>' + escapeXml((s.label || 'series') + ' — ' + kv.map(function (e) { return e.k + ': ' + e.v; }).join(', ')) + '</title></polygon>');
+      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="0.22" stroke="' + color + '" stroke-width="1.6" class="okc-radar-series" data-series-idx="' + si + '" tabindex="0" data-hover-payload="' + escapeXml(radarPayload) + '"><title>' + escapeXml((s.label || 'series') + ' — ' + kv.map(function (e) { return e.k + ': ' + e.v; }).join(', ')) + '</title></polygon>');
     });
     // Legend.
     var lgY = H - 24;
     series.forEach(function (s, si) {
       var color = palette[s.color] || palette.accent;
       var lx = 16 + si * 130;
-      parts.push('<g class="hdc-radar-legend"><rect x="' + lx + '" y="' + (lgY - 8) + '" width="10" height="10" rx="2" fill="' + color + '"/><text x="' + (lx + 16) + '" y="' + lgY + '" class="hdc-radar-legend-label">' + escapeXml(s.label || '') + '</text></g>');
+      parts.push('<g class="okc-radar-legend"><rect x="' + lx + '" y="' + (lgY - 8) + '" width="10" height="10" rx="2" fill="' + color + '"/><text x="' + (lx + 16) + '" y="' + lgY + '" class="okc-radar-legend-label">' + escapeXml(s.label || '') + '</text></g>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -4036,16 +4036,16 @@ class HtmlDocChart extends HTMLElement {
     function sx(v) { return pad.left + ((v - vmin) / span) * plotW; }
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Box plot') + '" class="hdc-svg hdc-boxplot">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Box plot') + '" class="okc-svg okc-boxplot">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     boxes.forEach(function (b, i) {
       var y = pad.top + i * rowH + rowH / 2;
       var color = palette[b.color] || palette.accent;
-      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="hdc-boxplot-label">' + escapeXml(b.label || '') + '</text>');
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-boxplot-label">' + escapeXml(b.label || '') + '</text>');
       // Whisker.
-      parts.push('<line x1="' + sx(+b.min) + '" y1="' + y + '" x2="' + sx(+b.max) + '" y2="' + y + '" class="hdc-boxplot-whisker"/>');
-      parts.push('<line x1="' + sx(+b.min) + '" y1="' + (y - 7) + '" x2="' + sx(+b.min) + '" y2="' + (y + 7) + '" class="hdc-boxplot-whisker"/>');
-      parts.push('<line x1="' + sx(+b.max) + '" y1="' + (y - 7) + '" x2="' + sx(+b.max) + '" y2="' + (y + 7) + '" class="hdc-boxplot-whisker"/>');
+      parts.push('<line x1="' + sx(+b.min) + '" y1="' + y + '" x2="' + sx(+b.max) + '" y2="' + y + '" class="okc-boxplot-whisker"/>');
+      parts.push('<line x1="' + sx(+b.min) + '" y1="' + (y - 7) + '" x2="' + sx(+b.min) + '" y2="' + (y + 7) + '" class="okc-boxplot-whisker"/>');
+      parts.push('<line x1="' + sx(+b.max) + '" y1="' + (y - 7) + '" x2="' + sx(+b.max) + '" y2="' + (y + 7) + '" class="okc-boxplot-whisker"/>');
       // IQR box — rich hover surfaces all 5 quartile stats.
       var bpPayload = JSON.stringify({
         label: b.label || ('Box ' + (i + 1)),
@@ -4057,19 +4057,19 @@ class HtmlDocChart extends HTMLElement {
           { k: 'max',    v: fmtNum(+b.max) }
         ].concat((b.outliers || []).length ? [{ k: 'outliers', v: (b.outliers || []).map(fmtNum).join(', ') }] : [])
       });
-      parts.push('<rect x="' + sx(+b.q1) + '" y="' + (y - 12) + '" width="' + (sx(+b.q3) - sx(+b.q1)) + '" height="24" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="hdc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtNum(+b.min) + ', q1 ' + fmtNum(+b.q1) + ', med ' + fmtNum(+b.median) + ', q3 ' + fmtNum(+b.q3) + ', max ' + fmtNum(+b.max)) + '</title></rect>');
+      parts.push('<rect x="' + sx(+b.q1) + '" y="' + (y - 12) + '" width="' + (sx(+b.q3) - sx(+b.q1)) + '" height="24" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="okc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtNum(+b.min) + ', q1 ' + fmtNum(+b.q1) + ', med ' + fmtNum(+b.median) + ', q3 ' + fmtNum(+b.q3) + ', max ' + fmtNum(+b.max)) + '</title></rect>');
       // Median line.
-      parts.push('<line x1="' + sx(+b.median) + '" y1="' + (y - 12) + '" x2="' + sx(+b.median) + '" y2="' + (y + 12) + '" stroke="' + color + '" stroke-width="2" class="hdc-boxplot-median"/>');
+      parts.push('<line x1="' + sx(+b.median) + '" y1="' + (y - 12) + '" x2="' + sx(+b.median) + '" y2="' + (y + 12) + '" stroke="' + color + '" stroke-width="2" class="okc-boxplot-median"/>');
       (b.outliers || []).forEach(function (o) {
-        parts.push('<circle cx="' + sx(+o) + '" cy="' + y + '" r="3" fill="' + color + '" class="hdc-boxplot-outlier"><title>' + escapeXml(String(o)) + '</title></circle>');
+        parts.push('<circle cx="' + sx(+o) + '" cy="' + y + '" r="3" fill="' + color + '" class="okc-boxplot-outlier"><title>' + escapeXml(String(o)) + '</title></circle>');
       });
     });
     // Axis ticks (5).
     for (var t = 0; t <= 4; t++) {
       var vv = vmin + (t / 4) * span;
       var xx = sx(vv);
-      parts.push('<line x1="' + xx + '" y1="' + (H - pad.bottom + 2) + '" x2="' + xx + '" y2="' + (H - pad.bottom + 8) + '" class="hdc-axis"/>');
-      parts.push('<text x="' + xx + '" y="' + (H - pad.bottom + 20) + '" text-anchor="middle" class="hdc-tick">' + escapeXml(fmtNum(vv)) + '</text>');
+      parts.push('<line x1="' + xx + '" y1="' + (H - pad.bottom + 2) + '" x2="' + xx + '" y2="' + (H - pad.bottom + 8) + '" class="okc-axis"/>');
+      parts.push('<text x="' + xx + '" y="' + (H - pad.bottom + 20) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(vv)) + '</text>');
     }
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -4086,19 +4086,19 @@ class HtmlDocChart extends HTMLElement {
     var plotW = W - pad.left - pad.right;
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Bullet chart') + '" class="hdc-svg hdc-bullet">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Bullet chart') + '" class="okc-svg okc-bullet">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     tracks.forEach(function (t, i) {
       var y = pad.top + i * rowH + 8;
       var trackMax = +t.max || 100;
       function sx(v) { return pad.left + (Math.max(0, Math.min(trackMax, +v || 0)) / trackMax) * plotW; }
-      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 14) + '" text-anchor="end" class="hdc-bullet-label">' + escapeXml(t.label || '') + '</text>');
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 14) + '" text-anchor="end" class="okc-bullet-label">' + escapeXml(t.label || '') + '</text>');
       // Background track.
-      parts.push('<rect x="' + pad.left + '" y="' + y + '" width="' + plotW + '" height="22" rx="3" class="hdc-bullet-bg"/>');
+      parts.push('<rect x="' + pad.left + '" y="' + y + '" width="' + plotW + '" height="22" rx="3" class="okc-bullet-bg"/>');
       // Zone bands.
       (t.zones || []).forEach(function (z) {
         var zx = sx(z.from), zw = sx(z.to) - sx(z.from);
-        parts.push('<rect x="' + zx + '" y="' + y + '" width="' + zw + '" height="22" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.22" class="hdc-bullet-zone"/>');
+        parts.push('<rect x="' + zx + '" y="' + y + '" width="' + zw + '" height="22" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.22" class="okc-bullet-zone"/>');
       });
       // Value bar — rich hover surfaces actual / target / max + zones.
       var color = palette[t.color] || palette.accent;
@@ -4111,14 +4111,14 @@ class HtmlDocChart extends HTMLElement {
         label: t.label || 'metric',
         kv: bulletKv
       });
-      parts.push('<rect x="' + pad.left + '" y="' + (y + 6) + '" width="' + (sx(t.value) - pad.left) + '" height="10" rx="2" fill="' + color + '" class="hdc-bullet-value" tabindex="0" data-hover-payload="' + escapeXml(bulletPayload) + '"><title>' + escapeXml((t.label || 'metric') + ': ' + fmtNum(+t.value || 0) + ' / ' + fmtNum(trackMax) + (typeof t.target === 'number' ? ' (target ' + fmtNum(t.target) + ')' : '')) + '</title></rect>');
+      parts.push('<rect x="' + pad.left + '" y="' + (y + 6) + '" width="' + (sx(t.value) - pad.left) + '" height="10" rx="2" fill="' + color + '" class="okc-bullet-value" tabindex="0" data-hover-payload="' + escapeXml(bulletPayload) + '"><title>' + escapeXml((t.label || 'metric') + ': ' + fmtNum(+t.value || 0) + ' / ' + fmtNum(trackMax) + (typeof t.target === 'number' ? ' (target ' + fmtNum(t.target) + ')' : '')) + '</title></rect>');
       // Target tick.
       if (typeof t.target === 'number') {
         var tx = sx(t.target);
-        parts.push('<line x1="' + tx + '" y1="' + (y - 2) + '" x2="' + tx + '" y2="' + (y + 24) + '" class="hdc-bullet-target"/>');
+        parts.push('<line x1="' + tx + '" y1="' + (y - 2) + '" x2="' + tx + '" y2="' + (y + 24) + '" class="okc-bullet-target"/>');
       }
       // Value readout right of the track.
-      parts.push('<text x="' + (W - pad.right + 10) + '" y="' + (y + 14) + '" class="hdc-bullet-readout">' + escapeXml(fmtNum(+t.value || 0)) + '</text>');
+      parts.push('<text x="' + (W - pad.right + 10) + '" y="' + (y + 14) + '" class="okc-bullet-readout">' + escapeXml(fmtNum(+t.value || 0)) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -4139,14 +4139,14 @@ class HtmlDocChart extends HTMLElement {
     var leftX = pad.left, rightX = W - pad.right;
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Slope chart') + '" class="hdc-svg hdc-slope">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Slope chart') + '" class="okc-svg okc-slope">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Column labels.
-    parts.push('<text x="' + leftX + '" y="' + (pad.top - 12) + '" text-anchor="middle" class="hdc-slope-col">' + escapeXml(x.from_label || 'Before') + '</text>');
-    parts.push('<text x="' + rightX + '" y="' + (pad.top - 12) + '" text-anchor="middle" class="hdc-slope-col">' + escapeXml(x.to_label || 'After') + '</text>');
+    parts.push('<text x="' + leftX + '" y="' + (pad.top - 12) + '" text-anchor="middle" class="okc-slope-col">' + escapeXml(x.from_label || 'Before') + '</text>');
+    parts.push('<text x="' + rightX + '" y="' + (pad.top - 12) + '" text-anchor="middle" class="okc-slope-col">' + escapeXml(x.to_label || 'After') + '</text>');
     // Vertical guides.
-    parts.push('<line x1="' + leftX + '" y1="' + pad.top + '" x2="' + leftX + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
-    parts.push('<line x1="' + rightX + '" y1="' + pad.top + '" x2="' + rightX + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
+    parts.push('<line x1="' + leftX + '" y1="' + pad.top + '" x2="' + leftX + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    parts.push('<line x1="' + rightX + '" y1="' + pad.top + '" x2="' + rightX + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     items.forEach(function (it) {
       var fy = sy(+it.from || 0), ty = sy(+it.to || 0);
       var color = palette[it.color] || (((+it.to || 0) >= (+it.from || 0)) ? palette.success : palette.danger);
@@ -4160,11 +4160,11 @@ class HtmlDocChart extends HTMLElement {
           { k: 'delta',                  v: (delta >= 0 ? '+' : '') + fmtNum(delta) + (pct !== null ? ' (' + (pct >= 0 ? '+' : '') + pct + '%)' : '') }
         ]
       });
-      parts.push('<line x1="' + leftX + '" y1="' + fy.toFixed(1) + '" x2="' + rightX + '" y2="' + ty.toFixed(1) + '" stroke="' + color + '" stroke-width="2" class="hdc-slope-line" tabindex="0" data-hover-payload="' + escapeXml(slopePayload) + '"><title>' + escapeXml((it.label || 'item') + ': ' + fmtNum(+it.from || 0) + ' → ' + fmtNum(+it.to || 0)) + '</title></line>');
+      parts.push('<line x1="' + leftX + '" y1="' + fy.toFixed(1) + '" x2="' + rightX + '" y2="' + ty.toFixed(1) + '" stroke="' + color + '" stroke-width="2" class="okc-slope-line" tabindex="0" data-hover-payload="' + escapeXml(slopePayload) + '"><title>' + escapeXml((it.label || 'item') + ': ' + fmtNum(+it.from || 0) + ' → ' + fmtNum(+it.to || 0)) + '</title></line>');
       parts.push('<circle cx="' + leftX + '" cy="' + fy.toFixed(1) + '" r="4" fill="' + color + '"/>');
       parts.push('<circle cx="' + rightX + '" cy="' + ty.toFixed(1) + '" r="4" fill="' + color + '"/>');
-      parts.push('<text x="' + (leftX - 8) + '" y="' + (fy + 4).toFixed(1) + '" text-anchor="end" class="hdc-slope-readout">' + escapeXml(fmtNum(+it.from || 0)) + '</text>');
-      parts.push('<text x="' + (rightX + 8) + '" y="' + (ty + 4).toFixed(1) + '" class="hdc-slope-readout">' + escapeXml(fmtNum(+it.to || 0)) + ' · ' + escapeXml(it.label || '') + '</text>');
+      parts.push('<text x="' + (leftX - 8) + '" y="' + (fy + 4).toFixed(1) + '" text-anchor="end" class="okc-slope-readout">' + escapeXml(fmtNum(+it.from || 0)) + '</text>');
+      parts.push('<text x="' + (rightX + 8) + '" y="' + (ty + 4).toFixed(1) + '" class="okc-slope-readout">' + escapeXml(fmtNum(+it.to || 0)) + ' · ' + escapeXml(it.label || '') + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -4185,18 +4185,18 @@ class HtmlDocChart extends HTMLElement {
     function sx(v) { return pad.left + ((v - lo) / (hi - lo || 1)) * plotW; }
     function sy(v) { return pad.top + plotH - (v / maxCount) * plotH; }
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Histogram') + '" class="hdc-svg hdc-histogram">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Histogram') + '" class="okc-svg okc-histogram">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Y axis + ticks (5).
-    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
+    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     for (var t = 0; t <= 4; t++) {
       var v = maxCount * (t / 4);
       var y = sy(v);
-      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + y + '" x2="' + pad.left + '" y2="' + y + '" class="hdc-axis"/>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (y + 4) + '" text-anchor="end" class="hdc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + y + '" x2="' + pad.left + '" y2="' + y + '" class="okc-axis"/>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
     }
     // X axis baseline.
-    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="hdc-axis"/>');
+    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     // Bars + x-axis edge ticks.
     bins.forEach(function (b, i) {
       var x0 = sx(+b.lo), x1 = sx(+b.hi);
@@ -4205,16 +4205,16 @@ class HtmlDocChart extends HTMLElement {
         label: '[' + fmtNum(+b.lo) + ', ' + fmtNum(+b.hi) + ')',
         kv: [{ k: 'count', v: fmtNum(+b.count || 0) }]
       });
-      parts.push('<rect x="' + (x0 + 0.5) + '" y="' + top + '" width="' + (x1 - x0 - 1) + '" height="' + (pad.top + plotH - top) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="hdc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
+      parts.push('<rect x="' + (x0 + 0.5) + '" y="' + top + '" width="' + (x1 - x0 - 1) + '" height="' + (pad.top + plotH - top) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
       if (i === 0 || i === bins.length - 1 || (i % Math.max(1, Math.floor(bins.length / 6))) === 0) {
-        parts.push('<line x1="' + x0 + '" y1="' + (pad.top + plotH) + '" x2="' + x0 + '" y2="' + (pad.top + plotH + 4) + '" class="hdc-axis"/>');
-        parts.push('<text x="' + x0 + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + escapeXml(fmtNum(+b.lo)) + '</text>');
+        parts.push('<line x1="' + x0 + '" y1="' + (pad.top + plotH) + '" x2="' + x0 + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
+        parts.push('<text x="' + x0 + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(+b.lo)) + '</text>');
       }
     });
     // Right edge tick (the upper bound of the last bin).
     var xMax = sx(hi);
-    parts.push('<line x1="' + xMax + '" y1="' + (pad.top + plotH) + '" x2="' + xMax + '" y2="' + (pad.top + plotH + 4) + '" class="hdc-axis"/>');
-    parts.push('<text x="' + xMax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + escapeXml(fmtNum(hi)) + '</text>');
+    parts.push('<line x1="' + xMax + '" y1="' + (pad.top + plotH) + '" x2="' + xMax + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
+    parts.push('<text x="' + xMax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(hi)) + '</text>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
   }
@@ -4261,14 +4261,14 @@ class HtmlDocChart extends HTMLElement {
     var W = dayLabelW + weekCols * (cell + gap) + 12;
     var H = titleTop + monthLabelH + 7 * (cell + gap) + 16;
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || ('Activity calendar ' + year)) + '" class="hdc-svg hdc-calendar">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || ('Activity calendar ' + year)) + '" class="okc-svg okc-calendar">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Day-of-week labels (Mon, Wed, Fri only — typical convention).
     var dayLabels = ['Mon', '', 'Wed', '', 'Fri', '', ''];
     for (var d = 0; d < 7; d++) {
       if (!dayLabels[d]) continue;
       var dy = titleTop + monthLabelH + d * (cell + gap) + cell / 2 + 4;
-      parts.push('<text x="' + (dayLabelW - 6) + '" y="' + dy + '" text-anchor="end" class="hdc-calendar-label">' + dayLabels[d] + '</text>');
+      parts.push('<text x="' + (dayLabelW - 6) + '" y="' + dy + '" text-anchor="end" class="okc-calendar-label">' + dayLabels[d] + '</text>');
     }
     // Walk the year.
     var start = new Date(year, 0, 1);
@@ -4293,7 +4293,7 @@ class HtmlDocChart extends HTMLElement {
         label: dayIso,
         kv: hasVal ? [{ k: 'value', v: fmtNum(+val) }] : [{ k: 'value', v: 'no data' }]
       });
-      parts.push('<rect x="' + px + '" y="' + py + '" width="' + cell + '" height="' + cell + '" rx="2" fill="' + rectFill + '" fill-opacity="' + rectAlpha + '" class="hdc-calendar-cell" tabindex="0" data-hover-payload="' + escapeXml(calPayload) + '"><title>' + escapeXml(dayIso + (hasVal ? ' · ' + fmtNum(+val) : '')) + '</title></rect>');
+      parts.push('<rect x="' + px + '" y="' + py + '" width="' + cell + '" height="' + cell + '" rx="2" fill="' + rectFill + '" fill-opacity="' + rectAlpha + '" class="okc-calendar-cell" tabindex="0" data-hover-payload="' + escapeXml(calPayload) + '"><title>' + escapeXml(dayIso + (hasVal ? ' · ' + fmtNum(+val) : '')) + '</title></rect>');
       // Record the column where a new month begins.
       var mKey = cursor.getMonth();
       if (monthAt[mKey] === undefined) monthAt[mKey] = col;
@@ -4307,7 +4307,7 @@ class HtmlDocChart extends HTMLElement {
     for (var m = 0; m < 12; m++) {
       if (monthAt[m] === undefined) continue;
       var mx = dayLabelW + monthAt[m] * (cell + gap);
-      parts.push('<text x="' + mx + '" y="' + (titleTop + 12) + '" class="hdc-calendar-month">' + monthNames[m] + '</text>');
+      parts.push('<text x="' + mx + '" y="' + (titleTop + 12) + '" class="okc-calendar-month">' + monthNames[m] + '</text>');
     }
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -4378,14 +4378,14 @@ class HtmlDocChart extends HTMLElement {
     var scaled = tree.map(function (it) { return (Math.max(0, +it.value || 0) / total) * areaSize; });
     squarify(scaled.slice(), tree.slice(), { x: area.x, y: area.y, w: area.w, h: area.h });
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Treemap') + '" class="hdc-svg hdc-treemap">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Treemap') + '" class="okc-svg okc-treemap">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     rects.forEach(function (r) {
       var color = palette[r.item.color] || palette.accent;
       var labelFits = (r.w > 50 && r.h > 22);
       var v = +r.item.value || 0;
       var share = v / total;
-      parts.push('<g class="hdc-treemap-cell"><rect x="' + r.x.toFixed(1) + '" y="' + r.y.toFixed(1) + '" width="' + r.w.toFixed(1) + '" height="' + r.h.toFixed(1) + '" fill="' + color + '" fill-opacity="0.82"' +
+      parts.push('<g class="okc-treemap-cell"><rect x="' + r.x.toFixed(1) + '" y="' + r.y.toFixed(1) + '" width="' + r.w.toFixed(1) + '" height="' + r.h.toFixed(1) + '" fill="' + color + '" fill-opacity="0.82"' +
         ' tabindex="0"' +
         ' data-cell-label="' + escapeXml(r.item.label) + '"' +
         ' data-cell-value="' + v + '"' +
@@ -4393,8 +4393,8 @@ class HtmlDocChart extends HTMLElement {
         '<title>' + escapeXml(r.item.label + ': ' + fmtNum(v) + ' (' + Math.round(share * 100) + '%)') + '</title>' +
       '</rect>');
       if (labelFits) {
-        parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 18).toFixed(1) + '" class="hdc-treemap-label">' + escapeXml(r.item.label) + '</text>');
-        if (r.h > 38) parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 34).toFixed(1) + '" class="hdc-treemap-value">' + escapeXml(fmtNum(v)) + '</text>');
+        parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 18).toFixed(1) + '" class="okc-treemap-label">' + escapeXml(r.item.label) + '</text>');
+        if (r.h > 38) parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 34).toFixed(1) + '" class="okc-treemap-value">' + escapeXml(fmtNum(v)) + '</text>');
       }
       parts.push('</g>');
     });
@@ -4431,8 +4431,8 @@ class HtmlDocChart extends HTMLElement {
     var bins = 30, binW = (hi - lo) / bins;
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Ridgeline') + '" class="hdc-svg hdc-ridgeline">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Ridgeline') + '" class="okc-svg okc-ridgeline">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     distributions.forEach(function (d, i) {
       var counts = new Array(bins).fill(0);
       (d.values || []).forEach(function (v) {
@@ -4449,21 +4449,21 @@ class HtmlDocChart extends HTMLElement {
       pathPts.push('M ' + pad.left + ' ' + baseY);
       counts.forEach(function (cnt, bi) { pathPts.push('L ' + sx(bi).toFixed(1) + ' ' + sy(cnt).toFixed(1)); });
       pathPts.push('L ' + (pad.left + plotW) + ' ' + baseY + ' Z');
-      parts.push('<path d="' + pathPts.join(' ') + '" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="hdc-ridgeline-curve"/>');
-      parts.push('<text x="' + (pad.left - 10) + '" y="' + (baseY - 2) + '" text-anchor="end" class="hdc-ridgeline-label">' + escapeXml(d.label || '') + '</text>');
+      parts.push('<path d="' + pathPts.join(' ') + '" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-ridgeline-curve"/>');
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (baseY - 2) + '" text-anchor="end" class="okc-ridgeline-label">' + escapeXml(d.label || '') + '</text>');
     });
     // X axis ticks (5).
     var axisY = titleTop + distributions.length * rowH + 4;
     for (var t = 0; t <= 4; t++) {
       var v = lo + (t / 4) * (hi - lo);
       var ax = pad.left + (t / 4) * plotW;
-      parts.push('<text x="' + ax + '" y="' + axisY + '" text-anchor="middle" class="hdc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + ax + '" y="' + axisY + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
     }
     // Parallel cursor — a single vertical line spanning every ridge
     // that follows the pointer's X position. Sits inside the SVG so
     // its coordinates use the same viewBox basis as the ridges.
-    parts.push('<line class="hdc-ridge-cursor" x1="0" y1="' + titleTop + '" x2="0" y2="' + (titleTop + distributions.length * rowH) + '" stroke-width="1" pointer-events="none" visibility="hidden"/>');
-    parts.push('<text class="hdc-ridge-cursor-label" x="0" y="' + (titleTop - 8) + '" text-anchor="middle" pointer-events="none" visibility="hidden"></text>');
+    parts.push('<line class="okc-ridge-cursor" x1="0" y1="' + titleTop + '" x2="0" y2="' + (titleTop + distributions.length * rowH) + '" stroke-width="1" pointer-events="none" visibility="hidden"/>');
+    parts.push('<text class="okc-ridge-cursor-label" x="0" y="' + (titleTop - 8) + '" text-anchor="middle" pointer-events="none" visibility="hidden"></text>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
     this._wireRidgelineCursor(lo, hi);
@@ -4477,8 +4477,8 @@ class HtmlDocChart extends HTMLElement {
     var self = this;
     var svg = self.querySelector('svg');
     if (!svg) return;
-    var cursor = svg.querySelector('.hdc-ridge-cursor');
-    var label = svg.querySelector('.hdc-ridge-cursor-label');
+    var cursor = svg.querySelector('.okc-ridge-cursor');
+    var label = svg.querySelector('.okc-ridge-cursor-label');
     if (!cursor || !label) return;
     var padLeft = +self.getAttribute('data-ridge-pad-left');
     var padRight = +self.getAttribute('data-ridge-pad-right');
@@ -4543,8 +4543,8 @@ class HtmlDocChart extends HTMLElement {
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var bandCenter = (bandLeft + bandRight) / 2;
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Funnel') + '" class="hdc-svg hdc-funnel">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Funnel') + '" class="okc-svg okc-funnel">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     stages.forEach(function (st, i) {
       var v = +st.value || 0;
       var next = stages[i + 1];
@@ -4567,7 +4567,7 @@ class HtmlDocChart extends HTMLElement {
       // negative shouldn't happen in a funnel (sanity-clamped).
       var prev = i > 0 ? (+stages[i - 1].value || 0) : null;
       var drop = (prev !== null && prev > 0) ? Math.max(0, Math.round((1 - v / prev) * 100)) : null;
-      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="' + (0.82 - i * 0.08).toFixed(2) + '" class="hdc-funnel-band"' +
+      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="' + (0.82 - i * 0.08).toFixed(2) + '" class="okc-funnel-band"' +
         ' tabindex="0"' +
         ' data-stage-label="' + escapeXml(st.label || '') + '"' +
         ' data-stage-value="' + v + '"' +
@@ -4578,9 +4578,9 @@ class HtmlDocChart extends HTMLElement {
       // Three fixed columns — labels, values, percentages — all
       // right-anchored to their column edge so digits stack and
       // labels line up regardless of band width.
-      parts.push('<text x="' + labelColRight + '" y="' + textY + '" text-anchor="end" class="hdc-funnel-label">' + escapeXml(st.label || '') + '</text>');
-      parts.push('<text x="' + valueColRight + '" y="' + textY + '" text-anchor="end" class="hdc-funnel-value">' + escapeXml(fmtNum(v)) + '</text>');
-      parts.push('<text x="' + pctColRight + '" y="' + textY + '" text-anchor="end" class="hdc-funnel-pct">' + pct + '%</text>');
+      parts.push('<text x="' + labelColRight + '" y="' + textY + '" text-anchor="end" class="okc-funnel-label">' + escapeXml(st.label || '') + '</text>');
+      parts.push('<text x="' + valueColRight + '" y="' + textY + '" text-anchor="end" class="okc-funnel-value">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + pctColRight + '" y="' + textY + '" text-anchor="end" class="okc-funnel-pct">' + pct + '%</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -4650,8 +4650,8 @@ class HtmlDocChart extends HTMLElement {
       });
     });
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Sankey') + '" class="hdc-svg hdc-sankey">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Sankey') + '" class="okc-svg okc-sankey">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Track running source/target heights so concurrent links stack.
     nodes.forEach(function (n) { n._srcUsed = 0; n._tgtUsed = 0; });
     // Ribbons — draw before nodes so the rectangles cap the band edges.
@@ -4678,16 +4678,16 @@ class HtmlDocChart extends HTMLElement {
         label: (l.label || (s.label || s.id) + ' → ' + (t.label || t.id)),
         kv: [{ k: 'flow', v: fmtNum(v) }]
       });
-      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.32" class="hdc-sankey-link" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((l.label || (s.label || s.id) + ' → ' + (t.label || t.id)) + ': ' + fmtNum(v)) + '</title></path>');
+      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.32" class="okc-sankey-link" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((l.label || (s.label || s.id) + ' → ' + (t.label || t.id)) + ': ' + fmtNum(v)) + '</title></path>');
     });
     // Node rectangles + labels.
     nodes.forEach(function (n) {
       var nx = colX(n._col);
       var color = palette[n.color] || palette.accent;
-      parts.push('<rect x="' + nx + '" y="' + n._y + '" width="' + nodeW + '" height="' + n._h + '" fill="' + color + '" class="hdc-sankey-node"><title>' + escapeXml((n.label || n.id) + ': ' + fmtNum(Math.max(n._in, n._out))) + '</title></rect>');
+      parts.push('<rect x="' + nx + '" y="' + n._y + '" width="' + nodeW + '" height="' + n._h + '" fill="' + color + '" class="okc-sankey-node"><title>' + escapeXml((n.label || n.id) + ': ' + fmtNum(Math.max(n._in, n._out))) + '</title></rect>');
       var labelX = nx + (n._col === cols.length - 1 ? -6 : nodeW + 6);
       var anchor = n._col === cols.length - 1 ? 'end' : 'start';
-      parts.push('<text x="' + labelX + '" y="' + (n._y + n._h / 2 + 4) + '" text-anchor="' + anchor + '" class="hdc-sankey-label">' + escapeXml(n.label || n.id) + '</text>');
+      parts.push('<text x="' + labelX + '" y="' + (n._y + n._h / 2 + 4) + '" text-anchor="' + anchor + '" class="okc-sankey-label">' + escapeXml(n.label || n.id) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -4765,21 +4765,21 @@ class HtmlDocChart extends HTMLElement {
       temp *= 0.92;
     }
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Network') + '" class="hdc-svg hdc-network">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Network') + '" class="okc-svg okc-network">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Edges first (drawn under nodes).
     links.forEach(function (l) {
       var a = byId[l.source], b = byId[l.target];
       if (!a || !b) return;
-      parts.push('<line x1="' + a._x.toFixed(1) + '" y1="' + a._y.toFixed(1) + '" x2="' + b._x.toFixed(1) + '" y2="' + b._y.toFixed(1) + '" class="hdc-network-edge"/>');
+      parts.push('<line x1="' + a._x.toFixed(1) + '" y1="' + a._y.toFixed(1) + '" x2="' + b._x.toFixed(1) + '" y2="' + b._y.toFixed(1) + '" class="okc-network-edge"/>');
     });
     nodes.forEach(function (n) {
       var color = palette[n.color] || palette.accent;
       var deg = adj[n.id].length;
       var r = 6 + Math.min(8, deg);
-      parts.push('<g class="hdc-network-node" tabindex="0" data-hover-payload="' + escapeXml(JSON.stringify({label: n.label || n.id, kv: [{k: 'degree', v: String(deg)}]})) + '">' +
+      parts.push('<g class="okc-network-node" tabindex="0" data-hover-payload="' + escapeXml(JSON.stringify({label: n.label || n.id, kv: [{k: 'degree', v: String(deg)}]})) + '">' +
         '<circle cx="' + n._x.toFixed(1) + '" cy="' + n._y.toFixed(1) + '" r="' + r + '" fill="' + color + '"/>' +
-        '<text x="' + n._x.toFixed(1) + '" y="' + (n._y - r - 4).toFixed(1) + '" text-anchor="middle" class="hdc-network-label">' + escapeXml(n.label || n.id) + '</text>' +
+        '<text x="' + n._x.toFixed(1) + '" y="' + (n._y - r - 4).toFixed(1) + '" text-anchor="middle" class="okc-network-label">' + escapeXml(n.label || n.id) + '</text>' +
         '<title>' + escapeXml((n.label || n.id) + ' · degree ' + deg) + '</title>' +
         '</g>');
     });
@@ -4813,17 +4813,17 @@ class HtmlDocChart extends HTMLElement {
       if (v._lo === v._hi) { v._lo -= 1; v._hi += 1; }
     });
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + (titleTop + H + 12) + '" role="img" aria-label="' + escapeXml(this._title || 'Scatter matrix') + '" class="hdc-svg hdc-scatter-matrix">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + (titleTop + H + 12) + '" role="img" aria-label="' + escapeXml(this._title || 'Scatter matrix') + '" class="okc-svg okc-scatter-matrix">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     for (var i = 0; i < n; i++) {
       for (var j = 0; j < n; j++) {
         var cx = pad + j * cell;
         var cy = titleTop + i * cell;
         // Frame.
-        parts.push('<rect x="' + cx + '" y="' + cy + '" width="' + cell + '" height="' + cell + '" class="hdc-sm-cell"/>');
+        parts.push('<rect x="' + cx + '" y="' + cy + '" width="' + cell + '" height="' + cell + '" class="okc-sm-cell"/>');
         if (i === j) {
           // Diagonal: variable label.
-          parts.push('<text x="' + (cx + cell / 2) + '" y="' + (cy + cell / 2 + 4) + '" text-anchor="middle" class="hdc-sm-label">' + escapeXml(vars[i].label || vars[i].key) + '</text>');
+          parts.push('<text x="' + (cx + cell / 2) + '" y="' + (cy + cell / 2 + 4) + '" text-anchor="middle" class="okc-sm-label">' + escapeXml(vars[i].label || vars[i].key) + '</text>');
           continue;
         }
         var vx = vars[j], vy = vars[i];
@@ -4875,15 +4875,15 @@ class HtmlDocChart extends HTMLElement {
       return pad.top + plotH - ((val - v._lo) / range) * plotH;
     };
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Parallel coordinates') + '" class="hdc-svg hdc-parcoord">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Parallel coordinates') + '" class="okc-svg okc-parcoord">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Axes.
     vars.forEach(function (v, i) {
       var ax = axisX(i);
-      parts.push('<line x1="' + ax + '" y1="' + pad.top + '" x2="' + ax + '" y2="' + (pad.top + plotH) + '" class="hdc-parcoord-axis"/>');
-      parts.push('<text x="' + ax + '" y="' + (pad.top - 8) + '" text-anchor="middle" class="hdc-parcoord-label">' + escapeXml(v.label || v.key) + '</text>');
-      parts.push('<text x="' + ax + '" y="' + (pad.top - 22) + '" text-anchor="middle" class="hdc-tick">' + fmtNum(v._hi) + '</text>');
-      parts.push('<text x="' + ax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="hdc-tick">' + fmtNum(v._lo) + '</text>');
+      parts.push('<line x1="' + ax + '" y1="' + pad.top + '" x2="' + ax + '" y2="' + (pad.top + plotH) + '" class="okc-parcoord-axis"/>');
+      parts.push('<text x="' + ax + '" y="' + (pad.top - 8) + '" text-anchor="middle" class="okc-parcoord-label">' + escapeXml(v.label || v.key) + '</text>');
+      parts.push('<text x="' + ax + '" y="' + (pad.top - 22) + '" text-anchor="middle" class="okc-tick">' + fmtNum(v._hi) + '</text>');
+      parts.push('<text x="' + ax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + fmtNum(v._lo) + '</text>');
     });
     // Polylines.
     records.forEach(function (r, ri) {
@@ -4896,7 +4896,7 @@ class HtmlDocChart extends HTMLElement {
       }
       var color = palette[r._color] || palette.accent;
       var payload = JSON.stringify({ label: r._label || ('record ' + (ri + 1)), kv: vars.map(function (v) { return { k: v.label || v.key, v: fmtNum(+r[v.key]) }; }) });
-      parts.push('<polyline points="' + pts.join(' ') + '" stroke="' + color + '" class="hdc-parcoord-line" data-hover-payload="' + escapeXml(payload) + '"/>');
+      parts.push('<polyline points="' + pts.join(' ') + '" stroke="' + color + '" class="okc-parcoord-line" data-hover-payload="' + escapeXml(payload) + '"/>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -4970,8 +4970,8 @@ class HtmlDocChart extends HTMLElement {
       }
     }
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Chord') + '" class="hdc-svg hdc-chord">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Chord') + '" class="okc-svg okc-chord">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Ribbons first (drawn under arcs).
     ribbons.forEach(function (r) {
       var s0 = point(rInner, r.sA0), s1 = point(rInner, r.sA1);
@@ -4992,7 +4992,7 @@ class HtmlDocChart extends HTMLElement {
         label: (sg.label || sg.id) + ' → ' + (tg.label || tg.id),
         kv: [{ k: 'flow', v: fmtNum(r.value) }]
       });
-      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.28" class="hdc-chord-ribbon" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((sg.label || sg.id) + ' → ' + (tg.label || tg.id) + ': ' + fmtNum(r.value)) + '</title></path>');
+      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.28" class="okc-chord-ribbon" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((sg.label || sg.id) + ' → ' + (tg.label || tg.id) + ': ' + fmtNum(r.value)) + '</title></path>');
     });
     // Outer arcs (group perimeter).
     arcs.forEach(function (a) {
@@ -5006,12 +5006,12 @@ class HtmlDocChart extends HTMLElement {
         ' A ' + rInner + ' ' + rInner + ' 0 ' + largeArc + ' 0 ' + ip0[0].toFixed(1) + ' ' + ip0[1].toFixed(1) +
         ' Z';
       var color = palette[a.group.color] || palette.accent;
-      parts.push('<path d="' + d + '" fill="' + color + '" class="hdc-chord-arc"><title>' + escapeXml((a.group.label || a.group.id) + ': ' + fmtNum(totals[a.idx])) + '</title></path>');
+      parts.push('<path d="' + d + '" fill="' + color + '" class="okc-chord-arc"><title>' + escapeXml((a.group.label || a.group.id) + ': ' + fmtNum(totals[a.idx])) + '</title></path>');
       // Label outside the arc.
       var mid = (a.start + a.end) / 2;
       var lp = point(rOuter + 14, mid);
       var anchor = Math.cos(mid) < -0.2 ? 'end' : (Math.cos(mid) > 0.2 ? 'start' : 'middle');
-      parts.push('<text x="' + lp[0].toFixed(1) + '" y="' + lp[1].toFixed(1) + '" text-anchor="' + anchor + '" dominant-baseline="middle" class="hdc-chord-label">' + escapeXml(a.group.label || a.group.id) + '</text>');
+      parts.push('<text x="' + lp[0].toFixed(1) + '" y="' + lp[1].toFixed(1) + '" text-anchor="' + anchor + '" dominant-baseline="middle" class="okc-chord-label">' + escapeXml(a.group.label || a.group.id) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -5076,8 +5076,8 @@ class HtmlDocChart extends HTMLElement {
       return { color: palette.accent, opacity: 0.2 + t * 0.8 };
     }
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Geo cartogram') + '" class="hdc-svg hdc-geo">');
-    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="hdc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Geo cartogram') + '" class="okc-svg okc-geo">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Render every tile in the grid — present regions get colour;
     // absent get a faint placeholder outline so the geography reads.
     Object.keys(TILES).forEach(function (id) {
@@ -5094,15 +5094,15 @@ class HtmlDocChart extends HTMLElement {
           kv: [{ k: 'value', v: fmtNum(+r.value) }, { k: 'region', v: id }]
         });
         attrs = ' fill="' + f.color + '" fill-opacity="' + f.opacity.toFixed(2) + '" data-hover-payload="' + escapeXml(payload) + '"';
-        parts.push('<g class="hdc-geo-cell hdc-geo-cell-on" tabindex="0">');
+        parts.push('<g class="okc-geo-cell okc-geo-cell-on" tabindex="0">');
         parts.push('<rect x="' + px + '" y="' + py + '" width="' + cellW + '" height="' + cellH + '" rx="3"' + attrs + '/>');
-        parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 - 2) + '" text-anchor="middle" class="hdc-geo-code">' + escapeXml(id) + '</text>');
-        parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 + 12) + '" text-anchor="middle" class="hdc-geo-value">' + escapeXml(fmtNum(+r.value)) + '</text>');
+        parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 - 2) + '" text-anchor="middle" class="okc-geo-code">' + escapeXml(id) + '</text>');
+        parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 + 12) + '" text-anchor="middle" class="okc-geo-value">' + escapeXml(fmtNum(+r.value)) + '</text>');
         parts.push('<title>' + escapeXml((r.label || id) + ': ' + fmtNum(+r.value)) + '</title>');
         parts.push('</g>');
       } else {
-        parts.push('<rect x="' + px + '" y="' + py + '" width="' + cellW + '" height="' + cellH + '" rx="3" class="hdc-geo-cell-off"/>');
-        parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 + 4) + '" text-anchor="middle" class="hdc-geo-code-off">' + escapeXml(id) + '</text>');
+        parts.push('<rect x="' + px + '" y="' + py + '" width="' + cellW + '" height="' + cellH + '" rx="3" class="okc-geo-cell-off"/>');
+        parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 + 4) + '" text-anchor="middle" class="okc-geo-code-off">' + escapeXml(id) + '</text>');
       }
     });
     // Legend — value scale band at the bottom.
@@ -5112,8 +5112,8 @@ class HtmlDocChart extends HTMLElement {
       var t = s / (stops - 1);
       parts.push('<rect x="' + (lgX + s * (lgW / stops)).toFixed(1) + '" y="' + legendY + '" width="' + (lgW / stops + 0.5).toFixed(2) + '" height="' + lgH + '" fill="' + palette.accent + '" fill-opacity="' + (0.2 + t * 0.8).toFixed(2) + '"/>');
     }
-    parts.push('<text x="' + lgX + '" y="' + (legendY + lgH + 14) + '" class="hdc-geo-legend-tick">' + escapeXml(fmtNum(vMin)) + '</text>');
-    parts.push('<text x="' + (lgX + lgW) + '" y="' + (legendY + lgH + 14) + '" text-anchor="end" class="hdc-geo-legend-tick">' + escapeXml(fmtNum(vMax)) + '</text>');
+    parts.push('<text x="' + lgX + '" y="' + (legendY + lgH + 14) + '" class="okc-geo-legend-tick">' + escapeXml(fmtNum(vMin)) + '</text>');
+    parts.push('<text x="' + (lgX + lgW) + '" y="' + (legendY + lgH + 14) + '" text-anchor="end" class="okc-geo-legend-tick">' + escapeXml(fmtNum(vMax)) + '</text>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
   }
@@ -5121,11 +5121,11 @@ class HtmlDocChart extends HTMLElement {
   _attachToolbar() {
     var self = this;
     var chartTitle = self._title || (self._type + '-chart');
-    __htmldocVisualTools.makeToolbar(this, [
+    __okuVisualTools.makeToolbar(this, [
       {
         title: 'Reset zoom',
         icon: ICON_RESET,
-        run: function (btn) { self.resetView(); __htmldocVisualTools.flash(btn, 'ok', ICON_RESET); }
+        run: function (btn) { self.resetView(); __okuVisualTools.flash(btn, 'ok', ICON_RESET); }
       },
       {
         title: 'Copy data (TSV)',
@@ -5143,25 +5143,25 @@ class HtmlDocChart extends HTMLElement {
               lines.push(sLabel + '\t' + p.x + '\t' + p.y + '\t' + pLabel);
             });
           });
-          __htmldocVisualTools.copyText(btn, lines.join('\n'), ICON_CLIPBOARD);
+          __okuVisualTools.copyText(btn, lines.join('\n'), ICON_CLIPBOARD);
         }
       },
       {
         title: 'Download as PNG',
         icon: ICON_CAMERA,
         run: function (btn) {
-          var svg = self.querySelector('.hdc-svg');
-          __htmldocVisualTools.svgToPng(svg, chartTitle)
-            .then(function () { __htmldocVisualTools.flash(btn, 'ok', ICON_CAMERA); })
-            .catch(function () { __htmldocVisualTools.flash(btn, 'fail', ICON_CAMERA); });
+          var svg = self.querySelector('.okc-svg');
+          __okuVisualTools.svgToPng(svg, chartTitle)
+            .then(function () { __okuVisualTools.flash(btn, 'ok', ICON_CAMERA); })
+            .catch(function () { __okuVisualTools.flash(btn, 'fail', ICON_CAMERA); });
         }
       },
       {
         title: 'Expand to fullscreen',
         icon: ICON_EXPAND,
         run: function () {
-          var svg = self.querySelector('.hdc-svg');
-          if (!svg || !window.__htmldocLightbox) return;
+          var svg = self.querySelector('.okc-svg');
+          if (!svg || !window.__okuLightbox) return;
           var copy = svg.cloneNode(true);
           // The cloned SVG has the chart's intrinsic dimensions; let the
           // lightbox CSS scale it via max-width/max-height + viewBox so
@@ -5170,7 +5170,7 @@ class HtmlDocChart extends HTMLElement {
           copy.removeAttribute('height');
           copy.style.width = '100%';
           copy.style.height = 'auto';
-          __htmldocLightbox.open(copy, { title: chartTitle });
+          __okuLightbox.open(copy, { title: chartTitle });
         }
       }
     ]);
@@ -5186,7 +5186,7 @@ class HtmlDocChart extends HTMLElement {
     var drag = null;
     var pinch = null;
 
-    function getSvg() { return self.querySelector(':scope > .hdc-svg'); }
+    function getSvg() { return self.querySelector(':scope > .okc-svg'); }
 
     // Map a clientX/Y to data coordinates via SVG viewBox.
     function dataAtPointer(clientX, clientY) {
@@ -5239,7 +5239,7 @@ class HtmlDocChart extends HTMLElement {
 
     // Wheel zoom — preventDefault to stop page scroll over the chart.
     this.addEventListener('wheel', function (e) {
-      if (e.target.closest('.hdt-bar, .hdc-legend-chip')) return;
+      if (e.target.closest('.okt-bar, .okc-legend-chip')) return;
       e.preventDefault();
       var factor = e.deltaY > 0 ? 1.12 : (1 / 1.12);
       zoomAround(dataAtPointer(e.clientX, e.clientY), factor);
@@ -5248,7 +5248,7 @@ class HtmlDocChart extends HTMLElement {
     // Drag pan.
     this.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return;
-      if (e.target.closest('.hdt-bar, .hdc-legend-chip, .hdc-dot, .hdc-point-label')) return;
+      if (e.target.closest('.okt-bar, .okc-legend-chip, .okc-dot, .okc-point-label')) return;
       var svg = getSvg(); if (!svg) return;
       drag = {
         startClientX: e.clientX,
@@ -5335,7 +5335,7 @@ class HtmlDocChart extends HTMLElement {
 
     // Double-click resets.
     this.addEventListener('dblclick', function (e) {
-      if (e.target.closest('.hdt-bar, .hdc-legend-chip')) return;
+      if (e.target.closest('.okt-bar, .okc-legend-chip')) return;
       self.resetView();
     });
 
@@ -5348,10 +5348,10 @@ class HtmlDocChart extends HTMLElement {
 
     /* Hover tooltip — one shared element per chart, lazily created. */
     function ensureTip() {
-      var t = self.querySelector(':scope > .hdc-tooltip');
+      var t = self.querySelector(':scope > .okc-tooltip');
       if (t) return t;
       t = document.createElement('div');
-      t.className = 'hdc-tooltip';
+      t.className = 'okc-tooltip';
       t.setAttribute('role', 'tooltip');
       t.setAttribute('aria-hidden', 'true');
       self.appendChild(t);
@@ -5364,9 +5364,9 @@ class HtmlDocChart extends HTMLElement {
       var x = dot.getAttribute('data-x');
       var y = dot.getAttribute('data-y');
       var html = '';
-      if (seriesLbl) html += '<div class="hdc-tt-series">' + escapeXml(seriesLbl) + '</div>';
-      if (pointLbl)  html += '<div class="hdc-tt-label">'  + escapeXml(pointLbl)  + '</div>';
-      html += '<div class="hdc-tt-coords">(' + fmtNum(parseFloat(x)) + ', ' + fmtNum(parseFloat(y)) + ')</div>';
+      if (seriesLbl) html += '<div class="okc-tt-series">' + escapeXml(seriesLbl) + '</div>';
+      if (pointLbl)  html += '<div class="okc-tt-label">'  + escapeXml(pointLbl)  + '</div>';
+      html += '<div class="okc-tt-coords">(' + fmtNum(parseFloat(x)) + ', ' + fmtNum(parseFloat(y)) + ')</div>';
       tip.innerHTML = html;
       tip.setAttribute('aria-hidden', 'false');
       var hostRect = self.getBoundingClientRect();
@@ -5378,7 +5378,7 @@ class HtmlDocChart extends HTMLElement {
       tip.classList.add('visible');
     }
     function hideTip() {
-      var tip = self.querySelector(':scope > .hdc-tooltip');
+      var tip = self.querySelector(':scope > .okc-tooltip');
       if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
     }
     /* Bidirectional hover/focus: a dot and its inline label share a
@@ -5391,40 +5391,40 @@ class HtmlDocChart extends HTMLElement {
         el.classList.toggle('hovered', on);
       });
     }
-    this.querySelectorAll('.hdc-dot').forEach(function (dot) {
+    this.querySelectorAll('.okc-dot').forEach(function (dot) {
       var key = dot.getAttribute('data-point-key');
       dot.addEventListener('mouseenter', function () { setHover(key, true);  showTip(dot); });
       dot.addEventListener('mouseleave', function () { setHover(key, false); hideTip();   });
       dot.addEventListener('focus',      function () { setHover(key, true);  showTip(dot); });
       dot.addEventListener('blur',       function () { setHover(key, false); hideTip();   });
     });
-    this.querySelectorAll('.hdc-point-label').forEach(function (label) {
+    this.querySelectorAll('.okc-point-label').forEach(function (label) {
       var key = label.getAttribute('data-point-key');
       label.addEventListener('mouseenter', function () {
         setHover(key, true);
-        var dot = self.querySelector('.hdc-dot[data-point-key="' + key + '"]');
+        var dot = self.querySelector('.okc-dot[data-point-key="' + key + '"]');
         if (dot) showTip(dot);
       });
       label.addEventListener('mouseleave', function () { setHover(key, false); hideTip(); });
       label.addEventListener('focus', function () {
         setHover(key, true);
-        var dot = self.querySelector('.hdc-dot[data-point-key="' + key + '"]');
+        var dot = self.querySelector('.okc-dot[data-point-key="' + key + '"]');
         if (dot) showTip(dot);
       });
       label.addEventListener('blur', function () { setHover(key, false); hideTip(); });
     });
 
     /* Legend chip — click or Enter/Space toggles `.dim` on the matching
-       <g class="hdc-series"> so the user can mute series visually. */
+       <g class="okc-series"> so the user can mute series visually. */
     function toggleSeries(chip) {
       var idx = chip.getAttribute('data-series-idx');
-      var series = self.querySelector('.hdc-series[data-series-idx="' + idx + '"]');
+      var series = self.querySelector('.okc-series[data-series-idx="' + idx + '"]');
       if (!series) return;
       var on = series.classList.toggle('dim');
       chip.classList.toggle('off', on);
       chip.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
-    this.querySelectorAll('.hdc-legend-chip').forEach(function (chip) {
+    this.querySelectorAll('.okc-legend-chip').forEach(function (chip) {
       chip.setAttribute('aria-pressed', 'false');
       chip.addEventListener('click', function () { toggleSeries(chip); });
       chip.addEventListener('keydown', function (e) {
@@ -5438,7 +5438,7 @@ class HtmlDocChart extends HTMLElement {
     /* Rich-tooltip wiring for non-dot chart shapes. Reads the data
        payload from the element's own attributes (label, value, share,
        series) — each renderer below tags its shapes accordingly. The
-       tooltip element is the same .hdc-tooltip the dot-tip uses, so
+       tooltip element is the same .okc-tooltip the dot-tip uses, so
        only one tip is visible at a time. */
     // Click-pinned anchor state. When set, hover-leave does NOT
     // hide the tooltip; only another click (on the same anchor or
@@ -5448,17 +5448,17 @@ class HtmlDocChart extends HTMLElement {
     function showRich(anchor, payload) {
       var tip = ensureTip();
       var html = '';
-      if (payload.series) html += '<div class="hdc-tt-series">' + escapeXml(payload.series) + '</div>';
-      if (payload.label)  html += '<div class="hdc-tt-label">'  + escapeXml(payload.label)  + '</div>';
+      if (payload.series) html += '<div class="okc-tt-series">' + escapeXml(payload.series) + '</div>';
+      if (payload.label)  html += '<div class="okc-tt-label">'  + escapeXml(payload.label)  + '</div>';
       if (payload.kv && payload.kv.length) {
-        html += '<dl class="hdc-tt-kv">';
+        html += '<dl class="okc-tt-kv">';
         payload.kv.forEach(function (row) {
           html += '<dt>' + escapeXml(row.k) + '</dt><dd>' + escapeXml(row.v) + '</dd>';
         });
         html += '</dl>';
       }
-      if (payload.footer) html += '<div class="hdc-tt-coords">' + escapeXml(payload.footer) + '</div>';
-      html += '<span class="hdc-tt-pin-hint">click to pin</span>';
+      if (payload.footer) html += '<div class="okc-tt-coords">' + escapeXml(payload.footer) + '</div>';
+      html += '<span class="okc-tt-pin-hint">click to pin</span>';
       tip.innerHTML = html;
       tip.setAttribute('aria-hidden', 'false');
       var hostRect = self.getBoundingClientRect();
@@ -5469,7 +5469,7 @@ class HtmlDocChart extends HTMLElement {
     }
     function hideRich(force) {
       if (pinnedAnchor && !force) return;
-      var tip = self.querySelector(':scope > .hdc-tooltip');
+      var tip = self.querySelector(':scope > .okc-tooltip');
       if (tip) {
         tip.classList.remove('visible', 'pinned');
         tip.setAttribute('aria-hidden', 'true');
@@ -5478,7 +5478,7 @@ class HtmlDocChart extends HTMLElement {
     function pinRich(anchor, payload) {
       pinnedAnchor = anchor;
       showRich(anchor, payload);
-      var tip = self.querySelector(':scope > .hdc-tooltip');
+      var tip = self.querySelector(':scope > .okc-tooltip');
       if (tip) tip.classList.add('pinned');
     }
     function unpinRich() {
@@ -5522,7 +5522,7 @@ class HtmlDocChart extends HTMLElement {
       if (ev.key === 'Escape' && pinnedAnchor) unpinRich();
     });
     // Donut slices — label, value, share-of-total.
-    rich('.hdc-slice', function (el) {
+    rich('.okc-slice', function (el) {
       var label = el.getAttribute('data-slice-label') || '';
       var value = +el.getAttribute('data-slice-value') || 0;
       var share = +el.getAttribute('data-slice-share') || 0;
@@ -5537,7 +5537,7 @@ class HtmlDocChart extends HTMLElement {
       };
     });
     // Treemap cells — already tagged from renderer.
-    rich('.hdc-treemap-cell rect', function (el) {
+    rich('.okc-treemap-cell rect', function (el) {
       var label = el.getAttribute('data-cell-label') || '';
       var value = +el.getAttribute('data-cell-value') || 0;
       var share = +el.getAttribute('data-cell-share') || 0;
@@ -5550,7 +5550,7 @@ class HtmlDocChart extends HTMLElement {
       };
     });
     // Funnel bands — stage value, share-of-first, drop-off to next.
-    rich('.hdc-funnel-band', function (el) {
+    rich('.okc-funnel-band', function (el) {
       var label = el.getAttribute('data-stage-label') || '';
       var value = +el.getAttribute('data-stage-value') || 0;
       var share = +el.getAttribute('data-stage-share') || 0;
@@ -5571,17 +5571,17 @@ class HtmlDocChart extends HTMLElement {
     });
   }
 }
-if (!customElements.get('html-doc-chart')) customElements.define('html-doc-chart', HtmlDocChart);
+if (!customElements.get('oku-chart')) customElements.define('oku-chart', OkuChart);
 
 /* ============ .bar-chart hover enhancer ============ *
  * bar / stacked-bar / grouped-bar charts render via renderer.js as
  * <div class="bar-chart"> (single) or <div class="bar-chart-multi">
- * (stacked/grouped) — outside the <html-doc-chart> custom-element
+ * (stacked/grouped) — outside the <oku-chart> custom-element
  * lifecycle. This enhancer attaches the same rich tooltip to those
  * DIV-based charts by walking .bar-fill elements and reading their
  * data-hover-payload JSON.
  * --------------------------------------------------------------------- */
-function __htmldocEnhanceBarCharts(root) {
+function __okuEnhanceBarCharts(root) {
   var charts = (root || document).querySelectorAll('.bar-chart, .bar-chart-multi');
   charts.forEach(function (host) {
     if (host.dataset.hdcBarsBound === '1') return;
@@ -5590,7 +5590,7 @@ function __htmldocEnhanceBarCharts(root) {
     function ensureTip() {
       if (tip) return tip;
       tip = document.createElement('div');
-      tip.className = 'hdc-tooltip';
+      tip.className = 'okc-tooltip';
       tip.setAttribute('role', 'tooltip');
       tip.setAttribute('aria-hidden', 'true');
       host.appendChild(tip);
@@ -5600,17 +5600,17 @@ function __htmldocEnhanceBarCharts(root) {
     function show(anchor, payload) {
       var t = ensureTip();
       var html = '';
-      if (payload.series) html += '<div class="hdc-tt-series">' + escapeXml(payload.series) + '</div>';
-      if (payload.label)  html += '<div class="hdc-tt-label">'  + escapeXml(payload.label)  + '</div>';
+      if (payload.series) html += '<div class="okc-tt-series">' + escapeXml(payload.series) + '</div>';
+      if (payload.label)  html += '<div class="okc-tt-label">'  + escapeXml(payload.label)  + '</div>';
       if (payload.kv && payload.kv.length) {
-        html += '<dl class="hdc-tt-kv">';
+        html += '<dl class="okc-tt-kv">';
         payload.kv.forEach(function (row) {
           html += '<dt>' + escapeXml(row.k) + '</dt><dd>' + escapeXml(row.v) + '</dd>';
         });
         html += '</dl>';
       }
-      if (payload.footer) html += '<div class="hdc-tt-coords">' + escapeXml(payload.footer) + '</div>';
-      html += '<span class="hdc-tt-pin-hint">click to pin</span>';
+      if (payload.footer) html += '<div class="okc-tt-coords">' + escapeXml(payload.footer) + '</div>';
+      html += '<span class="okc-tt-pin-hint">click to pin</span>';
       t.innerHTML = html;
       t.setAttribute('aria-hidden', 'false');
       var hostRect = host.getBoundingClientRect();
@@ -5682,12 +5682,12 @@ function __htmldocEnhanceBarCharts(root) {
   });
 }
 document.addEventListener('DOMContentLoaded', function () {
-  __htmldocEnhanceBarCharts(document);
+  __okuEnhanceBarCharts(document);
 });
-// Renderer dispatches html-doc:rendered on window after each async
+// Renderer dispatches oku:rendered on window after each async
 // page render; re-enhance then to catch fresh bar-charts.
-window.addEventListener('html-doc:rendered', function () {
-  __htmldocEnhanceBarCharts(document);
+window.addEventListener('oku:rendered', function () {
+  __okuEnhanceBarCharts(document);
 });
 
 function escapeXml(s) {
@@ -5707,7 +5707,7 @@ function fmtNum(n) {
  * diagrams. Toolbar reveals on hover/focus-within; buttons flash green
  * (success) or red (failure) for 1.5s.
  * -------------------------------------------------------------------- */
-var __htmldocVisualTools = (function () {
+var __okuVisualTools = (function () {
   function flash(btn, kind, restoreIcon) {
     var icon = kind === 'ok' ? ICON_CHECK : ICON_CROSS;
     var cls  = kind === 'ok' ? 'flash-ok' : 'flash-fail';
@@ -5822,11 +5822,11 @@ var __htmldocVisualTools = (function () {
 
   function makeToolbar(host, actions) {
     if (!host) return null;
-    var existing = host.querySelector(':scope > .hdt-bar');
+    var existing = host.querySelector(':scope > .okt-bar');
     if (existing) existing.remove();
-    host.classList.add('hdt-host');
+    host.classList.add('okt-host');
     var bar = document.createElement('div');
-    bar.className = 'hdt-bar';
+    bar.className = 'okt-bar';
     actions.forEach(function (a) {
       var btn = document.createElement('button');
       btn.type = 'button';
@@ -5914,7 +5914,7 @@ var __prismLoader = (function () {
         Prism.highlightAll();
       }
     }).catch(function (e) {
-      window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+      window.dispatchEvent(new CustomEvent('oku:warnings', {
         detail: [{ code: 'prism-load-failed', msg: 'Could not load Prism: ' + (e.message || e), level: 'info' }]
       }));
     });
@@ -5922,7 +5922,7 @@ var __prismLoader = (function () {
   return { load: load, highlightAll: highlightAll };
 })();
 
-/* ============ <html-doc-diagram> — Mermaid (lazy-loaded) ============ */
+/* ============ <oku-diagram> — Mermaid (lazy-loaded) ============ */
 var __mermaidLoader = (function () {
   var loadPromise = null;
   // SUPPLY-CHAIN NOTE: this loads Mermaid from a CDN at runtime. The
@@ -6078,26 +6078,26 @@ var __mermaidLoader = (function () {
   return { load: load, reset: reset };
 })();
 
-class HtmlDocDiagram extends HTMLElement {
+class OkuDiagram extends HTMLElement {
   connectedCallback() {
     var srcNode = this.querySelector('script[type="text/x-mermaid"]');
     var src = srcNode ? srcNode.textContent.trim() : '';
     var caption = this.getAttribute('caption') || '';
-    this.classList.add('hdd-wrap');
+    this.classList.add('okd-wrap');
     // Two stacked views: rendered SVG and the raw Mermaid source. The
     // toolbar's first button toggles between them. Source is wrapped
     // in a language-mermaid <code> so the existing Prism + line-number
     // pipeline picks it up.
     this.innerHTML =
-      '<div class="hdd-render" aria-label="Diagram loading">Rendering…</div>' +
-      '<pre class="hdd-source" hidden><code class="language-mermaid">' + escapeXml(src) + '</code></pre>' +
-      (caption ? '<figcaption class="hdd-caption">' + escapeXml(caption) + '</figcaption>' : '');
-    var renderHost = this.querySelector('.hdd-render');
+      '<div class="okd-render" aria-label="Diagram loading">Rendering…</div>' +
+      '<pre class="okd-source" hidden><code class="language-mermaid">' + escapeXml(src) + '</code></pre>' +
+      (caption ? '<figcaption class="okd-caption">' + escapeXml(caption) + '</figcaption>' : '');
+    var renderHost = this.querySelector('.okd-render');
     var self = this;
     this._src = src;
     __mermaidLoader.load()
       .then(function (mermaid) {
-        var id = 'hdd-' + Math.random().toString(36).slice(2, 9);
+        var id = 'okd-' + Math.random().toString(36).slice(2, 9);
         return mermaid.render(id, src).then(function (out) {
           renderHost.innerHTML = out.svg;
           // Strip Mermaid's intrinsic width/height + inline style so
@@ -6119,16 +6119,16 @@ class HtmlDocDiagram extends HTMLElement {
       })
       .catch(function (err) {
         // Stable id so the warning panel can jump-link back here.
-        if (!self.id) self.id = 'hdd-error-' + Math.random().toString(36).slice(2, 9);
+        if (!self.id) self.id = 'okd-error-' + Math.random().toString(36).slice(2, 9);
         var raw = String((err && err.message) || err);
         // Replace our own render surface with our error card so the
         // framework noise doesn't leak through. The toolbar's source
         // toggle still lets the reader inspect the offending source.
-        renderHost.classList.add('hdd-error');
+        renderHost.classList.add('okd-error');
         renderHost.innerHTML =
-          '<div class="hdd-error-card" role="alert">' +
+          '<div class="okd-error-card" role="alert">' +
             '<strong>Diagram could not be rendered.</strong>' +
-            '<div class="hdd-error-hint">The source is preserved — open it from the toolbar to debug.</div>' +
+            '<div class="okd-error-hint">The source is preserved — open it from the toolbar to debug.</div>' +
             '<details>' +
               '<summary>Show parse error</summary>' +
               '<pre>' + escapeXml(raw) + '</pre>' +
@@ -6137,7 +6137,7 @@ class HtmlDocDiagram extends HTMLElement {
         self._attachToolbar();
         var firstLine = raw.split('\n')[0].trim();
         var label = (caption || 'Diagram') + ' — ' + (firstLine || 'parse error');
-        window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+        window.dispatchEvent(new CustomEvent('oku:warnings', {
           detail: [{
             code: 'mermaid-render-failed',
             msg: label,
@@ -6152,9 +6152,9 @@ class HtmlDocDiagram extends HTMLElement {
         // classes that the framework stamps. Polled briefly because
         // the error svg may be appended after our catch handler runs.
         function purgeOrphanMermaidErrors() {
-          document.querySelectorAll('body > svg[id^="hdd-"], body > .mermaid-error, body > svg[id^="d"][aria-roledescription="error"]').forEach(function (n) {
+          document.querySelectorAll('body > svg[id^="okd-"], body > .mermaid-error, body > svg[id^="d"][aria-roledescription="error"]').forEach(function (n) {
             // Only nuke svgs that aren't INSIDE our diagram host.
-            if (!n.closest('html-doc-diagram')) n.remove();
+            if (!n.closest('oku-diagram')) n.remove();
           });
         }
         purgeOrphanMermaidErrors();
@@ -6165,15 +6165,15 @@ class HtmlDocDiagram extends HTMLElement {
   _attachToolbar() {
     var self = this;
     var caption = this.getAttribute('caption') || 'diagram';
-    __htmldocVisualTools.makeToolbar(this, [
+    __okuVisualTools.makeToolbar(this, [
       {
         title: 'Toggle source / render',
         icon: ICON_BRACES,
         run: function (btn) {
-          var showSource = !self.classList.contains('hdd-source-mode');
-          self.classList.toggle('hdd-source-mode', showSource);
-          var src = self.querySelector(':scope > .hdd-source');
-          var ren = self.querySelector(':scope > .hdd-render');
+          var showSource = !self.classList.contains('okd-source-mode');
+          self.classList.toggle('okd-source-mode', showSource);
+          var src = self.querySelector(':scope > .okd-source');
+          var ren = self.querySelector(':scope > .okd-render');
           if (src) src.hidden = !showSource;
           if (ren) ren.hidden = showSource;
           btn.setAttribute('aria-pressed', showSource ? 'true' : 'false');
@@ -6184,42 +6184,42 @@ class HtmlDocDiagram extends HTMLElement {
         title: 'Copy diagram source',
         icon: ICON_CLIPBOARD,
         run: function (btn) {
-          __htmldocVisualTools.copyText(btn, self._src || '', ICON_CLIPBOARD);
+          __okuVisualTools.copyText(btn, self._src || '', ICON_CLIPBOARD);
         }
       },
       {
         title: 'Download as PNG',
         icon: ICON_CAMERA,
         run: function (btn) {
-          var svg = self.querySelector('.hdd-render svg');
-          __htmldocVisualTools.svgToPng(svg, caption || 'diagram')
-            .then(function () { __htmldocVisualTools.flash(btn, 'ok', ICON_CAMERA); })
-            .catch(function () { __htmldocVisualTools.flash(btn, 'fail', ICON_CAMERA); });
+          var svg = self.querySelector('.okd-render svg');
+          __okuVisualTools.svgToPng(svg, caption || 'diagram')
+            .then(function () { __okuVisualTools.flash(btn, 'ok', ICON_CAMERA); })
+            .catch(function () { __okuVisualTools.flash(btn, 'fail', ICON_CAMERA); });
         }
       },
       {
         title: 'Expand to fullscreen',
         icon: ICON_EXPAND,
         run: function () {
-          var svg = self.querySelector('.hdd-render svg');
-          if (!svg || !window.__htmldocLightbox) return;
+          var svg = self.querySelector('.okd-render svg');
+          if (!svg || !window.__okuLightbox) return;
           var copy = svg.cloneNode(true);
           copy.removeAttribute('width');
           copy.removeAttribute('height');
           copy.style.width = '100%';
           copy.style.height = 'auto';
-          __htmldocLightbox.open(copy, { title: caption || 'Diagram' });
+          __okuLightbox.open(copy, { title: caption || 'Diagram' });
         }
       }
     ]);
   }
   rerender() {
     if (!this._src) return;
-    var renderHost = this.querySelector('.hdd-render');
+    var renderHost = this.querySelector('.okd-render');
     var self = this;
     __mermaidLoader.reset();
     __mermaidLoader.load().then(function (mermaid) {
-      var id = 'hdd-' + Math.random().toString(36).slice(2, 9);
+      var id = 'okd-' + Math.random().toString(36).slice(2, 9);
       return mermaid.render(id, self._src).then(function (out) {
         renderHost.innerHTML = out.svg;
         self._attachToolbar();
@@ -6227,30 +6227,30 @@ class HtmlDocDiagram extends HTMLElement {
     }).catch(function () { /* swallow */ });
   }
 }
-if (!customElements.get('html-doc-diagram')) customElements.define('html-doc-diagram', HtmlDocDiagram);
+if (!customElements.get('oku-diagram')) customElements.define('oku-diagram', OkuDiagram);
 
 // Re-render every diagram on theme toggle so colors track the theme.
-window.addEventListener('html-doc:theme-changed', function () {
-  document.querySelectorAll('html-doc-diagram').forEach(function (d) {
+window.addEventListener('oku:theme-changed', function () {
+  document.querySelectorAll('oku-diagram').forEach(function (d) {
     if (typeof d.rerender === 'function') d.rerender();
   });
 });
 
-/* ============ <html-doc-annotated-code> — MkDocs-Material-style annotations ============ *
+/* ============ <oku-annotated-code> — MkDocs-Material-style annotations ============ *
  * Code block with numbered `(1)`, `(2)` markers that map to a side panel
  * of annotations. Hovering a marker brightens its annotation and vice
  * versa. Sources:
  *   - <script type="text/x-code"> code body (preserves whitespace, no escaping)
  *   - <script type="application/json"> [{ id: 1, content: "..." }, ...]
- *     OR a child <ol class="hdc-anno-source"> with one <li> per annotation
+ *     OR a child <ol class="okc-anno-source"> with one <li> per annotation
  *       (li index = id, content = li.innerHTML).
  * Renders into:
- *   <pre><code class="language-{lang}">...with .hdc-anno-marker chips...</code></pre>
- *   <ol class="hdc-anno-list">...<li class="hdc-anno-item">...</li></ol>
+ *   <pre><code class="language-{lang}">...with .okc-anno-marker chips...</code></pre>
+ *   <ol class="okc-anno-list">...<li class="okc-anno-item">...</li></ol>
  * Prism highlights the code first; the marker replacement walks the
  * highlighted text-nodes so `(1)` chips survive syntax coloring.
  * --------------------------------------------------------------------- */
-class HtmlDocAnnotatedCode extends HTMLElement {
+class OkuAnnotatedCode extends HTMLElement {
   connectedCallback() {
     var srcNode = this.querySelector('script[type="text/x-code"]');
     var jsonNode = this.querySelector('script[type="application/json"]');
@@ -6259,7 +6259,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
     if (jsonNode) {
       try { annos = JSON.parse(jsonNode.textContent || '[]'); } catch (e) { annos = []; }
     } else {
-      var ol = this.querySelector('ol.hdc-anno-source, ol.hdc-anno-list');
+      var ol = this.querySelector('ol.okc-anno-source, ol.okc-anno-list');
       if (ol) {
         annos = Array.prototype.map.call(ol.querySelectorAll(':scope > li'), function (li, i) {
           return { id: i + 1, content: li.innerHTML };
@@ -6269,7 +6269,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
     var lang = this.getAttribute('language') || this.getAttribute('lang') || '';
 
     this.innerHTML = '';
-    this.classList.add('hdc-anno-wrap');
+    this.classList.add('okc-anno-wrap');
 
     var pre = document.createElement('pre');
     var codeEl = document.createElement('code');
@@ -6280,17 +6280,17 @@ class HtmlDocAnnotatedCode extends HTMLElement {
 
     if (annos.length) {
       var list = document.createElement('ol');
-      list.className = 'hdc-anno-list';
+      list.className = 'okc-anno-list';
       annos.forEach(function (a) {
         var li = document.createElement('li');
-        li.className = 'hdc-anno-item';
+        li.className = 'okc-anno-item';
         li.setAttribute('data-anno-id', String(a.id));
         li.setAttribute('tabindex', '0');
         var num = document.createElement('span');
-        num.className = 'hdc-anno-num';
+        num.className = 'okc-anno-num';
         num.textContent = String(a.id);
         var body = document.createElement('div');
-        body.className = 'hdc-anno-body';
+        body.className = 'okc-anno-body';
         body.innerHTML = a.content || '';
         li.appendChild(num);
         li.appendChild(body);
@@ -6383,9 +6383,9 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         var targets = annoTargets[id];
         if (!targets || !targets.lines.length) return;
         var firstLine = targets.lines[0];
-        var lineEl = c.querySelector(':scope > .hdt-code-line[data-line="' + firstLine + '"]');
+        var lineEl = c.querySelector(':scope > .okt-code-line[data-line="' + firstLine + '"]');
         if (!lineEl) return;
-        var content = lineEl.querySelector(':scope > .hdt-code-content');
+        var content = lineEl.querySelector(':scope > .okt-code-content');
         if (!content) return;
         content.insertBefore(makeMarker(id), content.firstChild);
         placedIds[id] = true;
@@ -6402,10 +6402,10 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         if (placedIds[id]) return;
         var targets = annoTargets[id];
         if (!targets || !targets.match.length) return;
-        var firstMatch = self.querySelector('pre code .hdc-anno-substr[data-anno-id="' + id + '"]');
+        var firstMatch = self.querySelector('pre code .okc-anno-substr[data-anno-id="' + id + '"]');
         if (!firstMatch) return;
         var marker = makeMarker(id);
-        marker.classList.add('hdc-anno-marker-substr');
+        marker.classList.add('okc-anno-marker-substr');
         firstMatch.parentNode.insertBefore(marker, firstMatch);
         placedIds[id] = true;
       });
@@ -6415,7 +6415,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
 
     function makeMarker(id) {
       var btn = document.createElement('button');
-      btn.className = 'hdc-anno-marker';
+      btn.className = 'okc-anno-marker';
       btn.type = 'button';
       btn.setAttribute('data-anno-id', id);
       btn.setAttribute('aria-label', 'Annotation ' + id);
@@ -6424,7 +6424,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
     }
 
     // Wrap every occurrence of a `match` substring inside the
-    // wrapped code lines in <mark class=hdc-anno-substr
+    // wrapped code lines in <mark class=okc-anno-substr
     // data-anno-id=N>. Works even when Prism has split the needle
     // across token spans (e.g. ${name} becomes
     // <span class=interpolation-punct>${</span><span ...>name</span><span ...>}</span>).
@@ -6432,11 +6432,11 @@ class HtmlDocAnnotatedCode extends HTMLElement {
     // offset]; locate every needle occurrence in the joined text;
     // for each character range, split the involved text nodes and
     // re-parent the slices under a single <mark>. Idempotent — slices
-    // already inside an existing .hdc-anno-substr are skipped.
+    // already inside an existing .okc-anno-substr are skipped.
     function injectSubstringMarks() {
       var c = self.querySelector('pre code');
       if (!c) return;
-      var lineEls = c.querySelectorAll(':scope > .hdt-code-line');
+      var lineEls = c.querySelectorAll(':scope > .okt-code-line');
       // Fall back to whole-block when lines aren't wrapped yet.
       var scopes = lineEls.length ? lineEls : [c];
       annos.forEach(function (a) {
@@ -6454,12 +6454,12 @@ class HtmlDocAnnotatedCode extends HTMLElement {
 
     function markNeedleInScope(scope, needle, id) {
       // Build [char -> textNode] map, skipping nodes already inside
-      // .hdc-anno-substr (idempotency) and inside marker buttons.
+      // .okc-anno-substr (idempotency) and inside marker buttons.
       var nodes = [];
       var walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null);
       var n;
       while ((n = walker.nextNode())) {
-        if (n.parentElement && n.parentElement.closest('.hdc-anno-substr,.hdc-anno-marker')) continue;
+        if (n.parentElement && n.parentElement.closest('.okc-anno-substr,.okc-anno-marker')) continue;
         nodes.push(n);
       }
       if (!nodes.length) return;
@@ -6515,7 +6515,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
           var j = i;
           while (j < text.length && hits.has(j)) j++;
           var mark = document.createElement('mark');
-          mark.className = 'hdc-anno-substr';
+          mark.className = 'okc-anno-substr';
           mark.setAttribute('data-anno-id', id);
           mark.textContent = text.slice(i, j);
           frag.appendChild(mark);
@@ -6540,26 +6540,26 @@ class HtmlDocAnnotatedCode extends HTMLElement {
     function bindSync() {
       function setHover(id, on) {
         // Toggle .hovered on the marker, the side-panel item, and any
-        // .hdc-anno-substr matches.
+        // .okc-anno-substr matches.
         self.querySelectorAll('[data-anno-id="' + id + '"]').forEach(function (el) {
           el.classList.toggle('hovered', on);
         });
-        // Toggle .hdt-anno-target on every line the annotation points
+        // Toggle .okt-anno-target on every line the annotation points
         // at. Falls back to the line carrying the marker when no
         // explicit `lines` was authored.
         var targets = annoTargets[id];
         var lines = (targets && targets.lines.length) ? targets.lines.slice() : [];
         if (!lines.length) {
-          var markerEl = self.querySelector('.hdc-anno-marker[data-anno-id="' + id + '"]');
-          var lineEl = markerEl && markerEl.closest('.hdt-code-line');
+          var markerEl = self.querySelector('.okc-anno-marker[data-anno-id="' + id + '"]');
+          var lineEl = markerEl && markerEl.closest('.okt-code-line');
           if (lineEl) {
             var ln = parseInt(lineEl.getAttribute('data-line'), 10);
             if (ln) lines.push(ln);
           }
         }
         lines.forEach(function (n) {
-          var lineEl = self.querySelector('pre code > .hdt-code-line[data-line="' + n + '"]');
-          if (lineEl) lineEl.classList.toggle('hdt-anno-target', on);
+          var lineEl = self.querySelector('pre code > .okt-code-line[data-line="' + n + '"]');
+          if (lineEl) lineEl.classList.toggle('okt-anno-target', on);
         });
         // Tooltip positioning. The tip is position:fixed (escapes any
         // ancestor clipping context), pointing at the centre-top of
@@ -6568,23 +6568,23 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         // near the viewport top) we flip below and clamp.
         // Substring chips live inline (not in the gutter slot) and
         // get their tip as a sibling — handle both cases.
-        var slotMarker = self.querySelector('.hdc-anno-line-marker .hdc-anno-marker[data-anno-id="' + id + '"]');
-        var substrChip = self.querySelector('.hdc-anno-marker.hdc-anno-marker-substr[data-anno-id="' + id + '"]');
+        var slotMarker = self.querySelector('.okc-anno-line-marker .okc-anno-marker[data-anno-id="' + id + '"]');
+        var substrChip = self.querySelector('.okc-anno-marker.okc-anno-marker-substr[data-anno-id="' + id + '"]');
         var anchorMarker = slotMarker || substrChip;
         var tip = anchorMarker && (function () {
-          // Tip is always the immediate next-sibling .hdc-anno-tip
+          // Tip is always the immediate next-sibling .okc-anno-tip
           // OR a child of the slot — search both.
           var next = anchorMarker.nextElementSibling;
-          if (next && next.classList.contains('hdc-anno-tip')) return next;
+          if (next && next.classList.contains('okc-anno-tip')) return next;
           var parent = anchorMarker.parentElement;
-          return parent && parent.querySelector(':scope > .hdc-anno-tip');
+          return parent && parent.querySelector(':scope > .okc-anno-tip');
         })();
         if (tip) {
           if (on) {
             var anchorRect;
             if (lines.length) {
-              var firstLineEl = self.querySelector('pre code > .hdt-code-line[data-line="' + lines[0] + '"]');
-              var lastLineEl  = self.querySelector('pre code > .hdt-code-line[data-line="' + lines[lines.length - 1] + '"]');
+              var firstLineEl = self.querySelector('pre code > .okt-code-line[data-line="' + lines[0] + '"]');
+              var lastLineEl  = self.querySelector('pre code > .okt-code-line[data-line="' + lines[lines.length - 1] + '"]');
               if (firstLineEl && lastLineEl) {
                 var a = firstLineEl.getBoundingClientRect();
                 var b = lastLineEl.getBoundingClientRect();
@@ -6594,7 +6594,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
             if (!anchorRect) {
               // Substring annotations: anchor on the first matched
               // <mark>, or fall back to the marker itself.
-              var firstMark = self.querySelector('.hdc-anno-substr[data-anno-id="' + id + '"]');
+              var firstMark = self.querySelector('.okc-anno-substr[data-anno-id="' + id + '"]');
               var base = firstMark || anchorMarker;
               anchorRect = base.getBoundingClientRect();
             }
@@ -6620,7 +6620,7 @@ class HtmlDocAnnotatedCode extends HTMLElement {
           }
         }
       }
-      self.querySelectorAll('.hdc-anno-marker, .hdc-anno-item').forEach(function (el) {
+      self.querySelectorAll('.okc-anno-marker, .okc-anno-item').forEach(function (el) {
         var id = el.getAttribute('data-anno-id');
         if (el.dataset.hdcAnnoBound === '1') return;
         el.dataset.hdcAnnoBound = '1';
@@ -6629,43 +6629,43 @@ class HtmlDocAnnotatedCode extends HTMLElement {
         el.addEventListener('focus',      function () { setHover(id, true); });
         el.addEventListener('blur',       function () { setHover(id, false); });
         el.addEventListener('click', function () {
-          var partner = el.classList.contains('hdc-anno-marker')
-            ? self.querySelector('.hdc-anno-item[data-anno-id="' + id + '"]')
-            : self.querySelector('.hdc-anno-marker[data-anno-id="' + id + '"]');
+          var partner = el.classList.contains('okc-anno-marker')
+            ? self.querySelector('.okc-anno-item[data-anno-id="' + id + '"]')
+            : self.querySelector('.okc-anno-marker[data-anno-id="' + id + '"]');
           if (partner) partner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         });
       });
     }
 
-    /* Build the per-line annotation slot: each .hdt-code-line gets an
+    /* Build the per-line annotation slot: each .okt-code-line gets an
        extra cell that lives in its OWN grid column (not overlapping
        line numbers). Empty by default; populated by moveMarkersToSlots
        when an annotation marker for this line exists. */
     function prepareLineSlots() {
       var c = self.querySelector('pre code');
       if (!c) return;
-      if (!c.querySelector(':scope > .hdt-code-line')) {
+      if (!c.querySelector(':scope > .okt-code-line')) {
         _hdtWrapCodeLines(c);
       }
-      var lines = c.querySelectorAll(':scope > .hdt-code-line');
+      var lines = c.querySelectorAll(':scope > .okt-code-line');
       lines.forEach(function (line) {
-        if (line.querySelector(':scope > .hdc-anno-line-marker')) return;
+        if (line.querySelector(':scope > .okc-anno-line-marker')) return;
         var slot = document.createElement('span');
-        slot.className = 'hdc-anno-line-marker';
+        slot.className = 'okc-anno-line-marker';
         slot.setAttribute('aria-hidden', 'true');
         // Insert BEFORE the code-content cell so the annotation column
         // sits adjacent to the code (right of the line number + fold).
         // Final grid order: [num] [fold] [anno] [content]. The CSS
-        // override (below) widens .hdt-code-line's grid-template-columns
+        // override (below) widens .okt-code-line's grid-template-columns
         // to a 4-column layout matching that DOM order.
-        var content = line.querySelector(':scope > .hdt-code-content');
+        var content = line.querySelector(':scope > .okt-code-content');
         if (content) {
           line.insertBefore(slot, content);
         } else {
           line.appendChild(slot);
         }
       });
-      self.classList.add('hdc-anno-gutter-on');
+      self.classList.add('okc-anno-gutter-on');
     }
 
     /* After markers are injected inline (within the now per-line spans),
@@ -6673,24 +6673,24 @@ class HtmlDocAnnotatedCode extends HTMLElement {
        hover-tooltip carrying the annotation body so the reader can
        preview the explanation without scanning the list below. */
     function moveMarkersToSlots() {
-      var inline = self.querySelectorAll('pre code .hdc-anno-marker');
+      var inline = self.querySelectorAll('pre code .okc-anno-marker');
       Array.prototype.forEach.call(inline, function (btn) {
         // Substring-anchored chips stay inline next to their match.
         // Only the line-anchored chips move into the gutter slot.
-        if (btn.classList.contains('hdc-anno-marker-substr')) return;
-        var line = btn.closest('.hdt-code-line');
+        if (btn.classList.contains('okc-anno-marker-substr')) return;
+        var line = btn.closest('.okt-code-line');
         if (!line) return;
-        var slot = line.querySelector(':scope > .hdc-anno-line-marker');
+        var slot = line.querySelector(':scope > .okc-anno-line-marker');
         if (!slot) return;
         if (btn.parentElement !== slot) slot.appendChild(btn);
         // Tooltip carrying the annotation body. Pull from the matching
         // list item's body so authored HTML survives.
-        if (!slot.querySelector(':scope > .hdc-anno-tip')) {
+        if (!slot.querySelector(':scope > .okc-anno-tip')) {
           var id = btn.getAttribute('data-anno-id');
-          var match = self.querySelector('.hdc-anno-item[data-anno-id="' + id + '"] .hdc-anno-body');
+          var match = self.querySelector('.okc-anno-item[data-anno-id="' + id + '"] .okc-anno-body');
           if (match) {
             var tip = document.createElement('span');
-            tip.className = 'hdc-anno-tip';
+            tip.className = 'okc-anno-tip';
             tip.setAttribute('role', 'tooltip');
             tip.innerHTML = match.innerHTML;
             slot.appendChild(tip);
@@ -6700,13 +6700,13 @@ class HtmlDocAnnotatedCode extends HTMLElement {
       // Substring-anchored chips need their own tooltip — but it must
       // be the only tip per annotation id (otherwise the same body
       // shows twice). Attach to the chip itself, sibling-style.
-      self.querySelectorAll('pre code .hdc-anno-marker.hdc-anno-marker-substr').forEach(function (btn) {
-        if (btn.nextElementSibling && btn.nextElementSibling.classList.contains('hdc-anno-tip')) return;
+      self.querySelectorAll('pre code .okc-anno-marker.okc-anno-marker-substr').forEach(function (btn) {
+        if (btn.nextElementSibling && btn.nextElementSibling.classList.contains('okc-anno-tip')) return;
         var id = btn.getAttribute('data-anno-id');
-        var match = self.querySelector('.hdc-anno-item[data-anno-id="' + id + '"] .hdc-anno-body');
+        var match = self.querySelector('.okc-anno-item[data-anno-id="' + id + '"] .okc-anno-body');
         if (!match) return;
         var tip = document.createElement('span');
-        tip.className = 'hdc-anno-tip';
+        tip.className = 'okc-anno-tip';
         tip.setAttribute('role', 'tooltip');
         tip.innerHTML = match.innerHTML;
         btn.parentNode.insertBefore(tip, btn.nextSibling);
@@ -6731,10 +6731,10 @@ class HtmlDocAnnotatedCode extends HTMLElement {
     }
   }
 }
-if (!customElements.get('html-doc-annotated-code')) customElements.define('html-doc-annotated-code', HtmlDocAnnotatedCode);
+if (!customElements.get('oku-annotated-code')) customElements.define('oku-annotated-code', OkuAnnotatedCode);
 
-/* ============ <html-doc-snippet> — editable HTML/CSS/JS playground ============ */
-class HtmlDocSnippet extends HTMLElement {
+/* ============ <oku-snippet> — editable HTML/CSS/JS playground ============ */
+class OkuSnippet extends HTMLElement {
   connectedCallback() {
     var srcNode = this.querySelector('script[type="text/plain"]');
     var source = srcNode ? srcNode.textContent : '';
@@ -6810,7 +6810,7 @@ class HtmlDocSnippet extends HTMLElement {
     render();
   }
 }
-if (!customElements.get('html-doc-snippet')) customElements.define('html-doc-snippet', HtmlDocSnippet);
+if (!customElements.get('oku-snippet')) customElements.define('oku-snippet', OkuSnippet);
 
 /* ============ <page-nav> Custom Element ============ *
  * Loads site-manifest.json from the docs root and renders a collapsible
@@ -6835,7 +6835,7 @@ class PageNav extends HTMLElement {
     //                        bottom edge of the sidebar; never scrolls
     //                        and never sits between tree and TOC.
     // The version label is dimmed; it tells the reader which build
-    // of html-doc they're reading without competing with content.
+    // of oku they're reading without competing with content.
     this.innerHTML =
       '<div class="page-nav-scroll">' +
         '<div class="page-nav-panel">' +
@@ -6847,7 +6847,7 @@ class PageNav extends HTMLElement {
       '<div class="page-nav-edge" role="separator" aria-orientation="vertical" ' +
         'aria-label="Resize or collapse sidebar" tabindex="0"></div>' +
       '<div class="page-nav-footer">' +
-        'html-doc <span class="page-nav-version">v' + KIT_VERSION + '</span>' +
+        'oku <span class="page-nav-version">v' + KIT_VERSION + '</span>' +
       '</div>';
     var self = this;
     // Adopt the page-toc into the sidebar so both panels share a single
@@ -6963,7 +6963,7 @@ class PageNav extends HTMLElement {
     // the standalone-build inline page-data script (which sits at the
     // end of body, after <page-nav>).
     function start() {
-      if (document.getElementById('__htmldoc_page__')) {
+      if (document.getElementById('__oku_page__')) {
         self.style.display = 'none';
         return;
       }
@@ -6971,7 +6971,7 @@ class PageNav extends HTMLElement {
         .then(function (manifest) { self._renderTree(manifest); })
         .catch(function () {
           // No manifest: degrade silently. The sidebar prints an inline
-          // hint about running `html-doc serve` so the user knows how
+          // hint about running `oku serve` so the user knows how
           // to enable full site navigation. A floating warning banner
           // was noisy for IDE-served previews where this is expected.
           self._renderTree(null);
@@ -6979,7 +6979,7 @@ class PageNav extends HTMLElement {
     }
 
     /* Site tree discovery — three stages, in order of authority.
-       1) GET docs/site-manifest.json. `html-doc serve` synthesises this
+       1) GET docs/site-manifest.json. `oku serve` synthesises this
           in memory on each request (no file written to source); a built
           dist/site/ has the real file next to the pages. No-op on any
           static server that doesn't expose it (404 → next stage).
@@ -6990,20 +6990,20 @@ class PageNav extends HTMLElement {
           most static servers — parse the anchors, fetch each *.json,
           keep the ones with kind="page". Picks up pages added under
           existing subdirs without re-init.
-       3) Inline window.__htmldocManifest. Last-resort seed for setups
+       3) Inline window.__okuManifest. Last-resort seed for setups
           that do neither — file://, IntelliJ built-in webserver, the
-          standalone single-file build. `html-doc init` refreshes the
+          standalone single-file build. `oku init` refreshes the
           inline at the moment a new top-level page joins the tree. */
     function loadManifest() {
       var fileProto = (window.location && window.location.protocol === 'file:');
-      var inline = window.__htmldocManifest;
+      var inline = window.__okuManifest;
       if (fileProto) {
         return inline
           ? Promise.resolve(inline)
           : Promise.reject(new Error('file:// — no manifest reachable'));
       }
       return fetchManifestOverHttp()
-        .catch(function () { return discoverManifestByWalking(__htmldocDocsRoot, inline); })
+        .catch(function () { return discoverManifestByWalking(__okuDocsRoot, inline); })
         .catch(function (err) {
           if (inline) return inline;
           throw err;
@@ -7011,12 +7011,12 @@ class PageNav extends HTMLElement {
     }
 
     function fetchManifestOverHttp() {
-      /* Synthesised per-request by `html-doc serve` (in memory; nothing
+      /* Synthesised per-request by `oku serve` (in memory; nothing
          lands in docs/), and a real file in built dist/site/. Treat any
          non-2xx as "not provided by this server" and fall through to
          the walker. */
-      var wa = (window.__htmldocWithAuth || function (u) { return u; });
-      return fetch(wa(__htmldocDocsRoot + 'site-manifest.json'), { cache: 'no-cache' })
+      var wa = (window.__okuWithAuth || function (u) { return u; });
+      return fetch(wa(__okuDocsRoot + 'site-manifest.json'), { cache: 'no-cache' })
         .then(function (r) {
           if (r.ok) return r.json();
           throw new Error('manifest http ' + r.status);
@@ -7032,7 +7032,7 @@ class PageNav extends HTMLElement {
          fresh so newly-added pages appear without re-init. SKIP mirrors
          SKIP_DIRS in src/html_doc/cli.py; META lists .json filenames
          that aren't pages. */
-      var wa = (window.__htmldocWithAuth || function (u) { return u; });
+      var wa = (window.__okuWithAuth || function (u) { return u; });
       var SKIP = {
         '_kit': 1, 'kit': 1, 'dist': 1, 'build': 1, 'node_modules': 1,
         '.git': 1, '.idea': 1, '.venv': 1, 'venv': 1,
@@ -7174,18 +7174,18 @@ class PageNav extends HTMLElement {
       // No manifest available — typical when the page is opened directly
       // (IDE-served, file://). Tell the reader how to enable the full
       // site tree without making it look like an error.
-      tree.innerHTML = '<li class="page-nav-empty">Run <code>html-doc serve</code> for full site navigation.</li>';
+      tree.innerHTML = '<li class="page-nav-empty">Run <code>oku serve</code> for full site navigation.</li>';
       return;
     }
     if (!Array.isArray(manifest.pages)) {
-      tree.innerHTML = '<li class="page-nav-empty">site-manifest.json is malformed (no <code>pages</code> array). Run <code>html-doc build</code>.</li>';
-      window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+      tree.innerHTML = '<li class="page-nav-empty">site-manifest.json is malformed (no <code>pages</code> array). Run <code>oku build</code>.</li>';
+      window.dispatchEvent(new CustomEvent('oku:warnings', {
         detail: [{ code: 'manifest-malformed', msg: 'site-manifest.json missing pages[]', level: 'warn' }]
       }));
       return;
     }
     if (manifest.schema_version && manifest.schema_version > 1) {
-      window.dispatchEvent(new CustomEvent('html-doc:warnings', {
+      window.dispatchEvent(new CustomEvent('oku:warnings', {
         detail: [{ code: 'manifest-schema-future', msg: 'site-manifest.schema_version=' + manifest.schema_version + ' newer than this kit (1)', level: 'warn' }]
       }));
     }
@@ -7304,7 +7304,7 @@ function relativizeHref(fromUrl, toPath) {
  * message. Per-session dismiss; reappears on next load if errors
  * persist.
  * ----------------------------------------------------------------- */
-var __htmldocWarnings = (function () {
+var __okuWarnings = (function () {
   var list = [];
   var dismissed = false;
   var btn = null;
@@ -7366,8 +7366,8 @@ var __htmldocWarnings = (function () {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         // Brief flash so the eye locks onto the right element even
         // when several are visible after the scroll settles.
-        el.classList.add('html-doc-flash');
-        setTimeout(function () { el.classList.remove('html-doc-flash'); }, 1800);
+        el.classList.add('oku-flash');
+        setTimeout(function () { el.classList.remove('oku-flash'); }, 1800);
       });
     });
   }
@@ -7414,15 +7414,15 @@ var __htmldocWarnings = (function () {
   return { push: push, clear: clear };
 })();
 
-window.addEventListener('html-doc:warnings', function (e) {
-  if (e && e.detail) __htmldocWarnings.push(e.detail);
+window.addEventListener('oku:warnings', function (e) {
+  if (e && e.detail) __okuWarnings.push(e.detail);
 });
 
 // Scope warnings to the active page: clear the store on every hash
 // navigation so stale entries from the previous page (e.g. a mermaid
 // parse error) don't carry over. New renders push fresh entries.
 window.addEventListener('hashchange', function () {
-  __htmldocWarnings.clear();
+  __okuWarnings.clear();
 });
 
 /* ============ Pagefind search ============ *
@@ -7431,7 +7431,7 @@ window.addEventListener('hashchange', function () {
  * if the bundle is absent (e.g., dev mode without a build) the modal
  * shows a graceful message.
  * ----------------------------------------------------------------- */
-var __htmldocSearch = (function () {
+var __okuSearch = (function () {
   var pagefindPromise = null;
   var modal = null;
   var btn = null;
@@ -7444,8 +7444,8 @@ var __htmldocSearch = (function () {
     // ES dynamic import needs a relative-resolved URL ('./...') or absolute.
     // Pagefind index lives at the docs root (next to kit.json + site-manifest.json).
     var candidates = [
-      __htmldocDocsRoot + 'pagefind/pagefind.js',
-      __htmldocDocsRoot + '_kit/pagefind/pagefind.js'
+      __okuDocsRoot + 'pagefind/pagefind.js',
+      __okuDocsRoot + '_kit/pagefind/pagefind.js'
     ];
     pagefindPromise = candidates.reduce(function (acc, abs) {
       return acc.catch(function () {
@@ -7521,7 +7521,7 @@ var __htmldocSearch = (function () {
   }
 
   /* In-page fallback search: when the Pagefind index is missing (IDE-
-     served dev pages, no `html-doc build` has run yet), scan the
+     served dev pages, no `oku build` has run yet), scan the
      current page's headings + paragraph text for the query. Returns a
      small list of section-anchored matches so the reader can at least
      navigate the page they're on, instead of getting a dead-end "index
@@ -7654,7 +7654,7 @@ var __htmldocSearch = (function () {
         var msg = String((err && err.message) || err);
         if (/pagefind|404|Not Found|fetch/i.test(msg)) {
           status.innerHTML = 'Site index unavailable and no matches on this page. ' +
-            'Run <code>html-doc build</code> + view from <code>dist/site/</code> for full-site search.';
+            'Run <code>oku build</code> + view from <code>dist/site/</code> for full-site search.';
         } else {
           status.textContent = 'Search error: ' + msg;
         }
@@ -7700,10 +7700,10 @@ var __htmldocSearch = (function () {
   return { addButton: addButton, show: show };
 })();
 
-document.addEventListener('DOMContentLoaded', function () { __htmldocSearch.addButton(); });
+document.addEventListener('DOMContentLoaded', function () { __okuSearch.addButton(); });
 
 /* ============ Rebuild TOC after JSON renderer completes ============ */
-window.addEventListener('html-doc:rendered', function () {
+window.addEventListener('oku:rendered', function () {
   var tocList = document.querySelector('page-toc .toc-list');
   if (tocList) buildTOC(tocList);
   initReadingAids();

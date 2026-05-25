@@ -18,7 +18,7 @@
         "Charts — interactivity reach: 12/28 variants have full tooltip + click-pin + hover-highlight today. The tier-2 / tier-3 long tail (donut, sparkline, gauge, radar, box-plot, bullet, slope, calendar-heatmap, ridgeline, sankey, network, scatter-matrix, parallel-coordinates, chord, geo) is the next batch.",
         "Charts — visual quality: grouped-bar palette cycling, bubble legend deconfliction, quadrant label deconfliction, heatmap label / cell overlap, parallel-coordinates line thickness — all queued.",
         "Charts — catalog: add a real line example (renderer already supports it), a classic pie type, multi-series defaults on the sparse single-series examples, and the 'Pick by family' rewrite with mini-renders per variant + intent-based family grouping.",
-        "Rename — locked aggressive: src/html_doc/ → src/oku/, kit CSS prefixes hdt-/hdc-/hdd- → okt-/okc-/okd-, JS globals __htmldoc* → __oku*, events html-doc:* → oku:*, data-attrs data-html-doc-* → data-oku-*. One mechanical commit.",
+        "Rename — locked aggressive (now shipped): the package, kit CSS prefixes, JS globals, custom event names, data-attrs, and custom element names all moved off the legacy 'html-doc' branding to read 'oku'. The bin/html-doc + html-doc console-script aliases keep working through the 1.x sunset window so existing automation doesn't break.",
         "Mermaid — quality pass: trim cases on wide diagrams, font auto-fit for cramped layouts, font-color audit for explicit fill:# rules (dark-mode legibility).",
         "Tables — per-column wrap: true config so long-content columns render multi-line instead of horizontal-scrolling."
       ]

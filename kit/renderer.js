@@ -1,10 +1,10 @@
-/* html-doc · renderer.js
+/* oku · renderer.js
  *
  * Walks a JSON page tree and emits DOM into the host element. Custom
  * Elements (glossary-term, ext-ref, etc.) are registered in chrome.js
  * and provide their own behavior; the renderer just instantiates them.
  *
- * Entry point: HtmlDocRenderer.renderFromUrl(url, host?)
+ * Entry point: OkuRenderer.renderFromUrl(url, host?)
  *
  * Schema reference: ../schema/page.schema.json
  */
@@ -16,7 +16,7 @@
    * Public API
    * ---------------------------------------------------------------- */
 
-  class HtmlDocRenderer {
+  class OkuRenderer {
     constructor(opts) {
       opts = opts || {};
       this.host = opts.host || null; // resolved at render() time if absent
@@ -109,7 +109,7 @@
     /** Fetch JSON, parse, and render into the host. */
     async renderFromUrl(url, host) {
       let page;
-      const wa = (window.__htmldocWithAuth || ((u) => u));
+      const wa = (window.__okuWithAuth || ((u) => u));
       try {
         const res = await fetch(wa(url), { cache: 'no-cache' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -158,10 +158,10 @@
 
       // expose warnings for forward-compat indicator
       if (this.warnings.length) {
-        window.dispatchEvent(new CustomEvent('html-doc:warnings', { detail: this.warnings }));
+        window.dispatchEvent(new CustomEvent('oku:warnings', { detail: this.warnings }));
       }
       // tell chrome.js to (re)build TOC, init reading aids
-      window.dispatchEvent(new CustomEvent('html-doc:rendered', { detail: { page: page } }));
+      window.dispatchEvent(new CustomEvent('oku:rendered', { detail: { page: page } }));
     }
 
     /* -------------------------------------------------------------- *
@@ -335,7 +335,7 @@
       // - bar / stacked-bar / grouped-bar — DIV-based horizontal CSS
       //   bars. Real DOM text, fluid resizing, no JS after first paint.
       // - scatter / line / area / bubble / quadrant / donut — the
-      //   html-doc-chart Custom Element, which owns SVG + pan/zoom +
+      //   oku-chart Custom Element, which owns SVG + pan/zoom +
       //   PNG export. The element parses its data + extras from child
       //   <script> tags (avoids attribute-encoding pain).
       const type = block.type || 'scatter';
@@ -343,7 +343,7 @@
       if (type === 'stacked-bar' || type === 'grouped-bar') {
         return this._renderMultiBars(block, type);
       }
-      const el = document.createElement('html-doc-chart');
+      const el = document.createElement('oku-chart');
       el.setAttribute('type', type);
       if (block.title) el.setAttribute('title', block.title);
       if (block.x_label) el.setAttribute('x-label', block.x_label);
@@ -515,7 +515,7 @@
     }
 
     _renderDiagram(block) {
-      const el = document.createElement('html-doc-diagram');
+      const el = document.createElement('oku-diagram');
       if (block.caption) el.setAttribute('caption', block.caption);
       const src = document.createElement('script');
       src.type = 'text/x-mermaid';
@@ -525,7 +525,7 @@
     }
 
     _renderLiveSnippet(block) {
-      const el = document.createElement('html-doc-snippet');
+      const el = document.createElement('oku-snippet');
       if (block.label) el.setAttribute('label', block.label);
       el.setAttribute('language', block.language || 'html-css-js');
       const src = document.createElement('script');
@@ -741,7 +741,7 @@
     }
 
     _renderAnnotatedCode(block) {
-      const el = document.createElement('html-doc-annotated-code');
+      const el = document.createElement('oku-annotated-code');
       if (block.language) el.setAttribute('language', block.language);
       const src = document.createElement('script');
       src.setAttribute('type', 'text/x-code');
@@ -947,10 +947,10 @@
       // node.
       const self = this;
       const renderString = function (text) {
-        const tags = HtmlDocRenderer._splitInlineTags(text);
+        const tags = OkuRenderer._splitInlineTags(text);
         for (const part of tags) {
           if (typeof part === 'string') {
-            const mds = HtmlDocRenderer._splitInlineMd(part);
+            const mds = OkuRenderer._splitInlineMd(part);
             if (mds) {
               for (const sub of mds) {
                 if (typeof sub === 'string') frag.appendChild(document.createTextNode(sub));
@@ -1055,10 +1055,10 @@
         indigo: { light: '#4338ca', soft: '#e0e7ff', strong: '#3730a3', dark: '#a5b4fc', darkSoft: '#1e1b4b', darkStrong: '#c7d2fe' }
       };
       const p = palettes[accent];
-      let style = document.getElementById('html-doc-accent');
+      let style = document.getElementById('oku-accent');
       if (!style) {
         style = document.createElement('style');
-        style.id = 'html-doc-accent';
+        style.id = 'oku-accent';
         document.head.appendChild(style);
       }
       if (p) {
@@ -1084,41 +1084,41 @@
     _warn(code, msg, payload) {
       this.warnings.push({ code: code, msg: msg, payload: payload, level: 'warn' });
       // eslint-disable-next-line no-console
-      console.warn('[html-doc] ' + code + ': ' + msg, payload);
+      console.warn('[oku] ' + code + ': ' + msg, payload);
     }
 
     _fail(code, msg, payload) {
       this.warnings.push({ code: code, msg: msg, payload: payload, level: 'error' });
       // eslint-disable-next-line no-console
-      console.error('[html-doc] ' + code + ': ' + msg, payload);
+      console.error('[oku] ' + code + ': ' + msg, payload);
     }
   }
 
   /**
    * Auto-boot: pick up inline JSON if present, else fetch by URL.
    *
-   *   <script type="application/json" id="__htmldoc_page__">
+   *   <script type="application/json" id="__oku_page__">
    *     { "kind": "page", "title": "...", ... }
    *   </script>
    *
-   * Standalone builds (html-doc build → dist/standalone/) inline the
+   * Standalone builds (oku build → dist/standalone/) inline the
    * JSON via that tag so the page renders without a network fetch.
    * Dev pages and the dist/site/ build fall through to fetching the
    * sibling *.json file derived from the current URL.
    */
-  HtmlDocRenderer.autoBoot = function (opts) {
+  OkuRenderer.autoBoot = function (opts) {
     // Idempotent: legacy stubs include an inline autoBoot script that
     // races with the self-trigger below. Skip the second call so we
     // don't render twice.
-    if (HtmlDocRenderer._autoBootRan) return HtmlDocRenderer._autoBootRan;
-    const inline = document.getElementById('__htmldoc_page__');
+    if (OkuRenderer._autoBootRan) return OkuRenderer._autoBootRan;
+    const inline = document.getElementById('__oku_page__');
     let result;
     if (inline) {
       try {
         const data = JSON.parse(inline.textContent);
-        result = new HtmlDocRenderer(opts || {}).render(data);
+        result = new OkuRenderer(opts || {}).render(data);
       } catch (e) {
-        console.error('[html-doc] inline page parse failed', e);
+        console.error('[oku] inline page parse failed', e);
       }
     }
     if (result === undefined) {
@@ -1142,8 +1142,8 @@
       }
       // Set BEFORE renderFromUrl so chrome.js's render-event handlers
       // (e.g., buildTOC) namespace anchors to the right page.
-      window.__htmldocCurrentPage = pagePath;
-      result = new HtmlDocRenderer(opts || {}).renderFromUrl(jsonName);
+      window.__okuCurrentPage = pagePath;
+      result = new OkuRenderer(opts || {}).renderFromUrl(jsonName);
       // Honor the in-page anchor on first paint: refresh on
       // "#architecture.html:perf" should land at #perf, not page-top.
       // hashchange doesn't fire on reload (URL is unchanged), so scroll
@@ -1159,18 +1159,18 @@
         });
       }
     }
-    HtmlDocRenderer._autoBootRan = result;
+    OkuRenderer._autoBootRan = result;
     return result;
   };
 
-  window.HtmlDocRenderer = HtmlDocRenderer;
+  window.OkuRenderer = OkuRenderer;
 
   // Self-trigger so per-page stubs don't need an inline autoBoot script.
   // The legacy inline form remains compatible — autoBoot itself is
   // idempotent (see _autoBootRan guard above).
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { HtmlDocRenderer.autoBoot(); });
+    document.addEventListener('DOMContentLoaded', function () { OkuRenderer.autoBoot(); });
   } else {
-    HtmlDocRenderer.autoBoot();
+    OkuRenderer.autoBoot();
   }
 })();

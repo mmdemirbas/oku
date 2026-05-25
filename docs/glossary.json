@@ -134,7 +134,7 @@
       "kind": "section",
       "id": "resolution",
       "title": "Resolution algorithm",
-      "lead": "Implemented in chrome.js as __htmldocKit.resolveGlossary and resolveExtRef.",
+      "lead": "Implemented in chrome.js as __okuKit.resolveGlossary and resolveExtRef.",
       "blocks": [
         {
           "kind": "step-flow",

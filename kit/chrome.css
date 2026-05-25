@@ -1,5 +1,5 @@
 /* ============================================================
-   html-doc · chrome.css
+   oku · chrome.css
    Shared visual chrome for long-form HTML artifacts.
    Per-page overrides: define your own --accent / --accent-soft
    in a small <style> block on the page itself.
@@ -153,7 +153,7 @@ code, pre, .mono {
 /* Tabular numerics across all table cells so numbers align column-wise
    without depending on the cell padding. */
 table { font-variant-numeric: tabular-nums; }
-.hdt-stats, .hdt-group-count, .hdt-chip-count {
+.okt-stats, .okt-group-count, .okt-chip-count {
   font-variant-numeric: tabular-nums;
 }
 
@@ -497,7 +497,7 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
 
 /* Personalized-value spans inside code blocks: a subtle accent tint so
    the reader sees instantly which characters are theirs vs. literal. */
-.hdc-personalized {
+.okc-personalized {
   background: var(--accent-soft);
   color: var(--accent-strong);
   border-radius: 3px;
@@ -505,7 +505,7 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
   transition: background 0.18s ease;
   cursor: help;
 }
-.hdc-personalized:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.okc-personalized:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 
 /* Three-mode theme icon switch (system | light | dark) */
 .theme-toggle .icon-system,
@@ -565,14 +565,14 @@ pre {
   padding: 30px 18px 16px;
   /* Word-wrap by default — long lines fold instead of horizontal-
      scrolling out of the column. Authors who need single-line code
-     can override with pre.hdt-nowrap (rare). */
+     can override with pre.okt-nowrap (rare). */
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
   margin: 16px 0;
 }
-pre.hdt-nowrap {
+pre.okt-nowrap {
   white-space: pre;
   word-break: normal;
   overflow-wrap: normal;
@@ -580,7 +580,7 @@ pre.hdt-nowrap {
 pre code {
   white-space: inherit;
 }
-/* Per-line layout — each .hdt-code-line is a grid row carrying three
+/* Per-line layout — each .okt-code-line is a grid row carrying three
    cells: [line-number] [fold-marker] [code-content]. Numbers + fold
    markers ride with their code line: when word-wrap is enabled and a
    logical line spans multiple visual rows, the cells stay at the row
@@ -588,27 +588,27 @@ pre code {
    absolute-positioned gutter, which couldn't track wrapped lines.
    Order matches IntelliJ-style editors: number first (left), then
    the fold-marker column to the right of the number. */
-pre.hdt-line-numbered { padding-left: 12px; }
-pre.hdt-line-numbered code {
+pre.okt-line-numbered { padding-left: 12px; }
+pre.okt-line-numbered code {
   display: block;
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
 }
-pre.hdt-line-numbered .hdt-code-line {
+pre.okt-line-numbered .okt-code-line {
   display: grid;
   grid-template-columns: 36px 14px 1fr;
   column-gap: 0;
   align-items: start;
 }
-pre .hdt-code-line.hdt-line-hidden { display: none; }
-pre.hdt-line-numbered .hdt-code-content {
+pre .okt-code-line.okt-line-hidden { display: none; }
+pre.okt-line-numbered .okt-code-content {
   min-width: 0;
   padding-left: 8px;
 }
 /* Line numbers — UNIFORM across all rows: same color, same size, same
    weight regardless of foldability. */
-pre .hdt-code-ln {
+pre .okt-code-ln {
   display: block;
   text-align: right;
   padding-right: 4px;
@@ -623,13 +623,13 @@ pre .hdt-code-ln {
    before the language module arrives, once after) and the second pass
    re-reads textContent; if numbers leaked in, every line would render
    with a duplicated "1uv …" / "2# …" prefix. */
-pre .hdt-code-ln::before { content: attr(data-ln); }
+pre .okt-code-ln::before { content: attr(data-ln); }
 /* Fold marker column — sits to the RIGHT of the line number (IntelliJ
    convention). Empty for non-foldable lines; shows ▼ (expanded) or
    ▶ (collapsed) for foldable ones. Dim grey at rest; brighter on
    hover/focus. Pointer-events only on actually-foldable markers so
    non-foldable rows don't intercept code selection. */
-pre .hdt-fold-marker {
+pre .okt-fold-marker {
   display: block;
   text-align: center;
   font-size: 10px;
@@ -641,25 +641,25 @@ pre .hdt-fold-marker {
   pointer-events: none;
   transition: opacity 0.15s ease, color 0.15s ease;
 }
-pre .hdt-fold-marker.hdt-foldable {
+pre .okt-fold-marker.okt-foldable {
   pointer-events: auto;
   cursor: pointer;
   opacity: 0.45;
 }
-pre .hdt-fold-marker.hdt-foldable:hover,
-pre .hdt-fold-marker.hdt-foldable:focus-visible {
+pre .okt-fold-marker.okt-foldable:hover,
+pre .okt-fold-marker.okt-foldable:focus-visible {
   opacity: 1;
   color: var(--text-soft);
 }
-pre .hdt-fold-marker.hdt-foldable:focus-visible {
+pre .okt-fold-marker.okt-foldable:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-radius: 2px;
 }
 /* IDE-style triangle arrows: ▼ expanded, ▶ collapsed. No transform
    so the glyph stays crisp at small sizes. */
-pre .hdt-fold-marker.hdt-foldable::before { content: '\25BC'; }  /* ▼ */
-pre .hdt-fold-marker.hdt-foldable.hdt-folded::before { content: '\25B6'; }  /* ▶ */
+pre .okt-fold-marker.okt-foldable::before { content: '\25BC'; }  /* ▼ */
+pre .okt-fold-marker.okt-foldable.okt-folded::before { content: '\25B6'; }  /* ▶ */
 
 /* Language pill — a static label, NOT a button. No hover state, no
    accent transitions. Pinned to the top-left corner of the pre with
@@ -667,7 +667,7 @@ pre .hdt-fold-marker.hdt-foldable.hdt-folded::before { content: '\25B6'; }  /* �
    the block edge rather than a floating chip. Inside the pre's
    reserved padding-top band so it never overlaps the gutter (which
    starts at top: 30px) or the first code line. */
-pre > .hdt-code-lang {
+pre > .okt-code-lang {
   position: absolute;
   top: 0;
   left: 0;
@@ -689,7 +689,7 @@ pre > .hdt-code-lang {
    triangle. Subtle accent tint on the opening line's number cell so
    the reader notices where work is hidden — without changing
    number size/weight (which would break the grid alignment). */
-pre.hdt-has-folds .hdt-code-line:has(.hdt-fold-marker.hdt-folded) .hdt-code-ln {
+pre.okt-has-folds .okt-code-line:has(.okt-fold-marker.okt-folded) .okt-code-ln {
   color: var(--accent);
   opacity: 0.8;
 }
@@ -698,13 +698,13 @@ pre.hdt-has-folds .hdt-code-line:has(.hdt-fold-marker.hdt-folded) .hdt-code-ln {
    scrolling pre — without this they'd ride the pre's horizontal scroll
    and disappear off-screen when the reader scrolls a long line. The
    host carries pre's outer margin so the visible spacing is unchanged. */
-.hdt-pre-host {
+.okt-pre-host {
   position: relative;
   margin: 16px 0;
 }
-.hdt-pre-host > pre { margin: 0; }
+.okt-pre-host > pre { margin: 0; }
 /* Icon-only Copy on every <pre>. Same shape as the shared toolbar
-   used on diagrams and charts (see .hdt-bar below) so the affordance
+   used on diagrams and charts (see .okt-bar below) so the affordance
    is identical wherever copy/screenshot live. Anchored to the host
    so horizontal scroll of the pre doesn't push the button away. */
 .copy-btn {
@@ -717,7 +717,7 @@ pre.hdt-has-folds .hdt-code-line:has(.hdt-fold-marker.hdt-folded) .hdt-code-ln {
   transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
 }
 .copy-btn svg { width: 14px; height: 14px; }
-.hdt-pre-host:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
+.okt-pre-host:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
 .copy-btn:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
 .copy-btn.copied { color: var(--success); border-color: var(--success); background: var(--success-soft); }
 .copy-btn.error  { color: var(--danger);  border-color: var(--danger);  background: var(--danger-soft); }
@@ -725,7 +725,7 @@ pre.hdt-has-folds .hdt-code-line:has(.hdt-fold-marker.hdt-folded) .hdt-code-ln {
 /* Wrap toggle — same shape and reveal behaviour as .copy-btn, sits to
    its left. Active state (line wrapping on) tints the button so the
    reader can see at a glance whether the current block is in wrap mode. */
-.hdt-wrap-btn {
+.okt-wrap-btn {
   position: absolute; top: 8px; right: 46px;  /* 8 + 30 (copy) + 8 gap */
   width: 30px; height: 30px;
   background: var(--surface); color: var(--text-soft);
@@ -734,18 +734,18 @@ pre.hdt-has-folds .hdt-code-line:has(.hdt-fold-marker.hdt-folded) .hdt-code-ln {
   display: inline-flex; align-items: center; justify-content: center;
   transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
 }
-.hdt-wrap-btn svg { width: 14px; height: 14px; }
-.hdt-pre-host:hover .hdt-wrap-btn, .hdt-wrap-btn:focus-visible, .hdt-wrap-btn.active { opacity: 1; }
-.hdt-wrap-btn:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
-.hdt-wrap-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.okt-wrap-btn svg { width: 14px; height: 14px; }
+.okt-pre-host:hover .okt-wrap-btn, .okt-wrap-btn:focus-visible, .okt-wrap-btn.active { opacity: 1; }
+.okt-wrap-btn:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
+.okt-wrap-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 
 /* Wrap-on state — flip horizontal scroll into wrapping. Apply to the
    <code> element so the gutter (a sibling positioned absolutely) keeps
    its layout independent of the wrap. Long lines wrap at word
    boundaries; very long tokens (URLs, hashes) break inside via
    overflow-wrap so the block never overflows horizontally. */
-pre.hdt-wrap { overflow-x: visible; }
-pre.hdt-wrap .hdt-code-content {
+pre.okt-wrap { overflow-x: visible; }
+pre.okt-wrap .okt-code-content {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -753,15 +753,15 @@ pre.hdt-wrap .hdt-code-content {
 
 /* ============ Image expand affordance + shared lightbox ============ *
  * Reveals a small chip on image hover; click opens the lightbox overlay.
- * Same chip shape as .copy-btn / .hdt-wrap-btn so the affordance reads
+ * Same chip shape as .copy-btn / .okt-wrap-btn so the affordance reads
  * the same across code, image, chart, diagram. */
-.hdt-img-host {
+.okt-img-host {
   position: relative;
   display: inline-block;
   max-width: 100%;
 }
-.hdt-img-host img { display: block; max-width: 100%; }
-.hdt-img-expand {
+.okt-img-host img { display: block; max-width: 100%; }
+.okt-img-expand {
   position: absolute;
   top: 8px; right: 8px;
   width: 30px; height: 30px;
@@ -772,11 +772,11 @@ pre.hdt-wrap .hdt-code-content {
   transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
   backdrop-filter: blur(4px);
 }
-.hdt-img-expand svg { width: 14px; height: 14px; }
-.hdt-img-host:hover .hdt-img-expand,
-.hdt-img-host:focus-within .hdt-img-expand,
-.hdt-img-expand:focus-visible { opacity: 1; }
-.hdt-img-expand:hover {
+.okt-img-expand svg { width: 14px; height: 14px; }
+.okt-img-host:hover .okt-img-expand,
+.okt-img-host:focus-within .okt-img-expand,
+.okt-img-expand:focus-visible { opacity: 1; }
+.okt-img-expand:hover {
   color: var(--accent-strong);
   border-color: var(--accent);
   background: var(--accent-soft);
@@ -785,21 +785,21 @@ pre.hdt-wrap .hdt-code-content {
 /* Lightbox overlay — full-viewport modal. Backdrop dims the page; the
    frame centers content and provides a close button. Reused by image,
    chart, diagram, and (future) mermaid expand actions. */
-.hdt-lightbox {
+.okt-lightbox {
   position: fixed; inset: 0;
   z-index: 1000;
   display: none;
   align-items: center; justify-content: center;
 }
-.hdt-lightbox.open { display: flex; }
-html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
-.hdt-lightbox-backdrop {
+.okt-lightbox.open { display: flex; }
+html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
+.okt-lightbox-backdrop {
   position: absolute; inset: 0;
   background: rgba(0, 0, 0, 0.78);
   backdrop-filter: blur(4px);
   cursor: zoom-out;
 }
-.hdt-lightbox-frame {
+.okt-lightbox-frame {
   position: relative;
   /* Explicit size, not a cap — the frame should always fill the viewport
      so img/svg/table children have a stable box to stretch into. A
@@ -809,7 +809,7 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   display: flex; flex-direction: column;
   z-index: 1;
 }
-.hdt-lightbox-close {
+.okt-lightbox-close {
   position: absolute;
   top: -44px; right: 0;
   width: 36px; height: 36px;
@@ -819,13 +819,13 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   display: inline-flex; align-items: center; justify-content: center;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.hdt-lightbox-close:hover {
+.okt-lightbox-close:hover {
   color: var(--accent-strong);
   border-color: var(--accent);
   background: var(--accent-soft);
 }
-.hdt-lightbox-close svg { width: 18px; height: 18px; }
-.hdt-lightbox-content {
+.okt-lightbox-close svg { width: 18px; height: 18px; }
+.okt-lightbox-content {
   display: flex; align-items: center; justify-content: center;
   background: var(--surface);
   border: 1px solid var(--border-soft);
@@ -840,9 +840,9 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 /* Pan / zoom stage — fills the lightbox; its inner is transformed
    on wheel / drag / pinch. The stage clips overflow so wildly
    zoomed content stays inside the frame, and the inner uses
-   transform-origin top-left so the math in __htmldocPanZoom is
+   transform-origin top-left so the math in __okuPanZoom is
    straightforward. */
-.hdt-lightbox-content > .hdt-lightbox-pz {
+.okt-lightbox-content > .okt-lightbox-pz {
   position: relative;
   flex: 1;
   width: 100%; height: 100%;
@@ -851,19 +851,19 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   display: block;
   touch-action: none;
 }
-.hdt-lightbox-pz.panning { cursor: grabbing; }
-.hdt-lightbox-pz-inner {
+.okt-lightbox-pz.panning { cursor: grabbing; }
+.okt-lightbox-pz-inner {
   position: absolute;
   top: 0; left: 0;
   width: 100%; height: 100%;
   transform-origin: 0 0;
   display: flex; align-items: center; justify-content: center;
 }
-.hdt-lightbox-pz-inner > * {
+.okt-lightbox-pz-inner > * {
   max-width: 100%; max-height: 100%;
   width: auto; height: auto;
 }
-.hdt-lightbox-pz-toolbar {
+.okt-lightbox-pz-toolbar {
   position: absolute;
   right: 12px;
   bottom: 12px;
@@ -876,7 +876,7 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   z-index: 5;
   overflow: hidden;
 }
-.hdt-lightbox-pz-toolbar button {
+.okt-lightbox-pz-toolbar button {
   background: none;
   border: none;
   width: 32px; height: 32px;
@@ -885,31 +885,31 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.hdt-lightbox-pz-toolbar button + button { border-left: 1px solid var(--border); }
-.hdt-lightbox-pz-toolbar button:hover {
+.okt-lightbox-pz-toolbar button + button { border-left: 1px solid var(--border); }
+.okt-lightbox-pz-toolbar button:hover {
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
-.hdt-lightbox-content > img,
-.hdt-lightbox-content > svg,
-.hdt-lightbox-content > .hdt-lightbox-img {
+.okt-lightbox-content > img,
+.okt-lightbox-content > svg,
+.okt-lightbox-content > .okt-lightbox-img {
   display: block;
   width: 100%; height: 100%;
   max-width: 100%; max-height: 100%;
   object-fit: contain;
 }
-/* Table fullscreen: the moved .hdt-table-wrap stretches to fill the
+/* Table fullscreen: the moved .okt-table-wrap stretches to fill the
    lightbox; its scroll viewport scrolls both axes. Original margin /
    border-radius look right at body width, not at full-viewport — neutralise. */
-.hdt-lightbox-content > .hdt-table-wrap {
+.okt-lightbox-content > .okt-table-wrap {
   width: 100%; height: 100%;
   margin: 0;
   display: flex; flex-direction: column;
 }
-.hdt-lightbox-content > .hdt-table-wrap > .hdt-table-scroll,
-.hdt-lightbox-content > .hdt-table-wrap > .hdt-table-cards,
-.hdt-lightbox-content > .hdt-table-wrap > .hdt-table-list,
-.hdt-lightbox-content > .hdt-table-wrap > .hdt-table-board {
+.okt-lightbox-content > .okt-table-wrap > .okt-table-scroll,
+.okt-lightbox-content > .okt-table-wrap > .okt-table-cards,
+.okt-lightbox-content > .okt-table-wrap > .okt-table-list,
+.okt-lightbox-content > .okt-table-wrap > .okt-table-board {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -918,16 +918,16 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 /* Shared toolbar for diagrams + charts. Lives top-right of the host
    element; reveals on hover/focus-within. Each button is the same
    shape as .copy-btn for a single mental model. */
-.hdt-bar {
+.okt-bar {
   position: absolute; top: 8px; right: 8px;
   display: flex; gap: 4px;
   opacity: 0; transition: opacity 0.15s;
   z-index: 10;
   pointer-events: none;
 }
-.hdt-host:hover .hdt-bar,
-.hdt-host:focus-within .hdt-bar { opacity: 1; pointer-events: auto; }
-.hdt-bar button {
+.okt-host:hover .okt-bar,
+.okt-host:focus-within .okt-bar { opacity: 1; pointer-events: auto; }
+.okt-bar button {
   width: 30px; height: 30px;
   border-radius: 6px;
   background: var(--surface);
@@ -938,22 +938,22 @@ html.hdt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   padding: 0;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
-.hdt-bar button:hover {
+.okt-bar button:hover {
   background: var(--accent-soft);
   color: var(--accent-strong);
   border-color: var(--accent);
 }
-.hdt-bar button:focus-visible {
+.okt-bar button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.hdt-bar button svg { width: 14px; height: 14px; }
-.hdt-bar button.flash-ok {
+.okt-bar button svg { width: 14px; height: 14px; }
+.okt-bar button.flash-ok {
   background: var(--success-soft);
   color: var(--success);
   border-color: var(--success);
 }
-.hdt-bar button.flash-fail {
+.okt-bar button.flash-fail {
   background: var(--danger-soft);
   color: var(--danger);
   border-color: var(--danger);
@@ -1056,14 +1056,14 @@ code:not(pre code) {
 }
 
 /* ============ Wide tables — scroll wrap + view selector + expand ============ *
- * chrome.js wraps every <table> in .hdt-table-wrap with:
- *   .hdt-table-controls  → top-right view buttons + expand
- *   .hdt-table-scroll    → horizontal-scroll viewport for the original table
- *   .hdt-table-cards     → row-per-card grid (auto-generated if <thead>)
- *   .hdt-table-list      → definition-list per row (auto-generated)
+ * chrome.js wraps every <table> in .okt-table-wrap with:
+ *   .okt-table-controls  → top-right view buttons + expand
+ *   .okt-table-scroll    → horizontal-scroll viewport for the original table
+ *   .okt-table-cards     → row-per-card grid (auto-generated if <thead>)
+ *   .okt-table-list      → definition-list per row (auto-generated)
  * Edge-fade shadows on the scroll viewport hint at overflow; the expand
  * button breaks the table out of <main>'s max-width via negative margins. */
-.hdt-table-wrap {
+.okt-table-wrap {
   position: relative;
   margin: 32px 0;
   padding: 10px 12px 12px 12px;
@@ -1072,23 +1072,23 @@ code:not(pre code) {
   background: var(--surface);
   transition: margin 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.hdt-table-wrap:hover,
-.hdt-table-wrap:focus-within {
+.okt-table-wrap:hover,
+.okt-table-wrap:focus-within {
   border-color: var(--border);
 }
 /* Inner chrome reads as parts of a single card. */
-.hdt-table-wrap .hdt-table-controls { margin-bottom: 10px; }
-.hdt-table-wrap .hdt-chips {
+.okt-table-wrap .okt-table-controls { margin-bottom: 10px; }
+.okt-table-wrap .okt-chips {
   margin: 0 0 12px 0;
   background: var(--code-bg);
   border-color: var(--border-soft);
 }
-.hdt-table-wrap .hdt-table-scroll { background: var(--bg); }
+.okt-table-wrap .okt-table-scroll { background: var(--bg); }
 /* The expand affordance now opens the table in the shared lightbox
    overlay (same path as image / chart / diagram expand). The old
-   in-place bleed via .hdt-table-wrap.expanded was visually heavy and
+   in-place bleed via .okt-table-wrap.expanded was visually heavy and
    collided with the sidebar grid — removed. */
-.hdt-table-controls {
+.okt-table-controls {
   display: flex;
   gap: 4px;
   align-items: center;
@@ -1107,17 +1107,17 @@ code:not(pre code) {
   opacity: 0.45;
   transition: opacity 0.18s ease;
 }
-.hdt-table-controls .hdt-filter   { order: 0; }
-.hdt-table-controls .hdt-stats    { order: 1; }
-.hdt-table-controls .hdt-groupby  { order: 2; }
-.hdt-table-controls .hdt-view-group { order: 3; }
-.hdt-table-controls [data-expand]  { order: 4; }
+.okt-table-controls .okt-filter   { order: 0; }
+.okt-table-controls .okt-stats    { order: 1; }
+.okt-table-controls .okt-groupby  { order: 2; }
+.okt-table-controls .okt-view-group { order: 3; }
+.okt-table-controls [data-expand]  { order: 4; }
 /* When groupby wraps to a new line, push it to the LEFT edge
    instead of inheriting justify-content: flex-end. */
-.hdt-table-controls .hdt-groupby { margin-right: auto; }
-.hdt-table-wrap:hover .hdt-table-controls,
-.hdt-table-wrap:focus-within .hdt-table-controls { opacity: 1; }
-.hdt-table-controls button {
+.okt-table-controls .okt-groupby { margin-right: auto; }
+.okt-table-wrap:hover .okt-table-controls,
+.okt-table-wrap:focus-within .okt-table-controls { opacity: 1; }
+.okt-table-controls button {
   font: 600 11px 'Inter', sans-serif;
   letter-spacing: 0.02em;
   background: var(--surface);
@@ -1131,20 +1131,20 @@ code:not(pre code) {
   align-items: center;
   justify-content: center;
 }
-.hdt-table-controls button[data-expand] { padding: 4px 6px; }
-.hdt-table-controls button[data-expand] svg { width: 14px; height: 14px; }
-.hdt-table-controls button.active,
-.hdt-table-controls button:hover {
+.okt-table-controls button[data-expand] { padding: 4px 6px; }
+.okt-table-controls button[data-expand] svg { width: 14px; height: 14px; }
+.okt-table-controls button.active,
+.okt-table-controls button:hover {
   background: var(--accent-soft);
   color: var(--accent-strong);
   border-color: var(--accent);
 }
-.hdt-table-controls button:active { transform: scale(0.95); }
-.hdt-table-controls button:focus-visible {
+.okt-table-controls button:active { transform: scale(0.95); }
+.okt-table-controls button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.hdt-ctrl-sep {
+.okt-ctrl-sep {
   width: 1px;
   height: 18px;
   background: var(--border);
@@ -1155,7 +1155,7 @@ code:not(pre code) {
    group has a single rounded border; each button is borderless and
    shares the surrounding chrome. Active button reads the accent.
    Tooltip + aria-label carry the textual name. */
-.hdt-view-group {
+.okt-view-group {
   display: inline-flex;
   align-items: stretch;
   margin: 0 4px 0 0;
@@ -1164,7 +1164,7 @@ code:not(pre code) {
   background: var(--surface);
   overflow: hidden;
 }
-.hdt-table-controls .hdt-view-group .hdt-view-btn {
+.okt-table-controls .okt-view-group .okt-view-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1177,24 +1177,24 @@ code:not(pre code) {
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
 }
-.hdt-table-controls .hdt-view-group .hdt-view-btn + .hdt-view-btn {
+.okt-table-controls .okt-view-group .okt-view-btn + .okt-view-btn {
   border-left: 1px solid var(--border);
 }
-.hdt-table-controls .hdt-view-group .hdt-view-btn:hover {
+.okt-table-controls .okt-view-group .okt-view-btn:hover {
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
-.hdt-table-controls .hdt-view-group .hdt-view-btn.active {
+.okt-table-controls .okt-view-group .okt-view-btn.active {
   background: var(--accent);
   color: var(--on-accent);
 }
-.hdt-table-controls .hdt-view-group .hdt-view-btn:focus-visible {
+.okt-table-controls .okt-view-group .okt-view-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
 /* Filter input — left side of the controls bar; pushes the rest right. */
-.hdt-filter {
+.okt-filter {
   display: inline-flex;
   align-items: center;
   margin-right: 8px;
@@ -1212,13 +1212,13 @@ code:not(pre code) {
 }
 /* Stats lives next to the filter — they're read together. Pure
    numerics ("5" or "3/5") so the visual language stays neutral. */
-.hdt-table-controls .hdt-stats {
+.okt-table-controls .okt-stats {
   margin-left: 0;
   margin-right: auto;
 }
 
 /* Group-by selector — pick any column at runtime to bucket the rows. */
-.hdt-groupby {
+.okt-groupby {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1227,12 +1227,12 @@ code:not(pre code) {
   letter-spacing: 0.02em;
   color: var(--text-soft);
 }
-.hdt-groupby-label {
+.okt-groupby-label {
   text-transform: uppercase;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
-.hdt-groupby-select {
+.okt-groupby-select {
   font: inherit;
   background: var(--surface);
   color: var(--text);
@@ -1242,38 +1242,38 @@ code:not(pre code) {
   cursor: pointer;
   max-width: 160px;
 }
-.hdt-groupby-select:focus-visible {
+.okt-groupby-select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.hdt-filter:focus-within {
+.okt-filter:focus-within {
   border-color: var(--accent);
   color: var(--accent-strong);
   background: var(--surface);
 }
-.hdt-filter svg { width: 14px; height: 14px; flex-shrink: 0; }
-.hdt-filter input {
+.okt-filter svg { width: 14px; height: 14px; flex-shrink: 0; }
+.okt-filter input {
   border: none; background: transparent; outline: none;
   font: 500 12px 'Inter', sans-serif;
   color: var(--text);
   min-width: 0;
   width: 140px;
   /* Lets the input shrink (down to min-width) when the controls bar
-     is crowded — paired with .hdt-filter { min-width: 0 }. */
+     is crowded — paired with .okt-filter { min-width: 0 }. */
   flex: 1 1 0;
 }
-.hdt-filter input::placeholder { color: var(--text-faint); }
+.okt-filter input::placeholder { color: var(--text-faint); }
 
 /* Sort indicators on <thead th> when the cell is bound as sortable. */
-.hdt-sortable {
+.okt-sortable {
   cursor: pointer;
   user-select: none;
   position: relative;
   padding-right: 22px !important;
   transition: background 0.12s ease, color 0.12s ease;
 }
-.hdt-sortable:hover { background: var(--accent-soft) !important; color: var(--accent-strong) !important; }
-.hdt-sortable::after {
+.okt-sortable:hover { background: var(--accent-soft) !important; color: var(--accent-strong) !important; }
+.okt-sortable::after {
   content: '⇅';
   position: absolute;
   right: 6px;
@@ -1283,10 +1283,10 @@ code:not(pre code) {
   opacity: 0.35;
   transition: opacity 0.15s ease, color 0.15s ease;
 }
-.hdt-sortable:hover::after { opacity: 0.65; }
-.hdt-sortable.hdt-sort-asc::after  { content: '↑'; opacity: 1; color: var(--accent); }
-.hdt-sortable.hdt-sort-desc::after { content: '↓'; opacity: 1; color: var(--accent); }
-.hdt-sortable:focus-visible {
+.okt-sortable:hover::after { opacity: 0.65; }
+.okt-sortable.okt-sort-asc::after  { content: '↑'; opacity: 1; color: var(--accent); }
+.okt-sortable.okt-sort-desc::after { content: '↓'; opacity: 1; color: var(--accent); }
+.okt-sortable:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
@@ -1296,28 +1296,28 @@ code:not(pre code) {
 /* View-toggle visibility. Each [data-view] hides the three NON-active
    variants. Board is the fourth alternate; default (attribute absent)
    shows the table view. */
-.hdt-table-wrap[data-view="table"] .hdt-table-cards,
-.hdt-table-wrap[data-view="table"] .hdt-table-list,
-.hdt-table-wrap[data-view="table"] .hdt-table-board,
-.hdt-table-wrap[data-view="list"]  .hdt-table-scroll,
-.hdt-table-wrap[data-view="list"]  .hdt-table-cards,
-.hdt-table-wrap[data-view="list"]  .hdt-table-board,
-.hdt-table-wrap[data-view="cards"] .hdt-table-scroll,
-.hdt-table-wrap[data-view="cards"] .hdt-table-list,
-.hdt-table-wrap[data-view="cards"] .hdt-table-board,
-.hdt-table-wrap[data-view="board"] .hdt-table-scroll,
-.hdt-table-wrap[data-view="board"] .hdt-table-cards,
-.hdt-table-wrap[data-view="board"] .hdt-table-list { display: none !important; }
-.hdt-table-wrap:not([data-view]) .hdt-table-cards,
-.hdt-table-wrap:not([data-view]) .hdt-table-list,
-.hdt-table-wrap:not([data-view]) .hdt-table-board { display: none !important; }
+.okt-table-wrap[data-view="table"] .okt-table-cards,
+.okt-table-wrap[data-view="table"] .okt-table-list,
+.okt-table-wrap[data-view="table"] .okt-table-board,
+.okt-table-wrap[data-view="list"]  .okt-table-scroll,
+.okt-table-wrap[data-view="list"]  .okt-table-cards,
+.okt-table-wrap[data-view="list"]  .okt-table-board,
+.okt-table-wrap[data-view="cards"] .okt-table-scroll,
+.okt-table-wrap[data-view="cards"] .okt-table-list,
+.okt-table-wrap[data-view="cards"] .okt-table-board,
+.okt-table-wrap[data-view="board"] .okt-table-scroll,
+.okt-table-wrap[data-view="board"] .okt-table-cards,
+.okt-table-wrap[data-view="board"] .okt-table-list { display: none !important; }
+.okt-table-wrap:not([data-view]) .okt-table-cards,
+.okt-table-wrap:not([data-view]) .okt-table-list,
+.okt-table-wrap:not([data-view]) .okt-table-board { display: none !important; }
 
 /* Chip filter rack — tabular layout: column 1 is the label cell, column
    2 is the chip cell. Multiple filterable columns stack vertically; the
    labels right-align so the chip flush-left edge is shared. Each chip
    is a toggle and its inline count badge previews how many rows would
    survive if it were toggled (within current other-column filters). */
-.hdt-chips {
+.okt-chips {
   display: grid;
   grid-template-columns: max-content 1fr;
   column-gap: 14px;
@@ -1329,23 +1329,23 @@ code:not(pre code) {
   border-radius: 8px;
   background: var(--surface);
 }
-.hdt-chip-group {
+.okt-chip-group {
   display: contents;
 }
-.hdt-chip-row {
+.okt-chip-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
-.hdt-chip-label {
+.okt-chip-label {
   text-align: right;
   font: 600 11px 'Inter', sans-serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-soft);
 }
-.hdt-chip {
+.okt-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1358,21 +1358,21 @@ code:not(pre code) {
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
 }
-.hdt-chip:hover {
+.okt-chip:hover {
   border-color: var(--accent);
   color: var(--accent-strong);
 }
-.hdt-chip:focus-visible {
+.okt-chip:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.hdt-chip:active { transform: scale(0.97); }
-.hdt-chip.active {
+.okt-chip:active { transform: scale(0.97); }
+.okt-chip.active {
   background: var(--accent);
   color: var(--surface);
   border-color: var(--accent);
 }
-.hdt-chip-count {
+.okt-chip-count {
   font: 600 10.5px 'Inter', sans-serif;
   padding: 0 6px;
   border-radius: 999px;
@@ -1381,14 +1381,14 @@ code:not(pre code) {
   min-width: 14px;
   text-align: center;
 }
-.hdt-chip.active .hdt-chip-count {
+.okt-chip.active .okt-chip-count {
   background: rgba(255,255,255,0.22);
   color: inherit;
 }
-.hdt-chip.hdt-chip-empty {
+.okt-chip.okt-chip-empty {
   opacity: 0.4;
 }
-.hdt-chip-clear {
+.okt-chip-clear {
   display: none;
   font: 600 14px 'Inter', sans-serif;
   width: 22px;
@@ -1403,10 +1403,10 @@ code:not(pre code) {
   justify-content: center;
   line-height: 1;
 }
-.hdt-chip-group.has-active .hdt-chip-clear { display: inline-flex; }
-.hdt-chip-clear:hover { color: var(--accent-strong); background: var(--accent-soft); }
+.okt-chip-group.has-active .okt-chip-clear { display: inline-flex; }
+.okt-chip-clear:hover { color: var(--accent-strong); background: var(--accent-soft); }
 
-.hdt-table-scroll {
+.okt-table-scroll {
   overflow-x: auto;
   /* Headers stick to the viewport top via thead th `position: sticky`.
      Internal vertical scrolling would hide the header behind the
@@ -1424,21 +1424,21 @@ code:not(pre code) {
   background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
   background-attachment: local, local, scroll, scroll;
 }
-.hdt-table-scroll > table {
+.okt-table-scroll > table {
   margin: 0;
   min-width: 100%;
   width: max-content;
 }
 
 /* Cards view — auto-fit grid, key/value stack per cell */
-.hdt-table-cards {
+.okt-table-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
 }
 /* Group rows from the source table become full-width subheaders in
    the cards grid. Same vocabulary in the list view below. */
-.hdt-cards-group {
+.okt-cards-group {
   grid-column: 1 / -1;
   font-size: 11px;
   font-weight: 700;
@@ -1449,60 +1449,60 @@ code:not(pre code) {
   padding-bottom: 6px;
   border-bottom: 2px solid var(--accent-soft);
 }
-.hdt-cards-group:first-child { margin-top: 0; }
-.hdt-card {
+.okt-cards-group:first-child { margin-top: 0; }
+.okt-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
   transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.18s ease;
 }
-.hdt-card:hover {
+.okt-card:hover {
   border-color: var(--accent);
   transform: translateY(-1px);
 }
 /* Anchor / clickable cards — match the table-row affordance: pointer
    cursor, hover lift, the whole card is the click target, no link blue. */
-a.hdt-card,
-.hdt-card[onclick],
-.hdt-card[role="button"] {
+a.okt-card,
+.okt-card[onclick],
+.okt-card[role="button"] {
   cursor: pointer;
   text-decoration: none;
   color: inherit;
   display: block;
 }
-a.hdt-card:hover,
-.hdt-card[onclick]:hover,
-.hdt-card[role="button"]:hover {
+a.okt-card:hover,
+.okt-card[onclick]:hover,
+.okt-card[role="button"]:hover {
   border-color: var(--accent);
   box-shadow: 0 6px 16px var(--shadow-soft);
   transform: translateY(-2px);
 }
-a.hdt-card:focus-visible,
-.hdt-card[tabindex]:focus-visible {
+a.okt-card:focus-visible,
+.okt-card[tabindex]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.hdt-card-row { margin-bottom: 10px; }
-.hdt-card-row:last-child { margin-bottom: 0; }
-.hdt-card-key {
+.okt-card-row { margin-bottom: 10px; }
+.okt-card-row:last-child { margin-bottom: 0; }
+.okt-card-key {
   display: block;
   font-size: 10.5px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--text-soft);
   margin-bottom: 2px;
 }
-.hdt-card-val { display: block; font-size: 13.5px; color: var(--text); line-height: 1.45; }
+.okt-card-val { display: block; font-size: 13.5px; color: var(--text); line-height: 1.45; }
 
-/* List view — every row is its own 2-col <table class="hdt-list-card">.
+/* List view — every row is its own 2-col <table class="okt-list-card">.
    The first column is the header label; the second column is the cell
    value. Same vocabulary as the main table, just rotated 90°.
-   Group rows become section headings (.hdt-list-group) at the same
+   Group rows become section headings (.okt-list-group) at the same
    visual weight as the cards-view group header. Rows that carry an
-   onclick/href get wrapped in .hdt-list-row so the affordance moves
+   onclick/href get wrapped in .okt-list-row so the affordance moves
    across all three views. */
-.hdt-table-list { display: flex; flex-direction: column; gap: 18px; }
-.hdt-list-group {
+.okt-table-list { display: flex; flex-direction: column; gap: 18px; }
+.okt-list-group {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -1513,13 +1513,13 @@ a.hdt-card:focus-visible,
   padding-bottom: 6px;
   border-bottom: 2px solid var(--accent-soft);
 }
-.hdt-list-group:first-child { margin-top: 0; }
+.okt-list-group:first-child { margin-top: 0; }
 /* Each list item: clear visual card boundary so two consecutive items
    never blur together. Outer border uses --line (stronger than the
    inner row dividers below, which stay --border-soft); a subtle shadow
    lifts the card off the page background. Hover deepens both so the
    reader can confirm what they're focused on. */
-.hdt-list-card {
+.okt-list-card {
   width: 100%;
   border-collapse: collapse;
   margin: 0;
@@ -1530,7 +1530,7 @@ a.hdt-card:focus-visible,
   box-shadow: 0 1px 2px var(--shadow-soft);
   transition: box-shadow 0.18s ease, border-color 0.18s ease;
 }
-.hdt-list-card:hover {
+.okt-list-card:hover {
   border-color: var(--line-strong);
   box-shadow: 0 2px 6px var(--shadow-strong, var(--shadow-soft));
 }
@@ -1541,7 +1541,7 @@ a.hdt-card:focus-visible,
  * available width — never stack vertically (a wrapping kanban defeats
  * the purpose of the metaphor). Tight lane width (260px) keeps the
  * card density readable on a typical viewport. */
-.hdt-table-board {
+.okt-table-board {
   display: flex;
   flex-direction: row;
   gap: 16px;
@@ -1549,7 +1549,7 @@ a.hdt-card:focus-visible,
   align-items: flex-start;
   padding-bottom: 8px;
 }
-.hdt-board-lane {
+.okt-board-lane {
   flex: 0 0 260px;
   display: flex;
   flex-direction: column;
@@ -1558,7 +1558,7 @@ a.hdt-card:focus-visible,
   border-radius: 12px;
   max-height: 70vh;
 }
-.hdt-board-lane-head {
+.okt-board-lane-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 14px 8px;
   border-bottom: 1px solid var(--line);
@@ -1566,12 +1566,12 @@ a.hdt-card:focus-visible,
   background: inherit;
   border-radius: 12px 12px 0 0;
 }
-.hdt-board-lane-title {
+.okt-board-lane-title {
   font-size: 12px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--accent-strong);
 }
-.hdt-board-lane-count {
+.okt-board-lane-count {
   font: 700 11px 'JetBrains Mono', monospace;
   color: var(--text-soft);
   background: var(--accent-soft);
@@ -1579,14 +1579,14 @@ a.hdt-card:focus-visible,
   padding: 1px 8px;
   min-width: 22px; text-align: center;
 }
-.hdt-board-lane-body {
+.okt-board-lane-body {
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 10px 12px 12px;
   display: flex; flex-direction: column;
   gap: 10px;
 }
-.hdt-board-card {
+.okt-board-card {
   display: block;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1598,16 +1598,16 @@ a.hdt-card:focus-visible,
   box-shadow: 0 1px 2px var(--shadow-soft);
   transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
 }
-.hdt-board-card:hover {
+.okt-board-card:hover {
   border-color: var(--accent);
   box-shadow: 0 2px 6px var(--shadow-strong, var(--shadow-soft));
   transform: translateX(2px);
 }
-.hdt-board-card:focus-visible {
+.okt-board-card:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.hdt-board-card-row {
+.okt-board-card-row {
   display: grid;
   grid-template-columns: 80px 1fr;
   gap: 6px;
@@ -1615,21 +1615,21 @@ a.hdt-card:focus-visible,
   line-height: 1.45;
   padding: 2px 0;
 }
-.hdt-board-card-key {
+.okt-board-card-key {
   font-size: 10.5px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--text-soft);
   align-self: start;
 }
-.hdt-board-card-val {
+.okt-board-card-val {
   color: var(--text);
   word-wrap: break-word;
 }
-.hdt-list-card > tbody > tr + tr > th,
-.hdt-list-card > tbody > tr + tr > td {
+.okt-list-card > tbody > tr + tr > th,
+.okt-list-card > tbody > tr + tr > td {
   border-top: 1px solid var(--border-soft);
 }
-.hdt-list-card th[scope="row"] {
+.okt-list-card th[scope="row"] {
   text-align: left;
   vertical-align: top;
   font-size: 10.5px; font-weight: 700;
@@ -1640,14 +1640,14 @@ a.hdt-card:focus-visible,
   white-space: nowrap;
   background: var(--surface-strong, var(--surface));
 }
-.hdt-list-card td {
+.okt-list-card td {
   padding: 8px 12px;
   font-size: 14px;
   color: var(--text);
   line-height: 1.5;
   vertical-align: top;
 }
-.hdt-list-row {
+.okt-list-row {
   display: block;
   text-decoration: none;
   color: inherit;
@@ -1655,12 +1655,12 @@ a.hdt-card:focus-visible,
   cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease;
 }
-.hdt-list-row.hdt-list-row-static { cursor: default; }
-.hdt-list-row:not(.hdt-list-row-static):hover {
+.okt-list-row.okt-list-row-static { cursor: default; }
+.okt-list-row:not(.okt-list-row-static):hover {
   background: var(--accent-soft);
   transform: translateX(2px);
 }
-.hdt-list-row:focus-visible {
+.okt-list-row:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -1668,7 +1668,7 @@ a.hdt-card:focus-visible,
 /* Stats span — sits at the far right of the controls bar so the reader
    always knows what they're looking at. Goes accent-strong while a
    filter or chip set is narrowing the visible rows. */
-.hdt-stats {
+.okt-stats {
   margin-left: 8px;
   font: 500 11px 'Inter', sans-serif;
   letter-spacing: 0.02em;
@@ -1676,15 +1676,15 @@ a.hdt-card:focus-visible,
   transition: color 0.15s ease;
   white-space: nowrap;
 }
-.hdt-stats.hdt-stats-filtered { color: var(--accent-strong); }
-.hdt-stats.hdt-stats-empty { color: var(--text-soft); font-style: italic; }
+.okt-stats.okt-stats-filtered { color: var(--accent-strong); }
+.okt-stats.okt-stats-empty { color: var(--text-soft); font-style: italic; }
 
 /* Collapsible group chevron — sits before the title in every view.
    Rotates -90° (points right) when the group is collapsed; clicking
    it (or the group header band) toggles. The badge keeps the live
    row count for the group regardless of collapse state, so the
    reader still sees "this group has N rows" while folded. */
-.hdt-group-chevron {
+.okt-group-chevron {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1697,16 +1697,16 @@ a.hdt-card:focus-visible,
   transition: transform 0.18s ease, background 0.15s ease, color 0.15s ease;
   vertical-align: middle;
 }
-.hdt-group-chevron svg { width: 12px; height: 12px; }
-.hdt-group-chevron:hover { background: var(--accent-soft); color: var(--accent-strong); }
-.hdt-group-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.hdt-collapsed .hdt-group-chevron { transform: rotate(-90deg); }
-.hdt-collapsible { cursor: pointer; }
+.okt-group-chevron svg { width: 12px; height: 12px; }
+.okt-group-chevron:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.okt-group-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.okt-collapsed .okt-group-chevron { transform: rotate(-90deg); }
+.okt-collapsible { cursor: pointer; }
 
 /* Group count badge — sits between the chevron and the title in every
    view so the numbers align at the same x across rows. Numeric pill
    shape carries the meaning; no English word required. */
-.hdt-group-count {
+.okt-group-count {
   display: inline-block;
   margin-right: 8px;
   padding: 1px 8px;
@@ -1720,8 +1720,8 @@ a.hdt-card:focus-visible,
   text-transform: none;
   vertical-align: baseline;
 }
-.hdt-cards-group { display: flex; align-items: baseline; gap: 4px; }
-.hdt-group-title { display: inline; }
+.okt-cards-group { display: flex; align-items: baseline; gap: 4px; }
+.okt-group-title { display: inline; }
 
 /* ============ Synced highlight pairs · [data-bind] ============ *
  * Any two elements sharing `data-bind="<key>"` flash together when
@@ -1742,14 +1742,14 @@ a.hdt-card:focus-visible,
    against the syntax tokens — use a real outline instead of a box-shadow
    (which would clip when overflow-x scrolls). */
 pre [data-bind].bind-active,
-.hdt-table-scroll [data-bind].bind-active {
+.okt-table-scroll [data-bind].bind-active {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   background: var(--accent-soft);
 }
 
-/* ============ <html-doc-annotated-code> — numbered code-side annotations ============ */
-html-doc-annotated-code {
+/* ============ <oku-annotated-code> — numbered code-side annotations ============ */
+oku-annotated-code {
   display: block;
   margin: 24px 0;
   border: 1px solid var(--border);
@@ -1757,13 +1757,13 @@ html-doc-annotated-code {
   overflow: hidden;
   background: var(--surface);
 }
-html-doc-annotated-code > pre {
+oku-annotated-code > pre {
   margin: 0;
   border: none;
   border-radius: 0;
   border-bottom: 1px solid var(--border-soft);
 }
-.hdc-anno-marker {
+.okc-anno-marker {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1780,9 +1780,9 @@ html-doc-annotated-code > pre {
   transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
               box-shadow 0.18s ease;
 }
-.hdc-anno-marker:hover,
-.hdc-anno-marker:focus-visible,
-.hdc-anno-marker.hovered {
+.okc-anno-marker:hover,
+.okc-anno-marker:focus-visible,
+.okc-anno-marker.hovered {
   transform: scale(1.3);
   box-shadow: 0 0 0 3px var(--accent-soft);
   outline: none;
@@ -1793,11 +1793,11 @@ html-doc-annotated-code > pre {
    its right" rather than floating in the far gutter. Tooltip on hover
    shows the annotation body so the reader can preview without jumping
    to the list below. */
-.hdc-anno-wrap.hdc-anno-gutter-on pre.hdt-line-numbered .hdt-code-line {
+.okc-anno-wrap.okc-anno-gutter-on pre.okt-line-numbered .okt-code-line {
   /* [num 32px] [fold 14px] [anno 22px] [content 1fr] */
   grid-template-columns: 32px 14px 22px 1fr;
 }
-.hdc-anno-wrap.hdc-anno-gutter-on .hdc-anno-line-marker {
+.okc-anno-wrap.okc-anno-gutter-on .okc-anno-line-marker {
   position: relative;          /* anchor for absolute tooltip */
   display: inline-flex;
   align-items: start;
@@ -1806,7 +1806,7 @@ html-doc-annotated-code > pre {
   -webkit-user-select: none;
   pointer-events: none;       /* per-marker re-enables it */
 }
-.hdc-anno-wrap.hdc-anno-gutter-on .hdc-anno-line-marker .hdc-anno-marker {
+.okc-anno-wrap.okc-anno-gutter-on .okc-anno-line-marker .okc-anno-marker {
   margin: 0;
   pointer-events: auto;
   /* Smaller than the legacy 18px chip so it fits the 22px gutter
@@ -1827,7 +1827,7 @@ html-doc-annotated-code > pre {
    never blocks the code the annotation refers to. Anchored to the
    slot's left edge; `width: max-content` lets it grow to its content
    up to max-width based on the annotation body. The line itself is
-   highlighted via .hdt-anno-target so the reader can see at a glance
+   highlighted via .okt-anno-target so the reader can see at a glance
    which row(s) the chip points at. */
 /* Tooltip always renders ABOVE the trigger marker so it never
    shifts the surrounding code lines downward. The setHover wiring
@@ -1835,7 +1835,7 @@ html-doc-annotated-code > pre {
    tooltip escapes the annotated-code wrapper's clipping context
    and stays visible against the viewport edge. The CSS default
    stays anchored 'above' for the static (no-JS-positioning) case. */
-.hdc-anno-tip {
+.okc-anno-tip {
   position: fixed;
   display: none;
   z-index: 9999;
@@ -1858,7 +1858,7 @@ html-doc-annotated-code > pre {
   transform: translate(-50%, -100%);
   margin-top: -10px;
 }
-.hdc-anno-tip code {
+.okc-anno-tip code {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 12px;
   background: var(--surface-2, var(--code-bg));
@@ -1870,8 +1870,8 @@ html-doc-annotated-code > pre {
    The accent-soft band runs full-row width and never obscures the
    text — so the reader sees which line(s) belong to the chip the
    moment they hover the marker. Activated by JS toggling
-   .hdt-anno-target on the relevant .hdt-code-line spans. */
-.hdc-anno-wrap pre.hdt-line-numbered .hdt-code-line.hdt-anno-target {
+   .okt-anno-target on the relevant .okt-code-line spans. */
+.okc-anno-wrap pre.okt-line-numbered .okt-code-line.okt-anno-target {
   background: var(--accent-soft);
   transition: background 0.12s ease;
 }
@@ -1879,7 +1879,7 @@ html-doc-annotated-code > pre {
    so the chip can point at a token rather than a whole line. Light
    underline at rest; the row's background lift applies via the line-
    level rule above when the line is also in the target set. */
-.hdc-anno-substr {
+.okc-anno-substr {
   background: transparent;
   color: inherit;
   border-bottom: 1px dashed var(--accent);
@@ -1887,7 +1887,7 @@ html-doc-annotated-code > pre {
   padding: 0 1px;
   transition: background 0.12s ease, color 0.12s ease;
 }
-.hdc-anno-substr.hovered {
+.okc-anno-substr.hovered {
   background: var(--accent);
   color: var(--bg);
   border-bottom-color: transparent;
@@ -1895,7 +1895,7 @@ html-doc-annotated-code > pre {
 /* Substring-anchored auto-marker — sits inline immediately before the
    first highlighted occurrence. Smaller than the gutter chip so it
    doesn't crowd the surrounding tokens. */
-.hdc-anno-marker.hdc-anno-marker-substr {
+.okc-anno-marker.okc-anno-marker-substr {
   display: inline-flex;
   vertical-align: baseline;
   margin: 0 4px 0 0;
@@ -1911,13 +1911,13 @@ html-doc-annotated-code > pre {
    no longer fires because position:fixed without coords would
    render at (0,0). */
 
-.hdc-anno-list {
+.okc-anno-list {
   list-style: none;
   margin: 0;
   padding: 8px 0;
   background: var(--surface-2);
 }
-.hdc-anno-item {
+.okc-anno-item {
   display: flex;
   gap: 12px;
   padding: 10px 16px;
@@ -1925,14 +1925,14 @@ html-doc-annotated-code > pre {
   transition: background 0.15s ease, border-left-color 0.15s ease, transform 0.15s ease;
   cursor: pointer;
 }
-.hdc-anno-item:hover,
-.hdc-anno-item:focus-visible,
-.hdc-anno-item.hovered {
+.okc-anno-item:hover,
+.okc-anno-item:focus-visible,
+.okc-anno-item.hovered {
   background: var(--accent-soft);
   border-left-color: var(--accent);
   outline: none;
 }
-.hdc-anno-num {
+.okc-anno-num {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1944,10 +1944,10 @@ html-doc-annotated-code > pre {
   flex-shrink: 0;
   margin-top: 2px;
 }
-.hdc-anno-body { font-size: 14px; line-height: 1.55; color: var(--text); flex: 1; }
-.hdc-anno-body p:first-child { margin-top: 0; }
-.hdc-anno-body p:last-child  { margin-bottom: 0; }
-.hdc-anno-body code {
+.okc-anno-body { font-size: 14px; line-height: 1.55; color: var(--text); flex: 1; }
+.okc-anno-body p:first-child { margin-top: 0; }
+.okc-anno-body p:last-child  { margin-bottom: 0; }
+.okc-anno-body code {
   background: var(--surface);
   border: 1px solid var(--border-soft);
   padding: 1px 4px;
@@ -2364,20 +2364,20 @@ table td {
   vertical-align: top;
   /* Word-wrap by default so long cell content folds inside the
      column instead of forcing horizontal scroll. Tables that want
-     single-line cells can opt out per-row via the hdt-nowrap class. */
+     single-line cells can opt out per-row via the okt-nowrap class. */
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: normal;
 }
-table tr.hdt-nowrap td,
-table.hdt-nowrap td { white-space: nowrap; overflow-wrap: normal; }
+table tr.okt-nowrap td,
+table.okt-nowrap td { white-space: nowrap; overflow-wrap: normal; }
 table tr:hover td { background: var(--surface-2); }
 /* Column-resize grabber — thin right-edge strip on every thead <th>.
    Invisible until hovered, then a 3px accent line + ew-resize
-   cursor. While dragging, the table gains .hdt-table-resizing to
+   cursor. While dragging, the table gains .okt-table-resizing to
    silence pointer events on body text and force the resize cursor
    across the whole document. */
-.hdt-col-resize {
+.okt-col-resize {
   position: absolute;
   top: 0;
   right: -3px;
@@ -2387,7 +2387,7 @@ table tr:hover td { background: var(--surface-2); }
   z-index: 3;
   user-select: none;
 }
-.hdt-col-resize::after {
+.okt-col-resize::after {
   content: '';
   position: absolute;
   top: 6px;
@@ -2398,9 +2398,9 @@ table tr:hover td { background: var(--surface-2); }
   border-radius: 1px;
   transition: background 0.12s ease;
 }
-.hdt-col-resize:hover::after { background: var(--accent); }
-.hdt-table-resizing,
-.hdt-table-resizing * { cursor: ew-resize !important; user-select: none !important; }
+.okt-col-resize:hover::after { background: var(--accent); }
+.okt-table-resizing,
+.okt-table-resizing * { cursor: ew-resize !important; user-select: none !important; }
 
 .pill {
   display: inline-block; padding: 3px 10px; border-radius: 14px;
@@ -2602,8 +2602,8 @@ footer {
    <glossary-term>, <ext-ref>, and the tooltip popup
    (v2 interactive learning primitives)
    ============================================================ */
-.html-doc-gloss,
-.html-doc-extref {
+.oku-gloss,
+.oku-extref {
   border-bottom: 1px dotted var(--accent-strong);
   cursor: help;
   color: var(--text);
@@ -2612,19 +2612,19 @@ footer {
   border-radius: 3px;
   transition: background 0.15s;
 }
-.html-doc-gloss:hover,
-.html-doc-gloss:focus-visible,
-.html-doc-extref:hover,
-.html-doc-extref:focus-visible {
+.oku-gloss:hover,
+.oku-gloss:focus-visible,
+.oku-extref:hover,
+.oku-extref:focus-visible {
   background: var(--accent-soft);
   outline: none;
 }
-.html-doc-gloss:focus-visible,
-.html-doc-extref:focus-visible {
+.oku-gloss:focus-visible,
+.oku-extref:focus-visible {
   box-shadow: 0 0 0 2px var(--accent);
 }
-.html-doc-gloss.unknown,
-.html-doc-extref.unknown {
+.oku-gloss.unknown,
+.oku-extref.unknown {
   border-bottom: 1px dotted var(--warning);
   color: var(--warning);
 }
@@ -2633,11 +2633,11 @@ footer {
    reader sees in flow). Different source kinds carry different colors so
    the page hints at WHAT kind of source backs each claim before the
    reader hovers. */
-.html-doc-extref[data-cite-type="paper"]   { border-bottom-color: #4338ca; }
-.html-doc-extref[data-cite-type="rfc"]     { border-bottom-color: var(--text-soft); }
-.html-doc-extref[data-cite-type="release"] { border-bottom-color: var(--success); }
-.html-doc-extref[data-cite-type="blog"]    { border-bottom-color: var(--warning); }
-.html-doc-extref[data-cite-type="other"]   { border-bottom-color: var(--accent); }
+.oku-extref[data-cite-type="paper"]   { border-bottom-color: #4338ca; }
+.oku-extref[data-cite-type="rfc"]     { border-bottom-color: var(--text-soft); }
+.oku-extref[data-cite-type="release"] { border-bottom-color: var(--success); }
+.oku-extref[data-cite-type="blog"]    { border-bottom-color: var(--warning); }
+.oku-extref[data-cite-type="other"]   { border-bottom-color: var(--accent); }
 
 /* Ext-refs are pure hover-tooltip triggers — clicking the host pins
    the tooltip but never navigates. The destination URL lives as a
@@ -2647,17 +2647,17 @@ footer {
    both have been retired. */
 
 /* The citation card itself — rendered inside the tooltip body. */
-.hdt-cite {
+.okt-cite {
   display: grid;
   gap: 6px;
   font-family: 'Inter', sans-serif;
 }
-.hdt-cite-head {
+.okt-cite-head {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.hdt-cite-icon {
+.okt-cite-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2667,8 +2667,8 @@ footer {
   color: var(--accent-strong);
   flex-shrink: 0;
 }
-.hdt-cite-icon svg { width: 16px; height: 16px; }
-.hdt-cite-title {
+.okt-cite-icon svg { width: 16px; height: 16px; }
+.okt-cite-title {
   font-size: 14px;
   font-weight: 700;
   color: var(--text);
@@ -2680,7 +2680,7 @@ footer {
    styling is tuned for "follow the source" affordance: accent
    underline on hover, faint outbound-arrow glyph appended inline by
    the JS so screen readers see "domain ↗". */
-.hdt-cite-domain {
+.okt-cite-domain {
   display: inline-block;
   font-size: 12.5px;
   color: var(--accent-strong);
@@ -2690,8 +2690,8 @@ footer {
   padding: 1px 0;
   align-self: start;
 }
-a.hdt-cite-domain:hover,
-a.hdt-cite-domain:focus-visible {
+a.okt-cite-domain:hover,
+a.okt-cite-domain:focus-visible {
   color: var(--accent);
   border-bottom-style: solid;
   outline: none;
@@ -2700,21 +2700,21 @@ a.hdt-cite-domain:focus-visible {
    the generic "Learn more →" footer is redundant — hide it so the
    tooltip has a single navigation affordance. The `:has()` selector
    is widely supported in browsers oku already requires. */
-.html-doc-tooltip:has(.hdt-cite) .hdt-link { display: none; }
-.hdt-cite-meta {
+.oku-tooltip:has(.okt-cite) .okt-link { display: none; }
+.okt-cite-meta {
   font-size: 11.5px;
   color: var(--text-soft);
   display: flex; gap: 8px; flex-wrap: wrap;
   margin-top: 2px;
 }
-.hdt-cite-author {
+.okt-cite-author {
   font-style: italic;
 }
-.hdt-cite-date::before {
+.okt-cite-date::before {
   content: '· ';
   color: var(--text-faint);
 }
-.hdt-cite-summary {
+.okt-cite-summary {
   font-size: 13px;
   color: var(--text);
   line-height: 1.5;
@@ -2723,13 +2723,13 @@ a.hdt-cite-domain:focus-visible {
 
 /* Each type colors the icon background distinctly so the card "feels" the
    right kind even before reading the title. */
-.hdt-cite[data-cite-type="paper"]   .hdt-cite-icon { background: rgba(67, 56, 202, 0.12); color: #4338ca; }
-.hdt-cite[data-cite-type="rfc"]     .hdt-cite-icon { background: var(--surface-2); color: var(--text); }
-.hdt-cite[data-cite-type="release"] .hdt-cite-icon { background: var(--success-soft); color: var(--success); }
-.hdt-cite[data-cite-type="blog"]    .hdt-cite-icon { background: var(--warning-soft); color: var(--warning); }
-.hdt-cite[data-cite-type="other"]   .hdt-cite-icon { background: var(--accent-soft); color: var(--accent-strong); }
+.okt-cite[data-cite-type="paper"]   .okt-cite-icon { background: rgba(67, 56, 202, 0.12); color: #4338ca; }
+.okt-cite[data-cite-type="rfc"]     .okt-cite-icon { background: var(--surface-2); color: var(--text); }
+.okt-cite[data-cite-type="release"] .okt-cite-icon { background: var(--success-soft); color: var(--success); }
+.okt-cite[data-cite-type="blog"]    .okt-cite-icon { background: var(--warning-soft); color: var(--warning); }
+.okt-cite[data-cite-type="other"]   .okt-cite-icon { background: var(--accent-soft); color: var(--accent-strong); }
 
-.html-doc-tooltip {
+.oku-tooltip {
   position: absolute;
   max-width: 340px;
   background: var(--surface);
@@ -2745,34 +2745,34 @@ a.hdt-cite-domain:focus-visible {
   letter-spacing: 0;
   z-index: 300;
   pointer-events: auto;
-  animation: hdt-in 0.18s ease;
+  animation: okt-in 0.18s ease;
 }
-@keyframes hdt-in {
+@keyframes okt-in {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.html-doc-tooltip.pinned {
+.oku-tooltip.pinned {
   border-color: var(--accent);
   box-shadow: 0 8px 24px var(--shadow-strong), 0 0 0 2px var(--accent-soft);
 }
-.html-doc-tooltip .hdt-body { margin: 0; }
-.html-doc-tooltip .hdt-body p { margin: 0 0 8px 0; }
-.html-doc-tooltip .hdt-body p:last-child { margin-bottom: 0; }
-.html-doc-tooltip .hdt-body code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: var(--surface-2); padding: 1px 4px; border-radius: 3px; }
-.html-doc-tooltip .hdt-link {
+.oku-tooltip .okt-body { margin: 0; }
+.oku-tooltip .okt-body p { margin: 0 0 8px 0; }
+.oku-tooltip .okt-body p:last-child { margin-bottom: 0; }
+.oku-tooltip .okt-body code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: var(--surface-2); padding: 1px 4px; border-radius: 3px; }
+.oku-tooltip .okt-link {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
   font-size: 12.5px;
 }
-.html-doc-tooltip .hdt-link a {
+.oku-tooltip .okt-link a {
   color: var(--accent-strong);
   font-weight: 600;
   text-decoration: none;
   border-bottom: 1px solid var(--accent);
 }
-.html-doc-tooltip .hdt-link a:hover { background: var(--accent-soft); }
-.html-doc-tooltip .hdt-lang {
+.oku-tooltip .okt-link a:hover { background: var(--accent-soft); }
+.oku-tooltip .okt-lang {
   display: inline-block;
   font-size: 10.5px;
   color: var(--warning);
@@ -2784,20 +2784,20 @@ a.hdt-cite-domain:focus-visible {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-.html-doc-tooltip .hdt-pin-hint {
+.oku-tooltip .okt-pin-hint {
   display: block;
   margin-top: 8px;
   font-size: 11px;
   color: var(--text-soft);
   font-style: italic;
 }
-.html-doc-tooltip.pinned .hdt-pin-hint {
+.oku-tooltip.pinned .okt-pin-hint {
   color: var(--accent-strong);
   font-style: normal;
   font-weight: 600;
 }
-.html-doc-tooltip.pinned .hdt-pin-hint::before { content: '📌  '; font-style: normal; }
-.html-doc-tooltip:not(.pinned) .hdt-pin-hint::before { content: '↳ '; }
+.oku-tooltip.pinned .okt-pin-hint::before { content: '📌  '; font-style: normal; }
+.oku-tooltip:not(.pinned) .okt-pin-hint::before { content: '↳ '; }
 
 /* ============================================================
    <page-nav> — site-tree sidebar
@@ -3204,10 +3204,10 @@ body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
 /* Brief flash on the warning's target element when the reader clicks
    "Jump to". Quiet — a soft ring, no flicker — so it locates the
    element without disrupting reading. */
-.html-doc-flash {
-  animation: html-doc-flash 1.6s ease-out 1;
+.oku-flash {
+  animation: oku-flash 1.6s ease-out 1;
 }
-@keyframes html-doc-flash {
+@keyframes oku-flash {
   0%   { box-shadow: 0 0 0 4px var(--accent); }
   60%  { box-shadow: 0 0 0 4px var(--accent-soft); }
   100% { box-shadow: 0 0 0 0 transparent; }
@@ -3216,7 +3216,7 @@ body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
 /* In-place diagram error card — replaces mermaid's half-rendered SVG
    when the source fails to parse. Source is still reachable via the
    toolbar; the warning panel also lists this entry with a Jump-to. */
-.hdd-render.hdd-error {
+.okd-render.okd-error {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3226,30 +3226,30 @@ body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
   border: 1px dashed var(--warning);
   border-radius: 8px;
 }
-.hdd-error-card {
+.okd-error-card {
   max-width: 520px;
   font-size: 13px;
   color: var(--text-soft);
   line-height: 1.5;
 }
-.hdd-error-card strong {
+.okd-error-card strong {
   display: block;
   color: var(--warning);
   font-size: 14px;
   margin-bottom: 4px;
 }
-.hdd-error-card .hdd-error-hint {
+.okd-error-card .okd-error-hint {
   color: var(--text-faint);
   margin-bottom: 8px;
 }
-.hdd-error-card details summary {
+.okd-error-card details summary {
   cursor: pointer;
   color: var(--text-soft);
   font-size: 12px;
   user-select: none;
 }
-.hdd-error-card details[open] summary { margin-bottom: 6px; }
-.hdd-error-card details pre {
+.okd-error-card details[open] summary { margin-bottom: 6px; }
+.okd-error-card details pre {
   margin: 0;
   padding: 8px 10px;
   background: var(--surface);
@@ -3263,9 +3263,9 @@ body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
 }
 
 /* ============================================================
-   <html-doc-chart> — scatter / line SVG charts
+   <oku-chart> — scatter / line SVG charts
    ============================================================ */
-html-doc-chart {
+oku-chart {
   display: block;
   margin: 24px 0;
   background: var(--surface);
@@ -3274,38 +3274,38 @@ html-doc-chart {
   padding: 12px 14px;
   position: relative;
 }
-html-doc-chart .hdc-svg { display: block; width: 100%; height: auto; }
-html-doc-chart .hdc-title {
+oku-chart .okc-svg { display: block; width: 100%; height: auto; }
+oku-chart .okc-title {
   fill: var(--text);
   font: 600 14px 'Inter', sans-serif;
 }
-html-doc-chart .hdc-axis {
+oku-chart .okc-axis {
   stroke: var(--line-strong);
   stroke-width: 1;
   fill: none;
 }
-html-doc-chart .hdc-axis-label {
+oku-chart .okc-axis-label {
   fill: var(--text-soft);
   font: 500 11px 'Inter', sans-serif;
   letter-spacing: 0.02em;
 }
-html-doc-chart .hdc-tick {
+oku-chart .okc-tick {
   fill: var(--text-soft);
   font: 400 10.5px 'JetBrains Mono', monospace;
 }
-html-doc-chart .hdc-line { stroke-linejoin: round; stroke-linecap: round; }
-html-doc-chart .hdc-area { stroke: none; }
+oku-chart .okc-line { stroke-linejoin: round; stroke-linecap: round; }
+oku-chart .okc-area { stroke: none; }
 /* Quadrant chart — two reference lines dividing the plot into four
    regions, plus optional corner labels. The reference lines are
    dashed and faint so they read as guides, not as data. */
-html-doc-chart .hdc-quadrant {
+oku-chart .okc-quadrant {
   stroke: var(--text-faint);
   stroke-width: 1;
   stroke-dasharray: 4 4;
   opacity: 0.6;
   fill: none;
 }
-html-doc-chart .hdc-quadrant-label {
+oku-chart .okc-quadrant-label {
   fill: var(--text);
   font: 600 10.5px 'Inter', sans-serif;
   letter-spacing: 0.06em;
@@ -3314,13 +3314,13 @@ html-doc-chart .hdc-quadrant-label {
 /* Opaque backing pill behind every quadrant label. Combined with
    the chart drawing order (lines + ticks first, plot region next,
    labels LAST) the pill is always on top of data dots — no garble. */
-html-doc-chart .hdc-quadrant-label-pill {
+oku-chart .okc-quadrant-label-pill {
   fill: var(--surface);
   fill-opacity: 0.94;
   stroke: var(--border);
   stroke-width: 0.5;
 }
-html-doc-chart .hdc-legend {
+oku-chart .okc-legend {
   /* Same halo trick for legend chip text — keeps the label readable
      when a data point happens to scatter under the chip. */
   stroke: var(--bg);
@@ -3329,30 +3329,30 @@ html-doc-chart .hdc-legend {
   paint-order: stroke fill;
 }
 /* Donut chart — slices, centre readout, side legend. */
-html-doc-chart .hdc-donut .hdc-slice {
+oku-chart .okc-donut .okc-slice {
   stroke: var(--bg);
   stroke-width: 2;
   cursor: pointer;
   transition: opacity 0.12s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-origin: 140px 160px;
 }
-html-doc-chart .hdc-donut .hdc-slice:hover,
-html-doc-chart .hdc-donut .hdc-slice:focus-visible {
+oku-chart .okc-donut .okc-slice:hover,
+oku-chart .okc-donut .okc-slice:focus-visible {
   transform: scale(1.025);
   outline: none;
 }
-html-doc-chart .hdc-donut-total {
+oku-chart .okc-donut-total {
   fill: var(--text);
   font: 800 22px 'Inter', sans-serif;
   letter-spacing: -0.02em;
 }
-html-doc-chart .hdc-donut-caption {
+oku-chart .okc-donut-caption {
   fill: var(--text-soft);
   font: 500 10.5px 'Inter', sans-serif;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-html-doc-chart .hdc-donut-legend-label {
+oku-chart .okc-donut-legend-label {
   fill: var(--text);
   font: 500 12px 'Inter', sans-serif;
   dominant-baseline: middle;
@@ -3361,224 +3361,224 @@ html-doc-chart .hdc-donut-legend-label {
 /* ============ Tier-1 / Tier-3 chart variants ============ *
  * heatmap · sparkline · waffle · gauge · radar · box-plot · bullet · slope.
  * Visual tokens come from the same accent / warn / danger / success /
- * muted vocabulary as donut. Each rule scopes inside .hdc-<type> to
+ * muted vocabulary as donut. Each rule scopes inside .okc-<type> to
  * isolate the SVG-class space from the Cartesian renderer. */
 
-html-doc-chart .hdc-heatmap .hdc-heatmap-cell {
+oku-chart .okc-heatmap .okc-heatmap-cell {
   stroke: var(--surface);
   stroke-width: 0.5;
   transition: fill-opacity 0.12s ease;
 }
-html-doc-chart .hdc-heatmap .hdc-heatmap-cell:hover { stroke: var(--accent-strong); stroke-width: 1.5; }
-html-doc-chart .hdc-heatmap .hdc-heatmap-label {
+oku-chart .okc-heatmap .okc-heatmap-cell:hover { stroke: var(--accent-strong); stroke-width: 1.5; }
+oku-chart .okc-heatmap .okc-heatmap-label {
   fill: var(--text-soft);
   font: 500 11px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
 
-.hdc-sparkline-row {
+.okc-sparkline-row {
   display: inline-flex; align-items: center; gap: 6px;
   line-height: 1;
 }
-.hdc-sparkline-row svg.hdc-sparkline {
+.okc-sparkline-row svg.okc-sparkline {
   width: 120px; height: 28px;
   flex: 0 0 auto;
-  /* sparkline inherits theme color; .hdc-sparkline-* classes pick from it. */
+  /* sparkline inherits theme color; .okc-sparkline-* classes pick from it. */
   color: var(--accent);
 }
-.hdc-sparkline-row .hdc-sparkline-end-label {
+.okc-sparkline-row .okc-sparkline-end-label {
   font: 500 12px 'Inter', sans-serif;
   color: var(--text-soft);
 }
-html-doc-chart .hdc-sparkline .hdc-sparkline-line {
+oku-chart .okc-sparkline .okc-sparkline-line {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.6;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
-.hdc-sparkline .hdc-sparkline-cursor {
+.okc-sparkline .okc-sparkline-cursor {
   stroke: var(--accent-strong);
   stroke-width: 0.5;
   stroke-dasharray: 2 2;
   opacity: 0.7;
 }
-.hdc-sparkline .hdc-sparkline-cursor-dot {
+.okc-sparkline .okc-sparkline-cursor-dot {
   fill: var(--accent-strong);
 }
-html-doc-chart .hdc-sparkline .hdc-sparkline-area {
+oku-chart .okc-sparkline .okc-sparkline-area {
   fill: currentColor;
   fill-opacity: 0.16;
   stroke: none;
 }
-html-doc-chart .hdc-sparkline .hdc-sparkline-bar { fill: currentColor; }
-html-doc-chart .hdc-sparkline .hdc-sparkline-endpoint {
+oku-chart .okc-sparkline .okc-sparkline-bar { fill: currentColor; }
+oku-chart .okc-sparkline .okc-sparkline-endpoint {
   fill: currentColor;
   stroke: var(--surface);
   stroke-width: 1;
 }
 
-html-doc-chart .hdc-waffle .hdc-waffle-cell {
+oku-chart .okc-waffle .okc-waffle-cell {
   stroke: var(--surface);
   stroke-width: 0.6;
   transition: fill-opacity 0.12s ease;
 }
-html-doc-chart .hdc-waffle .hdc-waffle-cell:hover { stroke: var(--accent-strong); stroke-width: 1.4; }
-html-doc-chart .hdc-waffle .hdc-waffle-legend-label {
+oku-chart .okc-waffle .okc-waffle-cell:hover { stroke: var(--accent-strong); stroke-width: 1.4; }
+oku-chart .okc-waffle .okc-waffle-legend-label {
   fill: var(--text);
   font: 500 12px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
 
-html-doc-chart .hdc-gauge .hdc-gauge-bg { /* background arc — uses inline fill */ }
-html-doc-chart .hdc-gauge .hdc-gauge-zone { /* zone band — uses inline fill + opacity */ }
-html-doc-chart .hdc-gauge .hdc-gauge-value { /* value arc — accent */ }
-html-doc-chart .hdc-gauge .hdc-gauge-target {
+oku-chart .okc-gauge .okc-gauge-bg { /* background arc — uses inline fill */ }
+oku-chart .okc-gauge .okc-gauge-zone { /* zone band — uses inline fill + opacity */ }
+oku-chart .okc-gauge .okc-gauge-value { /* value arc — accent */ }
+oku-chart .okc-gauge .okc-gauge-target {
   stroke: var(--text);
   stroke-width: 2;
 }
-html-doc-chart .hdc-gauge .hdc-gauge-value-text {
+oku-chart .okc-gauge .okc-gauge-value-text {
   fill: var(--text);
   font: 700 30px 'Inter', sans-serif;
 }
-html-doc-chart .hdc-gauge .hdc-gauge-label {
+oku-chart .okc-gauge .okc-gauge-label {
   fill: var(--text-soft);
   font: 500 11.5px 'Inter', sans-serif;
 }
 
-html-doc-chart .hdc-radar .hdc-radar-ring {
+oku-chart .okc-radar .okc-radar-ring {
   fill: none;
   stroke: var(--border-soft);
   stroke-width: 0.6;
 }
-html-doc-chart .hdc-radar .hdc-radar-axis {
+oku-chart .okc-radar .okc-radar-axis {
   stroke: var(--border);
   stroke-width: 0.6;
 }
-html-doc-chart .hdc-radar .hdc-radar-label {
+oku-chart .okc-radar .okc-radar-label {
   fill: var(--text);
   font: 500 12px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
-html-doc-chart .hdc-radar .hdc-radar-series { cursor: default; transition: fill-opacity 0.18s ease; }
-html-doc-chart .hdc-radar .hdc-radar-series:hover { fill-opacity: 0.4; }
-html-doc-chart .hdc-radar .hdc-radar-legend-label {
+oku-chart .okc-radar .okc-radar-series { cursor: default; transition: fill-opacity 0.18s ease; }
+oku-chart .okc-radar .okc-radar-series:hover { fill-opacity: 0.4; }
+oku-chart .okc-radar .okc-radar-legend-label {
   fill: var(--text-soft);
   font: 500 12px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
 
-html-doc-chart .hdc-boxplot .hdc-boxplot-label {
+oku-chart .okc-boxplot .okc-boxplot-label {
   fill: var(--text);
   font: 500 12px 'Inter', sans-serif;
 }
-html-doc-chart .hdc-boxplot .hdc-boxplot-whisker {
+oku-chart .okc-boxplot .okc-boxplot-whisker {
   stroke: var(--text-soft);
   stroke-width: 1.2;
 }
-html-doc-chart .hdc-boxplot .hdc-boxplot-iqr { stroke-width: 1; }
-html-doc-chart .hdc-boxplot .hdc-boxplot-outlier {
+oku-chart .okc-boxplot .okc-boxplot-iqr { stroke-width: 1; }
+oku-chart .okc-boxplot .okc-boxplot-outlier {
   stroke: var(--surface);
   stroke-width: 1;
 }
 
-html-doc-chart .hdc-bullet .hdc-bullet-label {
+oku-chart .okc-bullet .okc-bullet-label {
   fill: var(--text);
   font: 500 12px 'Inter', sans-serif;
 }
-html-doc-chart .hdc-bullet .hdc-bullet-bg {
+oku-chart .okc-bullet .okc-bullet-bg {
   fill: var(--code-bg, rgba(127,127,127,0.12));
 }
-html-doc-chart .hdc-bullet .hdc-bullet-target {
+oku-chart .okc-bullet .okc-bullet-target {
   stroke: var(--text);
   stroke-width: 2.4;
 }
-html-doc-chart .hdc-bullet .hdc-bullet-readout {
+oku-chart .okc-bullet .okc-bullet-readout {
   fill: var(--text);
   font: 600 12px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
 
-html-doc-chart .hdc-slope .hdc-slope-col {
+oku-chart .okc-slope .okc-slope-col {
   fill: var(--text-soft);
   font: 600 12px 'Inter', sans-serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-html-doc-chart .hdc-slope .hdc-slope-readout {
+oku-chart .okc-slope .okc-slope-readout {
   fill: var(--text);
   font: 500 12px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
 
-html-doc-chart .hdc-histogram .hdc-histogram-bar {
+oku-chart .okc-histogram .okc-histogram-bar {
   transition: fill-opacity 0.12s ease;
 }
-html-doc-chart .hdc-histogram .hdc-histogram-bar:hover { fill-opacity: 1; }
+oku-chart .okc-histogram .okc-histogram-bar:hover { fill-opacity: 1; }
 
-html-doc-chart .hdc-calendar .hdc-calendar-cell {
+oku-chart .okc-calendar .okc-calendar-cell {
   stroke: var(--surface);
   stroke-width: 0.5;
   transition: fill-opacity 0.12s ease;
 }
-html-doc-chart .hdc-calendar .hdc-calendar-cell:hover { stroke: var(--accent-strong); stroke-width: 1.4; }
-html-doc-chart .hdc-calendar .hdc-calendar-label {
+oku-chart .okc-calendar .okc-calendar-cell:hover { stroke: var(--accent-strong); stroke-width: 1.4; }
+oku-chart .okc-calendar .okc-calendar-label {
   fill: var(--text-soft);
   font: 500 10.5px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
-html-doc-chart .hdc-calendar .hdc-calendar-month {
+oku-chart .okc-calendar .okc-calendar-month {
   fill: var(--text-soft);
   font: 500 10.5px 'Inter', sans-serif;
   letter-spacing: 0.06em;
 }
 
-html-doc-chart .hdc-treemap .hdc-treemap-cell rect {
+oku-chart .okc-treemap .okc-treemap-cell rect {
   stroke: var(--surface);
   stroke-width: 1;
   transition: fill-opacity 0.12s ease;
 }
-html-doc-chart .hdc-treemap .hdc-treemap-cell:hover rect { fill-opacity: 1; }
-html-doc-chart .hdc-treemap .hdc-treemap-label {
+oku-chart .okc-treemap .okc-treemap-cell:hover rect { fill-opacity: 1; }
+oku-chart .okc-treemap .okc-treemap-label {
   fill: var(--surface);
   font: 700 13px 'Inter', sans-serif;
   paint-order: stroke fill;
   stroke: rgba(0,0,0,0.32);
   stroke-width: 0.6;
 }
-html-doc-chart .hdc-treemap .hdc-treemap-value {
+oku-chart .okc-treemap .okc-treemap-value {
   fill: var(--surface);
   font: 500 11.5px 'Inter', sans-serif;
   fill-opacity: 0.88;
 }
 
-html-doc-chart .hdc-ridgeline .hdc-ridgeline-curve {
+oku-chart .okc-ridgeline .okc-ridgeline-curve {
   transition: fill-opacity 0.18s ease;
 }
-html-doc-chart .hdc-ridgeline .hdc-ridgeline-curve:hover { fill-opacity: 0.55; }
-html-doc-chart .hdc-ridgeline .hdc-ridgeline-label {
+oku-chart .okc-ridgeline .okc-ridgeline-curve:hover { fill-opacity: 0.55; }
+oku-chart .okc-ridgeline .okc-ridgeline-label {
   fill: var(--text);
   font: 600 12px 'Inter', sans-serif;
 }
 /* Parallel cursor — vertical line + numeric readout that follows the
    pointer across every ridge so the reader can compare a given X
    value across distributions in one glance. */
-html-doc-chart .hdc-ridgeline .hdc-ridge-cursor {
+oku-chart .okc-ridgeline .okc-ridge-cursor {
   stroke: var(--accent-strong);
   stroke-dasharray: 3 3;
   opacity: 0.75;
 }
-html-doc-chart .hdc-ridgeline .hdc-ridge-cursor-label {
+oku-chart .okc-ridgeline .okc-ridge-cursor-label {
   fill: var(--accent-strong);
   font: 600 11px 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
 }
 
-html-doc-chart .hdc-funnel .hdc-funnel-band {
+oku-chart .okc-funnel .okc-funnel-band {
   transition: fill-opacity 0.18s ease;
 }
-html-doc-chart .hdc-funnel .hdc-funnel-band:hover { fill-opacity: 1; }
-html-doc-chart .hdc-funnel .hdc-funnel-label {
+oku-chart .okc-funnel .okc-funnel-band:hover { fill-opacity: 1; }
+oku-chart .okc-funnel .okc-funnel-label {
   fill: var(--text);
   font: 500 12px 'Inter', sans-serif;
   dominant-baseline: middle;
@@ -3586,39 +3586,39 @@ html-doc-chart .hdc-funnel .hdc-funnel-label {
 /* Value + percentage now sit in their own right-anchored columns so
    digits stack visually. Tabular-nums keeps proportional fonts from
    wobbling between rows. Same family as labels for visual unity. */
-html-doc-chart .hdc-funnel .hdc-funnel-value,
-html-doc-chart .hdc-funnel .hdc-funnel-pct {
+oku-chart .okc-funnel .okc-funnel-value,
+oku-chart .okc-funnel .okc-funnel-pct {
   fill: var(--text-soft);
   font: 500 12px 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
   dominant-baseline: middle;
 }
-html-doc-chart .hdc-funnel .hdc-funnel-pct { fill: var(--text); }
+oku-chart .okc-funnel .okc-funnel-pct { fill: var(--text); }
 /* Legacy readout class — earlier rendering combined value+pct into
    one cell. Kept so older standalone exports still style cleanly. */
-html-doc-chart .hdc-funnel .hdc-funnel-readout {
+oku-chart .okc-funnel .okc-funnel-readout {
   fill: var(--text-soft);
   font: 500 12px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
 
-html-doc-chart .hdc-dot {
+oku-chart .okc-dot {
   stroke: var(--surface);
   stroke-width: 1.5;
   cursor: pointer;
   transition: r 0.12s ease, stroke-width 0.12s ease, opacity 0.18s ease;
 }
-html-doc-chart .hdc-dot:hover,
-html-doc-chart .hdc-dot:focus,
-html-doc-chart .hdc-dot.hovered {
+oku-chart .okc-dot:hover,
+oku-chart .okc-dot:focus,
+oku-chart .okc-dot.hovered {
   r: 6;
   stroke-width: 2;
   outline: none;
 }
-html-doc-chart .hdc-dot:focus-visible {
+oku-chart .okc-dot:focus-visible {
   stroke: var(--accent-strong);
 }
-html-doc-chart .hdc-point-label {
+oku-chart .okc-point-label {
   fill: var(--text-soft);
   font: 400 10.5px 'Inter', sans-serif;
   cursor: pointer;
@@ -3632,9 +3632,9 @@ html-doc-chart .hdc-point-label {
   stroke-linejoin: round;
   transition: fill 0.15s ease, font-weight 0.15s ease;
 }
-html-doc-chart .hdc-point-label:hover,
-html-doc-chart .hdc-point-label:focus,
-html-doc-chart .hdc-point-label.hovered {
+oku-chart .okc-point-label:hover,
+oku-chart .okc-point-label:focus,
+oku-chart .okc-point-label.hovered {
   fill: var(--accent-strong);
   font-weight: 600;
   outline: none;
@@ -3643,56 +3643,56 @@ html-doc-chart .hdc-point-label.hovered {
    y-shift; labels that couldn't fit anywhere are hidden until their
    dot is hovered/focused. The existing setHover(key,on) toggles the
    .hovered class on the matching label, which reveals it. */
-html-doc-chart .hdc-point-label.hdc-label-shifted {
+oku-chart .okc-point-label.okc-label-shifted {
   /* Visual hint that the label has been moved off the line. */
   fill: var(--text-faint);
 }
-html-doc-chart .hdc-point-label.hdc-label-shifted.hovered {
+oku-chart .okc-point-label.okc-label-shifted.hovered {
   fill: var(--accent-strong);
 }
-html-doc-chart .hdc-point-label.hdc-label-hidden {
+oku-chart .okc-point-label.okc-label-hidden {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
 }
-html-doc-chart .hdc-point-label.hdc-label-hidden.hovered {
+oku-chart .okc-point-label.okc-label-hidden.hovered {
   opacity: 1;
   pointer-events: auto;
   font-weight: 600;
 }
 
 /* Series dimming via legend toggle */
-html-doc-chart .hdc-series { transition: opacity 0.2s ease; }
-html-doc-chart .hdc-series.dim { opacity: 0.15; }
+oku-chart .okc-series { transition: opacity 0.2s ease; }
+oku-chart .okc-series.dim { opacity: 0.15; }
 
 /* Legend chips — clickable, focusable */
-html-doc-chart .hdc-legend-chip { cursor: pointer; }
+oku-chart .okc-legend-chip { cursor: pointer; }
 /* Legend backdrop. Opaque surface so a data point that lands
    underneath gets visually masked instead of bleeding through the
    chip text — fixes the user-reported "legends overlap data". */
-html-doc-chart .hdc-legend-bg {
+oku-chart .okc-legend-bg {
   fill: var(--surface);
   fill-opacity: 0.94;
   transition: fill 0.12s ease;
 }
-html-doc-chart .hdc-legend-chip:hover .hdc-legend-bg,
-html-doc-chart .hdc-legend-chip:focus-visible .hdc-legend-bg {
+oku-chart .okc-legend-chip:hover .okc-legend-bg,
+oku-chart .okc-legend-chip:focus-visible .okc-legend-bg {
   fill: var(--accent-soft);
 }
-html-doc-chart .hdc-legend-chip:focus-visible {
+oku-chart .okc-legend-chip:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-radius: 4px;
 }
-html-doc-chart .hdc-legend-chip.off .hdc-legend-swatch { opacity: 0.25; }
-html-doc-chart .hdc-legend-chip.off .hdc-legend { fill: var(--text-faint); text-decoration: line-through; }
+oku-chart .okc-legend-chip.off .okc-legend-swatch { opacity: 0.25; }
+oku-chart .okc-legend-chip.off .okc-legend { fill: var(--text-faint); text-decoration: line-through; }
 
 /* Hover tooltip — chart-local; styling shares the kit's surface tokens
    but doesn't reuse the glossary tooltip controller (no "pin" affordance,
    no "Learn more" link — wrong shape for a data tooltip). Selector is
-   intentionally bare-class so it works inside html-doc-chart, .bar-chart,
+   intentionally bare-class so it works inside oku-chart, .bar-chart,
    .bar-chart-multi, treemap, funnel, and any future host that wants it. */
-.hdc-tooltip {
+.okc-tooltip {
   position: absolute;
   transform: translate(-50%, -100%);
   background: var(--surface);
@@ -3709,8 +3709,8 @@ html-doc-chart .hdc-legend-chip.off .hdc-legend { fill: var(--text-faint); text-
   z-index: 5;
   max-width: 260px;
 }
-.hdc-tooltip.visible { opacity: 1; }
-.hdc-tooltip .hdc-tt-series {
+.okc-tooltip.visible { opacity: 1; }
+.okc-tooltip .okc-tt-series {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -3718,8 +3718,8 @@ html-doc-chart .hdc-legend-chip.off .hdc-legend { fill: var(--text-faint); text-
   color: var(--accent-strong);
   margin-bottom: 2px;
 }
-.hdc-tooltip .hdc-tt-label { font-weight: 600; }
-.hdc-tooltip .hdc-tt-coords {
+.okc-tooltip .okc-tt-label { font-weight: 600; }
+.okc-tooltip .okc-tt-coords {
   color: var(--text-soft);
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
@@ -3727,7 +3727,7 @@ html-doc-chart .hdc-legend-chip.off .hdc-legend { fill: var(--text-faint); text-
 }
 /* Key/value rows inside the rich tooltip — small two-column grid so
    "value", "share", "drop-off" lines stack cleanly. */
-.hdc-tooltip .hdc-tt-kv {
+.okc-tooltip .okc-tt-kv {
   margin: 4px 0 0 0;
   display: grid;
   grid-template-columns: auto auto;
@@ -3735,14 +3735,14 @@ html-doc-chart .hdc-legend-chip.off .hdc-legend { fill: var(--text-faint); text-
   row-gap: 1px;
   font-size: 11.5px;
 }
-.hdc-tooltip .hdc-tt-kv dt {
+.okc-tooltip .okc-tt-kv dt {
   color: var(--text-soft);
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: 10.5px;
 }
-.hdc-tooltip .hdc-tt-kv dd {
+.okc-tooltip .okc-tt-kv dd {
   margin: 0;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
@@ -3753,15 +3753,15 @@ html-doc-chart .hdc-legend-chip.off .hdc-legend { fill: var(--text-faint); text-
    the absolute tooltip to anchor correctly. */
 .bar-chart,
 .bar-chart-multi { position: relative; }
-html-doc-chart .hdc-legend {
+oku-chart .okc-legend {
   fill: var(--text);
   font: 500 11.5px 'Inter', sans-serif;
 }
 
 /* ============================================================
-   <html-doc-diagram> — Mermaid renders
+   <oku-diagram> — Mermaid renders
    ============================================================ */
-html-doc-diagram {
+oku-diagram {
   display: block;
   margin: 24px 0;
   background: var(--surface);
@@ -3770,8 +3770,8 @@ html-doc-diagram {
   padding: 16px;
   position: relative;
 }
-html-doc-diagram .hdd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; overflow: visible; }
-html-doc-diagram .hdd-render svg {
+oku-diagram .okd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; overflow: visible; }
+oku-diagram .okd-render svg {
   display: block;
   /* width:100% + height:auto + max-width:100% combine so the SVG
      scales to the container regardless of intrinsic width attrs
@@ -3784,14 +3784,14 @@ html-doc-diagram .hdd-render svg {
 }
 /* Fullscreen lightbox: let the diagram grow to fill the pan/zoom
    stage. The SVG keeps aspect ratio via viewBox. */
-.hdt-lightbox-pz html-doc-diagram .hdd-render svg,
-.hdt-lightbox-content html-doc-diagram .hdd-render svg {
+.okt-lightbox-pz oku-diagram .okd-render svg,
+.okt-lightbox-content oku-diagram .okd-render svg {
   width: 100%;
   height: auto;
   max-width: none;
   max-height: 100%;
 }
-html-doc-diagram .hdd-fallback {
+oku-diagram .okd-fallback {
   background: var(--surface-2);
   padding: 12px;
   border-radius: 6px;
@@ -3799,7 +3799,7 @@ html-doc-diagram .hdd-fallback {
   white-space: pre-wrap;
   overflow-x: auto;
 }
-html-doc-diagram .hdd-caption {
+oku-diagram .okd-caption {
   display: block;
   margin-top: 10px;
   padding-top: 10px;
@@ -3811,9 +3811,9 @@ html-doc-diagram .hdd-caption {
 }
 
 /* ============================================================
-   <html-doc-snippet> — editable HTML/CSS/JS playground
+   <oku-snippet> — editable HTML/CSS/JS playground
    ============================================================ */
-html-doc-snippet {
+oku-snippet {
   display: block;
   margin: 24px 0;
   background: var(--surface);
@@ -3821,7 +3821,7 @@ html-doc-snippet {
   border-radius: 12px;
   overflow: hidden;
 }
-html-doc-snippet .hds-header {
+oku-snippet .hds-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3831,11 +3831,11 @@ html-doc-snippet .hds-header {
   font-size: 12px;
   color: var(--text-soft);
 }
-html-doc-snippet .hds-label {
+oku-snippet .hds-label {
   font-weight: 600;
   color: var(--text);
 }
-html-doc-snippet .hds-reset {
+oku-snippet .hds-reset {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -3845,8 +3845,8 @@ html-doc-snippet .hds-reset {
   cursor: pointer;
   font-family: inherit;
 }
-html-doc-snippet .hds-reset:hover { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
-html-doc-snippet .hds-body {
+oku-snippet .hds-reset:hover { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
+oku-snippet .hds-body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   min-height: 320px;
@@ -3854,12 +3854,12 @@ html-doc-snippet .hds-body {
 /* When nested inside the example-pair render column, the grid is
    tight (~half content-width). Stack editor + preview unconditionally
    in that context so neither gets squashed to a sliver. */
-.example-render html-doc-snippet .hds-body {
+.example-render oku-snippet .hds-body {
   grid-template-columns: 1fr;
   min-height: 400px;
 }
-.example-render html-doc-snippet .hds-editor,
-.example-render html-doc-snippet .hds-preview {
+.example-render oku-snippet .hds-editor,
+.example-render oku-snippet .hds-preview {
   min-height: 200px;
 }
 /* Editor pane: a `<textarea>` overlaid on top of a Prism-highlighted
@@ -3869,14 +3869,14 @@ html-doc-snippet .hds-body {
    per-pixel with what the user types. The textarea drives layout
    (so resize: vertical works); the shadow is absolutely positioned
    over the wrap and scroll-synced from the textarea. */
-html-doc-snippet .hds-editor-wrap {
+oku-snippet .hds-editor-wrap {
   position: relative;
   background: var(--surface);
   border-right: 1px solid var(--border);
   overflow: hidden;
 }
-html-doc-snippet .hds-editor,
-html-doc-snippet .hds-editor-shadow {
+oku-snippet .hds-editor,
+oku-snippet .hds-editor-shadow {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12.5px;
   line-height: 1.55;
@@ -3888,7 +3888,7 @@ html-doc-snippet .hds-editor-shadow {
   white-space: pre;
   word-spacing: normal;
 }
-html-doc-snippet .hds-editor {
+oku-snippet .hds-editor {
   display: block;
   width: 100%;
   min-height: 200px;
@@ -3902,8 +3902,8 @@ html-doc-snippet .hds-editor {
   /* Selection stays visible even with transparent text. */
   -webkit-text-fill-color: transparent;
 }
-html-doc-snippet .hds-editor::selection { background: var(--accent-soft); color: transparent; }
-html-doc-snippet .hds-editor-shadow {
+oku-snippet .hds-editor::selection { background: var(--accent-soft); color: transparent; }
+oku-snippet .hds-editor-shadow {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -3912,7 +3912,7 @@ html-doc-snippet .hds-editor-shadow {
   background: transparent;
   color: var(--text);
 }
-html-doc-snippet .hds-editor-shadow code {
+oku-snippet .hds-editor-shadow code {
   display: block;
   background: transparent;
   font: inherit;
@@ -3920,16 +3920,16 @@ html-doc-snippet .hds-editor-shadow code {
   line-height: inherit;
   white-space: pre;
 }
-html-doc-snippet .hds-editor-wrap:focus-within { background: var(--surface-2); }
-html-doc-snippet .hds-preview {
+oku-snippet .hds-editor-wrap:focus-within { background: var(--surface-2); }
+oku-snippet .hds-preview {
   background: white;
   border: 0;
   width: 100%;
   min-height: 200px;
 }
 @media (max-width: 700px) {
-  html-doc-snippet .hds-body { grid-template-columns: 1fr; }
-  html-doc-snippet .hds-editor-wrap { border-right: 0; border-bottom: 1px solid var(--border); }
+  oku-snippet .hds-body { grid-template-columns: 1fr; }
+  oku-snippet .hds-editor-wrap { border-right: 0; border-bottom: 1px solid var(--border); }
 }
 
 /* ============================================================
@@ -4154,34 +4154,34 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
 /* ============ Tier 3 charts (sankey / network / scatter-matrix / parallel-coordinates) ============ */
 
 /* Sankey — left→right flow ribbons + column-stacked node rectangles. */
-html-doc-chart .hdc-sankey .hdc-sankey-link {
+oku-chart .okc-sankey .okc-sankey-link {
   transition: fill-opacity 0.18s ease;
   cursor: pointer;
 }
-html-doc-chart .hdc-sankey .hdc-sankey-link:hover { fill-opacity: 0.62; }
-html-doc-chart .hdc-sankey .hdc-sankey-node { cursor: pointer; }
-html-doc-chart .hdc-sankey .hdc-sankey-label {
+oku-chart .okc-sankey .okc-sankey-link:hover { fill-opacity: 0.62; }
+oku-chart .okc-sankey .okc-sankey-node { cursor: pointer; }
+oku-chart .okc-sankey .okc-sankey-label {
   fill: var(--text);
   font: 500 11px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
 
 /* Network — node-link diagram with force-relaxed layout. */
-html-doc-chart .hdc-network .hdc-network-edge {
+oku-chart .okc-network .okc-network-edge {
   stroke: var(--text-faint);
   stroke-width: 1;
   opacity: 0.55;
 }
-html-doc-chart .hdc-network .hdc-network-node {
+oku-chart .okc-network .okc-network-node {
   cursor: pointer;
   transition: filter 0.15s ease;
 }
-html-doc-chart .hdc-network .hdc-network-node:hover circle {
+oku-chart .okc-network .okc-network-node:hover circle {
   filter: brightness(1.1);
   stroke: var(--accent-strong);
   stroke-width: 2;
 }
-html-doc-chart .hdc-network .hdc-network-label {
+oku-chart .okc-network .okc-network-label {
   fill: var(--text);
   font: 500 10.5px 'Inter', sans-serif;
   stroke: var(--bg);
@@ -4191,12 +4191,12 @@ html-doc-chart .hdc-network .hdc-network-label {
 }
 
 /* Scatter-matrix — N×N grid of mini scatters. */
-html-doc-chart .hdc-scatter-matrix .hdc-sm-cell {
+oku-chart .okc-scatter-matrix .okc-sm-cell {
   fill: var(--surface);
   stroke: var(--border);
   stroke-width: 0.5;
 }
-html-doc-chart .hdc-scatter-matrix .hdc-sm-label {
+oku-chart .okc-scatter-matrix .okc-sm-label {
   fill: var(--text);
   font: 600 12px 'Inter', sans-serif;
   text-transform: uppercase;
@@ -4204,25 +4204,25 @@ html-doc-chart .hdc-scatter-matrix .hdc-sm-label {
 }
 
 /* Parallel-coordinates — multi-axis polylines. */
-html-doc-chart .hdc-parcoord .hdc-parcoord-axis {
+oku-chart .okc-parcoord .okc-parcoord-axis {
   stroke: var(--text-faint);
   stroke-width: 1;
 }
-html-doc-chart .hdc-parcoord .hdc-parcoord-label {
+oku-chart .okc-parcoord .okc-parcoord-label {
   fill: var(--text-soft);
   font: 600 10.5px 'Inter', sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-html-doc-chart .hdc-parcoord .hdc-parcoord-line {
+oku-chart .okc-parcoord .okc-parcoord-line {
   fill: none;
   stroke-width: 1.4;
   stroke-opacity: 0.45;
   transition: stroke-opacity 0.15s ease, stroke-width 0.15s ease;
   cursor: pointer;
 }
-html-doc-chart .hdc-parcoord .hdc-parcoord-line:hover,
-html-doc-chart .hdc-parcoord .hdc-parcoord-line.hovered {
+oku-chart .okc-parcoord .okc-parcoord-line:hover,
+oku-chart .okc-parcoord .okc-parcoord-line.hovered {
   stroke-opacity: 1;
   stroke-width: 2.4;
 }
@@ -4240,16 +4240,16 @@ html-doc-chart .hdc-parcoord .hdc-parcoord-line.hovered {
  * --prose-width remains as a CSS variable for callers who
  * want to opt back into a line-length cap on their own block.
  * ---------------------------------------------------------------- */
-main .hdt-table-wrap,
+main .okt-table-wrap,
 main .compare-grid,
 main .kpi-grid,
 main .step-cards,
 main .bar-chart,
 main .bar-chart-multi,
-main html-doc-chart,
-main html-doc-diagram,
-main html-doc-live-snippet,
-main html-doc-annotated-code,
+main oku-chart,
+main oku-diagram,
+main oku-snippet,
+main oku-annotated-code,
 main pre,
 main .example-pair {
   max-width: 100%;
@@ -4257,54 +4257,54 @@ main .example-pair {
 
 
 /* ============ Tier 3 — chord + geo ============ */
-html-doc-chart .hdc-chord .hdc-chord-arc {
+oku-chart .okc-chord .okc-chord-arc {
   stroke: var(--bg);
   stroke-width: 1.5;
   transition: filter 0.18s ease;
 }
-html-doc-chart .hdc-chord .hdc-chord-arc:hover { filter: brightness(1.05); }
-html-doc-chart .hdc-chord .hdc-chord-ribbon {
+oku-chart .okc-chord .okc-chord-arc:hover { filter: brightness(1.05); }
+oku-chart .okc-chord .okc-chord-ribbon {
   transition: fill-opacity 0.18s ease;
   cursor: pointer;
 }
-html-doc-chart .hdc-chord .hdc-chord-ribbon:hover { fill-opacity: 0.55; }
-html-doc-chart .hdc-chord .hdc-chord-label {
+oku-chart .okc-chord .okc-chord-ribbon:hover { fill-opacity: 0.55; }
+oku-chart .okc-chord .okc-chord-label {
   fill: var(--text);
   font: 600 11px 'Inter', sans-serif;
 }
 
-html-doc-chart .hdc-geo .hdc-geo-cell-on rect {
+oku-chart .okc-geo .okc-geo-cell-on rect {
   stroke: var(--border);
   stroke-width: 0.5;
   cursor: pointer;
   transition: filter 0.15s ease, stroke-width 0.15s ease;
 }
-html-doc-chart .hdc-geo .hdc-geo-cell-on:hover rect,
-html-doc-chart .hdc-geo .hdc-geo-cell-on:focus-visible rect {
+oku-chart .okc-geo .okc-geo-cell-on:hover rect,
+oku-chart .okc-geo .okc-geo-cell-on:focus-visible rect {
   filter: brightness(1.1);
   stroke: var(--accent-strong);
   stroke-width: 1.5;
 }
-html-doc-chart .hdc-geo .hdc-geo-cell-off {
+oku-chart .okc-geo .okc-geo-cell-off {
   fill: var(--surface-2);
   stroke: var(--border-soft);
   stroke-width: 0.5;
 }
-html-doc-chart .hdc-geo .hdc-geo-code {
+oku-chart .okc-geo .okc-geo-code {
   fill: var(--text);
   font: 700 11.5px 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: 0.04em;
 }
-html-doc-chart .hdc-geo .hdc-geo-value {
+oku-chart .okc-geo .okc-geo-value {
   fill: var(--text);
   font: 500 10px 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
-html-doc-chart .hdc-geo .hdc-geo-code-off {
+oku-chart .okc-geo .okc-geo-code-off {
   fill: var(--text-faint);
   font: 500 10px 'JetBrains Mono', ui-monospace, monospace;
 }
-html-doc-chart .hdc-geo .hdc-geo-legend-tick {
+oku-chart .okc-geo .okc-geo-legend-tick {
   fill: var(--text-soft);
   font: 500 10.5px 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
@@ -4312,7 +4312,7 @@ html-doc-chart .hdc-geo .hdc-geo-legend-tick {
 
 
 /* ============ Chart tooltip pin-hint + pinned state ============ */
-.hdc-tooltip .hdc-tt-pin-hint {
+.okc-tooltip .okc-tt-pin-hint {
   display: block;
   margin-top: 4px;
   font-size: 9.5px;
@@ -4321,11 +4321,11 @@ html-doc-chart .hdc-geo .hdc-geo-legend-tick {
   color: var(--text-faint);
   opacity: 0.7;
 }
-.hdc-tooltip.pinned {
+.okc-tooltip.pinned {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-soft), 0 6px 16px var(--shadow-strong);
   pointer-events: auto;
 }
-.hdc-tooltip.pinned .hdc-tt-pin-hint::after {
+.okc-tooltip.pinned .okc-tt-pin-hint::after {
   content: ' · pinned · Esc to close';
 }

@@ -1,4 +1,4 @@
-"""Tests for the `html-doc check` doctree linter.
+"""Tests for the `oku check` doctree linter.
 
 Each test builds a small in-memory page-JSON fixture, feeds it through
 check_pages(), and asserts on the resulting issue list. This isolates
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from html_doc import cli
+from oku import cli
 
 
 # ---------- helpers ----------
@@ -484,9 +484,9 @@ def test_code_block_without_language_is_info(tmp_path: Path) -> None:
 # ---------- end-to-end against the live repo ----------
 
 def test_project_docs_pass_check_strict(repo_root: Path) -> None:
-    """The kit's own docs must pass `html-doc check --strict`.
+    """The kit's own docs must pass `oku check --strict`.
 
-    This is the canonical regression net for the html-doc skill's
+    This is the canonical regression net for the oku skill's
     auto-verify step: the kit's own dogfooding must remain clean."""
     import importlib
     importlib.reload(cli)  # ensure fresh schema cache for the run
@@ -496,4 +496,4 @@ def test_project_docs_pass_check_strict(repo_root: Path) -> None:
     errors = [i for i in issues if i["severity"] == "error"]
     warnings = [i for i in issues if i["severity"] == "warning"]
     assert errors == [], f"Doctree has errors: {errors}"
-    assert warnings == [], f"Doctree has warnings (run `html-doc check`): {warnings}"
+    assert warnings == [], f"Doctree has warnings (run `oku check`): {warnings}"

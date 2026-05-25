@@ -1,4 +1,4 @@
-"""Tests for pure functions in html_doc.cli.
+"""Tests for pure functions in oku.cli.
 
 These don't touch the filesystem at all — fast, deterministic, and the
 right surface to catch markdown-twin / target-picker / docs-dir regressions
@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-from html_doc import cli
+from oku import cli
 
 
 # ---------- _flatten_inline ----------

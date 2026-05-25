@@ -1,39 +1,43 @@
-# CLAUDE.md — oku (formerly html-doc)
+# CLAUDE.md — oku
 
 Onboarding notes for a fresh Claude Code session in this repo.
 Read this before touching code. Skip nothing — every rule below was
 the answer to a real bug the user pointed out.
 
-The project is mid-rename from **html-doc** to **oku** (Turkish
-imperative "read!"). Both names work as CLI front-ends; the Python
-package on disk stays `html_doc/` until 1.0 ships. When in doubt
-about which name to use in user-facing text, prefer `oku`; in code
-imports keep `html_doc`.
+The project is **oku** (Turkish imperative "read!"). The rename from
+the legacy "html-doc" name now reaches into every layer — package
+(src/oku/), kit CSS prefixes (okt- / okc- / okd-), JS globals
+(__oku*), event names (oku:*), data-attrs (data-oku-*), and custom
+elements (oku-chart, oku-snippet, oku-diagram, oku-annotated-code,
+oku-cite). The legacy `html-doc` CLI alias still resolves through
+the 1.x sunset window so existing automation keeps working; new
+references read `oku`.
 
-Sunset window for the `html-doc` console-script alias (decision
-locked, mirrored in pyproject.toml):
+GitHub remote stays at `github.com/mmdemirbas/html-doc` — the schema
+URL, this repo's directory name, and external links keep pointing
+there until the upstream rename happens.
 
-- **0.x and 1.0** — both names work, no warning.
+Sunset window for the legacy `html-doc` console-script alias
+(locked, mirrored in pyproject.toml):
+
+- **1.0** — both names work, no warning.
 - **1.1** — `html-doc` emits a stderr deprecation note on every
   invocation; the run still succeeds.
 - **2.0** — `html-doc` console-script removed; only `oku` remains.
 
-Until 1.1 ships, all CLI help text + docs may continue to mention
-either name; new examples should prefer `oku`.
-
 ## What this repo is
 
-A shared HTML chrome kit + a Python CLI (`oku`, alias `html-doc`)
-that authors single-source JSON pages and renders them in the
-browser via Custom Elements. No build step for content; the kit is
-loaded as static assets and `renderer.js` walks the JSON tree at
-page load.
+A shared HTML chrome kit + a Python CLI (`oku`, legacy alias
+`html-doc`) that authors single-source JSON pages and renders them
+in the browser via Custom Elements. No build step for content; the
+kit is loaded as static assets and `renderer.js` walks the JSON
+tree at page load.
 
 Authoring shape: `docs/<page>.json` (data) + `docs/<page>.html` (thin
-stub that loads the kit and the page JSON). `html-doc build` produces
+stub that loads the kit and the page JSON). `oku build` produces
 three single-purpose trees under `dist/`:
 - `dist/standalone/` — self-contained single files (humans, file://).
-  Each HTML inlines kit + page JSON + `window.__htmldocManifest`.
+  Each HTML inlines kit + page JSON + `window.__okuManifest`.
 - `dist/site/` — shared-assets multi-page site with Pagefind search
   (humans, HTTP). Holds the one `site-manifest.json` chrome.js fetches.
 - `dist/markdown/` — `page.md` twins + `llms.txt` (AI/LLM consumers).
@@ -48,9 +52,9 @@ three single-purpose trees under `dist/`:
 | `renderer.js` | JSON → DOM mapping. `_renderTable`, `_renderTldr`, `_renderExample`, `_renderBars`, `_renderMultiBars`, inline kinds including `html`. ~1k LoC. |
 | `kit/schema/page.schema.json` | JSON-schema for page sources. Every `docs/*.json` validates against it; the optional `jsonschema` dep makes the check active. |
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
-| `src/html_doc/cli.py` | `oku init / build / clean / check / serve` plus the markdown converter (front-matter, nested lists, footnotes, def-lists, ref-links, sanitised inline HTML) and the `_md_block` markdown twin emitter. |
-| `src/html_doc/templates/` | `starter.{json,html}` — pair to copy when starting a new page. |
-| `bin/oku`, `bin/html-doc` | PEP 723 shims — run without install via `uv run bin/oku …`. Both point at the same `html_doc.cli:main`. |
+| `src/oku/cli.py` | `oku init / build / clean / check / serve` plus the markdown converter (front-matter, nested lists, footnotes, def-lists, ref-links, sanitised inline HTML) and the `_md_block` markdown twin emitter. |
+| `src/oku/templates/` | `starter.{json,html}` — pair to copy when starting a new page. |
+| `bin/oku`, `bin/html-doc` | PEP 723 shims — run without install via `uv run bin/oku …`. Both point at the same `oku.cli:main`. |
 | `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.json` tracks open phases. |
 
 ## Develop / verify
@@ -113,7 +117,7 @@ code.
 **No demo sibling pages.** Every example for a primitive lives
 inside `docs/reference.json` next to the primitive's heading: code
 sample + rendered block. Don't create `docs/<thing>-demo.{html,json}`
-— `src/html_doc_tests/test_content_regression.py::TestNoStrayDemoPages` enforces.
+— `src/oku_tests/test_content_regression.py::TestNoStrayDemoPages` enforces.
 
 **No process/round/historical references in docs.** "Round-N",
 "v2 review", "fixed in round 5" etc. are forbidden in `docs/*.json`.
@@ -121,7 +125,7 @@ Refer to current behaviour, not how it got here. Past sessions left
 this kind of breadcrumb in many places; `git grep -i round docs/`
 should return nothing relevant.
 
-**Tables read as one card.** `.hdt-table-wrap` carries a border +
+**Tables read as one card.** `.okt-table-wrap` carries a border +
 padding so two consecutive tables don't bleed into each other. The
 filter input + stats counter sit together on the left; chip rack is
 a two-column grid (label, chips) directly under the controls bar.
@@ -129,7 +133,7 @@ Group count badges go FIRST in the group header (before the title)
 so the numbers line up at a consistent x.
 
 **Code blocks: line numbers + language pill + brace folds.** Every
-`<pre><code>` gets a gray gutter with line numbers (`.hdt-code-gutter`,
+`<pre><code>` gets a gray gutter with line numbers (`.okt-code-gutter`,
 `user-select: none` so copy excludes them). When a language class is
 present, a small label appears at top-right of the pre. JS / TS /
 JSON / CSS code blocks gain a fold marker on every line ending with
@@ -141,10 +145,10 @@ block — a `.then()` chain after `highlightAll()` races and loses.
 **Add a regression test with every fix.** The user has explicitly
 called out that bugs keep recurring because tests don't cover the
 surface. For Python CLI behaviour use pytest under
-`src/html_doc_tests/`. For JSON-content regressions use
-`src/html_doc_tests/test_content_regression.py` (walk the doc tree,
+`src/oku_tests/`. For JSON-content regressions use
+`src/oku_tests/test_content_regression.py` (walk the doc tree,
 assert on shape). For runtime browser behaviour add Playwright tests
-under `src/html_doc_tests/browser/` (not yet wired — install
+under `src/oku_tests/browser/` (not yet wired — install
 `pytest-playwright` + `playwright install` first). Whatever the
 layer, the rule is: a bug found by the user must have a test that
 fails before the fix and passes after.
@@ -191,7 +195,7 @@ computed-style assertion, the rule isn't found yet.
 - **Stale chrome.js in the browser.** The CDN-loaded Prism autoloader
   fires `complete` twice per block (once before the language module
   arrives, once after). The line-wrap / fold pass guards against the
-  second pass via `code.querySelector('.hdt-code-line')` — DO NOT
+  second pass via `code.querySelector('.okt-code-line')` — DO NOT
   guard with a one-shot `data-` attribute; the second Prism pass
   wipes the spans, and a one-shot guard then refuses to re-apply.
 
@@ -212,8 +216,8 @@ computed-style assertion, the rule isn't found yet.
 
 ## Browser verification flow
 
-1. `html-doc build` (validates schema + emits artifacts).
-2. `html-doc serve --no-watch --no-search`.
+1. `oku build` (validates schema + emits artifacts).
+2. `oku serve --no-watch --no-search`.
 3. Open the changed surface in a browser.
 4. Force a hard reload (`Cmd+Shift+R` / `Ctrl+Shift+R`) — soft reloads
    keep the prior chrome.js in memory.

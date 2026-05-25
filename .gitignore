@@ -17,12 +17,15 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 
-# html-doc: generated artifacts (build/serve emit these; the recent
+# oku: generated artifacts (build/serve emit these; the recent
 # refactor keeps source dirs clean, so these patterns are defensive).
 **/site-manifest.json
 **/site-manifest.js
 **/llms.txt
 **/pagefind/
+# Root-level symlink dropped by `oku serve` so chrome.js's runtime
+# fetch resolves; never tracked.
+/pagefind
 
 # Personal / session working files
 SPEC.md

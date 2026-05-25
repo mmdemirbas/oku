@@ -92,7 +92,7 @@ tree and they appear in the site tree alongside JSON pages.
 ## Authoring model
 
 Each page is a `*.json` file at any depth under your docs root. A thin
-HTML stub next to it (`*.html`, copy of `src/html_doc/templates/starter.html`)
+HTML stub next to it (`*.html`, copy of `src/oku/templates/starter.html`)
 bootstraps the renderer. Authors only ever edit the JSON.
 
 ```jsonc
@@ -143,7 +143,7 @@ oku serve --no-search            # skip background Pagefind index
 `build` writes three single-purpose trees under `dist/`:
 
 - `dist/standalone/` — every HTML inlines kit + page JSON +
-  `window.__htmldocManifest`. Open via `file://`, attach to email.
+  `window.__okuManifest`. Open via `file://`, attach to email.
 - `dist/site/` — multi-page site with shared `_kit/` assets and a
   Pagefind index. One `site-manifest.json` sits at the docs root for
   the runtime page-nav fetch. Drop on any static host.
@@ -159,7 +159,7 @@ each request so source dirs stay clean.
 | Element / kind | Purpose |
 |---|---|
 | `<glossary-term term="...">` | Inline term. Hover → tooltip; click pins. Multi-domain registry. |
-| `<ext-ref name="...">` · `<html-doc-cite>` | Citation card with type theming (paper / rfc / release / blog / other). Auto-infers type from link domain. |
+| `<ext-ref name="...">` · `<oku-cite>` | Citation card with type theming (paper / rfc / release / blog / other). Auto-infers type from link domain. |
 | `<callout type="note\|tip\|info\|caution\|warn\|danger\|success\|neutral">` | Block-level themed note. |
 | `<insight>` | Pull-quote for a key takeaway. |
 | `kpi-grid` · `compare-grid` · `step-flow` | Layout primitives, all layout-safe by structure. `compare-grid` carries verdict variants `good` / `bad` / `neutral` (quality contrast) and `in` / `out` (scope contrast); cards accept either a rich `content` body, an `items` bullet list, or both. |
@@ -259,7 +259,7 @@ Click opens a panel listing entries; Dismiss closes it for the session.
 
 ```bash
 uv run pytest -q                            # ~249 tests, runs in under a second
-uv run html-doc check --strict              # schema + structural + content lint
+oku check --strict              # schema + structural + content lint
 ```
 
 Covers the pure converter (Markdown front-matter, nested lists,
@@ -287,7 +287,7 @@ amount of follow-up tracked for the 1.1 / 2.0 cuts.
 
 ## Companion files
 
-- `src/html_doc/templates/starter.html` + `src/html_doc/templates/starter.json` — copy to start a new page.
+- `src/oku/templates/starter.html` + `src/oku/templates/starter.json` — copy to start a new page.
 - `kit/schema/page.schema.json` — the page schema; editors pick this up via the `$schema` field.
 - `docs/` — the project's own docs (built with the kit, dogfood).
 - `docs/roadmap.json` — phase tracker.

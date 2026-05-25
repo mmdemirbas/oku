@@ -1202,7 +1202,7 @@
               "num": "2",
               "title": "dist/standalone/",
               "meta": "humans, file://",
-              "content": "Single-file artifacts. Every HTML inlines kit JS, CSS, page JSON, glossary bundle, and the manifest as window.__htmldocManifest. One self-contained file per page that opens offline — email-as-attachment ready. No sidecar manifest or llms.txt needed."
+              "content": "Single-file artifacts. Every HTML inlines kit JS, CSS, page JSON, glossary bundle, and the manifest as window.__okuManifest. One self-contained file per page that opens offline — email-as-attachment ready. No sidecar manifest or llms.txt needed."
             },
             {
               "num": "3",
@@ -1229,7 +1229,7 @@
         {
           "kind": "code",
           "language": "html",
-          "source": "<page-chrome></page-chrome>\n\n<div class=\"layout\">\n  <page-nav></page-nav>\n  <main id=\"main-content\"></main>\n  <page-toc></page-toc>\n</div>\n\n<script>\n  window.addEventListener('DOMContentLoaded', function () {\n    HtmlDocRenderer.autoBoot();\n  });\n</script>"
+          "source": "<page-chrome></page-chrome>\n\n<div class=\"layout\">\n  <page-nav></page-nav>\n  <main id=\"main-content\"></main>\n  <page-toc></page-toc>\n</div>\n\n<script>\n  window.addEventListener('DOMContentLoaded', function () {\n    OkuRenderer.autoBoot();\n  });\n</script>"
         },
         {
           "kind": "list",
@@ -1247,7 +1247,7 @@
                 "kind": "code",
                 "text": "<page-nav>"
               },
-              " — boxed site-tree at the top of the single left sidebar; reads site-manifest.json (or the inline window.__htmldocManifest in standalone builds). Marks the active page. Right-edge handle resizes / collapses. Footer at the bottom carries the kit version."
+              " — boxed site-tree at the top of the single left sidebar; reads site-manifest.json (or the inline window.__okuManifest in standalone builds). Marks the active page. Right-edge handle resizes / collapses. Footer at the bottom carries the kit version."
             ],
             [
               {

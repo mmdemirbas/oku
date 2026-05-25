@@ -1,12 +1,10 @@
 [project]
-# Project rename in flight (P8): the public name is "oku" (Turkish
-# imperative "read!"), but the package name on disk remains html_doc
-# until a coordinated 1.0 release ships. The console-script entry
-# below adds an "oku" command alongside "html-doc" so authors can
-# adopt the new name immediately without losing the legacy one.
-name = "html-doc"
-version = "0.2.0"
-description = "oku — shared HTML chrome kit + CLI. Standalone, theme-aware visual docs without a build step. (Distributed as html-doc until 1.0.)"
+# Project name is `oku` (Turkish imperative "read!"). Package lives at
+# src/oku/; the legacy `html-doc` console-script alias is preserved
+# through the 1.x sunset window so existing automation keeps working.
+name = "oku"
+version = "0.3.0"
+description = "oku — shared HTML chrome kit + CLI. Standalone, theme-aware visual docs without a build step."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Muhammed" }]
@@ -16,7 +14,7 @@ keywords = ["oku", "html", "docs", "static-site", "documentation"]
 # Runtime stays optional — the script tolerates a missing jsonschema
 # (validation is skipped, build still succeeds). uv-driven invocations
 # pull it in automatically via the PEP 723 inline metadata in
-# `bin/html-doc`; install-time users can opt in via the `schema` extra.
+# `bin/oku`; install-time users can opt in via the `schema` extra.
 dependencies = []
 
 [project.optional-dependencies]
@@ -37,18 +35,18 @@ dev = [
 Homepage = "https://github.com/mmdemirbas/html-doc"
 
 # `uv tool install .` (or `pip install .`) installs this as a console
-# script — both `oku` (preferred, 1.0 forward) and `html-doc`
-# (legacy compatibility) become available on PATH globally.
+# script — both `oku` (preferred) and `html-doc` (legacy alias)
+# become available on PATH globally.
 #
 # Sunset window for the html-doc alias (locked, see docs/roadmap.json):
-#   * 0.x and 1.0 — both names work, no warning.
-#   * 1.1         — html-doc emits a stderr deprecation note on each
-#                   invocation; the run still succeeds.
-#   * 2.0         — html-doc console-script removed; only `oku` remains.
+#   * 1.0 — both names work, no warning.
+#   * 1.1 — html-doc emits a stderr deprecation note on each
+#           invocation; the run still succeeds.
+#   * 2.0 — html-doc console-script removed; only `oku` remains.
 # Authors with existing automation should switch to `oku` before 2.0.
 [project.scripts]
-oku = "html_doc.cli:main"
-html-doc = "html_doc.cli:main"
+oku = "oku.cli:main"
+html-doc = "oku.cli:main"
 
 # Hatchling is the modern PEP 517 build backend — smaller surface than
 # setuptools, no implicit globbing, fast wheel builds. Build-time only;
@@ -58,24 +56,25 @@ requires = ["hatchling>=1.18"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/html_doc"]
+packages = ["src/oku"]
 
 # Pack the kit's runtime assets + shared registries (schema, glossary,
-# extrefs) under html_doc/assets/ in the installed wheel. The dev layout
-# at <repo>/kit/ mirrors the same shape; _kit_assets_dir() in cli.py
+# extrefs) under oku/assets/ in the installed wheel. The dev layout at
+# <repo>/kit/ mirrors the same shape; _kit_assets_dir() in cli.py
 # selects whichever exists.
 [tool.hatch.build.targets.wheel.force-include]
-"kit/chrome.css"      = "html_doc/assets/chrome.css"
-"kit/chrome.js"       = "html_doc/assets/chrome.js"
-"kit/chrome-boot.js"  = "html_doc/assets/chrome-boot.js"
-"kit/renderer.js"     = "html_doc/assets/renderer.js"
-"kit/schema"          = "html_doc/assets/schema"
-"kit/glossary"        = "html_doc/assets/glossary"
-"kit/extrefs"         = "html_doc/assets/extrefs"
+"kit/chrome.css"      = "oku/assets/chrome.css"
+"kit/chrome.js"       = "oku/assets/chrome.js"
+"kit/chrome-boot.js"  = "oku/assets/chrome-boot.js"
+"kit/renderer.js"     = "oku/assets/renderer.js"
+"kit/schema"          = "oku/assets/schema"
+"kit/glossary"        = "oku/assets/glossary"
+"kit/extrefs"         = "oku/assets/extrefs"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/html_doc",
+    "src/oku",
+    "bin/oku",
     "bin/html-doc",
     "kit/",
     "README.md",
@@ -89,6 +88,6 @@ line-length = 110
 target-version = "py310"
 
 [tool.pytest.ini_options]
-testpaths = ["src/html_doc_tests"]
+testpaths = ["src/oku_tests"]
 pythonpath = ["src"]
 addopts = "-ra --strict-markers"

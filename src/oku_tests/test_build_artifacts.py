@@ -13,10 +13,10 @@ from pathlib import Path
 
 import pytest
 
-from html_doc import cli
+from oku import cli
 
 
-# Sample HTML stub matching src/html_doc/templates/starter.html in shape.
+# Sample HTML stub matching src/oku/templates/starter.html in shape.
 SAMPLE_STUB = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -221,7 +221,7 @@ class TestBuildStandalone:
         cli.build_standalone(pages, out_dir, src_root)
         body = (out_dir / "index.html").read_text(encoding="utf-8")
         # autoBoot looks for this id; missing → standalone is dead on arrival.
-        assert 'id="__htmldoc_page__"' in body
+        assert 'id="__oku_page__"' in body
         assert "Body of Index" in body
 
     def test_escapes_closing_script_tag_in_json(self, tmp_path: Path) -> None:
@@ -256,7 +256,7 @@ class TestBuildStandalone:
         body = (out_dir / "tricky.html").read_text(encoding="utf-8")
         # The inlined JSON block should NOT contain a raw </script that
         # would terminate the surrounding inline script tag.
-        json_block_start = body.index('id="__htmldoc_page__"')
+        json_block_start = body.index('id="__oku_page__"')
         json_block_end = body.index("</script>", json_block_start)
         json_segment = body[json_block_start:json_block_end]
         assert "</script" not in json_segment
@@ -268,9 +268,9 @@ class TestBuildStandalone:
         pages = _scaffold_project(src_root, with_kit_json=True)
         cli.build_standalone(pages, out_dir, src_root)
         body = (out_dir / "index.html").read_text(encoding="utf-8")
-        # __htmldoc_kit_bundle__ surfaces when kit.json exists and the
+        # __oku_kit_bundle__ surfaces when kit.json exists and the
         # bundle has at least the kit block.
-        assert 'id="__htmldoc_kit_bundle__"' in body
+        assert 'id="__oku_kit_bundle__"' in body
 
     def test_preserves_nested_directory_structure(self, tmp_path: Path) -> None:
         src_root = tmp_path / "src"
@@ -292,9 +292,9 @@ class TestBuildStandalone:
 
 class TestKitAssetsResolver:
     def test_resolver_walks_up_through_src(self, repo_root: Path) -> None:
-        # The cli module lives at src/html_doc/cli.py; the resolver
+        # The cli module lives at src/oku/cli.py; the resolver
         # must walk up to the repo root to find <repo>/kit/ (not stop
-        # at src/ or html_doc/).
+        # at src/ or oku/).
         kit_dir = cli._kit_assets_dir()
         assert (kit_dir / "chrome.css").exists()
         assert (kit_dir / "chrome.js").exists()

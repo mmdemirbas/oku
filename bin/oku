@@ -5,11 +5,10 @@
 #     "jsonschema>=4.0",
 # ]
 # ///
-"""bin/oku — thin shim that runs html_doc.cli.main() without install.
+"""bin/oku — thin shim that runs oku.cli.main() without install.
 
-Same payload as bin/html-doc; this is the preferred name as the project
-rebrands to oku (Turkish imperative "read!"). The legacy bin/html-doc
-shim is kept for back-compat through the deprecation window.
+Preferred name. Same payload as the legacy bin/html-doc shim kept
+for back-compat through the 1.x sunset window.
 """
 
 import sys
@@ -18,7 +17,7 @@ from pathlib import Path
 _SRC = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(_SRC))
 
-from html_doc.cli import main  # noqa: E402  — sys.path adjustment must precede import
+from oku.cli import main  # noqa: E402  — sys.path adjustment must precede import
 
 if __name__ == "__main__":
     sys.exit(main())

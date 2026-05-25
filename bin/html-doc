@@ -5,23 +5,21 @@
 #     "jsonschema>=4.0",
 # ]
 # ///
-"""bin/html-doc — thin shim that runs html_doc.cli.main() without install.
+"""bin/html-doc — legacy shim; redirects to oku.cli.main() for back-compat.
 
-For installed use (`uv tool install .`), prefer the bare `html-doc`
-command on PATH. This shim exists for ad-hoc invocations from a clone
-of the repo when no install has happened: `uv run bin/html-doc serve`
-or plain `python3 bin/html-doc serve` both work. PEP 723 metadata
-pulls jsonschema into the ephemeral venv when invoked via uv.
+The project is now called `oku`; this shim keeps existing automation
+that calls `bin/html-doc <verb>` working through the 1.x sunset
+window. Prefer `bin/oku` (or the installed `oku` console script)
+for new invocations.
 """
 
 import sys
 from pathlib import Path
 
-# Make `src/html_doc` importable without needing the package installed.
 _SRC = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(_SRC))
 
-from html_doc.cli import main  # noqa: E402  — sys.path adjustment must precede import
+from oku.cli import main  # noqa: E402  — sys.path adjustment must precede import
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 
-from html_doc import cli
+from oku import cli
 
 
 # ---------- find_json_pages / find_html_files ----------
@@ -78,7 +78,7 @@ class TestBuildManifest:
         titles = {entry["title"] for entry in body["pages"]}
         assert titles == {"Alpha", "Beta"}
         # No .js companion — the runtime falls back to inline
-        # window.__htmldocManifest (shipped in every standalone HTML)
+        # window.__okuManifest (shipped in every standalone HTML)
         # or to a fresh fetch on each request.
         assert not (tmp_path / "site-manifest.js").exists()
 

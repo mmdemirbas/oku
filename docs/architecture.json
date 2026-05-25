@@ -22,7 +22,7 @@
         "Format: JSON tree → renderer.js walks it → Custom Element DOM → chrome.js attaches behavior.",
         "kit.json + per-domain glossary/extref JSON files are the registry; loaded once at page start, resolved per element.",
         "Visual Viewport API keeps fixed-position chrome buttons anchored during pinch-zoom on Safari.",
-        "Build pipeline (html-doc CLI) emits three single-purpose trees under dist/: standalone/ (self-contained HTMLs), site/ (multi-page + Pagefind + manifest), markdown/ (page.md twins + llms.txt)."
+        "Build pipeline (oku CLI) emits three single-purpose trees under dist/: standalone/ (self-contained HTMLs), site/ (multi-page + Pagefind + manifest), markdown/ (page.md twins + llms.txt)."
       ]
     },
     {
@@ -85,7 +85,7 @@
         {
           "kind": "diagram",
           "caption": "Custom Element class layout. Renderer instantiates these by tag; chrome.js owns their lifecycles.",
-          "source": "classDiagram\n  class HTMLElement\n  class HtmlDocChart {\n    +type, +title\n    +_extras\n    -_renderScatter() -_renderBar() -_renderDonut()\n    -_renderHeatmap() -_renderRidgeline() -_renderTreemap()\n    -_renderSankey() -_renderNetwork() -_renderChord()\n    -_renderGeo() -_renderScatterMatrix() -_renderParallelCoordinates()\n    -_wireInteractivity()\n    -_attachToolbar()\n  }\n  class HtmlDocDiagram {\n    -_loadMermaid()\n    -_render()\n    -_attachToolbar()\n  }\n  class HtmlDocLiveSnippet {\n    -iframe, -textarea\n    -_debouncedRender()\n  }\n  class HtmlDocAnnotatedCode {\n    -_injectMarkers()\n    -_injectSubstringMarks()\n    -_bindSync()\n    -_moveMarkersToSlots()\n  }\n  class GlossaryTerm\n  class ExtRef\n  class PageChrome\n  class PageNav\n  class PageToc\n  HTMLElement <|-- HtmlDocChart\n  HTMLElement <|-- HtmlDocDiagram\n  HTMLElement <|-- HtmlDocLiveSnippet\n  HTMLElement <|-- HtmlDocAnnotatedCode\n  HTMLElement <|-- GlossaryTerm\n  HTMLElement <|-- ExtRef\n  HTMLElement <|-- PageChrome\n  HTMLElement <|-- PageNav\n  HTMLElement <|-- PageToc"
+          "source": "classDiagram\n  class HTMLElement\n  class OkuChart {\n    +type, +title\n    +_extras\n    -_renderScatter() -_renderBar() -_renderDonut()\n    -_renderHeatmap() -_renderRidgeline() -_renderTreemap()\n    -_renderSankey() -_renderNetwork() -_renderChord()\n    -_renderGeo() -_renderScatterMatrix() -_renderParallelCoordinates()\n    -_wireInteractivity()\n    -_attachToolbar()\n  }\n  class OkuDiagram {\n    -_loadMermaid()\n    -_render()\n    -_attachToolbar()\n  }\n  class OkuLiveSnippet {\n    -iframe, -textarea\n    -_debouncedRender()\n  }\n  class OkuAnnotatedCode {\n    -_injectMarkers()\n    -_injectSubstringMarks()\n    -_bindSync()\n    -_moveMarkersToSlots()\n  }\n  class GlossaryTerm\n  class ExtRef\n  class PageChrome\n  class PageNav\n  class PageToc\n  HTMLElement <|-- OkuChart\n  HTMLElement <|-- OkuDiagram\n  HTMLElement <|-- OkuLiveSnippet\n  HTMLElement <|-- OkuAnnotatedCode\n  HTMLElement <|-- GlossaryTerm\n  HTMLElement <|-- ExtRef\n  HTMLElement <|-- PageChrome\n  HTMLElement <|-- PageNav\n  HTMLElement <|-- PageToc"
         },
         {
           "kind": "diagram",
@@ -219,12 +219,12 @@
             {
               "num": "2",
               "title": "Standalone check",
-              "content": "If the page has an inline __htmldoc_kit_bundle__ script (set by build_standalone), hydrate from it synchronously and skip all fetches."
+              "content": "If the page has an inline __oku_kit_bundle__ script (set by build_standalone), hydrate from it synchronously and skip all fetches."
             },
             {
               "num": "3",
               "title": "Standalone-but-no-bundle",
-              "content": "If __htmldoc_page__ is present but no bundle (i.e., handwritten standalone), resolve with an empty kit — tooltips degrade to plain text rather than showing 'Unknown term' for everything."
+              "content": "If __oku_page__ is present but no bundle (i.e., handwritten standalone), resolve with an empty kit — tooltips degrade to plain text rather than showing 'Unknown term' for everything."
             },
             {
               "num": "4",
@@ -244,7 +244,7 @@
         {
           "kind": "code",
           "language": "js",
-          "source": "// chrome.js — runs once at module init\nvar __htmldocDocsRoot = (function () {\n  var refs = document.querySelectorAll('link[href*=\"_kit/\"], script[src*=\"_kit/\"]');\n  for (var i = 0; i < refs.length; i++) {\n    var url = refs[i].href || refs[i].src;\n    var idx = url.indexOf('/_kit/');\n    if (idx >= 0) return url.slice(0, idx + 1);  // ends with /\n  }\n  return new URL('.', window.location.href).href;  // fallback\n})();"
+          "source": "// chrome.js — runs once at module init\nvar __okuDocsRoot = (function () {\n  var refs = document.querySelectorAll('link[href*=\"_kit/\"], script[src*=\"_kit/\"]');\n  for (var i = 0; i < refs.length; i++) {\n    var url = refs[i].href || refs[i].src;\n    var idx = url.indexOf('/_kit/');\n    if (idx >= 0) return url.slice(0, idx + 1);  // ends with /\n  }\n  return new URL('.', window.location.href).href;  // fallback\n})();"
         },
         {
           "kind": "paragraph",
@@ -292,7 +292,7 @@
               "if jsonschema is installed, validate every page against schema/page.schema.json; print errors with field paths. Structural lint runs regardless of jsonschema."
             ],
             [
-              "build_standalone: for each page, inline chrome.css + chrome.js + renderer.js + page JSON + kit bundle + window.__htmldocManifest seed into a single self-contained HTML. No external dependencies beyond Google Fonts and Mermaid CDN (when used)."
+              "build_standalone: for each page, inline chrome.css + chrome.js + renderer.js + page JSON + kit bundle + window.__okuManifest seed into a single self-contained HTML. No external dependencies beyond Google Fonts and Mermaid CDN (when used)."
             ],
             [
               "build_site: copy every HTML stub + sibling JSON into dist/site/<rel-path>; copy _kit/ as dist/site/_kit/ once; embed extracted text via hidden data-pagefind-body div for indexing."
@@ -319,7 +319,7 @@
         {
           "kind": "code",
           "language": "html",
-          "source": "<!-- dist/standalone/page.html — near the closing </body> -->\n<script type=\"application/json\" id=\"__htmldoc_page__\">{ ... page tree ... }</script>\n<script type=\"application/json\" id=\"__htmldoc_kit_bundle__\">{\n  \"kit\": { \"domains\": [\"data-platforms\", ...], \"lang\": \"en\", ... },\n  \"glossary\": { \"data-platforms\": { \"ACID\": { ... } }, ... },\n  \"extrefs\":  { \"data-platforms\": { ... }, ... }\n}</script>"
+          "source": "<!-- dist/standalone/page.html — near the closing </body> -->\n<script type=\"application/json\" id=\"__oku_page__\">{ ... page tree ... }</script>\n<script type=\"application/json\" id=\"__oku_kit_bundle__\">{\n  \"kit\": { \"domains\": [\"data-platforms\", ...], \"lang\": \"en\", ... },\n  \"glossary\": { \"data-platforms\": { \"ACID\": { ... } }, ... },\n  \"extrefs\":  { \"data-platforms\": { ... }, ... }\n}</script>"
         },
         {
           "kind": "callout",
@@ -359,13 +359,13 @@
           "kind": "callout",
           "type": "note",
           "title": "Boot stamp",
-          "content": "chrome.js console.info()s <code>[html-doc] kit boot · build=&lt;date&gt; · docsRoot=… · authToken=yes/no</code> at startup. Bump <code>__htmldocKitBuild</code> whenever a compatibility-affecting change ships so a stale-cache user can confirm from DevTools whether their browser is on the right chrome.js."
+          "content": "chrome.js console.info()s <code>[oku] kit boot · build=&lt;date&gt; · docsRoot=… · authToken=yes/no</code> at startup. Bump <code>__okuKitBuild</code> whenever a compatibility-affecting change ships so a stale-cache user can confirm from DevTools whether their browser is on the right chrome.js."
         },
         {
           "kind": "callout",
           "type": "note",
           "title": "IntelliJ _ijt token propagation",
-          "content": "chrome-boot.js plucks <code>_ijt</code> from <code>window.location.search</code> and exposes <code>window.__htmldocWithAuth(url)</code> that appends it to internal asset URLs (same-origin only — CDN URLs stay untouched). chrome.js and renderer.js wrap every fetch and script-src load through it so IntelliJ's built-in server stops 404'ing sub-resource requests."
+          "content": "chrome-boot.js plucks <code>_ijt</code> from <code>window.location.search</code> and exposes <code>window.__okuWithAuth(url)</code> that appends it to internal asset URLs (same-origin only — CDN URLs stay untouched). chrome.js and renderer.js wrap every fetch and script-src load through it so IntelliJ's built-in server stops 404'ing sub-resource requests."
         }
       ],
       "id": "internal-architecture-notes"

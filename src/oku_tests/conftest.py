@@ -1,6 +1,6 @@
 """Shared fixtures.
 
-The src/html_doc/ package layout is picked up via pythonpath in
+The src/oku/ package layout is picked up via pythonpath in
 pyproject.toml ([tool.pytest.ini_options]). No sys.path mangling needed.
 """
 
@@ -12,14 +12,14 @@ from pathlib import Path
 import pytest
 
 
-# conftest.py lives at <repo>/src/html_doc_tests/conftest.py — three
+# conftest.py lives at <repo>/src/oku_tests/conftest.py — three
 # parents up reaches the repo root.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(scope="session")
 def repo_root() -> Path:
-    """Path to the html-doc repo root."""
+    """Path to the oku repo root."""
     return REPO_ROOT
 
 

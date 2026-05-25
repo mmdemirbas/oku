@@ -1,4 +1,4 @@
-/* html-doc · chrome-boot.js
+/* oku · chrome-boot.js
  * Synchronous pre-paint init: sets theme before body renders.
  * Must be the FIRST script in <head>, loaded synchronously (no defer/async).
  * Reads localStorage: 'theme-pref' (light|dark|absent=system).
@@ -6,7 +6,7 @@
  * 'sidebarCollapsed'). The first-visit default is EXPANDED so a new
  * visitor sees the site tree — chrome.js only applies the collapsed
  * class when the key is explicitly '1'.
- * Also exposes window.__htmldocWithAuth() so chrome.js + renderer.js can
+ * Also exposes window.__okuWithAuth() so chrome.js + renderer.js can
  * propagate IntelliJ's _ijt token to internal asset URLs before either
  * deferred script executes.
  */
@@ -33,7 +33,7 @@
     var m = (window.location.search || '').match(/[?&]_ijt=([^&]+)/);
     if (m) authParam = '_ijt=' + m[1];
   } catch (e) { /* ignore */ }
-  window.__htmldocWithAuth = function (url) {
+  window.__okuWithAuth = function (url) {
     if (!authParam || !url) return url;
     if (url.charAt(0) === '#' || url.indexOf('javascript:') === 0) return url;
     // Absolute URL with scheme — only append for same-origin (don't taint
