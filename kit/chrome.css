@@ -4228,12 +4228,43 @@ oku-chart .okc-scatter-matrix .okc-sm-cell {
   fill: var(--surface);
   stroke: var(--border);
   stroke-width: 0.5;
+  cursor: pointer;
+  transition: fill 0.12s ease, stroke 0.12s ease;
+}
+oku-chart .okc-scatter-matrix .okc-sm-cell:hover,
+oku-chart .okc-scatter-matrix .okc-sm-cell:focus-visible {
+  fill: var(--surface-2);
+  stroke: var(--accent);
+  outline: none;
+}
+/* Diagonal cells label the axis — quieter background since no
+   data plot. */
+oku-chart .okc-scatter-matrix .okc-sm-cell-diag {
+  fill: var(--surface-2);
+  cursor: default;
+}
+oku-chart .okc-scatter-matrix .okc-sm-cell-diag:hover {
+  fill: var(--surface-2);
+  stroke: var(--border);
 }
 oku-chart .okc-scatter-matrix .okc-sm-label {
   fill: var(--text);
   font: 600 12px 'Inter', sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+/* Correlation coefficient chip in each off-diagonal cell. Faint
+   when weak (|r| < 0.7), accent-strong when the relationship
+   reaches the conventional "strong" threshold so the matrix
+   reads as a heatmap of strength at a glance. */
+oku-chart .okc-scatter-matrix .okc-sm-corr {
+  fill: var(--text-faint);
+  font: 500 9.5px 'JetBrains Mono', ui-monospace, monospace;
+  pointer-events: none;
+}
+oku-chart .okc-scatter-matrix .okc-sm-corr.strong {
+  fill: var(--accent-strong);
+  font-weight: 700;
 }
 
 /* Parallel-coordinates — multi-axis polylines. */

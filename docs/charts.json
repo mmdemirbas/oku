@@ -2149,7 +2149,13 @@
         },
         {
           "kind": "paragraph",
-          "content": "N×N grid of mini scatter plots for multivariate correlation reading. <code>variables[]</code> defines each axis; <code>records[]</code> is a flat list of objects keyed by variable id. The diagonal cells show the variable name; off-diagonal cells plot var-col vs var-row. Domains auto-derive from the records unless declared explicitly."
+          "content": "N×N grid of mini scatter plots for multivariate correlation reading. <code>variables[]</code> defines each axis; <code>records[]</code> is a flat list of objects keyed by variable id. Domains auto-derive from the records unless declared explicitly."
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "title": "How to read it",
+          "content": "Diagonal cells (top-left to bottom-right) label each variable. Off-diagonal cells plot the column-variable on X against the row-variable on Y. Each cell carries an <code>r=</code> chip in its top-left — Pearson correlation between the two variables (-1 to +1). Values where <code>|r| ≥ 0.7</code> show in accent-strong: those are the strong relationships worth investigating. Hover any off-diagonal cell to see the pair, n, and r in a tooltip; click to pin."
         },
         {
           "kind": "example",

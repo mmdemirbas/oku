@@ -3833,8 +3833,25 @@ class OkuChart extends HTMLElement {
     var plotW = W - pad * 2, plotH = H - pad * 2;
     function px(i) { return pad + (values.length === 1 ? plotW / 2 : (i / (values.length - 1)) * plotW); }
     function py(v) { return pad + plotH - ((v - minV) / (maxV - minV)) * plotH; }
+    // Summary stats for the rich-hover tooltip — min / max / first /
+    // last / mean. The cursor handles per-point readout via
+    // _wireSparklineCursor; the tooltip on the SVG host covers the
+    // overall-shape summary that the cursor can't.
+    var sumV = 0;
+    for (var sIdx = 0; sIdx < values.length; sIdx++) sumV += values[sIdx];
+    var sparkPayload = JSON.stringify({
+      label: this._title || 'sparkline',
+      kv: [
+        { k: 'min',   v: fmtNum(minV) },
+        { k: 'max',   v: fmtNum(maxV) },
+        { k: 'first', v: fmtNum(values[0]) },
+        { k: 'last',  v: fmtNum(values[values.length - 1]) },
+        { k: 'mean',  v: fmtNum(sumV / values.length) },
+        { k: 'n',     v: String(values.length) }
+      ]
+    });
     var parts = [];
-    parts.push('<span class="okc-sparkline-row"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'sparkline') + '" class="okc-svg okc-sparkline">');
+    parts.push('<span class="okc-sparkline-row"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'sparkline') + '" class="okc-svg okc-sparkline" tabindex="0" data-hover-payload="' + escapeXml(sparkPayload) + '">');
     if (variant === 'bar') {
       var barW = plotW / values.length - 1;
       for (var bi = 0; bi < values.length; bi++) {
@@ -4518,7 +4535,25 @@ class OkuChart extends HTMLElement {
       pathPts.push('M ' + pad.left + ' ' + baseY);
       counts.forEach(function (cnt, bi) { pathPts.push('L ' + sx(bi).toFixed(1) + ' ' + sy(cnt).toFixed(1)); });
       pathPts.push('L ' + (pad.left + plotW) + ' ' + baseY + ' Z');
-      parts.push('<path d="' + pathPts.join(' ') + '" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-ridgeline-curve"/>');
+      // Summary stats for the rich-hover tooltip — n / min / max /
+      // mean / median per distribution. The parallel cursor handles
+      // "value at pointer"; this tooltip covers the whole-row
+      // summary the cursor can't.
+      var vs = (d.values || []).map(Number).filter(function (n) { return !isNaN(n); }).sort(function (a, b) { return a - b; });
+      var sum = vs.reduce(function (s, n) { return s + n; }, 0);
+      var mean = vs.length ? sum / vs.length : 0;
+      var median = vs.length ? (vs.length % 2 ? vs[(vs.length - 1) / 2] : (vs[vs.length / 2 - 1] + vs[vs.length / 2]) / 2) : 0;
+      var ridgePayload = JSON.stringify({
+        label: d.label || ('distribution ' + (i + 1)),
+        kv: [
+          { k: 'n',       v: String(vs.length) },
+          { k: 'min',     v: fmtNum(vs.length ? vs[0] : 0) },
+          { k: 'median',  v: fmtNum(median) },
+          { k: 'mean',    v: fmtNum(mean) },
+          { k: 'max',     v: fmtNum(vs.length ? vs[vs.length - 1] : 0) }
+        ]
+      });
+      parts.push('<path d="' + pathPts.join(' ') + '" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-ridgeline-curve" tabindex="0" data-hover-payload="' + escapeXml(ridgePayload) + '"><title>' + escapeXml((d.label || 'distribution') + ': n=' + vs.length + ', median=' + fmtNum(median)) + '</title></path>');
       parts.push('<text x="' + (pad.left - 10) + '" y="' + (baseY - 2) + '" text-anchor="end" class="okc-ridgeline-label">' + escapeXml(d.label || '') + '</text>');
     });
     // X axis ticks (5).
@@ -4884,28 +4919,70 @@ class OkuChart extends HTMLElement {
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + (titleTop + H + 12) + '" role="img" aria-label="' + escapeXml(this._title || 'Scatter matrix') + '" class="okc-svg okc-scatter-matrix">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Pearson correlation per off-diagonal pair, used both in the
+    // hover payload and in the on-cell text annotation so the reader
+    // sees the strength of the relationship without leaving the
+    // scatter matrix.
+    function correlation(xs, ys) {
+      var n = xs.length;
+      if (n < 2) return 0;
+      var mx = 0, my = 0;
+      for (var k = 0; k < n; k++) { mx += xs[k]; my += ys[k]; }
+      mx /= n; my /= n;
+      var num = 0, dx = 0, dy = 0;
+      for (var k2 = 0; k2 < n; k2++) {
+        var ex = xs[k2] - mx, ey = ys[k2] - my;
+        num += ex * ey; dx += ex * ex; dy += ey * ey;
+      }
+      var denom = Math.sqrt(dx * dy);
+      return denom > 0 ? num / denom : 0;
+    }
     for (var i = 0; i < n; i++) {
       for (var j = 0; j < n; j++) {
         var cx = pad + j * cell;
         var cy = titleTop + i * cell;
-        // Frame.
-        parts.push('<rect x="' + cx + '" y="' + cy + '" width="' + cell + '" height="' + cell + '" class="okc-sm-cell"/>');
         if (i === j) {
-          // Diagonal: variable label.
+          // Diagonal: variable label on a quiet frame.
+          parts.push('<rect x="' + cx + '" y="' + cy + '" width="' + cell + '" height="' + cell + '" class="okc-sm-cell okc-sm-cell-diag"/>');
           parts.push('<text x="' + (cx + cell / 2) + '" y="' + (cy + cell / 2 + 4) + '" text-anchor="middle" class="okc-sm-label">' + escapeXml(vars[i].label || vars[i].key) + '</text>');
           continue;
         }
         var vx = vars[j], vy = vars[i];
         var rangeX = (vx._hi - vx._lo) || 1;
         var rangeY = (vy._hi - vy._lo) || 1;
+        // Collect aligned x/y values for correlation + plotting.
+        var xs = [], ys = [];
         records.forEach(function (r) {
           var xv = +r[vx.key], yv = +r[vy.key];
           if (isNaN(xv) || isNaN(yv)) return;
-          var px = cx + ((xv - vx._lo) / rangeX) * (cell - 6) + 3;
-          var py = cy + cell - ((yv - vy._lo) / rangeY) * (cell - 6) - 3;
-          var color = palette[r._color] || palette.accent;
-          parts.push('<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="1.6" fill="' + color + '" fill-opacity="0.7"/>');
+          xs.push(xv); ys.push(yv);
         });
+        var corr = correlation(xs, ys);
+        // Off-diagonal frame becomes the hover anchor — the rich
+        // tooltip lists the variable pair, the correlation, and the
+        // point count.
+        var smPayload = JSON.stringify({
+          label: (vx.label || vx.key) + ' vs ' + (vy.label || vy.key),
+          kv: [
+            { k: 'x-axis',      v: vx.label || vx.key },
+            { k: 'y-axis',      v: vy.label || vy.key },
+            { k: 'n',           v: String(xs.length) },
+            { k: 'correlation', v: corr.toFixed(2) }
+          ]
+        });
+        parts.push('<rect x="' + cx + '" y="' + cy + '" width="' + cell + '" height="' + cell + '" class="okc-sm-cell" tabindex="0" data-hover-payload="' + escapeXml(smPayload) + '"><title>' + escapeXml((vx.label || vx.key) + ' vs ' + (vy.label || vy.key) + ' · r=' + corr.toFixed(2) + ' · n=' + xs.length) + '</title></rect>');
+        // Plot the dots.
+        for (var pi = 0; pi < xs.length; pi++) {
+          var rec = records[pi] || {};
+          var px = cx + ((xs[pi] - vx._lo) / rangeX) * (cell - 6) + 3;
+          var py = cy + cell - ((ys[pi] - vy._lo) / rangeY) * (cell - 6) - 3;
+          var color = palette[rec._color] || palette.accent;
+          parts.push('<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="1.8" fill="' + color + '" fill-opacity="0.78" class="okc-sm-dot" pointer-events="none"/>');
+        }
+        // Correlation chip in the cell's top-left — accent-tinted
+        // when |r| > 0.7 so strong relationships pop out.
+        var strong = Math.abs(corr) >= 0.7;
+        parts.push('<text x="' + (cx + 6) + '" y="' + (cy + 14) + '" class="okc-sm-corr' + (strong ? ' strong' : '') + '">r=' + corr.toFixed(2) + '</text>');
       }
     }
     parts.push('</svg>');
@@ -5231,15 +5308,38 @@ class OkuChart extends HTMLElement {
         run: function () {
           var svg = self.querySelector('.okc-svg');
           if (!svg || !window.__okuLightbox) return;
-          var copy = svg.cloneNode(true);
-          // The cloned SVG has the chart's intrinsic dimensions; let the
-          // lightbox CSS scale it via max-width/max-height + viewBox so
-          // it fills the modal without overflowing.
-          copy.removeAttribute('width');
-          copy.removeAttribute('height');
-          copy.style.width = '100%';
-          copy.style.height = 'auto';
-          __okuLightbox.open(copy, { title: chartTitle });
+          // Move (not clone) the live SVG into the lightbox so the
+          // chart's hover / pin / cross-series interactivity travels
+          // with it — cloneNode strips all event listeners and any
+          // pinned-tooltip state. A placeholder marker takes the
+          // SVG's place inline so the host's layout doesn't collapse;
+          // the onClose callback returns the SVG to its origin.
+          var placeholder = document.createComment('okc-fullscreen-placeholder');
+          var origWidth = svg.getAttribute('width');
+          var origHeight = svg.getAttribute('height');
+          var origStyleWidth = svg.style.width;
+          var origStyleHeight = svg.style.height;
+          svg.parentNode.insertBefore(placeholder, svg);
+          svg.removeAttribute('width');
+          svg.removeAttribute('height');
+          svg.style.width = '100%';
+          svg.style.height = 'auto';
+          __okuLightbox.open(svg, {
+            title: chartTitle,
+            onClose: function () {
+              // Restore inline-size attributes + put the SVG back
+              // exactly where it came from. The placeholder marker
+              // is removed once the SVG is reinserted.
+              if (origWidth !== null && origWidth !== undefined) svg.setAttribute('width', origWidth);
+              if (origHeight !== null && origHeight !== undefined) svg.setAttribute('height', origHeight);
+              svg.style.width = origStyleWidth || '';
+              svg.style.height = origStyleHeight || '';
+              if (placeholder.parentNode) {
+                placeholder.parentNode.insertBefore(svg, placeholder);
+                placeholder.parentNode.removeChild(placeholder);
+              }
+            }
+          });
         }
       }
     ]);
