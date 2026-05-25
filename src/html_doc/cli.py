@@ -1702,7 +1702,7 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
     for p, data in pages:
         rel = p.relative_to(root)
         nav_path = rel.with_suffix(".html").as_posix()
-        parent = rel.parent.as_posix() if rel.parent != Path(".") else None
+        path_parent = rel.parent.as_posix() if rel.parent != Path(".") else None
         meta = data.get("meta") or {}
         # `p` is always a .json virtual path. For .md-derived pages the
         # .json file doesn't exist on disk; the real source is the
@@ -1713,6 +1713,11 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
             md_sibling = p.with_suffix(".md")
             if md_sibling.exists():
                 source_rel = md_sibling.relative_to(root)
+        # parent comes from one of (in priority): meta.parent (author
+        # opt-in to logical nesting, e.g. charts.json under
+        # reference), then the actual folder path. Lets a flat docs
+        # tree still represent a hierarchical nav.
+        parent = meta.get("parent", path_parent)
         entry = {
             "path": nav_path,
             "source": source_rel.as_posix(),

@@ -1286,9 +1286,11 @@ function initReadingAids() {
       headers.forEach(function (h, i) {
         opts.push('<option value="' + i + '">' + escapeXml(stripHtml0(h) || ('Column ' + (i + 1))) + '</option>');
       });
+      // No visible 'Group:' label — the dropdown's first option says
+      // "— no grouping —" and the aria-label gives screen readers
+      // the context. Saves toolbar width on narrow viewports.
       groupByHTML =
         '<label class="hdt-groupby">' +
-          '<span class="hdt-groupby-label" aria-hidden="true">Group:</span>' +
           '<select class="hdt-groupby-select" aria-label="Group by column">' + opts.join('') + '</select>' +
         '</label>';
     }
@@ -1322,14 +1324,20 @@ function initReadingAids() {
       '</span>' +
       '<span class="hdt-ctrl-sep" aria-hidden="true"></span>'
     ) : '';
+    // Order: filter → stats → view-toggle → expand → groupby.
+    // Wrapping break-points follow DOM order, so when the toolbar
+    // is too narrow to fit everything on one line, groupby is the
+    // last item and breaks to the second line first. View-toggle +
+    // expand stay on the first line, right-aligned via
+    // justify-content: flex-end on .hdt-table-controls.
     ctrl.innerHTML =
       filterInputHTML +
       statsHTML +
-      groupByHTML +
       viewBtns +
       '<button data-expand type="button" aria-pressed="false" title="Toggle full-width / fit to column">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
-      '</button>';
+      '</button>' +
+      groupByHTML;
 
     var scroll = document.createElement('div');
     scroll.className = 'hdt-table-scroll';
@@ -5908,11 +5916,36 @@ var __mermaidLoader = (function () {
         // State / class
         stateBkg:         surface,
         stateBorder:      accent,
+        // Text colour on state-diagram labels — Mermaid defaults to
+        // a white-ish stateLabelColor that's invisible against our
+        // light surface. Pin to --text so it tracks the theme.
+        stateLabelColor:  text,
+        labelColor:       text,
         altBackground:    surface2,
         compositeBackground: surface2,
         compositeBorder:  border,
         compositeTitleBackground: bg,
         innerEndBackground: textSoft,
+        // ER / class diagram colours — same family so the tokens
+        // stay consistent.
+        attributeBackgroundColorPrimary: surface,
+        attributeBackgroundColorSecondary: surface2,
+        classText:        text,
+        relationColor:    textSoft,
+        relationLabelColor: text,
+        // Mindmap / timeline / journey
+        cScale0: accent,
+        cScale1: '#b45309',
+        cScale2: '#4338ca',
+        cScale3: '#15803d',
+        cScale4: '#be185d',
+        cScale5: '#0369a1',
+        cScaleLabel0: text,
+        cScaleLabel1: text,
+        cScaleLabel2: text,
+        cScaleLabel3: text,
+        cScaleLabel4: text,
+        cScaleLabel5: text,
         // Gantt
         gridColor:        border,
         sectionBkgColor:  surface2,
@@ -5981,6 +6014,19 @@ class HtmlDocDiagram extends HTMLElement {
         var id = 'hdd-' + Math.random().toString(36).slice(2, 9);
         return mermaid.render(id, src).then(function (out) {
           renderHost.innerHTML = out.svg;
+          // Strip Mermaid's intrinsic width/height + inline style so
+          // CSS width:100% / height:auto can fit the SVG to the
+          // container instead of clipping when the column is narrower
+          // than Mermaid's natural render size.
+          var svg = renderHost.querySelector('svg');
+          if (svg) {
+            svg.removeAttribute('width');
+            svg.removeAttribute('height');
+            svg.style.removeProperty('max-width');
+            svg.style.removeProperty('width');
+            svg.style.removeProperty('height');
+            svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+          }
           self._rendered = true;
           self._attachToolbar();
         });
@@ -5989,11 +6035,9 @@ class HtmlDocDiagram extends HTMLElement {
         // Stable id so the warning panel can jump-link back here.
         if (!self.id) self.id = 'hdd-error-' + Math.random().toString(36).slice(2, 9);
         var raw = String((err && err.message) || err);
-        // Mermaid otherwise stamps a half-rendered SVG carrying
-        // "Syntax error in text mermaid version X" — replace the
-        // render surface with our own card so the framework noise
-        // doesn't leak through. The toolbar's source toggle still
-        // lets the reader inspect the offending source.
+        // Replace our own render surface with our error card so the
+        // framework noise doesn't leak through. The toolbar's source
+        // toggle still lets the reader inspect the offending source.
         renderHost.classList.add('hdd-error');
         renderHost.innerHTML =
           '<div class="hdd-error-card" role="alert">' +
@@ -6015,6 +6059,21 @@ class HtmlDocDiagram extends HTMLElement {
             target: '#' + self.id
           }]
         }));
+        // Mermaid v10 leaves an orphan error-svg attached to <body>
+        // when render() throws. The id is "id" we passed in or the
+        // mermaid-generated equivalent — remove any svg whose id
+        // starts with the prefix we used, plus generic mermaid-error
+        // classes that the framework stamps. Polled briefly because
+        // the error svg may be appended after our catch handler runs.
+        function purgeOrphanMermaidErrors() {
+          document.querySelectorAll('body > svg[id^="hdd-"], body > .mermaid-error, body > svg[id^="d"][aria-roledescription="error"]').forEach(function (n) {
+            // Only nuke svgs that aren't INSIDE our diagram host.
+            if (!n.closest('html-doc-diagram')) n.remove();
+          });
+        }
+        purgeOrphanMermaidErrors();
+        setTimeout(purgeOrphanMermaidErrors, 50);
+        setTimeout(purgeOrphanMermaidErrors, 250);
       });
   }
   _attachToolbar() {

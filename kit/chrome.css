@@ -1093,15 +1093,28 @@ code:not(pre code) {
   gap: 4px;
   align-items: center;
   justify-content: flex-end;
-  /* Allow secondary rows when the cumulative width of filter + stats +
-     groupby + view buttons + expand exceeds the wrap's inner width.
-     Without wrapping, justify-content: flex-end pushes overflow off
-     the START edge, putting the filter outside the table border. */
+  /* Allow secondary rows when the cumulative width of filter + stats
+     + view buttons + expand + groupby exceeds the wrap's inner
+     width. Without wrapping, justify-content: flex-end pushes
+     overflow off the START edge, putting the filter outside the
+     table border.
+     DOM order: filter → stats → view-toggle → expand → groupby.
+     groupby is LAST in DOM so the wrap break drops it (and only
+     it) to a second line. CSS order puts groupby visually between
+     stats and view-toggle when everything fits on one line. */
   flex-wrap: wrap;
   margin-bottom: 8px;
   opacity: 0.45;
   transition: opacity 0.18s ease;
 }
+.hdt-table-controls .hdt-filter   { order: 0; }
+.hdt-table-controls .hdt-stats    { order: 1; }
+.hdt-table-controls .hdt-groupby  { order: 2; }
+.hdt-table-controls .hdt-view-group { order: 3; }
+.hdt-table-controls [data-expand]  { order: 4; }
+/* When groupby wraps to a new line, push it to the LEFT edge
+   instead of inheriting justify-content: flex-end. */
+.hdt-table-controls .hdt-groupby { margin-right: auto; }
 .hdt-table-wrap:hover .hdt-table-controls,
 .hdt-table-wrap:focus-within .hdt-table-controls { opacity: 1; }
 .hdt-table-controls button {
@@ -3741,8 +3754,27 @@ html-doc-diagram {
   padding: 16px;
   position: relative;
 }
-html-doc-diagram .hdd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; }
-html-doc-diagram .hdd-render svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+html-doc-diagram .hdd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; overflow: visible; }
+html-doc-diagram .hdd-render svg {
+  display: block;
+  /* width:100% + height:auto + max-width:100% combine so the SVG
+     scales to the container regardless of intrinsic width attrs
+     Mermaid stamps on the element. Width attr is overridden so a
+     1400px-wide flowchart fits a 720px column. */
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  margin: 0 auto;
+}
+/* Fullscreen lightbox: let the diagram grow to fill the pan/zoom
+   stage. The SVG keeps aspect ratio via viewBox. */
+.hdt-lightbox-pz html-doc-diagram .hdd-render svg,
+.hdt-lightbox-content html-doc-diagram .hdd-render svg {
+  width: 100%;
+  height: auto;
+  max-width: none;
+  max-height: 100%;
+}
 html-doc-diagram .hdd-fallback {
   background: var(--surface-2);
   padding: 12px;
@@ -4007,7 +4039,11 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
-  align-items: stretch;
+  /* Each column lays out from the top — the rendered block keeps
+     its natural height instead of stretching to match the source
+     column. Was stretch; the visual side ended up edge-anchored
+     (bars / kpi tiles spread far apart vertically). */
+  align-items: start;
   margin: 18px 0 26px 0;
   border: 1px solid var(--border-soft);
   border-radius: 12px;
@@ -4035,18 +4071,16 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
   color: var(--text-soft);
   margin-bottom: 6px;
 }
-/* Source <pre> + the rendered block fill the column. The label sits
-   at the top with a small bottom margin; the body (second flex
-   child) explicitly resets ITS top margin so flex column gaps
-   don't double up against the label. Both columns hit the same
-   visual baseline — no more 'render starts lower' offset. */
+/* Each column's content sits at the top, natural height. The label
+   has a small bottom margin; the body (second flex child) explicitly
+   resets its top margin so the flex column gap doesn't double up
+   against the label. Stretch was retired — visual primitives rendered
+   edge-anchored (bars + tiles ballooned vertically). */
 .example-pair .example-code > pre,
 .example-pair .example-render > :not(.example-col-label) {
   margin-top: 0 !important;
-  flex: 1;
-  min-height: 0;
+  margin-bottom: 0;
 }
-.example-pair .example-code > pre { margin-bottom: 0; }
 @media (max-width: 900px) {
   .example-pair { grid-template-columns: 1fr; }
 }

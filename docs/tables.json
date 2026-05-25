@@ -8,8 +8,9 @@
     "eyebrow": "Reference · tables",
     "subtitle": "table primitive — flat rows, grouped rows, chip filters, board / kanban view, sticky headers, column resize.",
     "audience": "Author",
-    "order": 23,
-    "summary": "table primitive — flat rows, grouped rows, chip filters, board / kanban view, sticky headers, column resize."
+    "order": 22,
+    "summary": "table primitive — flat rows, grouped rows, chip filters, board / kanban view, sticky headers, column resize.",
+    "parent": "reference"
   },
   "blocks": [
     {
