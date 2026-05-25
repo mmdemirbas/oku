@@ -362,8 +362,9 @@
         q.textContent = JSON.stringify(block.quadrants);
         el.appendChild(q);
       }
-      // Donut slices: separate payload from `series`.
-      if (type === 'donut' && Array.isArray(block.slices)) {
+      // Donut / pie slices: separate payload from `series` (both share
+      // the renderer; pie is just rInner=0).
+      if ((type === 'donut' || type === 'pie') && Array.isArray(block.slices)) {
         const d = document.createElement('script');
         d.type = 'application/json';
         d.setAttribute('data-extras', 'slices');

@@ -3797,6 +3797,16 @@ oku-diagram .okd-render svg {
   max-width: 100%;
   margin: 0 auto;
 }
+/* Clamp text size inside Mermaid SVGs so state / mindmap diagrams
+   don't render their few labels at 30px+. Mermaid's `fontSize`
+   init option doesn't propagate to every diagram type; the CSS
+   floor catches the rest. Lightbox view (below) lifts the cap so
+   the fullscreen reader can read at full size. */
+oku-diagram .okd-render svg text,
+oku-diagram .okd-render svg foreignObject,
+oku-diagram .okd-render svg foreignObject span {
+  font-size: 13px !important;
+}
 /* Fullscreen lightbox: let the diagram grow to fill the pan/zoom
    stage. The SVG keeps aspect ratio via viewBox. */
 .okt-lightbox-pz oku-diagram .okd-render svg,
@@ -3805,6 +3815,14 @@ oku-diagram .okd-render svg {
   height: auto;
   max-width: none;
   max-height: 100%;
+}
+/* Drop the inline clamp inside the lightbox — the reader opened the
+   fullscreen view explicitly, so text should scale with the SVG. */
+.okt-lightbox-pz oku-diagram .okd-render svg text,
+.okt-lightbox-content oku-diagram .okd-render svg text,
+.okt-lightbox-pz oku-diagram .okd-render svg foreignObject,
+.okt-lightbox-content oku-diagram .okd-render svg foreignObject {
+  font-size: inherit !important;
 }
 oku-diagram .okd-fallback {
   background: var(--surface-2);

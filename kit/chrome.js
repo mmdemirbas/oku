@@ -969,8 +969,14 @@ function initReadingAids() {
   (function () {
     if (!navigator.clipboard) return;
     document.querySelectorAll('pre').forEach(function (pre) {
+      // Skip pres inside Custom Elements that render their own
+      // toolbar (charts, diagrams, snippets, tooltip popovers). The
+      // closest() check inside _hdtEnsurePreHost already bails by
+      // returning the original parent without wrapping; detect that
+      // case here and skip attaching the copy button.
+      if (pre.closest('oku-chart, oku-diagram, oku-snippet, .oku-tooltip')) return;
       var host = _hdtEnsurePreHost(pre);
-      if (!host || host === pre.parentNode === false) return;
+      if (!host) return;
       if (host.querySelector(':scope > .copy-btn')) return;
       var btn = document.createElement('button');
       btn.className = 'copy-btn';
@@ -3673,15 +3679,27 @@ class OkuChart extends HTMLElement {
       var y1 = cy + rOuter * Math.sin(angleStart);
       var x2 = cx + rOuter * Math.cos(angleEnd);
       var y2 = cy + rOuter * Math.sin(angleEnd);
-      var ix1 = cx + rInner * Math.cos(angleEnd);
-      var iy1 = cy + rInner * Math.sin(angleEnd);
-      var ix2 = cx + rInner * Math.cos(angleStart);
-      var iy2 = cy + rInner * Math.sin(angleStart);
-      var d = 'M ' + x1 + ' ' + y1 +
-              ' A ' + rOuter + ' ' + rOuter + ' 0 ' + largeArc + ' 1 ' + x2 + ' ' + y2 +
-              ' L ' + ix1 + ' ' + iy1 +
-              ' A ' + rInner + ' ' + rInner + ' 0 ' + largeArc + ' 0 ' + ix2 + ' ' + iy2 +
-              ' Z';
+      var d;
+      if (rInner <= 0) {
+        // Pie geometry — close through the centre. A 0-radius inner
+        // arc renders degenerate in browsers (the slice disappears),
+        // so route the path back to the centre with an explicit L
+        // segment and skip the inner arc entirely.
+        d = 'M ' + x1 + ' ' + y1 +
+            ' A ' + rOuter + ' ' + rOuter + ' 0 ' + largeArc + ' 1 ' + x2 + ' ' + y2 +
+            ' L ' + cx + ' ' + cy +
+            ' Z';
+      } else {
+        var ix1 = cx + rInner * Math.cos(angleEnd);
+        var iy1 = cy + rInner * Math.sin(angleEnd);
+        var ix2 = cx + rInner * Math.cos(angleStart);
+        var iy2 = cy + rInner * Math.sin(angleStart);
+        d = 'M ' + x1 + ' ' + y1 +
+            ' A ' + rOuter + ' ' + rOuter + ' 0 ' + largeArc + ' 1 ' + x2 + ' ' + y2 +
+            ' L ' + ix1 + ' ' + iy1 +
+            ' A ' + rInner + ' ' + rInner + ' 0 ' + largeArc + ' 0 ' + ix2 + ' ' + iy2 +
+            ' Z';
+      }
       var color = palette[slice.color] || palette.accent;
       parts.push('<path d="' + d + '" fill="' + color + '" class="okc-slice"' +
                  ' data-slice-idx="' + idx + '"' +
