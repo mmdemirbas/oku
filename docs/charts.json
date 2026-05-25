@@ -644,6 +644,86 @@
         {
           "kind": "heading",
           "level": 3,
+          "id": "chart-line",
+          "title": "type: line"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Same series-of-points contract as scatter — but the renderer connects consecutive points with a polyline. Use when the x-axis is ordered (time, build-number, sequence) and the reader should see slope, not just position. Two or more series stack on the same axes; legend chips at the top-right toggle visibility."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"line\",\n  \"title\": \"P50 latency over 7 days\",\n  \"x_label\": \"Day\",\n  \"y_label\": \"ms\",\n  \"series\": [\n    { \"label\": \"api-gateway\", \"color\": \"accent\", \"data\": [\n      { \"x\": 1, \"y\": 142 }, { \"x\": 2, \"y\": 155 }, { \"x\": 3, \"y\": 138 },\n      { \"x\": 4, \"y\": 161 }, { \"x\": 5, \"y\": 149 }, { \"x\": 6, \"y\": 144 }, { \"x\": 7, \"y\": 152 }\n    ]},\n    { \"label\": \"auth-svc\", \"color\": \"warn\", \"data\": [\n      { \"x\": 1, \"y\": 88 }, { \"x\": 2, \"y\": 92 }, { \"x\": 3, \"y\": 110 },\n      { \"x\": 4, \"y\": 132 }, { \"x\": 5, \"y\": 121 }, { \"x\": 6, \"y\": 98 }, { \"x\": 7, \"y\": 90 }\n    ]}\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "line",
+            "title": "P50 latency over 7 days",
+            "x_label": "Day",
+            "y_label": "ms",
+            "series": [
+              {
+                "label": "api-gateway",
+                "color": "accent",
+                "data": [
+                  {"x": 1, "y": 142}, {"x": 2, "y": 155}, {"x": 3, "y": 138},
+                  {"x": 4, "y": 161}, {"x": 5, "y": 149}, {"x": 6, "y": 144}, {"x": 7, "y": 152}
+                ]
+              },
+              {
+                "label": "auth-svc",
+                "color": "warn",
+                "data": [
+                  {"x": 1, "y": 88}, {"x": 2, "y": 92}, {"x": 3, "y": 110},
+                  {"x": 4, "y": 132}, {"x": 5, "y": 121}, {"x": 6, "y": 98}, {"x": 7, "y": 90}
+                ]
+              },
+              {
+                "label": "search-svc",
+                "color": "success",
+                "data": [
+                  {"x": 1, "y": 64}, {"x": 2, "y": 71}, {"x": 3, "y": 68},
+                  {"x": 4, "y": 79}, {"x": 5, "y": 73}, {"x": 6, "y": 70}, {"x": 7, "y": 66}
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-pie",
+          "title": "type: pie"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Same `slices` payload as donut; the only difference is the absence of the centre hole and the centre-readout. Reach for pie when the part-to-whole relationship is the whole story and the absolute total doesn't need an extra glance. Pie reads better than donut for 2–4 slice distributions; for 5+ slices, prefer donut (clearer per-slice legend strip) or stacked-bar."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"pie\",\n  \"title\": \"Build-time budget\",\n  \"slices\": [\n    { \"label\": \"chrome.js\",   \"value\": 40, \"color\": \"accent\" },\n    { \"label\": \"chrome.css\",  \"value\": 25, \"color\": \"success\" },\n    { \"label\": \"renderer.js\", \"value\": 20, \"color\": \"warn\" },\n    { \"label\": \"cli.py\",      \"value\": 15, \"color\": \"muted\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "pie",
+            "title": "Build-time budget",
+            "slices": [
+              {"label": "chrome.js",   "value": 40, "color": "accent"},
+              {"label": "chrome.css",  "value": 25, "color": "success"},
+              {"label": "renderer.js", "value": 20, "color": "warn"},
+              {"label": "cli.py",      "value": 15, "color": "muted"}
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
           "id": "chart-bar",
           "title": "type: bar"
         },

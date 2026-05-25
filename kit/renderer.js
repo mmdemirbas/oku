@@ -689,6 +689,15 @@
       const table = document.createElement('table');
       if (block.view) table.setAttribute('data-default-view', block.view);
       const headers = block.headers || [];
+      // Per-column `wrap: true` lets authors mark which columns honour
+      // explicit newlines in their cell content. Cells in a wrap
+      // column render with `white-space: pre-line` so `\n` in the
+      // source becomes a visible line break. The flag is read into
+      // a parallel array so renderCell can stamp each <td> with the
+      // matching data attribute.
+      const wrapColumn = headers.map(h =>
+        h && typeof h === 'object' && !Array.isArray(h) && h.wrap === true
+      );
       if (headers.length) {
         const thead = document.createElement('thead');
         const tr = document.createElement('tr');
@@ -702,6 +711,7 @@
             if (Array.isArray(h.boardOrder) && h.boardOrder.length) {
               th.setAttribute('data-board-order', h.boardOrder.join('|'));
             }
+            if (h.wrap === true) th.setAttribute('data-wrap', '1');
             th.appendChild(this._renderRich(h.label));
           } else {
             th.appendChild(this._renderRich(h));
@@ -714,8 +724,9 @@
       const tbody = document.createElement('tbody');
       const cellCount = headers.length || 1;
 
-      const renderCell = (cell) => {
+      const renderCell = (cell, colIdx) => {
         const td = document.createElement('td');
+        if (wrapColumn[colIdx]) td.setAttribute('data-wrap', '1');
         if (cell && typeof cell === 'object' && !Array.isArray(cell) && Array.isArray(cell.values)) {
           td.setAttribute('data-values', cell.values.join('|'));
           td.appendChild(this._renderRich(cell.value != null ? cell.value : cell.values.join(', ')));
@@ -735,8 +746,9 @@
           tr.style.cursor = 'pointer';
           tr.addEventListener('click', () => { window.location.href = opts.href; });
         }
-        for (const cell of (row.cells || row)) {
-          tr.appendChild(renderCell(cell));
+        const cells = row.cells || row;
+        for (let ci = 0; ci < cells.length; ci++) {
+          tr.appendChild(renderCell(cells[ci], ci));
         }
         tbody.appendChild(tr);
       };

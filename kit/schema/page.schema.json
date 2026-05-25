@@ -276,6 +276,10 @@
               "items": { "type": "string" },
               "minItems": 1,
               "description": "When this column drives the board view's group-by, render lanes in this order. Values present in row data but missing from boardOrder render at the end in first-occurrence order."
+            },
+            "wrap": {
+              "type": "boolean",
+              "description": "When true, cells in this column honour explicit newlines (\\n) in source content via `white-space: pre-line`. Use for narrative columns where the author wants multi-line cell content without inlining <br> tags."
             }
           },
           "dependentRequired": {
@@ -283,7 +287,8 @@
           },
           "anyOf": [
             { "required": ["filter"] },
-            { "required": ["boardOrder"] }
+            { "required": ["boardOrder"] },
+            { "required": ["wrap"] }
           ]
         }
       ]

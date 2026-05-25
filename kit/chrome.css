@@ -2371,6 +2371,11 @@ table td {
 }
 table tr.okt-nowrap td,
 table.okt-nowrap td { white-space: nowrap; overflow-wrap: normal; }
+/* Per-column wrap: true (header object). Cells in a wrap-flagged
+   column honour explicit newlines from the source so authors can
+   author multi-paragraph cell content with `\n` instead of inlining
+   `<br>` tags or splitting across multiple columns. */
+table td[data-wrap="1"] { white-space: pre-line; }
 table tr:hover td { background: var(--surface-2); }
 /* Column-resize grabber — thin right-edge strip on every thead <th>.
    Invisible until hovered, then a 3px accent line + ew-resize

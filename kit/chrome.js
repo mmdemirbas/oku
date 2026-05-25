@@ -6013,6 +6013,12 @@ var __mermaidLoader = (function () {
       startOnLoad: false,
       theme: 'base',
       fontFamily: 'Inter, -apple-system, sans-serif',
+      // Cap default font size so state / mindmap diagrams that have
+      // few labels don't blow them up to 24-30px — Mermaid's default
+      // scales the font with the diagram, which reads as cramped in
+      // an example-pair render column. 13px is comfortable inline;
+      // the lightbox still upscales when the reader opens it.
+      fontSize: 13,
       themeVariables: {
         // Flowchart / generic
         background:       bg,
