@@ -3300,18 +3300,19 @@ html-doc-chart .hdc-quadrant {
   fill: none;
 }
 html-doc-chart .hdc-quadrant-label {
-  fill: var(--text-faint);
+  fill: var(--text);
   font: 600 10.5px 'Inter', sans-serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  opacity: 0.85;
-  /* Paint a halo around the label so data dots drawn underneath
-     don't shred the glyphs. paint-order: stroke fill draws the
-     stroke first so the fill sits on top. */
-  stroke: var(--bg);
-  stroke-width: 4;
-  stroke-linejoin: round;
-  paint-order: stroke fill;
+}
+/* Opaque backing pill behind every quadrant label. Combined with
+   the chart drawing order (lines + ticks first, plot region next,
+   labels LAST) the pill is always on top of data dots — no garble. */
+html-doc-chart .hdc-quadrant-label-pill {
+  fill: var(--surface);
+  fill-opacity: 0.94;
+  stroke: var(--border);
+  stroke-width: 0.5;
 }
 html-doc-chart .hdc-legend {
   /* Same halo trick for legend chip text — keeps the label readable
@@ -3389,6 +3390,15 @@ html-doc-chart .hdc-sparkline .hdc-sparkline-line {
   stroke-width: 1.6;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+.hdc-sparkline .hdc-sparkline-cursor {
+  stroke: var(--accent-strong);
+  stroke-width: 0.5;
+  stroke-dasharray: 2 2;
+  opacity: 0.7;
+}
+.hdc-sparkline .hdc-sparkline-cursor-dot {
+  fill: var(--accent-strong);
 }
 html-doc-chart .hdc-sparkline .hdc-sparkline-area {
   fill: currentColor;
@@ -3833,6 +3843,17 @@ html-doc-snippet .hds-reset:hover { background: var(--surface); color: var(--tex
 html-doc-snippet .hds-body {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  min-height: 320px;
+}
+/* When nested inside the example-pair render column, the grid is
+   tight (~half content-width). Stack editor + preview unconditionally
+   in that context so neither gets squashed to a sliver. */
+.example-render html-doc-snippet .hds-body {
+  grid-template-columns: 1fr;
+  min-height: 400px;
+}
+.example-render html-doc-snippet .hds-editor,
+.example-render html-doc-snippet .hds-preview {
   min-height: 200px;
 }
 /* Editor pane: a `<textarea>` overlaid on top of a Prism-highlighted

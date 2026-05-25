@@ -3433,11 +3433,23 @@ class HtmlDocChart extends HTMLElement {
       }
       if (Array.isArray(q.labels)) {
         var ql = q.labels;
-        // Order: [TL, TR, BL, BR].
-        if (ql[0]) parts.push('<text x="' + (pad.left + 8) + '" y="' + (pad.top + 14) + '" class="hdc-quadrant-label">' + escapeXml(ql[0]) + '</text>');
-        if (ql[1]) parts.push('<text x="' + (W - pad.right - 8) + '" y="' + (pad.top + 14) + '" text-anchor="end" class="hdc-quadrant-label">' + escapeXml(ql[1]) + '</text>');
-        if (ql[2]) parts.push('<text x="' + (pad.left + 8) + '" y="' + (pad.top + plotH - 8) + '" class="hdc-quadrant-label">' + escapeXml(ql[2]) + '</text>');
-        if (ql[3]) parts.push('<text x="' + (W - pad.right - 8) + '" y="' + (pad.top + plotH - 8) + '" text-anchor="end" class="hdc-quadrant-label">' + escapeXml(ql[3]) + '</text>');
+        // Order: [TL, TR, BL, BR]. Each label gets an opaque backing
+        // pill so data dots scattering underneath never garble the
+        // text. Labels stay near each quadrant corner so the reader
+        // can still associate label ↔ region.
+        function pillLabel(text, x, y, anchor) {
+          var padX = 6, padY = 3;
+          // Approximate width — small monospace text.
+          var charW = 6.2;
+          var w = Math.min(180, text.length * charW + padX * 2);
+          var rx = anchor === 'end' ? x - w : x;
+          parts.push('<rect x="' + rx + '" y="' + (y - 11) + '" width="' + w + '" height="16" rx="3" class="hdc-quadrant-label-pill"/>');
+          parts.push('<text x="' + (anchor === 'end' ? x - padX : x + padX) + '" y="' + (y + 1) + '" text-anchor="' + (anchor === 'end' ? 'end' : 'start') + '" class="hdc-quadrant-label">' + escapeXml(text) + '</text>');
+        }
+        if (ql[0]) pillLabel(ql[0], pad.left + 6,           pad.top + 16,            'start');
+        if (ql[1]) pillLabel(ql[1], W - pad.right - 6,      pad.top + 16,            'end');
+        if (ql[2]) pillLabel(ql[2], pad.left + 6,           pad.top + plotH - 10,    'start');
+        if (ql[3]) pillLabel(ql[3], W - pad.right - 6,      pad.top + plotH - 10,    'end');
       }
     }
 
@@ -3790,10 +3802,58 @@ class HtmlDocChart extends HTMLElement {
       // Endpoint dot — always on for line/area; bar variant has its own visual.
       parts.push('<circle cx="' + px(values.length - 1).toFixed(2) + '" cy="' + py(values[values.length - 1]).toFixed(2) + '" r="2.4" class="hdc-sparkline-endpoint"/>');
     }
+    // Parallel cursor + per-point readout — same pattern as
+    // ridgeline. Pointer moves over the svg; the closest point gets
+    // a highlight ring + tooltip.
+    parts.push('<line class="hdc-sparkline-cursor" x1="0" y1="' + pad + '" x2="0" y2="' + (pad + plotH) + '" visibility="hidden" pointer-events="none"/>');
+    parts.push('<circle class="hdc-sparkline-cursor-dot" cx="0" cy="0" r="3" visibility="hidden" pointer-events="none"/>');
     parts.push('</svg>');
     if (x.end_label) parts.push('<span class="hdc-sparkline-end-label">' + escapeXml(String(x.end_label)) + '</span>');
     parts.push('</span>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireSparklineCursor(values, pad, plotW, plotH, px, py);
+  }
+  _wireSparklineCursor(values, pad, plotW, plotH, px, py) {
+    var self = this;
+    var svg = self.querySelector('svg.hdc-sparkline');
+    if (!svg) return;
+    var cursor = svg.querySelector('.hdc-sparkline-cursor');
+    var dot = svg.querySelector('.hdc-sparkline-cursor-dot');
+    if (!cursor || !dot) return;
+    function pointerToViewBoxX(ev) {
+      var pt = svg.createSVGPoint();
+      pt.x = ev.clientX; pt.y = ev.clientY;
+      var ctm = svg.getScreenCTM();
+      if (!ctm) return null;
+      return pt.matrixTransform(ctm.inverse()).x;
+    }
+    function move(ev) {
+      var vx = pointerToViewBoxX(ev);
+      if (vx === null || vx < pad || vx > pad + plotW) {
+        cursor.setAttribute('visibility', 'hidden');
+        dot.setAttribute('visibility', 'hidden');
+        // Reuse the rich tooltip controller's hide path via the
+        // existing _wireInteractivity infrastructure — sparkline
+        // doesn't host one, so just rely on tooltip dismissal.
+        return;
+      }
+      var t = Math.max(0, Math.min(values.length - 1, Math.round(((vx - pad) / plotW) * (values.length - 1))));
+      var x = px(t), y = py(values[t]);
+      cursor.setAttribute('x1', x); cursor.setAttribute('x2', x);
+      cursor.setAttribute('visibility', 'visible');
+      dot.setAttribute('cx', x); dot.setAttribute('cy', y);
+      dot.setAttribute('visibility', 'visible');
+      // Update a native tooltip via the SVG's <title> for now —
+      // the SVG is too small for the rich-tooltip card.
+      svg.setAttribute('aria-valuenow', String(values[t]));
+      svg.setAttribute('aria-valuetext', 'sample ' + (t + 1) + ': ' + values[t]);
+    }
+    function leave() {
+      cursor.setAttribute('visibility', 'hidden');
+      dot.setAttribute('visibility', 'hidden');
+    }
+    svg.addEventListener('mousemove', move);
+    svg.addEventListener('mouseleave', leave);
   }
 
   _renderWaffle() {
@@ -3881,8 +3941,15 @@ class HtmlDocChart extends HTMLElement {
     (x.zones || []).forEach(function (z) {
       parts.push('<path d="' + arcPath(angleOf(z.from), angleOf(z.to)) + '" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.32" class="hdc-gauge-zone"/>');
     });
-    // Value arc.
-    parts.push('<path d="' + arcPath(angleOf(mn), angleOf(val)) + '" fill="var(--accent)" class="hdc-gauge-value"/>');
+    // Value arc — rich hover surfaces value / target / range.
+    var gaugePayload = JSON.stringify({
+      label: x.label || (this._title || 'Gauge'),
+      kv: [
+        { k: 'value', v: fmtNum(val) },
+        { k: 'range', v: fmtNum(mn) + ' – ' + fmtNum(mx) }
+      ].concat(typeof x.target === 'number' ? [{ k: 'target', v: fmtNum(x.target) }] : [])
+    });
+    parts.push('<path d="' + arcPath(angleOf(mn), angleOf(val)) + '" fill="var(--accent)" class="hdc-gauge-value" tabindex="0" data-hover-payload="' + escapeXml(gaugePayload) + '"><title>' + escapeXml((x.label ? x.label + ': ' : '') + fmtNum(val) + ' (range ' + fmtNum(mn) + '–' + fmtNum(mx) + ')') + '</title></path>');
     // Target tick.
     if (typeof x.target === 'number') {
       var ta = angleOf(x.target);
@@ -3939,14 +4006,23 @@ class HtmlDocChart extends HTMLElement {
       var ly = cy + Math.sin(-Math.PI / 2 + i * (2 * Math.PI / axes.length)) * (R + 18);
       parts.push('<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" class="hdc-radar-label">' + escapeXml(a.label || '') + '</text>');
     });
-    // Series polygons.
+    // Series polygons — each carries a rich-hover payload listing
+    // its per-axis values so the reader can compare a series'
+    // shape against the axis labels in the tooltip.
     series.forEach(function (s, si) {
       var color = palette[s.color] || palette.accent;
       var pts = (s.values || []).map(function (v, ai) {
         var p = point(ai, +v || 0);
         return p[0].toFixed(1) + ',' + p[1].toFixed(1);
       }).join(' ');
-      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="0.22" stroke="' + color + '" stroke-width="1.6" class="hdc-radar-series" data-series-idx="' + si + '"/>');
+      var kv = axes.map(function (a, ai) {
+        return { k: (a.label || ('axis ' + (ai + 1))), v: fmtNum(+(s.values || [])[ai] || 0) };
+      });
+      var radarPayload = JSON.stringify({
+        series: s.label || ('Series ' + (si + 1)),
+        kv: kv
+      });
+      parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="0.22" stroke="' + color + '" stroke-width="1.6" class="hdc-radar-series" data-series-idx="' + si + '" tabindex="0" data-hover-payload="' + escapeXml(radarPayload) + '"><title>' + escapeXml((s.label || 'series') + ' — ' + kv.map(function (e) { return e.k + ': ' + e.v; }).join(', ')) + '</title></polygon>');
     });
     // Legend.
     var lgY = H - 24;
@@ -3989,8 +4065,18 @@ class HtmlDocChart extends HTMLElement {
       parts.push('<line x1="' + sx(+b.min) + '" y1="' + y + '" x2="' + sx(+b.max) + '" y2="' + y + '" class="hdc-boxplot-whisker"/>');
       parts.push('<line x1="' + sx(+b.min) + '" y1="' + (y - 7) + '" x2="' + sx(+b.min) + '" y2="' + (y + 7) + '" class="hdc-boxplot-whisker"/>');
       parts.push('<line x1="' + sx(+b.max) + '" y1="' + (y - 7) + '" x2="' + sx(+b.max) + '" y2="' + (y + 7) + '" class="hdc-boxplot-whisker"/>');
-      // IQR box.
-      parts.push('<rect x="' + sx(+b.q1) + '" y="' + (y - 12) + '" width="' + (sx(+b.q3) - sx(+b.q1)) + '" height="24" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="hdc-boxplot-iqr"/>');
+      // IQR box — rich hover surfaces all 5 quartile stats.
+      var bpPayload = JSON.stringify({
+        label: b.label || ('Box ' + (i + 1)),
+        kv: [
+          { k: 'min',    v: fmtNum(+b.min) },
+          { k: 'q1',     v: fmtNum(+b.q1) },
+          { k: 'median', v: fmtNum(+b.median) },
+          { k: 'q3',     v: fmtNum(+b.q3) },
+          { k: 'max',    v: fmtNum(+b.max) }
+        ].concat((b.outliers || []).length ? [{ k: 'outliers', v: (b.outliers || []).map(fmtNum).join(', ') }] : [])
+      });
+      parts.push('<rect x="' + sx(+b.q1) + '" y="' + (y - 12) + '" width="' + (sx(+b.q3) - sx(+b.q1)) + '" height="24" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="hdc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtNum(+b.min) + ', q1 ' + fmtNum(+b.q1) + ', med ' + fmtNum(+b.median) + ', q3 ' + fmtNum(+b.q3) + ', max ' + fmtNum(+b.max)) + '</title></rect>');
       // Median line.
       parts.push('<line x1="' + sx(+b.median) + '" y1="' + (y - 12) + '" x2="' + sx(+b.median) + '" y2="' + (y + 12) + '" stroke="' + color + '" stroke-width="2" class="hdc-boxplot-median"/>');
       (b.outliers || []).forEach(function (o) {
@@ -4033,9 +4119,18 @@ class HtmlDocChart extends HTMLElement {
         var zx = sx(z.from), zw = sx(z.to) - sx(z.from);
         parts.push('<rect x="' + zx + '" y="' + y + '" width="' + zw + '" height="22" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.22" class="hdc-bullet-zone"/>');
       });
-      // Value bar.
+      // Value bar — rich hover surfaces actual / target / max + zones.
       var color = palette[t.color] || palette.accent;
-      parts.push('<rect x="' + pad.left + '" y="' + (y + 6) + '" width="' + (sx(t.value) - pad.left) + '" height="10" rx="2" fill="' + color + '" class="hdc-bullet-value"/>');
+      var bulletKv = [
+        { k: 'value', v: fmtNum(+t.value || 0) },
+        { k: 'max',   v: fmtNum(trackMax) }
+      ];
+      if (typeof t.target === 'number') bulletKv.push({ k: 'target', v: fmtNum(t.target) });
+      var bulletPayload = JSON.stringify({
+        label: t.label || 'metric',
+        kv: bulletKv
+      });
+      parts.push('<rect x="' + pad.left + '" y="' + (y + 6) + '" width="' + (sx(t.value) - pad.left) + '" height="10" rx="2" fill="' + color + '" class="hdc-bullet-value" tabindex="0" data-hover-payload="' + escapeXml(bulletPayload) + '"><title>' + escapeXml((t.label || 'metric') + ': ' + fmtNum(+t.value || 0) + ' / ' + fmtNum(trackMax) + (typeof t.target === 'number' ? ' (target ' + fmtNum(t.target) + ')' : '')) + '</title></rect>');
       // Target tick.
       if (typeof t.target === 'number') {
         var tx = sx(t.target);
@@ -4074,7 +4169,17 @@ class HtmlDocChart extends HTMLElement {
     items.forEach(function (it) {
       var fy = sy(+it.from || 0), ty = sy(+it.to || 0);
       var color = palette[it.color] || (((+it.to || 0) >= (+it.from || 0)) ? palette.success : palette.danger);
-      parts.push('<line x1="' + leftX + '" y1="' + fy.toFixed(1) + '" x2="' + rightX + '" y2="' + ty.toFixed(1) + '" stroke="' + color + '" stroke-width="2" class="hdc-slope-line"/>');
+      var delta = (+it.to || 0) - (+it.from || 0);
+      var pct = (+it.from || 0) === 0 ? null : Math.round((delta / Math.abs(+it.from || 1)) * 100);
+      var slopePayload = JSON.stringify({
+        label: it.label || 'item',
+        kv: [
+          { k: x.from_label || 'before', v: fmtNum(+it.from || 0) },
+          { k: x.to_label   || 'after',  v: fmtNum(+it.to   || 0) },
+          { k: 'delta',                  v: (delta >= 0 ? '+' : '') + fmtNum(delta) + (pct !== null ? ' (' + (pct >= 0 ? '+' : '') + pct + '%)' : '') }
+        ]
+      });
+      parts.push('<line x1="' + leftX + '" y1="' + fy.toFixed(1) + '" x2="' + rightX + '" y2="' + ty.toFixed(1) + '" stroke="' + color + '" stroke-width="2" class="hdc-slope-line" tabindex="0" data-hover-payload="' + escapeXml(slopePayload) + '"><title>' + escapeXml((it.label || 'item') + ': ' + fmtNum(+it.from || 0) + ' → ' + fmtNum(+it.to || 0)) + '</title></line>');
       parts.push('<circle cx="' + leftX + '" cy="' + fy.toFixed(1) + '" r="4" fill="' + color + '"/>');
       parts.push('<circle cx="' + rightX + '" cy="' + ty.toFixed(1) + '" r="4" fill="' + color + '"/>');
       parts.push('<text x="' + (leftX - 8) + '" y="' + (fy + 4).toFixed(1) + '" text-anchor="end" class="hdc-slope-readout">' + escapeXml(fmtNum(+it.from || 0)) + '</text>');

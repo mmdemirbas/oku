@@ -191,16 +191,21 @@
               "verdict": "in",
               "title": "Markdown → page kinds",
               "items": [
+                "YAML front-matter (<code>---&nbsp;...&nbsp;---</code>) → page.title + page.meta",
                 "ATX heading H1 → page.title",
                 "ATX heading H2 → section (id auto-slugged from title)",
                 "ATX heading H3 / H4 → heading block inside the active section",
                 "Paragraph with **bold** / *italic* / `code` / [text](url) → paragraph + inline nodes",
+                "Reference-style links <code>[text][label]</code> + <code>[label]: url</code> → link inline node",
+                "Footnotes <code>[^id]</code> + <code>[^id]: …</code> → numbered superscript + 'Footnotes' section",
+                "Definition lists (term + <code>:&nbsp;definition</code>) → &lt;dl&gt; via html-inline",
+                "Inline HTML allowlist (a, code, em, strong, span, sup, sub, br, mark, kbd, samp, del, ins, abbr) → html-inline pass-through",
                 "Fenced code block → code (language preserved)",
                 "Fenced `mermaid` block → diagram (rendered via the kit's diagram primitive)",
-                "Unordered + ordered lists → list (style: bullet | numbered)",
+                "Unordered + ordered lists, including nested → list (with html-inline children)",
                 "Blockquote → callout (type: neutral)",
                 "GFM-style pipe table → table",
-                "Horizontal rule (---) → hr"
+                "Horizontal rule (---) → kit ignores (section borders already separate)"
               ]
             }
           ]
@@ -215,7 +220,7 @@
           "kind": "callout",
           "type": "neutral",
           "title": "Every Markdown file is a page by default",
-          "content": "README.md, CHANGELOG.md, CLAUDE.md, AGENTS.md, LICENSE.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md and any other <code>.md</code> the walker reaches all surface as pages. Hide one by moving it under a SKIP_DIRS subdirectory (<code>dist/</code>, <code>_kit/</code>, <code>.git/</code>, <code>.venv/</code>, <code>node_modules/</code>, <code>templates/</code>, <code>_internal/</code>). Missing Markdown features (nested lists, footnotes, definition lists, reference-style links, inline HTML pass-through, YAML front-matter) are tracked in P4 of the <a href=\"roadmap.html\">roadmap</a>."
+          "content": "README.md, CHANGELOG.md, CLAUDE.md, AGENTS.md, LICENSE.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md and any other <code>.md</code> the walker reaches all surface as pages. Hide one by moving it under a SKIP_DIRS subdirectory (<code>dist/</code>, <code>_kit/</code>, <code>.git/</code>, <code>.venv/</code>, <code>node_modules/</code>, <code>templates/</code>, <code>_internal/</code>)."
         }
       ]
     },
@@ -278,19 +283,32 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{ \"kind\": \"heading\", \"level\": 3, \"title\": \"Sub-heading\", \"id\": \"sub\" }\n{ \"kind\": \"heading\", \"level\": 4, \"title\": \"Sub-sub-heading\" }"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{ \"kind\": \"heading\", \"level\": 3, \"title\": \"Sub-heading\", \"id\": \"sub\" }"
+          },
+          "render": {
+            "kind": "heading",
+            "level": 3,
+            "id": "heading-sample-3",
+            "title": "Sub-heading"
+          }
         },
         {
-          "kind": "heading",
-          "level": 4,
-          "id": "heading-sample",
-          "title": "Live heading sample — this row is the rendered result"
-        },
-        {
-          "kind": "paragraph",
-          "content": "The heading immediately above is the actual rendered output of the JSON example below — same size, weight, anchor affordance, and id-based permalink the kit emits everywhere. The chevron appears on hover."
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{ \"kind\": \"heading\", \"level\": 4, \"title\": \"Sub-sub-heading\" }"
+          },
+          "render": {
+            "kind": "heading",
+            "level": 4,
+            "id": "heading-sample-4",
+            "title": "Sub-sub-heading"
+          }
         },
         {
           "kind": "heading",
@@ -366,9 +384,17 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"code\",\n  \"language\": \"python\",\n  \"source\": \"def hello():\\n    print('world')\"\n}"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"code\",\n  \"language\": \"python\",\n  \"source\": \"def hello():\\n    print('world')\"\n}"
+          },
+          "render": {
+            "kind": "code",
+            "language": "python",
+            "source": "def hello():\n    print('world')"
+          }
         },
         {
           "kind": "heading",
@@ -962,21 +988,20 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"text\": \"ACID\" }\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"in\": \"chemistry\" }\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"lang\": \"tr\" }"
-        },
-        {
-          "kind": "paragraph",
-          "content": [
-            "Example: hover ",
-            {
-              "kind": "glossary-term",
-              "term": "ACID",
-              "text": "ACID"
-            },
-            " — click to pin; move toward the tooltip to keep it open."
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Hover \",\n    { \"kind\": \"glossary-term\", \"term\": \"ACID\", \"text\": \"ACID\" },\n    \" — click to pin; move toward the tooltip to keep it open.\"\n  ]\n}"
+          },
+          "render": {
+            "kind": "paragraph",
+            "content": [
+              "Hover ",
+              { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
+              " — click to pin; move toward the tooltip to keep it open."
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1006,21 +1031,20 @@
           ]
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{ \"kind\": \"ext-ref\", \"name\": \"Pagefind\", \"text\": \"Pagefind\" }"
-        },
-        {
-          "kind": "paragraph",
-          "content": [
-            "Example: ",
-            {
-              "kind": "ext-ref",
-              "name": "Pagefind",
-              "text": "Pagefind"
-            },
-            " — hover for the card, click to pin."
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Powered by \",\n    { \"kind\": \"ext-ref\", \"name\": \"Pagefind\", \"text\": \"Pagefind\" },\n    \" — hover for the card, click to pin, click the inline link to open in a new tab.\"\n  ]\n}"
+          },
+          "render": {
+            "kind": "paragraph",
+            "content": [
+              "Powered by ",
+              { "kind": "ext-ref", "name": "Pagefind", "text": "Pagefind" },
+              " — hover for the card, click to pin, click the inline link to open in a new tab."
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1029,36 +1053,46 @@
           "title": "code, em, strong, link"
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{ \"kind\": \"code\",   \"text\": \"build_manifest()\" }\n{ \"kind\": \"em\",     \"text\": \"italic\" }\n{ \"kind\": \"strong\", \"text\": \"bold\" }\n{ \"kind\": \"link\",   \"text\": \"jsDelivr\", \"href\": \"https://cdn.jsdelivr.net\" }"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Inline \",\n    { \"kind\": \"code\",   \"text\": \"build_manifest()\" },\n    \", \",\n    { \"kind\": \"em\",     \"text\": \"italic\" },\n    \", \",\n    { \"kind\": \"strong\", \"text\": \"bold\" },\n    \", and a \",\n    { \"kind\": \"link\",   \"text\": \"jsDelivr\", \"href\": \"https://cdn.jsdelivr.net\" },\n    \" link (opens in a new tab).\"\n  ]\n}"
+          },
+          "render": {
+            "kind": "paragraph",
+            "content": [
+              "Inline ",
+              { "kind": "code", "text": "build_manifest()" },
+              ", ",
+              { "kind": "em", "text": "italic" },
+              ", ",
+              { "kind": "strong", "text": "bold" },
+              ", and a ",
+              { "kind": "link", "text": "jsDelivr", "href": "https://cdn.jsdelivr.net" },
+              " link (opens in a new tab)."
+            ]
+          }
         },
         {
-          "kind": "paragraph",
-          "content": [
-            "Example: inline ",
-            {
-              "kind": "code",
-              "text": "build_manifest()"
-            },
-            ", ",
-            {
-              "kind": "em",
-              "text": "italic"
-            },
-            ", ",
-            {
-              "kind": "strong",
-              "text": "bold"
-            },
-            ", and a ",
-            {
-              "kind": "link",
-              "text": "jsDelivr",
-              "href": "https://cdn.jsdelivr.net"
-            },
-            " link (opens in a new tab)."
-          ]
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Sanitised inline HTML pass-through: \",\n    { \"kind\": \"html\", \"text\": \"<kbd>Ctrl</kbd>\" },\n    \" + \",\n    { \"kind\": \"html\", \"text\": \"<kbd>C</kbd>\" },\n    \" copies a selection, with H<sub>2</sub>O as a chemistry footnote.\"\n  ]\n}"
+          },
+          "render": {
+            "kind": "paragraph",
+            "content": [
+              "Sanitised inline HTML pass-through: ",
+              { "kind": "html", "text": "<kbd>Ctrl</kbd>" },
+              " + ",
+              { "kind": "html", "text": "<kbd>C</kbd>" },
+              " copies a selection, with H",
+              { "kind": "html", "text": "<sub>2</sub>" },
+              "O as a chemistry footnote."
+            ]
+          }
         }
       ]
     },

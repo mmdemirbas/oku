@@ -93,7 +93,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-families",
           "title": "Pick by family"
         },
@@ -574,7 +574,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-scatter-line",
           "title": "type: scatter | line"
         },
@@ -643,7 +643,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-bar",
           "title": "type: bar"
         },
@@ -709,7 +709,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-area",
           "title": "type: area"
         },
@@ -770,7 +770,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-bubble",
           "title": "type: bubble"
         },
@@ -834,7 +834,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-quadrant",
           "title": "type: quadrant"
         },
@@ -919,7 +919,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-stacked",
           "title": "type: stacked-bar"
         },
@@ -1003,7 +1003,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-grouped",
           "title": "type: grouped-bar"
         },
@@ -1060,7 +1060,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-donut",
           "title": "type: donut"
         },
@@ -1117,7 +1117,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-heatmap",
           "title": "type: heatmap"
         },
@@ -1188,7 +1188,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-sparkline",
           "title": "type: sparkline"
         },
@@ -1242,7 +1242,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-waffle",
           "title": "type: waffle"
         },
@@ -1287,7 +1287,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-gauge",
           "title": "type: gauge"
         },
@@ -1331,7 +1331,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-radar",
           "title": "type: radar"
         },
@@ -1395,7 +1395,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-box-plot",
           "title": "type: box-plot"
         },
@@ -1454,7 +1454,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-bullet",
           "title": "type: bullet"
         },
@@ -1534,7 +1534,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-slope",
           "title": "type: slope"
         },
@@ -1576,7 +1576,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-histogram",
           "title": "type: histogram"
         },
@@ -1631,7 +1631,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-calendar-heatmap",
           "title": "type: calendar-heatmap"
         },
@@ -1678,7 +1678,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-treemap",
           "title": "type: treemap"
         },
@@ -1728,7 +1728,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-ridgeline",
           "title": "type: ridgeline"
         },
@@ -1839,7 +1839,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-funnel",
           "title": "type: funnel"
         },
@@ -1889,7 +1889,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-sankey",
           "title": "type: sankey"
         },
@@ -1986,7 +1986,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-network",
           "title": "type: network"
         },
@@ -2063,7 +2063,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-scatter-matrix",
           "title": "type: scatter-matrix"
         },
@@ -2178,7 +2178,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-parallel-coordinates",
           "title": "type: parallel-coordinates"
         },
@@ -2263,7 +2263,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-chord",
           "title": "type: chord"
         },
@@ -2330,7 +2330,7 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
           "id": "chart-geo",
           "title": "type: geo"
         },
