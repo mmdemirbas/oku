@@ -1,0 +1,768 @@
+<!--
+  Example artifact produced from the html-doc skill.
+
+  Pattern: engineering-review shape.
+  Topic (illustrative): adopting structured logging in a TypeScript HTTP service.
+
+  Read in the browser to see:
+  - Theme toggle (top-right) — light/dark, persists, respects OS
+  - TOC toggle (top-left) — collapses sidebar, mobile drawer
+  - Scroll-spy TOC highlighting
+  - Callout / KPI / comparison-card / details / tooltip components
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Structured Logging Migration — Engineering Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --text: #0f172a;
+  --text-soft: #475569;
+  --text-faint: #94a3b8;
+  --border: #e2e8f0;
+  --border-soft: #f1f5f9;
+  --primary: #0f172a;
+  --accent: #0d9488;
+  --accent-soft: #ccfbf1;
+  --accent-strong: #115e59;
+  --warning: #b45309;
+  --warning-soft: #fef3c7;
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
+  --success: #15803d;
+  --success-soft: #dcfce7;
+  --on-accent: #ffffff;
+  --max-width: 840px;
+  --shadow-strong: rgba(15, 23, 42, 0.18);
+  --shadow-soft: rgba(15, 23, 42, 0.06);
+  --ctrl-bg: rgba(255, 255, 255, 0.85);
+  --ctrl-bg-hover: rgba(255, 255, 255, 0.95);
+  --line-strong: #cbd5e1;
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --bg: #0b1220;
+  --surface: #111827;
+  --surface-2: #0f172a;
+  --text: #e2e8f0;
+  --text-soft: #cbd5e1;
+  --text-faint: #64748b;
+  --border: #334155;
+  --border-soft: #1e293b;
+  --primary: #e2e8f0;
+  --accent: #2dd4bf;
+  --accent-soft: #134e4a;
+  --accent-strong: #5eead4;
+  --warning: #fbbf24;
+  --warning-soft: #422006;
+  --danger: #fca5a5;
+  --danger-soft: #450a0a;
+  --success: #86efac;
+  --success-soft: #052e16;
+  --on-accent: #0b1220;
+  --shadow-strong: rgba(0, 0, 0, 0.5);
+  --shadow-soft: rgba(0, 0, 0, 0.25);
+  --ctrl-bg: rgba(17, 24, 39, 0.78);
+  --ctrl-bg-hover: rgba(30, 41, 59, 0.92);
+  --line-strong: #475569;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px; line-height: 1.65;
+  letter-spacing: 0.005em;
+  color: var(--text); background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color .18s ease, color .18s ease;
+}
+code, pre, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.layout { display: grid; grid-template-columns: 280px 1fr; max-width: 1260px; margin: 0 auto; transition: grid-template-columns 0.25s ease; }
+body.toc-collapsed .layout { grid-template-columns: 0 1fr; }
+main { padding: 56px 64px 120px 64px; max-width: var(--max-width); margin: 0 auto; }
+nav.toc { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 36px 24px; border-right: 1px solid var(--border); background: var(--surface); font-size: 13.5px; line-height: 1.5; transition: padding 0.25s ease, border-color 0.25s ease; }
+body.toc-collapsed nav.toc { padding: 0; border-right: none; overflow: hidden; }
+.toc-header { margin: 0 0 14px 0; }
+.toc-header h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-faint); font-weight: 700; margin: 0; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; }
+nav.toc > ol > li.toc-h2 { margin: 2px 0; }
+nav.toc .toc-head { display: flex; align-items: baseline; gap: 6px; padding: 5px 4px; cursor: pointer; user-select: none; border-radius: 4px; }
+nav.toc .toc-head:hover { background: var(--surface-2); }
+nav.toc .toc-head .chevron { font-size: 9px; color: var(--text-faint); transition: transform 0.2s; width: 10px; flex-shrink: 0; text-align: center; }
+nav.toc .toc-head .chevron.hidden { visibility: hidden; }
+nav.toc li.expanded > .toc-head .chevron { transform: rotate(90deg); }
+nav.toc .toc-head .num { color: var(--text-faint); font-variant-numeric: tabular-nums; font-weight: 600; flex-shrink: 0; min-width: 18px; }
+nav.toc a { color: var(--text); text-decoration: none; border-bottom: 1px solid transparent; flex: 1; }
+nav.toc .toc-head a:hover { color: var(--accent); }
+nav.toc .toc-h2.active > .toc-head > a, nav.toc .toc-h2.active > .toc-head > .num { color: var(--accent); font-weight: 700; }
+nav.toc ol.sub { display: none; padding-left: 26px; margin: 2px 0 6px 12px; border-left: 1px solid var(--border-soft); }
+nav.toc li.expanded > ol.sub { display: block; }
+nav.toc ol.sub li { margin: 0; }
+nav.toc ol.sub a { color: var(--text-soft); font-size: 12.5px; display: block; padding: 4px 8px; border-left: 2px solid transparent; margin-left: -10px; line-height: 1.4; }
+nav.toc ol.sub a:hover { color: var(--accent); }
+nav.toc ol.sub a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+.ctrl-btn {
+  position: fixed; z-index: 200; width: 44px; height: 44px;
+  border-radius: 12px; background: var(--ctrl-bg); color: var(--text);
+  border: 1px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0; font: inherit;
+  box-shadow: 0 6px 18px var(--shadow-strong), 0 0 0 1px var(--shadow-soft);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  backdrop-filter: blur(12px) saturate(140%);
+  isolation: isolate;
+  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .12s ease, opacity .2s ease;
+}
+.ctrl-btn:hover { background: var(--ctrl-bg-hover); border-color: var(--line-strong); }
+.ctrl-btn:active { transform: scale(0.96); }
+.ctrl-btn svg { width: 20px; height: 20px; display: block; }
+.toc-toggle { top: 16px; left: 16px; }
+.theme-toggle { top: 16px; right: 16px; }
+.back-to-top { bottom: 18px; right: 18px; opacity: 0; pointer-events: none; }
+.back-to-top.visible { opacity: 1; pointer-events: auto; }
+.theme-toggle .icon-sun, .theme-toggle .icon-moon { display: none; }
+[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+:root:not([data-theme="dark"]) .theme-toggle .icon-moon { display: block; }
+.progress-bar { position: fixed; top: 0; left: 0; height: 3px; width: 0; background: var(--accent); z-index: 200; transition: width 0.1s linear; }
+.skip-link { position: absolute; left: -9999px; top: auto; background: var(--primary); color: var(--bg); padding: 10px 16px; border-radius: 4px; font-size: 14px; font-weight: 600; text-decoration: none; z-index: 1000; }
+.skip-link:focus { left: 16px; top: 16px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+button:focus-visible, a:focus-visible { outline-offset: 3px; }
+@keyframes flash-highlight { 0% { background-color: var(--accent-soft); } 100% { background-color: transparent; } }
+:target { animation: flash-highlight 1.5s ease-out; }
+.permalink { opacity: 0; margin-left: 10px; color: var(--text-faint); text-decoration: none; font-size: 0.7em; font-weight: 400; transition: opacity 0.15s, color 0.15s; }
+h2:hover .permalink, h3:hover .permalink, .permalink:focus-visible { opacity: 1; }
+.permalink:hover { color: var(--accent); }
+pre { position: relative; }
+.copy-btn { position: absolute; top: 8px; right: 8px; background: var(--surface); color: var(--text-soft); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s, border-color 0.15s; font-family: inherit; }
+pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
+.copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+.copy-btn.copied { color: var(--success); border-color: var(--success); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
+header.cover {
+  border-bottom: 3px solid var(--primary); padding-bottom: 36px; margin-bottom: 36px;
+  position: relative; overflow: hidden;
+}
+header.cover::before {
+  content: ''; position: absolute;
+  width: 600px; height: 600px; top: -300px; right: -200px;
+  background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+header.cover > * { position: relative; z-index: 1; }
+header.cover .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--accent); font-weight: 700; margin-bottom: 12px; }
+header.cover h1 { font-size: 44px; line-height: 1.08; margin: 0 0 16px 0; color: var(--primary); font-weight: 800; letter-spacing: -0.025em; }
+header.cover .subtitle { font-size: 18px; color: var(--text-soft); margin: 0; font-weight: 400; line-height: 1.6; }
+header.cover .meta { margin-top: 22px; font-size: 13px; color: var(--text-faint); }
+h2 { font-size: 28px; color: var(--primary); margin: 64px 0 8px 0; padding-top: 16px; font-weight: 800; letter-spacing: -0.015em; }
+h2 .num { display: inline-block; font-size: 14px; background: var(--accent); color: var(--on-accent); padding: 2px 10px; border-radius: 12px; vertical-align: middle; margin-right: 10px; letter-spacing: 0.05em; font-weight: 700; position: relative; top: -4px; }
+.section-lead { font-size: 17px; color: var(--text-soft); margin: 0 0 28px 0; line-height: 1.6; }
+h3 { font-size: 21px; color: var(--text); margin: 36px 0 12px 0; font-weight: 700; letter-spacing: -0.01em; }
+h4 { font-size: 14px; color: var(--text-soft); margin: 22px 0 10px 0; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+p { margin: 0 0 18px 0; }
+p.lead { font-size: 18px; line-height: 1.65; color: var(--text); }
+ul, ol { padding-left: 22px; margin: 0 0 18px 0; }
+li { margin: 8px 0; }
+strong { color: var(--text); font-weight: 700; }
+em { color: var(--text-soft); font-style: italic; }
+code { background: var(--surface-2); border: 1px solid var(--border-soft); padding: 1px 6px; border-radius: 4px; font-size: 0.92em; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; overflow-x: auto; font-size: 13.5px; line-height: 1.55; }
+pre code { background: transparent; border: none; padding: 0; }
+.tldr { margin: 0 0 40px 0; padding: 28px 32px; background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface-2) 100%); border: 1px solid var(--border); border-radius: 12px; }
+.tldr .tldr-label { font-size: 11px; font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent-strong); margin-bottom: 12px; display: inline-block; padding: 4px 10px; background: var(--surface); border-radius: 12px; }
+.tldr h2 { margin: 0 0 16px 0; border: none; padding-top: 0; font-size: 22px; }
+.tldr .one-line { font-size: 17px; line-height: 1.55; font-weight: 600; color: var(--primary); margin: 0 0 16px 0; }
+.tldr ul { margin-bottom: 0; }
+.tldr li { font-size: 15.5px; }
+.g { border-bottom: 1px dotted var(--accent); cursor: help; color: inherit; }
+.g-wrap { position: relative; display: inline-block; }
+.g:focus { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.g-tip { display: none; position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 50; background: var(--primary); color: var(--bg); padding: 12px 14px; border-radius: 8px; font-size: 13.5px; line-height: 1.5; font-weight: 400; text-align: left; letter-spacing: 0; width: 320px; max-width: calc(100vw - 32px); box-shadow: 0 12px 32px rgba(0,0,0,0.25); white-space: normal; }
+.g-tip::after { content: ''; position: absolute; top: 100%; left: 16px; border: 6px solid transparent; border-top-color: var(--primary); }
+.g-wrap:hover .g-tip, .g-wrap.open .g-tip { display: block; }
+@media (max-width: 600px) { .g-tip { position: fixed; left: 16px; right: 16px; width: auto; max-width: none; bottom: auto; top: 50%; transform: translateY(-50%); } .g-tip::after { display: none; } }
+.callout { margin: 22px 0; padding: 18px 22px; border-radius: 10px; border-left: 5px solid var(--accent); background: var(--accent-soft); }
+.callout.warning { border-left-color: var(--warning); background: var(--warning-soft); }
+.callout.danger { border-left-color: var(--danger); background: var(--danger-soft); }
+.callout.success { border-left-color: var(--success); background: var(--success-soft); }
+.callout.neutral { border-left-color: var(--text-soft); background: var(--surface-2); }
+.callout h4 { margin: 0 0 8px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--accent-strong); }
+.callout.warning h4 { color: var(--warning); }
+.callout.danger h4 { color: var(--danger); }
+.callout.success h4 { color: var(--success); }
+.callout.neutral h4 { color: var(--text); }
+.callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5px; line-height: 1.5; }
+table th { text-align: left; background: var(--surface-2); padding: 12px 14px; border-bottom: 2px solid var(--border); font-weight: 700; color: var(--text); font-size: 13px; }
+table td { padding: 12px 14px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+table tr:hover td { background: var(--surface-2); }
+.pill { display: inline-block; padding: 3px 10px; border-radius: 14px; font-size: 12px; font-weight: 700; margin-right: 4px; white-space: nowrap; }
+.pill.ok { background: var(--success-soft); color: var(--success); }
+.pill.warn { background: var(--warning-soft); color: var(--warning); }
+.pill.fail { background: var(--danger-soft); color: var(--danger); }
+.pill.info { background: var(--accent-soft); color: var(--accent-strong); }
+.pill.muted { background: var(--border-soft); color: var(--text-soft); }
+.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 24px 0; }
+.kpi { text-align: center; padding: 22px 14px; background: var(--surface); border-radius: 10px; border: 1px solid var(--border); }
+.kpi .num { font-size: 30px; font-weight: 800; color: var(--accent); line-height: 1.1; letter-spacing: -0.02em; }
+.kpi .label { font-size: 12.5px; color: var(--text-soft); margin-top: 6px; line-height: 1.4; }
+.compare-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin: 24px 0; }
+.compare-card { padding: 22px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+.compare-card.bad { border-top: 4px solid var(--danger); }
+.compare-card.good { border-top: 4px solid var(--success); }
+.compare-card h4 { margin: 0 0 12px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--text); }
+details.card { margin: 14px 0; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; border-left: 4px solid var(--accent); }
+details.card[open] { box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
+details.card summary { cursor: pointer; font-weight: 600; list-style: none; position: relative; padding-right: 28px; color: var(--text); }
+details.card summary::after { content: "▾"; position: absolute; right: 4px; top: 2px; color: var(--text-faint); transition: transform 0.2s; }
+details.card[open] summary::after { transform: rotate(180deg); }
+details.card summary::-webkit-details-marker { display: none; }
+details.card .body { margin-top: 12px; font-size: 14.5px; line-height: 1.6; }
+footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-faint); }
+@media (max-width: 920px) {
+  .layout { display: block; }
+  body.toc-collapsed .layout { grid-template-columns: none; }
+  nav.toc { position: fixed; top: 0; left: -300px; width: 300px; height: 100vh; z-index: 99; transition: left 0.25s ease; box-shadow: 4px 0 24px rgba(0,0,0,0.1); padding: 36px 24px; }
+  body.toc-collapsed nav.toc { padding: 36px 24px; border-right: none; overflow-y: auto; }
+  nav.toc.open { left: 0; }
+  main { padding: 28px 22px 96px 22px; }
+  header.cover h1 { font-size: 30px; }
+  header.cover .subtitle { font-size: 16px; }
+  h2 { font-size: 24px; }
+  .kpi-grid, .compare-grid { grid-template-columns: 1fr; }
+  .copy-btn { opacity: 1; }
+  .permalink { display: none; }
+}
+@media print {
+  .toc-toggle, .theme-toggle, .back-to-top, .progress-bar, .skip-link, .copy-btn { display: none !important; }
+  nav.toc { display: none !important; }
+  .layout { display: block; }
+  body { background: white; color: black; font-size: 11pt; }
+  main { padding: 0; max-width: none; }
+  header.cover { page-break-after: avoid; }
+  h1, h2, h3, h4 { page-break-after: avoid; color: black; }
+  pre, table, .callout, .compare-grid, .kpi-grid, .compare-card, details.card, .tldr { page-break-inside: avoid; }
+  a { color: black; text-decoration: underline; }
+  a[href^="http"]::after, a[href^="https"]::after { content: " (" attr(href) ")"; font-size: 9pt; color: #555; }
+  details { display: block; }
+  details > *:not(summary) { display: block !important; }
+  details summary::after { content: " (expanded)"; font-size: 9pt; color: #888; }
+}
+</style>
+<script>
+(function() {
+  try {
+    var saved = localStorage.getItem('theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+  } catch (e) {}
+})();
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    if (localStorage.getItem('tocCollapsed') === '1' && window.innerWidth > 920) {
+      document.body.classList.add('toc-collapsed');
+    }
+  } catch (e) {}
+});
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to content</a>
+
+<div class="progress-bar" id="progress-bar"></div>
+
+<button class="ctrl-btn toc-toggle" onclick="toggleTOC()" aria-label="Toggle table of contents" title="Contents">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+  </svg>
+</button>
+<button class="ctrl-btn theme-toggle" onclick="toggleTheme()" aria-label="Toggle light/dark theme" title="Theme">
+  <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+  </svg>
+  <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="4"/>
+    <line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>
+    <line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>
+    <line x1="4.5" y1="4.5" x2="6.6" y2="6.6"/><line x1="17.4" y1="17.4" x2="19.5" y2="19.5"/>
+    <line x1="4.5" y1="19.5" x2="6.6" y2="17.4"/><line x1="17.4" y1="6.6" x2="19.5" y2="4.5"/>
+  </svg>
+</button>
+<button class="ctrl-btn back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Back to top" title="Back to top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+  </svg>
+</button>
+
+<div class="layout">
+
+<nav class="toc">
+  <div class="toc-header"><h2>Contents</h2></div>
+  <ol id="toc-list"></ol>
+</nav>
+
+<main id="main-content">
+
+<header class="cover">
+  <div class="eyebrow">Engineering Review · Illustrative Example</div>
+  <h1>Structured Logging Migration — From <code>console.log</code> to <code>pino</code></h1>
+  <p class="subtitle">
+    A worked example of the html-doc skill. The topic — migrating
+    a TypeScript HTTP service from ad-hoc logging to a structured
+    JSON logger — is fictional but realistic. The point is to show
+    how the engineering-review narrative arc, the component kit, and
+    the chrome layout look when applied to a concrete review.
+  </p>
+  <div class="meta">14 May 2026 · Audience: service team · Read time ~10 min</div>
+</header>
+
+<section id="tldr">
+<div class="tldr">
+  <span class="tldr-label">TL;DR</span>
+  <h2>One paragraph, then five points</h2>
+  <p class="one-line">
+    Replacing scattered <code>console.log</code> calls with a structured logger
+    (<code>pino</code>) gives the team queryable logs and correlation IDs at the
+    cost of a one-week migration. The shape of the work matches the
+    code-mod pattern; the open question is request-context propagation.
+  </p>
+  <ul>
+    <li><strong>Why now:</strong> on-call has spent 14 hours over four
+    incidents grepping plain-text logs in the last quarter.</li>
+    <li><strong>What changes:</strong> log calls go from positional strings to
+    object-first <code>logger.info({ user_id }, "message")</code>.</li>
+    <li><strong>What stays:</strong> log levels, log destination, dashboard
+    queries (they get easier, not different).</li>
+    <li><strong>Effort:</strong> ~3 days code-mod, ~2 days context plumbing,
+    ~1 day cutover.</li>
+    <li><strong>Open question:</strong> AsyncLocalStorage vs explicit
+    <code>req.logger</code> handoff — covered in §6.</li>
+  </ul>
+</div>
+</section>
+
+<section id="foundations">
+<h2><span class="num">§1</span>Foundations</h2>
+<p class="section-lead">
+  Quick refresher on the relevant terms; skip if you've shipped a
+  structured logger before.
+</p>
+
+<p>
+  <strong>Structured logging</strong> means every log line is a single
+  JSON object with a stable schema:
+  <code>{ "level": "info", "msg": "...", "user_id": 42, "request_id": "..." }</code>.
+  Compare to traditional logging, which emits a freeform string like
+  <code>"info: user 42 requested resource ..."</code> — the same data,
+  but no machine can filter on <code>user_id</code> without a regex.
+</p>
+
+<p>
+  <span class="g-wrap"><span class="g" tabindex="0">Pino</span><span class="g-tip">Pino is a low-overhead Node.js logger that emits NDJSON to stdout. Designed to keep hot paths fast: serialisation happens in a child process or after the request returns.</span></span>
+  is one of three plausible libraries
+  (<span class="g-wrap"><span class="g" tabindex="0">Winston</span><span class="g-tip">Winston is a more flexible/configurable logger but with higher per-call overhead. Trade-off: more transports out of the box, slower hot path.</span></span>,
+  <span class="g-wrap"><span class="g" tabindex="0">Bunyan</span><span class="g-tip">Bunyan is the original JSON logger for Node; mostly superseded by Pino but still used in long-lived services.</span></span>,
+  <code>pino</code>). The decision is in §5.
+</p>
+</section>
+
+<section id="problem">
+<h2><span class="num">§2</span>The problem</h2>
+
+<p class="section-lead">
+  Plain-text logs are working against us in three measurable ways.
+</p>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="num">14h</div><div class="label">On-call hours spent grepping logs<br>last quarter (4 incidents)</div></div>
+  <div class="kpi"><div class="num">~38%</div><div class="label">Of incidents required regex-on-prod<br>to extract a user ID</div></div>
+  <div class="kpi"><div class="num">0</div><div class="label">Dashboards that filter by user_id<br>(can't, fields aren't parsed)</div></div>
+</div>
+
+<p>The three concrete pain points:</p>
+
+<ol>
+  <li><strong>No correlation across services.</strong> A request crossing
+  the API gateway → service A → service B can't be reconstructed
+  without timestamp alignment, because no correlation ID is attached.</li>
+  <li><strong>No filtering by attribute.</strong> Splunk and CloudWatch
+  Insights both parse JSON natively but get nothing useful from
+  <code>"user 42 requested ..."</code> strings.</li>
+  <li><strong>No type discipline.</strong> Half the team writes
+  <code>console.log(user, action)</code> (positional, fragile); the other half
+  writes <code>console.log(\`user $\{user\} did $\{action\}\`)</code>. Schemas
+  drift; downstream regex breaks weekly.</li>
+</ol>
+</section>
+
+<section id="solution">
+<h2><span class="num">§3</span>The solution shape</h2>
+<p class="lead">
+  Adopt <code>pino</code> with a request-scoped child logger.
+  AsyncLocalStorage carries the request context through the call
+  chain, so any code path can log <code>request_id</code> + <code>user_id</code>
+  without explicit threading.
+</p>
+
+<pre><code>// Before
+console.log(\`user $\{user.id\} updated profile\`);
+
+// After
+req.log.info({ user_id: user.id, action: "update_profile" }, "profile updated");
+</code></pre>
+
+<p>
+  Headline shape: every log line is a JSON object whose first argument
+  is the structured payload, second is a human-readable message. The
+  request context (request ID, user ID, route) is bound to a child
+  logger created in the request middleware; downstream code uses
+  <code>req.log</code> instead of importing a global logger.
+</p>
+</section>
+
+<section id="components">
+<h2><span class="num">§4</span>Components</h2>
+
+<p class="section-lead">
+  Three load-bearing pieces. Built and reviewed in dependency order.
+</p>
+
+<h3>4.1 Logger module (<code>lib/logger.ts</code>)</h3>
+<p>
+  Single source of truth. Exports a configured pino instance plus a
+  factory for child loggers. Sets <code>base</code> fields (service, version,
+  environment) once at boot.
+</p>
+
+<h3>4.2 Request middleware</h3>
+<p>
+  Generates a request ID per inbound HTTP request, attaches a child
+  logger to <code>req</code>, and registers it in AsyncLocalStorage so deeper
+  code (queue consumers, DB hooks) can pick it up without a parameter.
+</p>
+
+<h3>4.3 Code-mod across handlers</h3>
+<p>
+  Every <code>console.*</code> call in <code>src/handlers/**</code> becomes a
+  <code>req.log.*</code> call. A jscodeshift codemod handles 90%
+  mechanically; manual review for the 10% that need new structured
+  fields (e.g. splitting a message into <code>action</code> +
+  <code>resource</code> attributes).
+</p>
+
+<details class="card">
+<summary>Why request middleware, not a per-call import?
+<small style="color:var(--text-faint); font-weight:400;"> · click to expand</small>
+</summary>
+<div class="body">
+<p>
+  A global <code>import { logger } from './lib/logger'</code> at every call site
+  works for the level and base fields, but it can't carry per-request
+  context. The same log line ends up with no <code>request_id</code>, so
+  you've structured the data but lost the correlation — solving 2 of 3
+  pain points instead of 3.
+</p>
+<p>
+  AsyncLocalStorage means the request context follows the call chain
+  even into async hooks. Cost: a single import at the entry point;
+  no boilerplate in handlers.
+</p>
+</div>
+</details>
+</section>
+
+<section id="decisions">
+<h2><span class="num">§5</span>Decisions and rejected alternatives</h2>
+
+<h3>5.1 Library choice: pino vs Winston</h3>
+
+<div class="compare-grid">
+<div class="compare-card bad">
+  <h4>Winston (rejected)</h4>
+  <ul>
+    <li>More configurable, more transports, but ~10× per-call CPU
+    cost in synchronous mode.</li>
+    <li>Async mode is opt-in and fiddly.</li>
+    <li>Stronger ecosystem of transports we don't need.</li>
+  </ul>
+</div>
+<div class="compare-card good">
+  <h4>Pino (chosen)</h4>
+  <ul>
+    <li>Fastest by ~5× on hot paths; serialisation off the request
+    thread.</li>
+    <li>Defaults to NDJSON, fits our log shipper.</li>
+    <li>Same on-prem stack the platform team already uses.</li>
+  </ul>
+</div>
+</div>
+
+<h3>5.2 Context propagation: AsyncLocalStorage vs explicit handoff</h3>
+
+<div class="callout warning">
+<h4>Open question — see §6</h4>
+<p>
+  We've leaned toward AsyncLocalStorage in the prototype, but it has
+  one sharp edge with Node's worker threads. If the service ever
+  spins up worker threads, the request context doesn't follow. The
+  explicit-<code>req.logger</code> path is more verbose but bulletproof.
+</p>
+</div>
+</section>
+
+<section id="verification">
+<h2><span class="num">§6</span>Verification and known gaps</h2>
+
+<table>
+<thead><tr><th>Check</th><th>Status</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Unit tests for child logger creation</td><td><span class="pill ok">passing</span></td><td>14 tests, all green</td></tr>
+<tr><td>Integration test: request_id flows end-to-end</td><td><span class="pill ok">passing</span></td><td>Verified across HTTP → DB → queue</td></tr>
+<tr><td>Load test: 5k RPS sustained</td><td><span class="pill ok">passing</span></td><td>p99 latency identical to <code>console.log</code> baseline</td></tr>
+<tr><td>AsyncLocalStorage in worker_threads</td><td><span class="pill fail">known gap</span></td><td>Context lost when worker spawned; see §5.2</td></tr>
+<tr><td>Splunk dashboard for <code>user_id</code> filter</td><td><span class="pill warn">in progress</span></td><td>Waiting on field mapping from platform team</td></tr>
+<tr><td>Log volume budget</td><td><span class="pill info">to check</span></td><td>JSON is ~1.4× larger than current strings; need quarterly ingest cost estimate</td></tr>
+</tbody>
+</table>
+
+<div class="callout">
+<h4>What "passing" means here</h4>
+<p>
+  Local + CI test runs are green. Production canary has been running
+  on one node for 3 days with no error rate change. Full rollout
+  gated on the Splunk dashboard work and the worker_threads
+  resolution.
+</p>
+</div>
+</section>
+
+<section id="future">
+<h2><span class="num">§7</span>Future / FAQ</h2>
+
+<details class="card">
+<summary>Do we have to migrate everything before turning it on?</summary>
+<div class="body">
+<p>
+  No. <code>pino</code> and <code>console</code> can coexist; both write to stdout. The
+  shipper parses NDJSON if present and falls back to plain text. The
+  migration can ship per-handler.
+</p>
+</div>
+</details>
+
+<details class="card">
+<summary>What about the existing log retention rules?</summary>
+<div class="body">
+<p>
+  Retention is set by the shipper, not the logger. Same 14-day hot /
+  90-day cold split; no platform-team change needed.
+</p>
+</div>
+</details>
+
+<details class="card">
+<summary>Can we still log objects? <code>console.log(err)</code> is a habit.</summary>
+<div class="body">
+<p>
+  Yes: <code>req.log.error({ err })</code> uses pino's built-in error serialiser
+  and you get the full stack, message, and properties as JSON fields.
+  Cleaner than <code>console.log(err)</code>, which serialises differently in
+  every runtime.
+</p>
+</div>
+</details>
+</section>
+
+<footer>
+<p><strong>Structured Logging Migration — Engineering Review</strong> · 14 May 2026</p>
+<p>
+  Example artifact for the html-doc skill. Not a real project
+  document. Topic chosen because the engineering-review shape maps
+  cleanly: problem → solution → components → decisions → verification.
+</p>
+</footer>
+
+</main>
+</div>
+
+<script>
+function toggleTheme() {
+  var current = document.documentElement.getAttribute('data-theme') || 'light';
+  var next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('theme', next); } catch (e) {}
+}
+function toggleTOC() {
+  if (window.innerWidth <= 920) {
+    document.querySelector('nav.toc').classList.toggle('open');
+  } else {
+    document.body.classList.toggle('toc-collapsed');
+    try { localStorage.setItem('tocCollapsed', document.body.classList.contains('toc-collapsed') ? '1' : '0'); } catch (e) {}
+  }
+}
+(function buildTOC() {
+  var tocList = document.getElementById('toc-list');
+  if (!tocList) return;
+  var sections = document.querySelectorAll('main > section');
+  if (sections.length === 0) return;
+  tocList.innerHTML = '';
+  function slugify(text) {
+    return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  function appendPermalink(heading, id) {
+    if (heading.querySelector('.permalink')) return;
+    var a = document.createElement('a');
+    a.className = 'permalink';
+    a.href = '#' + id;
+    a.textContent = '#';
+    a.setAttribute('aria-label', 'Permalink to this section');
+    heading.appendChild(a);
+  }
+  sections.forEach(function(sec, i) {
+    var h2 = sec.querySelector('h2');
+    if (!h2) return;
+    if (!sec.id) sec.id = 'sec-' + i;
+    appendPermalink(h2, sec.id);
+    var numEl = h2.querySelector('.num');
+    var num = numEl ? numEl.textContent.trim() : (i + 1);
+    var titleClone = h2.cloneNode(true);
+    var n = titleClone.querySelector('.num');
+    if (n) n.remove();
+    var pl = titleClone.querySelector('.permalink');
+    if (pl) pl.remove();
+    var title = titleClone.textContent.trim();
+    var li = document.createElement('li');
+    li.className = 'toc-h2';
+    li.dataset.target = sec.id;
+    var head = document.createElement('div');
+    head.className = 'toc-head';
+    head.innerHTML = '<span class="chevron">▸</span>' +
+                     '<span class="num">' + num + '.</span>' +
+                     '<a href="#' + sec.id + '">' + title + '</a>';
+    li.appendChild(head);
+    var h3s = sec.querySelectorAll('h3');
+    var subOl = document.createElement('ol');
+    subOl.className = 'sub';
+    h3s.forEach(function(h3, j) {
+      if (!h3.id) h3.id = sec.id + '-' + slugify(h3.textContent).slice(0, 40);
+      appendPermalink(h3, h3.id);
+      var subLi = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + h3.id;
+      a.textContent = h3.textContent.replace(/#$/, '').trim();
+      subLi.appendChild(a);
+      subOl.appendChild(subLi);
+    });
+    if (h3s.length > 0) {
+      li.appendChild(subOl);
+      head.addEventListener('click', function(e) {
+        if (e.target.tagName !== 'A') { e.preventDefault(); li.classList.toggle('expanded'); }
+      });
+    } else {
+      head.querySelector('.chevron').classList.add('hidden');
+    }
+    tocList.appendChild(li);
+  });
+  var tocItems = tocList.querySelectorAll('.toc-h2');
+  var idToItem = {};
+  tocItems.forEach(function(it) { idToItem[it.dataset.target] = it; });
+  var allSubLinks = tocList.querySelectorAll('ol.sub a');
+  var idToSubLink = {};
+  allSubLinks.forEach(function(a) { idToSubLink[a.getAttribute('href').slice(1)] = a; });
+  function setActive(sectionId, h3Id) {
+    tocItems.forEach(function(it) { it.classList.remove('active'); });
+    allSubLinks.forEach(function(a) { a.classList.remove('active'); });
+    var item = idToItem[sectionId];
+    if (item) {
+      item.classList.add('active', 'expanded');
+      tocItems.forEach(function(it) { if (it !== item) it.classList.remove('expanded'); });
+    }
+    if (h3Id && idToSubLink[h3Id]) idToSubLink[h3Id].classList.add('active');
+  }
+  var headings = [];
+  sections.forEach(function(sec) {
+    headings.push({ el: sec, sectionId: sec.id, h3Id: null });
+    sec.querySelectorAll('h3').forEach(function(h3) { headings.push({ el: h3, sectionId: sec.id, h3Id: h3.id }); });
+  });
+  function updateActive() {
+    var scrollY = window.scrollY + 150;
+    var current = headings[0];
+    for (var k = 0; k < headings.length; k++) {
+      var rect = headings[k].el.getBoundingClientRect();
+      var top = rect.top + window.scrollY;
+      if (top <= scrollY) current = headings[k]; else break;
+    }
+    if (current) setActive(current.sectionId, current.h3Id);
+  }
+  var ticking = false;
+  window.addEventListener('scroll', function() {
+    if (!ticking) { window.requestAnimationFrame(function() { updateActive(); ticking = false; }); ticking = true; }
+  }, { passive: true });
+  updateActive();
+})();
+document.querySelectorAll('.g-wrap').forEach(function(el) {
+  el.addEventListener('click', function(e) {
+    if (window.matchMedia('(hover: none)').matches) {
+      e.preventDefault();
+      document.querySelectorAll('.g-wrap.open').forEach(function(o) { if (o !== el) o.classList.remove('open'); });
+      el.classList.toggle('open');
+    }
+  });
+});
+document.querySelectorAll('nav.toc a').forEach(function(a) {
+  a.addEventListener('click', function() { document.querySelector('nav.toc').classList.remove('open'); });
+});
+(function() {
+  var bar = document.getElementById('progress-bar');
+  var btt = document.querySelector('.back-to-top');
+  var ticking = false;
+  function update() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? (h.scrollTop / max) * 100 : 0;
+    if (bar) bar.style.width = pct + '%';
+    if (btt) btt.classList.toggle('visible', h.scrollTop > 600);
+    ticking = false;
+  }
+  window.addEventListener('scroll', function() {
+    if (!ticking) { window.requestAnimationFrame(update); ticking = true; }
+  }, { passive: true });
+  update();
+})();
+(function() {
+  if (!navigator.clipboard) return;
+  document.querySelectorAll('pre').forEach(function(pre) {
+    if (pre.querySelector('.copy-btn')) return;
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn'; btn.type = 'button';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy code to clipboard');
+    pre.appendChild(btn);
+    btn.addEventListener('click', function() {
+      var code = pre.querySelector('code');
+      var text = code ? code.textContent : pre.textContent.replace(/Copy$/, '').trim();
+      navigator.clipboard.writeText(text).then(function() {
+        btn.textContent = 'Copied'; btn.classList.add('copied');
+        setTimeout(function() { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+      }).catch(function() {
+        btn.textContent = 'Error';
+        setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+      });
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
