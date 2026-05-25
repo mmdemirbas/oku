@@ -155,7 +155,7 @@ def test_chart_unknown_type_errors(tmp_path: Path) -> None:
                 "kind": "section",
                 "id": "s",
                 "title": "S",
-                "blocks": [{"kind": "chart", "type": "pie", "rows": []}],
+                "blocks": [{"kind": "chart", "type": "spirograph", "rows": []}],
             },
         ],
     }

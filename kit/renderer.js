@@ -423,6 +423,25 @@
         h.textContent = block.title;
         wrap.appendChild(h);
       }
+      // Per-series colour resolution. Named tokens (accent / warn /
+      // danger / success / muted) get a class on the swatch and the
+      // bar fill so existing CSS rules apply. Unnamed series rotate
+      // through the --series-1..10 ramp inline so a multi-series
+      // chart without explicit colours doesn't render every series
+      // in accent (the historic default that made grouped-bar reads
+      // as single-series).
+      const TOKEN_COLORS = ['accent', 'warn', 'danger', 'success', 'muted'];
+      function resolveSeriesColor(s, idx) {
+        if (s && TOKEN_COLORS.indexOf(s.color) >= 0) {
+          return { className: s.color, inlineBackground: null };
+        }
+        // Custom CSS color string passed through; honour it inline.
+        if (s && s.color) {
+          return { className: '', inlineBackground: s.color };
+        }
+        const slot = (idx % 10) + 1;
+        return { className: '', inlineBackground: 'var(--series-' + slot + ')' };
+      }
       // Legend chip rack at the top — one entry per series.
       // Each chip carries data-series-idx so chrome.js can wire a
       // click-toggle that dims the matching .bar-fill[data-series=N].
@@ -431,14 +450,16 @@
         legend.className = 'bar-chart-legend';
         series.forEach((s, si) => {
           if (!s.label) return;
+          const colorInfo = resolveSeriesColor(s, si);
           const chip = document.createElement('button');
           chip.type = 'button';
-          chip.className = 'bar-chart-legend-chip ' + (s.color || 'accent');
+          chip.className = 'bar-chart-legend-chip ' + (colorInfo.className || '');
           chip.setAttribute('data-series-idx', String(si));
           chip.setAttribute('aria-pressed', 'false');
           chip.setAttribute('aria-label', 'Toggle ' + s.label + ' series');
           const sw = document.createElement('span');
           sw.className = 'bar-chart-legend-swatch';
+          if (colorInfo.inlineBackground) sw.style.background = colorInfo.inlineBackground;
           chip.appendChild(sw);
           chip.appendChild(document.createTextNode(s.label));
           legend.appendChild(chip);
@@ -484,8 +505,10 @@
         const rowTotal = rowTotals[ci];
         series.forEach((s, si) => {
           const v = (s.values && s.values[ci]) || 0;
+          const colorInfo = resolveSeriesColor(s, si);
           const fill = document.createElement('div');
-          fill.className = 'bar-fill ' + (s.color || 'accent');
+          fill.className = 'bar-fill ' + (colorInfo.className || '');
+          if (colorInfo.inlineBackground) fill.style.background = colorInfo.inlineBackground;
           fill.setAttribute('data-series', String(si));
           const pct = Math.max(0, Math.min(100, (v / scaleMax) * 100));
           fill.style.width = pct + '%';

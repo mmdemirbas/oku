@@ -1484,10 +1484,10 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     if not blk.get("series"):
                         add(p, "error", "chart-multi-bar-missing-series", where_prefix,
                             f"chart with type:{ctype} requires a `series` array.")
-                elif ctype == "donut":
+                elif ctype in ("donut", "pie"):
                     if not blk.get("slices"):
                         add(p, "error", "chart-donut-missing-slices", where_prefix,
-                            "chart with type:donut requires a `slices` array.")
+                            f"chart with type:{ctype} requires a `slices` array.")
                 elif ctype == "heatmap":
                     if not blk.get("cells"):
                         add(p, "error", "chart-heatmap-missing-cells", where_prefix,
@@ -1558,7 +1558,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                             "chart with type:geo requires a `regions` array of {id, value, label?}.")
                 elif ctype is not None:
                     add(p, "error", "chart-unknown-type", where_prefix,
-                        f"chart type '{ctype}' is not supported. Known: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, heatmap, sparkline, waffle, gauge, radar, box-plot, bullet, slope, histogram, calendar-heatmap, treemap, ridgeline, funnel, sankey, network, scatter-matrix, parallel-coordinates, chord, geo.")
+                        f"chart type '{ctype}' is not supported. Known: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, pie, heatmap, sparkline, waffle, gauge, radar, box-plot, bullet, slope, histogram, calendar-heatmap, treemap, ridgeline, funnel, sankey, network, scatter-matrix, parallel-coordinates, chord, geo.")
 
         # 7. Duplicate section IDs within a page — anchors must be unique.
         seen_ids: dict[str, int] = {}

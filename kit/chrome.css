@@ -3675,6 +3675,16 @@ oku-chart .okc-legend-bg {
   fill-opacity: 0.94;
   transition: fill 0.12s ease;
 }
+/* Cluster-level backdrop — sits behind every legend chip in the
+   top-right column. Higher opacity than the per-chip bg so the
+   chips themselves remain colour-neutral, but a giant bubble that
+   reaches into the legend area no longer overlaps the chip labels. */
+oku-chart .okc-legend-backdrop {
+  fill: var(--surface);
+  fill-opacity: 0.92;
+  stroke: var(--border-soft);
+  stroke-width: 1;
+}
 oku-chart .okc-legend-chip:hover .okc-legend-bg,
 oku-chart .okc-legend-chip:focus-visible .okc-legend-bg {
   fill: var(--accent-soft);
@@ -4216,15 +4226,15 @@ oku-chart .okc-parcoord .okc-parcoord-label {
 }
 oku-chart .okc-parcoord .okc-parcoord-line {
   fill: none;
-  stroke-width: 1.4;
-  stroke-opacity: 0.45;
+  stroke-width: 2.6;
+  stroke-opacity: 0.55;
   transition: stroke-opacity 0.15s ease, stroke-width 0.15s ease;
   cursor: pointer;
 }
 oku-chart .okc-parcoord .okc-parcoord-line:hover,
 oku-chart .okc-parcoord .okc-parcoord-line.hovered {
   stroke-opacity: 1;
-  stroke-width: 2.4;
+  stroke-width: 4;
 }
 
 

@@ -3268,6 +3268,7 @@ class OkuChart extends HTMLElement {
     // (copy / screenshot / lightbox) attaches the same way.
     var nonCartesian = {
       donut: '_renderDonut',
+      pie:   '_renderDonut',
       heatmap: '_renderHeatmap',
       sparkline: '_renderSparkline',
       waffle: '_renderWaffle',
@@ -3400,8 +3401,12 @@ class OkuChart extends HTMLElement {
       parts.push('<text x="' + (pad.left - 6) + '" y="' + (pos + 4) + '" text-anchor="end" class="okc-tick">' + fmtNum(val) + '</text>');
     });
 
-    // Quadrant overlay: two reference lines + optional corner labels.
-    // Drawn BEFORE the plot region so the data dots sit on top.
+    // Quadrant overlay: two reference lines underlay the data; corner
+    // labels are deferred (rendered after the dots in `quadrantLabelParts`
+    // below) so a dot that happens to sit at the corner can't garble the
+    // label text. The reference lines are intentionally drawn BEFORE the
+    // dots so the dots sit on top of them.
+    var quadrantLabelParts = [];
     if (self._type === 'quadrant' && self._extras && self._extras.quadrants) {
       var q = self._extras.quadrants;
       if (typeof q.x === 'number') {
@@ -3415,17 +3420,17 @@ class OkuChart extends HTMLElement {
       if (Array.isArray(q.labels)) {
         var ql = q.labels;
         // Order: [TL, TR, BL, BR]. Each label gets an opaque backing
-        // pill so data dots scattering underneath never garble the
-        // text. Labels stay near each quadrant corner so the reader
-        // can still associate label ↔ region.
+        // pill so even when a dot sits behind it, the text remains
+        // legible. Labels render last (post-dots) — pill background
+        // covers the dot, the high-contrast text reads cleanly.
         function pillLabel(text, x, y, anchor) {
-          var padX = 6, padY = 3;
-          // Approximate width — small monospace text.
-          var charW = 6.2;
-          var w = Math.min(180, text.length * charW + padX * 2);
+          var padX = 8;
+          // Approximate width — short label, sans-serif.
+          var charW = 6.4;
+          var w = Math.min(200, text.length * charW + padX * 2);
           var rx = anchor === 'end' ? x - w : x;
-          parts.push('<rect x="' + rx + '" y="' + (y - 11) + '" width="' + w + '" height="16" rx="3" class="okc-quadrant-label-pill"/>');
-          parts.push('<text x="' + (anchor === 'end' ? x - padX : x + padX) + '" y="' + (y + 1) + '" text-anchor="' + (anchor === 'end' ? 'end' : 'start') + '" class="okc-quadrant-label">' + escapeXml(text) + '</text>');
+          quadrantLabelParts.push('<rect x="' + rx + '" y="' + (y - 12) + '" width="' + w + '" height="18" rx="4" class="okc-quadrant-label-pill"/>');
+          quadrantLabelParts.push('<text x="' + (anchor === 'end' ? x - padX : x + padX) + '" y="' + (y + 1) + '" text-anchor="' + (anchor === 'end' ? 'end' : 'start') + '" class="okc-quadrant-label">' + escapeXml(text) + '</text>');
         }
         if (ql[0]) pillLabel(ql[0], pad.left + 6,           pad.top + 16,            'start');
         if (ql[1]) pillLabel(ql[1], W - pad.right - 6,      pad.top + 16,            'end');
@@ -3504,21 +3509,48 @@ class OkuChart extends HTMLElement {
       parts.push('</g>');
     });
     parts.push('</g>'); // /clip
+    // Quadrant labels render LAST so they sit above any dot that
+    // happens to share their corner — the opaque pill backing keeps
+    // text legible. Their fixed-corner positioning is intentional
+    // (the reader's eye scans corners for region labels).
+    if (quadrantLabelParts.length) {
+      parts.push(quadrantLabelParts.join(''));
+    }
     // Legend chips sit OUTSIDE the clip so they're always visible.
-    this._series.forEach(function (s, i) {
-      var color = __okuPickColor(s.color, i);
-      if (!s.label) return;
-      var lx = W - pad.right - 12;
-      var ly = pad.top + 14 + i * 18;
+    // For scatter/bubble/line/area/quadrant: cluster legend chips in
+    // a vertical column near the top-right edge, with the column's
+    // total height computed from the visible-series count so the
+    // last chip never extends past the plot region. The fixed
+    // top-right placement is what trips up dense bubble layouts (a
+    // huge marker in the top-right collides with the legend); to
+    // mitigate, the legend gets its own padded backing rectangle
+    // that occludes any data dot rendered behind it.
+    var legendSeries = this._series.filter(function (s) { return !!s.label; });
+    if (legendSeries.length) {
+      var lgWidth = 130;
+      var lgRowH = 20;
+      var lgX = W - pad.right - lgWidth + 8;
+      var lgY = pad.top + 6;
+      var lgH = legendSeries.length * lgRowH + 8;
+      // Padded backing so data underneath the legend doesn't garble
+      // the chip text. Slight rounded rect, lower opacity surface so
+      // the chart visually retains its colour underneath.
       parts.push(
-        '<g class="okc-legend-chip" data-series-idx="' + i + '" tabindex="0" role="button" ' +
-        'aria-label="Toggle ' + escapeXml(s.label) + ' series">' +
-          '<rect x="' + (lx - 116) + '" y="' + (ly - 12) + '" width="120" height="20" rx="4" class="okc-legend-bg"/>' +
-          '<rect x="' + (lx - 110) + '" y="' + (ly - 9) + '" width="14" height="14" rx="2" fill="' + color + '" class="okc-legend-swatch"/>' +
-          '<text x="' + (lx - 92) + '" y="' + (ly + 2) + '" class="okc-legend">' + escapeXml(s.label) + '</text>' +
-        '</g>'
+        '<rect x="' + (lgX - 6) + '" y="' + lgY + '" width="' + lgWidth + '" height="' + lgH + '" rx="6" class="okc-legend-backdrop"/>'
       );
-    });
+      legendSeries.forEach(function (s, i) {
+        var srcIdx = self._series.indexOf(s);
+        var color = __okuPickColor(s.color, srcIdx >= 0 ? srcIdx : i);
+        var rowY = lgY + 4 + i * lgRowH;
+        parts.push(
+          '<g class="okc-legend-chip" data-series-idx="' + (srcIdx >= 0 ? srcIdx : i) + '" tabindex="0" role="button" ' +
+          'aria-label="Toggle ' + escapeXml(s.label) + ' series">' +
+            '<rect x="' + lgX + '" y="' + rowY + '" width="14" height="14" rx="2" fill="' + color + '" class="okc-legend-swatch"/>' +
+            '<text x="' + (lgX + 18) + '" y="' + (rowY + 11) + '" class="okc-legend">' + escapeXml(s.label) + '</text>' +
+          '</g>'
+        );
+      });
+    }
     parts.push('</svg>');
 
     var oldSvg = this.querySelector(':scope > .okc-svg');
@@ -3619,9 +3651,15 @@ class OkuChart extends HTMLElement {
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var W = 420, H = 320;
     var cx = 140, cy = H / 2;
-    var rOuter = 110, rInner = 64;
+    var rOuter = 110;
+    // type=pie renders with no inner hole; donut keeps the empty centre
+    // for the total-readout. Same render path otherwise — the only
+    // difference is whether the slice path closes through the centre
+    // or via an inner arc.
+    var isPie = this._type === 'pie';
+    var rInner = isPie ? 0 : 64;
     var parts = [];
-    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Donut chart') + '" class="okc-svg okc-donut">');
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || (isPie ? 'Pie chart' : 'Donut chart')) + '" class="okc-svg okc-donut' + (isPie ? ' okc-pie' : '') + '">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
 
     var angleStart = -Math.PI / 2; // 12 o'clock
@@ -3655,9 +3693,13 @@ class OkuChart extends HTMLElement {
       angleStart = angleEnd;
     });
 
-    // Centre readout — total + a small caption.
-    parts.push('<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" class="okc-donut-total">' + escapeXml(fmtNum(total)) + '</text>');
-    parts.push('<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" class="okc-donut-caption">total</text>');
+    // Centre readout — total + caption. Donut has the empty centre
+    // to fit the readout; pie covers the centre with slice geometry,
+    // so the readout would overlay a slice. Skip it for pie.
+    if (!isPie) {
+      parts.push('<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" class="okc-donut-total">' + escapeXml(fmtNum(total)) + '</text>');
+      parts.push('<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" class="okc-donut-caption">total</text>');
+    }
 
     // Legend on the right side, one row per slice.
     var lx = 280;
@@ -3700,8 +3742,15 @@ class OkuChart extends HTMLElement {
     }
     var diverging = x.scale === 'diverging';
     var cell = 34;
-    var labelLeft = (x.row_labels && x.row_labels.length) ? 96 : 4;
-    var labelTop  = (x.col_labels && x.col_labels.length) ? 56 : 4;
+    // Reserve more vertical headroom when column labels are long — the
+    // -45° rotation extends the label up and to the left of its column
+    // anchor; without enough headroom the leftmost label clips the title
+    // and the rest visually crowd into the cell rim. Same idea for row
+    // labels: scale the left gutter with the longest label.
+    var maxColLabelLen = (x.col_labels || []).reduce(function (m, s) { return Math.max(m, String(s || '').length); }, 0);
+    var maxRowLabelLen = (x.row_labels || []).reduce(function (m, s) { return Math.max(m, String(s || '').length); }, 0);
+    var labelLeft = (x.row_labels && x.row_labels.length) ? Math.max(96, maxRowLabelLen * 7 + 16) : 4;
+    var labelTop  = (x.col_labels && x.col_labels.length) ? Math.max(64, maxColLabelLen * 5 + 28) : 4;
     var titleTop  = this._title ? 28 : 0;
     var W = labelLeft + cols * cell + 12;
     var H = titleTop + labelTop + rows * cell + 12;
@@ -3724,7 +3773,9 @@ class OkuChart extends HTMLElement {
     if (x.col_labels && x.col_labels.length) {
       for (var c = 0; c < cols; c++) {
         var cxp = labelLeft + c * cell + cell / 2;
-        var cyp = titleTop + labelTop - 6;
+        // Push the anchor 12px above the cell row so the rotated
+        // label doesn't visually touch the cell's top edge.
+        var cyp = titleTop + labelTop - 12;
         parts.push('<text x="' + cxp + '" y="' + cyp + '" text-anchor="end" class="okc-heatmap-label" transform="rotate(-45 ' + cxp + ',' + cyp + ')">' + escapeXml(String(x.col_labels[c] || '')) + '</text>');
       }
     }
