@@ -21,8 +21,14 @@ dependencies = []
 
 [project.optional-dependencies]
 schema = ["jsonschema>=4.0"]
+# Pagefind ships its own Rust binary inside the `pagefind[bin]` PyPI
+# extra — no brew / npm / npx needed. cli.py prefers `python -m
+# pagefind` over the system binary so an `oku[search]` install gives
+# users a self-contained search build out of the box.
+search = ["pagefind[bin]>=1.5"]
 dev = [
     "jsonschema>=4.0",
+    "pagefind[bin]>=1.5",
     "ruff>=0.5",
     "pytest>=7.0",
 ]

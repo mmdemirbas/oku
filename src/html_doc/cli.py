@@ -2090,6 +2090,35 @@ def build_llms_txt(root: Path, *, out_dir: Path | None = None, pages: list | Non
 
 
 # ---------- Pagefind search index ----------
+def _pagefind_cmd(site_dir: Path) -> list[str] | None:
+    """Pick the most self-contained pagefind invocation available.
+
+    Resolution order (prefer the one with no system-level prerequisite):
+      1. python -m pagefind  — bundled binary from the PyPI `pagefind[bin]`
+         extra. Self-contained inside the project's virtualenv.
+      2. system `pagefind`   — brew / cargo / manual install on PATH.
+      3. npx pagefind        — fall back through Node if available.
+
+    Returns None when nothing is reachable; the caller logs once and
+    skips the search step (the rest of the build still completes).
+    """
+    try:
+        probe = subprocess.run(
+            [sys.executable, "-m", "pagefind", "--version"],
+            capture_output=True,
+            timeout=15,
+        )
+        if probe.returncode == 0:
+            return [sys.executable, "-m", "pagefind", "--site", str(site_dir)]
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    if shutil.which("pagefind"):
+        return ["pagefind", "--site", str(site_dir)]
+    if shutil.which("npx"):
+        return ["npx", "--yes", "pagefind", "--site", str(site_dir)]
+    return None
+
+
 def pagefind_index(site_dir: Path) -> bool:
     """Run Pagefind over an HTML site directory.
 
@@ -2099,16 +2128,12 @@ def pagefind_index(site_dir: Path) -> bool:
     """
     if not site_dir.exists():
         return False
-    if not shutil.which("pagefind"):
-        # Try npx as a fallback so the binary doesn't have to be installed globally.
-        if shutil.which("npx"):
-            cmd = ["npx", "--yes", "pagefind", "--site", str(site_dir)]
-        else:
-            print("! pagefind not on PATH; skipping search index.")
-            print("  Install: brew install pagefind  OR  npm i -g pagefind")
-            return False
-    else:
-        cmd = ["pagefind", "--site", str(site_dir)]
+    cmd = _pagefind_cmd(site_dir)
+    if cmd is None:
+        print("! pagefind not available; skipping search index.")
+        print("  Install:  uv pip install 'pagefind[bin]'  (preferred — bundled binary)")
+        print("            or  brew install pagefind  /  npm i -g pagefind")
+        return False
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         if result.returncode == 0:
@@ -2533,11 +2558,11 @@ def _build_serve_search_index(root: Path) -> bool:
     pages = find_json_pages(root)
     if not pages:
         return False
-    has_bin = bool(shutil.which("pagefind") or shutil.which("npx"))
-    if not has_bin:
+    if _pagefind_cmd(root) is None:
         print(
-            "! Search disabled — install pagefind (brew install pagefind) "
-            "or pass --no-search to silence this notice."
+            "! Search disabled — install with  uv pip install 'pagefind[bin]'  "
+            "(bundled binary, no system prereq), or pass --no-search to silence "
+            "this notice."
         )
         return False
     docs_dir = _common_docs_dir(root, pages)

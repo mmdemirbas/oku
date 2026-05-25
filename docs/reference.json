@@ -1103,29 +1103,72 @@
       "lead": "meta drives nav placement, the cover header, the llms.txt sitemap, and search excerpts.",
       "blocks": [
         {
-          "kind": "compare-grid",
-          "cards": [
+          "kind": "table",
+          "headers": [
+            "Field",
             {
-              "verdict": "neutral",
-              "title": "Display fields",
-              "content": [
-                "eyebrow — small label above the H1 (\"Architecture\", \"Notes\"). ",
-                "subtitle — one-paragraph description under the H1. ",
-                "audience — \"Spark+Iceberg team\", \"Personal\", etc. ",
-                "date — ISO date or human string. Shown in cover meta. ",
-                "read_time — like \"~5 min read\". Shown in cover meta."
-              ]
+              "label": "Group",
+              "filter": "chips",
+              "values": ["Display", "Behavior", "Top-level"]
             },
-            {
-              "verdict": "neutral",
-              "title": "Behavior fields",
-              "content": [
-                "order — sort key in the site-tree nav. Lower = earlier. ",
-                "summary — one line. Used in nav tooltips, llms.txt, search. ",
-                "lang — \"en\" or \"tr\" (or any code the kit knows). Overrides the project default. ",
-                "accent (top-level, not under meta) — named token or CSS color."
-              ]
-            }
+            "Meaning"
+          ],
+          "rows": [
+            [
+              [{"kind": "code", "text": "eyebrow"}],
+              {"value": "Display", "values": ["Display"]},
+              "Small label above the H1 — \"Architecture\", \"Notes\", \"Reference · charts\". One short noun phrase."
+            ],
+            [
+              [{"kind": "code", "text": "subtitle"}],
+              {"value": "Display", "values": ["Display"]},
+              "One-paragraph description sitting under the H1 in the cover header. Sets reader expectations for the page."
+            ],
+            [
+              [{"kind": "code", "text": "audience"}],
+              {"value": "Display", "values": ["Display"]},
+              "Free-form audience label — \"Spark+Iceberg team\", \"Personal\", \"Maintainer\". Appears in the cover meta row."
+            ],
+            [
+              [{"kind": "code", "text": "date"}],
+              {"value": "Display", "values": ["Display"]},
+              "ISO date or human string. Shown in the cover meta row. Authors pick the convention — the kit never parses the value."
+            ],
+            [
+              [{"kind": "code", "text": "read_time"}],
+              {"value": "Display", "values": ["Display"]},
+              "Like \"~5 min read\". Appears in the cover meta row. Author-supplied — no autocomputation."
+            ],
+            [
+              [{"kind": "code", "text": "updated"}],
+              {"value": "Display", "values": ["Display"]},
+              "Last-updated date. Renders as a quiet italic line under the cover meta row — pure trust signal for freshness."
+            ],
+            [
+              [{"kind": "code", "text": "order"}],
+              {"value": "Behavior", "values": ["Behavior"]},
+              "Sort key in the site-tree nav. Lower numbers sort earlier; ties fall back to title."
+            ],
+            [
+              [{"kind": "code", "text": "summary"}],
+              {"value": "Behavior", "values": ["Behavior"]},
+              "Single line. Used in nav tooltips, llms.txt entries, and search excerpts."
+            ],
+            [
+              [{"kind": "code", "text": "lang"}],
+              {"value": "Behavior", "values": ["Behavior"]},
+              "Locale code — \"en\", \"tr\", or anything the kit knows. Overrides the project default on this page only."
+            ],
+            [
+              [{"kind": "code", "text": "parent"}],
+              {"value": "Behavior", "values": ["Behavior"]},
+              "Page id of the parent. Nests this page under it in the site tree (charts / tables / diagrams under Reference, etc.)."
+            ],
+            [
+              [{"kind": "code", "text": "accent"}],
+              {"value": "Top-level", "values": ["Top-level"]},
+              "Sits on the page root, not under meta. Named token (teal, amber, indigo, rose…) or any valid CSS color."
+            ]
           ]
         },
         {
@@ -1309,9 +1352,21 @@
           "content": "<code>meta.updated</code> renders as a quiet italic line under the cover meta row. Pure trust signal — readers learn at a glance how fresh a page is."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"meta\": {\n    \"date\": \"2026-05-10\",\n    \"updated\": \"2026-05-18\",\n    \"read_time\": \"~3 min\"\n  },\n  \"blocks\": [ ... ]\n}"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"meta\": {\n    \"date\": \"2026-05-10\",\n    \"updated\": \"2026-05-18\",\n    \"read_time\": \"~3 min\"\n  },\n  \"blocks\": [ ... ]\n}"
+          },
+          "render": {
+            "kind": "paragraph",
+            "content": [
+              {
+                "kind": "html",
+                "text": "<div style=\"padding:14px 16px; background:var(--surface-2); border:1px solid var(--border-soft); border-radius:10px; line-height:1.5;\"><div style=\"font:600 22px Inter,sans-serif; color:var(--text); margin-bottom:6px;\">My note</div><div style=\"font-size:12.5px; color:var(--text-soft); letter-spacing:0.02em;\">~3 min read · 2026-05-10</div><div style=\"margin-top:4px; font-size:11.5px; color:var(--text-faint); font-style:italic; letter-spacing:0.02em;\">Last updated 2026-05-18</div></div>"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",

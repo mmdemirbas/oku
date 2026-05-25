@@ -332,21 +332,29 @@ class TestChromeKitMarkers:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "sidebar-collapsed" in src, "sidebar collapse class wiring missing"
 
-    def test_chrome_extref_clickable(self, repo_root: Path) -> None:
-        """ext-ref with a resolved link wraps the inline text in
-        click + keyboard handlers that open a new tab. The pointer
-        and arrow affordance come from CSS class extref-link."""
+    def test_chrome_extref_link_in_tooltip(self, repo_root: Path) -> None:
+        """ext-ref hosts are NOT navigation links — clicking them only
+        pins the tooltip. The destination URL lives as a clickable
+        domain anchor inside the citation card (hdt-cite-domain),
+        rendered by the citation builder when hit.link is present.
+        Earlier behavior (host click → window.open) made the host
+        ambiguous: a single click both pinned the tooltip AND opened
+        the URL, so users couldn't tell which action they were
+        triggering. One affordance per element."""
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert (
-            "__htmldocExtRefMakeClickable" in js
-        ), "ext-ref clickability helper missing — links won't open on click"
+            "__htmldocExtRefMakeClickable" not in js
+        ), "ext-ref host should NOT be a navigation link — helper must stay deleted"
         assert (
-            "html-doc-extref-link" in css
-        ), "CSS class for clickable ext-ref missing — no pointer / arrow affordance"
+            "html-doc-extref-link" not in css
+        ), "CSS class for clickable host must stay deleted — clicking pins, not navigates"
         assert (
-            "html-doc-extref-link" in js
-        ), "ext-ref clickable helper should add the html-doc-extref-link class"
+            'a class="hdt-cite-domain"' in js
+        ), "citation card must render the domain as an <a>, not a code chip"
+        assert (
+            ".html-doc-tooltip:has(.hdt-cite) .hdt-link" in css
+        ), "duplicate Learn-more footer must be hidden when cite card has its own link"
 
     def test_callout_symbols_present(self, repo_root: Path) -> None:
         """Renderer writes a per-type symbol onto callouts via

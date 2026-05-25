@@ -30,7 +30,8 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
+          "id": "tables-flat",
           "title": "Flat rows"
         },
         {
@@ -73,7 +74,8 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
+          "id": "tables-grouped",
           "title": "Grouped rows with per-group counts"
         },
         {
@@ -131,7 +133,8 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
+          "id": "tables-chips",
           "title": "Chip filters + multi-valued cells"
         },
         {
@@ -277,7 +280,8 @@
         },
         {
           "kind": "heading",
-          "level": 4,
+          "level": 3,
+          "id": "tables-board",
           "title": "Board view: kanban lanes in declared order"
         },
         {

@@ -2639,22 +2639,12 @@ footer {
 .html-doc-extref[data-cite-type="blog"]    { border-bottom-color: var(--warning); }
 .html-doc-extref[data-cite-type="other"]   { border-bottom-color: var(--accent); }
 
-/* When an ext-ref carries a resolved link, swap the help-cursor for a
-   pointer and append a tiny "↗" so the reader sees this one is
-   actionable. The hover background already comes from the rule above. */
-.html-doc-extref.html-doc-extref-link { cursor: pointer; }
-.html-doc-extref.html-doc-extref-link::after {
-  content: '\2197';
-  font-size: 0.8em;
-  margin-left: 0.1em;
-  color: var(--text-soft);
-  vertical-align: super;
-  line-height: 1;
-}
-.html-doc-extref.html-doc-extref-link:hover::after,
-.html-doc-extref.html-doc-extref-link:focus-visible::after {
-  color: var(--accent-strong);
-}
+/* Ext-refs are pure hover-tooltip triggers — clicking the host pins
+   the tooltip but never navigates. The destination URL lives as a
+   clickable link inside the citation card instead. The arrow that
+   previously hinted at outbound navigation lived alongside a duplicate
+   "Learn more →" row and read as an action affordance on the host;
+   both have been retired. */
 
 /* The citation card itself — rendered inside the tooltip body. */
 .hdt-cite {
@@ -2684,17 +2674,33 @@ footer {
   color: var(--text);
   line-height: 1.3;
 }
+/* Domain row inside the citation card. When the underlying ext-ref
+   carries a `link`, this element is an `<a>` instead of a `<div>` —
+   reading the URL should look like a link, not a code chip. The
+   styling is tuned for "follow the source" affordance: accent
+   underline on hover, faint outbound-arrow glyph appended inline by
+   the JS so screen readers see "domain ↗". */
 .hdt-cite-domain {
   display: inline-block;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10.5px;
-  padding: 2px 8px;
-  border-radius: 5px;
-  background: var(--surface-2);
-  color: var(--text-soft);
-  letter-spacing: 0.02em;
+  font-size: 12.5px;
+  color: var(--accent-strong);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--accent);
+  letter-spacing: 0;
+  padding: 1px 0;
   align-self: start;
 }
+a.hdt-cite-domain:hover,
+a.hdt-cite-domain:focus-visible {
+  color: var(--accent);
+  border-bottom-style: solid;
+  outline: none;
+}
+/* When the citation card already exposes its own clickable domain,
+   the generic "Learn more →" footer is redundant — hide it so the
+   tooltip has a single navigation affordance. The `:has()` selector
+   is widely supported in browsers oku already requires. */
+.html-doc-tooltip:has(.hdt-cite) .hdt-link { display: none; }
 .hdt-cite-meta {
   font-size: 11.5px;
   color: var(--text-soft);
@@ -4097,9 +4103,19 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
    resets its top margin so the flex column gap doesn't double up
    against the label. Stretch was retired — visual primitives rendered
    edge-anchored (bars + tiles ballooned vertically). */
-.example-pair .example-code > pre,
-.example-pair .example-render > :not(.example-col-label) {
+.example-pair .example-code > pre {
   margin-top: 0 !important;
+  margin-bottom: 0;
+}
+.example-pair .example-render > :not(.example-col-label) {
+  /* Match the visual baseline of the source-side <pre> block, which
+     reserves 30px of inner padding-top for the language pill. Without
+     this spacer the render column's content edge sits ~26px higher
+     than the source column's first code line, making the two halves
+     of the pair read as misaligned even when the labels line up.
+     Applies to every render-side primitive (chart, table, kpi grid,
+     bare text) so the rule is single-source. */
+  margin-top: 24px !important;
   margin-bottom: 0;
 }
 @media (max-width: 900px) {
