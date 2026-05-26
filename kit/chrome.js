@@ -3909,13 +3909,13 @@ class OkuChart extends HTMLElement {
       return pt.matrixTransform(ctm.inverse()).x;
     }
     function move(ev) {
+      // Pinned tooltips do not follow the cursor.
+      if (self._tipPinned) return;
       var vx = pointerToViewBoxX(ev);
       if (vx === null || vx < pad || vx > pad + plotW) {
         cursor.setAttribute('visibility', 'hidden');
         dot.setAttribute('visibility', 'hidden');
-        // Reuse the rich tooltip controller's hide path via the
-        // existing _wireInteractivity infrastructure — sparkline
-        // doesn't host one, so just rely on tooltip dismissal.
+        if (self._hideCursorTip) self._hideCursorTip();
         return;
       }
       var t = Math.max(0, Math.min(values.length - 1, Math.round(((vx - pad) / plotW) * (values.length - 1))));
@@ -3924,14 +3924,27 @@ class OkuChart extends HTMLElement {
       cursor.setAttribute('visibility', 'visible');
       dot.setAttribute('cx', x); dot.setAttribute('cy', y);
       dot.setAttribute('visibility', 'visible');
-      // Update a native tooltip via the SVG's <title> for now —
-      // the SVG is too small for the rich-tooltip card.
       svg.setAttribute('aria-valuenow', String(values[t]));
       svg.setAttribute('aria-valuetext', 'sample ' + (t + 1) + ': ' + values[t]);
+      // Surface the cursor value in the rich tooltip card. Sparkline
+      // is tiny so the tooltip sits anchored at the cursor X, just
+      // above the SVG's top edge — looks like it's labelled the
+      // current sample.
+      if (self._showCursorTip) {
+        var svgRect = svg.getBoundingClientRect();
+        self._showCursorTip({
+          label: (self._title || 'sparkline') + ' · #' + (t + 1),
+          kv: [
+            { k: 'value', v: fmtNum(values[t]) },
+            { k: 'index', v: (t + 1) + ' / ' + values.length }
+          ]
+        }, ev.clientX, svgRect.top);
+      }
     }
     function leave() {
       cursor.setAttribute('visibility', 'hidden');
       dot.setAttribute('visibility', 'hidden');
+      if (self._hideCursorTip && !self._tipPinned) self._hideCursorTip();
     }
     svg.addEventListener('mousemove', move);
     svg.addEventListener('mouseleave', leave);
@@ -4602,6 +4615,9 @@ class OkuChart extends HTMLElement {
     var padRight = +self.getAttribute('data-ridge-pad-right');
     var W = +self.getAttribute('data-ridge-w');
     var plotW = W - padLeft - padRight;
+    // Stash distributions so the cursor handler can compute the
+    // density at the cursor x and surface it in the rich tooltip.
+    var distributions = ((self._extras || {}).ridgeline || {}).distributions || [];
     function pointerToViewBoxX(ev) {
       var pt = svg.createSVGPoint();
       pt.x = ev.clientX; pt.y = ev.clientY;
@@ -4610,11 +4626,15 @@ class OkuChart extends HTMLElement {
       return pt.matrixTransform(ctm.inverse()).x;
     }
     function move(ev) {
+      // Pinned tooltips do not follow the cursor — let the reader
+      // read the pinned values without the floor moving under them.
+      if (self._tipPinned) return;
       var vx = pointerToViewBoxX(ev);
       if (vx === null) return;
       if (vx < padLeft || vx > padLeft + plotW) {
         cursor.setAttribute('visibility', 'hidden');
         label.setAttribute('visibility', 'hidden');
+        self._hideCursorTip();
         return;
       }
       var v = lo + ((vx - padLeft) / plotW) * (hi - lo);
@@ -4624,10 +4644,24 @@ class OkuChart extends HTMLElement {
       label.setAttribute('x', vx);
       label.setAttribute('visibility', 'visible');
       label.textContent = fmtNum(v);
+      // Find each distribution's count near v (±bin tolerance) so the
+      // tooltip surfaces per-distribution density at the cursor x.
+      var span = (hi - lo) || 1;
+      var binW = span / 30;
+      var kv = distributions.map(function (d) {
+        var vs = (d.values || []).map(Number).filter(function (n) { return !isNaN(n) && n >= v - binW && n <= v + binW; });
+        return { k: d.label || 'series', v: vs.length ? String(vs.length) : '·' };
+      });
+      self._showCursorTip({
+        label: 'value ≈ ' + fmtNum(v),
+        kv: kv,
+        footer: 'count within ±' + fmtNum(binW)
+      }, ev.clientX, ev.clientY);
     }
     function leave() {
       cursor.setAttribute('visibility', 'hidden');
       label.setAttribute('visibility', 'hidden');
+      if (!self._tipPinned) self._hideCursorTip();
     }
     svg.addEventListener('mousemove', move);
     svg.addEventListener('mouseleave', leave);
@@ -5664,6 +5698,42 @@ class OkuChart extends HTMLElement {
     // anywhere outside) unpins it. Lets readers select tooltip
     // text or follow values without the popup auto-closing.
     var pinnedAnchor = null;
+    // Expose tip-pinned state to other methods on the instance —
+    // cursor-driven charts (ridgeline, sparkline) check this before
+    // overwriting the pinned tooltip content with the cursor's
+    // payload.
+    Object.defineProperty(self, '_tipPinned', {
+      configurable: true,
+      get: function () { return !!pinnedAnchor; }
+    });
+    // Cursor-driven update path used by _wireRidgelineCursor /
+    // _wireSparklineCursor — render a payload near the screen
+    // coordinates (clientX/Y) without binding to a DOM anchor.
+    self._showCursorTip = function (payload, sx, sy) {
+      if (pinnedAnchor) return;
+      var tip = ensureTip();
+      var html = '';
+      if (payload.label) html += '<div class="okc-tt-label">' + escapeXml(payload.label) + '</div>';
+      if (payload.kv && payload.kv.length) {
+        html += '<dl class="okc-tt-kv">';
+        payload.kv.forEach(function (row) {
+          html += '<dt>' + escapeXml(row.k) + '</dt><dd>' + escapeXml(row.v) + '</dd>';
+        });
+        html += '</dl>';
+      }
+      if (payload.footer) html += '<div class="okc-tt-coords">' + escapeXml(payload.footer) + '</div>';
+      html += '<span class="okc-tt-pin-hint">click to pin</span>';
+      rebuildTipBody(tip, html);
+      tip.setAttribute('aria-hidden', 'false');
+      tip.style.left = sx + 'px';
+      tip.style.top  = (sy - 8) + 'px';
+      tip.classList.add('visible');
+    };
+    self._hideCursorTip = function () {
+      if (pinnedAnchor) return;
+      var tip = self.querySelector(':scope > .okc-tooltip');
+      if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
+    };
     function showRich(anchor, payload) {
       var tip = ensureTip();
       var html = '';
