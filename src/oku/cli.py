@@ -2614,14 +2614,33 @@ def _sse_broadcast(msg: str = "change") -> None:
                 pass
 
 
-_WATCH_SKIP = {"dist", "_kit", ".git", "node_modules", ".venv", "venv", "__pycache__", ".idea"}
-_WATCH_SKIP_SUFFIX = {".pyc", ".swp", ".tmp"}
+_WATCH_SKIP = {
+    "dist", "_kit", ".git", "node_modules", ".venv", "venv",
+    "__pycache__", ".idea", ".vscode", ".pytest_cache", ".ruff_cache",
+    ".mypy_cache", ".tox", "target", "build", ".gradle", "out",
+}
+_WATCH_SKIP_SUFFIX = {".pyc", ".swp", ".tmp", ".bak", ".log"}
 _WATCH_SKIP_NAMES = {".DS_Store", "site-manifest.json", "llms.txt"}  # avoid feedback loop
+# Whitelist of file types the renderer actually cares about. Anything
+# else changing (Python source, IDE indexer scratch files, build
+# artefacts the IDE writes alongside source) must NOT trigger a
+# reload — otherwise the page flickers every time the IDE pokes a
+# .py / .iml / .lock file. Previously we walked everything and any
+# mtime drift caused a reload; the user reported this as "periodic
+# refresh / flicker."
+_WATCH_INCLUDE_SUFFIX = {
+    ".json", ".html", ".htm", ".md", ".markdown",
+    ".css", ".js", ".svg",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif",
+}
 
 
 def _snapshot_tree(root: Path) -> dict:
-    """Map every file under root → mtime, skipping generated / VCS dirs.
-    Excludes site-manifest.json + llms.txt to avoid the rebuild→change loop."""
+    """Map every renderable file under root → mtime, skipping generated /
+    VCS / IDE dirs. Restricted to the suffix whitelist so IDE writes to
+    unrelated files (e.g. .py, .iml, lock files) do not trigger reloads.
+    Excludes site-manifest.json + llms.txt to avoid the rebuild→change
+    loop."""
     state = {}
     for p in root.rglob("*"):
         if not p.is_file():
@@ -2630,6 +2649,8 @@ def _snapshot_tree(root: Path) -> dict:
         if any(part in _WATCH_SKIP for part in parts):
             continue
         if p.suffix in _WATCH_SKIP_SUFFIX or p.name in _WATCH_SKIP_NAMES:
+            continue
+        if p.suffix.lower() not in _WATCH_INCLUDE_SUFFIX:
             continue
         try:
             state[str(p)] = p.stat().st_mtime
@@ -2671,6 +2692,18 @@ def _make_serve_handler(root: Path):
         # later in the lifetime.
         def __init__(self, *a, **kw):
             super().__init__(*a, directory=str(root), **kw)
+
+        def handle(self) -> None:
+            # Browsers drop SSE / kept-alive sockets unceremoniously
+            # on tab navigation, sleep, or reload. The base class lets
+            # the resulting ConnectionResetError / BrokenPipeError bubble
+            # up to socketserver, which logs a noisy multi-line traceback
+            # for every disconnect. Suppress here — these are normal,
+            # not actionable.
+            try:
+                super().handle()
+            except (ConnectionResetError, BrokenPipeError):
+                pass
 
         def do_GET(self) -> None:  # noqa: N802 — base API
             if self.path == "/__reload":
