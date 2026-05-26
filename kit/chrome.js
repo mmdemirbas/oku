@@ -188,8 +188,62 @@ var __okuPanZoom = (function () {
   function attach(stage, inner, toolbar) {
     var scale = 1, tx = 0, ty = 0;
     var min = 0.25, max = 12;
+    // Picture-in-picture minimap — shows the inner content scaled
+    // down with a viewport rect indicating the visible region of
+    // the zoomed stage. Click-drag the rect to pan; the rest of
+    // the minimap is non-interactive. Updates on every apply().
+    var pip = document.createElement('div');
+    pip.className = 'okt-lightbox-pip';
+    pip.setAttribute('aria-hidden', 'true');
+    var pipInner = document.createElement('div');
+    pipInner.className = 'okt-lightbox-pip-inner';
+    var pipViewport = document.createElement('div');
+    pipViewport.className = 'okt-lightbox-pip-viewport';
+    pip.appendChild(pipInner);
+    pip.appendChild(pipViewport);
+    stage.appendChild(pip);
+    // Populate the minimap with a static clone of the inner SVG so
+    // the reader sees a recognisable thumbnail (not just an empty
+    // box). Deferred to the next frame so `inner` is already
+    // populated by the caller. Cloning loses interactivity — that's
+    // intentional; the live SVG is in the stage above.
+    requestAnimationFrame(function () {
+      var svg = inner.querySelector('svg');
+      if (!svg) return;
+      var copy = svg.cloneNode(true);
+      copy.removeAttribute('width');
+      copy.removeAttribute('height');
+      copy.style.width = '100%';
+      copy.style.height = '100%';
+      copy.style.pointerEvents = 'none';
+      pipInner.appendChild(copy);
+    });
+    function updatePip() {
+      // The minimap only adds value when the content is zoomed in
+      // enough that the viewport doesn't cover the whole stage.
+      // Hide it at scale ≤ 1.1 so the chrome stays quiet during
+      // normal reads.
+      if (scale <= 1.1) { pip.classList.remove('visible'); return; }
+      pip.classList.add('visible');
+      var sRect = stage.getBoundingClientRect();
+      if (!sRect.width || !sRect.height) return;
+      // Inner's effective size after transform.
+      var iw = sRect.width * scale;
+      var ih = sRect.height * scale;
+      // What fraction of the inner is currently visible inside the
+      // stage's viewport? (Position = -tx, -ty in inner coords.)
+      var vx = Math.max(0, Math.min(1, -tx / iw));
+      var vy = Math.max(0, Math.min(1, -ty / ih));
+      var vw = Math.max(0.05, Math.min(1, sRect.width / iw));
+      var vh = Math.max(0.05, Math.min(1, sRect.height / ih));
+      pipViewport.style.left   = (vx * 100) + '%';
+      pipViewport.style.top    = (vy * 100) + '%';
+      pipViewport.style.width  = (vw * 100) + '%';
+      pipViewport.style.height = (vh * 100) + '%';
+    }
     function apply() {
       inner.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + scale + ')';
+      updatePip();
     }
     function zoomAt(cx, cy, factor) {
       var nextScale = Math.max(min, Math.min(max, scale * factor));
@@ -3242,6 +3296,12 @@ function __okuPickColor(name, idx) {
  * --------------------------------------------------------------- */
 class OkuChart extends HTMLElement {
   connectedCallback() {
+    // Guard against re-init when the host is moved (e.g., relocated
+    // into the lightbox stage). connectedCallback fires on every
+    // reparent; without this guard we'd wipe innerHTML and lose all
+    // wired interactivity. The render only runs once per host.
+    if (this._initialized) return;
+    this._initialized = true;
     var dataNode = this.querySelector('script[type="application/json"]:not([data-extras])');
     var extrasNodes = this.querySelectorAll('script[data-extras]');
     var series = [];
@@ -5553,44 +5613,28 @@ class OkuChart extends HTMLElement {
         title: 'Expand to fullscreen',
         icon: ICON_EXPAND,
         run: function () {
-          var svg = self.querySelector('.okc-svg');
-          if (!svg || !window.__okuLightbox) return;
-          // Move (not clone) the live SVG into the lightbox so the
-          // chart's hover / pin / cross-series interactivity travels
-          // with it — cloneNode strips all event listeners and any
-          // pinned-tooltip state. A placeholder marker takes the
-          // SVG's place inline so the host's layout doesn't collapse;
-          // the onClose callback returns the SVG to its origin.
+          if (!self.parentNode || !window.__okuLightbox) return;
+          // Move (not clone) the entire <oku-chart> host into the
+          // lightbox so all CSS selectors scoped to `oku-chart .okc-*`
+          // keep matching — moving just the SVG breaks edge/node/slice
+          // styling because the rules no longer match an oku-chart
+          // ancestor. The connectedCallback guard above prevents
+          // re-init when the host is reparented. A placeholder takes
+          // the host's slot inline so the page layout doesn't
+          // collapse; onClose returns the host to its origin.
           var placeholder = document.createComment('okc-fullscreen-placeholder');
-          var origWidth = svg.getAttribute('width');
-          var origHeight = svg.getAttribute('height');
-          var origStyleWidth = svg.style.width;
-          var origStyleHeight = svg.style.height;
-          svg.parentNode.insertBefore(placeholder, svg);
-          svg.removeAttribute('width');
-          svg.removeAttribute('height');
-          svg.style.width = '100%';
-          svg.style.height = 'auto';
-          // The tooltip card stays in the chart host but renders
-          // above the lightbox overlay because `.okc-tooltip` is
-          // `position: fixed` with z-index 1100 (lightbox is ~1000).
-          // No node move needed; viewport-relative position math in
-          // showTip / showRich already uses
-          // `dot.getBoundingClientRect()` so the tooltip lands at
-          // the dot's current screen position whether the SVG is
-          // inline or fullscreen.
-          __okuLightbox.open(svg, {
+          var origInlineMaxHeight = self.style.maxHeight;
+          var origInlineMaxWidth  = self.style.maxWidth;
+          self.parentNode.insertBefore(placeholder, self);
+          self.classList.add('okc-fullscreen');
+          __okuLightbox.open(self, {
             title: chartTitle,
             onClose: function () {
-              // Restore inline-size attributes + put the SVG back
-              // exactly where it came from. The placeholder marker
-              // is removed once the SVG is reinserted.
-              if (origWidth !== null && origWidth !== undefined) svg.setAttribute('width', origWidth);
-              if (origHeight !== null && origHeight !== undefined) svg.setAttribute('height', origHeight);
-              svg.style.width = origStyleWidth || '';
-              svg.style.height = origStyleHeight || '';
+              self.classList.remove('okc-fullscreen');
+              self.style.maxHeight = origInlineMaxHeight || '';
+              self.style.maxWidth  = origInlineMaxWidth  || '';
               if (placeholder.parentNode) {
-                placeholder.parentNode.insertBefore(svg, placeholder);
+                placeholder.parentNode.insertBefore(self, placeholder);
                 placeholder.parentNode.removeChild(placeholder);
               }
             }

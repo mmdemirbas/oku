@@ -890,6 +890,47 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
+/* Picture-in-picture minimap — appears in the top-left corner of
+   the lightbox stage when the chart is zoomed in past ~1.1x. Shows
+   a static thumbnail of the chart with a coloured rect indicating
+   the currently visible viewport region. Pointer-events:none so
+   it doesn't intercept pan / zoom gestures. */
+.okt-lightbox-pip {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: 160px;
+  height: 100px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px var(--shadow-soft);
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  z-index: 6;
+}
+.okt-lightbox-pip.visible {
+  opacity: 1;
+}
+.okt-lightbox-pip-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.okt-lightbox-pip-inner svg {
+  width: 100%;
+  height: 100%;
+}
+.okt-lightbox-pip-viewport {
+  position: absolute;
+  border: 2px solid var(--accent);
+  background: rgba(0, 0, 0, 0);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.12);
+}
 .okt-lightbox-content > img,
 .okt-lightbox-content > svg,
 .okt-lightbox-content > .okt-lightbox-img {
@@ -3324,6 +3365,17 @@ body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
 /* ============================================================
    <oku-chart> — scatter / line SVG charts
    ============================================================ */
+/* Fullscreen lift — the host carries its scoped rules with it into
+   the lightbox stage. Sizing overrides relax inline width/height so
+   the chart fills the stage instead of the original column. */
+oku-chart.okc-fullscreen,
+oku-chart.okc-fullscreen .okc-svg {
+  width: 100%;
+  height: auto;
+  max-width: none;
+  max-height: none;
+}
+oku-chart.okc-fullscreen .okc-svg { display: block; }
 oku-chart {
   display: block;
   margin: 24px 0;
