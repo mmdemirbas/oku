@@ -3691,12 +3691,13 @@ oku-chart .okc-legend-bg {
   transition: fill 0.12s ease;
 }
 /* Cluster-level backdrop — sits behind every legend chip in the
-   top-right column. Higher opacity than the per-chip bg so the
-   chips themselves remain colour-neutral, but a giant bubble that
-   reaches into the legend area no longer overlaps the chip labels. */
+   top-right column. Fully opaque so a giant bubble or dense data
+   region underneath is FULLY hidden (a partial-opacity backdrop
+   bled the bubble outline through the chip labels — see the user's
+   "Auth" overlap report). */
 oku-chart .okc-legend-backdrop {
   fill: var(--surface);
-  fill-opacity: 0.92;
+  fill-opacity: 1;
   stroke: var(--border-soft);
   stroke-width: 1;
 }
@@ -4301,15 +4302,20 @@ oku-chart .okc-parcoord .okc-parcoord-label {
 }
 oku-chart .okc-parcoord .okc-parcoord-line {
   fill: none;
-  stroke-width: 2.6;
-  stroke-opacity: 0.55;
+  stroke-width: 3.6;
+  stroke-opacity: 0.7;
   transition: stroke-opacity 0.15s ease, stroke-width 0.15s ease;
   cursor: pointer;
 }
+/* When ANY line is being hovered, fade the rest so the highlighted
+   record stands out instead of being one of N at the same opacity. */
+oku-chart .okc-parcoord:has(.okc-parcoord-line:hover) .okc-parcoord-line {
+  stroke-opacity: 0.15;
+}
 oku-chart .okc-parcoord .okc-parcoord-line:hover,
 oku-chart .okc-parcoord .okc-parcoord-line.hovered {
-  stroke-opacity: 1;
-  stroke-width: 4;
+  stroke-opacity: 1 !important;
+  stroke-width: 5;
 }
 
 

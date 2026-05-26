@@ -3671,18 +3671,31 @@ class OkuChart extends HTMLElement {
 
   /* Push overlapping point labels onto staggered y-offsets so they don't
      read as a single garbled run. If a label still has nowhere to go
-     (too many neighbors), hide it — the existing dot-hover sync brings
-     it back via the `.hovered` reveal rule in CSS. */
+     (too many neighbors or it's sitting inside a no-fly zone like a
+     quadrant corner pill OR the legend cluster), hide it — the
+     existing dot-hover sync brings it back via the `.hovered` reveal
+     rule in CSS. */
   _deconflictLabels() {
     var svg = this.querySelector(':scope > .okc-svg');
     if (!svg) return;
     var labels = Array.prototype.slice.call(svg.querySelectorAll('.okc-point-label'));
-    if (labels.length < 2) return;
+    if (labels.length < 1) return;
     // Reset any prior adjustments (re-render path: zoom/pan).
     labels.forEach(function (l) {
       l.classList.remove('okc-label-hidden', 'okc-label-shifted');
       if (l.dataset.origY) l.setAttribute('y', l.dataset.origY);
       else l.dataset.origY = l.getAttribute('y');
+    });
+    // No-fly zones: quadrant corner pills + legend cluster backdrop.
+    // Any candidate label box that overlaps one of these gets pushed
+    // off the corner (offset cycle below). If no offset clears, hide.
+    var noFly = [];
+    svg.querySelectorAll('.okc-quadrant-label-pill, .okc-legend-backdrop').forEach(function (rect) {
+      var x = +rect.getAttribute('x') || 0;
+      var y = +rect.getAttribute('y') || 0;
+      var w = +rect.getAttribute('width') || 0;
+      var h = +rect.getAttribute('height') || 0;
+      noFly.push({ x1: x, x2: x + w, y1: y, y2: y + h });
     });
     var boxes = [];
     for (var i = 0; i < labels.length; i++) {
@@ -3696,9 +3709,9 @@ class OkuChart extends HTMLElement {
         h: bb.height,
       });
     }
-    if (boxes.length < 2) return;
+    if (!boxes.length) return;
     boxes.sort(function (a, b) { return a.x1 - b.x1; });
-    var lineH = boxes[0].h + 3;
+    var lineH = (boxes[0] && boxes[0].h ? boxes[0].h : 14) + 3;
     // Treat labels within GAP_PX of each other as crowded — pure bbox
     // overlap underestimates how cramped the chart reads, because two
     // labels separated by a few pixels still look like one run.
@@ -3709,13 +3722,23 @@ class OkuChart extends HTMLElement {
       return !(a.x2 + GAP_PX < b.x1 || b.x2 + GAP_PX < a.x1
             || a.y2 + 1 < b.y1 || b.y2 + 1 < a.y1);
     }
-    var offsets = [0, -lineH, lineH, -2 * lineH, 2 * lineH];
+    var offsets = [0, -lineH, lineH, -2 * lineH, 2 * lineH, -3 * lineH, 3 * lineH];
     var placed = [];
+    function hitsNoFly(cand) {
+      for (var n = 0; n < noFly.length; n++) {
+        var nf = noFly[n];
+        if (!(cand.x2 < nf.x1 || nf.x2 < cand.x1 || cand.y2 < nf.y1 || nf.y2 < cand.y1)) {
+          return true;
+        }
+      }
+      return false;
+    }
     boxes.forEach(function (box) {
       var found = null;
       for (var k = 0; k < offsets.length; k++) {
         var oy = offsets[k];
         var cand = { x1: box.x1, x2: box.x2, y1: box.y1 + oy, y2: box.y2 + oy };
+        if (hitsNoFly(cand)) continue;
         var hit = false;
         for (var p = 0; p < placed.length; p++) {
           if (clash(placed[p], cand)) { hit = true; break; }
@@ -3730,8 +3753,9 @@ class OkuChart extends HTMLElement {
         }
         placed.push({ x1: box.x1, x2: box.x2, y1: box.y1 + found, y2: box.y2 + found });
       } else {
-        // Too crowded — hide. The existing dot-hover sync (.hovered)
-        // reveals it on demand via the CSS reveal rule.
+        // Too crowded OR every offset lands on a no-fly zone — hide.
+        // The existing dot-hover sync (.hovered) reveals it on demand
+        // via the CSS reveal rule.
         box.el.classList.add('okc-label-hidden');
       }
     });
