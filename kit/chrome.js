@@ -5796,6 +5796,33 @@ class OkuChart extends HTMLElement {
       self.appendChild(t);
       return t;
     }
+    /* Place the (position: fixed) tooltip at viewport coords
+       (anchorX, anchorY) but clamp it to stay inside the viewport.
+       The tooltip's CSS transform is translate(-50%, -100%) so the
+       requested point ends up at the centre-bottom of the box.
+       We re-measure post-paint so the clamp uses the tooltip's
+       actual width / height after the content swap. Without clamp,
+       anchors near the viewport's right / top edges push the
+       tooltip off-screen — the user has reported both. */
+    function placeTooltipAt(tip, anchorX, anchorY) {
+      tip.style.left = anchorX + 'px';
+      tip.style.top  = anchorY + 'px';
+      requestAnimationFrame(function () {
+        var rect = tip.getBoundingClientRect();
+        var vw = window.innerWidth, vh = window.innerHeight;
+        var pad = 8;
+        var left = anchorX, top = anchorY;
+        // Horizontal clamp.
+        if (rect.left < pad) left += (pad - rect.left);
+        else if (rect.right > vw - pad) left -= (rect.right - (vw - pad));
+        // Vertical clamp — flip below the anchor when the tooltip
+        // would render above the viewport (anchor near top).
+        if (rect.top < pad) top += (rect.height + 16);
+        else if (rect.bottom > vh - pad) top -= (rect.bottom - (vh - pad));
+        tip.style.left = left + 'px';
+        tip.style.top  = top  + 'px';
+      });
+    }
     function rebuildTipBody(tip, innerHtml) {
       // Replace the tooltip body without clobbering the persistent
       // close button. Anything inside `.okc-tt-body` is volatile;
@@ -5823,10 +5850,10 @@ class OkuChart extends HTMLElement {
       // `position: fixed` tooltip — anchor at viewport coords so the
       // tip lands consistently whether it lives inside the chart
       // host or temporarily inside the lightbox content (chart
-      // fullscreen).
+      // fullscreen). Viewport-clamped so the box stays on-screen
+      // even at the rightmost / topmost extents of the plot.
       var dotRect = dot.getBoundingClientRect();
-      tip.style.left = (dotRect.left + dotRect.width / 2) + 'px';
-      tip.style.top  = (dotRect.top - 8) + 'px';
+      placeTooltipAt(tip, dotRect.left + dotRect.width / 2, dotRect.top - 8);
       tip.classList.add('visible');
     }
     function hideTip() {
@@ -5924,8 +5951,7 @@ class OkuChart extends HTMLElement {
       html += '<span class="okc-tt-pin-hint">click to pin</span>';
       rebuildTipBody(tip, html);
       tip.setAttribute('aria-hidden', 'false');
-      tip.style.left = sx + 'px';
-      tip.style.top  = (sy - 8) + 'px';
+      placeTooltipAt(tip, sx, sy - 8);
       tip.classList.add('visible');
     };
     self._hideCursorTip = function () {
@@ -5949,12 +5975,12 @@ class OkuChart extends HTMLElement {
       html += '<span class="okc-tt-pin-hint">click to pin</span>';
       rebuildTipBody(tip, html);
       tip.setAttribute('aria-hidden', 'false');
-      // Viewport-relative position (tooltip is `position: fixed`).
-      // Robust across "tooltip in chart host" and "tooltip moved
-      // into lightbox content during chart-fullscreen" paths.
+      // Viewport-relative + clamped position (tooltip is
+      // `position: fixed`). Robust across "tooltip in chart host"
+      // and "tooltip moved into lightbox content during chart-
+      // fullscreen" paths, and never leaks past the viewport edges.
       var aRect = anchor.getBoundingClientRect();
-      tip.style.left = (aRect.left + aRect.width / 2) + 'px';
-      tip.style.top  = (aRect.top - 8) + 'px';
+      placeTooltipAt(tip, aRect.left + aRect.width / 2, aRect.top - 8);
       tip.classList.add('visible');
     }
     function hideRich(force) {
