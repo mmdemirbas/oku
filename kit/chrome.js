@@ -5537,7 +5537,11 @@ class OkuChart extends HTMLElement {
   _wireInteractivity() {
     var self = this;
 
-    /* Hover tooltip — one shared element per chart, lazily created. */
+    /* Hover tooltip — one shared element per chart, lazily created.
+       The persistent close button sits in the top-right; CSS hides
+       it unless the tooltip is `.pinned`. Clicking it unpins (same
+       path as the Escape key handler at the bottom of this
+       function). */
     function ensureTip() {
       var t = self.querySelector(':scope > .okc-tooltip');
       if (t) return t;
@@ -5545,8 +5549,31 @@ class OkuChart extends HTMLElement {
       t.className = 'okc-tooltip';
       t.setAttribute('role', 'tooltip');
       t.setAttribute('aria-hidden', 'true');
+      var closeBtn = document.createElement('button');
+      closeBtn.type = 'button';
+      closeBtn.className = 'okc-tt-close';
+      closeBtn.setAttribute('aria-label', 'Close tooltip');
+      closeBtn.setAttribute('title', 'Close (Esc)');
+      closeBtn.textContent = '×'; // ×
+      closeBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        unpinRich();
+      });
+      t.appendChild(closeBtn);
       self.appendChild(t);
       return t;
+    }
+    function rebuildTipBody(tip, innerHtml) {
+      // Replace the tooltip body without clobbering the persistent
+      // close button. Anything inside `.okc-tt-body` is volatile;
+      // siblings (the close button) survive.
+      var body = tip.querySelector(':scope > .okc-tt-body');
+      if (!body) {
+        body = document.createElement('div');
+        body.className = 'okc-tt-body';
+        tip.insertBefore(body, tip.firstChild);
+      }
+      body.innerHTML = innerHtml;
     }
     function showTip(dot) {
       var tip = ensureTip();
@@ -5558,7 +5585,7 @@ class OkuChart extends HTMLElement {
       if (seriesLbl) html += '<div class="okc-tt-series">' + escapeXml(seriesLbl) + '</div>';
       if (pointLbl)  html += '<div class="okc-tt-label">'  + escapeXml(pointLbl)  + '</div>';
       html += '<div class="okc-tt-coords">(' + fmtNum(parseFloat(x)) + ', ' + fmtNum(parseFloat(y)) + ')</div>';
-      tip.innerHTML = html;
+      rebuildTipBody(tip, html);
       tip.setAttribute('aria-hidden', 'false');
       // `position: fixed` tooltip — anchor at viewport coords so the
       // tip lands consistently whether it lives inside the chart
@@ -5651,7 +5678,7 @@ class OkuChart extends HTMLElement {
       }
       if (payload.footer) html += '<div class="okc-tt-coords">' + escapeXml(payload.footer) + '</div>';
       html += '<span class="okc-tt-pin-hint">click to pin</span>';
-      tip.innerHTML = html;
+      rebuildTipBody(tip, html);
       tip.setAttribute('aria-hidden', 'false');
       // Viewport-relative position (tooltip is `position: fixed`).
       // Robust across "tooltip in chart host" and "tooltip moved

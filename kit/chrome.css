@@ -3711,22 +3711,28 @@ oku-chart .okc-legend-chip.off .okc-legend { fill: var(--text-faint); text-decor
   /* `position: fixed` so the tooltip can render above the lightbox
      overlay when a chart is expanded. Position math in chrome.js
      uses viewport coords (dot.getBoundingClientRect()), so no host
-     ancestor needs to be a positioning context. */
+     ancestor needs to be a positioning context.
+
+     Width is clamped (min + max) so pin / unpin doesn't visually
+     resize the card — the hint footer changes between states but
+     the bounding box stays stable. */
   position: fixed;
   transform: translate(-50%, -100%);
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 8px 28px 8px 10px;
   font-size: 12px;
   color: var(--text);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.12s ease;
   box-shadow: 0 6px 16px var(--shadow-strong);
-  white-space: nowrap;
+  white-space: normal;
+  word-wrap: break-word;
   z-index: 1100;
-  max-width: 260px;
+  min-width: 200px;
+  max-width: 240px;
 }
 .okc-tooltip.visible { opacity: 1; }
 .okc-tooltip .okc-tt-series {
@@ -4144,36 +4150,17 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
    resets its top margin so the flex column gap doesn't double up
    against the label. Stretch was retired — visual primitives rendered
    edge-anchored (bars + tiles ballooned vertically). */
-/* Source side: the raw pre never carries its natural body-margin
-   inside the example-pair grid. */
-.example-pair .example-code > pre,
-.example-pair .example-code > .okt-pre-host {
+/* Source pre + render-side first child both flush against the column
+   label so their box-TOPS line up regardless of what the render is.
+   This is the universal rule the user has been asking for: when
+   render is a chart card, callout, tldr, kpi-grid, compare-grid,
+   table, info-tip, annotated-code, live-snippet, code pre, etc. —
+   the visible top edge of the box matches the visible top edge of
+   the source <pre> box. */
+.example-pair .example-code > *:not(.example-col-label),
+.example-pair .example-render > *:not(.example-col-label) {
   margin-top: 0 !important;
-  margin-bottom: 0;
-}
-/* Render side: when the rendered primitive is also a code block (a
-   bare <pre>, OR a <pre> wrapped by chrome.js's `.okt-pre-host` host
-   for copy + wrap + language pill), the box top must line up with
-   the source-side pre. No extra spacer — the language pills on both
-   sides sit at the same y, the first code lines also sit at the
-   same y. */
-.example-pair .example-render > pre,
-.example-pair .example-render > .okt-pre-host {
-  margin-top: 0 !important;
-  margin-bottom: 0;
-}
-/* Render side: when the rendered primitive ISN'T a code block (chart,
-   table, kpi, callout, prose), match the visual baseline of the
-   source <pre> by adding the same vertical offset the source's
-   language-pill chrome consumes (~24px). Without this the labels
-   line up but the source's first code line sits well below the
-   render's first content row, and the pair reads as misaligned. */
-.example-pair .example-render > :not(.example-col-label):not(pre):not(.okt-pre-host) {
-  margin-top: 24px !important;
-  margin-bottom: 0;
-}
-.example-pair .example-render > :not(.example-col-label) {
-  margin-bottom: 0;
+  margin-bottom: 0 !important;
 }
 @media (max-width: 900px) {
   .example-pair { grid-template-columns: 1fr; }
@@ -4414,6 +4401,55 @@ oku-chart .okc-geo .okc-geo-legend-tick {
   box-shadow: 0 0 0 2px var(--accent-soft), 0 6px 16px var(--shadow-strong);
   pointer-events: auto;
 }
+/* When pinned the click-to-pin hint becomes the Esc reminder. The
+   close button (top-right) is the primary close affordance. */
+.okc-tooltip.pinned .okc-tt-pin-hint {
+  /* Same line height as unpinned so the card height stays stable. */
+  font-size: 9.5px;
+}
+.okc-tooltip.pinned .okc-tt-pin-hint::before {
+  content: 'Esc / × to close';
+}
 .okc-tooltip.pinned .okc-tt-pin-hint::after {
-  content: ' · pinned · Esc to close';
+  content: '';
+}
+.okc-tooltip.pinned .okc-tt-pin-hint {
+  /* hide the original "click to pin" text by collapsing its content
+     into a span that's transparent — the ::before replaces it. */
+  color: transparent;
+  position: relative;
+}
+.okc-tooltip.pinned .okc-tt-pin-hint::before {
+  position: absolute;
+  left: 0; top: 0;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+/* Close × button — only visible when the tooltip is pinned. */
+.okc-tooltip .okc-tt-close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  display: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 4px;
+  align-items: center;
+  justify-content: center;
+}
+.okc-tooltip.pinned .okc-tt-close {
+  display: inline-flex;
+}
+.okc-tooltip .okc-tt-close:hover,
+.okc-tooltip .okc-tt-close:focus-visible {
+  background: var(--surface-2);
+  color: var(--text);
+  outline: none;
 }
