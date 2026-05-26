@@ -3334,17 +3334,32 @@ oku-chart .okc-legend {
   paint-order: stroke fill;
 }
 /* Donut chart — slices, centre readout, side legend. */
+/* Global: never show the browser default focus outline on chart
+   interactive shapes. Each shape has its own per-state visual
+   below (scale, stroke, opacity). */
+oku-chart [tabindex]:focus,
+oku-chart [tabindex]:focus-visible {
+  outline: none;
+}
 oku-chart .okc-donut .okc-slice {
   stroke: var(--bg);
   stroke-width: 2;
   cursor: pointer;
-  transition: opacity 0.12s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.12s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), stroke-width 0.12s ease;
   transform-origin: 140px 160px;
 }
 oku-chart .okc-donut .okc-slice:hover,
 oku-chart .okc-donut .okc-slice:focus-visible {
-  transform: scale(1.025);
+  transform: scale(1.04);
+  stroke-width: 3;
   outline: none;
+}
+/* Pinned slice — stronger raise + accent ring so the click-pin
+   state reads at a glance after the cursor moves away. */
+oku-chart .okc-donut .okc-slice.okc-pinned {
+  transform: scale(1.06);
+  stroke: var(--accent);
+  stroke-width: 3;
 }
 oku-chart .okc-donut-total {
   fill: var(--text);

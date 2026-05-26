@@ -5877,12 +5877,18 @@ class OkuChart extends HTMLElement {
       }
     }
     function pinRich(anchor, payload) {
+      // Drop the pinned-marker from any previous pin before applying
+      // the new one — keeps a single "selected" indicator across the
+      // chart at any time.
+      self.querySelectorAll('.okc-pinned').forEach(function (el) { el.classList.remove('okc-pinned'); });
       pinnedAnchor = anchor;
+      anchor.classList.add('okc-pinned');
       showRich(anchor, payload);
       var tip = self.querySelector(':scope > .okc-tooltip');
       if (tip) tip.classList.add('pinned');
     }
     function unpinRich() {
+      self.querySelectorAll('.okc-pinned').forEach(function (el) { el.classList.remove('okc-pinned'); });
       pinnedAnchor = null;
       hideRich(true);
     }
