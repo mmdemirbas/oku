@@ -4370,11 +4370,20 @@ oku-chart .okc-network .okc-network-edge {
   opacity: 0.55;
 }
 oku-chart .okc-network .okc-network-node {
-  cursor: pointer;
+  cursor: grab;
   transition: filter 0.15s ease;
+  touch-action: none;
 }
 oku-chart .okc-network .okc-network-node:hover circle {
   filter: brightness(1.1);
+  stroke: var(--accent-strong);
+  stroke-width: 2;
+}
+oku-chart .okc-network .okc-network-node.okc-dragging {
+  cursor: grabbing;
+}
+oku-chart .okc-network .okc-network-node.okc-dragging circle {
+  filter: brightness(1.15);
   stroke: var(--accent-strong);
   stroke-width: 2;
 }

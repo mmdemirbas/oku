@@ -5178,24 +5178,98 @@ class OkuChart extends HTMLElement {
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Network') + '" class="okc-svg okc-network">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
-    // Edges first (drawn under nodes).
+    // Edges first (drawn under nodes). Tagged with source / target so
+    // the drag handler can locate every edge touching a moved node.
     links.forEach(function (l) {
       var a = byId[l.source], b = byId[l.target];
       if (!a || !b) return;
-      parts.push('<line x1="' + a._x.toFixed(1) + '" y1="' + a._y.toFixed(1) + '" x2="' + b._x.toFixed(1) + '" y2="' + b._y.toFixed(1) + '" class="okc-network-edge"/>');
+      parts.push('<line data-source="' + escapeXml(String(l.source)) + '" data-target="' + escapeXml(String(l.target)) + '" x1="' + a._x.toFixed(1) + '" y1="' + a._y.toFixed(1) + '" x2="' + b._x.toFixed(1) + '" y2="' + b._y.toFixed(1) + '" class="okc-network-edge"/>');
     });
+    // Nodes use a translated group so drag updates one transform
+    // instead of three coordinate attributes. Layout positions are
+    // stored on data-x / data-y for the drag handler.
     nodes.forEach(function (n) {
       var color = palette[n.color] || palette.accent;
       var deg = adj[n.id].length;
       var r = 6 + Math.min(8, deg);
-      parts.push('<g class="okc-network-node" tabindex="0" data-hover-payload="' + escapeXml(JSON.stringify({label: n.label || n.id, kv: [{k: 'degree', v: String(deg)}]})) + '">' +
-        '<circle cx="' + n._x.toFixed(1) + '" cy="' + n._y.toFixed(1) + '" r="' + r + '" fill="' + color + '"/>' +
-        '<text x="' + n._x.toFixed(1) + '" y="' + (n._y - r - 4).toFixed(1) + '" text-anchor="middle" class="okc-network-label">' + escapeXml(n.label || n.id) + '</text>' +
+      parts.push('<g class="okc-network-node" tabindex="0" data-node-id="' + escapeXml(String(n.id)) + '" data-x="' + n._x.toFixed(1) + '" data-y="' + n._y.toFixed(1) + '" transform="translate(' + n._x.toFixed(1) + ',' + n._y.toFixed(1) + ')" data-hover-payload="' + escapeXml(JSON.stringify({label: n.label || n.id, kv: [{k: 'degree', v: String(deg)}]})) + '">' +
+        '<circle cx="0" cy="0" r="' + r + '" fill="' + color + '"/>' +
+        '<text x="0" y="' + (-r - 4).toFixed(1) + '" text-anchor="middle" class="okc-network-label">' + escapeXml(n.label || n.id) + '</text>' +
         '<title>' + escapeXml((n.label || n.id) + ' · degree ' + deg) + '</title>' +
         '</g>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireNetworkDrag();
+  }
+
+  /* ---------------- Network drag — drag-to-untangle ----------------
+     Force-directed layouts pack nicely but often produce overlapping
+     bundles for small graphs. Let the reader drag individual nodes
+     to clean up the view — pointer events on each node group update
+     its transform AND every edge that touches it. Pinned positions
+     persist for the lifetime of the chart instance (until the page
+     re-renders). */
+  _wireNetworkDrag() {
+    var svg = this.querySelector('.okc-network');
+    if (!svg) return;
+    var dragging = null;       // { node, edges, startCx, startCy, ptX, ptY }
+    function svgPoint(ev) {
+      var pt = svg.createSVGPoint();
+      pt.x = ev.clientX; pt.y = ev.clientY;
+      var ctm = svg.getScreenCTM();
+      if (!ctm) return { x: ev.clientX, y: ev.clientY };
+      var inv = ctm.inverse();
+      return pt.matrixTransform(inv);
+    }
+    svg.addEventListener('pointerdown', function (ev) {
+      var node = ev.target.closest('.okc-network-node');
+      if (!node || !svg.contains(node)) return;
+      var id = node.getAttribute('data-node-id');
+      if (!id) return;
+      var edges = svg.querySelectorAll('line[data-source="' + CSS.escape(id) + '"], line[data-target="' + CSS.escape(id) + '"]');
+      var startPt = svgPoint(ev);
+      dragging = {
+        node: node,
+        id: id,
+        edges: edges,
+        startCx: +node.getAttribute('data-x'),
+        startCy: +node.getAttribute('data-y'),
+        ptX: startPt.x,
+        ptY: startPt.y,
+      };
+      node.classList.add('okc-dragging');
+      svg.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+    });
+    svg.addEventListener('pointermove', function (ev) {
+      if (!dragging) return;
+      var pt = svgPoint(ev);
+      var nx = dragging.startCx + (pt.x - dragging.ptX);
+      var ny = dragging.startCy + (pt.y - dragging.ptY);
+      dragging.node.setAttribute('transform', 'translate(' + nx.toFixed(1) + ',' + ny.toFixed(1) + ')');
+      dragging.node.setAttribute('data-x', nx.toFixed(1));
+      dragging.node.setAttribute('data-y', ny.toFixed(1));
+      for (var i = 0; i < dragging.edges.length; i++) {
+        var e = dragging.edges[i];
+        var isSrc = e.getAttribute('data-source') === dragging.id;
+        if (isSrc) {
+          e.setAttribute('x1', nx.toFixed(1));
+          e.setAttribute('y1', ny.toFixed(1));
+        } else {
+          e.setAttribute('x2', nx.toFixed(1));
+          e.setAttribute('y2', ny.toFixed(1));
+        }
+      }
+    });
+    function endDrag(ev) {
+      if (!dragging) return;
+      dragging.node.classList.remove('okc-dragging');
+      try { svg.releasePointerCapture(ev.pointerId); } catch (e) {}
+      dragging = null;
+    }
+    svg.addEventListener('pointerup', endDrag);
+    svg.addEventListener('pointercancel', endDrag);
   }
 
   /* ---------------- Tier 3 — scatter-matrix ----------------
