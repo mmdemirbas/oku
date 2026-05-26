@@ -1199,7 +1199,12 @@ function initReadingAids() {
       ths.forEach(function (th, idx) {
         if (th.querySelector(':scope > .okt-col-resize')) return;
         // Make th a positioning context for the absolute handle.
-        if (getComputedStyle(th).position === 'static') th.style.position = 'relative';
+        // Both `relative` and `sticky` qualify; only step in when the
+        // cell is `static` (CSS default). Overriding sticky→relative
+        // here would silently kill the sticky-header behaviour the
+        // CSS already wires for every thead th.
+        var pos = getComputedStyle(th).position;
+        if (pos === 'static') th.style.position = 'relative';
         var handle = document.createElement('span');
         handle.className = 'okt-col-resize';
         handle.setAttribute('aria-hidden', 'true');

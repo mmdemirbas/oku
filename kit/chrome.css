@@ -1305,11 +1305,16 @@ code:not(pre code) {
 }
 .okt-filter input::placeholder { color: var(--text-faint); }
 
-/* Sort indicators on <thead th> when the cell is bound as sortable. */
+/* Sort indicators on <thead th> when the cell is bound as sortable.
+   Sticky is preserved here — `position: sticky` is also a containing
+   block for the absolutely-positioned sort indicator, so it doubles
+   for both jobs and the header stays pinned during vertical scroll. */
 .okt-sortable {
   cursor: pointer;
   user-select: none;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 2;
   padding-right: 22px !important;
   transition: background 0.12s ease, color 0.12s ease;
 }
@@ -1448,13 +1453,21 @@ code:not(pre code) {
 .okt-chip-clear:hover { color: var(--accent-strong); background: var(--accent-soft); }
 
 .okt-table-scroll {
-  overflow-x: auto;
-  /* Headers stick to the viewport top via thead th `position: sticky`.
-     Internal vertical scrolling would hide the header behind the
-     scroll container; instead, the whole page scrolls and the header
-     row pins to the viewport for tables of any height. */
+  /* Default: no scroll context. `overflow-x: auto` would implicitly
+     promote `overflow-y` to `auto` too (per CSS spec), which then
+     breaks `position: sticky` on thead th — the sticky element would
+     be contained by this box instead of pinning to the viewport.
+     Cells wrap (white-space: normal + overflow-wrap: anywhere on td)
+     so default tables don't overflow horizontally. Opt-in `okt-nowrap`
+     re-introduces horizontal scroll for tables that genuinely need
+     unbreakable columns (and accept losing sticky as the trade). */
+  overflow-x: visible;
   border-radius: 8px;
-  /* Edge fade shadows hint at horizontal overflow. */
+  background: var(--surface);
+}
+.okt-table-scroll:has(> table.okt-nowrap) {
+  overflow-x: auto;
+  /* Edge fade shadows hint at horizontal overflow on opt-in tables. */
   background:
     linear-gradient(to right, var(--surface) 30%, transparent),
     linear-gradient(to right, transparent, var(--surface) 70%) 100% 0,
@@ -1467,8 +1480,17 @@ code:not(pre code) {
 }
 .okt-table-scroll > table {
   margin: 0;
-  min-width: 100%;
+  /* Default: fit the wrap container so cell content wraps inside its
+     column instead of forcing horizontal scroll. Tables with many
+     genuinely-unbreakable columns can opt in to single-line layout
+     with the okt-nowrap class — that's when the scroll container
+     earns its keep. */
+  width: 100%;
+  table-layout: auto;
+}
+.okt-table-scroll > table.okt-nowrap {
   width: max-content;
+  min-width: 100%;
 }
 
 /* Cards view — auto-fit grid, key/value stack per cell */
