@@ -2238,6 +2238,14 @@ function _hdtAfterPrismHighlight(env) {
   if (!pre.classList.contains('okt-line-numbered')) return;
   if (code.querySelector(':scope > .okt-code-line')) return; // already wrapped, intact
   _hdtWrapCodeLines(code);
+  // After line wrap, walk each per-line `.token.script` /
+  // `.token.style` shard and re-tokenise its text contents with the
+  // embedded language. The wrap reduces multi-line elements to one
+  // plain-text clone per line, so each shard is single-line and can
+  // be tokenised independently. Running before wrap would lose the
+  // nested tokens — the multi-line-clone path uses `textContent =`
+  // which strips descendant spans.
+  _hdtHighlightNestedLanguages(code);
   pre.setAttribute('data-okt-lines-wrapped', '1');
   // Clear any stale fold-marker state inside per-line cells so a fresh
   // detection pass attaches handlers to the current line's marker.
@@ -2267,6 +2275,60 @@ function _hdtAfterPrismHighlight(env) {
     var folds = _hdtDetectBraceFolds(code);
     if (folds.length) _hdtApplyFolds(pre, code, folds);
   }
+}
+
+function _hdtHighlightNestedLanguages(code) {
+  if (!window.Prism) return;
+  // Two shapes to handle:
+  //   (a) explicit `class="language-foo"` spans created by markdown
+  //       fences inside markdown, or by author-supplied HTML;
+  //   (b) Prism's `markup` grammar emitting `.token.script` (JS) and
+  //       `.token.style` (CSS) for <script> / <style> contents inside
+  //       a language-markup block. These do NOT carry a language-*
+  //       class; the lazy autoloader can't see them.
+  var targets = [];
+  Array.prototype.forEach.call(code.querySelectorAll('[class*="language-"]'), function (el) {
+    if (el.tagName === 'CODE') return;
+    // Already tokenised? — has at least one .token child element.
+    for (var j = 0; j < el.children.length; j++) {
+      if (el.children[j].classList && el.children[j].classList.contains('token')) return;
+    }
+    var m = el.className.match(/language-([\w-]+)/);
+    if (!m) return;
+    var nestedLang = m[1].toLowerCase();
+    if (/^(markup|html|plaintext|text|none)$/.test(nestedLang)) return;
+    targets.push({ el: el, lang: nestedLang });
+  });
+  Array.prototype.forEach.call(code.querySelectorAll('.token.script'), function (el) {
+    if (el.querySelector('.token')) return; // already tokenised
+    targets.push({ el: el, lang: 'javascript' });
+  });
+  Array.prototype.forEach.call(code.querySelectorAll('.token.style'), function (el) {
+    if (el.querySelector('.token')) return;
+    targets.push({ el: el, lang: 'css' });
+  });
+  targets.forEach(function (t) {
+    var target = t.el, langName = t.lang;
+    function rehl() {
+      try {
+        var grammar = window.Prism.languages[langName];
+        if (!grammar) return;
+        // Use Prism.highlight on the raw text so we don't re-trigger
+        // the outer block's `complete` hook (recursion risk).
+        var raw = target.textContent;
+        target.innerHTML = window.Prism.highlight(raw, grammar, langName);
+      } catch (e) {}
+    }
+    if (window.Prism.languages && window.Prism.languages[langName]) {
+      rehl();
+      return;
+    }
+    if (window.Prism.plugins && window.Prism.plugins.autoloader) {
+      try {
+        window.Prism.plugins.autoloader.loadLanguages([langName], rehl);
+      } catch (e) {}
+    }
+  });
 }
 
 /* ============ Code-block line wrap + brace fold (module scope) ============ *
@@ -6558,6 +6620,25 @@ var __prismLoader = (function () {
         if (window.Prism && window.Prism.plugins && window.Prism.plugins.autoloader) {
           window.Prism.plugins.autoloader.languages_path = CDN + 'components/';
         }
+        // Eagerly preload the languages most commonly nested inside
+        // other languages — JavaScript inside <script>, CSS inside
+        // <style>, bash inside Markdown fences, JSON inside fences.
+        // Prism's markup grammar inlines <script> / <style> contents
+        // as `language-javascript` / `language-css` ONLY when the
+        // embedded grammar is already loaded at first-highlight time.
+        // Without this preload the script body shows as raw text
+        // until the autoloader's second pass — which we can't safely
+        // re-trigger because our line-wrap mutation invalidates the
+        // anchor. Cheap: ~5 small CDN fetches once per page.
+        return Promise.all([
+          ensureScript(CDN + 'components/prism-javascript.min.js').catch(function () {}),
+          ensureScript(CDN + 'components/prism-css.min.js').catch(function () {}),
+          ensureScript(CDN + 'components/prism-bash.min.js').catch(function () {}),
+          ensureScript(CDN + 'components/prism-json.min.js').catch(function () {}),
+          ensureScript(CDN + 'components/prism-yaml.min.js').catch(function () {}),
+        ]);
+      })
+      .then(function () {
         // Register the per-element post-process exactly once. The
         // autoloader replaces innerHTML asynchronously per block as
         // its language module arrives — wrapping in a .then() after
