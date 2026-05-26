@@ -634,7 +634,8 @@
             "properties": {
               "from": { "type": "number" },
               "to":   { "type": "number" },
-              "tone": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "muted" }
+              "tone": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "muted" },
+              "label": { "type": "string", "description": "Optional short label rendered above the band (gauge) or in the band's hover title — names the zone so the reader doesn't have to guess what 'the green slice' means." }
             }
           }
         },

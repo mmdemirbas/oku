@@ -2408,7 +2408,7 @@
           "code": {
             "kind": "code",
             "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"gauge\",\n  \"title\": \"SLO budget\",\n  \"value\": 92,\n  \"max\": 100,\n  \"target\": 80,\n  \"label\": \"of monthly window remaining\",\n  \"zones\": [\n    { \"from\":  0, \"to\": 50, \"tone\": \"danger\"  },\n    { \"from\": 50, \"to\": 80, \"tone\": \"warn\"    },\n    { \"from\": 80, \"to\": 100,\"tone\": \"success\" }\n  ]\n}"
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"gauge\",\n  \"title\": \"SLO budget\",\n  \"value\": 92,\n  \"max\": 100,\n  \"target\": 80,\n  \"label\": \"of monthly window remaining\",\n  \"zones\": [\n    { \"from\":  0, \"to\": 50, \"tone\": \"danger\",  \"label\": \"breaching\" },\n    { \"from\": 50, \"to\": 80, \"tone\": \"warn\",    \"label\": \"caution\"   },\n    { \"from\": 80, \"to\": 100,\"tone\": \"success\", \"label\": \"healthy\"   }\n  ]\n}"
           },
           "render": {
             "kind": "chart",
@@ -2419,21 +2419,9 @@
             "target": 80,
             "label": "of monthly window remaining",
             "zones": [
-              {
-                "from": 0,
-                "to": 50,
-                "tone": "danger"
-              },
-              {
-                "from": 50,
-                "to": 80,
-                "tone": "warn"
-              },
-              {
-                "from": 80,
-                "to": 100,
-                "tone": "success"
-              }
+              { "from": 0,  "to": 50,  "tone": "danger",  "label": "breaching" },
+              { "from": 50, "to": 80,  "tone": "warn",    "label": "caution" },
+              { "from": 80, "to": 100, "tone": "success", "label": "healthy" }
             ]
           }
         },

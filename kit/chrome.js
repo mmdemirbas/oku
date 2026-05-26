@@ -4141,17 +4141,32 @@ class OkuChart extends HTMLElement {
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Background arc — full semicircle.
     parts.push('<path d="' + arcPath(angleOf(mn), angleOf(mx)) + '" fill="var(--surface-soft, rgba(127,127,127,0.18))" class="okc-gauge-bg"/>');
-    // Zone bands.
+    // Zone bands + per-zone label (when provided). The label sits
+    // ABOVE the arc band, anchored at the band's mid-angle so the
+    // reader can name each zone instead of guessing what "the
+    // green slice" means. Without labels the three zones are
+    // visually distinct but semantically opaque (user feedback).
     (x.zones || []).forEach(function (z) {
-      parts.push('<path d="' + arcPath(angleOf(z.from), angleOf(z.to)) + '" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.32" class="okc-gauge-zone"/>');
+      parts.push('<path d="' + arcPath(angleOf(z.from), angleOf(z.to)) + '" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.32" class="okc-gauge-zone"><title>' + escapeXml((z.label || z.tone || 'zone') + ': ' + fmtNum(z.from) + ' – ' + fmtNum(z.to)) + '</title></path>');
+      if (z.label) {
+        var mid = (angleOf(z.from) + angleOf(z.to)) / 2;
+        var lr = r + 14;
+        var lx = cx + lr * Math.cos(mid);
+        var ly = cy + lr * Math.sin(mid);
+        parts.push('<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" class="okc-gauge-zone-label" fill="' + (palette[z.tone] || palette.muted) + '">' + escapeXml(z.label) + '</text>');
+      }
     });
     // Value arc — rich hover surfaces value / target / range.
+    var zoneSummary = (x.zones || []).map(function (z) { return (z.label || z.tone) + ': ' + fmtNum(z.from) + '–' + fmtNum(z.to); }).join(', ');
+    var gaugeKv = [
+      { k: 'value', v: fmtNum(val) },
+      { k: 'range', v: fmtNum(mn) + ' – ' + fmtNum(mx) }
+    ];
+    if (typeof x.target === 'number') gaugeKv.push({ k: 'target', v: fmtNum(x.target) });
+    if (zoneSummary) gaugeKv.push({ k: 'zones', v: zoneSummary });
     var gaugePayload = JSON.stringify({
       label: x.label || (this._title || 'Gauge'),
-      kv: [
-        { k: 'value', v: fmtNum(val) },
-        { k: 'range', v: fmtNum(mn) + ' – ' + fmtNum(mx) }
-      ].concat(typeof x.target === 'number' ? [{ k: 'target', v: fmtNum(x.target) }] : [])
+      kv: gaugeKv
     });
     parts.push('<path d="' + arcPath(angleOf(mn), angleOf(val)) + '" fill="var(--accent)" class="okc-gauge-value" tabindex="0" data-hover-payload="' + escapeXml(gaugePayload) + '"><title>' + escapeXml((x.label ? x.label + ': ' : '') + fmtNum(val) + ' (range ' + fmtNum(mn) + '–' + fmtNum(mx) + ')') + '</title></path>');
     // Target tick.
@@ -4164,8 +4179,82 @@ class OkuChart extends HTMLElement {
     // Centre readout.
     parts.push('<text x="' + cx + '" y="' + (cy - 12) + '" text-anchor="middle" class="okc-gauge-value-text">' + escapeXml(fmtNum(val)) + '</text>');
     if (x.label) parts.push('<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" class="okc-gauge-label">' + escapeXml(x.label) + '</text>');
+    // Cursor-driven inspector: hover anywhere on the arc and the
+    // tooltip surfaces the value at the cursor's angle, plus which
+    // zone that value falls in. Lets the reader read "if we hit 65
+    // we're in caution" without squinting at the ticks.
+    parts.push('<circle class="okc-gauge-cursor" cx="' + cx + '" cy="' + cy + '" r="0" pointer-events="none" visibility="hidden"/>');
+    parts.push('<line class="okc-gauge-cursor-line" x1="' + cx + '" y1="' + cy + '" x2="' + cx + '" y2="' + cy + '" pointer-events="none" visibility="hidden"/>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGaugeCursor(cx, cy, r, sr, mn, mx, angleOf, x.zones || []);
+  }
+  _wireGaugeCursor(cx, cy, rOuter, rInner, mn, mx, angleOf, zones) {
+    var self = this;
+    var svg = self.querySelector('svg.okc-gauge');
+    if (!svg) return;
+    var cursor = svg.querySelector('.okc-gauge-cursor');
+    var cursorLine = svg.querySelector('.okc-gauge-cursor-line');
+    if (!cursor || !cursorLine) return;
+    function pointerToViewBoxPoint(ev) {
+      var pt = svg.createSVGPoint();
+      pt.x = ev.clientX; pt.y = ev.clientY;
+      var ctm = svg.getScreenCTM();
+      if (!ctm) return null;
+      return pt.matrixTransform(ctm.inverse());
+    }
+    function move(ev) {
+      if (self._tipPinned) return;
+      var p = pointerToViewBoxPoint(ev);
+      if (!p) return;
+      var dx = p.x - cx, dy = p.y - cy;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      // Only react when the pointer is roughly over the arc.
+      if (dy > 6 || dist < rInner - 12 || dist > rOuter + 18) {
+        cursor.setAttribute('visibility', 'hidden');
+        cursorLine.setAttribute('visibility', 'hidden');
+        if (self._hideCursorTip) self._hideCursorTip();
+        return;
+      }
+      var ang = Math.atan2(dy, dx);
+      if (ang < Math.PI && ang > 0) ang = Math.PI; // clamp to top half
+      if (ang < 0) ang += 2 * Math.PI; // 180..360 range
+      var t = (ang - Math.PI) / Math.PI;
+      t = Math.max(0, Math.min(1, t));
+      var v = mn + t * (mx - mn);
+      var px = cx + rOuter * Math.cos(ang);
+      var py = cy + rOuter * Math.sin(ang);
+      cursorLine.setAttribute('x1', cx + (rInner - 4) * Math.cos(ang));
+      cursorLine.setAttribute('y1', cy + (rInner - 4) * Math.sin(ang));
+      cursorLine.setAttribute('x2', cx + (rOuter + 4) * Math.cos(ang));
+      cursorLine.setAttribute('y2', cy + (rOuter + 4) * Math.sin(ang));
+      cursorLine.setAttribute('visibility', 'visible');
+      cursor.setAttribute('cx', px);
+      cursor.setAttribute('cy', py);
+      cursor.setAttribute('r', 4);
+      cursor.setAttribute('visibility', 'visible');
+      var zoneHit = null;
+      for (var i = 0; i < zones.length; i++) {
+        var z = zones[i];
+        if (v >= z.from && v <= z.to) { zoneHit = z; break; }
+      }
+      if (self._showCursorTip) {
+        self._showCursorTip({
+          label: 'value ≈ ' + fmtNum(v),
+          kv: [
+            { k: 'zone',  v: zoneHit ? (zoneHit.label || zoneHit.tone || 'zone') : '—' },
+            { k: 'range', v: fmtNum(mn) + ' – ' + fmtNum(mx) }
+          ]
+        }, ev.clientX, svg.getBoundingClientRect().top);
+      }
+    }
+    function leave() {
+      cursor.setAttribute('visibility', 'hidden');
+      cursorLine.setAttribute('visibility', 'hidden');
+      if (self._hideCursorTip && !self._tipPinned) self._hideCursorTip();
+    }
+    svg.addEventListener('mousemove', move);
+    svg.addEventListener('mouseleave', leave);
   }
 
   _renderRadar() {

@@ -3598,6 +3598,21 @@ oku-chart .okc-cartesian-cursor {
   opacity: 0.6;
   pointer-events: none;
 }
+oku-chart .okc-gauge-zone-label {
+  font: 600 9.5px 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+oku-chart .okc-gauge-cursor {
+  fill: var(--accent-strong);
+  pointer-events: none;
+}
+oku-chart .okc-gauge-cursor-line {
+  stroke: var(--accent-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 2;
+  pointer-events: none;
+}
 oku-chart .okc-ridgeline .okc-ridge-cursor-label {
   fill: var(--accent-strong);
   font: 600 11px 'JetBrains Mono', monospace;
