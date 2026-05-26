@@ -1,0 +1,428 @@
+{
+  "$schema": "../kit/schema/page.schema.json",
+  "kind": "page",
+  "title": "Design review",
+  "accent": "indigo",
+  "meta": {
+    "eyebrow": "Strategy",
+    "subtitle": "Where the kit is, where it should go, and the decisions that need a human",
+    "updated": "2026-05-26",
+    "summary": "Honest pass over the kit. North star, chart-family unification proposals (each with the counter-argument addressed), interaction-budget audit, library-adoption analysis, and a short list of decisions the user needs to make before the next round of implementation."
+  },
+  "blocks": [
+    {
+      "kind": "tldr",
+      "title": "TL;DR",
+      "summary": "The kit has drifted toward 'maximum features'. The next round should be opinionated trimming, family unification, and one or two carefully-chosen library swaps — not more primitives.",
+      "bullets": [
+        "**North star is at risk.** 'Easy for AI to write, nice for human to read' was the founding contract. The current schema has 29 chart types, 7 callout flavours, ~12 chart-level options, and growing. The schema is still small relative to the runtime, but the runtime grew faster than the contract intends.",
+        "**Unification: three viable groups.** Bar variants (`bar` / `stacked-bar` / `grouped-bar`) fold into one with a `mode` enum. `scatter` / `line` / `area` are the same chart with different mark types — same story. `donut` / `pie` / `gauge` share an arc geometry; add an `arc` property and let `pie` be `donut` with inner-radius 0 and `gauge` be `donut` with a half-arc.",
+        "**Interaction-budget audit.** Tooltips on every cell, hover-flash on every paragraph, pin / unpin on every chart — the system has more reactive surface than the content needs. Specific places to trim are named below.",
+        "**Library adoption is a real tradeoff, not free.** D3 / ECharts / Observable Plot each shrink chrome.js but add bundle weight, runtime API surface, and a re-learning cost for AI authors. Recommendation: keep current SVG renderer, adopt **only** Mermaid (already in), **add** Prism (already in), defer everything else until a primitive is genuinely painful to ship.",
+        "**Decisions needed.** Five concrete choices listed in the final section — they shape the next week of work."
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "north-star",
+      "title": "The north star",
+      "lead": "Restate the contract so every later decision is measured against it.",
+      "blocks": [
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "Contract (from the user, paraphrased)",
+          "content": "JSON is the substrate so AI can read / write / modify content without fighting style or glue markup. The presentation should be capable yet simple — simplicity is the ultimate sophistication. Pre-defined structures should be enough for the 90% case, but raw HTML/JS escape hatches should remain available for the 10%."
+        },
+        {
+          "kind": "paragraph",
+          "content": "Two failure modes to guard against. **Drift toward complexity:** every new feature adds schema surface, runtime branches, and visual-language vocabulary the reader has to learn. Each addition is locally justifiable; collectively they erode the contract. **Drift toward purity:** rejecting every addition leaves the reader with bullet-points and tables for everything a chart could illustrate. Equally a failure."
+        },
+        {
+          "kind": "paragraph",
+          "content": "The discipline: every new primitive must answer two questions. **(1) Can AI emit this in one obvious shape, with no per-page judgement calls?** (2) Does the rendered result earn the schema cost — i.e., does the reader recognise the shape faster than they'd parse a paragraph + bullets?"
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "title": "Enforcement proposal",
+          "content": "Add a `kit/PRIMITIVES.md` (kit-internal, not user-facing) that lists every primitive with: the JSON shape, the AI-emission rule (one sentence), and the user-payoff (one sentence). New primitive PRs must update this doc. When the doc gets hard to write for a proposed primitive, that is the signal that the primitive is not earning its place."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "unify-bars",
+      "title": "Unify the bar family",
+      "lead": "Three chart types today differ only in how multi-series rows render. Collapse to one with a mode switch.",
+      "blocks": [
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "title": "Current state",
+              "blocks": [
+                {
+                  "kind": "list",
+                  "items": [
+                    "`type: bar` — one value per row",
+                    "`type: stacked-bar` — categories × series, stacked",
+                    "`type: grouped-bar` — categories × series, side-by-side"
+                  ]
+                },
+                {
+                  "kind": "paragraph",
+                  "content": "Schema cost: three distinct shapes for the AI to choose between. Runtime cost: three renderer paths that share 80% of their layout math."
+                }
+              ]
+            },
+            {
+              "title": "Proposed unified shape",
+              "blocks": [
+                {
+                  "kind": "code",
+                  "language": "json",
+                  "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bar\",\n  \"mode\": \"stacked\",        // \"single\" | \"stacked\" | \"grouped\"\n  \"categories\": [\"Q1\", \"Q2\", \"Q3\"],\n  \"series\": [\n    {\"label\": \"new\",     \"values\": [12, 18, 22]},\n    {\"label\": \"renewal\", \"values\": [30, 28, 35]}\n  ]\n}"
+                },
+                {
+                  "kind": "paragraph",
+                  "content": "AI now picks one shape (`type: bar`) and answers one question (`mode`). Single-series omits `mode` (defaults to `single`); both series-modes share the same `categories` + `series` shape."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "caution",
+          "title": "Counter-argument: 'these ARE different chart types'",
+          "content": "True in statistics-textbook vocabulary. False in this kit's job description. The kit's job is to help AI emit a JSON shape that maps to a rendering; the rendering distinction is one property, not three top-level types. Keeping them separate doubles the API surface AI has to remember without giving anyone a richer outcome. Backwards-compat: keep the old `type: stacked-bar` / `type: grouped-bar` as deprecated aliases (`oku check` warns, schema normalises)."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "unify-cartesian",
+      "title": "Unify scatter / line / area",
+      "lead": "Same axes, same data shape, different mark.",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": "`scatter` plots points, `line` connects them, `area` fills under the line. The data shape is identical — series of `{x, y}` points. The renderer differences are: render dots? yes/no. Render line? yes/no. Render fill? yes/no. Three booleans, eight combinations — most useful, all expressible."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "title": "Today",
+              "blocks": [
+                {
+                  "kind": "code",
+                  "language": "json",
+                  "source": "{ \"type\": \"scatter\", \"series\": [...] }\n{ \"type\": \"line\",    \"series\": [...] }\n{ \"type\": \"area\",    \"series\": [...] }"
+                }
+              ]
+            },
+            {
+              "title": "Unified",
+              "blocks": [
+                {
+                  "kind": "code",
+                  "language": "json",
+                  "source": "{ \"type\": \"plot\", \"marks\": [\"line\"],         \"series\": [...] }\n{ \"type\": \"plot\", \"marks\": [\"line\",\"area\"], \"series\": [...] }\n{ \"type\": \"plot\", \"marks\": [\"dots\"],         \"series\": [...] }\n{ \"type\": \"plot\", \"marks\": [\"dots\",\"line\"],  \"series\": [...] }"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "caution",
+          "title": "Counter-argument: 'naming convention from stats / D3 calls them different things'",
+          "content": "Observable Plot, R/ggplot, Vega-Lite, and Tableau all use a layered-mark model — exactly what `marks: [...]` proposes. The 'three types' convention belongs to spreadsheet UIs (Excel, Google Sheets) where the user picks one wizard. AI doesn't need that wizard; it needs a small set of orthogonal switches. The unified shape is closer to industry-mature visualisation libraries, not further from them."
+        },
+        {
+          "kind": "callout",
+          "type": "warn",
+          "title": "Risk worth naming",
+          "content": "`marks: [\"line\"]` is one more word for the AI to emit than `type: \"line\"`. Cost: token. Gain: discoverability — `marks` makes 'this is a Cartesian chart that you compose' explicit. Mitigation: the schema can accept `type: \"line\"` as sugar that desugars to `type: \"plot\", marks: [\"line\"]`. Pick one canonical, keep the other as alias."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "unify-arcs",
+      "title": "Unify donut / pie / gauge",
+      "lead": "Three primitives that share an arc-geometry renderer.",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": "Today `donut` and `pie` differ in inner-radius (`pie` has 0 → no hole). `gauge` differs in arc extent — it covers a 180° span instead of 360°, and renders along zones rather than slices. All three share: an arc renderer, an angular layout function, a label placer."
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "Arc family in one shape"
+        },
+        {
+          "kind": "table",
+          "headers": ["Property", "pie", "donut", "gauge"],
+          "rows": [
+            ["`arc.start`", "0°",   "0°",   "−90°"],
+            ["`arc.end`",   "360°", "360°", "+90°"],
+            ["`inner_radius` (% of outer)", "0",  "0.55", "0.55"],
+            ["Data shape", "slices", "slices", "value + zones"]
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "content": "The data-shape split is the wrinkle. `gauge` carries one scalar + a zones array; `pie` / `donut` carry a slices array. So the unification stops at the geometry — `type: arc` with arc + inner-radius props collapses pie+donut cleanly, but gauge stays its own type because its data carries different semantics. **Recommendation: unify pie+donut as `type: arc, mode: \"pie\"|\"donut\"`. Leave gauge as its own type** — its semantics are a single-value KPI, not a part-to-whole breakdown."
+        },
+        {
+          "kind": "callout",
+          "type": "caution",
+          "title": "Counter-argument: 'donut and pie ARE the same chart with one switch — why keep `mode` at all?'",
+          "content": "Because the default is different. A reader looking at a donut expects a centre-total label; a pie reader expects edge-only labels. The `mode` switch can map to both inner-radius AND default-label-strategy in one move. Hide-radius behind a mode rather than expose it as a number — readers don't need to know about radii, only about which-shape-they-want."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "interaction-budget",
+      "title": "Interaction budget — what to trim",
+      "lead": "Liveness is a feature; ubiquitous reactivity is noise. Five concrete trims.",
+      "blocks": [
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "Where the current reactivity stops earning its place"
+        },
+        {
+          "kind": "table",
+          "headers": ["Surface", "Today", "Proposed trim", "Why"],
+          "rows": [
+            ["Tables — every cell",
+             "Filter + chip rack + group-by + count badge present on every table",
+             "Hide all controls until the table is hovered / focused; or expose only when `controls: true` on the source",
+             "Tables with 3 rows do not need a filter input. The chrome is louder than the data."],
+            ["Code blocks — every fence",
+             "Line gutter + fold markers + language pill always rendered",
+             "Gutter on by default, fold markers only for ≥ 8-line blocks, language pill only when the block sits inside a multi-language sequence",
+             "A 3-line shell command does not benefit from fold markers."],
+            ["Charts — every primitive",
+             "Hover-tooltip + click-pin + cursor + lightbox-expand on every chart",
+             "Click-pin only when the chart has labels worth pinning (≥ 4 series or ≥ 8 categories). Lightbox-expand only when the chart is bigger than its column.",
+             "A 3-bar chart does not need pin-to-compare. The user can read all three."],
+            ["Paragraphs — hover-bind",
+             "`bind` key wires cross-block flash on hover",
+             "Keep the feature but remove demos that use it just to demonstrate it. Bind should be invisible until the reader needs it.",
+             "Demo-driven cross-flash trains the reader to expect things to flash; expecting flash makes the page feel busy."],
+            ["Sidebar — perpetual",
+             "Drag-handle, collapse rail, drawer, three states, all always wired",
+             "Keep the states, hide all affordances except the active one. The drag-handle hairline can be 1px wider on hover; off-hover it can be invisible.",
+             "Invisible affordance is fine when the reader is in flow; the visible state changes on intention (hover, focus)."]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "title": "Heuristic",
+          "content": "An interactive feature earns its always-on visibility iff the reader is likely to want it on every page view. Otherwise — invisible until intent. Hover, focus, and keyboard navigation are all signals of intent that cost the kit nothing extra."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "libraries",
+      "title": "Library adoption — what's worth importing",
+      "lead": "Honest cost / benefit per candidate.",
+      "blocks": [
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "Candidate libraries"
+        },
+        {
+          "kind": "table",
+          "headers": ["Library", "Would replace", "~Cost", "Verdict"],
+          "rows": [
+            ["**D3**",
+             "Hand-rolled scales / axes / layouts in chrome.js (~3k of the chart code)",
+             "~80 KB gz core, modular tree-shake possible (~30 KB for axis+scale only)",
+             "**Defer.** D3 imposes its own data-binding model. Net: less code to write per chart, more code to understand per chart. Not worth the cognitive shift when the existing renderer works and the AI emits one shape per chart anyway."],
+            ["**Observable Plot**",
+             "Entire chart engine — replace `_renderScatter`, `_renderBar`, ... with Plot.plot({marks: [...]})",
+             "~120 KB gz (Plot + D3 core)",
+             "**Watch.** Conceptually aligned with the proposed mark-composition unification. But: it owns the SVG output, so we'd lose the current control over hover / pin / cursor wiring. Adopt only if we also adopt Plot's interactivity story."],
+            ["**ECharts**",
+             "Replace every chart type",
+             "~290 KB gz core, ~180 KB tree-shaken",
+             "**Reject.** Massive surface, owns its own DOM, theme system fights the kit's tokens. Wins only on 'every imaginable chart already exists' — which we don't need and the AI doesn't want to navigate."],
+            ["**Mermaid**",
+             "Diagrams (already in use)",
+             "~280 KB gz (already paying)",
+             "**Keep.** Diagrams are not a chart — they are a DSL the AI emits and Mermaid renders. The cost is paid once at first diagram render."],
+            ["**Prism**",
+             "Code highlighting (already in use)",
+             "~30 KB gz core + per-language modules",
+             "**Keep.** Nested-language support is non-trivial; PrismJS handles it. Continue using the autoloader pattern."],
+            ["**Pagefind**",
+             "Static-site search (already in use for `dist/site/`)",
+             "Lazy-loaded, ~50 KB on first search-open",
+             "**Keep.** Solves a real problem with no maintained alternative at this size."],
+            ["**Vis-network / Sigma.js**",
+             "Replace the hand-rolled Fruchterman-Reingold network renderer",
+             "~140 KB gz (vis-network)",
+             "**Watch.** Worth it only if network charts become a primary use case. Today they are one of 29 chart types. The current FR layout is rough but works."]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "Net recommendation",
+          "content": "No new libraries this round. The unification work (bars, plots, arcs) is where the next leverage is. Library adoption pays off once we know the unified shapes — then we can ask 'does library X render this shape better than our renderer?' instead of asking 'should we use X?' in the abstract."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "wording",
+      "title": "'render' → 'output' wording",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": "Where it appears: the example-pair primitive labels the right column 'render' (`docs/reference.json` calls it 'render', schema has a `render` field). The label sits at the top of every example."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "title": "render",
+              "blocks": [
+                { "kind": "paragraph", "content": "Verbed-noun. Accurate but technical. The reader has to know that 'render' = 'the result of running the code on the left'." }
+              ]
+            },
+            {
+              "title": "output",
+              "blocks": [
+                { "kind": "paragraph", "content": "Plain noun. Universal. Matches how a non-developer thinks about the column: 'this is what the code produces.'" }
+              ]
+            },
+            {
+              "title": "result",
+              "blocks": [
+                { "kind": "paragraph", "content": "Also plain. Slightly more user-facing than 'output', which implies a console / pipeline. 'Result' implies 'what you see'." }
+              ]
+            },
+            {
+              "title": "preview",
+              "blocks": [
+                { "kind": "paragraph", "content": "Implies impermanence — like a draft. Wrong: this is the live thing, not a preview of it." }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "title": "Recommendation",
+          "content": "**'output'** wins for the right-column label. **'render'** stays as the JSON schema field name (changing the field is a backwards-compatible nightmare for no AI-author benefit). The visible label differs from the field name — that's normal for any kit."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "pick-by-family-grouping",
+      "title": "Group 'Pick by family' explicitly",
+      "lead": "Today the chart family panel is one flat 29-card grid. The intent families exist in the lower sections but not in the picker.",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "content": "Today: a single `compare-grid` of 29 cards, one per variant. The user reads left-to-right scanning shapes. The intent families (Cartesian, Categorical, Part-to-whole, Distribution, Trend, Flow, Network, Multivariate, Goal, Geographic) exist as `section` headings further down."
+        },
+        {
+          "kind": "paragraph",
+          "content": "Proposal: replace the flat grid with a sequence of named groups. Each group is a heading + a sub-grid. The reader sees structure before reading shapes. 29 cards in 10 buckets parse faster than 29 cards in 1 bucket."
+        },
+        {
+          "kind": "callout",
+          "type": "caution",
+          "title": "Counter-argument: 'one grid is faster to scan'",
+          "content": "True for the user who knows what they want. False for the user who is exploring. The flat grid optimises for recall; the grouped grid optimises for learning. A new user — including AI — benefits more from learning the families than from recalling the cards. Mitigation: keep the flat sub-grid layout inside each family; the only chrome added is the family heading."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "risk-register",
+      "title": "Risk register",
+      "lead": "What could go wrong with each direction.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["Direction", "Risk", "Mitigation"],
+          "rows": [
+            ["Bar unification",
+             "Existing docs break when `stacked-bar` / `grouped-bar` go away",
+             "Schema accepts both for one release; `oku check` warns; the renderer normalises old → new. Delete the alias only when no doc uses it."],
+            ["Cartesian unification",
+             "AI has been trained on the current shape and emits the old types reliably",
+             "Keep `scatter` / `line` / `area` as sugar that desugars to `plot, marks: [...]`. AI emits either; the canonical form is one."],
+            ["Arc unification",
+             "Pie / donut visual defaults diverge subtly (label placement, centre total)",
+             "Defaults map from `mode`; an author can override any default. Tested via reference.json examples."],
+            ["Trim chrome",
+             "Trimming feels like 'removing the features I asked for'",
+             "Hide, don't delete. Every trimmed control remains accessible on hover / focus / opt-in. The kit gains a single `interaction_density: minimal | normal` global so the entire site can dial chrome up or down."],
+            ["Library adoption",
+             "Bundle weight; coupling to a third-party's API choices",
+             "Defer this round. Revisit only after unification, when we know the shape we'd want a library to render."]
+          ]
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "decisions",
+      "title": "Decisions the user needs to make",
+      "lead": "Five concrete choices. Each gates a chunk of work.",
+      "blocks": [
+        {
+          "kind": "table",
+          "headers": ["#", "Question", "If you don't decide"],
+          "rows": [
+            ["1",
+             "Unify bar / stacked-bar / grouped-bar into `type: bar` + `mode`? (recommendation: yes, with deprecated aliases)",
+             "Skip; leave three types as-is"],
+            ["2",
+             "Unify scatter / line / area into `type: plot` + `marks: [...]`? (recommendation: yes, with sugar aliases)",
+             "Skip; leave three types as-is"],
+            ["3",
+             "Unify pie + donut into `type: arc` + `mode`, leave gauge alone? (recommendation: yes)",
+             "Skip; leave three types as-is"],
+            ["4",
+             "Add a global `interaction_density` switch (minimal | normal) and trim per the budget table?",
+             "Keep current always-on chrome"],
+            ["5",
+             "Group 'Pick by family' under the 10 intent headings, or keep one flat grid?",
+             "Keep flat"]
+          ]
+        },
+        {
+          "kind": "paragraph",
+          "content": "Independent decisions; answer in any order. After the answers land, the next implementation round becomes scoped — three weeks of work compresses to under a week because the decisions remove ambiguity."
+        }
+      ]
+    }
+  ]
+}
