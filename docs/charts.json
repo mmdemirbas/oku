@@ -17,6 +17,7 @@
       "kind": "section",
       "id": "charts",
       "title": "Chart variants",
+      "lead": "28 chart types, one primitive (`chart`). Reach for a type by intent — the families below cluster types that solve the same shape of problem. Each card has a tiny live preview; click through to the variant for its full payload and a live render.",
       "blocks": [
         {
           "kind": "heading",
@@ -571,7 +572,15 @@
               ]
             }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "family-cartesian",
+      "title": "Cartesian — x/y points with axes",
+      "lead": "Use when the x-axis is a continuous quantity (or ordered sequence) and you want to show position, slope, or relationships between two numeric dimensions.",
+      "blocks": [
         {
           "kind": "heading",
           "level": 3,
@@ -669,120 +678,103 @@
                 "label": "api-gateway",
                 "color": "accent",
                 "data": [
-                  {"x": 1, "y": 142}, {"x": 2, "y": 155}, {"x": 3, "y": 138},
-                  {"x": 4, "y": 161}, {"x": 5, "y": 149}, {"x": 6, "y": 144}, {"x": 7, "y": 152}
+                  {
+                    "x": 1,
+                    "y": 142
+                  },
+                  {
+                    "x": 2,
+                    "y": 155
+                  },
+                  {
+                    "x": 3,
+                    "y": 138
+                  },
+                  {
+                    "x": 4,
+                    "y": 161
+                  },
+                  {
+                    "x": 5,
+                    "y": 149
+                  },
+                  {
+                    "x": 6,
+                    "y": 144
+                  },
+                  {
+                    "x": 7,
+                    "y": 152
+                  }
                 ]
               },
               {
                 "label": "auth-svc",
                 "color": "warn",
                 "data": [
-                  {"x": 1, "y": 88}, {"x": 2, "y": 92}, {"x": 3, "y": 110},
-                  {"x": 4, "y": 132}, {"x": 5, "y": 121}, {"x": 6, "y": 98}, {"x": 7, "y": 90}
+                  {
+                    "x": 1,
+                    "y": 88
+                  },
+                  {
+                    "x": 2,
+                    "y": 92
+                  },
+                  {
+                    "x": 3,
+                    "y": 110
+                  },
+                  {
+                    "x": 4,
+                    "y": 132
+                  },
+                  {
+                    "x": 5,
+                    "y": 121
+                  },
+                  {
+                    "x": 6,
+                    "y": 98
+                  },
+                  {
+                    "x": 7,
+                    "y": 90
+                  }
                 ]
               },
               {
                 "label": "search-svc",
                 "color": "success",
                 "data": [
-                  {"x": 1, "y": 64}, {"x": 2, "y": 71}, {"x": 3, "y": 68},
-                  {"x": 4, "y": 79}, {"x": 5, "y": 73}, {"x": 6, "y": 70}, {"x": 7, "y": 66}
+                  {
+                    "x": 1,
+                    "y": 64
+                  },
+                  {
+                    "x": 2,
+                    "y": 71
+                  },
+                  {
+                    "x": 3,
+                    "y": 68
+                  },
+                  {
+                    "x": 4,
+                    "y": 79
+                  },
+                  {
+                    "x": 5,
+                    "y": 73
+                  },
+                  {
+                    "x": 6,
+                    "y": 70
+                  },
+                  {
+                    "x": 7,
+                    "y": 66
+                  }
                 ]
-              }
-            ]
-          }
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "chart-pie",
-          "title": "type: pie"
-        },
-        {
-          "kind": "paragraph",
-          "content": "Same `slices` payload as donut; the only difference is the absence of the centre hole and the centre-readout. Reach for pie when the part-to-whole relationship is the whole story and the absolute total doesn't need an extra glance. Pie reads better than donut for 2–4 slice distributions; for 5+ slices, prefer donut (clearer per-slice legend strip) or stacked-bar."
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"pie\",\n  \"title\": \"Build-time budget\",\n  \"slices\": [\n    { \"label\": \"chrome.js\",   \"value\": 40, \"color\": \"accent\" },\n    { \"label\": \"chrome.css\",  \"value\": 25, \"color\": \"success\" },\n    { \"label\": \"renderer.js\", \"value\": 20, \"color\": \"warn\" },\n    { \"label\": \"cli.py\",      \"value\": 15, \"color\": \"muted\" }\n  ]\n}"
-          },
-          "render": {
-            "kind": "chart",
-            "type": "pie",
-            "title": "Build-time budget",
-            "slices": [
-              {"label": "chrome.js",   "value": 40, "color": "accent"},
-              {"label": "chrome.css",  "value": 25, "color": "success"},
-              {"label": "renderer.js", "value": 20, "color": "warn"},
-              {"label": "cli.py",      "value": 15, "color": "muted"}
-            ]
-          }
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "chart-bar",
-          "title": "type: bar"
-        },
-        {
-          "kind": "paragraph",
-          "content": [
-            "Row-per-item horizontal bars. Each row carries ",
-            {
-              "kind": "code",
-              "text": "label"
-            },
-            ", ",
-            {
-              "kind": "code",
-              "text": "value"
-            },
-            ", optional ",
-            {
-              "kind": "code",
-              "text": "display"
-            },
-            " (right-hand readout override), and optional ",
-            {
-              "kind": "code",
-              "text": "color"
-            },
-            " (accent / warn / danger / success). ",
-            {
-              "kind": "code",
-              "text": "max"
-            },
-            " caps the bar full-width; if omitted, the largest row's value sets the scale. Use when you want a label/value comparison without axis chrome."
-          ]
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bar\",\n  \"rows\": [\n    { \"label\": \"Spark\",  \"value\": 95, \"display\": \"95 / 100\" },\n    { \"label\": \"Flink\",  \"value\": 80 },\n    { \"label\": \"Trino\",  \"value\": 75 }\n  ]\n}"
-          },
-          "render": {
-            "kind": "chart",
-            "type": "bar",
-            "rows": [
-              {
-                "label": "Spark",
-                "value": 95,
-                "display": "95 / 100"
-              },
-              {
-                "label": "Flink",
-                "value": 80,
-                "display": "80 / 100"
-              },
-              {
-                "label": "Trino",
-                "value": 75,
-                "display": "75 / 100"
               }
             ]
           }
@@ -996,6 +988,80 @@
               }
             ]
           }
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "family-categorical",
+      "title": "Categorical — value per category",
+      "lead": "One bar per item, optionally split into stacks or sub-groups. Use when each row has a single label and value; reach for stacked/grouped when each row has multiple comparable values.",
+      "blocks": [
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-bar",
+          "title": "type: bar"
+        },
+        {
+          "kind": "paragraph",
+          "content": [
+            "Row-per-item horizontal bars. Each row carries ",
+            {
+              "kind": "code",
+              "text": "label"
+            },
+            ", ",
+            {
+              "kind": "code",
+              "text": "value"
+            },
+            ", optional ",
+            {
+              "kind": "code",
+              "text": "display"
+            },
+            " (right-hand readout override), and optional ",
+            {
+              "kind": "code",
+              "text": "color"
+            },
+            " (accent / warn / danger / success). ",
+            {
+              "kind": "code",
+              "text": "max"
+            },
+            " caps the bar full-width; if omitted, the largest row's value sets the scale. Use when you want a label/value comparison without axis chrome."
+          ]
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bar\",\n  \"rows\": [\n    { \"label\": \"Spark\",  \"value\": 95, \"display\": \"95 / 100\" },\n    { \"label\": \"Flink\",  \"value\": 80 },\n    { \"label\": \"Trino\",  \"value\": 75 }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "bar",
+            "rows": [
+              {
+                "label": "Spark",
+                "value": 95,
+                "display": "95 / 100"
+              },
+              {
+                "label": "Flink",
+                "value": 80,
+                "display": "80 / 100"
+              },
+              {
+                "label": "Trino",
+                "value": 75,
+                "display": "75 / 100"
+              }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -1137,7 +1203,15 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "family-partwhole",
+      "title": "Part-to-whole",
+      "lead": "A whole divided into named slices. Donut + pie are the classic choices; waffle reads better when the absolute count matters; treemap when the parts have a hierarchy.",
+      "blocks": [
         {
           "kind": "heading",
           "level": 3,
@@ -1198,127 +1272,47 @@
         {
           "kind": "heading",
           "level": 3,
-          "id": "chart-heatmap",
-          "title": "type: heatmap"
+          "id": "chart-pie",
+          "title": "type: pie"
         },
         {
           "kind": "paragraph",
-          "content": "N×M cell grid coloured by value. `cells` is a 2D array (outer = rows, inner = columns). Optional `row_labels` / `col_labels` annotate the edges. `scale` picks the palette family: sequential (one-sided ramp on accent) or diverging (accent for positives, danger for negatives). Hover any cell for the raw value."
+          "content": "Same `slices` payload as donut; the only difference is the absence of the centre hole and the centre-readout. Reach for pie when the part-to-whole relationship is the whole story and the absolute total doesn't need an extra glance. Pie reads better than donut for 2–4 slice distributions; for 5+ slices, prefer donut (clearer per-slice legend strip) or stacked-bar."
         },
         {
           "kind": "example",
           "code": {
             "kind": "code",
             "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"heatmap\",\n  \"title\": \"Latency by service × hour\",\n  \"row_labels\": [\"svc-a\", \"svc-b\", \"svc-c\"],\n  \"col_labels\": [\"00\", \"06\", \"12\", \"18\"],\n  \"cells\": [[12,18,42,30],[8,22,36,24],[40,50,28,16]]\n}"
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"pie\",\n  \"title\": \"Build-time budget\",\n  \"slices\": [\n    { \"label\": \"chrome.js\",   \"value\": 40, \"color\": \"accent\" },\n    { \"label\": \"chrome.css\",  \"value\": 25, \"color\": \"success\" },\n    { \"label\": \"renderer.js\", \"value\": 20, \"color\": \"warn\" },\n    { \"label\": \"cli.py\",      \"value\": 15, \"color\": \"muted\" }\n  ]\n}"
           },
           "render": {
             "kind": "chart",
-            "type": "heatmap",
-            "title": "Latency by service × hour",
-            "row_labels": [
-              "svc-a",
-              "svc-b",
-              "svc-c",
-              "svc-d"
-            ],
-            "col_labels": [
-              "00",
-              "04",
-              "08",
-              "12",
-              "16",
-              "20"
-            ],
-            "cells": [
-              [
-                12,
-                18,
-                26,
-                42,
-                30,
-                18
-              ],
-              [
-                8,
-                22,
-                36,
-                24,
-                16,
-                10
-              ],
-              [
-                40,
-                50,
-                28,
-                16,
-                12,
-                8
-              ],
-              [
-                6,
-                12,
-                18,
-                24,
-                38,
-                50
-              ]
+            "type": "pie",
+            "title": "Build-time budget",
+            "slices": [
+              {
+                "label": "chrome.js",
+                "value": 40,
+                "color": "accent"
+              },
+              {
+                "label": "chrome.css",
+                "value": 25,
+                "color": "success"
+              },
+              {
+                "label": "renderer.js",
+                "value": 20,
+                "color": "warn"
+              },
+              {
+                "label": "cli.py",
+                "value": 15,
+                "color": "muted"
+              }
             ]
           }
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "chart-sparkline",
-          "title": "type: sparkline"
-        },
-        {
-          "kind": "paragraph",
-          "content": "Inline mini line / area / bar. No axes, no chrome — sized for the line height of surrounding prose. `values` is a flat numeric series. `variant` picks line (default), area (filled), or bar (per-value mini-bars). `end_label` renders to the right of the curve as a small caption (`62%`, `↗`, etc.)."
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sparkline\",\n  \"values\": [12,14,18,17,22,25,28,31,30,35],\n  \"variant\": \"area\",\n  \"end_label\": \"35\"\n}"
-          },
-          "render": {
-            "kind": "chart",
-            "type": "sparkline",
-            "values": [
-              12,
-              14,
-              18,
-              17,
-              22,
-              25,
-              28,
-              31,
-              30,
-              35,
-              33,
-              38
-            ],
-            "variant": "area",
-            "end_label": "↗ 38"
-          }
-        },
-        {
-          "kind": "chart",
-          "type": "sparkline",
-          "values": [
-            4,
-            8,
-            12,
-            9,
-            14,
-            6,
-            11,
-            8
-          ],
-          "variant": "bar",
-          "end_label": "11 events"
         },
         {
           "kind": "heading",
@@ -1368,107 +1362,112 @@
         {
           "kind": "heading",
           "level": 3,
-          "id": "chart-gauge",
-          "title": "type: gauge"
+          "id": "chart-treemap",
+          "title": "type: treemap"
         },
         {
           "kind": "paragraph",
-          "content": "Semicircular arc, 0 → max, with a needle / fill at the current value and an optional target tick. Use for single-metric status (SLO budget, runway, uptime) where the gap to target is the point. Optional `zones` paint coloured threshold bands behind the value."
+          "content": "Area-proportional nested rectangles via squarified layout. `tree[]` is a flat list of `{label, value, color?}` leaves; the largest values occupy the largest rectangles. Labels render only when the rectangle is large enough to fit them legibly. Use for composition (LoC by language, spend by category, traffic by route)."
         },
         {
           "kind": "example",
           "code": {
             "kind": "code",
             "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"gauge\",\n  \"title\": \"SLO budget\",\n  \"value\": 92,\n  \"max\": 100,\n  \"target\": 80,\n  \"label\": \"of monthly window remaining\",\n  \"zones\": [\n    { \"from\":  0, \"to\": 50, \"tone\": \"danger\"  },\n    { \"from\": 50, \"to\": 80, \"tone\": \"warn\"    },\n    { \"from\": 80, \"to\": 100,\"tone\": \"success\" }\n  ]\n}"
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"treemap\",\n  \"title\": \"LoC by language\",\n  \"tree\": [\n    {\"label\": \"JavaScript\", \"value\": 6200, \"color\": \"accent\"},\n    {\"label\": \"CSS\",        \"value\": 2400, \"color\": \"success\"},\n    {\"label\": \"Python\",     \"value\": 2800, \"color\": \"warn\"},\n    {\"label\": \"JSON\",       \"value\":  900, \"color\": \"muted\"},\n    {\"label\": \"Markdown\",   \"value\":  400, \"color\": \"danger\"}\n  ]\n}"
           },
           "render": {
             "kind": "chart",
-            "type": "gauge",
-            "title": "SLO budget",
-            "value": 92,
-            "max": 100,
-            "target": 80,
-            "label": "of monthly window remaining",
-            "zones": [
+            "type": "treemap",
+            "title": "LoC by language",
+            "tree": [
               {
-                "from": 0,
-                "to": 50,
-                "tone": "danger"
+                "label": "JavaScript",
+                "value": 6200,
+                "color": "accent"
               },
               {
-                "from": 50,
-                "to": 80,
-                "tone": "warn"
+                "label": "CSS",
+                "value": 2400,
+                "color": "success"
               },
               {
-                "from": 80,
-                "to": 100,
-                "tone": "success"
+                "label": "Python",
+                "value": 2800,
+                "color": "warn"
+              },
+              {
+                "label": "JSON",
+                "value": 900,
+                "color": "muted"
+              },
+              {
+                "label": "Markdown",
+                "value": 400,
+                "color": "danger"
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "family-distribution",
+      "title": "Distribution shape",
+      "lead": "How a value's frequency is spread, not its total. Histogram for binned counts; box-plot for quartile summary; ridgeline to compare multiple distributions vertically.",
+      "blocks": [
         {
           "kind": "heading",
           "level": 3,
-          "id": "chart-radar",
-          "title": "type: radar"
+          "id": "chart-histogram",
+          "title": "type: histogram"
         },
         {
           "kind": "paragraph",
-          "content": "N spokes radiating from centre, one filled polygon per series. Best for 3–8 axes and 1–4 series. `axes[].label` names the spoke; optional `axes[].max` overrides per-axis scaling. `series[].values` array must align with `axes` by index."
+          "content": "Frequency by bin. Author supplies the binning (`bins[]` with `{lo, hi, count}`). Contiguous bins read as a connected distribution; gaps are allowed but render with the visible gap. Use for distribution shape, latency tail, time-to-event."
         },
         {
           "kind": "example",
           "code": {
             "kind": "code",
             "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"radar\",\n  \"title\": \"Tool shortlist — five criteria\",\n  \"axes\": [\n    { \"label\": \"Speed\"   },\n    { \"label\": \"UX\"      },\n    { \"label\": \"Cost\"    },\n    { \"label\": \"Docs\"    },\n    { \"label\": \"Support\" }\n  ],\n  \"series\": [\n    { \"label\": \"Option A\", \"color\": \"accent\",  \"values\": [8, 9, 6, 7, 8] },\n    { \"label\": \"Option B\", \"color\": \"success\", \"values\": [6, 7, 9, 5, 6] }\n  ]\n}"
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"histogram\",\n  \"title\": \"Request latency (ms)\",\n  \"bins\": [\n    {\"lo\":   0, \"hi\":  20, \"count\":  4},\n    {\"lo\":  20, \"hi\":  40, \"count\": 14},\n    {\"lo\":  40, \"hi\":  60, \"count\": 22},\n    {\"lo\":  60, \"hi\":  80, \"count\": 18},\n    {\"lo\":  80, \"hi\": 100, \"count\":  9},\n    {\"lo\": 100, \"hi\": 120, \"count\":  3}\n  ]\n}"
           },
           "render": {
             "kind": "chart",
-            "type": "radar",
-            "title": "Tool shortlist — five criteria",
-            "axes": [
+            "type": "histogram",
+            "title": "Request latency (ms)",
+            "bins": [
               {
-                "label": "Speed"
+                "lo": 0,
+                "hi": 20,
+                "count": 4
               },
               {
-                "label": "UX"
+                "lo": 20,
+                "hi": 40,
+                "count": 14
               },
               {
-                "label": "Cost"
+                "lo": 40,
+                "hi": 60,
+                "count": 22
               },
               {
-                "label": "Docs"
+                "lo": 60,
+                "hi": 80,
+                "count": 18
               },
               {
-                "label": "Support"
-              }
-            ],
-            "series": [
-              {
-                "label": "Option A",
-                "color": "accent",
-                "values": [
-                  8,
-                  9,
-                  6,
-                  7,
-                  8
-                ]
+                "lo": 80,
+                "hi": 100,
+                "count": 9
               },
               {
-                "label": "Option B",
-                "color": "success",
-                "values": [
-                  6,
-                  7,
-                  9,
-                  5,
-                  6
-                ]
+                "lo": 100,
+                "hi": 120,
+                "count": 3
               }
             ]
           }
@@ -1528,280 +1527,6 @@
                   210
                 ],
                 "color": "warn"
-              }
-            ]
-          }
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "chart-bullet",
-          "title": "type: bullet"
-        },
-        {
-          "kind": "paragraph",
-          "content": "Actual-vs-target on a banded horizontal track — Stephen Few's bullet chart. One row per `tracks[]` entry: `label`, `value` (current), `target` (optional vertical tick), `max` (right-edge), optional `zones` painted behind the value."
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bullet\",\n  \"title\": \"Quarter at a glance\",\n  \"tracks\": [\n    { \"label\": \"Revenue ($M)\", \"value\": 92, \"target\": 80, \"max\": 120,\n      \"zones\": [{ \"from\":0, \"to\":40, \"tone\":\"danger\" }, { \"from\":40, \"to\":80, \"tone\":\"warn\" }, { \"from\":80, \"to\":120, \"tone\":\"success\" }] },\n    { \"label\": \"NPS\",          \"value\": 58, \"target\": 65, \"max\": 100, \"color\": \"warn\" }\n  ]\n}"
-          },
-          "render": {
-            "kind": "chart",
-            "type": "bullet",
-            "title": "Quarter at a glance",
-            "tracks": [
-              {
-                "label": "Revenue ($M)",
-                "value": 92,
-                "target": 80,
-                "max": 120,
-                "color": "success",
-                "zones": [
-                  {
-                    "from": 0,
-                    "to": 40,
-                    "tone": "danger"
-                  },
-                  {
-                    "from": 40,
-                    "to": 80,
-                    "tone": "warn"
-                  },
-                  {
-                    "from": 80,
-                    "to": 120,
-                    "tone": "success"
-                  }
-                ]
-              },
-              {
-                "label": "NPS",
-                "value": 58,
-                "target": 65,
-                "max": 100,
-                "color": "warn",
-                "zones": [
-                  {
-                    "from": 0,
-                    "to": 30,
-                    "tone": "danger"
-                  },
-                  {
-                    "from": 30,
-                    "to": 60,
-                    "tone": "warn"
-                  },
-                  {
-                    "from": 60,
-                    "to": 100,
-                    "tone": "success"
-                  }
-                ]
-              },
-              {
-                "label": "Churn (%)",
-                "value": 3,
-                "target": 5,
-                "max": 12,
-                "color": "success"
-              }
-            ]
-          }
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "chart-slope",
-          "title": "type: slope"
-        },
-        {
-          "kind": "paragraph",
-          "content": "Two-time-point change — left column is `from`, right column is `to`, one slope line per `items[]` entry. The renderer auto-colours rising as success and falling as danger unless an explicit `color` is set. Use this when ‘who went up, who went down’ is the question."
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"slope\",\n  \"title\": \"Page-load p95 (ms) — before / after CDN\",\n  \"from_label\": \"Before\",\n  \"to_label\":   \"After\",\n  \"items\": [\n    { \"label\": \"/home\",      \"from\": 1400, \"to\":  680 },\n    { \"label\": \"/dashboard\", \"from\": 2200, \"to\": 1100 },\n    { \"label\": \"/settings\",  \"from\":  900, \"to\": 1500 }\n  ]\n}"
-          },
-          "render": {
-            "kind": "chart",
-            "type": "slope",
-            "title": "Page-load p95 (ms) — before / after CDN",
-            "from_label": "Before",
-            "to_label": "After",
-            "items": [
-              {
-                "label": "/home",
-                "from": 1400,
-                "to": 680
-              },
-              {
-                "label": "/dashboard",
-                "from": 2200,
-                "to": 1100
-              },
-              {
-                "label": "/settings",
-                "from": 900,
-                "to": 1500
-              }
-            ]
-          }
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "chart-histogram",
-          "title": "type: histogram"
-        },
-        {
-          "kind": "paragraph",
-          "content": "Frequency by bin. Author supplies the binning (`bins[]` with `{lo, hi, count}`). Contiguous bins read as a connected distribution; gaps are allowed but render with the visible gap. Use for distribution shape, latency tail, time-to-event."
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"histogram\",\n  \"title\": \"Request latency (ms)\",\n  \"bins\": [\n    {\"lo\":   0, \"hi\":  20, \"count\":  4},\n    {\"lo\":  20, \"hi\":  40, \"count\": 14},\n    {\"lo\":  40, \"hi\":  60, \"count\": 22},\n    {\"lo\":  60, \"hi\":  80, \"count\": 18},\n    {\"lo\":  80, \"hi\": 100, \"count\":  9},\n    {\"lo\": 100, \"hi\": 120, \"count\":  3}\n  ]\n}"
-          },
-          "render": {
-            "kind": "chart",
-            "type": "histogram",
-            "title": "Request latency (ms)",
-            "bins": [
-              {
-                "lo": 0,
-                "hi": 20,
-                "count": 4
-              },
-              {
-                "lo": 20,
-                "hi": 40,
-                "count": 14
-              },
-              {
-                "lo": 40,
-                "hi": 60,
-                "count": 22
-              },
-              {
-                "lo": 60,
-                "hi": 80,
-                "count": 18
-              },
-              {
-                "lo": 80,
-                "hi": 100,
-                "count": 9
-              },
-              {
-                "lo": 100,
-                "hi": 120,
-                "count": 3
-              }
-            ]
-          }
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "chart-calendar-heatmap",
-          "title": "type: calendar-heatmap"
-        },
-        {
-          "kind": "paragraph",
-          "content": "Year-in-cells activity grid. `date_values` is a map of ISO date → numeric value; days missing from the map render faintly to show the calendar shape. Mon, Wed, Fri labels along the left; month names along the top at the first cell of each month."
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"calendar-heatmap\",\n  \"title\": \"Commits in 2026\",\n  \"year\": 2026,\n  \"date_values\": {\n    \"2026-01-04\": 3, \"2026-01-12\": 9,\n    \"2026-03-22\": 14, \"2026-07-01\": 6,\n    \"2026-11-15\": 11, \"2026-12-30\": 4\n  }\n}"
-          },
-          "render": {
-            "kind": "chart",
-            "type": "calendar-heatmap",
-            "title": "Commits in 2026 (sample)",
-            "year": 2026,
-            "date_values": {
-              "2026-01-04": 3,
-              "2026-01-12": 9,
-              "2026-01-18": 6,
-              "2026-02-03": 8,
-              "2026-02-17": 12,
-              "2026-02-28": 5,
-              "2026-03-08": 14,
-              "2026-03-22": 17,
-              "2026-03-30": 9,
-              "2026-04-11": 6,
-              "2026-04-25": 10,
-              "2026-05-09": 13,
-              "2026-05-22": 22,
-              "2026-06-15": 8,
-              "2026-07-04": 4,
-              "2026-08-19": 11,
-              "2026-09-30": 7,
-              "2026-10-12": 9,
-              "2026-11-15": 16,
-              "2026-11-29": 4,
-              "2026-12-22": 6
-            }
-          }
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "chart-treemap",
-          "title": "type: treemap"
-        },
-        {
-          "kind": "paragraph",
-          "content": "Area-proportional nested rectangles via squarified layout. `tree[]` is a flat list of `{label, value, color?}` leaves; the largest values occupy the largest rectangles. Labels render only when the rectangle is large enough to fit them legibly. Use for composition (LoC by language, spend by category, traffic by route)."
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"treemap\",\n  \"title\": \"LoC by language\",\n  \"tree\": [\n    {\"label\": \"JavaScript\", \"value\": 6200, \"color\": \"accent\"},\n    {\"label\": \"CSS\",        \"value\": 2400, \"color\": \"success\"},\n    {\"label\": \"Python\",     \"value\": 2800, \"color\": \"warn\"},\n    {\"label\": \"JSON\",       \"value\":  900, \"color\": \"muted\"},\n    {\"label\": \"Markdown\",   \"value\":  400, \"color\": \"danger\"}\n  ]\n}"
-          },
-          "render": {
-            "kind": "chart",
-            "type": "treemap",
-            "title": "LoC by language",
-            "tree": [
-              {
-                "label": "JavaScript",
-                "value": 6200,
-                "color": "accent"
-              },
-              {
-                "label": "CSS",
-                "value": 2400,
-                "color": "success"
-              },
-              {
-                "label": "Python",
-                "value": 2800,
-                "color": "warn"
-              },
-              {
-                "label": "JSON",
-                "value": 900,
-                "color": "muted"
-              },
-              {
-                "label": "Markdown",
-                "value": 400,
-                "color": "danger"
               }
             ]
           }
@@ -1916,7 +1641,166 @@
               }
             ]
           }
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "family-trend",
+      "title": "Trend over time",
+      "lead": "Sequence on the x-axis, value on the y. Sparkline for in-line micro-trends; slope for before/after pairs; calendar-heatmap for day-of-year × day-of-week activity.",
+      "blocks": [
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-sparkline",
+          "title": "type: sparkline"
         },
+        {
+          "kind": "paragraph",
+          "content": "Inline mini line / area / bar. No axes, no chrome — sized for the line height of surrounding prose. `values` is a flat numeric series. `variant` picks line (default), area (filled), or bar (per-value mini-bars). `end_label` renders to the right of the curve as a small caption (`62%`, `↗`, etc.)."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sparkline\",\n  \"values\": [12,14,18,17,22,25,28,31,30,35],\n  \"variant\": \"area\",\n  \"end_label\": \"35\"\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "sparkline",
+            "values": [
+              12,
+              14,
+              18,
+              17,
+              22,
+              25,
+              28,
+              31,
+              30,
+              35,
+              33,
+              38
+            ],
+            "variant": "area",
+            "end_label": "↗ 38"
+          }
+        },
+        {
+          "kind": "chart",
+          "type": "sparkline",
+          "values": [
+            4,
+            8,
+            12,
+            9,
+            14,
+            6,
+            11,
+            8
+          ],
+          "variant": "bar",
+          "end_label": "11 events"
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-slope",
+          "title": "type: slope"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Two-time-point change — left column is `from`, right column is `to`, one slope line per `items[]` entry. The renderer auto-colours rising as success and falling as danger unless an explicit `color` is set. Use this when ‘who went up, who went down’ is the question."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"slope\",\n  \"title\": \"Page-load p95 (ms) — before / after CDN\",\n  \"from_label\": \"Before\",\n  \"to_label\":   \"After\",\n  \"items\": [\n    { \"label\": \"/home\",      \"from\": 1400, \"to\":  680 },\n    { \"label\": \"/dashboard\", \"from\": 2200, \"to\": 1100 },\n    { \"label\": \"/settings\",  \"from\":  900, \"to\": 1500 }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "slope",
+            "title": "Page-load p95 (ms) — before / after CDN",
+            "from_label": "Before",
+            "to_label": "After",
+            "items": [
+              {
+                "label": "/home",
+                "from": 1400,
+                "to": 680
+              },
+              {
+                "label": "/dashboard",
+                "from": 2200,
+                "to": 1100
+              },
+              {
+                "label": "/settings",
+                "from": 900,
+                "to": 1500
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-calendar-heatmap",
+          "title": "type: calendar-heatmap"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Year-in-cells activity grid. `date_values` is a map of ISO date → numeric value; days missing from the map render faintly to show the calendar shape. Mon, Wed, Fri labels along the left; month names along the top at the first cell of each month."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"calendar-heatmap\",\n  \"title\": \"Commits in 2026\",\n  \"year\": 2026,\n  \"date_values\": {\n    \"2026-01-04\": 3, \"2026-01-12\": 9,\n    \"2026-03-22\": 14, \"2026-07-01\": 6,\n    \"2026-11-15\": 11, \"2026-12-30\": 4\n  }\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "calendar-heatmap",
+            "title": "Commits in 2026 (sample)",
+            "year": 2026,
+            "date_values": {
+              "2026-01-04": 3,
+              "2026-01-12": 9,
+              "2026-01-18": 6,
+              "2026-02-03": 8,
+              "2026-02-17": 12,
+              "2026-02-28": 5,
+              "2026-03-08": 14,
+              "2026-03-22": 17,
+              "2026-03-30": 9,
+              "2026-04-11": 6,
+              "2026-04-25": 10,
+              "2026-05-09": 13,
+              "2026-05-22": 22,
+              "2026-06-15": 8,
+              "2026-07-04": 4,
+              "2026-08-19": 11,
+              "2026-09-30": 7,
+              "2026-10-12": 9,
+              "2026-11-15": 16,
+              "2026-11-29": 4,
+              "2026-12-22": 6
+            }
+          }
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "family-flow",
+      "title": "Flow / conversion",
+      "lead": "How a quantity moves between stages or sources. Funnel for ordered drop-off; sankey for arbitrary weighted flows between any pair of nodes.",
+      "blocks": [
         {
           "kind": "heading",
           "level": 3,
@@ -2063,7 +1947,15 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "family-network",
+      "title": "Network / relationship",
+      "lead": "Edges between nodes. Network for free-form graphs (force-relaxed layout); chord for fully-connected directional flow matrices.",
+      "blocks": [
         {
           "kind": "heading",
           "level": 3,
@@ -2138,6 +2030,152 @@
                 "source": "architecture",
                 "target": "cli"
               }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-chord",
+          "title": "type: chord"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Circular relationship diagram. <code>groups[]</code> defines the perimeter sequence (clockwise from 12 o'clock); <code>matrix</code> is an N×N flow matrix where <code>matrix[i][j]</code> is the flow from <code>groups[i]</code> to <code>groups[j]</code>. Each group occupies an outer arc sized by its total in+out flow; ribbons through the centre carry the pairwise flows."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"chord\",\n  \"title\": \"Cross-team handoffs (this week)\",\n  \"groups\": [\n    {\"id\": \"design\",  \"color\": \"accent\"},\n    {\"id\": \"eng\",     \"color\": \"success\"},\n    {\"id\": \"product\", \"color\": \"warn\"},\n    {\"id\": \"docs\",    \"color\": \"muted\"}\n  ],\n  \"matrix\": [\n    [0, 8, 3, 2],\n    [4, 0, 5, 6],\n    [2, 7, 0, 1],\n    [3, 4, 1, 0]\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "chord",
+            "title": "Cross-team handoffs (this week)",
+            "groups": [
+              {
+                "id": "design",
+                "color": "accent"
+              },
+              {
+                "id": "eng",
+                "color": "success"
+              },
+              {
+                "id": "product",
+                "color": "warn"
+              },
+              {
+                "id": "docs",
+                "color": "muted"
+              }
+            ],
+            "matrix": [
+              [
+                0,
+                8,
+                3,
+                2
+              ],
+              [
+                4,
+                0,
+                5,
+                6
+              ],
+              [
+                2,
+                7,
+                0,
+                1
+              ],
+              [
+                3,
+                4,
+                1,
+                0
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "family-matrix",
+      "title": "Multivariate / matrix",
+      "lead": "More than two dimensions per record. Heatmap for a 2-D grid coloured by value; scatter-matrix for pair-wise scatters across N variables; parallel-coordinates for per-record polylines crossing N axes.",
+      "blocks": [
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-heatmap",
+          "title": "type: heatmap"
+        },
+        {
+          "kind": "paragraph",
+          "content": "N×M cell grid coloured by value. `cells` is a 2D array (outer = rows, inner = columns). Optional `row_labels` / `col_labels` annotate the edges. `scale` picks the palette family: sequential (one-sided ramp on accent) or diverging (accent for positives, danger for negatives). Hover any cell for the raw value."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"heatmap\",\n  \"title\": \"Latency by service × hour\",\n  \"row_labels\": [\"svc-a\", \"svc-b\", \"svc-c\"],\n  \"col_labels\": [\"00\", \"06\", \"12\", \"18\"],\n  \"cells\": [[12,18,42,30],[8,22,36,24],[40,50,28,16]]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "heatmap",
+            "title": "Latency by service × hour",
+            "row_labels": [
+              "svc-a",
+              "svc-b",
+              "svc-c",
+              "svc-d"
+            ],
+            "col_labels": [
+              "00",
+              "04",
+              "08",
+              "12",
+              "16",
+              "20"
+            ],
+            "cells": [
+              [
+                12,
+                18,
+                26,
+                42,
+                30,
+                18
+              ],
+              [
+                8,
+                22,
+                36,
+                24,
+                16,
+                10
+              ],
+              [
+                40,
+                50,
+                28,
+                16,
+                12,
+                8
+              ],
+              [
+                6,
+                12,
+                18,
+                24,
+                38,
+                50
+              ]
             ]
           }
         },
@@ -2346,74 +2384,211 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "family-goal",
+      "title": "Goal / progress",
+      "lead": "Where a value sits inside a known range (often with a target). Gauge for a single arc; bullet for actual-vs-target with zone bands; radar for multi-axis profile comparison.",
+      "blocks": [
         {
           "kind": "heading",
           "level": 3,
-          "id": "chart-chord",
-          "title": "type: chord"
+          "id": "chart-gauge",
+          "title": "type: gauge"
         },
         {
           "kind": "paragraph",
-          "content": "Circular relationship diagram. <code>groups[]</code> defines the perimeter sequence (clockwise from 12 o'clock); <code>matrix</code> is an N×N flow matrix where <code>matrix[i][j]</code> is the flow from <code>groups[i]</code> to <code>groups[j]</code>. Each group occupies an outer arc sized by its total in+out flow; ribbons through the centre carry the pairwise flows."
+          "content": "Semicircular arc, 0 → max, with a needle / fill at the current value and an optional target tick. Use for single-metric status (SLO budget, runway, uptime) where the gap to target is the point. Optional `zones` paint coloured threshold bands behind the value."
         },
         {
           "kind": "example",
           "code": {
             "kind": "code",
             "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"chord\",\n  \"title\": \"Cross-team handoffs (this week)\",\n  \"groups\": [\n    {\"id\": \"design\",  \"color\": \"accent\"},\n    {\"id\": \"eng\",     \"color\": \"success\"},\n    {\"id\": \"product\", \"color\": \"warn\"},\n    {\"id\": \"docs\",    \"color\": \"muted\"}\n  ],\n  \"matrix\": [\n    [0, 8, 3, 2],\n    [4, 0, 5, 6],\n    [2, 7, 0, 1],\n    [3, 4, 1, 0]\n  ]\n}"
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"gauge\",\n  \"title\": \"SLO budget\",\n  \"value\": 92,\n  \"max\": 100,\n  \"target\": 80,\n  \"label\": \"of monthly window remaining\",\n  \"zones\": [\n    { \"from\":  0, \"to\": 50, \"tone\": \"danger\"  },\n    { \"from\": 50, \"to\": 80, \"tone\": \"warn\"    },\n    { \"from\": 80, \"to\": 100,\"tone\": \"success\" }\n  ]\n}"
           },
           "render": {
             "kind": "chart",
-            "type": "chord",
-            "title": "Cross-team handoffs (this week)",
-            "groups": [
+            "type": "gauge",
+            "title": "SLO budget",
+            "value": 92,
+            "max": 100,
+            "target": 80,
+            "label": "of monthly window remaining",
+            "zones": [
               {
-                "id": "design",
-                "color": "accent"
+                "from": 0,
+                "to": 50,
+                "tone": "danger"
               },
               {
-                "id": "eng",
-                "color": "success"
+                "from": 50,
+                "to": 80,
+                "tone": "warn"
               },
               {
-                "id": "product",
-                "color": "warn"
-              },
-              {
-                "id": "docs",
-                "color": "muted"
+                "from": 80,
+                "to": 100,
+                "tone": "success"
               }
-            ],
-            "matrix": [
-              [
-                0,
-                8,
-                3,
-                2
-              ],
-              [
-                4,
-                0,
-                5,
-                6
-              ],
-              [
-                2,
-                7,
-                0,
-                1
-              ],
-              [
-                3,
-                4,
-                1,
-                0
-              ]
             ]
           }
         },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-bullet",
+          "title": "type: bullet"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Actual-vs-target on a banded horizontal track — Stephen Few's bullet chart. One row per `tracks[]` entry: `label`, `value` (current), `target` (optional vertical tick), `max` (right-edge), optional `zones` painted behind the value."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bullet\",\n  \"title\": \"Quarter at a glance\",\n  \"tracks\": [\n    { \"label\": \"Revenue ($M)\", \"value\": 92, \"target\": 80, \"max\": 120,\n      \"zones\": [{ \"from\":0, \"to\":40, \"tone\":\"danger\" }, { \"from\":40, \"to\":80, \"tone\":\"warn\" }, { \"from\":80, \"to\":120, \"tone\":\"success\" }] },\n    { \"label\": \"NPS\",          \"value\": 58, \"target\": 65, \"max\": 100, \"color\": \"warn\" }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "bullet",
+            "title": "Quarter at a glance",
+            "tracks": [
+              {
+                "label": "Revenue ($M)",
+                "value": 92,
+                "target": 80,
+                "max": 120,
+                "color": "success",
+                "zones": [
+                  {
+                    "from": 0,
+                    "to": 40,
+                    "tone": "danger"
+                  },
+                  {
+                    "from": 40,
+                    "to": 80,
+                    "tone": "warn"
+                  },
+                  {
+                    "from": 80,
+                    "to": 120,
+                    "tone": "success"
+                  }
+                ]
+              },
+              {
+                "label": "NPS",
+                "value": 58,
+                "target": 65,
+                "max": 100,
+                "color": "warn",
+                "zones": [
+                  {
+                    "from": 0,
+                    "to": 30,
+                    "tone": "danger"
+                  },
+                  {
+                    "from": 30,
+                    "to": 60,
+                    "tone": "warn"
+                  },
+                  {
+                    "from": 60,
+                    "to": 100,
+                    "tone": "success"
+                  }
+                ]
+              },
+              {
+                "label": "Churn (%)",
+                "value": 3,
+                "target": 5,
+                "max": 12,
+                "color": "success"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-radar",
+          "title": "type: radar"
+        },
+        {
+          "kind": "paragraph",
+          "content": "N spokes radiating from centre, one filled polygon per series. Best for 3–8 axes and 1–4 series. `axes[].label` names the spoke; optional `axes[].max` overrides per-axis scaling. `series[].values` array must align with `axes` by index."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"radar\",\n  \"title\": \"Tool shortlist — five criteria\",\n  \"axes\": [\n    { \"label\": \"Speed\"   },\n    { \"label\": \"UX\"      },\n    { \"label\": \"Cost\"    },\n    { \"label\": \"Docs\"    },\n    { \"label\": \"Support\" }\n  ],\n  \"series\": [\n    { \"label\": \"Option A\", \"color\": \"accent\",  \"values\": [8, 9, 6, 7, 8] },\n    { \"label\": \"Option B\", \"color\": \"success\", \"values\": [6, 7, 9, 5, 6] }\n  ]\n}"
+          },
+          "render": {
+            "kind": "chart",
+            "type": "radar",
+            "title": "Tool shortlist — five criteria",
+            "axes": [
+              {
+                "label": "Speed"
+              },
+              {
+                "label": "UX"
+              },
+              {
+                "label": "Cost"
+              },
+              {
+                "label": "Docs"
+              },
+              {
+                "label": "Support"
+              }
+            ],
+            "series": [
+              {
+                "label": "Option A",
+                "color": "accent",
+                "values": [
+                  8,
+                  9,
+                  6,
+                  7,
+                  8
+                ]
+              },
+              {
+                "label": "Option B",
+                "color": "success",
+                "values": [
+                  6,
+                  7,
+                  9,
+                  5,
+                  6
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "section",
+      "id": "family-geo",
+      "title": "Geographic",
+      "lead": "Value per region laid out on a rough world grid. Use for at-a-glance regional breakdowns without the visual budget of a real choropleth.",
+      "blocks": [
         {
           "kind": "heading",
           "level": 3,
