@@ -3376,6 +3376,19 @@ oku-chart.okc-fullscreen .okc-svg {
   max-height: none;
 }
 oku-chart.okc-fullscreen .okc-svg { display: block; }
+/* Sparkline normally renders inline at 120x28; relax that in fullscreen
+   so the chart actually fills the lightbox instead of looking like a
+   thumbnail floating in dead space. The row wrapper switches from
+   inline-flex to a block flow with the SVG stretching to viewport. */
+oku-chart.okc-fullscreen .okc-sparkline-row { display: block; }
+oku-chart.okc-fullscreen .okc-sparkline-row svg.okc-sparkline {
+  width: 100%;
+  height: auto;
+  min-height: 320px;
+  max-width: none;
+  max-height: none;
+  flex: none;
+}
 oku-chart {
   display: block;
   margin: 24px 0;
