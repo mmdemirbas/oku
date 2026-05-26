@@ -3821,7 +3821,13 @@ oku-diagram {
   padding: 16px;
   position: relative;
 }
-oku-diagram .okd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; overflow: visible; }
+/* `overflow: hidden` clips any mermaid layout overspill (boxes that
+   extend past the SVG's viewBox bounds — happens when Mermaid lays
+   out content wider than the computed viewBox). Without this the
+   overflowing box leaks into / past the column edge and reads as a
+   "trim". The fullscreen lightbox shows the full diagram for cases
+   where the inline view ends up clipping anything important. */
+oku-diagram .okd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; overflow: hidden; }
 oku-diagram .okd-render svg {
   /* width:100% on a fixed-aspect-ratio SVG would stretch a tall
      portrait diagram (mindmap, vertical state machine) into a

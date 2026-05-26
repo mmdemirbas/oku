@@ -576,22 +576,46 @@
           }
         },
         {
-          "kind": "callout",
-          "type": "danger",
-          "title": "danger",
-          "content": "Red-bordered, used for breaking changes or risks."
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"danger\",\n  \"title\": \"danger\",\n  \"content\": \"Red-bordered, used for breaking changes or risks.\"\n}"
+          },
+          "render": {
+            "kind": "callout",
+            "type": "danger",
+            "title": "danger",
+            "content": "Red-bordered, used for breaking changes or risks."
+          }
         },
         {
-          "kind": "callout",
-          "type": "success",
-          "title": "success",
-          "content": "Green-bordered, used for confirmations."
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"success\",\n  \"title\": \"success\",\n  \"content\": \"Green-bordered, used for confirmations.\"\n}"
+          },
+          "render": {
+            "kind": "callout",
+            "type": "success",
+            "title": "success",
+            "content": "Green-bordered, used for confirmations."
+          }
         },
         {
-          "kind": "callout",
-          "type": "neutral",
-          "title": "neutral",
-          "content": "Gray-bordered, used for general notes."
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"neutral\",\n  \"title\": \"neutral\",\n  \"content\": \"Gray-bordered, used for general notes.\"\n}"
+          },
+          "render": {
+            "kind": "callout",
+            "type": "neutral",
+            "title": "neutral",
+            "content": "Gray-bordered, used for general notes."
+          }
         },
         {
           "kind": "heading",
@@ -1379,28 +1403,60 @@
           "content": "Callout <code>type</code> accepts both the kit's original names (<code>warn / warning / danger / success / neutral</code>) and the industry-standard aliases (<code>note / tip / info / caution</code>). Each row below is the same canonical styling reached from two different vocabularies."
         },
         {
-          "kind": "callout",
-          "type": "note",
-          "title": "note · alias of neutral",
-          "content": "<code>type: \"note\"</code> reads the same as <code>type: \"neutral\"</code> — generic informational tint."
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"note\",\n  \"title\": \"note · alias of neutral\",\n  \"content\": \"...\"\n}"
+          },
+          "render": {
+            "kind": "callout",
+            "type": "note",
+            "title": "note · alias of neutral",
+            "content": "<code>type: \"note\"</code> reads the same as <code>type: \"neutral\"</code> — generic informational tint."
+          }
         },
         {
-          "kind": "callout",
-          "type": "tip",
-          "title": "tip · alias of success",
-          "content": "<code>type: \"tip\"</code> matches <code>type: \"success\"</code> — green guidance accent for positive advice."
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"tip\",\n  \"title\": \"tip · alias of success\",\n  \"content\": \"...\"\n}"
+          },
+          "render": {
+            "kind": "callout",
+            "type": "tip",
+            "title": "tip · alias of success",
+            "content": "<code>type: \"tip\"</code> matches <code>type: \"success\"</code> — green guidance accent for positive advice."
+          }
         },
         {
-          "kind": "callout",
-          "type": "info",
-          "title": "info · alias of neutral with informational tint",
-          "content": "Same surface as neutral; reserved name keeps Docusaurus / Mintlify habits intact."
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"info\",\n  \"title\": \"info\",\n  \"content\": \"...\"\n}"
+          },
+          "render": {
+            "kind": "callout",
+            "type": "info",
+            "title": "info · alias of neutral with informational tint",
+            "content": "Same surface as neutral; reserved name keeps Docusaurus / Mintlify habits intact."
+          }
         },
         {
-          "kind": "callout",
-          "type": "caution",
-          "title": "caution · alias of warning",
-          "content": "Amber border + icon; same look as <code>type: \"warning\"</code> from earlier rounds."
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"caution\",\n  \"title\": \"caution · alias of warning\",\n  \"content\": \"...\"\n}"
+          },
+          "render": {
+            "kind": "callout",
+            "type": "caution",
+            "title": "caution · alias of warning",
+            "content": "Amber border + icon; same look as <code>type: \"warning\"</code> from earlier rounds."
+          }
         }
       ]
     }
