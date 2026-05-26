@@ -418,6 +418,7 @@
                 "description": "Card accent in the kit's standard color tokens. Wins over verdict if both are set. Use this when verdict's good/bad/in/out feels too arbitrary — accent maps directly to the same colour vocabulary as charts and callouts."
               },
               "title": { "type": "string" },
+              "href": { "type": "string", "description": "Optional anchor (e.g. `#chart-line`) — when set, the whole card becomes a clickable link to that target. Used by the charts page Pick-by-family grid so each variant mini-card jumps to its full example." },
               "content": { "$ref": "#/$defs/richString", "description": "Rich-text body. Combine with items / blocks, or use any subset alone." },
               "items": {
                 "type": "array",

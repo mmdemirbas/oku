@@ -934,10 +934,14 @@
       const grid = document.createElement('div');
       grid.className = 'compare-grid';
       for (const c of (block.cards || [])) {
-        const card = document.createElement('div');
-        // accent wins over verdict. Fall through to neutral.
+        // When a card declares `href`, render the card as an <a> so
+        // the whole tile becomes clickable (used by Pick-by-family
+        // grid → each variant mini-card jumps to its full example).
+        // Otherwise the card is a plain <div>.
+        const card = document.createElement(c.href ? 'a' : 'div');
         const styleKey = c.accent || c.verdict || 'neutral';
-        card.className = 'compare-card ' + styleKey;
+        card.className = 'compare-card ' + styleKey + (c.href ? ' compare-card-link' : '');
+        if (c.href) card.setAttribute('href', c.href);
         if (c.title) {
           const h = document.createElement('h4');
           h.textContent = c.title;
