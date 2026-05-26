@@ -5,7 +5,7 @@
   "title": "Roadmap",
   "accent": "amber",
   "meta": {
-    "subtitle": "What's open, what just shipped, and the locked decisions that shape the kit.",
+    "subtitle": "What just shipped, what's still open, and the locked decisions that shape the kit.",
     "audience": "Maintainer",
     "order": 999,
     "summary": "Open work, recent landings, and locked design decisions for oku."
@@ -13,14 +13,14 @@
   "blocks": [
     {
       "kind": "tldr",
-      "summary": "oku 1.0 is substantially shipped — 28 chart variants, full Markdown parity, asymmetric-friendly wide-screen layout, three-tree build (standalone / site / markdown), a chip-filtered + kanban-able table, a Mermaid catalog, and a per-page accent system. Open work concentrates on chart interactivity reach (hover / pin / cross-series highlight across the long tail of chart types), mermaid quality, and tables per-column wrap.",
+      "summary": "Most of the chart kit is interactive now — tooltips, click-pin, cursor sweep, fullscreen-preserving lightbox, deconflicted labels, family-grouped catalog with clickable mini-cards. Open work concentrates on legend interactivity for the long tail, draggable network nodes, lightbox scrollbar + minimap, and nested-language code highlighting.",
       "bullets": [
-        "Charts — interactivity reach: 12/28 variants have full tooltip + click-pin + hover-highlight today. The tier-2 / tier-3 long tail (donut, sparkline, gauge, radar, box-plot, bullet, slope, calendar-heatmap, ridgeline, sankey, network, scatter-matrix, parallel-coordinates, chord, geo) is the next batch.",
-        "Charts — visual quality: grouped-bar palette cycling, bubble legend deconfliction, quadrant label deconfliction, heatmap label / cell overlap, parallel-coordinates line thickness — all queued.",
-        "Charts — catalog: add a real line example (renderer already supports it), a classic pie type, multi-series defaults on the sparse single-series examples, and the 'Pick by family' rewrite with mini-renders per variant + intent-based family grouping.",
-        "Rename — locked aggressive (now shipped): every layer reads `oku` — package, kit CSS prefixes, JS globals, custom event names, data-attrs, and custom-element tag names. The GitHub remote URL is the one remaining surface still on the legacy name.",
-        "Mermaid — quality pass: trim cases on wide diagrams, font auto-fit for cramped layouts, font-color audit for explicit fill:# rules (dark-mode legibility).",
-        "Tables — per-column wrap: true config so long-content columns render multi-line instead of horizontal-scrolling."
+        "Interactivity coverage: 29 / 29 chart variants now fire contextual tooltips on hover with real per-anchor data. Cartesian + ridgeline + sparkline + gauge carry a synced cursor that updates the tooltip per-position.",
+        "Visual polish: quadrant + bubble label deconfliction is no-fly-zone aware. Parallel-coordinates line stroke 3.6 → 5px with fade-others on hover. Donut/pie pinned slices scale + accent-stroke. Mermaid fonts clamped to 13px, aspect-fit caps tall portrait diagrams.",
+        "Layout: source / render columns universally box-top aligned (zero pixel delta across 21 / 29 / 5 example-pairs on reference / charts / tables).",
+        "Tooltip: width-stable across pin states; explicit × close button when pinned; `_tipPinned` flag stops cursor-driven charts from overwriting pinned content.",
+        "Pick-by-family: 29 clickable mini-cards (one per variant) each with a tiny live render — readers scan the shape they want and click straight into the variant's full example.",
+        "`oku` is on PATH as a system command (uv tool install)."
       ]
     },
 
@@ -33,12 +33,12 @@
         {
           "kind": "kpi-grid",
           "tiles": [
-            { "num": "28",  "label": "Chart variants in the kit" },
-            { "num": "19",  "label": "Mermaid diagram types documented with live samples" },
-            { "num": "16",  "label": "Documentation pages clean under oku check --strict" },
+            { "num": "29",  "label": "Chart variants in the kit" },
+            { "num": "29",  "label": "Variants with rich tooltip + click-pin" },
+            { "num": "19",  "label": "Mermaid diagram types catalogued" },
+            { "num": "10",  "label": "Intent families on the charts page" },
+            { "num": "17",  "label": "Documentation pages clean under oku check --strict" },
             { "num": "249", "label": "Pytest assertions — green" },
-            { "num": "12",  "label": "Chart variants with full hover / pin / highlight" },
-            { "num": "16",  "label": "Chart variants still on bare-title tooltip (queued)" },
             { "num": "3",   "label": "Build trees per oku build (standalone / site / markdown)" },
             { "num": "10",  "label": "Series colour ramp (--series-1..10)" }
           ]
@@ -48,60 +48,57 @@
 
     {
       "kind": "section",
-      "id": "coverage",
-      "title": "Coverage — chart interactivity by feature",
-      "lead": "Which chart types already have which interaction primitive. The next batch focuses on the empty boxes in the donut → geo rows.",
+      "id": "interactivity",
+      "title": "Chart interactivity by feature",
+      "lead": "Which chart types carry which interaction primitive today. Filled cells are shipped; empty cells are queued.",
       "blocks": [
         {
           "kind": "table",
           "headers": [
             "Variant",
-            {
-              "label": "Family",
-              "filter": "chips",
-              "values": ["cartesian", "categorical", "distribution", "part-to-whole", "flow", "hierarchy", "matrix", "geo", "trend"]
-            },
+            { "label": "Family", "filter": "chips", "values": ["cartesian", "categorical", "distribution", "part-to-whole", "flow", "hierarchy", "matrix", "trend", "goal", "geo"] },
             "Tooltip",
             "Click-pin",
             "Hover-highlight",
+            "Synced cursor",
             "Fullscreen"
           ],
           "rows": [
-            ["scatter",              {"value": "cartesian",     "values": ["cartesian"]},     "✓", "✓", "✓", "✓"],
-            ["line",                 {"value": "cartesian",     "values": ["cartesian"]},     "✓", "✓", "✓", "✓"],
-            ["area",                 {"value": "cartesian",     "values": ["cartesian"]},     "✓", "✓", "✓", "✓"],
-            ["bubble",               {"value": "cartesian",     "values": ["cartesian"]},     "✓", "✓", "✓", "✓"],
-            ["quadrant",             {"value": "cartesian",     "values": ["cartesian"]},     "✓", "✓", "✓", "✓"],
-            ["bar",                  {"value": "categorical",   "values": ["categorical"]},   "✓", "✓", "○", "○"],
-            ["stacked-bar",          {"value": "categorical",   "values": ["categorical"]},   "✓", "✓", "○", "○"],
-            ["grouped-bar",          {"value": "categorical",   "values": ["categorical"]},   "✓", "✓", "○", "○"],
-            ["waffle",               {"value": "part-to-whole", "values": ["part-to-whole"]}, "◐", "✓", "○", "✓"],
-            ["donut",                {"value": "part-to-whole", "values": ["part-to-whole"]}, "○", "○", "○", "✓"],
-            ["treemap",              {"value": "hierarchy",     "values": ["hierarchy"]},     "✓", "✓", "○", "✓"],
-            ["funnel",               {"value": "flow",          "values": ["flow"]},          "✓", "✓", "○", "✓"],
-            ["heatmap",              {"value": "matrix",        "values": ["matrix"]},        "◐", "✓", "○", "✓"],
-            ["histogram",            {"value": "distribution",  "values": ["distribution"]},  "◐", "✓", "○", "✓"],
-            ["sparkline",            {"value": "trend",         "values": ["trend"]},         "○", "○", "○", "✓"],
-            ["gauge",                {"value": "part-to-whole", "values": ["part-to-whole"]}, "○", "○", "○", "✓"],
-            ["radar",                {"value": "categorical",   "values": ["categorical"]},   "○", "○", "○", "✓"],
-            ["box-plot",             {"value": "distribution",  "values": ["distribution"]},  "○", "○", "○", "✓"],
-            ["bullet",               {"value": "categorical",   "values": ["categorical"]},   "○", "○", "○", "✓"],
-            ["slope",                {"value": "trend",         "values": ["trend"]},         "○", "○", "○", "✓"],
-            ["calendar-heatmap",     {"value": "matrix",        "values": ["matrix"]},        "○", "○", "○", "✓"],
-            ["ridgeline",            {"value": "distribution",  "values": ["distribution"]},  "○", "○", "○", "✓"],
-            ["sankey",               {"value": "flow",          "values": ["flow"]},          "○", "○", "○", "✓"],
-            ["network",              {"value": "flow",          "values": ["flow"]},          "○", "○", "○", "✓"],
-            ["scatter-matrix",       {"value": "matrix",        "values": ["matrix"]},        "○", "○", "○", "✓"],
-            ["parallel-coordinates", {"value": "matrix",        "values": ["matrix"]},        "○", "○", "○", "✓"],
-            ["chord",                {"value": "flow",          "values": ["flow"]},          "○", "○", "○", "✓"],
-            ["geo",                  {"value": "geo",           "values": ["geo"]},           "○", "○", "○", "✓"]
+            ["scatter",              { "value": "cartesian",     "values": ["cartesian"] },     "●", "●", "●", "●", "●"],
+            ["line",                 { "value": "cartesian",     "values": ["cartesian"] },     "●", "●", "●", "●", "●"],
+            ["area",                 { "value": "cartesian",     "values": ["cartesian"] },     "●", "●", "●", "●", "●"],
+            ["bubble",               { "value": "cartesian",     "values": ["cartesian"] },     "●", "●", "●", "●", "●"],
+            ["quadrant",             { "value": "cartesian",     "values": ["cartesian"] },     "●", "●", "●", "—", "●"],
+            ["bar",                  { "value": "categorical",   "values": ["categorical"] },   "●", "●", "●", "—", "—"],
+            ["stacked-bar",          { "value": "categorical",   "values": ["categorical"] },   "●", "●", "●", "—", "—"],
+            ["grouped-bar",          { "value": "categorical",   "values": ["categorical"] },   "●", "●", "●", "—", "—"],
+            ["donut",                { "value": "part-to-whole", "values": ["part-to-whole"] }, "●", "●", "●", "—", "●"],
+            ["pie",                  { "value": "part-to-whole", "values": ["part-to-whole"] }, "●", "●", "●", "—", "●"],
+            ["waffle",               { "value": "part-to-whole", "values": ["part-to-whole"] }, "●", "●", "○", "—", "●"],
+            ["treemap",              { "value": "hierarchy",     "values": ["hierarchy"] },     "●", "●", "○", "—", "●"],
+            ["heatmap",              { "value": "matrix",        "values": ["matrix"] },        "●", "●", "○", "—", "●"],
+            ["histogram",            { "value": "distribution",  "values": ["distribution"] },  "●", "●", "○", "—", "●"],
+            ["sparkline",            { "value": "trend",         "values": ["trend"] },         "●", "●", "—", "●", "●"],
+            ["gauge",                { "value": "goal",          "values": ["goal"] },          "●", "●", "—", "●", "●"],
+            ["radar",                { "value": "categorical",   "values": ["categorical"] },   "●", "●", "○", "—", "●"],
+            ["box-plot",             { "value": "distribution",  "values": ["distribution"] },  "●", "●", "○", "—", "●"],
+            ["bullet",               { "value": "goal",          "values": ["goal"] },          "●", "●", "○", "—", "●"],
+            ["slope",                { "value": "trend",         "values": ["trend"] },         "●", "●", "○", "—", "●"],
+            ["calendar-heatmap",     { "value": "trend",         "values": ["trend"] },         "●", "●", "○", "—", "●"],
+            ["ridgeline",            { "value": "distribution",  "values": ["distribution"] },  "●", "●", "○", "●", "●"],
+            ["sankey",               { "value": "flow",          "values": ["flow"] },          "●", "●", "○", "—", "●"],
+            ["network",              { "value": "flow",          "values": ["flow"] },          "●", "●", "○", "—", "●"],
+            ["scatter-matrix",       { "value": "matrix",        "values": ["matrix"] },        "●", "●", "○", "—", "●"],
+            ["parallel-coordinates", { "value": "matrix",        "values": ["matrix"] },        "●", "●", "●", "—", "●"],
+            ["chord",                { "value": "flow",          "values": ["flow"] },          "●", "●", "○", "—", "●"],
+            ["geo",                  { "value": "geo",           "values": ["geo"] },           "●", "●", "○", "—", "●"]
           ]
         },
         {
           "kind": "callout",
           "type": "neutral",
           "title": "Symbol key",
-          "content": "● shipped · ◐ partial (hover payload wired, tooltip not always rich) · ○ on the queue. Fullscreen ○ on bar variants is intentional — bar charts are DIV-based and don't go through the SVG-cloning lightbox path."
+          "content": "● shipped · ○ queued · — not applicable. Tooltip + click-pin coverage is now complete across all 28 chart variants. Hover-highlight (fade-others when one element is hovered) is still queued for most non-Cartesian types; synced-cursor only makes sense for charts with a sweep axis (Cartesian, ridgeline, sparkline, gauge). Fullscreen lightbox preserves chart interactivity for SVG charts; bar variants are DIV-based and use the page's normal scroll instead."
         }
       ]
     },
@@ -110,50 +107,26 @@
       "kind": "section",
       "id": "open",
       "title": "Open / in-flight",
-      "lead": "Kanban board: queued → in-flight → blocked. Filter by area or priority to scope. Click a chip to drill in.",
+      "lead": "Kanban board — filter by area or priority to scope. Each chip filters; the board view groups by status.",
       "blocks": [
         {
           "kind": "table",
           "view": "board",
           "headers": [
             "Item",
-            {
-              "label": "Status",
-              "boardOrder": ["in-flight", "queued", "exploring", "blocked"]
-            },
-            {
-              "label": "Area",
-              "filter": "chips",
-              "values": ["charts", "diagrams", "tables", "kit", "rename", "docs"]
-            },
-            {
-              "label": "Priority",
-              "filter": "chips",
-              "values": ["P1", "P2", "P3"]
-            },
-            {
-              "label": "Effort",
-              "filter": "chips",
-              "values": ["S", "M", "L"]
-            }
+            { "label": "Status",   "boardOrder": ["in-flight", "queued", "exploring", "shipped"] },
+            { "label": "Area",     "filter": "chips", "values": ["charts", "diagrams", "tables", "kit", "docs", "build"] },
+            { "label": "Priority", "filter": "chips", "values": ["P1", "P2", "P3"] },
+            { "label": "Effort",   "filter": "chips", "values": ["S", "M", "L"] }
           ],
           "rows": [
-            ["Aggressive rename · src/html_doc/ → src/oku/, kit CSS prefixes, JS globals, events, data-attrs", {"value": "in-flight", "values": ["in-flight"]}, {"value": "rename",    "values": ["rename"]},    {"value": "P1", "values": ["P1"]}, {"value": "L", "values": ["L"]}],
-            ["Chart interactivity sweep · tooltip + pin + highlight across the donut → geo long tail",          {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P1", "values": ["P1"]}, {"value": "L", "values": ["L"]}],
-            ["Lightbox preserves chart interactivity (currently clones a static SVG)",                          {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}],
-            ["Pick-by-family rewrite · mini-render per variant, intent-based family grouping",                  {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P1", "values": ["P1"]}, {"value": "M", "values": ["M"]}],
-            ["Grouped-bar palette cycling · series.color absent → rotate through --series-1..10, not always accent", {"value": "queued","values": ["queued"]}, {"value": "charts",    "values": ["charts"]},    {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}],
-            ["Add line-chart example + classic pie type to the catalog",                                        {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P1", "values": ["P1"]}, {"value": "S", "values": ["S"]}],
-            ["Multi-series defaults · single-series samples gain 2-3 series so the kit reads visually-rich",     {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P2", "values": ["P2"]}, {"value": "S", "values": ["S"]}],
-            ["Bubble legend conflict avoidance · stop colliding with right-edge data points",                   {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P2", "values": ["P2"]}, {"value": "S", "values": ["S"]}],
-            ["Quadrant label deconfliction · corner pills never overlap dots in the same quadrant",             {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}],
-            ["Heatmap · drop label / cell overlap, add proper hover tooltip body",                              {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P2", "values": ["P2"]}, {"value": "S", "values": ["S"]}],
-            ["Sparkline · two render styles documented; tooltip + synced cursor across siblings",               {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P2", "values": ["P2"]}, {"value": "S", "values": ["S"]}],
-            ["Parallel-coordinates · thicker line stroke (current 1px reads as scaffold, not data)",            {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P2", "values": ["P2"]}, {"value": "S", "values": ["S"]}],
-            ["Scatter-matrix · clearer reading-instructions + a sample that actually shows correlation",        {"value": "queued",   "values": ["queued"]},   {"value": "charts",    "values": ["charts"]},    {"value": "P3", "values": ["P3"]}, {"value": "S", "values": ["S"]}],
-            ["Mermaid quality pass · investigate specific trim cases, font auto-fit, audit fill:# without color:#", {"value": "queued","values": ["queued"]},   {"value": "diagrams",  "values": ["diagrams"]},  {"value": "P2", "values": ["P2"]}, {"value": "M", "values": ["M"]}],
-            ["Tables · per-column wrap: true config for multi-line cell content",                               {"value": "queued",   "values": ["queued"]},   {"value": "tables",    "values": ["tables"]},    {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}],
-            ["Catalog research · what other chart / diagram types fit oku's intent (waterfall, marimekko, dot-matrix, joy-plot, etc.)", {"value": "exploring", "values": ["exploring"]}, {"value": "charts",    "values": ["charts"]},    {"value": "P3", "values": ["P3"]}, {"value": "M", "values": ["M"]}]
+            ["Network — draggable nodes so readers can untangle the graph manually",                                        { "value": "queued",   "values": ["queued"] },   { "value": "charts",   "values": ["charts"] },   { "value": "P1", "values": ["P1"] }, { "value": "M", "values": ["M"] }],
+            ["Interactive legends across all chart types (donut/pie/waffle/radar/box-plot — match Cartesian + bar behavior)",{ "value": "queued",   "values": ["queued"] },   { "value": "charts",   "values": ["charts"] },   { "value": "P2", "values": ["P2"] }, { "value": "M", "values": ["M"] }],
+            ["Nested code highlighting (JS in HTML, bash in Markdown — sub-language detect inside fenced blocks)",          { "value": "queued",   "values": ["queued"] },   { "value": "kit",      "values": ["kit"] },      { "value": "P2", "values": ["P2"] }, { "value": "M", "values": ["M"] }],
+            ["Lightbox: scrollbar + picture-in-picture minimap for over-flowing expanded charts",                            { "value": "queued",   "values": ["queued"] },   { "value": "kit",      "values": ["kit"] },      { "value": "P2", "values": ["P2"] }, { "value": "M", "values": ["M"] }],
+            ["Mermaid — investigate residual trim cases on wide architecture diagrams (overflow:hidden now clips, but content shouldn't extend past viewBox)", { "value": "exploring", "values": ["exploring"] }, { "value": "diagrams", "values": ["diagrams"] }, { "value": "P3", "values": ["P3"] }, { "value": "M", "values": ["M"] }],
+            ["Hover-highlight (fade-others) for non-Cartesian charts (donut/pie/waffle/treemap/heatmap, etc.)",              { "value": "queued",   "values": ["queued"] },   { "value": "charts",   "values": ["charts"] },   { "value": "P3", "values": ["P3"] }, { "value": "S", "values": ["S"] }],
+            ["Catalog research — waterfall, marimekko, dot-matrix, joy-plot, sunburst",                                      { "value": "exploring", "values": ["exploring"] }, { "value": "charts",   "values": ["charts"] },   { "value": "P3", "values": ["P3"] }, { "value": "M", "values": ["M"] }]
           ]
         }
       ]
@@ -166,24 +139,33 @@
       "lead": "Highlights shipped in the current cycle. Full per-commit history lives in git log.",
       "blocks": [
         {
+          "kind": "kpi-grid",
+          "tiles": [
+            { "num": "29",  "label": "Chart variants with rich tooltip" },
+            { "num": "5",   "label": "Charts with synced-cursor sweep" },
+            { "num": "10",  "label": "Intent-grouped families on charts page" },
+            { "num": "0",   "label": "Visible label-vs-corner overlaps on quadrant Playwright sweep" }
+          ]
+        },
+        {
           "kind": "list",
           "style": "bullet",
           "items": [
-            "ext-ref host is no longer a navigation link — clicking pins the tooltip, period. The destination URL is a proper clickable domain inside the citation card; the duplicate Learn-more footer is hidden when the cite card already exposes its own link.",
-            "live-snippet enhancement guards · the copy / wrap / language-pill / line-number passes now correctly skip the snippet's shadow pre (the `closest()` selectors previously named a tag that didn't exist).",
-            "Source / render columns inside .example-pair align — render-side first-child gains a 24px top margin to match the 30px the source-side pre reserves for its language pill.",
-            "Pagefind via PyPI — `oku check` runs `python -m pagefind` first (bundled binary from the `pagefind[bin]` extra), falls back to system pagefind / npx. brew / npm install no longer required.",
-            "Diagrams + Tables · per-type and per-style headings promoted to h3 so they appear in page-toc (which walks h2 / h3 only).",
-            "Per-page metadata · run-on `compare-grid` rewritten as a chip-filtered table (Field / Group / Meaning) — one field per row, three filter chips for Display / Behavior / Top-level.",
-            "Last-updated demo · a live example block now sits alongside the JSON snippet so the reader actually sees the quiet italic meta line the prose describes.",
-            "Skill relocation · the Claude Code skill now lives at ./skill/ in the repo, registered as `oku` via symlink to ~/.claude/skills/oku.",
-            "Reference split · charts.json, tables.json, diagrams.json nested under reference via meta.parent.",
-            "Tier 3 charts · sankey, network, scatter-matrix, parallel-coordinates, chord, geo.",
-            "Markdown parity · YAML front-matter, footnotes, definition lists, reference-style links, nested lists, sanitised inline HTML allowlist (a, code, em, strong, span, sup, sub, br, mark, kbd, samp, del, ins, abbr).",
-            "Tables · kanban / board view by default via view: 'board', drag-resize columns, word-wrap cells, compact icon view-toggle.",
-            "Wide-screen · symmetric widening (everything follows --content-width); breakpoints at 1500px / 1900px.",
-            "annotated-code · substring chip auto-place + tooltip via Prism-token-split-safe wrapping; multi-line tooltip position:fixed above the block, escapes ancestor clipping.",
-            "Lightbox · true fullscreen with wheel / pinch zoom + drag pan + keyboard, reused for image / chart / diagram / mermaid (interactivity-preserve still queued)."
+            "Pick-by-family rewrite — 29 clickable mini-cards (one per variant) with live tiny renders; click goes straight to the variant's full example.",
+            "Charts page regrouped into 10 intent families (Cartesian / Categorical / Part-to-whole / Distribution / Trend / Flow / Network / Multivariate / Goal / Geographic).",
+            "Source / render alignment is universally zero-pixel — boxes line up at top across every example-pair on every doc page.",
+            "Tooltip width is stable across pin states; pinned tooltip gets an × close button; viewport-fixed positioning surfaces it above the fullscreen lightbox.",
+            "Cartesian charts gain a synced vertical-dash cursor + a per-position tooltip listing every series value at the cursor's nearest x.",
+            "Ridgeline + sparkline cursor handlers update the rich tooltip per cursor position (was static-on-enter).",
+            "Quadrant corner-pill + Cartesian legend-cluster are no-fly zones for data labels — `_deconflictLabels` shifts or hides labels that would land in them.",
+            "Bubble legend backdrop fully opaque — a giant bubble can no longer bleed through the chip labels.",
+            "Parallel-coordinates stroke 3.6px resting / 5px hover, fade-others on hover so the highlighted record stands out.",
+            "Donut / pie pinned slices scale + accent-stroke; global focus-outline kill across chart shapes.",
+            "Gauge zones gain optional labels + a cursor-driven value-at-position inspector.",
+            "Mermaid trim mitigation: `.okd-render` now overflow:hidden, aspect-fit caps tall portrait diagrams at 70vh, font-size clamped to 13px for all SVG text.",
+            "Compare-grid cards gain optional `href` — whole-tile clickable. Used by Pick-by-family.",
+            "Tables `wrap: true` per-column for multi-line cell content.",
+            "All html-doc surface references removed (only the GitHub URL remains on the legacy name)."
           ]
         }
       ]
@@ -200,16 +182,14 @@
           "style": "bullet",
           "items": [
             "Project name = oku (Turkish 'read!'). Every layer reads `oku`: package (src/oku/), kit CSS prefixes (okt- / okc- / okd-), JS globals (__oku*), event names (oku:*), data-attrs (data-oku-*), and custom-element tag names.",
-            "GitHub remote URL (github.com/mmdemirbas/html-doc) is the one remaining surface still using the legacy name — the schema $id, the git-clone example, and the jsdelivr CDN URL all point there. Renaming the remote on GitHub will let those flip too.",
-            "Layout = option A (centered document, four-mode content-width cycle: narrow / comfortable / wide / max).",
-            "Wide-screen widening is symmetric — every primitive follows --content-width. The earlier asymmetric prose clamp was retired.",
-            "Fullscreen uses CSS-transform pan/zoom on the inner stage (wheel zoom anchored at cursor, drag pan, pinch on touch, keyboard +/-/0/arrows). Not SVG-viewBox math.",
-            "Code / render pair = 2-column grid above 900px, stacked below. Tabs widget rejected — reader wants both at once.",
-            "Inline HTML allowlist over a full sanitisation pipeline. Allowed: a, code, em, strong, span, sup, sub, br, mark, kbd, samp, del, ins, abbr.",
-            "Tier 3 viz (sankey / network / scatter-matrix / parallel-coordinates / chord / geo) all ship as kit-native chart types — no third-party chart library.",
-            "Charts / tables / diagrams are sub-pages of Reference (meta.parent: 'reference').",
+            "GitHub remote URL stays at github.com/mmdemirbas/html-doc — the schema $id, the git-clone example, and the jsdelivr CDN URL all point there. The local repo directory name follows the remote.",
+            "Source / render columns inside example-pair MUST align at the top edge of the box. No 24px spacer for non-pre renders — the visible top edges of source and render columns line up regardless of render kind.",
+            "Tooltip width is stable across pin states. Pinned vs unpinned switches the footer text + close-button visibility, NEVER the bounding box.",
             "ext-ref host is NOT a navigation link. Clicking pins the tooltip; the destination URL lives as a clickable domain anchor inside the citation card. One affordance per element.",
-            "Pagefind is a Python dep, not a system binary — `oku[search]` extra pulls `pagefind[bin]>=1.5` so the bundled Rust binary lives inside the project's venv."
+            "Pagefind is a Python dep, not a system binary — `oku[search]` extra pulls `pagefind[bin]>=1.5`.",
+            "Layout = option A (centered document, four-mode content-width cycle: narrow / comfortable / wide / max).",
+            "Tier 3 viz (sankey / network / scatter-matrix / parallel-coordinates / chord / geo) all ship as kit-native chart types — no third-party chart library.",
+            "Charts / tables / diagrams are sub-pages of Reference (meta.parent: 'reference')."
           ]
         }
       ]
@@ -227,7 +207,7 @@
           "items": [
             "Single LEFT sidebar — TOC + site tree stacked. No right TOC, no mid-edge tab.",
             "Visual-first authoring. Pros/cons → comparison-cards, metrics → kpi-grid, trade-offs → table-with-chips. Paragraph + bullets is the fallback, not the default.",
-            "Every fix pairs with a regression test. Browser-level fixes ship with a Playwright assertion or, at minimum, a numeric bounding-box check captured in the commit message.",
+            "Every fix pairs with a Playwright check. Browser-level fixes ship with numeric assertions captured in the commit body.",
             "Numbers in counters / badges only — no English words baked into the kit.",
             "No demo sibling pages. Every example for a primitive lives next to its heading.",
             "No process / round / historical references in docs — describe current behaviour, not how it got there.",
