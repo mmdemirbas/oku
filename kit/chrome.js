@@ -3297,6 +3297,20 @@ class OkuChart extends HTMLElement {
     };
     if (nonCartesian[this._type]) {
       this[nonCartesian[this._type]]();
+      // Wire the shared rich-tooltip controller so non-Cartesian
+      // charts (donut, pie, heatmap, treemap, funnel, waffle,
+      // gauge, radar, box-plot, bullet, slope, histogram,
+      // calendar-heatmap, ridgeline, sankey, network, scatter-
+      // matrix, parallel-coordinates, chord, geo, sparkline) get
+      // hover / pin / click-outside / Escape just like the
+      // Cartesian charts. Each renderer above tags its anchors
+      // with `data-hover-payload` (or the legacy `.okc-slice`,
+      // `.okc-treemap-cell rect`, `.okc-funnel-band` shapes); the
+      // generic `rich('[data-hover-payload]', …)` wrapper picks
+      // them up. Without this call, ONLY scatter / line / area /
+      // bubble / quadrant ever fired tooltips — the rest were
+      // statically decorated and silent.
+      this._wireInteractivity();
       this._attachToolbar();
       return;
     }

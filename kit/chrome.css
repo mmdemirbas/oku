@@ -3791,14 +3791,18 @@ oku-diagram {
 }
 oku-diagram .okd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; overflow: visible; }
 oku-diagram .okd-render svg {
+  /* width:100% on a fixed-aspect-ratio SVG would stretch a tall
+     portrait diagram (mindmap, vertical state machine) into a
+     ~2000px scroll-wall. Use auto+max-* instead so the browser
+     fits the SVG inside BOTH dimensions while preserving the
+     viewBox aspect ratio — wide flowcharts hit max-width first,
+     tall diagrams hit max-height first. The lightbox (below)
+     drops the height cap so fullscreen reads at full size. */
   display: block;
-  /* width:100% + height:auto + max-width:100% combine so the SVG
-     scales to the container regardless of intrinsic width attrs
-     Mermaid stamps on the element. Width attr is overridden so a
-     1400px-wide flowchart fits a 720px column. */
-  width: 100%;
+  width: auto;
   height: auto;
   max-width: 100%;
+  max-height: 70vh;
   margin: 0 auto;
 }
 /* Clamp text size inside Mermaid SVGs so state / mindmap diagrams
@@ -4140,19 +4144,35 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
    resets its top margin so the flex column gap doesn't double up
    against the label. Stretch was retired — visual primitives rendered
    edge-anchored (bars + tiles ballooned vertically). */
-.example-pair .example-code > pre {
+/* Source side: the raw pre never carries its natural body-margin
+   inside the example-pair grid. */
+.example-pair .example-code > pre,
+.example-pair .example-code > .okt-pre-host {
   margin-top: 0 !important;
   margin-bottom: 0;
 }
-.example-pair .example-render > :not(.example-col-label) {
-  /* Match the visual baseline of the source-side <pre> block, which
-     reserves 30px of inner padding-top for the language pill. Without
-     this spacer the render column's content edge sits ~26px higher
-     than the source column's first code line, making the two halves
-     of the pair read as misaligned even when the labels line up.
-     Applies to every render-side primitive (chart, table, kpi grid,
-     bare text) so the rule is single-source. */
+/* Render side: when the rendered primitive is also a code block (a
+   bare <pre>, OR a <pre> wrapped by chrome.js's `.okt-pre-host` host
+   for copy + wrap + language pill), the box top must line up with
+   the source-side pre. No extra spacer — the language pills on both
+   sides sit at the same y, the first code lines also sit at the
+   same y. */
+.example-pair .example-render > pre,
+.example-pair .example-render > .okt-pre-host {
+  margin-top: 0 !important;
+  margin-bottom: 0;
+}
+/* Render side: when the rendered primitive ISN'T a code block (chart,
+   table, kpi, callout, prose), match the visual baseline of the
+   source <pre> by adding the same vertical offset the source's
+   language-pill chrome consumes (~24px). Without this the labels
+   line up but the source's first code line sits well below the
+   render's first content row, and the pair reads as misaligned. */
+.example-pair .example-render > :not(.example-col-label):not(pre):not(.okt-pre-host) {
   margin-top: 24px !important;
+  margin-bottom: 0;
+}
+.example-pair .example-render > :not(.example-col-label) {
   margin-bottom: 0;
 }
 @media (max-width: 900px) {
