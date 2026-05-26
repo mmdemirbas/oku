@@ -3478,6 +3478,39 @@ oku-chart .okc-donut-caption {
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
+/* Interactive non-Cartesian legends — clicking a legend item toggles
+   the matching slice / cell / area's visibility. Hidden shapes fade
+   out; the legend item shows the off state via line-through label. */
+oku-chart .okc-donut-legend,
+oku-chart .okc-waffle-legend,
+oku-chart .okc-radar-legend {
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+oku-chart .okc-donut-legend:hover,
+oku-chart .okc-waffle-legend:hover,
+oku-chart .okc-radar-legend:hover {
+  opacity: 0.85;
+}
+oku-chart .okc-donut-legend.okc-legend-off text,
+oku-chart .okc-waffle-legend.okc-legend-off text,
+oku-chart .okc-radar-legend.okc-legend-off text {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+oku-chart .okc-donut-legend.okc-legend-off rect,
+oku-chart .okc-waffle-legend.okc-legend-off rect,
+oku-chart .okc-radar-legend.okc-legend-off rect {
+  opacity: 0.35;
+}
+oku-chart .okc-hidden,
+oku-chart .okc-donut .okc-slice.okc-hidden,
+oku-chart .okc-waffle .okc-waffle-cell.okc-hidden,
+oku-chart .okc-radar .okc-radar-series.okc-hidden {
+  opacity: 0.08;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
 oku-chart .okc-donut-legend-label {
   fill: var(--text);
   font: 500 12px 'Inter', sans-serif;

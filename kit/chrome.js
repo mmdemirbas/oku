@@ -3909,7 +3909,7 @@ class OkuChart extends HTMLElement {
       var color = palette[slice.color] || palette.accent;
       var ly = 64 + idx * 22;
       var pct = Math.round((Math.max(0, +slice.value || 0) / total) * 100);
-      parts.push('<g class="okc-donut-legend" data-slice-idx="' + idx + '">' +
+      parts.push('<g class="okc-donut-legend" data-slice-idx="' + idx + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml('Toggle ' + (slice.label || 'slice')) + '">' +
                  '<rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/>' +
                  '<text x="' + (lx + 18) + '" y="' + ly + '" class="okc-donut-legend-label">' +
                    escapeXml(slice.label || '') + ' · ' + pct + '%' +
@@ -4130,13 +4130,14 @@ class OkuChart extends HTMLElement {
     // Build a flat array of [tone] per cell, by walking segments in order.
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var fills = [];
-    segments.forEach(function (seg) {
+    segments.forEach(function (seg, sIdx) {
       var cells = Math.round((Math.max(0, +seg.count || 0) / total) * totalCells);
       var color = palette[seg.color] || palette.accent;
-      for (var k = 0; k < cells && fills.length < totalCells; k++) fills.push({ color: color, label: seg.label });
+      for (var k = 0; k < cells && fills.length < totalCells; k++) fills.push({ color: color, label: seg.label, segIdx: sIdx });
     });
-    // Pad with empty (muted-tone, very faint) cells.
-    while (fills.length < totalCells) fills.push({ color: palette.muted, label: 'empty', empty: true });
+    // Pad with empty (muted-tone, very faint) cells. -1 means "no
+    // segment" — the legend ignores them when toggling.
+    while (fills.length < totalCells) fills.push({ color: palette.muted, label: 'empty', empty: true, segIdx: -1 });
     var cell = 22, gap = 3;
     var W = gCols * (cell + gap) + 12 + 160; // grid + legend
     var H = (this._title ? 28 : 4) + gRows * (cell + gap) + 12;
@@ -4158,7 +4159,7 @@ class OkuChart extends HTMLElement {
             { k: 'percent', v: (Math.round(((idx + 1) / totalCells) * 100)) + '%' }
           ]
         });
-        parts.push('<rect x="' + rx + '" y="' + ry + '" width="' + cell + '" height="' + cell + '" rx="3" fill="' + item.color + '" fill-opacity="' + op + '" class="okc-waffle-cell" tabindex="0" data-hover-payload="' + escapeXml(wpay) + '"><title>' + escapeXml((item.label || 'cell') + ' · cell ' + (idx + 1) + '/' + totalCells) + '</title></rect>');
+        parts.push('<rect x="' + rx + '" y="' + ry + '" width="' + cell + '" height="' + cell + '" rx="3" fill="' + item.color + '" fill-opacity="' + op + '" class="okc-waffle-cell" data-segment-idx="' + item.segIdx + '" tabindex="0" data-hover-payload="' + escapeXml(wpay) + '"><title>' + escapeXml((item.label || 'cell') + ' · cell ' + (idx + 1) + '/' + totalCells) + '</title></rect>');
       }
     }
     // Legend on the right.
@@ -4166,7 +4167,7 @@ class OkuChart extends HTMLElement {
     segments.forEach(function (seg, idx) {
       var ly = titleTop + 16 + idx * 22;
       var color = palette[seg.color] || palette.accent;
-      parts.push('<g class="okc-waffle-legend"><rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/><text x="' + (lx + 18) + '" y="' + ly + '" class="okc-waffle-legend-label">' + escapeXml(seg.label || '') + ' · ' + (Math.round((Math.max(0, +seg.count || 0) / total) * 100)) + '%</text></g>');
+      parts.push('<g class="okc-waffle-legend" data-segment-idx="' + idx + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml('Toggle ' + (seg.label || 'segment')) + '"><rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/><text x="' + (lx + 18) + '" y="' + ly + '" class="okc-waffle-legend-label">' + escapeXml(seg.label || '') + ' · ' + (Math.round((Math.max(0, +seg.count || 0) / total) * 100)) + '%</text></g>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -4382,7 +4383,7 @@ class OkuChart extends HTMLElement {
     series.forEach(function (s, si) {
       var color = palette[s.color] || palette.accent;
       var lx = 16 + si * 130;
-      parts.push('<g class="okc-radar-legend"><rect x="' + lx + '" y="' + (lgY - 8) + '" width="10" height="10" rx="2" fill="' + color + '"/><text x="' + (lx + 16) + '" y="' + lgY + '" class="okc-radar-legend-label">' + escapeXml(s.label || '') + '</text></g>');
+      parts.push('<g class="okc-radar-legend" data-series-idx="' + si + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml('Toggle ' + (s.label || 'series')) + '"><rect x="' + lx + '" y="' + (lgY - 8) + '" width="10" height="10" rx="2" fill="' + color + '"/><text x="' + (lx + 16) + '" y="' + lgY + '" class="okc-radar-legend-label">' + escapeXml(s.label || '') + '</text></g>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -6031,6 +6032,37 @@ class OkuChart extends HTMLElement {
         }
       });
     });
+
+    /* Legend interactivity for non-Cartesian charts. Each legend item
+       carries an index attribute (`data-slice-idx` for donut/pie,
+       `data-segment-idx` for waffle, `data-series-idx` for radar)
+       and toggling adds `.okc-hidden` to every matching shape. CSS
+       collapses opacity / pointer events for hidden shapes so the
+       reader can mute parts of the breakdown without re-rendering. */
+    function wireNonCartesianLegend(legendSel, idxAttr, targetSel) {
+      self.querySelectorAll(legendSel).forEach(function (legendItem) {
+        function toggle() {
+          var idx = legendItem.getAttribute(idxAttr);
+          if (idx == null) return;
+          var targets = self.querySelectorAll(targetSel + '[' + idxAttr + '="' + CSS.escape(idx) + '"]');
+          if (!targets.length) return;
+          var nowHidden = !targets[0].classList.contains('okc-hidden');
+          targets.forEach(function (t) { t.classList.toggle('okc-hidden', nowHidden); });
+          legendItem.classList.toggle('okc-legend-off', nowHidden);
+          legendItem.setAttribute('aria-pressed', nowHidden ? 'true' : 'false');
+        }
+        legendItem.addEventListener('click', toggle);
+        legendItem.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggle();
+          }
+        });
+      });
+    }
+    wireNonCartesianLegend('.okc-donut-legend',  'data-slice-idx',   '.okc-slice');
+    wireNonCartesianLegend('.okc-waffle-legend', 'data-segment-idx', '.okc-waffle-cell');
+    wireNonCartesianLegend('.okc-radar-legend',  'data-series-idx',  '.okc-radar-series');
 
     /* Rich-tooltip wiring for non-dot chart shapes. Reads the data
        payload from the element's own attributes (label, value, share,
