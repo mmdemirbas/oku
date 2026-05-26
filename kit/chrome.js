@@ -3571,16 +3571,102 @@ class OkuChart extends HTMLElement {
         );
       });
     }
+    // Synced cursor (vertical dashed line) — sits at the top of the
+    // plot region and is shown/positioned by _wireCartesianCursor on
+    // pointer-move. Gives the reader a single "where am I" indicator
+    // across every series, with the tooltip listing each series's
+    // value at the cursor's x. Skipped for quadrant because quadrant
+    // axes carry semantic labels (e.g. "effort × value") that don't
+    // benefit from a sweep.
+    if (self._type !== 'quadrant') {
+      parts.push('<line class="okc-cartesian-cursor" x1="0" y1="' + pad.top + '" x2="0" y2="' + (pad.top + plotH) + '" visibility="hidden" pointer-events="none"/>');
+    }
     parts.push('</svg>');
 
     var oldSvg = this.querySelector(':scope > .okc-svg');
     if (oldSvg) oldSvg.remove();
     this.insertAdjacentHTML('beforeend', parts.join(''));
     this._wireInteractivity();
+    if (self._type !== 'quadrant') {
+      this._wireCartesianCursor({
+        padLeft: pad.left, padRight: pad.right,
+        padTop: pad.top, plotW: plotW, plotH: plotH,
+        W: W, sx: sx, sy: sy
+      });
+    }
     // SVG must be in the DOM before getBBox() reports anything sane.
     // Defer to next frame so layout has a chance to settle.
-    var self = this;
     requestAnimationFrame(function () { self._deconflictLabels(); });
+  }
+
+  /* Synced cursor for Cartesian charts. Tracks the pointer's x
+     (mapped back through the chart's x-scale), drops a vertical
+     dashed line that spans the plot region, and updates the rich
+     tooltip with one row per series — "at x = ?, series A is ?,
+     series B is ?" — so the reader compares all series at the same
+     x in a single glance. */
+  _wireCartesianCursor(opts) {
+    var self = this;
+    var svg = self.querySelector('svg.okc-svg');
+    if (!svg) return;
+    var cursor = svg.querySelector('.okc-cartesian-cursor');
+    if (!cursor) return;
+    // Invert the x scale so a screen-space x maps back to the data
+    // domain. For linear: just lerp the plot region. For log: same,
+    // because sx() above already used the log basis — we use sx()
+    // as the forward map and binary-invert.
+    function pointerToViewBoxX(ev) {
+      var pt = svg.createSVGPoint();
+      pt.x = ev.clientX; pt.y = ev.clientY;
+      var ctm = svg.getScreenCTM();
+      if (!ctm) return null;
+      return pt.matrixTransform(ctm.inverse()).x;
+    }
+    function move(ev) {
+      if (self._tipPinned) return;
+      var vx = pointerToViewBoxX(ev);
+      if (vx === null || vx < opts.padLeft || vx > opts.padLeft + opts.plotW) {
+        cursor.setAttribute('visibility', 'hidden');
+        if (self._hideCursorTip) self._hideCursorTip();
+        return;
+      }
+      // For each series, find the data point with the closest x to
+      // the cursor. Some series sample irregularly — nearest-point
+      // works for all without assuming sorted-by-x data.
+      var bestX = null;
+      var rows = [];
+      (self._series || []).forEach(function (s, sIdx) {
+        var pts = s.data || [];
+        if (!pts.length) return;
+        var nearest = pts[0];
+        var bestDelta = Math.abs(opts.sx(nearest.x) - vx);
+        for (var i = 1; i < pts.length; i++) {
+          var d = Math.abs(opts.sx(pts[i].x) - vx);
+          if (d < bestDelta) { bestDelta = d; nearest = pts[i]; }
+        }
+        if (bestX === null) bestX = nearest.x;
+        rows.push({
+          k: s.label || ('series ' + (sIdx + 1)),
+          v: fmtNum(nearest.y) + (nearest.label ? ' (' + nearest.label + ')' : '')
+        });
+      });
+      if (!rows.length) return;
+      cursor.setAttribute('x1', vx);
+      cursor.setAttribute('x2', vx);
+      cursor.setAttribute('visibility', 'visible');
+      if (self._showCursorTip) {
+        self._showCursorTip({
+          label: (self._xLabel ? self._xLabel + ' ≈ ' : 'x ≈ ') + fmtNum(bestX),
+          kv: rows
+        }, ev.clientX, svg.getBoundingClientRect().top);
+      }
+    }
+    function leave() {
+      cursor.setAttribute('visibility', 'hidden');
+      if (self._hideCursorTip && !self._tipPinned) self._hideCursorTip();
+    }
+    svg.addEventListener('mousemove', move);
+    svg.addEventListener('mouseleave', leave);
   }
 
   /* Push overlapping point labels onto staggered y-offsets so they don't

@@ -3573,6 +3573,16 @@ oku-chart .okc-ridgeline .okc-ridge-cursor {
   stroke-dasharray: 3 3;
   opacity: 0.75;
 }
+/* Same idea for Cartesian charts (scatter / line / area / bubble).
+   The synced cursor spans the plot region; tooltip shows every
+   series' value at the cursor's nearest x. */
+oku-chart .okc-cartesian-cursor {
+  stroke: var(--accent-strong);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.6;
+  pointer-events: none;
+}
 oku-chart .okc-ridgeline .okc-ridge-cursor-label {
   fill: var(--accent-strong);
   font: 600 11px 'JetBrains Mono', monospace;
