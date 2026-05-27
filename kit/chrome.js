@@ -7130,6 +7130,40 @@ class OkuChart extends HTMLElement {
         tip.style.top  = top  + 'px';
       });
     }
+    /* Reposition a tooltip to track its anchor's current viewport
+       position. Used by the global scroll/resize handler so a tip
+       opened when the page is at scrollY=0 keeps appearing next
+       to the same data point after the reader scrolls. */
+    function placeTooltipAtAnchor(tip, anchor, anchorOffset) {
+      if (!anchor || !anchor.isConnected) return;
+      var r = anchor.getBoundingClientRect();
+      var ax = r.left + r.width / 2;
+      var ay = r.top - (anchorOffset || 8);
+      placeTooltipAt(tip, ax, ay);
+    }
+    // Global listener — keep every visible tooltip pinned to its
+    // anchor element while the reader scrolls or resizes. Without
+    // this, position:fixed tooltips appear glued to the viewport
+    // and drift away from the chart they describe.
+    if (!window.__okuTipScrollWired) {
+      window.__okuTipScrollWired = true;
+      var rafPending = false;
+      function repositionAll() {
+        rafPending = false;
+        document.querySelectorAll('.okc-tooltip.visible').forEach(function (tip) {
+          var anchor = tip.__okuAnchor;
+          if (!anchor) return;
+          placeTooltipAtAnchor(tip, anchor, tip.__okuAnchorOffset || 8);
+        });
+      }
+      function schedule() {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(repositionAll);
+      }
+      window.addEventListener('scroll', schedule, true);
+      window.addEventListener('resize', schedule);
+    }
     function rebuildTipBody(tip, innerHtml) {
       // Replace the tooltip body without clobbering the persistent
       // close button. Anything inside `.okc-tt-body` is volatile;
@@ -7161,6 +7195,8 @@ class OkuChart extends HTMLElement {
       // even at the rightmost / topmost extents of the plot.
       var dotRect = dot.getBoundingClientRect();
       placeTooltipAt(tip, dotRect.left + dotRect.width / 2, dotRect.top - 8);
+      tip.__okuAnchor = dot;
+      tip.__okuAnchorOffset = 8;
       tip.classList.add('visible');
     }
     function hideTip() {
@@ -7319,6 +7355,8 @@ class OkuChart extends HTMLElement {
       // fullscreen" paths, and never leaks past the viewport edges.
       var aRect = anchor.getBoundingClientRect();
       placeTooltipAt(tip, aRect.left + aRect.width / 2, aRect.top - 8);
+      tip.__okuAnchor = anchor;
+      tip.__okuAnchorOffset = 8;
       tip.classList.add('visible');
     }
     function hideRich(force) {
