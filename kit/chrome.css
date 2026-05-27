@@ -4361,6 +4361,27 @@ oku-diagram {
    "trim". The fullscreen lightbox shows the full diagram for cases
    where the inline view ends up clipping anything important. */
 oku-diagram .okd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; overflow: hidden; }
+
+/* Mermaid diagram interactivity — minimal: hover on a node lifts
+   it visually (accent stroke + slight scale via filter). Click
+   handlers are mermaid's own `click NodeId "url"` syntax which
+   the renderer already honours. Pan/zoom in fullscreen is the
+   shared lightbox lightbox-stage. */
+oku-diagram .okd-render svg .node,
+oku-diagram .okd-render svg [class*="node"] {
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+oku-diagram .okd-render svg .node:hover {
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+oku-diagram .okd-render svg .node:hover > rect,
+oku-diagram .okd-render svg .node:hover > circle,
+oku-diagram .okd-render svg .node:hover > polygon,
+oku-diagram .okd-render svg .node:hover > path {
+  stroke: var(--accent) !important;
+  stroke-width: 2px;
+}
 oku-diagram .okd-render svg {
   /* width:100% on a fixed-aspect-ratio SVG would stretch a tall
      portrait diagram (mindmap, vertical state machine) into a
