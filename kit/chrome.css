@@ -3914,6 +3914,25 @@ oku-chart .okc-generic-cursor {
   stroke-dasharray: 3 3;
   pointer-events: none;
 }
+/* Bar chart vertical cursor (DIV-based variant of .okc-generic-
+   cursor). Same visual semantic — dashed accent line following
+   the pointer's x. The chart wrap is position:relative so an
+   absolutely-positioned full-height line lands inside it. */
+.bar-chart,
+.bar-chart-multi {
+  position: relative;
+}
+.okc-bar-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 1;
+}
 oku-chart:has(.okc-dot:hover) .okc-label-overlay,
 oku-chart:has(.okc-bubble:hover) .okc-label-overlay,
 oku-chart:has(.okc-slice:hover) .okc-label-overlay,

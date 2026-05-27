@@ -7558,6 +7558,27 @@ function __okuEnhanceBarCharts(root) {
   charts.forEach(function (host) {
     if (host.dataset.hdcBarsBound === '1') return;
     host.dataset.hdcBarsBound = '1';
+    // Vertical cursor — absolute-positioned line following the
+    // pointer within the chart wrap. SVG charts get an SVG cursor
+    // via _wireGenericVerticalCursor; bar charts are DIV-based, so
+    // the same affordance lives as a DOM line.
+    var cursor = document.createElement('div');
+    cursor.className = 'okc-bar-cursor';
+    cursor.setAttribute('aria-hidden', 'true');
+    host.appendChild(cursor);
+    host.addEventListener('mousemove', function (ev) {
+      var r = host.getBoundingClientRect();
+      var x = ev.clientX - r.left;
+      if (x < 0 || x > r.width) {
+        cursor.style.opacity = '0';
+        return;
+      }
+      cursor.style.left = x + 'px';
+      cursor.style.opacity = '1';
+    });
+    host.addEventListener('mouseleave', function () {
+      cursor.style.opacity = '0';
+    });
     var tip = null;
     function ensureTip() {
       if (tip) return tip;
