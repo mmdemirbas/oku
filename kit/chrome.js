@@ -388,16 +388,23 @@ var __okuChartConfig = (function () {
         { type: 'pie',   label: 'pie' },
       ];
     }
-    // Cartesian — series of {x, y} points.
+    // Cartesian — series of {x, y} points. Every Cartesian shape
+    // (scatter / line / area / bubble / quadrant) consumes the same
+    // {x, y, ...} payload, so each is a valid alternative for the
+    // others. Quadrant is included because it just adds dividing
+    // lines + corner labels on top of the same scatter payload —
+    // the user's complaint was that switching scatter → line lost
+    // the round-trip to quadrant.
     var hasXY = series.length && (series[0].data || []).some(function (p) {
       return p && p.x != null && p.y != null;
     });
     if (hasXY) {
       var hasSize = (series[0].data || []).some(function (p) { return p && p.size != null; });
       var opts = [
-        { type: 'scatter', label: 'scatter' },
-        { type: 'line',    label: 'line' },
-        { type: 'area',    label: 'area' },
+        { type: 'scatter',  label: 'scatter' },
+        { type: 'line',     label: 'line' },
+        { type: 'area',     label: 'area' },
+        { type: 'quadrant', label: 'quadrant' },
       ];
       if (hasSize) opts.unshift({ type: 'bubble', label: 'bubble' });
       return opts;
@@ -498,8 +505,9 @@ var __okuChartConfig = (function () {
         'Type <code>' + host._type + '</code> has no shape-compatible alternatives yet.' +
       '</div>');
     }
-    // Cartesian — marks combo.
-    if (host._type === 'scatter' || host._type === 'line' || host._type === 'area' || host._type === 'plot') {
+    // Cartesian — marks combo. Bubble + quadrant share the same
+    // Cartesian payload so marks also applies to them.
+    if (host._type === 'scatter' || host._type === 'line' || host._type === 'area' || host._type === 'plot' || host._type === 'bubble' || host._type === 'quadrant') {
       var marks = host._marks || (host._type === 'scatter' ? ['dots'] : host._type === 'line' ? ['line'] : host._type === 'area' ? ['line', 'area'] : ['dots']);
       rows.push('<div class="okc-cfg-row">' +
         '<span class="okc-cfg-label">Marks</span>' +
@@ -560,18 +568,48 @@ var __okuChartConfig = (function () {
 
   /* Apply a partial config delta by building a new oku-chart host
      with merged attributes + the same data <script> children, then
-     swap it in place. The popover re-renders against the new host. */
+     swap it in place. The popover re-renders against the new host.
+
+     Type vs marks coupling: a marks change implies a type switch
+     because OkuChart's dispatcher maps `type=plot` + marks to one
+     of scatter / line / area based on mark precedence (area > line
+     > dots). So a marks delta is normalised to `type=plot` + the
+     new marks attr. Conversely, a pure type change must DROP any
+     prior `marks` attr — otherwise switching from line back to
+     quadrant would carry the old marks="line" and OkuChart would
+     re-resolve to type=line. */
   function applyChange(oldHost, delta) {
     var newHost = document.createElement('oku-chart');
-    var copyAttrs = ['title', 'x-label', 'y-label', 'x-scale', 'y-scale', 'marks', 'mode', 'arc-start', 'arc-end', 'inner-radius'];
+    // Copy purely-presentation attrs that don't interact with
+    // type / marks resolution.
+    var copyAttrs = ['title', 'x-label', 'y-label', 'x-scale', 'y-scale', 'inner-radius', 'arc-start'];
     copyAttrs.forEach(function (a) {
       var v = oldHost.getAttribute(a);
       if (v !== null) newHost.setAttribute(a, v);
     });
-    var newType = delta.type !== undefined ? delta.type : oldHost.getAttribute('type');
-    newHost.setAttribute('type', newType);
-    if (delta.marks)  newHost.setAttribute('marks', delta.marks.join(','));
-    if (delta.arcEnd !== undefined) newHost.setAttribute('arc-end', String(delta.arcEnd));
+    if (delta.marks) {
+      // Marks change → canonical plot form, fresh marks list.
+      newHost.setAttribute('type', 'plot');
+      newHost.setAttribute('marks', delta.marks.join(','));
+    } else if (delta.type !== undefined) {
+      // Pure type change → fresh type, NO inherited marks.
+      newHost.setAttribute('type', delta.type);
+    } else {
+      // Neither type nor marks in delta → preserve both as-is.
+      newHost.setAttribute('type', oldHost.getAttribute('type'));
+      var oldMarks = oldHost.getAttribute('marks');
+      if (oldMarks) newHost.setAttribute('marks', oldMarks);
+    }
+    // Mode (arc / bar grouping) — carry through unless replaced.
+    var oldMode = oldHost.getAttribute('mode');
+    if (oldMode) newHost.setAttribute('mode', oldMode);
+    // Arc-end can be overridden via delta or preserved.
+    if (delta.arcEnd !== undefined) {
+      newHost.setAttribute('arc-end', String(delta.arcEnd));
+    } else {
+      var oldArcEnd = oldHost.getAttribute('arc-end');
+      if (oldArcEnd) newHost.setAttribute('arc-end', oldArcEnd);
+    }
     // Carry over data + extras scripts.
     Array.from(oldHost.querySelectorAll('script[type="application/json"]')).forEach(function (s) {
       newHost.appendChild(s.cloneNode(true));
@@ -4340,6 +4378,50 @@ class OkuChart extends HTMLElement {
      wiring. Used by box-plot / histogram / candlestick / density /
      beeswarm / dot-plot. The richer Cartesian cursor (with nearest-
      point lookup + multi-series tooltip) is a separate method. */
+  /* Emit a horizontal series-legend swatch row inside an SVG.
+     Used by chart types whose multi-series colour-coding would
+     otherwise be a guessing game (marimekko, stream, anything else
+     that paints per-series fills without a built-in legend).
+
+     opts:
+       x, y       — top-left of the legend row (viewBox coords)
+       width      — total horizontal room available
+       idxAttr    — data-* suffix written on each chip, for legend-hover
+                    wiring downstream (defaults to "series-idx")
+
+     The row is auto-clipped: if `width` won't fit every label, the
+     chips overflow to a second row on a 18-px stride. Each chip
+     carries data-legend-hover so the existing legend-hover CSS
+     reactions still apply. */
+  _renderSeriesLegend(series, palette, opts) {
+    if (!series || !series.length) return '';
+    var x0 = opts.x, y0 = opts.y, width = opts.width;
+    var idxAttr = opts.idxAttr || 'series-idx';
+    var swatch = 11, gap = 6, rowH = 18, fontPx = 11;
+    var html = '<g class="okc-series-legend" pointer-events="all">';
+    var cx = x0, cy = y0;
+    series.forEach(function (s, i) {
+      if (!s || !s.label) return;
+      var label = String(s.label);
+      // Estimate label width — 5.6px per char at 11px font with a
+      // little slack. Cheap heuristic; SVG doesn't tell us the real
+      // measure until paint, so we over-estimate by ~10% to be safe.
+      var labW = Math.max(20, Math.ceil(label.length * 5.6) + 2);
+      var chipW = swatch + 4 + labW + gap;
+      if (cx + chipW > x0 + width && cx > x0) {
+        cx = x0; cy += rowH;
+      }
+      var color = palette[i % palette.length];
+      html += '<g class="okc-legend-chip" tabindex="0" data-legend-hover="' + i + '" data-' + idxAttr + '="' + i + '">';
+      html +=   '<rect x="' + cx + '" y="' + (cy + 1) + '" width="' + swatch + '" height="' + swatch + '" rx="2" fill="' + color + '"/>';
+      html +=   '<text x="' + (cx + swatch + 4) + '" y="' + (cy + 9) + '" class="okc-legend" font-size="' + fontPx + '">' + escapeXml(label) + '</text>';
+      html += '</g>';
+      cx += chipW;
+    });
+    html += '</g>';
+    return html;
+  }
+
   _wireGenericVerticalCursor(plotBounds) {
     var self = this;
     var svg = self.querySelector('svg.okc-svg');
@@ -6651,12 +6733,15 @@ class OkuChart extends HTMLElement {
       return series.reduce(function (s, ser) { return s + Math.max(0, +(ser.values && ser.values[i]) || 0); }, 0);
     });
     var grandTotal = colTotals.reduce(function (s, v) { return s + v; }, 0) || 1;
-    var W = 640, H = this._title ? 360 : 320;
-    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 16, right: 16 };
+    var legendY = (this._title ? 30 : 12);
+    var legendH = 18;
+    var W = 640, H = (this._title ? 360 : 320);
+    var pad = { top: legendY + legendH + 8, bottom: 36, left: 16, right: 16 };
     var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Marimekko') + '" class="okc-svg okc-marimekko">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    parts.push(this._renderSeriesLegend(series, palette, { x: pad.left, y: legendY, width: plotW, idxAttr: 'series-idx' }));
     var xCursor = pad.left;
     categories.forEach(function (cat, ci) {
       var colW = (colTotals[ci] / grandTotal) * plotW;
@@ -6701,8 +6786,10 @@ class OkuChart extends HTMLElement {
       return series.reduce(function (s, ser) { return s + Math.max(0, +(ser.values && ser.values[i]) || 0); }, 0);
     });
     var maxTotal = Math.max.apply(null, totals.concat([1]));
+    var legendY = (this._title ? 30 : 12);
+    var legendH = 18;
     var W = 640, H = this._title ? 320 : 280;
-    var pad = { top: this._title ? 36 : 16, bottom: 30, left: 36, right: 12 };
+    var pad = { top: legendY + legendH + 8, bottom: 30, left: 36, right: 12 };
     var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     function xOf(i) { return pad.left + (i / (categories.length - 1)) * plotW; }
     function scaleY(v) { return (v / maxTotal) * plotH; }
@@ -6724,6 +6811,7 @@ class OkuChart extends HTMLElement {
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Stream graph') + '" class="okc-svg okc-stream">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    parts.push(this._renderSeriesLegend(series, palette, { x: pad.left, y: legendY, width: plotW, idxAttr: 'series-idx' }));
     bands.forEach(function (b, si) {
       var color = palette[si % palette.length];
       var d = b.top.map(function (p, j) {
