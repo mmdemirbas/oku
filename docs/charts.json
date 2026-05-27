@@ -96,208 +96,25 @@
           "kind": "heading",
           "level": 3,
           "id": "chart-families",
-          "title": "Pick by family"
+          "title": "Pick by function"
         },
         {
           "kind": "paragraph",
-          "content": "29 chart variants — pick the shape that fits what you're communicating. Each card shows a tiny live render so you can compare visual shape at a glance; click any card to jump to the variant's full example."
+          "content": "29 chart variants, grouped by what you're trying to say. Click any card to jump to the variant's full example — the live tiny render previews the shape."
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-fn-compare-values",
+          "title": "Compare values"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Bars, dots-vs-targets, radial spokes — anything that lines values up side by side so the reader can compare magnitudes."
         },
         {
           "kind": "compare-grid",
           "cards": [
-            {
-              "title": "scatter",
-              "href": "#chart-scatter-line",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "scatter",
-                  "series": [
-                    {
-                      "label": "a",
-                      "color": "accent",
-                      "data": [
-                        {
-                          "x": 1,
-                          "y": 3
-                        },
-                        {
-                          "x": 3,
-                          "y": 7
-                        },
-                        {
-                          "x": 5,
-                          "y": 4
-                        },
-                        {
-                          "x": 7,
-                          "y": 9
-                        },
-                        {
-                          "x": 9,
-                          "y": 6
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "line",
-              "href": "#chart-line",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "line",
-                  "series": [
-                    {
-                      "label": "a",
-                      "color": "accent",
-                      "data": [
-                        {
-                          "x": 1,
-                          "y": 4
-                        },
-                        {
-                          "x": 2,
-                          "y": 7
-                        },
-                        {
-                          "x": 3,
-                          "y": 5
-                        },
-                        {
-                          "x": 4,
-                          "y": 9
-                        },
-                        {
-                          "x": 5,
-                          "y": 6
-                        },
-                        {
-                          "x": 6,
-                          "y": 8
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "area",
-              "href": "#chart-area",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "area",
-                  "series": [
-                    {
-                      "label": "a",
-                      "color": "success",
-                      "data": [
-                        {
-                          "x": 1,
-                          "y": 3
-                        },
-                        {
-                          "x": 2,
-                          "y": 5
-                        },
-                        {
-                          "x": 3,
-                          "y": 4
-                        },
-                        {
-                          "x": 4,
-                          "y": 8
-                        },
-                        {
-                          "x": 5,
-                          "y": 7
-                        },
-                        {
-                          "x": 6,
-                          "y": 9
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "bubble",
-              "href": "#chart-bubble",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "bubble",
-                  "series": [
-                    {
-                      "label": "a",
-                      "color": "accent",
-                      "data": [
-                        {
-                          "x": 2,
-                          "y": 4,
-                          "size": 30
-                        },
-                        {
-                          "x": 5,
-                          "y": 7,
-                          "size": 80
-                        },
-                        {
-                          "x": 7,
-                          "y": 3,
-                          "size": 50
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "quadrant",
-              "href": "#chart-quadrant",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "quadrant",
-                  "quadrants": {
-                    "x": 5,
-                    "y": 5
-                  },
-                  "series": [
-                    {
-                      "label": "a",
-                      "color": "accent",
-                      "data": [
-                        {
-                          "x": 2,
-                          "y": 8
-                        },
-                        {
-                          "x": 8,
-                          "y": 8
-                        },
-                        {
-                          "x": 3,
-                          "y": 2
-                        },
-                        {
-                          "x": 8,
-                          "y": 3
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
             {
               "title": "bar",
               "href": "#chart-bar",
@@ -393,121 +210,298 @@
               ]
             },
             {
-              "title": "donut",
-              "href": "#chart-donut",
+              "title": "bullet",
+              "href": "#chart-bullet",
               "blocks": [
                 {
                   "kind": "chart",
-                  "type": "donut",
-                  "slices": [
+                  "type": "bullet",
+                  "tracks": [
                     {
                       "label": "a",
-                      "value": 40,
+                      "value": 70,
+                      "target": 80,
+                      "max": 100,
                       "color": "accent"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "gauge",
+              "href": "#chart-gauge",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "gauge",
+                  "value": 72,
+                  "max": 100,
+                  "target": 80,
+                  "label": "OKR"
+                }
+              ]
+            },
+            {
+              "title": "radar",
+              "href": "#chart-radar",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "radar",
+                  "axes": [
+                    {
+                      "label": "a"
                     },
                     {
-                      "label": "b",
-                      "value": 30,
-                      "color": "success"
+                      "label": "b"
                     },
                     {
-                      "label": "c",
-                      "value": 20,
-                      "color": "warn"
+                      "label": "c"
                     },
                     {
-                      "label": "d",
-                      "value": 10,
+                      "label": "d"
+                    }
+                  ],
+                  "series": [
+                    {
+                      "label": "x",
+                      "color": "accent",
+                      "values": [
+                        7,
+                        9,
+                        5,
+                        8
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "slope",
+              "href": "#chart-slope",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "slope",
+                  "from_label": "before",
+                  "to_label": "after",
+                  "items": [
+                    {
+                      "label": "a",
+                      "from": 80,
+                      "to": 60,
                       "color": "danger"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "pie",
-              "href": "#chart-pie",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "pie",
-                  "slices": [
-                    {
-                      "label": "a",
-                      "value": 35,
-                      "color": "accent"
                     },
                     {
                       "label": "b",
-                      "value": 30,
+                      "from": 40,
+                      "to": 70,
                       "color": "success"
-                    },
-                    {
-                      "label": "c",
-                      "value": 20,
-                      "color": "warn"
-                    },
-                    {
-                      "label": "d",
-                      "value": 15,
-                      "color": "muted"
                     }
                   ]
                 }
               ]
             },
             {
-              "title": "waffle",
-              "href": "#chart-waffle",
+              "title": "parallel-coordinates",
+              "href": "#chart-parallel-coordinates",
               "blocks": [
                 {
                   "kind": "chart",
-                  "type": "waffle",
-                  "total": 100,
-                  "grid_rows": 6,
-                  "grid_cols": 10,
-                  "segments": [
+                  "type": "parallel-coordinates",
+                  "variables": [
                     {
-                      "label": "done",
-                      "count": 42,
-                      "color": "accent"
+                      "key": "x",
+                      "label": "x"
                     },
                     {
-                      "label": "todo",
-                      "count": 58,
-                      "color": "muted"
+                      "key": "y",
+                      "label": "y"
+                    },
+                    {
+                      "key": "z",
+                      "label": "z"
+                    }
+                  ],
+                  "records": [
+                    {
+                      "x": 1,
+                      "y": 8,
+                      "z": 3
+                    },
+                    {
+                      "x": 4,
+                      "y": 5,
+                      "z": 7
+                    },
+                    {
+                      "x": 7,
+                      "y": 2,
+                      "z": 6
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-fn-show-change-over-time",
+          "title": "Show change over time"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Continuous trends or cyclic patterns where the x-axis is time."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "title": "line",
+              "href": "#chart-line",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "line",
+                  "series": [
+                    {
+                      "label": "a",
+                      "color": "accent",
+                      "data": [
+                        {
+                          "x": 1,
+                          "y": 4
+                        },
+                        {
+                          "x": 2,
+                          "y": 7
+                        },
+                        {
+                          "x": 3,
+                          "y": 5
+                        },
+                        {
+                          "x": 4,
+                          "y": 9
+                        },
+                        {
+                          "x": 5,
+                          "y": 6
+                        },
+                        {
+                          "x": 6,
+                          "y": 8
+                        }
+                      ]
                     }
                   ]
                 }
               ]
             },
             {
-              "title": "treemap",
-              "href": "#chart-treemap",
+              "title": "area",
+              "href": "#chart-area",
               "blocks": [
                 {
                   "kind": "chart",
-                  "type": "treemap",
-                  "tree": [
+                  "type": "area",
+                  "series": [
                     {
-                      "label": "JS",
-                      "value": 60,
-                      "color": "accent"
-                    },
-                    {
-                      "label": "CSS",
-                      "value": 25,
-                      "color": "success"
-                    },
-                    {
-                      "label": "PY",
-                      "value": 15,
-                      "color": "warn"
+                      "label": "a",
+                      "color": "success",
+                      "data": [
+                        {
+                          "x": 1,
+                          "y": 3
+                        },
+                        {
+                          "x": 2,
+                          "y": 5
+                        },
+                        {
+                          "x": 3,
+                          "y": 4
+                        },
+                        {
+                          "x": 4,
+                          "y": 8
+                        },
+                        {
+                          "x": 5,
+                          "y": 7
+                        },
+                        {
+                          "x": 6,
+                          "y": 9
+                        }
+                      ]
                     }
                   ]
                 }
               ]
             },
+            {
+              "title": "sparkline",
+              "href": "#chart-sparkline",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "sparkline",
+                  "values": [
+                    3,
+                    5,
+                    4,
+                    7,
+                    6,
+                    8,
+                    9,
+                    7,
+                    6,
+                    8
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "calendar-heatmap",
+              "href": "#chart-calendar-heatmap",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "calendar-heatmap",
+                  "year": 2026,
+                  "date_values": {
+                    "2026-01-05": 3,
+                    "2026-02-10": 5,
+                    "2026-03-12": 8,
+                    "2026-04-18": 6,
+                    "2026-05-22": 9,
+                    "2026-06-15": 4,
+                    "2026-07-08": 7,
+                    "2026-08-25": 5
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-fn-show-distribution",
+          "title": "Show distribution"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Where values cluster, what the spread looks like, how peaks compare across categories."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
             {
               "title": "histogram",
               "href": "#chart-histogram",
@@ -613,76 +607,476 @@
                   ]
                 }
               ]
-            },
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-fn-show-parts-of-a-whole",
+          "title": "Show parts of a whole"
+        },
+        {
+          "kind": "paragraph",
+          "content": "One total, broken into named slices that add up to it. Pick the shape to match how many parts you have and whether the centre matters."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
             {
-              "title": "sparkline",
-              "href": "#chart-sparkline",
+              "title": "pie",
+              "href": "#chart-pie",
               "blocks": [
                 {
                   "kind": "chart",
-                  "type": "sparkline",
-                  "values": [
-                    3,
-                    5,
-                    4,
-                    7,
-                    6,
-                    8,
-                    9,
-                    7,
-                    6,
-                    8
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "slope",
-              "href": "#chart-slope",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "slope",
-                  "from_label": "before",
-                  "to_label": "after",
-                  "items": [
+                  "type": "pie",
+                  "slices": [
                     {
                       "label": "a",
-                      "from": 80,
-                      "to": 60,
-                      "color": "danger"
+                      "value": 35,
+                      "color": "accent"
                     },
                     {
                       "label": "b",
-                      "from": 40,
-                      "to": 70,
+                      "value": 30,
                       "color": "success"
+                    },
+                    {
+                      "label": "c",
+                      "value": 20,
+                      "color": "warn"
+                    },
+                    {
+                      "label": "d",
+                      "value": 15,
+                      "color": "muted"
                     }
                   ]
                 }
               ]
             },
             {
-              "title": "calendar-heatmap",
-              "href": "#chart-calendar-heatmap",
+              "title": "donut",
+              "href": "#chart-donut",
               "blocks": [
                 {
                   "kind": "chart",
-                  "type": "calendar-heatmap",
-                  "year": 2026,
-                  "date_values": {
-                    "2026-01-05": 3,
-                    "2026-02-10": 5,
-                    "2026-03-12": 8,
-                    "2026-04-18": 6,
-                    "2026-05-22": 9,
-                    "2026-06-15": 4,
-                    "2026-07-08": 7,
-                    "2026-08-25": 5
-                  }
+                  "type": "donut",
+                  "slices": [
+                    {
+                      "label": "a",
+                      "value": 40,
+                      "color": "accent"
+                    },
+                    {
+                      "label": "b",
+                      "value": 30,
+                      "color": "success"
+                    },
+                    {
+                      "label": "c",
+                      "value": 20,
+                      "color": "warn"
+                    },
+                    {
+                      "label": "d",
+                      "value": 10,
+                      "color": "danger"
+                    }
+                  ]
                 }
               ]
             },
+            {
+              "title": "waffle",
+              "href": "#chart-waffle",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "waffle",
+                  "total": 100,
+                  "grid_rows": 6,
+                  "grid_cols": 10,
+                  "segments": [
+                    {
+                      "label": "done",
+                      "count": 42,
+                      "color": "accent"
+                    },
+                    {
+                      "label": "todo",
+                      "count": 58,
+                      "color": "muted"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-fn-show-relationships",
+          "title": "Show relationships"
+        },
+        {
+          "kind": "paragraph",
+          "content": "How one variable depends on another — pairs, matrices, links between entities."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "title": "scatter",
+              "href": "#chart-scatter-line",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "scatter",
+                  "series": [
+                    {
+                      "label": "a",
+                      "color": "accent",
+                      "data": [
+                        {
+                          "x": 1,
+                          "y": 3
+                        },
+                        {
+                          "x": 3,
+                          "y": 7
+                        },
+                        {
+                          "x": 5,
+                          "y": 4
+                        },
+                        {
+                          "x": 7,
+                          "y": 9
+                        },
+                        {
+                          "x": 9,
+                          "y": 6
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "bubble",
+              "href": "#chart-bubble",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "bubble",
+                  "series": [
+                    {
+                      "label": "a",
+                      "color": "accent",
+                      "data": [
+                        {
+                          "x": 2,
+                          "y": 4,
+                          "size": 30
+                        },
+                        {
+                          "x": 5,
+                          "y": 7,
+                          "size": 80
+                        },
+                        {
+                          "x": 7,
+                          "y": 3,
+                          "size": 50
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "quadrant",
+              "href": "#chart-quadrant",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "quadrant",
+                  "quadrants": {
+                    "x": 5,
+                    "y": 5
+                  },
+                  "series": [
+                    {
+                      "label": "a",
+                      "color": "accent",
+                      "data": [
+                        {
+                          "x": 2,
+                          "y": 8
+                        },
+                        {
+                          "x": 8,
+                          "y": 8
+                        },
+                        {
+                          "x": 3,
+                          "y": 2
+                        },
+                        {
+                          "x": 8,
+                          "y": 3
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "heatmap",
+              "href": "#chart-heatmap",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "heatmap",
+                  "row_labels": [
+                    "r1",
+                    "r2",
+                    "r3"
+                  ],
+                  "col_labels": [
+                    "c1",
+                    "c2",
+                    "c3",
+                    "c4"
+                  ],
+                  "cells": [
+                    [
+                      1,
+                      3,
+                      5,
+                      2
+                    ],
+                    [
+                      4,
+                      6,
+                      2,
+                      7
+                    ],
+                    [
+                      2,
+                      8,
+                      4,
+                      5
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "chord",
+              "href": "#chart-chord",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "chord",
+                  "groups": [
+                    {
+                      "id": "a"
+                    },
+                    {
+                      "id": "b"
+                    },
+                    {
+                      "id": "c"
+                    }
+                  ],
+                  "matrix": [
+                    [
+                      0,
+                      3,
+                      5
+                    ],
+                    [
+                      3,
+                      0,
+                      2
+                    ],
+                    [
+                      5,
+                      2,
+                      0
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "network",
+              "href": "#chart-network",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "network",
+                  "nodes": [
+                    {
+                      "id": "a"
+                    },
+                    {
+                      "id": "b"
+                    },
+                    {
+                      "id": "c"
+                    },
+                    {
+                      "id": "d"
+                    },
+                    {
+                      "id": "e"
+                    }
+                  ],
+                  "links": [
+                    {
+                      "source": "a",
+                      "target": "b"
+                    },
+                    {
+                      "source": "a",
+                      "target": "c"
+                    },
+                    {
+                      "source": "b",
+                      "target": "d"
+                    },
+                    {
+                      "source": "c",
+                      "target": "d"
+                    },
+                    {
+                      "source": "d",
+                      "target": "e"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "scatter-matrix",
+              "href": "#chart-scatter-matrix",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "scatter-matrix",
+                  "variables": [
+                    {
+                      "key": "x",
+                      "label": "x"
+                    },
+                    {
+                      "key": "y",
+                      "label": "y"
+                    },
+                    {
+                      "key": "z",
+                      "label": "z"
+                    }
+                  ],
+                  "records": [
+                    {
+                      "x": 1,
+                      "y": 2,
+                      "z": 3
+                    },
+                    {
+                      "x": 4,
+                      "y": 5,
+                      "z": 6
+                    },
+                    {
+                      "x": 7,
+                      "y": 8,
+                      "z": 9
+                    },
+                    {
+                      "x": 2,
+                      "y": 4,
+                      "z": 7
+                    },
+                    {
+                      "x": 5,
+                      "y": 1,
+                      "z": 4
+                    },
+                    {
+                      "x": 8,
+                      "y": 6,
+                      "z": 2
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-fn-show-hierarchy",
+          "title": "Show hierarchy"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Nested containment — a thing inside a thing inside a thing."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "title": "treemap",
+              "href": "#chart-treemap",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "treemap",
+                  "tree": [
+                    {
+                      "label": "JS",
+                      "value": 60,
+                      "color": "accent"
+                    },
+                    {
+                      "label": "CSS",
+                      "value": 25,
+                      "color": "success"
+                    },
+                    {
+                      "label": "PY",
+                      "value": 15,
+                      "color": "warn"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-fn-show-flow-or-movement",
+          "title": "Show flow or movement"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Quantity moving from one place to another — funnel stages, weighted source→target links."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
             {
               "title": "funnel",
               "href": "#chart-funnel",
@@ -755,301 +1149,22 @@
                   ]
                 }
               ]
-            },
-            {
-              "title": "network",
-              "href": "#chart-network",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "network",
-                  "nodes": [
-                    {
-                      "id": "a"
-                    },
-                    {
-                      "id": "b"
-                    },
-                    {
-                      "id": "c"
-                    },
-                    {
-                      "id": "d"
-                    },
-                    {
-                      "id": "e"
-                    }
-                  ],
-                  "links": [
-                    {
-                      "source": "a",
-                      "target": "b"
-                    },
-                    {
-                      "source": "a",
-                      "target": "c"
-                    },
-                    {
-                      "source": "b",
-                      "target": "d"
-                    },
-                    {
-                      "source": "c",
-                      "target": "d"
-                    },
-                    {
-                      "source": "d",
-                      "target": "e"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "chord",
-              "href": "#chart-chord",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "chord",
-                  "groups": [
-                    {
-                      "id": "a"
-                    },
-                    {
-                      "id": "b"
-                    },
-                    {
-                      "id": "c"
-                    }
-                  ],
-                  "matrix": [
-                    [
-                      0,
-                      3,
-                      5
-                    ],
-                    [
-                      3,
-                      0,
-                      2
-                    ],
-                    [
-                      5,
-                      2,
-                      0
-                    ]
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "heatmap",
-              "href": "#chart-heatmap",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "heatmap",
-                  "row_labels": [
-                    "r1",
-                    "r2",
-                    "r3"
-                  ],
-                  "col_labels": [
-                    "c1",
-                    "c2",
-                    "c3",
-                    "c4"
-                  ],
-                  "cells": [
-                    [
-                      1,
-                      3,
-                      5,
-                      2
-                    ],
-                    [
-                      4,
-                      6,
-                      2,
-                      7
-                    ],
-                    [
-                      2,
-                      8,
-                      4,
-                      5
-                    ]
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "scatter-matrix",
-              "href": "#chart-scatter-matrix",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "scatter-matrix",
-                  "variables": [
-                    {
-                      "key": "x",
-                      "label": "x"
-                    },
-                    {
-                      "key": "y",
-                      "label": "y"
-                    },
-                    {
-                      "key": "z",
-                      "label": "z"
-                    }
-                  ],
-                  "records": [
-                    {
-                      "x": 1,
-                      "y": 2,
-                      "z": 3
-                    },
-                    {
-                      "x": 4,
-                      "y": 5,
-                      "z": 6
-                    },
-                    {
-                      "x": 7,
-                      "y": 8,
-                      "z": 9
-                    },
-                    {
-                      "x": 2,
-                      "y": 4,
-                      "z": 7
-                    },
-                    {
-                      "x": 5,
-                      "y": 1,
-                      "z": 4
-                    },
-                    {
-                      "x": 8,
-                      "y": 6,
-                      "z": 2
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "parallel-coordinates",
-              "href": "#chart-parallel-coordinates",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "parallel-coordinates",
-                  "variables": [
-                    {
-                      "key": "x",
-                      "label": "x"
-                    },
-                    {
-                      "key": "y",
-                      "label": "y"
-                    },
-                    {
-                      "key": "z",
-                      "label": "z"
-                    }
-                  ],
-                  "records": [
-                    {
-                      "x": 1,
-                      "y": 8,
-                      "z": 3
-                    },
-                    {
-                      "x": 4,
-                      "y": 5,
-                      "z": 7
-                    },
-                    {
-                      "x": 7,
-                      "y": 2,
-                      "z": 6
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "gauge",
-              "href": "#chart-gauge",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "gauge",
-                  "value": 72,
-                  "max": 100,
-                  "target": 80,
-                  "label": "OKR"
-                }
-              ]
-            },
-            {
-              "title": "bullet",
-              "href": "#chart-bullet",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "bullet",
-                  "tracks": [
-                    {
-                      "label": "a",
-                      "value": 70,
-                      "target": 80,
-                      "max": 100,
-                      "color": "accent"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "title": "radar",
-              "href": "#chart-radar",
-              "blocks": [
-                {
-                  "kind": "chart",
-                  "type": "radar",
-                  "axes": [
-                    {
-                      "label": "a"
-                    },
-                    {
-                      "label": "b"
-                    },
-                    {
-                      "label": "c"
-                    },
-                    {
-                      "label": "d"
-                    }
-                  ],
-                  "series": [
-                    {
-                      "label": "x",
-                      "color": "accent",
-                      "values": [
-                        7,
-                        9,
-                        5,
-                        8
-                      ]
-                    }
-                  ]
-                }
-              ]
-            },
+            }
+          ]
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "id": "chart-fn-show-location",
+          "title": "Show location"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Values placed on a real-world map."
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
             {
               "title": "geo",
               "href": "#chart-geo",
