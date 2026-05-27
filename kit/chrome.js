@@ -358,6 +358,255 @@ var __okuPanZoom = (function () {
   return { attach: attach };
 })();
 
+/* ============ Chart-config popover ============ *
+ * Opens a floating panel anchored to a chart's toolbar button.
+ * Initial controls: type switch (compatible types derived from the
+ * chart's data shape — no `compatible_with` field needed). Changing
+ * the type rebuilds the chart in place by replacing the host with a
+ * new <oku-chart> carrying the new attributes + same data scripts.
+ *
+ * Why a fresh host instead of re-running connectedCallback in place:
+ * OkuChart's `_initialized` guard means a single host renders once.
+ * The cleaner path is to swap the host so the new instance walks the
+ * normal init path. The popover stays open and re-anchors.
+ * --------------------------------------------------------------------- */
+var __okuChartConfig = (function () {
+  var popover = null;
+  var currentHost = null;
+  var anchorBtn = null;
+
+  /* Derive the list of chart types that consume the host's data
+     shape. Lives in code (per the design-review decision) rather
+     than on each chart's schema. Returns a list of {type, label}. */
+  function getCompatibleTypes(host) {
+    var extras = host._extras || {};
+    var series = host._series || [];
+    // Slice-based shapes — pie / donut share a payload via extras.slices.
+    if (extras.slices && extras.slices.length) {
+      return [
+        { type: 'donut', label: 'donut' },
+        { type: 'pie',   label: 'pie' },
+      ];
+    }
+    // Cartesian — series of {x, y} points.
+    var hasXY = series.length && (series[0].data || []).some(function (p) {
+      return p && p.x != null && p.y != null;
+    });
+    if (hasXY) {
+      var hasSize = (series[0].data || []).some(function (p) { return p && p.size != null; });
+      var opts = [
+        { type: 'scatter', label: 'scatter' },
+        { type: 'line',    label: 'line' },
+        { type: 'area',    label: 'area' },
+      ];
+      if (hasSize) opts.unshift({ type: 'bubble', label: 'bubble' });
+      return opts;
+    }
+    // Distribution-leaning shapes: extras.histogram and extras['box-plot']
+    // each consume a different sub-payload but represent the same kind of
+    // "one column of values" question. We don't auto-convert payloads
+    // across them in v1 — list only the current type as compatible.
+    if (extras.histogram)   return [{ type: 'histogram',   label: 'histogram' }];
+    if (extras['box-plot']) return [{ type: 'box-plot',    label: 'box-plot' }];
+    if (extras.ridgeline)   return [{ type: 'ridgeline',   label: 'ridgeline' }];
+    if (extras.sparkline)   return [{ type: 'sparkline',   label: 'sparkline' }];
+    if (extras.gauge)       return [{ type: 'gauge',       label: 'gauge' }];
+    if (extras.bullet)      return [{ type: 'bullet',      label: 'bullet' }];
+    if (extras.radar)       return [{ type: 'radar',       label: 'radar' }];
+    if (extras.heatmap)     return [{ type: 'heatmap',     label: 'heatmap' }];
+    if (extras['calendar-heatmap']) return [{ type: 'calendar-heatmap', label: 'calendar-heatmap' }];
+    if (extras.treemap)     return [{ type: 'treemap',     label: 'treemap' }];
+    if (extras.waffle)      return [{ type: 'waffle',      label: 'waffle' }];
+    if (extras.funnel)      return [{ type: 'funnel',      label: 'funnel' }];
+    if (extras.sankey)      return [{ type: 'sankey',      label: 'sankey' }];
+    if (extras.network)     return [{ type: 'network',     label: 'network' }];
+    if (extras.chord)       return [{ type: 'chord',       label: 'chord' }];
+    if (extras['scatter-matrix']) return [{ type: 'scatter-matrix', label: 'scatter-matrix' }];
+    if (extras['parallel-coordinates']) return [{ type: 'parallel-coordinates', label: 'parallel-coordinates' }];
+    if (extras.geo)         return [{ type: 'geo',         label: 'geo' }];
+    if (extras.slope)       return [{ type: 'slope',       label: 'slope' }];
+    // Fallback: just the current type.
+    return [{ type: host._type, label: host._type }];
+  }
+
+  function build() {
+    if (popover) return popover;
+    popover = document.createElement('div');
+    popover.className = 'okc-config-popover';
+    popover.setAttribute('role', 'dialog');
+    popover.setAttribute('aria-modal', 'false');
+    popover.setAttribute('aria-label', 'Chart configuration');
+    popover.hidden = true;
+    document.body.appendChild(popover);
+    document.addEventListener('keydown', function (e) {
+      if (popover.hidden) return;
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+    });
+    document.addEventListener('click', function (e) {
+      if (popover.hidden) return;
+      if (popover.contains(e.target)) return;
+      if (anchorBtn && anchorBtn.contains(e.target)) return;
+      close();
+    }, true);
+    window.addEventListener('resize', function () { if (!popover.hidden) position(); });
+    window.addEventListener('scroll', function () { if (!popover.hidden) position(); }, true);
+    return popover;
+  }
+
+  function position() {
+    if (!anchorBtn || !popover) return;
+    var r = anchorBtn.getBoundingClientRect();
+    var pad = 8;
+    var pr = popover.getBoundingClientRect();
+    // Anchor below the button by default; flip to above if it would
+    // overflow the viewport bottom.
+    var top  = r.bottom + 6;
+    var left = r.right - pr.width;
+    if (top + pr.height > window.innerHeight - pad) top = r.top - pr.height - 6;
+    if (left < pad) left = pad;
+    if (left + pr.width > window.innerWidth - pad) left = window.innerWidth - pr.width - pad;
+    if (top < pad) top = pad;
+    popover.style.left = left + 'px';
+    popover.style.top  = top  + 'px';
+  }
+
+  /* Populate the popover with the current chart's config — title,
+     type dropdown, mode/marks if applicable. Bind handlers that
+     mutate the chart on change. */
+  function render(host) {
+    if (!popover) return;
+    var compat = getCompatibleTypes(host);
+    var rows = [];
+    rows.push(
+      '<div class="okc-cfg-head">' +
+        '<span class="okc-cfg-title">Configure chart</span>' +
+        '<button type="button" class="okc-cfg-close" aria-label="Close">' + ICON_CROSS + '</button>' +
+      '</div>'
+    );
+    if (compat.length > 1) {
+      rows.push('<label class="okc-cfg-row">' +
+        '<span class="okc-cfg-label">Type</span>' +
+        '<select class="okc-cfg-select" data-cfg="type">' +
+          compat.map(function (c) {
+            var sel = c.type === host._type ? ' selected' : '';
+            return '<option value="' + c.type + '"' + sel + '>' + c.label + '</option>';
+          }).join('') +
+        '</select>' +
+      '</label>');
+    } else {
+      rows.push('<div class="okc-cfg-row okc-cfg-hint">' +
+        'Type <code>' + host._type + '</code> has no shape-compatible alternatives yet.' +
+      '</div>');
+    }
+    // Cartesian — marks combo.
+    if (host._type === 'scatter' || host._type === 'line' || host._type === 'area' || host._type === 'plot') {
+      var marks = host._marks || (host._type === 'scatter' ? ['dots'] : host._type === 'line' ? ['line'] : host._type === 'area' ? ['line', 'area'] : ['dots']);
+      rows.push('<div class="okc-cfg-row">' +
+        '<span class="okc-cfg-label">Marks</span>' +
+        '<div class="okc-cfg-chips" data-cfg="marks">' +
+          ['dots', 'line', 'area'].map(function (m) {
+            var on = marks.indexOf(m) !== -1;
+            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-mark="' + m + '">' + m + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>');
+    }
+    // Arc — mode + arc start/end.
+    if (host._type === 'donut' || host._type === 'pie') {
+      var mode = host._type === 'pie' ? 'pie' : 'donut';
+      rows.push('<div class="okc-cfg-row">' +
+        '<span class="okc-cfg-label">Mode</span>' +
+        '<div class="okc-cfg-chips" data-cfg="arc-mode">' +
+          ['pie', 'donut'].map(function (m) {
+            var on = m === mode;
+            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-mode="' + m + '">' + m + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>');
+      rows.push('<div class="okc-cfg-row">' +
+        '<span class="okc-cfg-label">Arc end (deg)</span>' +
+        '<input type="number" class="okc-cfg-num" data-cfg="arc-end" min="-360" max="720" step="15" value="' + (host._arcEnd !== null && host._arcEnd !== undefined ? host._arcEnd : 360) + '">' +
+      '</div>');
+    }
+    popover.innerHTML = rows.join('');
+    wire(host);
+  }
+
+  function wire(host) {
+    var closeBtn = popover.querySelector('.okc-cfg-close');
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    var sel = popover.querySelector('select[data-cfg="type"]');
+    if (sel) sel.addEventListener('change', function () { applyChange(host, { type: sel.value }); });
+    popover.querySelectorAll('.okc-cfg-chip[data-mark]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var marks = Array.from(popover.querySelectorAll('.okc-cfg-chip[data-mark].on')).map(function (c) { return c.getAttribute('data-mark'); });
+        var m = chip.getAttribute('data-mark');
+        var idx = marks.indexOf(m);
+        if (idx === -1) marks.push(m); else marks.splice(idx, 1);
+        if (!marks.length) marks.push(m); // never empty
+        applyChange(host, { marks: marks });
+      });
+    });
+    popover.querySelectorAll('.okc-cfg-chip[data-mode]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        applyChange(host, { type: chip.getAttribute('data-mode') });
+      });
+    });
+    var arcEnd = popover.querySelector('input[data-cfg="arc-end"]');
+    if (arcEnd) arcEnd.addEventListener('input', function () {
+      applyChange(host, { arcEnd: arcEnd.value });
+    });
+  }
+
+  /* Apply a partial config delta by building a new oku-chart host
+     with merged attributes + the same data <script> children, then
+     swap it in place. The popover re-renders against the new host. */
+  function applyChange(oldHost, delta) {
+    var newHost = document.createElement('oku-chart');
+    var copyAttrs = ['title', 'x-label', 'y-label', 'x-scale', 'y-scale', 'marks', 'mode', 'arc-start', 'arc-end', 'inner-radius'];
+    copyAttrs.forEach(function (a) {
+      var v = oldHost.getAttribute(a);
+      if (v !== null) newHost.setAttribute(a, v);
+    });
+    var newType = delta.type !== undefined ? delta.type : oldHost.getAttribute('type');
+    newHost.setAttribute('type', newType);
+    if (delta.marks)  newHost.setAttribute('marks', delta.marks.join(','));
+    if (delta.arcEnd !== undefined) newHost.setAttribute('arc-end', String(delta.arcEnd));
+    // Carry over data + extras scripts.
+    Array.from(oldHost.querySelectorAll('script[type="application/json"]')).forEach(function (s) {
+      newHost.appendChild(s.cloneNode(true));
+    });
+    oldHost.parentNode.replaceChild(newHost, oldHost);
+    currentHost = newHost;
+    // Re-anchor the popover to the new toolbar's gear button after init.
+    requestAnimationFrame(function () {
+      var bar = newHost.querySelector(':scope > .okt-bar');
+      var gear = bar && bar.querySelector('button[title="Configure chart"]');
+      if (gear) anchorBtn = gear;
+      render(newHost);
+      position();
+    });
+  }
+
+  function open(host, btn) {
+    build();
+    currentHost = host;
+    anchorBtn = btn;
+    popover.hidden = false;
+    render(host);
+    requestAnimationFrame(position);
+  }
+
+  function close() {
+    if (!popover) return;
+    popover.hidden = true;
+    currentHost = null;
+    anchorBtn = null;
+  }
+
+  return { open: open, close: close, getCompatibleTypes: getCompatibleTypes };
+})();
+
 /* ============ Three-mode theme cycler (system → light → dark → system) ============ */
 function getThemeMode() {
   return document.documentElement.getAttribute('data-theme-mode') || 'system';
@@ -5776,6 +6025,11 @@ class OkuChart extends HTMLElement {
     var self = this;
     var chartTitle = self._title || (self._type + '-chart');
     __okuVisualTools.makeToolbar(this, [
+      {
+        title: 'Configure chart',
+        icon: ICON_GEAR,
+        run: function (btn) { __okuChartConfig.open(self, btn); }
+      },
       {
         title: 'Reset zoom',
         icon: ICON_RESET,

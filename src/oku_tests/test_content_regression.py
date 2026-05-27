@@ -135,34 +135,42 @@ class TestTldrPrimitive:
 class TestKpiGridSync:
     def test_kpi_example_matches_render(self, reference: dict) -> None:
         """The kpi-grid example code and the adjacent rendered sample
-        must agree on the tile set, otherwise the doc is lying."""
+        must agree on the tile set, otherwise the doc is lying.
+
+        Scoped to the reference page's `id="kpi-grid"` heading and the
+        very next kpi-grid block + code block in walk order. Other
+        pages (index.json etc.) now also host kpi-grid examples, so
+        an unscoped 'first matching code block' search would pick the
+        wrong one in the aggregated fixture.
+        """
         blocks = list(_walk_blocks(reference))
-        # Find the rendered kpi-grid that immediately follows the
-        # heading id="kpi-grid".
-        rendered = None
+        heading_idx = None
         for i, b in enumerate(blocks):
             if b.get("id") == "kpi-grid" and b.get("kind") == "heading":
-                for j in range(i + 1, len(blocks)):
-                    if blocks[j].get("kind") == "kpi-grid":
-                        rendered = blocks[j]
-                        break
+                heading_idx = i
                 break
-        assert rendered is not None, "no rendered kpi-grid sample"
+        assert heading_idx is not None, "no heading id='kpi-grid' in reference docs"
+        rendered = None
+        code_block = None
+        for j in range(heading_idx + 1, len(blocks)):
+            b = blocks[j]
+            if b.get("kind") == "kpi-grid" and rendered is None:
+                rendered = b
+            if (
+                code_block is None
+                and b.get("kind") == "code"
+                and b.get("language") == "json"
+                and '"kind": "kpi-grid"' in (b.get("source") or "")
+            ):
+                code_block = b
+            if rendered is not None and code_block is not None:
+                break
+        assert rendered is not None, "no rendered kpi-grid sample after heading"
+        assert code_block is not None, "no kpi-grid code example after heading"
         labels = {t.get("label") for t in rendered.get("tiles", [])}
-        # Find the code block immediately before the render (the example).
-        # Look up siblings via blocks list — pragmatic; not airtight.
-        code_blocks = [
-            b
-            for b in blocks
-            if b.get("kind") == "code"
-            and b.get("language") == "json"
-            and '"kind": "kpi-grid"' in (b.get("source") or "")
-        ]
-        assert code_blocks, "no kpi-grid code example next to the render"
-        example_source = code_blocks[0]["source"]
         for label in labels:
             assert (
-                label in example_source
+                label in code_block["source"]
             ), f"render shows tile {label!r} but the example code doesn't"
 
 
