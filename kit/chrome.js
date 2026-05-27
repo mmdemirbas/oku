@@ -8499,6 +8499,7 @@ class OkuDiagram extends HTMLElement {
             svg.style.removeProperty('width');
             svg.style.removeProperty('height');
             svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+            self._wireNeighborHighlight(svg);
           }
           self._rendered = true;
           self._attachToolbar();
@@ -8601,6 +8602,60 @@ class OkuDiagram extends HTMLElement {
       }
     ]);
   }
+  _wireNeighborHighlight(svg) {
+    // Mermaid flowcharts encode adjacency in two predictable shapes:
+    //   - Nodes carry data-id="<NodeId>" (the user's source id).
+    //   - Edges carry classes "LS-<source>" + "LE-<target>".
+    // Build an adjacency map once per render, then on node hover/focus
+    // mark the node, its incident edges, and its neighbor nodes with
+    // data-okd-active="1". CSS dims the rest. Free fallback for
+    // diagram types without that shape (sequence, gantt, journey):
+    // nodes still get the single-node hover lift via the existing CSS,
+    // since this code only runs when nodes have data-id.
+    var nodes = Array.from(svg.querySelectorAll('.node[data-id], g.node[data-id]'));
+    if (!nodes.length) return;
+    var edgesByEndpoint = {}; // 'NodeId' → [edgeEl, neighborNodeId][]
+    var nodeById = {};
+    nodes.forEach(function (n) {
+      var id = n.getAttribute('data-id');
+      nodeById[id] = n;
+    });
+    var edges = svg.querySelectorAll('.flowchart-link, path.edge-thickness-normal');
+    edges.forEach(function (e) {
+      var cls = e.getAttribute('class') || '';
+      var sm = cls.match(/\bLS-([^\s]+)/);
+      var tm = cls.match(/\bLE-([^\s]+)/);
+      if (!sm || !tm) return;
+      var src = sm[1], tgt = tm[1];
+      (edgesByEndpoint[src] = edgesByEndpoint[src] || []).push([e, tgt]);
+      (edgesByEndpoint[tgt] = edgesByEndpoint[tgt] || []).push([e, src]);
+      // Also mark the edge's start/end labels (mermaid renders these as
+      // separate <g class="edgeLabel">) when present — they share the
+      // edge's class list via mermaid's "edgeLabels" group, but the
+      // group's bbox is far from the edge so we don't auto-link them.
+    });
+    function setActive(id) {
+      svg.querySelectorAll('[data-okd-active]').forEach(function (el) { el.removeAttribute('data-okd-active'); });
+      svg.removeAttribute('data-okd-has-active');
+      if (!id) return;
+      svg.setAttribute('data-okd-has-active', '1');
+      var node = nodeById[id];
+      if (node) node.setAttribute('data-okd-active', '1');
+      (edgesByEndpoint[id] || []).forEach(function (pair) {
+        pair[0].setAttribute('data-okd-active', '1');
+        if (nodeById[pair[1]]) nodeById[pair[1]].setAttribute('data-okd-active', '1');
+      });
+    }
+    nodes.forEach(function (n) {
+      var id = n.getAttribute('data-id');
+      n.addEventListener('mouseenter', function () { setActive(id); });
+      n.addEventListener('mouseleave', function () { setActive(null); });
+      n.addEventListener('focus', function () { setActive(id); });
+      n.addEventListener('blur', function () { setActive(null); });
+      // Keyboard reachability — nodes already get cursor:pointer from CSS.
+      if (!n.hasAttribute('tabindex')) n.setAttribute('tabindex', '0');
+    });
+  }
   rerender() {
     if (!this._src) return;
     var renderHost = this.querySelector('.okd-render');
@@ -8610,6 +8665,8 @@ class OkuDiagram extends HTMLElement {
       var id = 'okd-' + Math.random().toString(36).slice(2, 9);
       return mermaid.render(id, self._src).then(function (out) {
         renderHost.innerHTML = out.svg;
+        var svg = renderHost.querySelector('svg');
+        if (svg) self._wireNeighborHighlight(svg);
         self._attachToolbar();
       });
     }).catch(function () { /* swallow */ });

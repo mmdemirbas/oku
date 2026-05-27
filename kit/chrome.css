@@ -4507,6 +4507,49 @@ oku-diagram .okd-render svg .node:hover > path {
   stroke: var(--accent) !important;
   stroke-width: 2px;
 }
+
+/* Neighbor highlight — wired by `_wireNeighborHighlight` on flowchart
+   nodes (those that carry data-id). When any node is active, the SVG
+   gets data-okd-has-active="1"; the hovered node, its incident edges,
+   and the neighbor nodes get data-okd-active="1" individually. CSS
+   dims everything else so the active subgraph reads loud while the
+   rest fades back. Falls back gracefully on diagram types without
+   data-id (sequence, gantt, etc.) — neither attribute appears, the
+   hover-only rule above still applies. */
+oku-diagram .okd-render svg[data-okd-has-active] .node:not([data-okd-active]),
+oku-diagram .okd-render svg[data-okd-has-active] .flowchart-link:not([data-okd-active]),
+oku-diagram .okd-render svg[data-okd-has-active] .edge-thickness-normal:not([data-okd-active]),
+oku-diagram .okd-render svg[data-okd-has-active] .edgeLabel,
+oku-diagram .okd-render svg[data-okd-has-active] .edgeLabels > g {
+  opacity: 0.25;
+  transition: opacity 0.18s ease;
+}
+oku-diagram .okd-render svg .node[data-okd-active] > rect,
+oku-diagram .okd-render svg .node[data-okd-active] > circle,
+oku-diagram .okd-render svg .node[data-okd-active] > polygon,
+oku-diagram .okd-render svg .node[data-okd-active] > path {
+  stroke: var(--accent) !important;
+  stroke-width: 2px;
+}
+oku-diagram .okd-render svg .flowchart-link[data-okd-active],
+oku-diagram .okd-render svg path.edge-thickness-normal[data-okd-active] {
+  stroke: var(--accent) !important;
+  stroke-width: 2.5px;
+}
+/* Keyboard focus ring on flowchart nodes (we add tabindex=0 to them so
+   keyboard users can step through the graph). Drop the default browser
+   outline since it floats outside the SVG's path; use a visible
+   inner-stroke instead. */
+oku-diagram .okd-render svg .node:focus {
+  outline: none;
+}
+oku-diagram .okd-render svg .node:focus > rect,
+oku-diagram .okd-render svg .node:focus > circle,
+oku-diagram .okd-render svg .node:focus > polygon,
+oku-diagram .okd-render svg .node:focus > path {
+  stroke: var(--accent) !important;
+  stroke-width: 2.5px;
+}
 oku-diagram .okd-render svg {
   /* width:100% on a fixed-aspect-ratio SVG would stretch a tall
      portrait diagram (mindmap, vertical state machine) into a
