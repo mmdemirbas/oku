@@ -4422,7 +4422,7 @@ class OkuChart extends HTMLElement {
     return html;
   }
 
-  _wireGenericVerticalCursor(plotBounds) {
+  _wireGenericVerticalCursor(plotBounds, opts) {
     var self = this;
     var svg = self.querySelector('svg.okc-svg');
     if (!svg) return;
@@ -4441,18 +4441,32 @@ class OkuChart extends HTMLElement {
       var ctm = svg.getScreenCTM();
       return ctm ? pt.matrixTransform(ctm.inverse()).x : null;
     }
+    var seriesLookup = opts && opts.seriesLookup;
     svg.addEventListener('mousemove', function (ev) {
+      if (self._tipPinned) return;
       var x = svgX(ev);
       if (x === null || x < plotBounds.left || x > plotBounds.right) {
         cursor.setAttribute('visibility', 'hidden');
+        if (self._hideCursorTip) self._hideCursorTip();
         return;
       }
       cursor.setAttribute('x1', x);
       cursor.setAttribute('x2', x);
       cursor.setAttribute('visibility', 'visible');
+      // If the renderer registered a series-lookup callback, build a
+      // per-series intersection tooltip — same shape as the Cartesian
+      // cursor uses. Lets the reader read off values at the cursor's x
+      // without hovering each individual point.
+      if (seriesLookup && self._showCursorTip) {
+        var payload = seriesLookup(x);
+        if (payload && payload.kv && payload.kv.length) {
+          self._showCursorTip(payload, ev.clientX, svg.getBoundingClientRect().top);
+        }
+      }
     });
     svg.addEventListener('mouseleave', function () {
       cursor.setAttribute('visibility', 'hidden');
+      if (self._hideCursorTip && !self._tipPinned) self._hideCursorTip();
     });
   }
 
@@ -6830,7 +6844,25 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
-    this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
+    this._wireGenericVerticalCursor(
+      { top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right },
+      {
+        seriesLookup: function (svgX) {
+          // Find the nearest category index by inverting xOf.
+          var nearestIdx = 0;
+          var bestDelta = Math.abs(xOf(0) - svgX);
+          for (var i = 1; i < categories.length; i++) {
+            var d = Math.abs(xOf(i) - svgX);
+            if (d < bestDelta) { bestDelta = d; nearestIdx = i; }
+          }
+          var rows = series.map(function (s) {
+            var v = +(s.values && s.values[nearestIdx]) || 0;
+            return { k: s.label || '', v: fmtNum(v) };
+          });
+          return { label: categories[nearestIdx], kv: rows };
+        }
+      }
+    );
   }
 
   /* ---------------- Violin ----------------
@@ -7323,7 +7355,26 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
-    this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
+    this._wireGenericVerticalCursor(
+      { top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right },
+      {
+        seriesLookup: function (svgX) {
+          var nearestIdx = 0;
+          var bestDelta = Math.abs(xOf(0) - svgX);
+          for (var i = 1; i < categories.length; i++) {
+            var d = Math.abs(xOf(i) - svgX);
+            if (d < bestDelta) { bestDelta = d; nearestIdx = i; }
+          }
+          var rows = series.map(function (s, si) {
+            return {
+              k: s.label || ('series ' + (si + 1)),
+              v: '#' + ranks[nearestIdx][si] + ' (' + fmtNum(+(s.values && s.values[nearestIdx]) || 0) + ')'
+            };
+          });
+          return { label: categories[nearestIdx], kv: rows };
+        }
+      }
+    );
   }
 
   _attachToolbar() {
@@ -7738,37 +7789,83 @@ class OkuChart extends HTMLElement {
       label.addEventListener('blur', function () { setHover(key, false); hideTip(); });
     });
 
-    /* Legend chip — click or Enter/Space toggles `.dim` on the matching
-       <g class="okc-series"> so the user can mute series visually. */
+    /* Legend chip — click toggles `.dim` on the matching
+       <g class="okc-series"> so the user can mute series visually.
+
+       Modifier+click (Cmd on Mac, Ctrl elsewhere) solos: only the
+       clicked series stays visible, every other series is dimmed.
+       A second modifier+click on the same chip (when it's the only
+       un-dimmed series) restores ALL series. Useful when a chart
+       has many series and the reader wants to focus on one without
+       individually muting the rest. */
+    function setSeriesDim(idx, dim) {
+      var chip = self.querySelector('.okc-legend-chip[data-series-idx="' + idx + '"]');
+      var series = self.querySelector('.okc-series[data-series-idx="' + idx + '"]');
+      if (series) series.classList.toggle('dim', dim);
+      if (chip) {
+        chip.classList.toggle('off', dim);
+        chip.setAttribute('aria-pressed', dim ? 'true' : 'false');
+      }
+    }
     function toggleSeries(chip) {
       var idx = chip.getAttribute('data-series-idx');
       var series = self.querySelector('.okc-series[data-series-idx="' + idx + '"]');
       if (!series) return;
-      var on = series.classList.toggle('dim');
-      chip.classList.toggle('off', on);
-      chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+      setSeriesDim(idx, !series.classList.contains('dim'));
     }
-    /* Hover highlight — putting a pointer on a legend entry fades
-       every other series so the reader can isolate just that one
-       without clicking. Pure CSS via a class on the chart that
-       carries the active series index. */
+    function soloSeries(idx) {
+      // If `idx` is already the only visible series, restore all.
+      var allChips = self.querySelectorAll('.okc-legend-chip[data-series-idx]');
+      var visibleIdxs = [];
+      allChips.forEach(function (c) {
+        var i = c.getAttribute('data-series-idx');
+        var s = self.querySelector('.okc-series[data-series-idx="' + i + '"]');
+        if (s && !s.classList.contains('dim')) visibleIdxs.push(i);
+      });
+      var alreadySolo = visibleIdxs.length === 1 && visibleIdxs[0] === idx;
+      allChips.forEach(function (c) {
+        var i = c.getAttribute('data-series-idx');
+        setSeriesDim(i, alreadySolo ? false : i !== idx);
+      });
+    }
+    /* Hover highlight — putting a pointer on a legend entry
+       emphasizes the matching series. (Earlier behaviour dimmed
+       the rest, which made the reader's eye track the change-points
+       instead of the target; flipped to emphasis-only via CSS in
+       chrome.css's `.okc-legend-hovering` rules.) */
     function setHoverHighlight(idx) {
       self.classList.toggle('okc-legend-hovering', idx != null);
       self.setAttribute('data-legend-hover', idx == null ? '' : String(idx));
     }
     this.querySelectorAll('.okc-legend-chip').forEach(function (chip) {
       chip.setAttribute('aria-pressed', 'false');
-      chip.addEventListener('click', function () { toggleSeries(chip); });
+      chip.addEventListener('click', function (e) {
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault();
+          soloSeries(chip.getAttribute('data-series-idx'));
+        } else {
+          toggleSeries(chip);
+        }
+      });
       chip.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          toggleSeries(chip);
+          if (e.metaKey || e.ctrlKey) {
+            soloSeries(chip.getAttribute('data-series-idx'));
+          } else {
+            toggleSeries(chip);
+          }
         }
       });
       chip.addEventListener('mouseenter', function () { setHoverHighlight(chip.getAttribute('data-series-idx')); });
       chip.addEventListener('mouseleave', function () { setHoverHighlight(null); });
       chip.addEventListener('focus', function () { setHoverHighlight(chip.getAttribute('data-series-idx')); });
       chip.addEventListener('blur',  function () { setHoverHighlight(null); });
+      // Tooltip hint so first-time users know the modifier exists.
+      var prevTitle = chip.getAttribute('title') || '';
+      if (!prevTitle.includes('solo')) {
+        chip.setAttribute('title', (prevTitle ? prevTitle + ' · ' : '') + 'click toggles · ' + (navigator.platform.toLowerCase().includes('mac') ? '⌘' : 'Ctrl') + '+click solos');
+      }
     });
 
     /* Legend interactivity for non-Cartesian charts. Each legend item
@@ -7778,16 +7875,39 @@ class OkuChart extends HTMLElement {
        collapses opacity / pointer events for hidden shapes so the
        reader can mute parts of the breakdown without re-rendering. */
     function wireNonCartesianLegend(legendSel, idxAttr, targetSel) {
-      self.querySelectorAll(legendSel).forEach(function (legendItem) {
+      var items = self.querySelectorAll(legendSel);
+      function setHidden(idx, hidden) {
+        var item = self.querySelector(legendSel + '[' + idxAttr + '="' + CSS.escape(idx) + '"]');
+        var targets = self.querySelectorAll(targetSel + '[' + idxAttr + '="' + CSS.escape(idx) + '"]');
+        targets.forEach(function (t) { t.classList.toggle('okc-hidden', hidden); });
+        if (item) {
+          item.classList.toggle('okc-legend-off', hidden);
+          item.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+        }
+      }
+      function getIdx(item) { return item.getAttribute(idxAttr); }
+      function solo(idx) {
+        // Already solo? Restore all.
+        var visibleIdxs = [];
+        items.forEach(function (it) {
+          var i = getIdx(it);
+          var targets = self.querySelectorAll(targetSel + '[' + idxAttr + '="' + CSS.escape(i) + '"]');
+          if (!targets.length) return;
+          if (!targets[0].classList.contains('okc-hidden')) visibleIdxs.push(i);
+        });
+        var alreadySolo = visibleIdxs.length === 1 && visibleIdxs[0] === idx;
+        items.forEach(function (it) {
+          var i = getIdx(it);
+          setHidden(i, alreadySolo ? false : i !== idx);
+        });
+      }
+      items.forEach(function (legendItem) {
         function toggle() {
           var idx = legendItem.getAttribute(idxAttr);
           if (idx == null) return;
           var targets = self.querySelectorAll(targetSel + '[' + idxAttr + '="' + CSS.escape(idx) + '"]');
           if (!targets.length) return;
-          var nowHidden = !targets[0].classList.contains('okc-hidden');
-          targets.forEach(function (t) { t.classList.toggle('okc-hidden', nowHidden); });
-          legendItem.classList.toggle('okc-legend-off', nowHidden);
-          legendItem.setAttribute('aria-pressed', nowHidden ? 'true' : 'false');
+          setHidden(idx, !targets[0].classList.contains('okc-hidden'));
         }
         function setHover(on) {
           var idx = legendItem.getAttribute(idxAttr);
@@ -7795,11 +7915,15 @@ class OkuChart extends HTMLElement {
           self.setAttribute('data-legend-hover-attr', idxAttr);
           self.setAttribute('data-legend-hover', on ? (idx || '') : '');
         }
-        legendItem.addEventListener('click', toggle);
+        legendItem.addEventListener('click', function (e) {
+          if (e.metaKey || e.ctrlKey) { e.preventDefault(); solo(getIdx(legendItem)); }
+          else toggle();
+        });
         legendItem.addEventListener('keydown', function (e) {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            toggle();
+            if (e.metaKey || e.ctrlKey) solo(getIdx(legendItem));
+            else toggle();
           }
         });
         legendItem.addEventListener('mouseenter', function () { setHover(true); });
@@ -8112,15 +8236,40 @@ function __okuEnhanceBarCharts(root) {
     // every category row. Mirrors the Cartesian chart legend chip
     // behaviour. State is purely visual (CSS class), no data
     // recompute — kept simple so the page doesn't repaint heavily.
-    host.querySelectorAll('.bar-chart-legend-chip[data-series-idx]').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        var idx = chip.getAttribute('data-series-idx');
-        var dimmed = chip.classList.toggle('off');
-        chip.setAttribute('aria-pressed', dimmed ? 'true' : 'false');
-        host.querySelectorAll('.bar-fill[data-series="' + idx + '"]').forEach(function (f) {
-          f.classList.toggle('dim', dimmed);
-        });
+    var allLegendChips = host.querySelectorAll('.bar-chart-legend-chip[data-series-idx]');
+    function setChipDim(chip, dim) {
+      var idx = chip.getAttribute('data-series-idx');
+      chip.classList.toggle('off', dim);
+      chip.setAttribute('aria-pressed', dim ? 'true' : 'false');
+      host.querySelectorAll('.bar-fill[data-series="' + idx + '"]').forEach(function (f) {
+        f.classList.toggle('dim', dim);
       });
+    }
+    function soloBarSeries(idx) {
+      // Restore-all if this idx is already the only un-dimmed.
+      var visibleIdxs = [];
+      allLegendChips.forEach(function (c) {
+        if (!c.classList.contains('off')) visibleIdxs.push(c.getAttribute('data-series-idx'));
+      });
+      var alreadySolo = visibleIdxs.length === 1 && visibleIdxs[0] === idx;
+      allLegendChips.forEach(function (c) {
+        var i = c.getAttribute('data-series-idx');
+        setChipDim(c, alreadySolo ? false : i !== idx);
+      });
+    }
+    allLegendChips.forEach(function (chip) {
+      chip.addEventListener('click', function (e) {
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault();
+          soloBarSeries(chip.getAttribute('data-series-idx'));
+        } else {
+          setChipDim(chip, !chip.classList.contains('off'));
+        }
+      });
+      var prevTitle = chip.getAttribute('title') || '';
+      if (!prevTitle.includes('solo')) {
+        chip.setAttribute('title', (prevTitle ? prevTitle + ' · ' : '') + 'click toggles · ' + (navigator.platform.toLowerCase().includes('mac') ? '⌘' : 'Ctrl') + '+click solos');
+      }
     });
   });
 }

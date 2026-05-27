@@ -3837,17 +3837,22 @@ oku-chart .okc-radar .okc-radar-series.okc-hidden {
   transition: opacity 0.18s ease;
 }
 
-/* Legend hover highlight — when a legend entry is hovered or
-   focused, fade every chart shape whose series / slice / segment
-   index does NOT match the hovered legend's index. The chart
-   carries data-legend-hover="<idx>"; CSS selects shapes by their
-   index attribute and dims the non-matching ones. Cartesian
-   shapes use data-series-idx on the parent .okc-series group;
-   non-Cartesian shapes (donut slices, waffle cells, radar areas)
-   use their own index attribute. */
-oku-chart.okc-legend-hovering .okc-series:not([data-series-idx=""]) {
-  opacity: 0.18;
-  transition: opacity 0.15s ease;
+/* Legend hover highlight — **emphasize** the hovered series rather
+   than dim the others. Earlier behaviour faded the non-matching
+   series to opacity 0.18; the reader's attention then tracked the
+   change-points (the dimming shapes) instead of the target (which
+   stayed stationary). Inverted to keep the other series stable so
+   only the target shifts: the hovered series gets a thicker stroke
+   + larger dot + accent drop-shadow, everything else stays as-is.
+
+   Wiring: the chart's `<oku-chart>` host gets `.okc-legend-hovering`
+   + `data-legend-hover="<idx>"` while a legend chip is hovered or
+   focused. Cartesian shapes carry `data-series-idx` on the parent
+   `.okc-series`; non-Cartesian shapes use their own index attr. */
+
+/* Cartesian — emphasize the matching series. */
+oku-chart.okc-legend-hovering .okc-series {
+  transition: filter 0.15s ease;
 }
 oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-series[data-series-idx="0"],
 oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-series[data-series-idx="1"],
@@ -3857,16 +3862,35 @@ oku-chart.okc-legend-hovering[data-legend-hover="4"] .okc-series[data-series-idx
 oku-chart.okc-legend-hovering[data-legend-hover="5"] .okc-series[data-series-idx="5"],
 oku-chart.okc-legend-hovering[data-legend-hover="6"] .okc-series[data-series-idx="6"],
 oku-chart.okc-legend-hovering[data-legend-hover="7"] .okc-series[data-series-idx="7"] {
-  opacity: 1;
-  filter: drop-shadow(0 0 4px var(--accent));
+  filter: drop-shadow(0 0 5px var(--accent)) drop-shadow(0 0 2px var(--accent));
 }
-/* Non-Cartesian: fade every indexed shape, then un-fade the
-   matching one. Driven by the same data-legend-hover attribute. */
+oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-series[data-series-idx="0"] path,
+oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-series[data-series-idx="1"] path,
+oku-chart.okc-legend-hovering[data-legend-hover="2"] .okc-series[data-series-idx="2"] path,
+oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-series[data-series-idx="3"] path,
+oku-chart.okc-legend-hovering[data-legend-hover="4"] .okc-series[data-series-idx="4"] path,
+oku-chart.okc-legend-hovering[data-legend-hover="5"] .okc-series[data-series-idx="5"] path,
+oku-chart.okc-legend-hovering[data-legend-hover="6"] .okc-series[data-series-idx="6"] path,
+oku-chart.okc-legend-hovering[data-legend-hover="7"] .okc-series[data-series-idx="7"] path {
+  stroke-width: 3.5;
+}
+oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-series[data-series-idx="0"] circle,
+oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-series[data-series-idx="1"] circle,
+oku-chart.okc-legend-hovering[data-legend-hover="2"] .okc-series[data-series-idx="2"] circle,
+oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-series[data-series-idx="3"] circle,
+oku-chart.okc-legend-hovering[data-legend-hover="4"] .okc-series[data-series-idx="4"] circle,
+oku-chart.okc-legend-hovering[data-legend-hover="5"] .okc-series[data-series-idx="5"] circle,
+oku-chart.okc-legend-hovering[data-legend-hover="6"] .okc-series[data-series-idx="6"] circle,
+oku-chart.okc-legend-hovering[data-legend-hover="7"] .okc-series[data-series-idx="7"] circle {
+  r: 6;
+}
+
+/* Non-Cartesian: emphasize the matching shape with a brighter
+   ring + accent halo. Other slices/cells/areas stay as-is. */
 oku-chart.okc-legend-hovering .okc-slice,
 oku-chart.okc-legend-hovering .okc-waffle-cell,
 oku-chart.okc-legend-hovering .okc-radar-series {
-  opacity: 0.18;
-  transition: opacity 0.15s ease;
+  transition: filter 0.15s ease, stroke-width 0.15s ease;
 }
 oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-slice[data-slice-idx="0"],
 oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-slice[data-slice-idx="1"],
@@ -3875,20 +3899,18 @@ oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-slice[data-slice-idx="
 oku-chart.okc-legend-hovering[data-legend-hover="4"] .okc-slice[data-slice-idx="4"],
 oku-chart.okc-legend-hovering[data-legend-hover="5"] .okc-slice[data-slice-idx="5"],
 oku-chart.okc-legend-hovering[data-legend-hover="6"] .okc-slice[data-slice-idx="6"],
-oku-chart.okc-legend-hovering[data-legend-hover="7"] .okc-slice[data-slice-idx="7"] {
-  opacity: 1;
-}
+oku-chart.okc-legend-hovering[data-legend-hover="7"] .okc-slice[data-slice-idx="7"],
 oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-waffle-cell[data-segment-idx="0"],
 oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-waffle-cell[data-segment-idx="1"],
 oku-chart.okc-legend-hovering[data-legend-hover="2"] .okc-waffle-cell[data-segment-idx="2"],
-oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-waffle-cell[data-segment-idx="3"] {
-  opacity: 1;
-}
+oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-waffle-cell[data-segment-idx="3"],
 oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-radar-series[data-series-idx="0"],
 oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-radar-series[data-series-idx="1"],
 oku-chart.okc-legend-hovering[data-legend-hover="2"] .okc-radar-series[data-series-idx="2"],
 oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-radar-series[data-series-idx="3"] {
-  opacity: 1;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 6px var(--accent));
 }
 
 /* General label-overlay collision avoidance — any chart label that
