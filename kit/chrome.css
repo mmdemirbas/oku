@@ -3890,6 +3890,29 @@ oku-chart.okc-legend-hovering[data-legend-hover="2"] .okc-radar-series[data-seri
 oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-radar-series[data-series-idx="3"] {
   opacity: 1;
 }
+
+/* General label-overlay collision avoidance — any chart label that
+   could obscure a data point (quadrant corner labels, future axis
+   titles in tight charts) tags itself with .okc-label-overlay.
+   The label stays click-transparent (pointer-events:none) and
+   fades when the chart :has() a hovered data point OR an active
+   tooltip — the reader's interaction with data wins over a
+   stationary label. */
+oku-chart .okc-label-overlay {
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+oku-chart:has(.okc-dot:hover) .okc-label-overlay,
+oku-chart:has(.okc-bubble:hover) .okc-label-overlay,
+oku-chart:has(.okc-slice:hover) .okc-label-overlay,
+oku-chart:has(.okc-waffle-cell:hover) .okc-label-overlay,
+oku-chart:has(.okc-treemap-cell:hover) .okc-label-overlay,
+oku-chart:has(.okc-funnel-band:hover) .okc-label-overlay,
+oku-chart:has(.okc-network-node:hover) .okc-label-overlay,
+oku-chart:has(.okc-pinned) .okc-label-overlay,
+oku-chart:has(.okc-tooltip.visible) .okc-label-overlay {
+  opacity: 0.15;
+}
 oku-chart .okc-donut-legend-label {
   fill: var(--text);
   font: 500 12px 'Inter', sans-serif;

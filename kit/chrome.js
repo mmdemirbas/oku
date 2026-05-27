@@ -4166,8 +4166,13 @@ class OkuChart extends HTMLElement {
           var charW = 6.4;
           var w = Math.min(200, text.length * charW + padX * 2);
           var rx = anchor === 'end' ? x - w : x;
-          quadrantLabelParts.push('<rect x="' + rx + '" y="' + (y - 12) + '" width="' + w + '" height="18" rx="4" class="okc-quadrant-label-pill"/>');
-          quadrantLabelParts.push('<text x="' + (anchor === 'end' ? x - padX : x + padX) + '" y="' + (y + 1) + '" text-anchor="' + (anchor === 'end' ? 'end' : 'start') + '" class="okc-quadrant-label">' + escapeXml(text) + '</text>');
+          // Both pill + text carry the generic .okc-label-overlay
+          // class so the chart's :has(data-hover) CSS rule can fade
+          // them out of the way when the reader is interacting with
+          // a data point underneath. Pointer-events:none lets clicks
+          // pass through.
+          quadrantLabelParts.push('<rect x="' + rx + '" y="' + (y - 12) + '" width="' + w + '" height="18" rx="4" class="okc-quadrant-label-pill okc-label-overlay"/>');
+          quadrantLabelParts.push('<text x="' + (anchor === 'end' ? x - padX : x + padX) + '" y="' + (y + 1) + '" text-anchor="' + (anchor === 'end' ? 'end' : 'start') + '" class="okc-quadrant-label okc-label-overlay">' + escapeXml(text) + '</text>');
         }
         if (ql[0]) pillLabel(ql[0], pad.left + 6,           pad.top + 16,            'start');
         if (ql[1]) pillLabel(ql[1], W - pad.right - 6,      pad.top + 16,            'end');
