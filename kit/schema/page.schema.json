@@ -452,6 +452,23 @@
           "items": { "enum": ["dots", "line", "area"] },
           "description": "For Cartesian (canonical type=plot, or alias scatter/line/area): which marks to draw. dots = scatter points, line = connecting line, area = fill under the line. Combine freely (e.g. [\"dots\", \"line\"] = line with point markers). Defaults: scatter→[dots], line→[line], area→[line, area], plot→[dots]."
         },
+        "data": {
+          "type": "array",
+          "description": "Canonical record-array input — alternative to the legacy `series: [{data: [{x, y}]}]` shape. Each record is a flat object; the `encoding` field maps column names to visual channels. Mark-composition uses the same `marks` list. Currently supported for the plot family (canonical type=plot or alias scatter/line/area). Desugars internally to series-grouped-by-encoding.color.",
+          "items": { "type": "object" }
+        },
+        "encoding": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Field-to-channel mapping for canonical record-array input. Names of fields in each `data` record drive the visual channels.",
+          "properties": {
+            "x":     { "type": "string", "description": "Field name for the x-axis position." },
+            "y":     { "type": "string", "description": "Field name for the y-axis position." },
+            "color": { "type": "string", "description": "Field name that groups records into colour series (one rendered series per distinct value)." },
+            "size":  { "type": "string", "description": "Field name for the bubble-size channel (when relevant)." },
+            "label": { "type": "string", "description": "Field name carrying a per-record label (shown in tooltips)." }
+          }
+        },
         "mode": {
           "type": "string",
           "description": "Sub-mode for canonical types. bar: single | stacked | grouped. arc: pie | donut. Defaults inferred from legacy alias when applicable (stacked-bar→stacked, donut→donut)."

@@ -348,7 +348,55 @@
        Aliases stay as the rendered type so the existing renderer
        branches keep matching; canonical types translate to their
        canonical alias-form before render dispatch. */
+    /* Canonical record-array → legacy `series` desugar. Lets plot
+       authors emit a flat record table + encoding map (the Vega-Lite
+       shape) instead of the series-of-series shape the renderer was
+       originally built for. Currently scoped to the plot family; other
+       families follow as they're migrated. */
+    _normaliseChartData(block) {
+      if (!block || !Array.isArray(block.data) || !block.data.length) return block;
+      const enc = block.encoding || {};
+      const xField     = enc.x     || 'x';
+      const yField     = enc.y     || 'y';
+      const colorField = enc.color || null;
+      const sizeField  = enc.size  || null;
+      const labelField = enc.label || null;
+      // Only desugar when the chart actually uses series-shape charts.
+      // Plot / scatter / line / area / bubble / quadrant all consume
+      // `series: [{label, color, data: [{x, y}]}]`.
+      const cartesian = /^(plot|scatter|line|area|bubble|quadrant)$/i.test(String(block.type || ''));
+      if (!cartesian) return block;
+      // Group records by encoding.color (if set) into one series per
+      // distinct value. With no color encoding, all records collapse
+      // into a single anonymous series.
+      const series = new Map();
+      const seriesPalette = ['accent', 'success', 'warn', 'danger', 'muted'];
+      block.data.forEach((rec) => {
+        const seriesKey = colorField ? String(rec[colorField] ?? '') : '__default';
+        if (!series.has(seriesKey)) {
+          const idx = series.size;
+          series.set(seriesKey, {
+            label: colorField ? seriesKey : (block.title || ''),
+            color: seriesPalette[idx % seriesPalette.length],
+            data: []
+          });
+        }
+        const point = { x: +rec[xField], y: +rec[yField] };
+        if (sizeField  && rec[sizeField]  != null) point.size  = +rec[sizeField];
+        if (labelField && rec[labelField] != null) point.label = String(rec[labelField]);
+        series.get(seriesKey).data.push(point);
+      });
+      const out = Object.assign({}, block);
+      out.series = Array.from(series.values());
+      // Strip the canonical fields so the downstream renderer sees the
+      // legacy shape and doesn't double-count.
+      delete out.data;
+      delete out.encoding;
+      return out;
+    }
+
     _normaliseChartType(block) {
+      block = this._normaliseChartData(block);
       const out = Object.assign({}, block || {});
       const t = String(out.type || 'scatter').toLowerCase();
       // Canonical inputs: translate to the equivalent legacy alias so
