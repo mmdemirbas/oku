@@ -712,6 +712,38 @@ var __okuTableConfig = (function () {
       moveInto(viewGroup, popover, 'View');
       moveInto(groupby,   popover, 'Group by');
     }
+    // Per-column filters. Lives in code under wrap.__oktState so the
+    // popover can write into the wrap's filter map + trigger a
+    // re-render without coupling to its closures.
+    var state = wrap.__oktState;
+    if (state && state.headers && state.headers.length) {
+      var section = document.createElement('div');
+      section.className = 'okt-cfg-section';
+      section.innerHTML = '<div class="okt-cfg-subtitle">Filter columns</div>';
+      state.headers.forEach(function (label, idx) {
+        var row = document.createElement('label');
+        row.className = 'okt-cfg-row';
+        var lbl = document.createElement('span');
+        lbl.className = 'okt-cfg-label';
+        lbl.textContent = label || ('Column ' + (idx + 1));
+        var input = document.createElement('input');
+        input.type = 'search';
+        input.className = 'okt-cfg-colfilter';
+        input.placeholder = 'contains…';
+        input.value = state.columnFilters[idx] || '';
+        input.addEventListener('input', function () {
+          state.columnFilters[idx] = input.value;
+          state.render();
+        });
+        var holder = document.createElement('span');
+        holder.className = 'okt-cfg-field';
+        holder.appendChild(input);
+        row.appendChild(lbl);
+        row.appendChild(holder);
+        section.appendChild(row);
+      });
+      popover.appendChild(section);
+    }
     requestAnimationFrame(position);
   }
 
@@ -1908,6 +1940,21 @@ function initReadingAids() {
         return e.cells.some(function (c) { return stripHtml(c).toLowerCase().indexOf(needle) !== -1; });
       }
 
+      /* Per-column filter — separate from the global text filter and
+         from the chip-rack filter. Map of col-index → substring; row
+         passes if every active per-column filter matches its cell. */
+      var columnFilters = {};
+      function rowMatchesColumnFilters(e) {
+        for (var col in columnFilters) {
+          if (!Object.prototype.hasOwnProperty.call(columnFilters, col)) continue;
+          var needle = (columnFilters[col] || '').trim().toLowerCase();
+          if (!needle) continue;
+          var cellText = stripHtml(e.cells[+col] || '').toLowerCase();
+          if (cellText.indexOf(needle) === -1) return false;
+        }
+        return true;
+      }
+
       /* Build the current entry list based on groupByCol:
            - 'author' → reuse the JSON-declared groups verbatim
            - 'none'   → flat row list, no group entries
@@ -1945,14 +1992,21 @@ function initReadingAids() {
         return out;
       }
 
+      function hasActiveColumnFilters() {
+        for (var col in columnFilters) {
+          if (!Object.prototype.hasOwnProperty.call(columnFilters, col)) continue;
+          if ((columnFilters[col] || '').trim()) return true;
+        }
+        return false;
+      }
       function entriesMatchingFilter() {
         var entries = buildEntries();
-        if (!filterText && !hasActiveChips()) return entries;
+        if (!filterText && !hasActiveChips() && !hasActiveColumnFilters()) return entries;
         var needle = filterText ? filterText.toLowerCase() : '';
         // Keep groups whose subsequent rows have at least one match.
         var visible = entries.map(function (e) {
           if (e.type === 'row') {
-            return rowMatchesText(e, needle) && rowMatchesChips(e);
+            return rowMatchesText(e, needle) && rowMatchesChips(e) && rowMatchesColumnFilters(e);
           }
           return null; // groups decided below
         });
@@ -2528,6 +2582,15 @@ function initReadingAids() {
         });
       }
 
+      // Expose state hooks the table-config popover can call into:
+      // column-filter mutations and a render trigger. Lives on the
+      // wrap so the body-level popover finds them via the wrap it
+      // anchors to.
+      wrap.__oktState = {
+        columnFilters: columnFilters,
+        headers: headers.map(function (h) { return stripHtml(h); }),
+        render: render,
+      };
       // Gear button → open the table-config popover. The popover
        // moves the stashed view-toggle + group-by selects into
        // itself, leaves a marker, and on close moves them back —

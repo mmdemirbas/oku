@@ -1185,6 +1185,31 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   color: var(--text);
   min-width: 0;
 }
+.okt-cfg-section {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 8px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.okt-cfg-subtitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin-bottom: 2px;
+}
+.okt-cfg-colfilter {
+  flex: 1 1 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  color: var(--text);
+  min-width: 0;
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
