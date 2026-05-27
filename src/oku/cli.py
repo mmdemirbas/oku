@@ -115,6 +115,28 @@ SKIP_DIRS = {
 _project_skip_cache: dict[str, frozenset[str]] = {}
 
 
+def find_kit_json(root: Path) -> Path | None:
+    """Return the first existing kit.json under root, preferring the
+    docs root over the project root.
+
+    Lookup order:
+      1. ``root/docs/kit.json`` — canonical (schema description says
+         "Lives at docs/kit.json (or wherever the project's docs root
+         is)"). Authors who keep pages under docs/ get this for free.
+      2. ``root/kit.json`` — fallback for projects where the project
+         root *is* the docs root (no docs/ subdir).
+
+    Returns None if neither exists. The build copies the result, when
+    present, into the dist site's docs root so chrome.js's runtime
+    fetch (``__okuDocsRoot + 'kit.json'``) resolves.
+    """
+    candidates = (root / "docs" / "kit.json", root / "kit.json")
+    for c in candidates:
+        if c.exists():
+            return c
+    return None
+
+
 def project_skip_dirs(root: Path) -> frozenset[str]:
     """Read kit.json's optional ``skip_dirs`` array. Cached per (resolved)
     root so repeated find_* calls don't re-parse kit.json.
@@ -135,8 +157,8 @@ def project_skip_dirs(root: Path) -> frozenset[str]:
     if cached is not None:
         return cached
     extras: set[str] = set()
-    kit_json = root / "kit.json"
-    if kit_json.exists():
+    kit_json = find_kit_json(root)
+    if kit_json is not None:
         try:
             data = json.loads(kit_json.read_text(encoding="utf-8"))
             raw = data.get("skip_dirs") if isinstance(data, dict) else None
@@ -2039,8 +2061,8 @@ def compute_llms_txt(root: Path, *, pages: list | None = None) -> str:
         pages = find_json_pages(root)
     project_name = root.name
     description = ""
-    kit_json = root / "kit.json"
-    if kit_json.exists():
+    kit_json = find_kit_json(root)
+    if kit_json is not None:
         try:
             kit_data = json.loads(kit_json.read_text(encoding="utf-8"))
             project_name = kit_data.get("name", project_name)
@@ -2263,10 +2285,9 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
     # Project-level files that pages depend on at runtime. site-manifest
     # and llms.txt are derived; cmd_build writes them into the dist
     # tree's docs_dir directly after this call, NOT into source.
-    for f in ("kit.json",):
-        sp = src_root / f
-        if sp.exists():
-            shutil.copy(sp, out_dir / f)
+    kit_json = find_kit_json(src_root)
+    if kit_json is not None:
+        shutil.copy(kit_json, out_dir / "kit.json")
 
     # Page sources (HTML stubs + JSON content) — preserve directory structure.
     # For nested pages, rewrite `_kit/...` URLs in the stub to climb the
@@ -2309,8 +2330,8 @@ def build_kit_bundle(src_root: Path) -> str | None:
     into one JSON blob for inlining into standalone builds. Returns None
     if no kit.json is present (no glossary to inline).
     """
-    kit_json_path = src_root / "kit.json"
-    if not kit_json_path.exists():
+    kit_json_path = find_kit_json(src_root)
+    if kit_json_path is None:
         return None
     try:
         kit_data = json.loads(kit_json_path.read_text(encoding="utf-8"))
@@ -2708,6 +2729,17 @@ def _make_serve_handler(root: Path):
         def do_GET(self) -> None:  # noqa: N802 — base API
             if self.path == "/__reload":
                 self._serve_reload_stream()
+                return
+            if self.path == "/favicon.ico":
+                # Browsers auto-request /favicon.ico from every origin;
+                # answering with a 1x1 empty PNG avoids a console 404 on
+                # every page load without polluting the source tree with
+                # a real favicon binary.
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", "0")
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
                 return
             # Synthesize stubs / JSON on the fly so `oku serve` previews
             # markdown- and json-authored sources without a build step:
