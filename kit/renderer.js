@@ -546,7 +546,7 @@
       const categories = block.categories || [];
       const series = block.series || [];
       const wrap = document.createElement('div');
-      wrap.className = 'bar-chart bar-chart-multi bar-chart-' + mode;
+      wrap.className = 'bar-chart bar-chart-multi bar-chart-' + mode + (block.orientation === 'vertical' ? ' bar-chart-vertical' : '');
       wrap.setAttribute('role', 'img');
       wrap.setAttribute('aria-label', (block.title ? block.title + ' — ' : '') + mode + ' with ' + categories.length + ' categories');
       if (block.title) {
@@ -643,6 +643,10 @@
           if (colorInfo.inlineBackground) fill.style.background = colorInfo.inlineBackground;
           fill.setAttribute('data-series', String(si));
           const pct = Math.max(0, Math.min(100, (v / scaleMax) * 100));
+          // Set both --bar-pct (used by vertical CSS) and width
+          // (used by horizontal default) so the same DOM works for
+          // either orientation. CSS picks which one applies.
+          fill.style.setProperty('--bar-pct', String(pct));
           fill.style.width = pct + '%';
           // Rich hover payload — chrome.js wires .bar-chart-multi
           // .bar-fill to the shared tooltip controller.
@@ -966,7 +970,7 @@
       const rows = block.rows || [];
       const max = block.max !== undefined ? block.max : Math.max.apply(null, rows.map(function (r) { return r.value || 0; }).concat([1]));
       const wrap = document.createElement('div');
-      wrap.className = 'bar-chart';
+      wrap.className = 'bar-chart' + (block.orientation === 'vertical' ? ' bar-chart-vertical' : '');
       wrap.setAttribute('role', 'img');
       wrap.setAttribute('aria-label', (block.title ? block.title + ' — ' : '') + 'Bar chart with ' + rows.length + ' rows');
       if (block.title) {
@@ -988,6 +992,7 @@
         const fill = document.createElement('div');
         fill.className = 'bar-fill ' + (r.color || 'accent');
         const pct = max > 0 ? Math.max(2, Math.min(100, (r.value / max) * 100)) : 0;
+        fill.style.setProperty('--bar-pct', String(pct));
         fill.style.width = pct + '%';
         const share = total > 0 ? r.value / total : 0;
         fill.setAttribute('data-hover-payload', JSON.stringify({

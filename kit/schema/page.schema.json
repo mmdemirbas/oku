@@ -488,6 +488,11 @@
           "maximum": 0.95,
           "description": "For type=arc / pie / donut: inner-ring radius as fraction of outer radius. 0 = pie, ~0.55 = donut. Override the mode default — e.g. type=pie + inner_radius=0.3 renders a thick ring."
         },
+        "orientation": {
+          "enum": ["horizontal", "vertical"],
+          "default": "horizontal",
+          "description": "For charts whose layout has both forms (bar / column = horizontal vs vertical bars; histogram / column-histogram; box-plot rotation; violin rotation): switch the layout axis. Bar charts default to horizontal (rows). Set 'vertical' for column charts. Charts that don't support both axes ignore this property."
+        },
         "title": { "type": "string" },
         "x_label": { "type": "string", "description": "Cartesian only (scatter / line / area / bubble / quadrant)." },
         "y_label": { "type": "string", "description": "Cartesian only." },
