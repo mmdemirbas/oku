@@ -1,8 +1,248 @@
-# viz-catalog research notes
+# Visualization catalog — gap analysis (2026-05-27)
 
-In-flight research notes on chart taxonomies and how the oku chart
-picker should be organised. Sections below are appended as the
-research progresses.
+## Sources
+
+- **datylon** — https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization — vendor blog, exhaustive (60+ types) with one-line use-cases; strongest of the six for surfacing exotic types (bump, horizon, beeswarm, strip/jitter, contour, barcode, semicircle donut).
+- **atlassian** — https://www.atlassian.com/data/charts/essential-chart-types-for-data-visualization — short editorial overview of ~13 "essential" types; shallow but well-edited.
+- **quickchart** — https://quickchart.io/documentation/chart-types/ — implementation docs for a Chart.js-as-a-service renderer; useful as a reality check on which types ship in practice (bar/line/radar/pie/doughnut/polar/scatter/bubble/gauge/box/violin/funnel/sparkline/sankey/candlestick/OHLC).
+- **datavizcatalogue** — https://datavizcatalogue.com/ — canonical reference catalogue; the landing page lists ~60 distinct types alphabetically and is heaviest on exotic types (Kagi, Point & Figure, Stem & Leaf, Tally, Spiral Plot, Span chart, Non-ribbon Chord, Parallel Sets).
+- **holistics** — https://www.holistics.io/blog/types-of-charts/ — "40+ chart types" guide grouped by purpose (categorical / temporal / distribution / relational / hierarchical / geospatial / proportional); the only source with first-class Waterfall, Trellis (small multiples), and Org chart.
+- **datawrapper** — https://www.datawrapper.de/blog/chart-types-guide — opinionated editorial; lightest on volume but richest in best-practice and chart-pair guidance (arrow vs slope, alluvial vs sankey, multi-line vs small multiples, locator vs symbol map).
+
+Source initials used below: **daty**, **atla**, **qchart**, **dvc**, **holi**, **datw**.
+
+## Master list (alphabetical)
+
+| Visualization | Best for | In oku? | Sources |
+|---|---|---|---|
+| Alluvial diagram | Category switching / preference flow | partial (sankey) | datw |
+| Arc diagram | Pairwise links along a 1-D axis | no | daty, dvc |
+| Area chart | Continuous change with volume emphasis | yes | atla, daty, dvc, holi, datw |
+| Arrow plot | Compact before/after for many categories | no | datw |
+| Bar chart (horizontal & vertical/column) | Categorical comparison | yes | all |
+| Barcode chart | 1-D distribution as a row of tick marks | no | daty |
+| Beeswarm chart | 1-D distribution, non-overlapping dots | no | daty |
+| Box plot (box & whisker) | Distribution summary across groups | yes | all |
+| Bubble chart | XY + magnitude (3 vars) | yes | atla, daty, dvc, holi, qchart |
+| Bullet graph | Single KPI vs target + bands | yes | atla, daty, dvc, holi |
+| Bump chart | Rank changes over time | no | daty |
+| Bump area chart | Stacked-rank changes over time | no | daty |
+| Calendar heatmap | Daily value over a year grid | yes | dvc |
+| Candlestick chart | OHLC price intervals | no | daty, dvc, holi, qchart |
+| Cartogram | Geo distortion proportional to value | no | datw |
+| Chord diagram | Pairwise flows in a circle | yes | daty, dvc, holi |
+| Choropleth map | Value shading per region | partial (geo) | dvc, holi, datw |
+| Circle packing | Hierarchy as nested circles | no | dvc, holi |
+| Connected scatter plot | Trajectory of two paired metrics | no | daty |
+| Connection map | Lines between locations | no | dvc, holi |
+| Contour plot | 2-D density / surface levels | no | daty |
+| Dendrogram | Hierarchical cluster tree | no | daty, datw, dvc |
+| Density plot (KDE) | Continuous distribution curve | no | atla, daty, dvc, holi |
+| Diverging stacked bar (Likert) | Sentiment / opinion split around center | no | daty, datw |
+| Donut chart | Part-to-whole, centered KPI | yes | all |
+| Dot map | Point locations on a map | no | dvc, holi |
+| Dot plot | Categorical values without bar baseline | no | atla, daty, datw |
+| Dual-axis chart | Two scales sharing one X | no | atla |
+| Dumbbell plot | Two values per category | no | daty |
+| Euler diagram | Set overlap, area-accurate | no | daty |
+| Funnel chart | Pipeline stage drop-off | yes | atla, daty, dvc, holi, qchart |
+| Gantt chart | Project schedule / overlapping intervals | no | daty, dvc, holi, datw |
+| Gauge / radial gauge | Single KPI on a dial | yes | daty, holi, qchart |
+| Grouped bar / column | Sub-category side-by-side | yes | atla, daty, holi, datw |
+| Heatmap (2-D matrix) | Two-axis category × value matrix | yes | all |
+| Histogram | Distribution of one numeric variable | yes | atla, daty, dvc, holi |
+| Histogram, 2-D (binned scatter) | Joint distribution under overplotting | no | datw |
+| Horizon chart | Many parallel time series, color-folded | no | daty |
+| Illustration diagram | Annotated explanatory figure | no | dvc |
+| Isotype / pictogram | Count-as-icons | no | daty, datw, dvc |
+| Jitter / strip plot | Raw points along one axis | no | daty |
+| Kagi chart | Price reversal regardless of time | no | dvc |
+| Line chart | Continuous change over time | yes | all |
+| Locator map | Pin / label specific points | no | datw |
+| Lollipop chart | Bar chart with marked endpoint | no | daty |
+| Marimekko / mosaic chart | Two-dim part-to-whole (size × share) | no | daty, dvc, holi, datw |
+| Network diagram | Nodes + edges, general graph | yes | daty, dvc, holi |
+| Nightingale rose / polar area / radial column | Bars on a circular axis | no | daty, dvc, holi, qchart |
+| OHLC chart | Open-high-low-close bars | no | daty, dvc, qchart |
+| Org chart | Reporting hierarchy | no | holi |
+| Parallel coordinates | Multi-variable lines across axes | yes | daty, dvc, holi |
+| Parallel sets | Categorical alluvial flow | no | dvc |
+| Parliament chart | Seat distribution as a hemicycle | no | datw |
+| Pie chart | Part-to-whole, ≤6 slices | yes | all |
+| Point & figure chart | Price moves, no time axis | no | dvc |
+| Population pyramid | Two-sided bars by age band & sex | no | daty, datw, dvc |
+| Progress bar | Single horizontal % | partial (gauge / bar) | qchart |
+| Proportional area chart | Bare circles/squares sized by value | no | daty, datw, dvc, holi |
+| Pyramid chart | Stacked triangle of stages | no | daty, dvc |
+| Quadrant chart | XY with reference cross | yes | daty |
+| Radar / spider chart | Multivariate per item on a wheel | yes | daty, holi, qchart |
+| Range plot | One range per category (low / high) | no | daty |
+| Ridgeline / joyplot | Stacked density curves | yes | daty |
+| Sankey diagram | Weighted flows between stages | yes | atla, daty, dvc, holi, qchart |
+| Scatter matrix | Pairwise scatter grid | yes | daty |
+| Scatter plot | Two numeric vars, correlation | yes | all |
+| Semicircle donut | 180° gauge-like donut | no | daty |
+| Slope chart | First vs last value, many categories | yes | daty, datw |
+| Small multiples / trellis | Grid of sub-charts | no | holi, datw |
+| Span chart | Min-max range per category | no | dvc |
+| Sparkline | Inline mini time-series | yes | atla, dvc, qchart |
+| Spiral plot | Cyclical patterns over a long span | no | dvc |
+| Spline / step line | Smoothed or stepped line variants | partial (line) | daty |
+| Stacked area chart | Continuous part-to-whole over time | yes | daty, holi, dvc |
+| Stacked bar / column | Categorical part-to-whole | yes | all |
+| Stem-and-leaf plot | Distribution preserving digits | no | dvc |
+| Stream graph | Soft-baseline stacked area | no | daty, dvc, holi, datw |
+| Sunburst chart | Hierarchical part-to-whole, radial | no | daty, dvc, holi |
+| Symbol map | Symbols sized/colored per location | partial (geo) | datw |
+| Table | Exact values | yes (kit primitive) | atla |
+| Tally chart | Count by tally marks | no | dvc |
+| Tile / hex map | Equal-area regional grid | partial (geo) | daty |
+| Timeline | Events on a 1-D axis | no | dvc |
+| Treemap | Hierarchy by rectangle area | yes | daty, dvc, holi |
+| Venn diagram | Set overlap | no | daty, dvc |
+| Violin plot | Distribution + density per group | no | atla, daty, dvc, holi, qchart |
+| Waffle chart | 10×10 grid of part-to-whole | yes | daty, datw |
+| Waterfall chart | Incremental positive/negative steps | no | daty, holi |
+| Word cloud | Term frequency | no | dvc |
+
+For reference the 29 oku types are: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, pie, waffle, treemap, histogram, box-plot, ridgeline, sparkline, slope, calendar-heatmap, funnel, sankey, network, chord, heatmap, scatter-matrix, parallel-coordinates, gauge, bullet, radar, geo.
+
+## Gaps — visualizations oku doesn't have yet (ranked by usefulness)
+
+Ranked by (a) how often a serious doc would need the type, (b) how cheap the renderer is on top of existing primitives, (c) how many catalogues flagged it.
+
+### 1. Waterfall chart — high
+
+Incremental gains/losses connecting two totals (start → +A → −B → +C → end). Canonical "what changed between these two numbers" chart — financial bridge, retention loss-explanation, performance breakdown. holi and daty both flag it first-class; stacked-bar is the wrong substitute (loses the cumulative axis). Pure layout on top of the existing bar primitive, small lift. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [holi](https://www.holistics.io/blog/types-of-charts/).
+
+### 2. Dot plot / lollipop chart — high
+
+One dot (or stem + dot) per category, value encoded by position, no bar baseline. Default replacement for "too many bars" — atla, daty, datw all recommend. Lollipop = same chart with a thin stem. Cheap addition, reuses bar layout. Sources: [atla](https://www.atlassian.com/data/charts/essential-chart-types-for-data-visualization), [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### 3. Dumbbell / arrow plot — high
+
+Two dots per category joined by a line — before/after, men/women, 2010/2020. datw positions arrow plot explicitly as the compact alternative to slope when many categories don't fit; daty's dumbbell is the same chart with a different name. Heavy use in news graphics. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### 4. Small multiples / trellis — high
+
+Not a chart type — a layout primitive. Same chart repeated in a grid, one panel per category. The single most-recommended "declutter" pattern across the six sources; holi calls it Trellis, datw a peer of slope and arrow plot. Implementation is a wrapper that repeats any existing kind. Sources: [holi](https://www.holistics.io/blog/types-of-charts/), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### 5. Stream graph — medium-high
+
+Stacked area with a centered baseline; emphasises shape over absolute values. Cited in 4 of 6 sources (daty, dvc, holi, datw). datw explicitly suggests it as the antidote to "too familiar" charts. Layered on the existing area renderer with a different baseline function. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [holi](https://www.holistics.io/blog/types-of-charts/), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### 6. Marimekko / mosaic chart — medium
+
+Stacked-column where column width is also proportional to a second variable (country × age band, market × segment). Distinct from treemap (preserves a categorical axis) and from stacked-bar (varying width). 4-source mention. Higher lift — needs a variable-width axis. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [holi](https://www.holistics.io/blog/types-of-charts/), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### 7. Density curve (KDE) + violin plot — medium
+
+Smoothed-frequency curve (1-D) and its mirrored twin for per-group comparison. Preferred over histogram when bin choice is arbitrary and shape matters; violin replaces box plot when shape detail is wanted. 4 of 6 sources treat them as first-class peers. The existing ridgeline already implies a KDE primitive — lift into standalone density and add violin as a box-plot variant. Sources: [atla](https://www.atlassian.com/data/charts/essential-chart-types-for-data-visualization), [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [holi](https://www.holistics.io/blog/types-of-charts/).
+
+### 8. Population pyramid / diverging stacked bar — medium
+
+Stacked bars mirrored around a center axis. Any "split by category" — male/female by age, agree/disagree on a Likert, sentiment +/−, gain/loss. datw specifically calls out diverging-bar for Likert-survey rendering, a common doc artifact. Small lift (stacked-bar in two passes, mirrored axis). Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### 9. Bump chart — medium
+
+Line chart where the Y axis is rank instead of value. "Who was #1 each year" — leaderboards, standings, popularity drift. Reuses line renderer with a rank-transform pre-pass. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization).
+
+### 10. Polar area / Nightingale rose / radial column — medium
+
+Bars laid out around a circle. Cyclical categorical data (months, hours, compass) where the cyclic shape itself carries meaning. Common ask for time-of-day / month-of-year viz. Distinct from radar (radar = filled polygon over multi-vars). Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [holi](https://www.holistics.io/blog/types-of-charts/), [qchart](https://quickchart.io/documentation/chart-types/), [dvc](https://datavizcatalogue.com/).
+
+### 11. Candlestick / OHLC chart — medium-low
+
+Open/high/low/close per period; box body = open→close, wicks = high/low. Any time-series with an explicit range per tick — financial, weather min/max, latency p50/p95 intervals. Modest lift on top of scatter/line. Particularly worth it because oku ships into engineering docs that often need latency interval rendering without inventing new shapes. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [holi](https://www.holistics.io/blog/types-of-charts/), [qchart](https://quickchart.io/documentation/chart-types/), [dvc](https://datavizcatalogue.com/).
+
+### 12. Gantt chart — medium-low
+
+Horizontal bars positioned on a time axis, one per task. Project schedules, release plans, roadmap windows. 4 of 6 sources list it. Mid-effort: reuses bar layout but needs a time-axis primitive. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [holi](https://www.holistics.io/blog/types-of-charts/), [dvc](https://datavizcatalogue.com/), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### 13. Sunburst chart — low-medium
+
+Treemap on a polar axis — concentric rings for hierarchy levels. Sibling of the existing treemap; lift is mostly a polar projection pass. Skip if treemap covers the use case in practice — they answer the same author question. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [holi](https://www.holistics.io/blog/types-of-charts/), [dvc](https://datavizcatalogue.com/).
+
+### 14. Connected scatter plot — low
+
+Scatter with points connected in temporal order — trajectory of two paired metrics over time (unemployment vs inflation each year). Tiny lift on top of scatter (add an ordered-connection layer). Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization).
+
+### 15. Horizon chart — low
+
+Time series folded into colour bands so many series fit in tight strips. Dashboards with 20+ time series in narrow columns. Distinctive but niche; defer unless a concrete dashboard need surfaces. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization).
+
+## Improvements to existing oku types
+
+Each item is a delta against current behaviour — what the catalogues describe that the current renderer either doesn't expose or doesn't enforce.
+
+### bar — horizontal vs vertical as a single primitive, sorted by default
+
+datw: "a bar chart is often a safer pick for small screens than a column chart, since it grows vertically rather than horizontally." atla and qchart treat `bar` and `horizontalBar` as one type with an orientation flag. The oku bar should accept `orientation: horizontal | vertical` and default to sorted-by-value unless the X axis is intrinsically ordered (time, age band). Sources: [atla](https://www.atlassian.com/data/charts/essential-chart-types-for-data-visualization), [qchart](https://quickchart.io/documentation/chart-types/), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### stacked-bar — 100 % (relative) variant + split-bar mode
+
+datw and daty both flag the 100 %-stacked variant as a distinct visual mode (each bar normalised, useful for survey-share comparison). Today it requires pre-computing percentages in the data. A `normalize: percent` mode would be the right affordance. The same control underlies datw's "split bar chart" (two-sided stacked, basis of the population pyramid above). Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### line — multi-line guidance + step / spline variants
+
+holi: keep two or three lines at most with direct labels (no legend look-up). daty: step-line and spline-line as first-class variants. line should accept a `mode: linear | step | spline` switch, and the authoring docs should call out the direct-label-over-legend convention (the kit can default to end-of-line labels above ~3 series). Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [holi](https://www.holistics.io/blog/types-of-charts/).
+
+### area — stacked-area + stream-graph share the renderer
+
+daty groups stacked-area, stream-graph, and bump-area under one family. Today oku has line/area but not stacked-area as a first-class kind. Bringing stacked-area in (and treating stream-graph as `baseline: center`) consolidates three gap entries into one renderer family. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization).
+
+### donut + pie — semicircle / half-donut + "use bar instead" warning
+
+daty's semicircle donut and qchart's half-doughnut-as-gauge both demonstrate one affordance: a 180° rotation parameter that turns the chart into a horizontal gauge / progress dial. Expose as `arc: 360 | 180 | <degrees>` on donut. Also: holi, datw, and atla all warn that for ≥4 categories a bar chart beats a pie/donut — surface as a "when not to use" note in the authoring docs next to the primitive. Sources: [daty](https://www.datylon.com/blog/types-of-charts-graphs-examples-data-visualization), [qchart](https://quickchart.io/documentation/chart-types/), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### histogram — bin-count guidance + 2-D histogram mode
+
+datw flags the 2-D histogram (binned scatter) as the cure for a "sea of overlapping dots" in scatter. atla and holi both warn that bin count materially changes the perceived distribution. A `bins: auto | <int>` option with a sensible default (Sturges or Freedman-Diaconis) plus a 2-D mode that takes `x` and `y` bins closes two gaps at once. Sources: [atla](https://www.atlassian.com/data/charts/essential-chart-types-for-data-visualization), [holi](https://www.holistics.io/blog/types-of-charts/), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### box-plot — raw-points overlay + violin variant
+
+qchart explicitly: "for best results, add a scatter plot to your box or violin chart." atla, daty, dvc, holi all treat violin as the next step when shape matters. box-plot should accept `points: none | jitter | strip` overlay and `shape: box | violin`. Sources: [qchart](https://quickchart.io/documentation/chart-types/), [atla](https://www.atlassian.com/data/charts/essential-chart-types-for-data-visualization).
+
+### scatter — overplotting fallback to 2-D histogram
+
+holi flags overlapping bubbles as the dominant failure mode; datw recommends 2-D-histogram for dense scatter. Add a `density: points | hex | rect` mode on scatter to switch to binned rendering when overplotting is detected. Even an `oku check` lint that warns when point count × point-size ratio exceeds a threshold would help. Sources: [holi](https://www.holistics.io/blog/types-of-charts/), [datw](https://www.datawrapper.de/blog/chart-types-guide).
+
+### geo — choropleth / dot map / symbol map / connection map / hex-tile as modes
+
+Today the kit ships a single `geo` kind. The catalogues split this family cleanly into five: choropleth (region shading), dot map (raw points), symbol map (sized markers), connection map (lines between points), hex-tile (equal-area regions). datw splits by purpose — point locations → symbol or locator, regions → choropleth or hex-tile. A single `geo` with `mode: choropleth | dots | symbols | hex | connections` would map the docs guidance directly. Sources: [datw](https://www.datawrapper.de/blog/chart-types-guide), [holi](https://www.holistics.io/blog/types-of-charts/), [dvc](https://datavizcatalogue.com/).
+
+### gauge — multi-value variant + orientation doc vs bullet
+
+holi's "multi-value gauge" is the right primitive when several related KPIs share one dial. The kit ships gauge and bullet separately; documenting the choice (one KPI vs target → bullet; multiple KPIs in one frame → multi-gauge; single KPI no benchmark → gauge) closes the orientation gap without new code. Sources: [holi](https://www.holistics.io/blog/types-of-charts/), [qchart](https://quickchart.io/documentation/chart-types/).
+
+## Defer / reject
+
+Types the catalogues list but oku should not pursue near-term, with reasoning.
+
+- **3-D bar / 3-D pie / 3-D anything** — datw, holi, atla all explicitly warn against. Adds occlusion, hides values. Reject.
+- **Word cloud** — dvc only. Visually loud, analytically poor (size encodes frequency but layout encodes nothing). Skip unless a doc specifically needs decorative term display.
+- **Tally chart / stem-and-leaf plot** — dvc only. Pedagogical curiosities. Histogram does the same job, better. Reject.
+- **Kagi chart / Point & Figure chart** — dvc only. Highly specialised technical-trading charts. Defer indefinitely.
+- **Spiral plot** — dvc only. Cyclical patterns over a long span. The existing calendar-heatmap already covers the canonical use case. Defer.
+- **Pictogram / isotype chart** — daty, datw, dvc. Eye-candy for count-as-icons. Waffle already covers part-to-whole; pictogram needs custom SVG icons per dataset, which doesn't fit the kit's data-only authoring model. Defer.
+- **Parliament chart** — datw only. A semicircle donut with seat-shaped tiles; narrow use case. Build as a special case of the semicircle donut affordance above.
+- **Org chart** — holi only. Hierarchical relationship — the existing network kind or the diagram (Mermaid) primitive covers it.
+- **Cartogram** — datw only. Geographic value-distortion. Powerful but implementation lift is huge (Dorling / hex / contiguous variants are distinct algorithms). Defer.
+- **Brainstorm / illustration diagram** — dvc only. Not charts — document layouts. The existing comparison-cards / steps / cards primitives already cover this space.
+- **Timeline / Timetable** — dvc only. A timeline can be served by Gantt (proposed above) or by the existing steps primitive; no separate type warranted.
+- **QR codes** — qchart only. Not a chart. Out of scope.
+- **Euler diagram (vs Venn)** — daty only. Subtle distinction (Euler drops empty intersections from Venn). If Venn ships, the same primitive covers Euler.
+- **Span chart** — dvc only. A degenerate form of range-plot / dumbbell (proposed above). Skip as a distinct type.
+- **Non-ribbon chord diagram** — dvc only. A network laid out circularly. Existing chord and network kinds together cover the space.
+- **Parallel sets** — dvc only. Categorical alluvial. Folded into the alluvial improvement (sankey-mode).
+- **Contour plot** — daty only. Continuous 2-D density. The 2-D histogram proposed under histogram improvements covers the practical need; contour adds smoothing for limited gain.
+- **Beeswarm / jitter / strip plot** — daty only. Strong visualisations of 1-D distribution, but the proposed `points` overlay on box-plot covers the common case. Promote later if a doc specifically needs standalone versions.
+- **Barcode chart** — daty only. A degenerate strip plot used as a 1-D distribution glyph. Sparkline neighbour; skip unless asked.
+- **Bump area chart** — daty only. A streamgraph variant on rank. Niche enough to defer until bump and stream both ship.
+- **Radial bar / radial column** — daty, dvc. Decorative variants of bar. Cover via polar-area / Nightingale (gap #10) instead of a separate type.
+- **Dendrogram** — daty, datw, dvc. Hierarchical cluster tree. Useful for statistics docs, but the existing network and treemap cover most cases. Defer; reconsider if a stats-heavy doc lands.
+- **Dual-axis chart** — atla only. Best practice is divided; many designers consider dual-axis misleading. If shipped at all, ship as a `secondaryAxis: ...` mode on line/bar rather than a distinct type. Defer.
+
 
 ## Function-based taxonomy (from datavizcatalogue/search.html)
 
