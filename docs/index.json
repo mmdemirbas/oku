@@ -40,17 +40,17 @@
             },
             {
               "num": "2",
-              "title": "Charts",
-              "meta": "28 variants · families",
-              "href": "charts.html",
-              "content": "Every chart variant with a tiny live sample, grouped by intent (categorical / distribution / time series / hierarchy / relationship / multivariate / flow / graph / geographic) plus the rich-hover + click-to-pin + pan/zoom fullscreen behaviour shared across them."
-            },
-            {
-              "num": "3",
               "title": "Tables",
               "meta": "flat · grouped · chips · board",
               "href": "tables.html",
               "content": "table primitive — flat rows, grouped rows, chip filters, board / kanban view, sticky headers, drag-resize columns, word-wrap by default."
+            },
+            {
+              "num": "3",
+              "title": "Charts",
+              "meta": "37 variants · 8 function groups",
+              "href": "charts.html",
+              "content": "Every chart variant with a tiny live sample, grouped by what you're trying to show (compare · trend · distribution · composition · relationship · hierarchy · flow · location) plus rich hover, click-to-pin, pan/zoom fullscreen, and the live configure popover."
             },
             {
               "num": "4",
