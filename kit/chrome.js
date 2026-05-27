@@ -1822,9 +1822,14 @@ function initReadingAids() {
     // resting state (CSS .okt-config-stashed) and physically moved
     // into the popover on gear click, then moved back on close —
     // same nodes, same listeners.
+    // Visual order after CSS reflow: filter · stats · | · gear · expand.
+    // The separator marker carries no semantic role; CSS draws the
+    // 1px divider between the data-shaping controls (filter / stats)
+    // and the chart-side affordances (gear / expand).
     ctrl.innerHTML =
       filterInputHTML +
       statsHTML +
+      '<span class="okt-ctrl-sep-after" aria-hidden="true"></span>' +
       gearBtnHTML +
       '<button data-expand type="button" aria-pressed="false" title="Toggle full-width / fit to column">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
@@ -6805,12 +6810,11 @@ class OkuChart extends HTMLElement {
   _attachToolbar() {
     var self = this;
     var chartTitle = self._title || (self._type + '-chart');
+    // Order (per user feedback): data-output actions (reset / copy /
+    // download) on the left, then a separator, then the chart-side
+    // affordances (configure, expand). The separator is a special
+    // toolbar entry the visual-tools module recognises.
     __okuVisualTools.makeToolbar(this, [
-      {
-        title: 'Configure chart',
-        icon: ICON_GEAR,
-        run: function (btn) { __okuChartConfig.open(self, btn); }
-      },
       {
         title: 'Reset zoom',
         icon: ICON_RESET,
@@ -6844,6 +6848,12 @@ class OkuChart extends HTMLElement {
             .then(function () { __okuVisualTools.flash(btn, 'ok', ICON_CAMERA); })
             .catch(function () { __okuVisualTools.flash(btn, 'fail', ICON_CAMERA); });
         }
+      },
+      { separator: true },
+      {
+        title: 'Configure chart',
+        icon: ICON_GEAR,
+        run: function (btn) { __okuChartConfig.open(self, btn); }
       },
       {
         title: 'Expand to fullscreen',
@@ -7661,6 +7671,13 @@ var __okuVisualTools = (function () {
     var bar = document.createElement('div');
     bar.className = 'okt-bar';
     actions.forEach(function (a) {
+      if (a && a.separator) {
+        var sep = document.createElement('span');
+        sep.className = 'okt-bar-sep';
+        sep.setAttribute('aria-hidden', 'true');
+        bar.appendChild(sep);
+        return;
+      }
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.title = a.title;
@@ -8055,6 +8072,7 @@ class OkuDiagram extends HTMLElement {
             .catch(function () { __okuVisualTools.flash(btn, 'fail', ICON_CAMERA); });
         }
       },
+      { separator: true },
       {
         title: 'Expand to fullscreen',
         icon: ICON_EXPAND,

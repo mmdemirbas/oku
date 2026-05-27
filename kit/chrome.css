@@ -989,6 +989,14 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   outline-offset: 2px;
 }
 .okt-bar button svg { width: 14px; height: 14px; }
+.okt-bar-sep {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  align-self: center;
+  background: var(--border);
+  margin: 0 4px;
+}
 .okt-bar button.flash-ok {
   background: var(--success-soft);
   color: var(--success);
@@ -1368,7 +1376,20 @@ code:not(pre code) {
 .okt-table-controls .okt-stats    { order: 1; }
 .okt-table-controls .okt-groupby  { order: 2; }
 .okt-table-controls .okt-view-group { order: 3; }
-.okt-table-controls [data-expand]  { order: 4; }
+/* Separator before the configure / expand pair so they read as
+   "the chart-side affordances" rather than blending into the
+   data-shaping controls on the left. */
+.okt-table-controls .okt-ctrl-sep-after { order: 4; }
+.okt-table-controls [data-cfg]    { order: 5; }
+.okt-table-controls [data-expand] { order: 6; }
+.okt-table-controls .okt-ctrl-sep-after::before {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+}
 /* When groupby wraps to a new line, push it to the LEFT edge
    instead of inheriting justify-content: flex-end. */
 .okt-table-controls .okt-groupby { margin-right: auto; }
@@ -1398,7 +1419,9 @@ code:not(pre code) {
   justify-content: center;
 }
 .okt-table-controls button[data-expand] { padding: 4px 6px; }
-.okt-table-controls button[data-expand] svg { width: 14px; height: 14px; }
+.okt-table-controls button[data-expand] svg,
+.okt-table-controls button[data-cfg] svg { width: 14px; height: 14px; }
+.okt-table-controls button[data-cfg]     { padding: 4px 6px; }
 .okt-table-controls button.active,
 .okt-table-controls button:hover {
   background: var(--accent-soft);
