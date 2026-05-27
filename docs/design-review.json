@@ -221,6 +221,20 @@
               ]
             },
             {
+              "title": "B2 — system bug review + fixes (kit.json 404, missing cursors)",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Playwright sweep across all 37 chart types + tables + index page. Two real bugs found: kit.json 404 (file lived at docs/kit.json but build expected ./kit.json; moved to project root) and missing vertical cursor on violin + stream. Both fixed. Everything else checked clean — 37/37 charts render, all toolbars order correctly, tables popover works end-to-end, dark-mode colors all theme-correct, console clean."}
+              ]
+            },
+            {
+              "title": "V4 — 6 more visualizations (43 total)",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "**waterfall · lollipop · dumbbell · polar-area · gantt · bump**. Each ships renderer + schema + doc section + picker card + vertical cursor (where it makes sense). Chart-type count: 37 → 43. Catalog gap items: 1, 2 (dot-plot variant), 3 (dumbbell), 10 (polar-area), 12 (gantt), 9 (bump)."}
+              ]
+            },
+            {
               "title": "E — quiet table chrome",
               "accent": "success",
               "blocks": [
