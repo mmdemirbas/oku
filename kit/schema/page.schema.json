@@ -444,8 +444,32 @@
       "properties": {
         "kind": { "const": "chart" },
         "type": {
-          "enum": ["scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "pie", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo"],
-          "description": "Render mode. scatter / line / area / bubble / quadrant — Cartesian SVG. bar / stacked-bar / grouped-bar — horizontal CSS bars. donut / pie — distribution arc (pie is a donut with rInner=0, no centre readout). heatmap — N×M coloured cell grid. sparkline — inline mini line/area/bar. waffle — N×M unit-cell breakdown. gauge — single value 0→max arc. radar — multi-axis comparison polygons. box-plot — quartile + whisker distribution summary. bullet — actual-vs-target horizontal track. slope — two-time-point comparison. histogram — frequency by bin. calendar-heatmap — date-of-year × day-of-week activity grid. treemap — nested area-proportional rectangles. ridgeline — stacked small-distributions. funnel — conversion stages with drop-off. sankey — flow / share between stages with curved ribbons. network — node-link force-relaxed graph. scatter-matrix — N×N grid of mini scatters for multivariate correlation. parallel-coordinates — multi-axis polyline per record. chord — circular relationship diagram with arcs around the perimeter and ribbons between. geo — simplified tile cartogram (one cell per region, coloured by value) using ISO-style region codes laid out in a rough world grid."
+          "enum": ["plot", "arc", "scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "pie", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo"],
+          "description": "Render mode. Canonical types: plot (Cartesian, marks-composed) and arc (radial slice, mode-switched). Sugar aliases — scatter/line/area desugar to plot+marks; pie/donut desugar to arc+mode; stacked-bar/grouped-bar desugar to bar+mode. Aliases keep working AND let the author override any preset (e.g. type=pie + arc.end=270 for a 3/4 pie). Other types (bubble / quadrant / bar / heatmap / sparkline / waffle / gauge / radar / box-plot / bullet / slope / histogram / calendar-heatmap / treemap / ridgeline / funnel / sankey / network / scatter-matrix / parallel-coordinates / chord / geo) keep their existing payload shapes."
+        },
+        "marks": {
+          "type": "array",
+          "items": { "enum": ["dots", "line", "area"] },
+          "description": "For Cartesian (canonical type=plot, or alias scatter/line/area): which marks to draw. dots = scatter points, line = connecting line, area = fill under the line. Combine freely (e.g. [\"dots\", \"line\"] = line with point markers). Defaults: scatter→[dots], line→[line], area→[line, area], plot→[dots]."
+        },
+        "mode": {
+          "type": "string",
+          "description": "Sub-mode for canonical types. bar: single | stacked | grouped. arc: pie | donut. Defaults inferred from legacy alias when applicable (stacked-bar→stacked, donut→donut)."
+        },
+        "arc": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Arc-family geometry overrides for type=arc / pie / donut. Defaults to a full 360° starting at 12 o'clock. Set start/end in degrees (clockwise from 12) for a partial arc.",
+          "properties": {
+            "start": { "type": "number" },
+            "end":   { "type": "number" }
+          }
+        },
+        "inner_radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.95,
+          "description": "For type=arc / pie / donut: inner-ring radius as fraction of outer radius. 0 = pie, ~0.55 = donut. Override the mode default — e.g. type=pie + inner_radius=0.3 renders a thick ring."
         },
         "title": { "type": "string" },
         "x_label": { "type": "string", "description": "Cartesian only (scatter / line / area / bubble / quadrant)." },

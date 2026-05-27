@@ -329,7 +329,73 @@
       return el;
     }
 
+    /* Chart-type unification: aliases desugar to canonical types with
+       defaults the author can still override. Operates in a copy of
+       the block so callers' object stays untouched.
+
+       Canonical → alias mapping:
+         plot   ← scatter (marks=[dots]), line (marks=[line]),
+                  area (marks=[line, area])
+         arc    ← pie (mode=pie, inner_radius=0),
+                  donut (mode=donut, inner_radius≈0.55)
+         bar    ← bar (mode=single),
+                  stacked-bar (mode=stacked),
+                  grouped-bar (mode=grouped)
+
+       Explicit fields on the block win over alias defaults — e.g.
+       type=pie + arc.end=270 produces a 3/4 pie, type=scatter +
+       marks=["dots","line"] adds a connecting line to a scatter.
+       Aliases stay as the rendered type so the existing renderer
+       branches keep matching; canonical types translate to their
+       canonical alias-form before render dispatch. */
+    _normaliseChartType(block) {
+      const out = Object.assign({}, block || {});
+      const t = String(out.type || 'scatter').toLowerCase();
+      // Canonical inputs: translate to the equivalent legacy alias so
+      // existing renderer code paths keep working. Author overrides
+      // (mode / marks / arc / inner_radius) carry through.
+      if (t === 'plot') {
+        const marks = Array.isArray(out.marks) && out.marks.length ? out.marks : ['dots'];
+        out.marks = marks;
+        // Pick the closest alias for the renderer dispatch.
+        if (marks.includes('area'))      out.type = 'area';
+        else if (marks.includes('line')) out.type = 'line';
+        else                              out.type = 'scatter';
+      } else if (t === 'arc') {
+        const mode = out.mode || 'donut';
+        out.mode = mode;
+        out.type = mode === 'pie' ? 'pie' : 'donut';
+      } else if (t === 'bar') {
+        const mode = out.mode || 'single';
+        out.mode = mode;
+        if (mode === 'stacked') out.type = 'stacked-bar';
+        else if (mode === 'grouped') out.type = 'grouped-bar';
+        else out.type = 'bar';
+      } else {
+        // Sugar aliases — fill in the canonical-equivalent defaults so
+        // the OkuChart Custom Element receives the same payload either
+        // way. Author overrides are preserved.
+        if (t === 'scatter') out.marks = Array.isArray(out.marks) ? out.marks : ['dots'];
+        else if (t === 'line') out.marks = Array.isArray(out.marks) ? out.marks : ['line'];
+        else if (t === 'area') out.marks = Array.isArray(out.marks) ? out.marks : ['line', 'area'];
+        else if (t === 'pie') out.mode = out.mode || 'pie';
+        else if (t === 'donut') out.mode = out.mode || 'donut';
+        else if (t === 'stacked-bar') out.mode = out.mode || 'stacked';
+        else if (t === 'grouped-bar') out.mode = out.mode || 'grouped';
+      }
+      return out;
+    }
+
     _renderChart(block) {
+      // Normalise canonical-or-alias type first. The unification lets
+      // authors emit either form:
+      //   - canonical: type=plot/arc/bar + marks/mode/arc/inner_radius
+      //   - sugar alias: type=scatter/line/area/pie/donut/stacked-bar/
+      //     grouped-bar (presets baked in; explicit fields still win)
+      // Both shapes route to the same renderer; the alias just supplies
+      // defaults the author can override.
+      block = this._normaliseChartType(block);
+
       // Dispatch by type. Three rendering paths:
       //
       // - bar / stacked-bar / grouped-bar — DIV-based horizontal CSS
@@ -345,6 +411,15 @@
       }
       const el = document.createElement('oku-chart');
       el.setAttribute('type', type);
+      if (Array.isArray(block.marks)) el.setAttribute('marks', block.marks.join(','));
+      if (block.mode) el.setAttribute('mode', String(block.mode));
+      if (block.arc && (block.arc.start !== undefined || block.arc.end !== undefined)) {
+        const s = block.arc.start !== undefined ? block.arc.start : 0;
+        const e = block.arc.end   !== undefined ? block.arc.end   : 360;
+        el.setAttribute('arc-start', String(s));
+        el.setAttribute('arc-end',   String(e));
+      }
+      if (block.inner_radius !== undefined) el.setAttribute('inner-radius', String(block.inner_radius));
       if (block.title) el.setAttribute('title', block.title);
       if (block.x_label) el.setAttribute('x-label', block.x_label);
       if (block.y_label) el.setAttribute('y-label', block.y_label);

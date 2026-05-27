@@ -3386,11 +3386,46 @@ class OkuChart extends HTMLElement {
     this._series   = series;
     this._extras   = extras;
     this._type     = this.getAttribute('type') || 'scatter';
+    // Canonical-type → legacy-alias normalisation. The renderer.js
+    // chart-block dispatcher does this same step before creating the
+    // oku-chart element, but direct DOM creation (or any code that
+    // sets type="plot"/"arc"/"bar" without going through the renderer)
+    // would otherwise leave OkuChart's dispatcher without a matching
+    // branch. Mirror the renderer.js logic so both entry points
+    // converge on the same internal type.
+    var _modeAttr = (this.getAttribute('mode') || '').toLowerCase();
+    var _marksAttr = (this.getAttribute('marks') || '').toLowerCase();
+    if (this._type === 'plot') {
+      var marksList = _marksAttr ? _marksAttr.split(',').map(function (s) { return s.trim(); }) : ['dots'];
+      if (marksList.indexOf('area') !== -1)      this._type = 'area';
+      else if (marksList.indexOf('line') !== -1) this._type = 'line';
+      else                                        this._type = 'scatter';
+    } else if (this._type === 'arc') {
+      this._type = _modeAttr === 'pie' ? 'pie' : 'donut';
+    } else if (this._type === 'bar' && (_modeAttr === 'stacked' || _modeAttr === 'grouped')) {
+      // Not actually rendered here (bar goes through renderer.js), but
+      // keep the mapping consistent if someone reaches this branch.
+      this._type = _modeAttr === 'stacked' ? 'stacked-bar' : 'grouped-bar';
+    }
     this._title    = this.getAttribute('title') || '';
     this._xLabel   = this.getAttribute('x-label') || '';
     this._yLabel   = this.getAttribute('y-label') || '';
     this._xScale   = (this.getAttribute('x-scale') || 'linear').toLowerCase();
     this._yScale   = (this.getAttribute('y-scale') || 'linear').toLowerCase();
+    // Chart-type unification overrides — read directly from the host
+    // attributes the renderer sets when an author opts into canonical
+    // shapes (type=plot/arc/bar) or overrides an alias preset (e.g.
+    // type=pie + arc.end=270 → a 3/4 pie). All optional; undefined
+    // falls back to the legacy renderer behaviour for the type.
+    var marksAttr = this.getAttribute('marks');
+    this._marks = marksAttr ? marksAttr.split(',').map(function (s) { return s.trim(); }) : null;
+    this._mode = this.getAttribute('mode') || null;
+    var arcStartAttr = this.getAttribute('arc-start');
+    var arcEndAttr   = this.getAttribute('arc-end');
+    this._arcStart = arcStartAttr !== null ? parseFloat(arcStartAttr) : null;
+    this._arcEnd   = arcEndAttr   !== null ? parseFloat(arcEndAttr)   : null;
+    var innerRadiusAttr = this.getAttribute('inner-radius');
+    this._innerRadius = innerRadiusAttr !== null ? parseFloat(innerRadiusAttr) : null;
 
     this.innerHTML = '';
     if (dataNode) this.appendChild(dataNode);
@@ -3910,22 +3945,38 @@ class OkuChart extends HTMLElement {
     var cx = 140, cy = H / 2;
     var rOuter = 110;
     // type=pie renders with no inner hole; donut keeps the empty centre
-    // for the total-readout. Same render path otherwise — the only
-    // difference is whether the slice path closes through the centre
-    // or via an inner arc.
+    // for the total-readout. Author can override with the inner_radius
+    // property (0-0.95 fraction of rOuter) — e.g. pie+inner_radius=0.3
+    // for a thick ring without leaving the pie sugar form.
     var isPie = this._type === 'pie';
-    var rInner = isPie ? 0 : 64;
+    var defaultInner = isPie ? 0 : 64;
+    var rInner = this._innerRadius !== null && this._innerRadius !== undefined
+      ? Math.round(rOuter * Math.max(0, Math.min(0.95, this._innerRadius)))
+      : defaultInner;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || (isPie ? 'Pie chart' : 'Donut chart')) + '" class="okc-svg okc-donut' + (isPie ? ' okc-pie' : '') + '">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
 
-    var angleStart = -Math.PI / 2; // 12 o'clock
+    // Sweep angles: defaults to a full circle starting at 12 o'clock,
+    // overridable by the arc.start / arc.end author fields (in degrees
+    // clockwise from 12). end < start is treated as a counter-clockwise
+    // arc by absolute value of the delta — the slices still progress
+    // in declaration order.
+    var DEG = Math.PI / 180;
+    var sweepStartDeg = this._arcStart !== null && this._arcStart !== undefined ? this._arcStart : 0;
+    var sweepEndDeg   = this._arcEnd   !== null && this._arcEnd   !== undefined ? this._arcEnd   : 360;
+    var sweepRadians  = (sweepEndDeg - sweepStartDeg) * DEG;
+    if (sweepRadians === 0) sweepRadians = Math.PI * 2;
+    var angleStart = -Math.PI / 2 + sweepStartDeg * DEG;
     slices.forEach(function (slice, idx) {
       var value = Math.max(0, +slice.value || 0);
       if (value <= 0) return;
       var fraction = value / total;
-      var angleEnd = angleStart + fraction * Math.PI * 2;
-      var largeArc = fraction > 0.5 ? 1 : 0;
+      var angleEnd = angleStart + fraction * sweepRadians;
+      // largeArc is on the slice's actual angular extent — not on
+      // the fraction-of-total. For partial sweeps (e.g. a 3/4 pie)
+      // a 50% slice covers 135° and should NOT use the long arc.
+      var largeArc = Math.abs(fraction * sweepRadians) > Math.PI ? 1 : 0;
       var x1 = cx + rOuter * Math.cos(angleStart);
       var y1 = cy + rOuter * Math.sin(angleStart);
       var x2 = cx + rOuter * Math.cos(angleEnd);

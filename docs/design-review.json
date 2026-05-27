@@ -36,15 +36,15 @@
             ["1",
              "Unify bar / stacked-bar / grouped-bar → `type: bar` + `mode`",
              "**Yes**, as alias desugar — `stacked-bar` and `grouped-bar` keep working, become aliases for `bar, mode: stacked|grouped`. Author can override any `mode` preset.",
-             "Pending — task C"],
+             "Shipped"],
             ["2",
              "Unify scatter / line / area → `type: plot` + `marks: [...]`",
              "**Yes**, as alias desugar — old names keep working as sugar for `plot, marks: [dots|line|area]`. Author can override marks on the alias form. Research confirms this is the Vega-Lite shape.",
-             "Pending — task C"],
+             "Shipped"],
             ["3",
              "Unify pie + donut → `type: arc` + `mode`, keep gauge separate",
              "**Yes**, as alias desugar — `pie` and `donut` keep working, with `arc.start` / `arc.end` / `inner_radius` author-overridable on either. Gauge stays separate (different data shape).",
-             "Pending — task C"],
+             "Shipped"],
             ["4",
              "Add `interaction_density` switch + trim per the budget table",
              "**No setting.** Default behaviour should cover both worlds — smart hiding suffices. Aim for capable-yet-quiet notebook feel.",
@@ -94,6 +94,13 @@
               "accent": "success",
               "blocks": [
                 {"kind": "paragraph", "content": "Table controls at opacity 0.15 by default. Reveal on hover or keyboard focus. Force-show via `:has()` when filter has text, any chip is active, or view is non-default. Charts and code blocks were already hover-only."}
+              ]
+            },
+            {
+              "title": "C — chart-type unification",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Canonical types: `plot` (with `marks: [dots|line|area]`), `arc` (with `mode: pie|donut` + `arc: {start, end}` + `inner_radius`), `bar` (with `mode: single|stacked|grouped`). Legacy names (scatter / line / area / pie / donut / stacked-bar / grouped-bar) keep working as aliases that desugar to the canonical form with appropriate defaults — and author overrides win over alias presets. Verified: all 6 canonical+alias Cartesian forms produce matching DOM, donut+pie+arc-override all render correctly, all 29 existing chart types still pass regression tests."}
               ]
             }
           ]
@@ -192,8 +199,8 @@
         {
           "kind": "callout",
           "type": "success",
-          "title": "Decision: Yes — alias desugar (Status: pending, task C)",
-          "content": "`type: bar` becomes canonical with `mode: single | stacked | grouped`. `stacked-bar` / `grouped-bar` keep working as aliases that desugar to `bar, mode: stacked|grouped`. Author can override any preset on the alias form (e.g. write `type: stacked-bar, bar_padding: 4` and it just works). No backward-compat break."
+          "title": "Decision: Yes — alias desugar (Status: shipped)",
+          "content": "`type: bar` is canonical with `mode: single | stacked | grouped`. `stacked-bar` / `grouped-bar` keep working as aliases that desugar to `bar, mode: stacked|grouped`. Author can override any preset on the alias form. No backward-compat break — all existing pages pass regression tests."
         },
         {
           "kind": "code",
@@ -216,8 +223,8 @@
         {
           "kind": "callout",
           "type": "success",
-          "title": "Decision: Yes — alias desugar (Status: pending, task C)",
-          "content": "`type: plot` becomes canonical with `marks: [dots | line | area]`. `scatter` / `line` / `area` keep working as aliases. Author can override marks on either form. Mark-composition matches Vega-Lite — the syntax research confirms this is the shape industry-mature visualisation libraries converge on."
+          "title": "Decision: Yes — alias desugar (Status: shipped)",
+          "content": "`type: plot` is canonical with `marks: [dots | line | area]`. `scatter` / `line` / `area` keep working as aliases. Author can override marks on either form. Mark-composition matches Vega-Lite. Verified: all 6 canonical+alias Cartesian forms produce identical dots/lines/areas counts."
         },
         {
           "kind": "compare-grid",
@@ -262,8 +269,8 @@
         {
           "kind": "callout",
           "type": "success",
-          "title": "Decision: Yes for pie+donut, no for gauge (Status: pending, task C)",
-          "content": "`type: arc` becomes canonical for pie + donut. `pie` and `donut` stay as aliases, with `arc: { start, end }` and `inner_radius` overridable on either. Example: `type: pie, arc: { start: 0, end: 270 }` produces a three-quarter pie. Gauge keeps its own type — its data shape (value + zones) differs from slice-based arcs."
+          "title": "Decision: Yes for pie+donut, no for gauge (Status: shipped)",
+          "content": "`type: arc` is canonical for pie + donut. `pie` and `donut` stay as aliases, with `arc: { start, end }` and `inner_radius` overridable on either. Verified: `type: pie + arc.end=270` produces a 3/4 pie; `type: donut + inner_radius=0.3` produces a thicker ring. Gauge stays its own type — different data shape (value + zones)."
         },
         {
           "kind": "heading",
@@ -443,13 +450,9 @@
           "headers": ["#", "Question", "Gated on", "Recommendation"],
           "rows": [
             ["1",
-             "Implement task C (chart-type unification)?",
-             "Nothing — research landed, decision made.",
-             "Proceed. Vega-Lite-shaped mark composition + alias desugar. ~1-2 sessions."],
-            ["2",
              "Implement decision 6 (runtime chart-type toggle UI)?",
-             "Task C landing first.",
-             "Schedule for after C. Reuses the canonical `marks` axis."],
+             "Task C landed.",
+             "Now unblocked. Reuses the canonical `marks` axis."],
             ["3",
              "Which catalogue-research visualizations to add next?",
              "User picks from the top-8 list.",
