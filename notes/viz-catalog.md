@@ -758,3 +758,265 @@ chart code, so each technique has a copyable reference impl.
     https://observablehq.com/@d3/bar-chart-race ,
     https://observablehq.com/@d3/stacked-to-grouped-bars
 
+## datavizproject.com (~150 chart types)
+
+Source: https://datavizproject.com/ — a Ferdio-curated reference of
+166 distinct chart entries (the homepage exposes one anchor per
+chart under `/data-type/<slug>/`). Heavier than the marketing-style
+catalogues; closer in tone to a working taxonomy. Each chart page
+carries four parallel tag axes that the site exposes as separate
+filter dimensions, every value clickable as its own index page:
+
+- **Function** — what the chart communicates. Values observed:
+  *Comparison, Correlation, Distribution, Geolocation, Part to
+  whole, Trend over time, Concept visualization* (7 total). Same
+  axis as datavizcatalogue's "What do you want to show?", with
+  fewer, cleaner labels.
+- **Family** — render archetype. Values: *Chart, Diagram, Plot,
+  Geospatial, Table* (5 total). Coarser than oku's family axis but
+  useful as a coarse first filter.
+- **Shape** — dominant visual primitive. Values include *Bar, Line,
+  Circle, Area* (plus a few more — `/shape/point/` 404s, so the
+  enumeration on the site itself is inconsistent).
+- **Input data** — declared as descriptive metadata on each chart
+  page but not exposed as filter index pages the way the other
+  axes are.
+
+Heaviest families: *Chart* (88 entries), *Plot* (40), *Diagram*
+(31), *Geospatial* (13), *Table* (7). Heaviest functions:
+*Comparison* (93), *Distribution* (55), *Correlation* (41), *Trend
+over time* (35), *Concept visualization* (23), *Part to whole*
+(14). Same overlap-heavy property as datavizcatalogue — Bubble
+Chart appears under five functions, Heat Map under four. The
+taxonomy is a tag system, not a partition.
+
+The catalogue includes a number of niche, decorative, and
+pictorial-flavoured entries (Chernoff Faces, Pictorial Stacked
+Chart, Pictorial Fraction Chart, Scaled-up Number with Icon,
+Step-by-step Illustration, Exploded View Drawing, Fishbone Diagram,
+SWOT Analysis, 2x2 Matrix as "Opposite Diagram"). These inflate
+the count but mostly aren't chart types in the analytic sense —
+they are layout patterns that overlap with what oku would treat as
+infographic kit primitives (callouts, comparison cards, step
+flows), not chart kit primitives. Filter them out before counting
+"what's missing."
+
+### Distinct visualizations NOT covered by earlier sources
+
+The entries that survive the filter and are genuine chart concepts,
+not pictograms or infographic primitives. Each rated against the
+candidate question: is this something an oku author would
+realistically reach for, or a niche curiosity. Honest verdicts;
+the list is short on purpose.
+
+1. **Alluvial Diagram** — Sankey with explicit categorical
+   "snapshots" at each time step (rather than a free directed
+   flow). Reads as a stacked-bar sequence with bands connecting
+   matching categories across steps. **Candidate.** Cohort
+   retention and status-transition stories are common; cleanly
+   implementable as `mode: alluvial` on the existing `sankey`
+   type — same renderer family, different layout pass.
+   https://datavizproject.com/data-type/alluvial-diagram/
+
+2. **Bump Chart** — line chart of *ranks* over time. Y-axis is
+   integer rank position; lines cross when ranks swap. Tells the
+   "who's ahead, who's catching up" story that a slope chart tells
+   for two periods but extended to N periods.
+   **Candidate.** Leaderboard / standings storytelling is common
+   in real writeups. Distinct enough from `line` and `slope` to
+   warrant either its own type or `mode: bump` on `line`.
+   https://datavizproject.com/data-type/bump-chart-2/
+
+3. **Marimekko / Mosaic** — stacked bar where bar *widths* also
+   encode a quantity (a 2D area encoding of two proportions).
+   Cited often in business writing. **Candidate.** Doesn't degrade
+   gracefully to any current oku type — width-as-quantity is a
+   real second encoding dimension. Either its own type or `mode:
+   marimekko` on `stacked-bar`. (Also surfaced in the D3 gallery
+   notes above — this is the same chart from a working-code
+   angle.) https://datavizproject.com/data-type/marimekko-chart/
+
+4. **Pareto Chart** — bar chart sorted descending, overlaid with
+   a cumulative-percentage line on a secondary axis. The "80/20"
+   chart. **Candidate.** Common in quality-management and
+   root-cause writing. Implementable as a composed chart (bar +
+   line on dual axis) rather than a new type; the composition is
+   the feature. https://datavizproject.com/data-type/pareto-chart/
+
+5. **Waterfall Chart** — sequence of bars where each starts at
+   the previous bar's end, with positive/negative deltas
+   colour-coded; the classic finance "bridge" chart.
+   **Candidate.** Common in any docs involving budget or change
+   decomposition. Either its own type or `mode: waterfall` on
+   `bar`. https://datavizproject.com/data-type/waterfall-chart/
+
+6. **Cartogram** — geo map where territory sizes are scaled by a
+   data value, not by physical area. Distinct from choropleth.
+   **Candidate.** Specialised but high-signal (election results,
+   demographic distortion). Likely `mode: cartogram` on the
+   existing `geo` type. (D3 gallery notes call this out as well.)
+   https://datavizproject.com/data-type/cartogram/
+
+7. **Dot Density Map** — many dots scattered within regions; dot
+   count proportional to value, no aggregation to a single colour
+   per region. **Candidate.** Common alternative to choropleth
+   when the visual impact of "many dots" is wanted.
+   `mode: dot-density` on `geo`.
+   https://datavizproject.com/data-type/dot-density-map/
+
+8. **Control Chart** — line chart with explicit upper/lower
+   control limits and a centre line; the SPC ("statistical
+   process control") staple. **Candidate.** Operational and SRE
+   writeups routinely benefit. Probably a styled `line` with
+   annotation bands rather than its own type — i.e., a
+   well-supported pattern in `line`, not a new mode.
+   https://datavizproject.com/data-type/control-chart/
+
+9. **Lollipop Chart** — bar chart with a thin stem and a circle
+   tip; same data shape as a bar chart, less ink. Distinct
+   enough that authors do specifically ask for it.
+   **Candidate (mode-level).** `mode: lollipop` on `bar`, not a
+   new type. https://datavizproject.com/data-type/lollipop-chart/
+
+10. **Stream Graph** — stacked area on a centred baseline
+    (rather than zero baseline), producing a flowing organic
+    shape. **Candidate (mode-level).** `mode: stream` on `area`.
+    (D3 gallery flags the same.)
+    https://datavizproject.com/data-type/stream-graph/
+
+11. **Icicle Diagram** (partition layer) — rectangular cousin of
+    sunburst; tree depth maps to a horizontal/vertical axis.
+    Reads easier than sunburst for deep hierarchies.
+    **Candidate (low priority).** Worth adding when oku gains a
+    hierarchical-tree story; for now, `treemap` covers the
+    common case. https://datavizproject.com/data-type/partition-layer-chart/
+
+12. **Ternary Plot** — three-axis simplex for compositions that
+    sum to 1 (proportions of three components). Specialist —
+    chemistry, geology, soil composition. **Niche curiosity.**
+    Skip unless a concrete oku doc needs it.
+    https://datavizproject.com/data-type/ternary-plot/
+
+13. **Hive Plot** — network laid out on radial axes rather than
+    force-directed. **Niche curiosity.** Force-directed networks
+    cover the common cases. Skip.
+    https://datavizproject.com/data-type/hive-plot/
+
+14. **Hyperbolic Tree** — tree rendered in hyperbolic space
+    (fish-eye distortion). **Niche curiosity.** Specialist UI
+    pattern, not a docs primitive. Skip.
+    https://datavizproject.com/data-type/hyperbolic-tree/
+
+15. **Chernoff Faces** — encoding data dimensions onto facial
+    features. **Niche curiosity / historical interest.** Skip.
+    https://datavizproject.com/data-type/chernoff-faces/
+
+16. **Hanging Rootogram** — histogram with bars hanging from a
+    fitted distribution curve, so residuals sit at the baseline.
+    Statistical diagnostic. **Niche curiosity.** Skip unless oku
+    starts producing statistical-method docs.
+    https://datavizproject.com/data-type/rootogram/
+
+17. **Spiral Heat Map / Spiral Histogram** — heatmap or
+    histogram laid out along a spiral path; cyclical data.
+    **Niche curiosity / decorative.** Visually striking but
+    reading-cost is high. Skip.
+    https://datavizproject.com/data-type/spiral-heat-map/
+
+18. **Bagplot** — 2D box plot — a bivariate analogue of the
+    standard 1D box (median point, inner "bag" with 50% of data,
+    outer "fence" with outliers). **Niche curiosity.** No
+    obvious authoring use case until oku has 2D distribution
+    needs. Skip. https://datavizproject.com/data-type/bagplot/
+
+Beeswarm, hexagonal binning, connected scatterplot, fan chart,
+and bivariate choropleth are also on datavizproject but the
+**D3 gallery section above already covers them** — those are
+counted there as the canonical entry, not duplicated here.
+
+Cut from this list as not chart-type novelty: every Pictorial *
+entry (illustration kit primitives, not charts); Scaled-up
+Number, Icon and Number, Icon Count (oku's existing KPI /
+stat-counter pattern under a different name); SWOT Analysis,
+Fishbone Diagram, Mind Map, Cycle Diagram, Linear/Swimlane
+Process Diagram, Target Diagram, Organisational Chart,
+Step-by-step Illustration, Exploded View Drawing, Comparison
+Chart, Opposite Diagram (these belong to the diagram/infographic
+kit, not the chart kit — overlap with oku's `diagram` and
+comparison-card primitives); Table Chart and Matrix Diagrams
+(oku's `table` primitive); 3D Bar / 3D Scatter / 3D Stream Graph
+(visually unreliable, harms reading, not worth implementing);
+Tally Chart (a unit notation, not a chart type); Profile Map,
+Topographic Map, Isoline Map (specialist cartographic styles —
+folded into `geo`).
+
+### Variations on visualizations oku has
+
+Interesting variants the catalogue documents that could be added
+as a `mode:` switch on an existing oku type. Each is a small
+render change, not a new type — same data shape, different
+layout pass. Where a variant has already been pitched as its own
+candidate type above, the table reuses the same entry to make
+explicit that the candidate also reads as a variant.
+
+| oku type | datavizproject variant | What's different |
+|---|---|---|
+| `bar` | **Bar Chart (Horizontal)** | y-axis carries the categories, x carries values. Often already supported as `orientation: "horizontal"` — confirm parity. https://datavizproject.com/data-type/bar-chart-horizontal/ |
+| `bar` | **Lollipop Chart** | thin stem + circle tip instead of filled bar; lower visual weight. `mode: "lollipop"`. https://datavizproject.com/data-type/lollipop-chart/ |
+| `bar` | **Dumbbell Plot** | two points per category joined by a segment; before/after comparison. `mode: "dumbbell"`. https://datavizproject.com/data-type/dumbbell-plot/ |
+| `bar` | **Butterfly Chart** | back-to-back horizontal bars (two series, opposite directions from a shared centre); population-pyramid layout for non-demographic data. `mode: "butterfly"`. https://datavizproject.com/data-type/butterfly-chart/ |
+| `bar` | **Population Pyramid** | back-to-back horizontal bars binned along a shared y-axis (typically age); demographic staple. Either `mode: "pyramid"` on `bar` or a thin `population-pyramid` alias. https://datavizproject.com/data-type/population-pyramid-2/ |
+| `bar` | **Waterfall Chart** | sequential bars where each starts at the previous bar's end; +/- deltas; sums to a final total. `mode: "waterfall"`. https://datavizproject.com/data-type/waterfall-chart/ |
+| `bar` | **Pareto Chart** | sorted bars + cumulative-percentage line overlay on dual axis. `mode: "pareto"`. https://datavizproject.com/data-type/pareto-chart/ |
+| `bar` | **Column Range** | each bar shows a [min, max] range rather than a single value (a 1D box without quartiles). `mode: "range"`. https://datavizproject.com/data-type/column-range/ |
+| `bar` | **Curved Bar Chart** | bars rendered as arcs of a circle rather than straight rectangles; decorative variant. `mode: "curved"`. Honest take: low priority. https://datavizproject.com/data-type/curved-bar-chart/ |
+| `bar` | **Triangle Bar Chart** | tapered bars (triangle profile); decorative variant for sorted data. `mode: "triangle"`. Low priority. https://datavizproject.com/data-type/triangle-bar-chart/ |
+| `area` | **Stream Graph** | stacked area on a *centred* baseline; organic flowing shape. `mode: "stream"`. https://datavizproject.com/data-type/stream-graph/ |
+| `area` | **Sorted Stream Graph** | stream graph with series reordered each step to minimise wiggle. `mode: "stream-sorted"`. https://datavizproject.com/data-type/sorted-stream-graph/ |
+| `area` | **Range Area Chart** | area between two series (an [upper, lower] band over time); confidence-interval shape. `mode: "range"`. https://datavizproject.com/data-type/range-area-chart/ |
+| `area` | **Layered Area Chart** | multiple areas overlaid with transparency rather than stacked. `mode: "layered"`. https://datavizproject.com/data-type/nested-area-chart/ |
+| `line` | **Stepped Line Graph** | lines connect via horizontal/vertical segments rather than diagonals; discrete-state transitions. `mode: "stepped"`. https://datavizproject.com/data-type/stepped-line-graph/ |
+| `line` | **Spline Graph** | lines drawn as smoothed curves rather than straight segments. `mode: "spline"`. https://datavizproject.com/data-type/spline-graph/ |
+| `line` | **Fan Chart (Time Series)** | line with a widening confidence-band envelope; forecast charts. `mode: "fan"` or a `band:` flag. https://datavizproject.com/data-type/fan-chart-time-series/ |
+| `line` | **Bump Chart** | line of *ranks* over time; integer y-axis, lines cross when ranks swap. Distinct enough that it may warrant its own type. https://datavizproject.com/data-type/bump-chart-2/ |
+| `line` | **Control Chart bands** | line with explicit upper/lower control bands and a centre line. Annotation pattern on `line`. https://datavizproject.com/data-type/control-chart/ |
+| `scatter` | **Connected Scatter Plot** | points joined in sequence order by a path. `mode: "connected"`. https://datavizproject.com/data-type/connected-scatter-plot/ |
+| `scatter` | **Beeswarm / Jitter / Strip Plot** | 1D scatter variants jittered along the non-data axis (beeswarm = collision-avoided, jitter = random, strip = no jitter). `mode: "beeswarm" \| "jitter" \| "strip"`. https://datavizproject.com/data-type/beeswarm-blot/ |
+| `scatter` | **Hexagonal Binning** | dense 2D scatter aggregated into hex cells colour-coded by count. `mode: "hexbin"` (could also live on `heatmap`). https://datavizproject.com/data-type/hexagonal-binning/ |
+| `scatter` | **Trendline overlay** | least-squares line through the points; not a mode, a flag. `trendline: true`. https://datavizproject.com/data-type/trendline/ |
+| `bubble` | **Circular Bubble Chart** | bubbles packed inside a bounding circle rather than positioned in (x,y); halfway between bubble and packed-circle. `mode: "circular"`. https://datavizproject.com/data-type/circular-bubble-chart/ |
+| `bubble` | **Bubble Timeline** | bubbles along a 1D time axis; size encodes magnitude, position encodes when. `mode: "timeline"`. https://datavizproject.com/data-type/bubble-timeline/ |
+| `bubble` | **Packed Circle Chart** | bubbles arranged via circle-packing (no axes); a degenerate bubble chart with layout-only positioning. `mode: "packed"`. https://datavizproject.com/data-type/packed-circle-chart/ |
+| `bubble` | **Clustered Force Layout** | bubbles arranged by force-directed clustering into groups. `mode: "clustered"`. https://datavizproject.com/data-type/clustered-force-layout/ |
+| `donut` | **Multi-level Donut Chart** | concentric donuts representing nested category levels (a flat sunburst variant). `mode: "multi-level"`. https://datavizproject.com/data-type/multi-level-donut-chart/ |
+| `donut` | **Semi Circle Donut Chart** | half-circle donut; reads as a gauge-shaped breakdown. `mode: "semi"`. https://datavizproject.com/data-type/semi-circle-donut-chart/ |
+| `pie` | **Multi-level Pie Chart** | concentric pies; same as sunburst with categorical-only encoding. `mode: "multi-level"`. https://datavizproject.com/data-type/multilevel-pie-chart/ |
+| `pie` | **Polar Area Chart** (Nightingale Rose) | equal-angle wedges with varying *radius* encoding the value, rather than equal-radius wedges with varying angle. Distinct visual semantics — `mode: "polar-area"` or its own thin alias. https://datavizproject.com/data-type/polar-area-chart/ |
+| `treemap` | **Convex Treemap** | treemap with non-rectangular cells (convex polygons); better aspect ratios at the cost of geometry. `mode: "convex"`. Low priority — geometry heavy, payoff small. https://datavizproject.com/data-type/convex-treemap/ |
+| `treemap` | **Icicle Diagram** (partition layer) | hierarchical bars stacked horizontally or vertically (a rectangular sunburst). `mode: "icicle"` or its own thin type. https://datavizproject.com/data-type/partition-layer-chart/ |
+| `histogram` | **Spiral Histogram** | histogram laid out as a radial spiral rather than along a linear axis; cyclical data. `mode: "spiral"`. Decorative; low priority. https://datavizproject.com/data-type/spiral-histogram/ |
+| `sparkline` | **Column Sparkline** | sparkline rendered as tiny columns rather than a line. `mode: "column"`. https://datavizproject.com/data-type/column-sparkline/ |
+| `sparkline` | **Win-Loss Sparkline** | sparkline showing only +1/-1 outcomes as up/down ticks; sports-result and streak charts. `mode: "win-loss"`. https://datavizproject.com/data-type/win-loss-sparkline/ |
+| `heatmap` | **Circular Heat Map** | heatmap arranged radially around a centre (clock-face / cyclical-time layout). `mode: "circular"`. https://datavizproject.com/data-type/radial-heatmap/ |
+| `heatmap` | **Bubble-based Heat Map** | grid heatmap where the cell encoding is a sized bubble rather than a coloured rectangle. `mode: "bubble"`. https://datavizproject.com/data-type/bubble-based-heat-map/ |
+| `sankey` | **Alluvial Diagram** | sankey with explicit categorical snapshots at each step (rather than free directed flow); cohort / state-transition layout. `mode: "alluvial"`. https://datavizproject.com/data-type/alluvial-diagram/ |
+| `sankey` | **Parallel Sets** | sankey-shaped layout for purely categorical co-occurrence (no flow direction implied). `mode: "parallel-sets"`. https://datavizproject.com/data-type/parallel-sets/ |
+| `chord` | **Non-ribbon Chord Diagram** | chord layout with straight lines between nodes instead of ribbons; emphasises pair links over flow volume. `mode: "non-ribbon"`. https://datavizproject.com/data-type/non-ribbon-chord-diagram/ |
+| `chord` | **Radial Convergences** | chord-like layout where all links converge to a single central focus point rather than forming pairwise ribbons. `mode: "radial-convergence"`. https://datavizproject.com/data-type/radial-convergences/ |
+| `network` | **Arc Diagram** | nodes along a 1D line; links drawn as arcs above/below. Different topology from chord but same "show pairwise links" job. `mode: "arc"`. https://datavizproject.com/data-type/arc-diagram/ |
+| `radar` / `bar` / `line` / `area` | **Radial wrappers** (Radial Bar / Radial Line / Radial Area / Radial Histogram) | the standard cartesian primitives wrapped onto a polar axis. May collapse into a single `polar: true` flag across `bar`/`line`/`area`/`histogram` rather than living under `radar`. https://datavizproject.com/data-type/circular-bar-chart/ |
+| `gauge` | **Solid Gauge / Angular Gauge** | gauge variants — solid (filled arc) vs angular (needle on dial). Likely already covered by oku's gauge modes; worth a parity audit. https://datavizproject.com/data-type/angular-index-gauge/ |
+| `geo` | **Cartogram** | territory sizes scaled by data value, distorting geography. `mode: "cartogram"`. https://datavizproject.com/data-type/cartogram/ |
+| `geo` | **Dot Density Map** | many dots scattered within regions, count proportional to value (vs choropleth's region colouring). `mode: "dot-density"`. https://datavizproject.com/data-type/dot-density-map/ |
+| `geo` | **Pin Map / Route Map / Connection Map / Flow Map** | geo overlays varying by glyph: pins (point markers), routes (line segments), connections (great-circle arcs), flows (weighted arrows). Likely a `layer:` family on `geo` rather than separate types. https://datavizproject.com/data-type/connection-map/ |
+| `geo` | **Bar Chart on a Map / Pie Chart on a Map** | small-multiples of bar or pie placed at geo coordinates. Composed-chart pattern; if oku supports geo + glyph layering this falls out for free. https://datavizproject.com/data-type/map-bar-chart/ |
+| `funnel` | **Pyramid Chart** | upright triangular variant of funnel (or funnel flipped); same data, different orientation. `mode: "pyramid"` or `orientation: "up"`. https://datavizproject.com/data-type/pyramid-chart/ |
+| `slope` | **Bump Chart** (revisited) | extended slope to N periods with rank-only y-axis. Already cited above as its own candidate; mention here as the explicit slope-family variant. https://datavizproject.com/data-type/bump-chart-2/ |
+
+Variant verdict: most of these are cheap render-pass changes on
+existing types. The honest priority for oku is the small handful
+flagged "Candidate" in the previous subsection (alluvial, bump,
+dumbbell, beeswarm, connected scatter, marimekko, waterfall,
+pareto, cartogram, dot-density). The long mode-switch table above
+is closer to a backlog of polish than a list of must-haves.
+
