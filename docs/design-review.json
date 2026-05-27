@@ -200,6 +200,27 @@
               ]
             },
             {
+              "title": "Q9 — label-vs-datapoint collision (general CSS solution)",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Any label that could obscure data tags itself with `.okc-label-overlay`. CSS `:has()` rule fades it to 0.15 when any data point is hovered, a tooltip is visible, or a slice/dot is click-pinned. Applied to quadrant corner labels today; same class is the convention for any future overlay label."}
+              ]
+            },
+            {
+              "title": "Q7 — vertical cursor on every chart type",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Generic `_wireGenericVerticalCursor` SVG helper wired into histogram, box-plot, candlestick, density, beeswarm, dot-plot. DIV-based bar / stacked-bar / grouped-bar get the same affordance via an absolute-positioned dashed line that follows the pointer's x. Cartesian / ridgeline / sparkline already had it. Standard everywhere now."}
+              ]
+            },
+            {
+              "title": "Q8 — bar orientation switch (vertical / column)",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "`orientation: horizontal | vertical` property in the chart schema. Bar family implemented today via a `.bar-chart-vertical` CSS class + a shared `--bar-pct` CSS var on the fills. Single / stacked / grouped all flip cleanly. Violin / box-plot / histogram / candlestick orientation switch needs an SVG-axis-swap per renderer — follow-up."}
+              ]
+            },
+            {
               "title": "E — quiet table chrome",
               "accent": "success",
               "blocks": [
@@ -715,18 +736,14 @@
              "Continue the dual-form refactor family-by-family (after plot)",
              "Plot family migrated; arc / bar / categorical / flow remaining.",
              "Each family takes ~1 session. Same desugar-at-entry pattern. Tests guard each step (the alias surface keeps every existing page rendering identically)."],
-            ["Q7",
-             "Vertical cursor on ALL chart types (bar, box-plot, etc.)",
-             "Currently Cartesian / ridgeline / sparkline only.",
-             "Per-chart wiring needed. Bar / box-plot / heatmap / calendar most useful. Defer to next round — substantial work per chart."],
-            ["Q8",
-             "Vertical / horizontal orientation switch (violin, etc.)",
-             "Bar already has it via mode; extend to violin / other distribution charts.",
-             "Add `orientation: vertical | horizontal` property. Each renderer that supports both axes can opt in. Defer to next round."],
-            ["Q9",
-             "Elegant label-vs-datapoint collision avoidance (quadrant + general)",
-             "Quadrant labels obscure data points.",
-             "General solution: when labels would overlap data, push labels to chart edges OR make them transparent on hover. Defer to next round; needs design decision before coding."]
+            ["Q8 follow-up",
+             "Orientation switch for SVG charts (violin / box-plot / histogram / candlestick)",
+             "Bar family ships today.",
+             "Each renderer needs an SVG-axis-swap pass. Best done per chart as the need arises rather than batch."],
+            ["Q10 deeper",
+             "Mermaid node-level interactivity (tooltip / highlight neighbors / pan-zoom in fullscreen)",
+             "Basic hover highlight + native click + lightbox pan-zoom shipped.",
+             "Deeper: hover a node → highlight all its edges + neighbours; or click → open the node's documentation. Each is a small additive feature, no architectural change needed."]
             ["3",
              "Which catalogue-research visualizations to add next?",
              "User picks from the top-8 list.",
