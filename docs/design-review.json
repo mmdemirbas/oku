@@ -228,6 +228,28 @@
               ]
             },
             {
+              "title": "B3 — round-2 audit: kit.json placement + slope label clipping + favicon noise",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Second Playwright pass at 1440×900 + 360×800 across all 43 chart types and every doc page. Three real defects found and fixed:"},
+                {"kind": "list", "items": [
+                  "**kit.json belongs next to docs/, not the project root.** B2's quick fix unblocked the build but broke `oku serve` against the source tree (chrome.js resolves from __okuDocsRoot = /docs/, so /docs/kit.json must exist). Moved back to docs/kit.json (which the schema's own description prescribes); added a `find_kit_json(root)` helper that probes docs/ first, falls back to root. Both dev and dist now work.",
+                  "**Slope chart's right-side endpoint labels clipped past the SVG edge** because pad.right=80 was too narrow for typical `value · label` readouts. Made pad.right scale to the longest label (24 + 6·chars, min 80). Title row also overlapped the BEFORE/AFTER column heads — bumped pad.top from 44 to 56 so column heads land at y≥44 (22-unit gap).",
+                  "**Favicon 404 on every page load** — synthesized a 0-byte image/png response so the dev server stops logging the error without polluting the source tree with a real binary."
+                ]},
+                {"kind": "paragraph", "content": "Verified numerically: 0 SVG text labels overflow the slope chart's svg bounds (was 3), /docs/kit.json: 304 (was 404), /favicon.ico: 200 (was 404), charts.html console: 0 errors (was 1)."}
+              ]
+            },
+            {
+              "title": "Q10 deeper — mermaid flowchart neighbor highlight",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Hovering a node now lights up its incident edges + neighbor nodes while the rest of the graph dims to 0.25 opacity. Reading a multi-step flow becomes path-tracing instead of visual-search."},
+                {"kind": "paragraph", "content": "Wiring leans on conventions Mermaid v10 already emits for flowcharts: nodes carry `data-id=\"<NodeId>\"`; edges carry `LS-<source>` + `LE-<target>` classes. `_wireNeighborHighlight` walks the SVG once per render, builds an adjacency map, and binds mouseenter/leave + focus/blur on every node. Nodes also get tabindex=0 so keyboard users can step through. Verified: hovering JSON in the index-page flowchart stamps data-okd-active on JSON (self) + JSON→RJ edge + RJ neighbor (3 elements). svg[data-okd-has-active]=\"1\" present during hover, removed on leave."},
+                {"kind": "paragraph", "content": "Fallback shape: diagram types without `data-id` on nodes (sequence, gantt, journey, state, mindmap) get no extra wiring — the loop early-exits when nodes.length === 0. The pre-existing single-node hover-lift rule remains."}
+              ]
+            },
+            {
               "title": "V4 — 6 more visualizations (43 total)",
               "accent": "success",
               "blocks": [
@@ -755,9 +777,9 @@
              "Bar family ships today.",
              "Each renderer needs an SVG-axis-swap pass. Best done per chart as the need arises rather than batch."],
             ["Q10 deeper",
-             "Mermaid node-level interactivity (tooltip / highlight neighbors / pan-zoom in fullscreen)",
-             "Basic hover highlight + native click + lightbox pan-zoom shipped.",
-             "Deeper: hover a node → highlight all its edges + neighbours; or click → open the node's documentation. Each is a small additive feature, no architectural change needed."]
+             "Mermaid node-level interactivity — tooltip / open-on-click",
+             "Hover-neighbour-highlight + native click + lightbox pan-zoom all shipped.",
+             "Remaining: hover-tooltip with arbitrary author text; click-to-navigate (mermaid's native `click NodeId 'url'` syntax already honoured). Each is a small additive feature, no architectural change needed."]
             ["3",
              "Which catalogue-research visualizations to add next?",
              "User picks from the top-8 list.",
