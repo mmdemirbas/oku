@@ -7246,6 +7246,14 @@ class OkuChart extends HTMLElement {
       chip.classList.toggle('off', on);
       chip.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
+    /* Hover highlight — putting a pointer on a legend entry fades
+       every other series so the reader can isolate just that one
+       without clicking. Pure CSS via a class on the chart that
+       carries the active series index. */
+    function setHoverHighlight(idx) {
+      self.classList.toggle('okc-legend-hovering', idx != null);
+      self.setAttribute('data-legend-hover', idx == null ? '' : String(idx));
+    }
     this.querySelectorAll('.okc-legend-chip').forEach(function (chip) {
       chip.setAttribute('aria-pressed', 'false');
       chip.addEventListener('click', function () { toggleSeries(chip); });
@@ -7255,6 +7263,10 @@ class OkuChart extends HTMLElement {
           toggleSeries(chip);
         }
       });
+      chip.addEventListener('mouseenter', function () { setHoverHighlight(chip.getAttribute('data-series-idx')); });
+      chip.addEventListener('mouseleave', function () { setHoverHighlight(null); });
+      chip.addEventListener('focus', function () { setHoverHighlight(chip.getAttribute('data-series-idx')); });
+      chip.addEventListener('blur',  function () { setHoverHighlight(null); });
     });
 
     /* Legend interactivity for non-Cartesian charts. Each legend item
@@ -7275,6 +7287,12 @@ class OkuChart extends HTMLElement {
           legendItem.classList.toggle('okc-legend-off', nowHidden);
           legendItem.setAttribute('aria-pressed', nowHidden ? 'true' : 'false');
         }
+        function setHover(on) {
+          var idx = legendItem.getAttribute(idxAttr);
+          self.classList.toggle('okc-legend-hovering', on);
+          self.setAttribute('data-legend-hover-attr', idxAttr);
+          self.setAttribute('data-legend-hover', on ? (idx || '') : '');
+        }
         legendItem.addEventListener('click', toggle);
         legendItem.addEventListener('keydown', function (e) {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -7282,6 +7300,10 @@ class OkuChart extends HTMLElement {
             toggle();
           }
         });
+        legendItem.addEventListener('mouseenter', function () { setHover(true); });
+        legendItem.addEventListener('mouseleave', function () { setHover(false); });
+        legendItem.addEventListener('focus', function () { setHover(true); });
+        legendItem.addEventListener('blur',  function () { setHover(false); });
       });
     }
     wireNonCartesianLegend('.okc-donut-legend',  'data-slice-idx',   '.okc-slice');

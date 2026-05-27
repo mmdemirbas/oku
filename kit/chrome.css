@@ -3836,6 +3836,60 @@ oku-chart .okc-radar .okc-radar-series.okc-hidden {
   pointer-events: none;
   transition: opacity 0.18s ease;
 }
+
+/* Legend hover highlight — when a legend entry is hovered or
+   focused, fade every chart shape whose series / slice / segment
+   index does NOT match the hovered legend's index. The chart
+   carries data-legend-hover="<idx>"; CSS selects shapes by their
+   index attribute and dims the non-matching ones. Cartesian
+   shapes use data-series-idx on the parent .okc-series group;
+   non-Cartesian shapes (donut slices, waffle cells, radar areas)
+   use their own index attribute. */
+oku-chart.okc-legend-hovering .okc-series:not([data-series-idx=""]) {
+  opacity: 0.18;
+  transition: opacity 0.15s ease;
+}
+oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-series[data-series-idx="0"],
+oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-series[data-series-idx="1"],
+oku-chart.okc-legend-hovering[data-legend-hover="2"] .okc-series[data-series-idx="2"],
+oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-series[data-series-idx="3"],
+oku-chart.okc-legend-hovering[data-legend-hover="4"] .okc-series[data-series-idx="4"],
+oku-chart.okc-legend-hovering[data-legend-hover="5"] .okc-series[data-series-idx="5"],
+oku-chart.okc-legend-hovering[data-legend-hover="6"] .okc-series[data-series-idx="6"],
+oku-chart.okc-legend-hovering[data-legend-hover="7"] .okc-series[data-series-idx="7"] {
+  opacity: 1;
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+/* Non-Cartesian: fade every indexed shape, then un-fade the
+   matching one. Driven by the same data-legend-hover attribute. */
+oku-chart.okc-legend-hovering .okc-slice,
+oku-chart.okc-legend-hovering .okc-waffle-cell,
+oku-chart.okc-legend-hovering .okc-radar-series {
+  opacity: 0.18;
+  transition: opacity 0.15s ease;
+}
+oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-slice[data-slice-idx="0"],
+oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-slice[data-slice-idx="1"],
+oku-chart.okc-legend-hovering[data-legend-hover="2"] .okc-slice[data-slice-idx="2"],
+oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-slice[data-slice-idx="3"],
+oku-chart.okc-legend-hovering[data-legend-hover="4"] .okc-slice[data-slice-idx="4"],
+oku-chart.okc-legend-hovering[data-legend-hover="5"] .okc-slice[data-slice-idx="5"],
+oku-chart.okc-legend-hovering[data-legend-hover="6"] .okc-slice[data-slice-idx="6"],
+oku-chart.okc-legend-hovering[data-legend-hover="7"] .okc-slice[data-slice-idx="7"] {
+  opacity: 1;
+}
+oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-waffle-cell[data-segment-idx="0"],
+oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-waffle-cell[data-segment-idx="1"],
+oku-chart.okc-legend-hovering[data-legend-hover="2"] .okc-waffle-cell[data-segment-idx="2"],
+oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-waffle-cell[data-segment-idx="3"] {
+  opacity: 1;
+}
+oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-radar-series[data-series-idx="0"],
+oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-radar-series[data-series-idx="1"],
+oku-chart.okc-legend-hovering[data-legend-hover="2"] .okc-radar-series[data-series-idx="2"],
+oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-radar-series[data-series-idx="3"] {
+  opacity: 1;
+}
 oku-chart .okc-donut-legend-label {
   fill: var(--text);
   font: 500 12px 'Inter', sans-serif;
