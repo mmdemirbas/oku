@@ -1113,6 +1113,79 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   color: var(--accent-strong);
 }
 
+/* ============ Table-config popover ============
+   Same shell as the chart-config popover, plus an explicit row
+   layout for the moved-in view-toggle and group-by select. The
+   .okt-config-stashed span (in the table toolbar) is hidden at
+   rest; the popover shows it when open. */
+.okt-config-stashed[hidden] { display: none; }
+.okt-config-popover {
+  position: fixed;
+  z-index: 1150;
+  min-width: 280px;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 36px var(--shadow-strong);
+  padding: 12px 14px;
+  font: 13px/1.4 'Inter', sans-serif;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.okt-config-popover[hidden] { display: none; }
+.okt-config-popover .okt-cfg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+}
+.okt-config-popover .okt-cfg-label {
+  flex: 0 0 80px;
+  font-size: 12px;
+  color: var(--text-soft);
+}
+.okt-config-popover .okt-cfg-field {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+}
+/* Re-style the moved-in view buttons + group-by select so they
+   sit inside the popover rather than the toolbar context. */
+.okt-config-popover .okt-view-group {
+  display: inline-flex;
+  gap: 4px;
+}
+.okt-config-popover .okt-view-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-soft);
+}
+.okt-config-popover .okt-view-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.okt-config-popover .okt-groupby-select {
+  flex: 1 1 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font: inherit;
+  color: var(--text);
+  min-width: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

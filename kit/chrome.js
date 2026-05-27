@@ -607,6 +607,143 @@ var __okuChartConfig = (function () {
   return { open: open, close: close, getCompatibleTypes: getCompatibleTypes };
 })();
 
+/* ============ Table-config popover ============ *
+ * Same pattern as the chart-config popover: gear button on a
+ * table's toolbar opens a floating panel anchored to the gear.
+ * The panel hosts the configuration knobs that don't need to be
+ * always-visible — view mode, group-by, sort, per-column filters.
+ *
+ * Implementation note: instead of cloning the controls (which
+ * would lose event listeners), the popover MOVES the live
+ * elements from the stashed area in ctrl into itself. A marker
+ * tracks where they belong; close restores them.
+ * --------------------------------------------------------------------- */
+var __okuTableConfig = (function () {
+  var popover = null;
+  var currentWrap = null;
+  var anchorBtn = null;
+  // [{ node, markerComment }] — what we moved out of ctrl.
+  var movedNodes = [];
+
+  function build() {
+    if (popover) return popover;
+    popover = document.createElement('div');
+    popover.className = 'okt-config-popover';
+    popover.setAttribute('role', 'dialog');
+    popover.setAttribute('aria-modal', 'false');
+    popover.setAttribute('aria-label', 'Table configuration');
+    popover.hidden = true;
+    document.body.appendChild(popover);
+    document.addEventListener('keydown', function (e) {
+      if (popover.hidden) return;
+      if (e.key === 'Escape') { e.preventDefault(); close(); }
+    });
+    document.addEventListener('click', function (e) {
+      if (popover.hidden) return;
+      if (popover.contains(e.target)) return;
+      if (anchorBtn && anchorBtn.contains(e.target)) return;
+      close();
+    }, true);
+    window.addEventListener('resize', function () { if (!popover.hidden) position(); });
+    window.addEventListener('scroll', function () { if (!popover.hidden) position(); }, true);
+    return popover;
+  }
+
+  function position() {
+    if (!anchorBtn || !popover) return;
+    var r = anchorBtn.getBoundingClientRect();
+    var pad = 8;
+    var pr = popover.getBoundingClientRect();
+    var top  = r.bottom + 6;
+    var left = r.right - pr.width;
+    if (top + pr.height > window.innerHeight - pad) top = r.top - pr.height - 6;
+    if (left < pad) left = pad;
+    if (left + pr.width > window.innerWidth - pad) left = window.innerWidth - pr.width - pad;
+    if (top < pad) top = pad;
+    popover.style.left = left + 'px';
+    popover.style.top  = top  + 'px';
+  }
+
+  /* Move a stashed inline control into a labelled popover row. */
+  function moveInto(stashed, popoverRoot, label) {
+    if (!stashed) return null;
+    var marker = document.createComment('table-config-slot');
+    stashed.parentNode.insertBefore(marker, stashed);
+    var row = document.createElement('label');
+    row.className = 'okt-cfg-row';
+    if (label) {
+      var lbl = document.createElement('span');
+      lbl.className = 'okt-cfg-label';
+      lbl.textContent = label;
+      row.appendChild(lbl);
+    }
+    var holder = document.createElement('span');
+    holder.className = 'okt-cfg-field';
+    // Unhide the stashed element + drop its data-hidden flag now
+    // that it's inside the popover.
+    stashed.removeAttribute('hidden');
+    holder.appendChild(stashed);
+    row.appendChild(holder);
+    popoverRoot.appendChild(row);
+    movedNodes.push({ node: stashed, marker: marker });
+    return row;
+  }
+
+  function open(wrap, btn) {
+    build();
+    currentWrap = wrap;
+    anchorBtn = btn;
+    popover.hidden = false;
+    popover.innerHTML =
+      '<div class="okc-cfg-head">' +
+        '<span class="okc-cfg-title">Configure table</span>' +
+        '<button type="button" class="okc-cfg-close" aria-label="Close">' + ICON_CROSS + '</button>' +
+      '</div>';
+    var closeBtn = popover.querySelector('.okc-cfg-close');
+    closeBtn.addEventListener('click', close);
+    // Pull the stashed controls out and into popover rows. View
+    // toggle first (most common change), then group-by.
+    var stash = wrap.querySelector('.okt-config-stashed');
+    if (stash) {
+      var viewGroup = stash.querySelector('.okt-view-group');
+      var groupby   = stash.querySelector('.okt-groupby');
+      // The empty .okt-ctrl-sep used inline between view and groupby
+      // can stay in ctrl — only move the meaningful controls.
+      moveInto(viewGroup, popover, 'View');
+      moveInto(groupby,   popover, 'Group by');
+    }
+    requestAnimationFrame(position);
+  }
+
+  function close() {
+    if (!popover || popover.hidden) return;
+    // Put the moved nodes back where they came from.
+    for (var i = movedNodes.length - 1; i >= 0; i--) {
+      var m = movedNodes[i];
+      if (m.marker && m.marker.parentNode) {
+        m.node.setAttribute('hidden', '');
+        m.marker.parentNode.insertBefore(m.node, m.marker);
+        m.marker.parentNode.removeChild(m.marker);
+      }
+    }
+    movedNodes = [];
+    popover.hidden = true;
+    currentWrap = null;
+    anchorBtn = null;
+  }
+
+  function toggle(wrap, btn) {
+    if (popover && !popover.hidden && currentWrap === wrap) {
+      close();
+    } else {
+      if (popover && !popover.hidden) close();
+      open(wrap, btn);
+    }
+  }
+
+  return { open: open, close: close, toggle: toggle };
+})();
+
 /* ============ Three-mode theme cycler (system → light → dark → system) ============ */
 function getThemeMode() {
   return document.documentElement.getAttribute('data-theme-mode') || 'system';
@@ -1638,20 +1775,31 @@ function initReadingAids() {
       '</span>' +
       '<span class="okt-ctrl-sep" aria-hidden="true"></span>'
     ) : '';
-    // Order: filter → stats → view-toggle → expand → groupby.
-    // Wrapping break-points follow DOM order, so when the toolbar
-    // is too narrow to fit everything on one line, groupby is the
-    // last item and breaks to the second line first. View-toggle +
-    // expand stay on the first line, right-aligned via
-    // justify-content: flex-end on .okt-table-controls.
+    // Order: filter → stats → gear → expand. The gear opens the
+    // configuration popover (group-by, view mode, multi-column sort,
+    // per-column filters). Filter + stats stay inline for instant
+    // interaction; configuration knobs move into the popover so the
+    // resting toolbar is two affordances, not seven.
+    var gearBtnHTML = canPivot
+      ? '<button data-cfg type="button" title="Configure table — group, view, sort, filter" aria-label="Configure table">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' +
+        '</button>'
+      : '';
+    // View-buttons and group-by select stay in ctrl so the existing
+    // wiring binds to live DOM nodes. They're visually hidden in
+    // resting state (CSS .okt-config-stashed) and physically moved
+    // into the popover on gear click, then moved back on close —
+    // same nodes, same listeners.
     ctrl.innerHTML =
       filterInputHTML +
       statsHTML +
-      viewBtns +
+      gearBtnHTML +
       '<button data-expand type="button" aria-pressed="false" title="Toggle full-width / fit to column">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
       '</button>' +
-      groupByHTML;
+      // Stashed area — group-by + view-toggle live here at rest but
+      // visually hidden; the popover moves them into itself when open.
+      '<span class="okt-config-stashed" hidden>' + viewBtns + groupByHTML + '</span>';
 
     var scroll = document.createElement('div');
     scroll.className = 'okt-table-scroll';
@@ -2333,6 +2481,16 @@ function initReadingAids() {
         });
       }
 
+      // Gear button → open the table-config popover. The popover
+       // moves the stashed view-toggle + group-by selects into
+       // itself, leaves a marker, and on close moves them back —
+       // same DOM nodes so the wiring keeps working.
+      var gearBtn = ctrl.querySelector('button[data-cfg]');
+      if (gearBtn) {
+        gearBtn.addEventListener('click', function () {
+          __okuTableConfig.toggle(wrap, gearBtn);
+        });
+      }
       // View-toggle handler — CSS-driven via wrap.dataset.view.
       function setView(view) {
         wrap.dataset.view = view;
