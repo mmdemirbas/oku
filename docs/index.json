@@ -95,7 +95,7 @@
       "kind": "section",
       "id": "shape",
       "title": "What a page looks like",
-      "lead": "Two source formats produce the same rendered page. Pick whichever fits the content — JSON for kit-native authoring, Markdown for prose that should drop in unchanged.",
+      "lead": "Two source formats produce the same rendered page. Pick whichever fits the content — JSON for kit-native authoring, Markdown for prose that should drop in unchanged. Code on the left, the actual rendered output on the right.",
       "blocks": [
         {
           "kind": "heading",
@@ -108,9 +108,34 @@
           "content": "Hand-authored or AI-emitted. Every block declares its kind explicitly; nothing has to be guessed. Validated against the kit schema before it ships."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json\",\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"blocks\": [\n    { \"kind\": \"section\", \"id\": \"overview\", \"title\": \"Overview\", \"blocks\": [\n      { \"kind\": \"paragraph\", \"content\": \"Plain prose works as a string.\" },\n      { \"kind\": \"callout\", \"type\": \"info\", \"content\": \"Use callouts, kpi-grid, charts, tables and the other primitives in the reference.\" }\n    ]}\n  ]\n}"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"info\",\n  \"title\": \"Heads up\",\n  \"content\": \"Callouts carry one of seven tones: info, tip, note, neutral, success, caution, danger.\"\n}"
+          },
+          "output": {
+            "kind": "callout",
+            "type": "info",
+            "title": "Heads up",
+            "content": "Callouts carry one of seven tones: info, tip, note, neutral, success, caution, danger."
+          }
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"kpi-grid\",\n  \"tiles\": [\n    { \"num\": \"29\",   \"label\": \"chart variants\" },\n    { \"num\": \"JSON\", \"label\": \"single source\" },\n    { \"num\": \"0\",    \"label\": \"build steps for content\" }\n  ]\n}"
+          },
+          "output": {
+            "kind": "kpi-grid",
+            "tiles": [
+              { "num": "29",   "label": "chart variants" },
+              { "num": "JSON", "label": "single source" },
+              { "num": "0",    "label": "build steps for content" }
+            ]
+          }
         },
         {
           "kind": "heading",
@@ -120,12 +145,49 @@
         },
         {
           "kind": "paragraph",
-          "content": "Drop existing .md files into the docs root. ATX headings, code fences (mermaid included), lists, tables, blockquotes, inline formatting all convert. Relative .md links retarget to .html. README / CHANGELOG / CLAUDE.md and friends are surfaced as pages too — keep them at the root or under a subdirectory exactly where you want them in the site tree."
+          "content": "Drop existing .md files into the docs root. ATX headings, code fences (mermaid included), lists, tables, blockquotes, inline formatting all convert. Relative .md links retarget to .html. README / CHANGELOG / CLAUDE.md and friends are surfaced as pages too."
         },
         {
-          "kind": "code",
-          "language": "markdown",
-          "source": "# My note\n\n## Overview\n\nPlain prose works as a paragraph.\n\n- bullets render as a list\n- *emphasis* and **strong** and `code` work inline\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n> A blockquote becomes a neutral callout.\n"
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "markdown",
+            "source": "> Blockquotes become neutral callouts.\n>\n> Multiple lines stay grouped inside the same callout body."
+          },
+          "output": {
+            "kind": "callout",
+            "type": "neutral",
+            "content": "Blockquotes become neutral callouts.\n\nMultiple lines stay grouped inside the same callout body."
+          }
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "markdown",
+            "source": "- *emphasis* and **strong** work inline\n- `inline code` renders with the kit's monospace font\n- bullets and numbered lists fold straight in"
+          },
+          "output": {
+            "kind": "list",
+            "style": "bullet",
+            "items": [
+              "*emphasis* and **strong** work inline",
+              "`inline code` renders with the kit's monospace font",
+              "bullets and numbered lists fold straight in"
+            ]
+          }
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "markdown",
+            "source": "```mermaid\nflowchart LR\n  A[\"Markdown\"] --> B[\"oku\"]\n  B --> C[\"Rendered diagram\"]\n```"
+          },
+          "output": {
+            "kind": "diagram",
+            "source": "flowchart LR\n  A[\"Markdown\"] --> B[\"oku\"]\n  B --> C[\"Rendered diagram\"]\n"
+          }
         }
       ]
     },

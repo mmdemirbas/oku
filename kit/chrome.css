@@ -4136,12 +4136,12 @@ oku-snippet .hds-body {
 /* When nested inside the example-pair render column, the grid is
    tight (~half content-width). Stack editor + preview unconditionally
    in that context so neither gets squashed to a sliver. */
-.example-render oku-snippet .hds-body {
+.example-output oku-snippet .hds-body {
   grid-template-columns: 1fr;
   min-height: 400px;
 }
-.example-render oku-snippet .hds-editor,
-.example-render oku-snippet .hds-preview {
+.example-output oku-snippet .hds-editor,
+.example-output oku-snippet .hds-preview {
   min-height: 200px;
 }
 /* Editor pane: a `<textarea>` overlaid on top of a Prism-highlighted
@@ -4368,7 +4368,7 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
   color: var(--accent-strong);
 }
 .example-pair .example-code,
-.example-pair .example-render {
+.example-pair .example-output {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -4393,7 +4393,7 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
    the visible top edge of the box matches the visible top edge of
    the source <pre> box. */
 .example-pair .example-code > *:not(.example-col-label),
-.example-pair .example-render > *:not(.example-col-label) {
+.example-pair .example-output > *:not(.example-col-label) {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }

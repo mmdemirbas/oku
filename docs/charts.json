@@ -105,8 +105,8 @@
         {
           "kind": "heading",
           "level": 4,
-          "id": "chart-fn-compare-values",
-          "title": "Compare values"
+          "id": "chart-fn-compare",
+          "title": "Compare"
         },
         {
           "kind": "paragraph",
@@ -350,8 +350,8 @@
         {
           "kind": "heading",
           "level": 4,
-          "id": "chart-fn-show-change-over-time",
-          "title": "Show change over time"
+          "id": "chart-fn-trend",
+          "title": "Trend"
         },
         {
           "kind": "paragraph",
@@ -492,8 +492,8 @@
         {
           "kind": "heading",
           "level": 4,
-          "id": "chart-fn-show-distribution",
-          "title": "Show distribution"
+          "id": "chart-fn-distribution",
+          "title": "Distribution"
         },
         {
           "kind": "paragraph",
@@ -613,8 +613,8 @@
         {
           "kind": "heading",
           "level": 4,
-          "id": "chart-fn-show-parts-of-a-whole",
-          "title": "Show parts of a whole"
+          "id": "chart-fn-composition",
+          "title": "Composition"
         },
         {
           "kind": "paragraph",
@@ -717,8 +717,8 @@
         {
           "kind": "heading",
           "level": 4,
-          "id": "chart-fn-show-relationships",
-          "title": "Show relationships"
+          "id": "chart-fn-relationship",
+          "title": "Relationship"
         },
         {
           "kind": "paragraph",
@@ -1025,8 +1025,8 @@
         {
           "kind": "heading",
           "level": 4,
-          "id": "chart-fn-show-hierarchy",
-          "title": "Show hierarchy"
+          "id": "chart-fn-hierarchy",
+          "title": "Hierarchy"
         },
         {
           "kind": "paragraph",
@@ -1067,8 +1067,8 @@
         {
           "kind": "heading",
           "level": 4,
-          "id": "chart-fn-show-flow-or-movement",
-          "title": "Show flow or movement"
+          "id": "chart-fn-flow",
+          "title": "Flow"
         },
         {
           "kind": "paragraph",
@@ -1155,8 +1155,8 @@
         {
           "kind": "heading",
           "level": 4,
-          "id": "chart-fn-show-location",
-          "title": "Show location"
+          "id": "chart-fn-location",
+          "title": "Location"
         },
         {
           "kind": "paragraph",
@@ -1228,7 +1228,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"scatter\",\n  \"title\": \"Cost vs. impact\",\n  \"x_label\": \"Engineering cost\",\n  \"y_label\": \"User impact\",\n  \"series\": [\n    { \"label\": \"Sample series\", \"color\": \"accent\", \"data\": [\n      { \"x\": 4, \"y\": 9, \"label\": \"H3\" },\n      { \"x\": 6, \"y\": 8, \"label\": \"S2-inline\" }\n    ]}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "scatter",
             "title": "Chart sample — cost vs. impact",
@@ -1297,7 +1297,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"line\",\n  \"title\": \"P50 latency over 7 days\",\n  \"x_label\": \"Day\",\n  \"y_label\": \"ms\",\n  \"series\": [\n    { \"label\": \"api-gateway\", \"color\": \"accent\", \"data\": [\n      { \"x\": 1, \"y\": 142 }, { \"x\": 2, \"y\": 155 }, { \"x\": 3, \"y\": 138 },\n      { \"x\": 4, \"y\": 161 }, { \"x\": 5, \"y\": 149 }, { \"x\": 6, \"y\": 144 }, { \"x\": 7, \"y\": 152 }\n    ]},\n    { \"label\": \"auth-svc\", \"color\": \"warn\", \"data\": [\n      { \"x\": 1, \"y\": 88 }, { \"x\": 2, \"y\": 92 }, { \"x\": 3, \"y\": 110 },\n      { \"x\": 4, \"y\": 132 }, { \"x\": 5, \"y\": 121 }, { \"x\": 6, \"y\": 98 }, { \"x\": 7, \"y\": 90 }\n    ]}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "line",
             "title": "P50 latency over 7 days",
@@ -1426,7 +1426,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"area\",\n  \"x_label\": \"Day\",\n  \"y_label\": \"Active users\",\n  \"series\": [\n    { \"label\": \"Daily\", \"color\": \"accent\", \"data\": [\n      { \"x\": 1, \"y\": 40 }, { \"x\": 2, \"y\": 65 },\n      { \"x\": 3, \"y\": 55 }, { \"x\": 4, \"y\": 80 },\n      { \"x\": 5, \"y\": 95 }, { \"x\": 6, \"y\": 110 },\n      { \"x\": 7, \"y\": 130 }\n    ]}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "area",
             "title": "Active users — first week",
@@ -1494,7 +1494,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bubble\",\n  \"x_label\": \"Cost\",\n  \"y_label\": \"Impact\",\n  \"series\": [\n    { \"label\": \"Initiatives\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"size\": 40,  \"label\": \"Search\" },\n      { \"x\": 6, \"y\": 9, \"size\": 120, \"label\": \"Auth\" },\n      { \"x\": 4, \"y\": 4, \"size\": 80,  \"label\": \"Logging\" },\n      { \"x\": 7, \"y\": 2, \"size\": 25,  \"label\": \"Theme\" }\n    ]}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "bubble",
             "title": "Initiatives — cost vs. impact vs. team-size",
@@ -1573,7 +1573,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"quadrant\",\n  \"x_label\": \"Effort\",\n  \"y_label\": \"Value\",\n  \"quadrants\": {\n    \"x\": 5, \"y\": 5,\n    \"labels\": [\"Quick wins\", \"Big bets\", \"Skip\", \"Re-evaluate\"]\n  },\n  \"series\": [\n    { \"label\": \"Items\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"label\": \"A\" },\n      { \"x\": 7, \"y\": 8, \"label\": \"B\" },\n      { \"x\": 2, \"y\": 3, \"label\": \"C\" },\n      { \"x\": 8, \"y\": 2, \"label\": \"D\" }\n    ]}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "quadrant",
             "title": "Effort × value — decision matrix",
@@ -1671,7 +1671,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bar\",\n  \"rows\": [\n    { \"label\": \"Spark\",  \"value\": 95, \"display\": \"95 / 100\" },\n    { \"label\": \"Flink\",  \"value\": 80 },\n    { \"label\": \"Trino\",  \"value\": 75 }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "bar",
             "rows": [
@@ -1737,7 +1737,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"stacked-bar\",\n  \"title\": \"Build time by phase\",\n  \"categories\": [\"v1.0\", \"v1.1\", \"v1.2\"],\n  \"series\": [\n    { \"label\": \"compile\", \"color\": \"accent\",  \"values\": [12, 14, 11] },\n    { \"label\": \"test\",    \"color\": \"success\", \"values\": [8,  10, 12] },\n    { \"label\": \"package\", \"color\": \"warn\",    \"values\": [3,  4,  3] }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "stacked-bar",
             "title": "Build time by phase",
@@ -1794,7 +1794,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"grouped-bar\",\n  \"title\": \"Latency by region\",\n  \"categories\": [\"p50\", \"p95\", \"p99\"],\n  \"series\": [\n    { \"label\": \"EU\", \"color\": \"accent\",  \"values\": [40, 110, 220] },\n    { \"label\": \"US\", \"color\": \"success\", \"values\": [55, 130, 260] },\n    { \"label\": \"AP\", \"color\": \"warn\",    \"values\": [70, 180, 340] }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "grouped-bar",
             "title": "Latency by region (ms)",
@@ -1871,7 +1871,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"donut\",\n  \"title\": \"Page load breakdown\",\n  \"slices\": [\n    { \"label\": \"HTML\",  \"value\": 12, \"color\": \"accent\" },\n    { \"label\": \"CSS\",   \"value\": 28, \"color\": \"success\" },\n    { \"label\": \"JS\",    \"value\": 44, \"color\": \"warn\" },\n    { \"label\": \"Other\", \"value\": 16, \"color\": \"muted\" }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "donut",
             "title": "Page load breakdown (KB)",
@@ -1916,7 +1916,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"pie\",\n  \"title\": \"Build-time budget\",\n  \"slices\": [\n    { \"label\": \"chrome.js\",   \"value\": 40, \"color\": \"accent\" },\n    { \"label\": \"chrome.css\",  \"value\": 25, \"color\": \"success\" },\n    { \"label\": \"renderer.js\", \"value\": 20, \"color\": \"warn\" },\n    { \"label\": \"cli.py\",      \"value\": 15, \"color\": \"muted\" }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "pie",
             "title": "Build-time budget",
@@ -1961,7 +1961,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"waffle\",\n  \"title\": \"User-status breakdown\",\n  \"segments\": [\n    { \"label\": \"Active\",   \"count\": 40, \"color\": \"success\" },\n    { \"label\": \"Trialing\", \"count\": 25, \"color\": \"accent\" },\n    { \"label\": \"Paused\",   \"count\": 10, \"color\": \"warn\" },\n    { \"label\": \"Churned\",  \"count\": 25, \"color\": \"danger\" }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "waffle",
             "title": "User-status breakdown",
@@ -2006,7 +2006,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"treemap\",\n  \"title\": \"LoC by language\",\n  \"tree\": [\n    {\"label\": \"JavaScript\", \"value\": 6200, \"color\": \"accent\"},\n    {\"label\": \"CSS\",        \"value\": 2400, \"color\": \"success\"},\n    {\"label\": \"Python\",     \"value\": 2800, \"color\": \"warn\"},\n    {\"label\": \"JSON\",       \"value\":  900, \"color\": \"muted\"},\n    {\"label\": \"Markdown\",   \"value\":  400, \"color\": \"danger\"}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "treemap",
             "title": "LoC by language",
@@ -2064,7 +2064,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"histogram\",\n  \"title\": \"Request latency (ms)\",\n  \"bins\": [\n    {\"lo\":   0, \"hi\":  20, \"count\":  4},\n    {\"lo\":  20, \"hi\":  40, \"count\": 14},\n    {\"lo\":  40, \"hi\":  60, \"count\": 22},\n    {\"lo\":  60, \"hi\":  80, \"count\": 18},\n    {\"lo\":  80, \"hi\": 100, \"count\":  9},\n    {\"lo\": 100, \"hi\": 120, \"count\":  3}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "histogram",
             "title": "Request latency (ms)",
@@ -2119,7 +2119,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"box-plot\",\n  \"title\": \"Cold-start latency (ms) per region\",\n  \"boxes\": [\n    { \"label\": \"us-east-1\",  \"min\": 18, \"q1\": 32, \"median\": 48, \"q3\": 60, \"max\": 86, \"outliers\": [120] },\n    { \"label\": \"eu-west-1\",  \"min\": 22, \"q1\": 38, \"median\": 52, \"q3\": 66, \"max\": 92 },\n    { \"label\": \"ap-south-1\", \"min\": 38, \"q1\": 62, \"median\": 78, \"q3\": 96, \"max\": 132, \"outliers\": [180, 210] }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "box-plot",
             "title": "Cold-start latency (ms) per region",
@@ -2178,7 +2178,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"ridgeline\",\n  \"title\": \"Per-region latency (ms)\",\n  \"distributions\": [\n    {\"label\": \"us-east-1\",  \"values\": [..raw samples..]},\n    {\"label\": \"eu-west-1\",  \"values\": [..raw samples..]},\n    {\"label\": \"ap-south-1\", \"values\": [..raw samples..]}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "ridgeline",
             "title": "Per-region cold-start latency (ms)",
@@ -2297,7 +2297,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sparkline\",\n  \"values\": [12,14,18,17,22,25,28,31,30,35],\n  \"variant\": \"area\",\n  \"end_label\": \"35\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "sparkline",
             "values": [
@@ -2351,7 +2351,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"slope\",\n  \"title\": \"Page-load p95 (ms) — before / after CDN\",\n  \"from_label\": \"Before\",\n  \"to_label\":   \"After\",\n  \"items\": [\n    { \"label\": \"/home\",      \"from\": 1400, \"to\":  680 },\n    { \"label\": \"/dashboard\", \"from\": 2200, \"to\": 1100 },\n    { \"label\": \"/settings\",  \"from\":  900, \"to\": 1500 }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "slope",
             "title": "Page-load p95 (ms) — before / after CDN",
@@ -2393,7 +2393,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"calendar-heatmap\",\n  \"title\": \"Commits in 2026\",\n  \"year\": 2026,\n  \"date_values\": {\n    \"2026-01-04\": 3, \"2026-01-12\": 9,\n    \"2026-03-22\": 14, \"2026-07-01\": 6,\n    \"2026-11-15\": 11, \"2026-12-30\": 4\n  }\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "calendar-heatmap",
             "title": "Commits in 2026 (sample)",
@@ -2448,7 +2448,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"funnel\",\n  \"title\": \"Signup conversion\",\n  \"stages\": [\n    {\"label\": \"Visitors\",   \"value\": 1000},\n    {\"label\": \"Signed up\",  \"value\":  680},\n    {\"label\": \"Activated\",  \"value\":  430},\n    {\"label\": \"Upgraded\",   \"value\":  180},\n    {\"label\": \"Retained 30d\",\"value\":  120}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "funnel",
             "title": "Signup conversion",
@@ -2498,7 +2498,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sankey\",\n  \"title\": \"Where time goes\",\n  \"nodes\": [\n    {\"id\": \"source\",  \"label\": \"Working hours\", \"color\": \"muted\"},\n    {\"id\": \"build\",   \"label\": \"Shipping\",   \"color\": \"accent\"},\n    {\"id\": \"plan\",    \"label\": \"Planning\",   \"color\": \"accent\"},\n    {\"id\": \"meet\",    \"label\": \"Meetings\",   \"color\": \"warn\"},\n    {\"id\": \"code\",    \"label\": \"Code\",       \"color\": \"success\"},\n    {\"id\": \"review\",  \"label\": \"Review\",     \"color\": \"success\"},\n    {\"id\": \"docs\",    \"label\": \"Docs\",       \"color\": \"accent\"}\n  ],\n  \"links\": [\n    {\"source\": \"source\", \"target\": \"build\",  \"value\": 24},\n    {\"source\": \"source\", \"target\": \"plan\",   \"value\":  9},\n    {\"source\": \"source\", \"target\": \"meet\",   \"value\":  7},\n    {\"source\": \"build\",  \"target\": \"code\",   \"value\": 14},\n    {\"source\": \"build\",  \"target\": \"review\", \"value\":  6},\n    {\"source\": \"build\",  \"target\": \"docs\",   \"value\":  4},\n    {\"source\": \"plan\",   \"target\": \"docs\",   \"value\":  3}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "sankey",
             "title": "Where time goes",
@@ -2603,7 +2603,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"network\",\n  \"title\": \"Pages link graph\",\n  \"nodes\": [\n    {\"id\": \"index\"},     {\"id\": \"reference\"},  {\"id\": \"glossary\"},\n    {\"id\": \"architecture\"}, {\"id\": \"cli\"},   {\"id\": \"roadmap\"}\n  ],\n  \"links\": [\n    {\"source\": \"index\", \"target\": \"reference\"},\n    {\"source\": \"index\", \"target\": \"glossary\"},\n    {\"source\": \"index\", \"target\": \"architecture\"},\n    {\"source\": \"index\", \"target\": \"cli\"},\n    {\"source\": \"index\", \"target\": \"roadmap\"},\n    {\"source\": \"reference\", \"target\": \"glossary\"},\n    {\"source\": \"reference\", \"target\": \"architecture\"},\n    {\"source\": \"architecture\", \"target\": \"cli\"}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "network",
             "title": "Pages link graph",
@@ -2680,7 +2680,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"chord\",\n  \"title\": \"Cross-team handoffs (this week)\",\n  \"groups\": [\n    {\"id\": \"design\",  \"color\": \"accent\"},\n    {\"id\": \"eng\",     \"color\": \"success\"},\n    {\"id\": \"product\", \"color\": \"warn\"},\n    {\"id\": \"docs\",    \"color\": \"muted\"}\n  ],\n  \"matrix\": [\n    [0, 8, 3, 2],\n    [4, 0, 5, 6],\n    [2, 7, 0, 1],\n    [3, 4, 1, 0]\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "chord",
             "title": "Cross-team handoffs (this week)",
@@ -2755,7 +2755,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"heatmap\",\n  \"title\": \"Latency by service × hour\",\n  \"row_labels\": [\"svc-a\", \"svc-b\", \"svc-c\"],\n  \"col_labels\": [\"00\", \"06\", \"12\", \"18\"],\n  \"cells\": [[12,18,42,30],[8,22,36,24],[40,50,28,16]]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "heatmap",
             "title": "Latency by service × hour",
@@ -2832,7 +2832,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"scatter-matrix\",\n  \"title\": \"Page metrics\",\n  \"variables\": [\n    {\"key\": \"lines\",   \"label\": \"Lines\"},\n    {\"key\": \"images\",  \"label\": \"Images\"},\n    {\"key\": \"charts\",  \"label\": \"Charts\"},\n    {\"key\": \"reads\",   \"label\": \"Reads\"}\n  ],\n  \"records\": [\n    {\"lines\":  320, \"images\":  4, \"charts\":  2, \"reads\":  120},\n    {\"lines\":  180, \"images\":  2, \"charts\":  0, \"reads\":   60},\n    ... 20 more rows ...\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "scatter-matrix",
             "title": "Page metrics",
@@ -2947,7 +2947,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"parallel-coordinates\",\n  \"title\": \"Build performance\",\n  \"variables\": [\n    {\"key\": \"pages\",     \"label\": \"Pages\"},\n    {\"key\": \"size_kb\",   \"label\": \"Total KB\"},\n    {\"key\": \"build_ms\",  \"label\": \"Build ms\"},\n    {\"key\": \"lighthouse\",\"label\": \"Lighthouse\"}\n  ],\n  \"records\": [\n    {\"pages\":  10, \"size_kb\":  240, \"build_ms\":  900, \"lighthouse\": 96, \"_color\": \"success\"},\n    {\"pages\":  25, \"size_kb\":  540, \"build_ms\": 1400, \"lighthouse\": 94, \"_color\": \"accent\"},\n    ...\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "parallel-coordinates",
             "title": "Build performance",
@@ -3040,7 +3040,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"gauge\",\n  \"title\": \"SLO budget\",\n  \"value\": 92,\n  \"max\": 100,\n  \"target\": 80,\n  \"label\": \"of monthly window remaining\",\n  \"zones\": [\n    { \"from\":  0, \"to\": 50, \"tone\": \"danger\",  \"label\": \"breaching\" },\n    { \"from\": 50, \"to\": 80, \"tone\": \"warn\",    \"label\": \"caution\"   },\n    { \"from\": 80, \"to\": 100,\"tone\": \"success\", \"label\": \"healthy\"   }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "gauge",
             "title": "SLO budget",
@@ -3087,7 +3087,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bullet\",\n  \"title\": \"Quarter at a glance\",\n  \"tracks\": [\n    { \"label\": \"Revenue ($M)\", \"value\": 92, \"target\": 80, \"max\": 120,\n      \"zones\": [{ \"from\":0, \"to\":40, \"tone\":\"danger\" }, { \"from\":40, \"to\":80, \"tone\":\"warn\" }, { \"from\":80, \"to\":120, \"tone\":\"success\" }] },\n    { \"label\": \"NPS\",          \"value\": 58, \"target\": 65, \"max\": 100, \"color\": \"warn\" }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "bullet",
             "title": "Quarter at a glance",
@@ -3167,7 +3167,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"radar\",\n  \"title\": \"Tool shortlist — five criteria\",\n  \"axes\": [\n    { \"label\": \"Speed\"   },\n    { \"label\": \"UX\"      },\n    { \"label\": \"Cost\"    },\n    { \"label\": \"Docs\"    },\n    { \"label\": \"Support\" }\n  ],\n  \"series\": [\n    { \"label\": \"Option A\", \"color\": \"accent\",  \"values\": [8, 9, 6, 7, 8] },\n    { \"label\": \"Option B\", \"color\": \"success\", \"values\": [6, 7, 9, 5, 6] }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "radar",
             "title": "Tool shortlist — five criteria",
@@ -3239,7 +3239,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"geo\",\n  \"title\": \"Site traffic by country (k visits)\",\n  \"regions\": [\n    {\"id\": \"US\", \"value\":  82, \"label\": \"United States\"},\n    {\"id\": \"GB\", \"value\":  18, \"label\": \"United Kingdom\"},\n    {\"id\": \"DE\", \"value\":  24, \"label\": \"Germany\"},\n    {\"id\": \"FR\", \"value\":  11, \"label\": \"France\"},\n    {\"id\": \"BR\", \"value\":  14, \"label\": \"Brazil\"},\n    {\"id\": \"IN\", \"value\":  38, \"label\": \"India\"},\n    {\"id\": \"JP\", \"value\":  21, \"label\": \"Japan\"},\n    {\"id\": \"AU\", \"value\":   9, \"label\": \"Australia\"},\n    {\"id\": \"OTH\",\"value\":  47, \"label\": \"Other\"}\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "chart",
             "type": "geo",
             "title": "Site traffic by country (k visits)",

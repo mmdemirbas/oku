@@ -886,18 +886,18 @@
       codeLbl.textContent = 'Code';
       codeCol.appendChild(codeLbl);
       if (block.code) codeCol.appendChild(this._renderCode(block.code));
-      const renderCol = document.createElement('div');
-      renderCol.className = 'example-render';
-      const renderLbl = document.createElement('div');
-      renderLbl.className = 'example-col-label';
-      renderLbl.textContent = 'Output';
-      renderCol.appendChild(renderLbl);
-      if (block.render) {
-        const renderEl = this._renderContentBlock(block.render);
-        if (renderEl) renderCol.appendChild(renderEl);
+      const outputCol = document.createElement('div');
+      outputCol.className = 'example-output';
+      const outputLbl = document.createElement('div');
+      outputLbl.className = 'example-col-label';
+      outputLbl.textContent = 'Output';
+      outputCol.appendChild(outputLbl);
+      if (block.output) {
+        const outputEl = this._renderContentBlock(block.output);
+        if (outputEl) outputCol.appendChild(outputEl);
       }
       wrap.appendChild(codeCol);
-      wrap.appendChild(renderCol);
+      wrap.appendChild(outputCol);
       return wrap;
     }
 

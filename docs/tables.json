@@ -41,7 +41,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\"Stage\", \"Status\", \"Duration\"],\n  \"rows\": [\n    [\"Plan\",  \"done\",         \"1d\"],\n    [\"Build\", \"done\",         \"3d\"],\n    [\"Test\",  \"in-progress\",  \"2d\"],\n    [\"Ship\",  \"queued\",       \"—\"]\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "table",
             "headers": [
               "Stage",
@@ -85,7 +85,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\"Engine\", \"Storage\", \"License\"],\n  \"groups\": [\n    { \"title\": \"Lakehouse formats\",\n      \"rows\": [\n        [\"Apache Iceberg\", \"Object store\", \"Apache 2.0\"],\n        [\"Delta Lake\",    \"Object store\", \"Apache 2.0\"]\n      ]\n    },\n    { \"title\": \"Query engines\",\n      \"rows\": [[\"Trino\", \"Pluggable\", \"Apache 2.0\"]]\n    }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "table",
             "headers": [
               "Engine",
@@ -148,7 +148,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\n    \"Engine\",\n    { \"label\": \"Tags\", \"filter\": \"chips\",\n      \"values\": [\"lakehouse\", \"streaming\", \"query\"] },\n    { \"label\": \"Maturity\", \"filter\": \"chips\",\n      \"values\": [\"incubating\", \"ga\", \"experimental\"] }\n  ],\n  \"rows\": [\n    [\"Apache Iceberg\",\n      { \"values\": [\"lakehouse\"] },\n      { \"value\": \"GA\", \"values\": [\"ga\"] }],\n    [\"Apache Paimon\",\n      { \"values\": [\"lakehouse\", \"streaming\"] },\n      { \"value\": \"Incubating\", \"values\": [\"incubating\"] }],\n    [\"Trino\",\n      { \"values\": [\"query\"] },\n      { \"value\": \"GA\", \"values\": [\"ga\"] }]\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "table",
             "headers": [
               "Engine",
@@ -295,7 +295,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"table\",\n  \"view\": \"board\",\n  \"headers\": [\n    \"Item\",\n    { \"label\": \"Status\",\n      \"boardOrder\": [\"queued\", \"in-progress\", \"blocked\", \"done\"] }\n  ],\n  \"rows\": [\n    [\"Cut release tag\",        \"queued\"],\n    [\"Wire CI matrix\",         \"in-progress\"],\n    [\"Vendor security review\", \"blocked\"],\n    [\"Migrate auth layer\",     \"done\"],\n    [\"Draft RFC\",              \"in-progress\"],\n    [\"Update changelog\",       \"queued\"]\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "table",
             "view": "board",
             "headers": [
@@ -355,11 +355,14 @@
             "language": "json",
             "source": "{\n  \"kind\": \"table\",\n  \"headers\": [\n    \"Option\",\n    { \"label\": \"Trade-off\", \"wrap\": true }\n  ],\n  \"rows\": [\n    [\"Mock the DB\",\n     \"Fast in CI.\\nMisses real SQL errors.\\nLast quarter's migration regression slipped past mocks.\"],\n    [\"Testcontainers\",\n     \"Slower setup (~3s/test).\\nCatches schema + driver behaviour.\\nRequires Docker.\"]\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "table",
             "headers": [
               "Option",
-              { "label": "Trade-off", "wrap": true }
+              {
+                "label": "Trade-off",
+                "wrap": true
+              }
             ],
             "rows": [
               [

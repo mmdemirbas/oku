@@ -185,29 +185,33 @@
           ]
         },
         {
-          "kind": "compare-grid",
-          "cards": [
-            {
-              "verdict": "in",
-              "title": "Markdown → page kinds",
-              "items": [
-                "YAML front-matter (<code>---&nbsp;...&nbsp;---</code>) → page.title + page.meta",
-                "ATX heading H1 → page.title",
-                "ATX heading H2 → section (id auto-slugged from title)",
-                "ATX heading H3 / H4 → heading block inside the active section",
-                "Paragraph with **bold** / *italic* / `code` / [text](url) → paragraph + inline nodes",
-                "Reference-style links <code>[text][label]</code> + <code>[label]: url</code> → link inline node",
-                "Footnotes <code>[^id]</code> + <code>[^id]: …</code> → numbered superscript + 'Footnotes' section",
-                "Definition lists (term + <code>:&nbsp;definition</code>) → &lt;dl&gt; via html-inline",
-                "Inline HTML allowlist (a, code, em, strong, span, sup, sub, br, mark, kbd, samp, del, ins, abbr) → html-inline pass-through",
-                "Fenced code block → code (language preserved)",
-                "Fenced `mermaid` block → diagram (rendered via the kit's diagram primitive)",
-                "Unordered + ordered lists, including nested → list (with html-inline children)",
-                "Blockquote → callout (type: neutral)",
-                "GFM-style pipe table → table",
-                "Horizontal rule (---) → kit ignores (section borders already separate)"
-              ]
-            }
+          "kind": "heading",
+          "level": 4,
+          "title": "Markdown → kit conversion"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Every Markdown construct maps to a specific kit block or inline node. The table is the source of truth — same row order the converter walks the parse tree."
+        },
+        {
+          "kind": "table",
+          "headers": ["Markdown", "Becomes"],
+          "rows": [
+            ["YAML front-matter (`--- ... ---`)",      "`page.title` + `page.meta`"],
+            ["ATX heading H1",                          "`page.title`"],
+            ["ATX heading H2",                          "`section` (id auto-slugged from title)"],
+            ["ATX heading H3 / H4",                     "`heading` block inside the active section"],
+            ["Paragraph with `**bold**` / `*italic*` / `` `code` `` / `[text](url)`", "`paragraph` + inline nodes"],
+            ["Reference-style links `[text][label]` + `[label]: url`", "link inline node"],
+            ["Footnotes `[^id]` + `[^id]: …`",         "Numbered superscript + a 'Footnotes' section"],
+            ["Definition list (`term\\n: definition`)", "`<dl>` via html-inline"],
+            ["Inline HTML allowlist (`a, code, em, strong, span, sup, sub, br, mark, kbd, samp, del, ins, abbr`)", "html-inline pass-through"],
+            ["Fenced code block (` ```lang `)",         "`code` (language preserved)"],
+            ["Fenced `mermaid` block",                 "`diagram` (rendered via the kit's diagram primitive)"],
+            ["Unordered + ordered lists, nested",      "`list` (with html-inline children)"],
+            ["Blockquote (`>`)",                        "`callout` (type: neutral)"],
+            ["GFM pipe table",                          "`table`"],
+            ["Horizontal rule (`---`)",                 "Ignored — section borders already separate"]
           ]
         },
         {
@@ -243,7 +247,7 @@
             "language": "json",
             "source": "{ \"kind\": \"paragraph\", \"content\": [\n  \"Plain prose with a \",\n  { \"kind\": \"strong\", \"text\": \"bold token\" },\n  \" and a \",\n  { \"kind\": \"code\", \"text\": \"code\" },\n  \" span.\"\n] }"
           },
-          "render": {
+          "output": {
             "kind": "paragraph",
             "content": [
               "Plain prose with a ",
@@ -289,7 +293,7 @@
             "language": "json",
             "source": "{ \"kind\": \"heading\", \"level\": 3, \"title\": \"Sub-heading\", \"id\": \"sub\" }"
           },
-          "render": {
+          "output": {
             "kind": "heading",
             "level": 3,
             "id": "heading-sample-3",
@@ -303,7 +307,7 @@
             "language": "json",
             "source": "{ \"kind\": \"heading\", \"level\": 4, \"title\": \"Sub-sub-heading\" }"
           },
-          "render": {
+          "output": {
             "kind": "heading",
             "level": 4,
             "id": "heading-sample-4",
@@ -323,7 +327,7 @@
             "language": "json",
             "source": "{ \"kind\": \"list\", \"style\": \"bullet\", \"items\": [\n  \"Plain string item.\",\n  [\"Or an array with \", { \"kind\": \"code\", \"text\": \"inline\" }, \" nodes.\"]\n] }"
           },
-          "render": {
+          "output": {
             "kind": "list",
             "style": "bullet",
             "items": [
@@ -346,7 +350,7 @@
             "language": "json",
             "source": "{ \"kind\": \"list\", \"style\": \"numbered\", \"items\": [\"step 1\", \"step 2\", \"step 3\"] }"
           },
-          "render": {
+          "output": {
             "kind": "list",
             "style": "numbered",
             "items": [
@@ -390,7 +394,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"code\",\n  \"language\": \"python\",\n  \"source\": \"def hello():\\n    print('world')\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "code",
             "language": "python",
             "source": "def hello():\n    print('world')"
@@ -454,7 +458,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"annotated-code\",\n  \"language\": \"javascript\",\n  \"source\": \"const x = 1; // (1)\\nfunction greet(name) {\\n  return `Hello, ${name}!`;\\n}\",\n  \"annotations\": [\n    { \"id\": 1, \"content\": \"<code>const</code> creates a block-scoped binding.\" },\n    { \"id\": 2, \"content\": \"Function body — highlights lines 2-4.\", \"lines\": \"2-4\" },\n    { \"id\": 3, \"content\": \"Template-literal interpolation.\", \"match\": \"${name}\" }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "annotated-code",
             "language": "javascript",
             "source": "const x = 1; // (1)\nfunction greet(name) {\n  return `Hello, ${name}!`;\n}",
@@ -568,7 +572,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"warn\",\n  \"title\": \"Watch the lock\",\n  \"content\": \"Compaction holds a metadata lock; long jobs block writers.\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "callout",
             "type": "warn",
             "title": "warn",
@@ -582,7 +586,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"danger\",\n  \"title\": \"danger\",\n  \"content\": \"Red-bordered, used for breaking changes or risks.\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "callout",
             "type": "danger",
             "title": "danger",
@@ -596,7 +600,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"success\",\n  \"title\": \"success\",\n  \"content\": \"Green-bordered, used for confirmations.\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "callout",
             "type": "success",
             "title": "success",
@@ -610,7 +614,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"neutral\",\n  \"title\": \"neutral\",\n  \"content\": \"Gray-bordered, used for general notes.\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "callout",
             "type": "neutral",
             "title": "neutral",
@@ -634,7 +638,7 @@
             "language": "json",
             "source": "{ \"kind\": \"insight\", \"content\": \"The catalog is the locking primitive. Snapshots are the multi-version mechanism.\" }"
           },
-          "render": {
+          "output": {
             "kind": "insight",
             "content": "The catalog is the locking primitive. Snapshots are the multi-version mechanism."
           }
@@ -668,7 +672,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"info-tip\",\n  \"summary\": \"How the lock actually works\",\n  \"content\": [\n    { \"kind\": \"paragraph\", \"content\": \"Two writers race ...\" }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "info-tip",
             "summary": "Click to expand a live info-tip",
             "content": [
@@ -721,7 +725,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"tldr\",\n  \"summary\": \"One-sentence essence.\",\n  \"bullets\": [\n    \"Three to five concrete points.\",\n    \"Each bullet may include inline kinds like glossary terms.\"\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "tldr",
             "title": "TL;DR (example)",
             "summary": "One-sentence essence. The summary line is bigger than bullets and reads first.",
@@ -745,7 +749,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"kpi-grid\",\n  \"tiles\": [\n    { \"num\": \"17\",   \"label\": \"Primitives\" },\n    { \"num\": \"JSON\", \"label\": \"Source\" },\n    { \"num\": \"0\",    \"label\": \"Build steps for content\" }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "kpi-grid",
             "tiles": [
               {
@@ -802,7 +806,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"compare-grid\",\n  \"cards\": [\n    { \"verdict\": \"bad\",  \"title\": \"Before\", \"content\": \"...\" },\n    { \"verdict\": \"good\", \"title\": \"After\",  \"content\": \"...\" }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "compare-grid",
             "cards": [
               {
@@ -861,7 +865,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"compare-grid\",\n  \"cards\": [\n    { \"verdict\": \"in\",  \"title\": \"v1\",     \"items\": [\"...\"] },\n    { \"verdict\": \"out\", \"title\": \"Future\", \"items\": [\"...\"] }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "compare-grid",
             "cards": [
               {
@@ -904,7 +908,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"step-flow\",\n  \"steps\": [\n    { \"num\": \"1\", \"title\": \"Init\",  \"meta\": \"~1 min\", \"content\": \"oku init\" },\n    { \"num\": \"2\", \"title\": \"Author\", \"content\": \"Write the JSON page.\" }\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "step-flow",
             "steps": [
               {
@@ -970,7 +974,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"live-snippet\",\n  \"label\": \"Edit the gradient and message\",\n  \"source\": \"<style>...</style>\\n<div>...</div>\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "live-snippet",
             "label": "Edit the markup — preview updates live",
             "source": "<style>\n  body { margin:0; height:100vh; display:grid; place-items:center;\n         background: linear-gradient(135deg, #115e59, #2dd4bf);\n         font-family: system-ui; }\n  .box { background:white; padding:20px 28px; border-radius:12px;\n         box-shadow:0 8px 24px rgba(0,0,0,0.15); }\n  h1 { margin:0 0 6px; color:#0f766e; font-size:20px; }\n  p  { margin:0; color:#475569; font-size:14px; }\n</style>\n<div class=\"box\">\n  <h1>Try the snippet</h1>\n  <p>Edit the source on the left.</p>\n</div>"
@@ -1018,11 +1022,15 @@
             "language": "json",
             "source": "{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Hover \",\n    { \"kind\": \"glossary-term\", \"term\": \"ACID\", \"text\": \"ACID\" },\n    \" — click to pin; move toward the tooltip to keep it open.\"\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "paragraph",
             "content": [
               "Hover ",
-              { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
+              {
+                "kind": "glossary-term",
+                "term": "ACID",
+                "text": "ACID"
+              },
               " — click to pin; move toward the tooltip to keep it open."
             ]
           }
@@ -1061,11 +1069,15 @@
             "language": "json",
             "source": "{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Powered by \",\n    { \"kind\": \"ext-ref\", \"name\": \"Pagefind\", \"text\": \"Pagefind\" },\n    \" — hover for the card, click to pin, click the inline link to open in a new tab.\"\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "paragraph",
             "content": [
               "Powered by ",
-              { "kind": "ext-ref", "name": "Pagefind", "text": "Pagefind" },
+              {
+                "kind": "ext-ref",
+                "name": "Pagefind",
+                "text": "Pagefind"
+              },
               " — hover for the card, click to pin, click the inline link to open in a new tab."
             ]
           }
@@ -1083,17 +1095,30 @@
             "language": "json",
             "source": "{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Inline \",\n    { \"kind\": \"code\",   \"text\": \"build_manifest()\" },\n    \", \",\n    { \"kind\": \"em\",     \"text\": \"italic\" },\n    \", \",\n    { \"kind\": \"strong\", \"text\": \"bold\" },\n    \", and a \",\n    { \"kind\": \"link\",   \"text\": \"jsDelivr\", \"href\": \"https://cdn.jsdelivr.net\" },\n    \" link (opens in a new tab).\"\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "paragraph",
             "content": [
               "Inline ",
-              { "kind": "code", "text": "build_manifest()" },
+              {
+                "kind": "code",
+                "text": "build_manifest()"
+              },
               ", ",
-              { "kind": "em", "text": "italic" },
+              {
+                "kind": "em",
+                "text": "italic"
+              },
               ", ",
-              { "kind": "strong", "text": "bold" },
+              {
+                "kind": "strong",
+                "text": "bold"
+              },
               ", and a ",
-              { "kind": "link", "text": "jsDelivr", "href": "https://cdn.jsdelivr.net" },
+              {
+                "kind": "link",
+                "text": "jsDelivr",
+                "href": "https://cdn.jsdelivr.net"
+              },
               " link (opens in a new tab)."
             ]
           }
@@ -1105,15 +1130,24 @@
             "language": "json",
             "source": "{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Sanitised inline HTML pass-through: \",\n    { \"kind\": \"html\", \"text\": \"<kbd>Ctrl</kbd>\" },\n    \" + \",\n    { \"kind\": \"html\", \"text\": \"<kbd>C</kbd>\" },\n    \" copies a selection, with H<sub>2</sub>O as a chemistry footnote.\"\n  ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "paragraph",
             "content": [
               "Sanitised inline HTML pass-through: ",
-              { "kind": "html", "text": "<kbd>Ctrl</kbd>" },
+              {
+                "kind": "html",
+                "text": "<kbd>Ctrl</kbd>"
+              },
               " + ",
-              { "kind": "html", "text": "<kbd>C</kbd>" },
+              {
+                "kind": "html",
+                "text": "<kbd>C</kbd>"
+              },
               " copies a selection, with H",
-              { "kind": "html", "text": "<sub>2</sub>" },
+              {
+                "kind": "html",
+                "text": "<sub>2</sub>"
+              },
               "O as a chemistry footnote."
             ]
           }
@@ -1133,64 +1167,178 @@
             {
               "label": "Group",
               "filter": "chips",
-              "values": ["Display", "Behavior", "Top-level"]
+              "values": [
+                "Display",
+                "Behavior",
+                "Top-level"
+              ]
             },
             "Meaning"
           ],
           "rows": [
             [
-              [{"kind": "code", "text": "eyebrow"}],
-              {"value": "Display", "values": ["Display"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "eyebrow"
+                }
+              ],
+              {
+                "value": "Display",
+                "values": [
+                  "Display"
+                ]
+              },
               "Small label above the H1 — \"Architecture\", \"Notes\", \"Reference · charts\". One short noun phrase."
             ],
             [
-              [{"kind": "code", "text": "subtitle"}],
-              {"value": "Display", "values": ["Display"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "subtitle"
+                }
+              ],
+              {
+                "value": "Display",
+                "values": [
+                  "Display"
+                ]
+              },
               "One-paragraph description sitting under the H1 in the cover header. Sets reader expectations for the page."
             ],
             [
-              [{"kind": "code", "text": "audience"}],
-              {"value": "Display", "values": ["Display"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "audience"
+                }
+              ],
+              {
+                "value": "Display",
+                "values": [
+                  "Display"
+                ]
+              },
               "Free-form audience label — \"Spark+Iceberg team\", \"Personal\", \"Maintainer\". Appears in the cover meta row."
             ],
             [
-              [{"kind": "code", "text": "date"}],
-              {"value": "Display", "values": ["Display"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "date"
+                }
+              ],
+              {
+                "value": "Display",
+                "values": [
+                  "Display"
+                ]
+              },
               "ISO date or human string. Shown in the cover meta row. Authors pick the convention — the kit never parses the value."
             ],
             [
-              [{"kind": "code", "text": "read_time"}],
-              {"value": "Display", "values": ["Display"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "read_time"
+                }
+              ],
+              {
+                "value": "Display",
+                "values": [
+                  "Display"
+                ]
+              },
               "Like \"~5 min read\". Appears in the cover meta row. Author-supplied — no autocomputation."
             ],
             [
-              [{"kind": "code", "text": "updated"}],
-              {"value": "Display", "values": ["Display"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "updated"
+                }
+              ],
+              {
+                "value": "Display",
+                "values": [
+                  "Display"
+                ]
+              },
               "Last-updated date. Renders as a quiet italic line under the cover meta row — pure trust signal for freshness."
             ],
             [
-              [{"kind": "code", "text": "order"}],
-              {"value": "Behavior", "values": ["Behavior"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "order"
+                }
+              ],
+              {
+                "value": "Behavior",
+                "values": [
+                  "Behavior"
+                ]
+              },
               "Sort key in the site-tree nav. Lower numbers sort earlier; ties fall back to title."
             ],
             [
-              [{"kind": "code", "text": "summary"}],
-              {"value": "Behavior", "values": ["Behavior"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "summary"
+                }
+              ],
+              {
+                "value": "Behavior",
+                "values": [
+                  "Behavior"
+                ]
+              },
               "Single line. Used in nav tooltips, llms.txt entries, and search excerpts."
             ],
             [
-              [{"kind": "code", "text": "lang"}],
-              {"value": "Behavior", "values": ["Behavior"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "lang"
+                }
+              ],
+              {
+                "value": "Behavior",
+                "values": [
+                  "Behavior"
+                ]
+              },
               "Locale code — \"en\", \"tr\", or anything the kit knows. Overrides the project default on this page only."
             ],
             [
-              [{"kind": "code", "text": "parent"}],
-              {"value": "Behavior", "values": ["Behavior"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "parent"
+                }
+              ],
+              {
+                "value": "Behavior",
+                "values": [
+                  "Behavior"
+                ]
+              },
               "Page id of the parent. Nests this page under it in the site tree (charts / tables / diagrams under Reference, etc.)."
             ],
             [
-              [{"kind": "code", "text": "accent"}],
-              {"value": "Top-level", "values": ["Top-level"]},
+              [
+                {
+                  "kind": "code",
+                  "text": "accent"
+                }
+              ],
+              {
+                "value": "Top-level",
+                "values": [
+                  "Top-level"
+                ]
+              },
               "Sits on the page root, not under meta. Named token (teal, amber, indigo, rose…) or any valid CSS color."
             ]
           ]
@@ -1382,7 +1530,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"meta\": {\n    \"date\": \"2026-05-10\",\n    \"updated\": \"2026-05-18\",\n    \"read_time\": \"~3 min\"\n  },\n  \"blocks\": [ ... ]\n}"
           },
-          "render": {
+          "output": {
             "kind": "paragraph",
             "content": [
               {
@@ -1409,7 +1557,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"note\",\n  \"title\": \"note · alias of neutral\",\n  \"content\": \"...\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "callout",
             "type": "note",
             "title": "note · alias of neutral",
@@ -1423,7 +1571,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"tip\",\n  \"title\": \"tip · alias of success\",\n  \"content\": \"...\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "callout",
             "type": "tip",
             "title": "tip · alias of success",
@@ -1437,7 +1585,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"info\",\n  \"title\": \"info\",\n  \"content\": \"...\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "callout",
             "type": "info",
             "title": "info · alias of neutral with informational tint",
@@ -1451,7 +1599,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"caution\",\n  \"title\": \"caution · alias of warning\",\n  \"content\": \"...\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "callout",
             "type": "caution",
             "title": "caution · alias of warning",

@@ -47,7 +47,7 @@
             "language": "json",
             "source": "{\n  \"kind\": \"diagram\",\n  \"caption\": \"Optional caption below the diagram.\",\n  \"source\": \"flowchart LR\\n  A[JSON page] --> B(renderer)\\n  B --> C[DOM]\"\n}"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "caption": "Build pipeline at a glance.",
             "source": "flowchart LR\n    JSON[*.json pages] --> RJ[renderer.js]\n    RJ --> DOM[Custom Element DOM]\n    KIT[kit.json + glossary] --> CJ[chrome.js]\n    CJ --> DOM"
@@ -80,7 +80,7 @@
             "language": "mermaid",
             "source": "sequenceDiagram\n  participant Reader\n  participant Renderer\n  Reader->>Renderer: open page\n  Renderer-->>Reader: hydrated DOM"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "source": "sequenceDiagram\n  participant Reader\n  participant Renderer\n  Reader->>Renderer: open page\n  Renderer-->>Reader: hydrated DOM"
           }
@@ -102,7 +102,7 @@
             "language": "mermaid",
             "source": "stateDiagram-v2\n  [*] --> Draft\n  Draft --> Review : submit\n  Review --> Draft : reject\n  Review --> Published : approve\n  Published --> [*]"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "source": "stateDiagram-v2\n  [*] --> Draft\n  Draft --> Review : submit\n  Review --> Draft : reject\n  Review --> Published : approve\n  Published --> [*]"
           }
@@ -124,7 +124,7 @@
             "language": "mermaid",
             "source": "erDiagram\n  PAGE ||--o{ BLOCK : contains\n  BLOCK ||--o{ INLINE : holds"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "source": "erDiagram\n  PAGE ||--o{ BLOCK : contains\n  BLOCK ||--o{ INLINE : holds"
           }
@@ -146,7 +146,7 @@
             "language": "mermaid",
             "source": "classDiagram\n  class OkuRenderer {\n    +render(json)\n    -_renderBlock(b)\n  }\n  class OkuChart\n  OkuRenderer --> OkuChart"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "source": "classDiagram\n  class OkuRenderer {\n    +render(json)\n    -_renderBlock(b)\n  }\n  class OkuChart\n  OkuRenderer --> OkuChart"
           }
@@ -168,7 +168,7 @@
             "language": "mermaid",
             "source": "gantt\n  title oku 1.0\n  dateFormat YYYY-MM-DD\n  section Foundations\n  P0 cleanup       :done, 2026-05-24, 1d\n  P1 components    :done, 2026-05-24, 1d\n  section Charts\n  P2 interactivity :done, 2026-05-24, 1d\n  section Content\n  P3 reference     :done, 2026-05-24, 1d\n  P4 markdown      :done, 2026-05-24, 1d"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "source": "gantt\n  title oku 1.0\n  dateFormat YYYY-MM-DD\n  section Foundations\n  P0 cleanup       :done, 2026-05-24, 1d\n  P1 components    :done, 2026-05-24, 1d\n  section Charts\n  P2 interactivity :done, 2026-05-24, 1d\n  section Content\n  P3 reference     :done, 2026-05-24, 1d\n  P4 markdown      :done, 2026-05-24, 1d"
           }
@@ -190,7 +190,7 @@
             "language": "mermaid",
             "source": "pie title Where time goes\n  \"chrome.js\" : 40\n  \"chrome.css\" : 25\n  \"renderer.js\" : 15\n  \"cli.py\" : 12\n  \"docs\" : 8"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "source": "pie title Where time goes\n  \"chrome.js\" : 40\n  \"chrome.css\" : 25\n  \"renderer.js\" : 15\n  \"cli.py\" : 12\n  \"docs\" : 8"
           }
@@ -212,7 +212,7 @@
             "language": "mermaid",
             "source": "journey\n  title Adopt the kit\n  section Setup\n    Discover repo : 4 : Author\n    Run init      : 5 : Author\n  section Author\n    Add a page    : 4 : Author\n    Build site    : 5 : Author"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "source": "journey\n  title Adopt the kit\n  section Setup\n    Discover repo : 4 : Author\n    Run init      : 5 : Author\n  section Author\n    Add a page    : 4 : Author\n    Build site    : 5 : Author"
           }
@@ -234,7 +234,7 @@
             "language": "mermaid",
             "source": "mindmap\n  root((oku))\n    Authoring\n      JSON\n      Markdown\n    Runtime\n      chrome.js\n      renderer.js\n    Build\n      site\n      standalone\n      markdown"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "source": "mindmap\n  root((oku))\n    Authoring\n      JSON\n      Markdown\n    Runtime\n      chrome.js\n      renderer.js\n    Build\n      site\n      standalone\n      markdown"
           }
@@ -256,7 +256,7 @@
             "language": "mermaid",
             "source": "timeline\n  title oku roadmap\n  section Foundations\n    2026-05-24 : P0 cleanup\n    2026-05-24 : P1 components\n  section Charts\n    2026-05-24 : P2 interactivity\n  section Content\n    2026-05-24 : P3 reference\n    2026-05-24 : P4 markdown parity"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "source": "timeline\n  title oku roadmap\n  section Foundations\n    2026-05-24 : P0 cleanup\n    2026-05-24 : P1 components\n  section Charts\n    2026-05-24 : P2 interactivity\n  section Content\n    2026-05-24 : P3 reference\n    2026-05-24 : P4 markdown parity"
           }
@@ -278,7 +278,7 @@
             "language": "mermaid",
             "source": "sankey-beta\n\nVisitors,Signups,40\nVisitors,Bounced,60\nSignups,Activated,25\nSignups,Dropped,15"
           },
-          "render": {
+          "output": {
             "kind": "diagram",
             "source": "sankey-beta\n\nVisitors,Signups,40\nVisitors,Bounced,60\nSignups,Activated,25\nSignups,Dropped,15"
           }
