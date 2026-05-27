@@ -2460,7 +2460,13 @@ details.info-tip > *:not(summary) p:last-child { margin-bottom: 0; }
 .bar-chart { display: grid; gap: 6px; margin: 24px 0; }
 .bar-row {
   display: grid;
-  grid-template-columns: 160px 1fr 56px;
+  /* Adaptive columns: label shrinks with available width, track
+     consumes the remainder (minmax(0,...) lets it actually shrink
+     to zero in tight containers like compare-card previews), value
+     auto-fits. Previously the label was a fixed 160px which made
+     the track collapse to 0 inside ~145px compare-card mini-renders
+     — bars were invisible. */
+  grid-template-columns: minmax(40px, max-content) minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   font-size: 13.5px;
