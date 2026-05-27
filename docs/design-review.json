@@ -158,6 +158,48 @@
               ]
             },
             {
+              "title": "Q1 — toolbar bugs fixed (gear svg + button order + bar previews)",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Gear svg in tables was rendering 0×0; sized to 14×14. Toolbar order normalised across charts + tables + diagrams: data-output actions on the left, separator, then chart-side affordances (Configure · Expand). Bar / stacked-bar / grouped-bar / bullet previews inside the picker cards were invisible (160px label column collapsed the 1fr track to 0); switched the grid to `minmax(40px, max-content) minmax(0, 1fr) auto`."}
+              ]
+            },
+            {
+              "title": "Q2 — instant theme swap",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "A temporary `.okt-theme-swapping` class on `<html>` silences every transition for the two frames around the data-theme flip. The page repaints in one pass instead of every transition animating independently."}
+              ]
+            },
+            {
+              "title": "Q4 — docs reorg (Tables → Charts → Diagrams; scatter heading split; new viz categorised)",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Index step-flow reorders to Reference · Tables · Charts · Diagrams. The chart-scatter-line heading split into its own `type: scatter` section. The 8 new chart sections (dot-plot, density, candlestick, sunburst, marimekko, stream, violin, beeswarm) move from the intro into family-categorical / family-distribution / family-trend / family-partwhole."}
+              ]
+            },
+            {
+              "title": "Q5 — tooltips scroll-follow their anchor",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Tooltips remain `position: fixed` (so they sit above the lightbox) but now track their anchor's getBoundingClientRect on scroll / resize. The reader can open a tooltip, scroll, and the tooltip slides along with the chart. requestAnimationFrame coalesces multiple scroll events into one paint."}
+              ]
+            },
+            {
+              "title": "Q6 — legend hover highlight",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Hovering or focusing a legend entry fades every other series / slice / segment / radar-area to opacity 0.18; the matching shape stays at 1 with an accent drop-shadow. Works on Cartesian and non-Cartesian charts. Released on mouseleave / blur."}
+              ]
+            },
+            {
+              "title": "Q10 — mermaid interactivity (basic)",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Hover on a mermaid node now triggers an accent drop-shadow + accent stroke. Click handlers are native to mermaid via `click NodeId \"url\"`. Pan/zoom is the same shared lightbox stage."}
+              ]
+            },
+            {
               "title": "E — quiet table chrome",
               "accent": "success",
               "blocks": [
@@ -673,6 +715,18 @@
              "Continue the dual-form refactor family-by-family (after plot)",
              "Plot family migrated; arc / bar / categorical / flow remaining.",
              "Each family takes ~1 session. Same desugar-at-entry pattern. Tests guard each step (the alias surface keeps every existing page rendering identically)."],
+            ["Q7",
+             "Vertical cursor on ALL chart types (bar, box-plot, etc.)",
+             "Currently Cartesian / ridgeline / sparkline only.",
+             "Per-chart wiring needed. Bar / box-plot / heatmap / calendar most useful. Defer to next round — substantial work per chart."],
+            ["Q8",
+             "Vertical / horizontal orientation switch (violin, etc.)",
+             "Bar already has it via mode; extend to violin / other distribution charts.",
+             "Add `orientation: vertical | horizontal` property. Each renderer that supports both axes can opt in. Defer to next round."],
+            ["Q9",
+             "Elegant label-vs-datapoint collision avoidance (quadrant + general)",
+             "Quadrant labels obscure data points.",
+             "General solution: when labels would overlap data, push labels to chart edges OR make them transparent on hover. Defer to next round; needs design decision before coding."]
             ["3",
              "Which catalogue-research visualizations to add next?",
              "User picks from the top-8 list.",
