@@ -5227,9 +5227,22 @@ class OkuChart extends HTMLElement {
     var x = (this._extras && this._extras.slope) || {};
     var items = x.items || [];
     if (!items.length) return;
+    // Right-pad scales with the longest endpoint readout ("value · label") so
+    // the labels never clip past the SVG edge. Empirically ~6 viewBox-units
+    // per character covers our 11px label font + an 8px gutter.
+    var maxRightLen = items.reduce(function (acc, it) {
+      var s = fmtNum(+it.to || 0) + ' · ' + (it.label || '');
+      return Math.max(acc, s.length);
+    }, 6);
+    var rightPad = Math.max(80, 24 + maxRightLen * 6);
+    // Title + "Before/After" column-head row need vertical breathing room so
+    // the title (y=22) doesn't collide with the column heads (y=pad.top-12).
+    // With pad.top=44 the column heads sit at y=32 — 10px below the title.
+    // Bump pad.top so column heads land at y≥40.
+    var topPad = this._title ? 56 : 30;
     var W = 480, H = 60 + items.length * 12 + 40;
     if (H < 240) H = 240;
-    var pad = { top: this._title ? 44 : 30, bottom: 30, left: 80, right: 80 };
+    var pad = { top: topPad, bottom: 30, left: 80, right: rightPad };
     var plotH = H - pad.top - pad.bottom;
     var allVals = items.reduce(function (acc, it) { acc.push(+it.from || 0, +it.to || 0); return acc; }, []);
     var vmin = Math.min.apply(null, allVals), vmax = Math.max.apply(null, allVals);
