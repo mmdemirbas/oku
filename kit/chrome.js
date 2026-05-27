@@ -2277,8 +2277,16 @@ function _hdtAfterPrismHighlight(env) {
     pill.textContent = lang;
   }
   if (/^(js|javascript|ts|typescript|jsx|tsx|json|json5|css|scss|less)$/.test(lang)) {
-    var folds = _hdtDetectBraceFolds(code);
-    if (folds.length) _hdtApplyFolds(pre, code, folds);
+    // Skip fold detection on short blocks. A 3-line shell command
+    // doesn't benefit from fold markers in the gutter — the chrome
+    // costs more attention than the affordance pays back. Threshold
+    // matches the user's design-review proposal ("fold markers only
+    // for ≥ 8-line blocks").
+    var lineCount = code.querySelectorAll(':scope > .okt-code-line').length;
+    if (lineCount >= 8) {
+      var folds = _hdtDetectBraceFolds(code);
+      if (folds.length) _hdtApplyFolds(pre, code, folds);
+    }
   }
 }
 

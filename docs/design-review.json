@@ -325,11 +325,11 @@
              "Stays static",
              "Earlier polish locked it as a flush corner label. A regression test forbids hover state. Future trim: only render when the block sits inside a multi-language sequence — needs chrome.js detection, not pure CSS."],
             ["Code fold markers",
-             "Pending",
-             "Currently rendered on every foldable line. Consider only for blocks ≥ 8 lines (matches the user's earlier proposal)."],
+             "**Shipped**",
+             "Fold detection skipped on blocks under 8 lines. Short blocks no longer add gutter chevrons — a 3-line shell command stays clean."],
             ["Sidebar resize / collapse affordances",
-             "Pending",
-             "Drag-handle is full-edge but visible. Could fade off-hover, brighten on hover. Consider after C lands."]
+             "Already quiet",
+             "Drag handle resting state is a 2px bar in `--border-soft`; widens to 20px on hover and brightens to `--accent-strong`. Reviewed in this round and judged already at the right level — further fade would make it undiscoverable."]
           ]
         }
       ]
