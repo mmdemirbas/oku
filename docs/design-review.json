@@ -69,10 +69,10 @@
              "Add the top-8 catalogue visualizations",
              "**Yes — all eight.** dot-plot, density, candlestick, sunburst, marimekko, stream, violin, beeswarm. Each gets a renderer, a schema entry, a doc section, an example pair, and a card in the appropriate function group. Chart-type count: 29 → 37.",
              "Shipped"],
-            ["S (the big one)",
+            ["S",
              "First-principles refactor — dual-form: keep type aliases for AI, ALSO expose canonical `mark + encoding + data`",
-             "**Greenlit by the user.** Multi-session work. Plot family is the obvious starting point (already half there via the marks unification). Other families follow one at a time, with tests guarding every step.",
-             "Open — R1 in progress (plot family proof of concept)"]
+             "**Plot family proof of concept shipped.** Canonical input — `data` (record array) + `encoding` (field→channel map: x/y/color/size/label) + `marks` (composition) — desugars at the renderer entry and routes through the existing series-based code path. Other families follow one at a time.",
+             "Plot: Shipped · Arc/Bar/Cat/Flow: pending"]
           ]
         }
       ]
@@ -148,6 +148,13 @@
               "accent": "success",
               "blocks": [
                 {"kind": "paragraph", "content": "From the catalogue-research top-8: **dot-plot · density · candlestick · sunburst · marimekko · stream · violin · beeswarm**. Each has a doc section + an example pair + a card in the appropriate function group. Chart-type count rises from 29 to 37."}
+              ]
+            },
+            {
+              "title": "R1 — dual-form refactor (plot family)",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Plot family accepts the canonical Vega-Lite-style input: `data: [...records]` + `encoding: { x, y, color, size, label }` + `marks: [...]`. Legacy `series` shape keeps working. The desugar runs at the renderer entry; downstream code is untouched. Same pattern is the template for arc / bar / categorical / flow in upcoming rounds."}
               ]
             },
             {
@@ -664,8 +671,8 @@
           "rows": [
             ["1",
              "Continue the dual-form refactor family-by-family (after plot)",
-             "Plot family migration ships first; arc / bar / categorical / flow follow.",
-             "Each family takes ~1 session. Tests guard each step (the alias surface keeps every existing page rendering identically)."],
+             "Plot family migrated; arc / bar / categorical / flow remaining.",
+             "Each family takes ~1 session. Same desugar-at-entry pattern. Tests guard each step (the alias surface keeps every existing page rendering identically)."],
             ["3",
              "Which catalogue-research visualizations to add next?",
              "User picks from the top-8 list.",
