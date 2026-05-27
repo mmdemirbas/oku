@@ -344,6 +344,44 @@
                   ]
                 }
               ]
+            },
+            {
+              "title": "dot-plot",
+              "href": "#chart-dot-plot",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "dot-plot",
+                  "title": "Adoption by team",
+                  "rows": [
+                    {
+                      "label": "infra",
+                      "value": 84,
+                      "color": "accent"
+                    },
+                    {
+                      "label": "platform",
+                      "value": 72,
+                      "color": "accent"
+                    },
+                    {
+                      "label": "growth",
+                      "value": 58,
+                      "color": "warn"
+                    },
+                    {
+                      "label": "ops",
+                      "value": 49,
+                      "color": "warn"
+                    },
+                    {
+                      "label": "billing",
+                      "value": 31,
+                      "color": "danger"
+                    }
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -486,6 +524,116 @@
                   }
                 }
               ]
+            },
+            {
+              "title": "candlestick",
+              "href": "#chart-candlestick",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "candlestick",
+                  "title": "Daily price action",
+                  "entries": [
+                    {
+                      "date": "Mon",
+                      "open": 100,
+                      "high": 108,
+                      "low": 98,
+                      "close": 105
+                    },
+                    {
+                      "date": "Tue",
+                      "open": 105,
+                      "high": 112,
+                      "low": 102,
+                      "close": 110
+                    },
+                    {
+                      "date": "Wed",
+                      "open": 110,
+                      "high": 115,
+                      "low": 99,
+                      "close": 101
+                    },
+                    {
+                      "date": "Thu",
+                      "open": 101,
+                      "high": 104,
+                      "low": 92,
+                      "close": 94
+                    },
+                    {
+                      "date": "Fri",
+                      "open": 94,
+                      "high": 102,
+                      "low": 92,
+                      "close": 100
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "stream",
+              "href": "#chart-stream",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "stream",
+                  "title": "Page views by source",
+                  "categories": [
+                    "W1",
+                    "W2",
+                    "W3",
+                    "W4",
+                    "W5",
+                    "W6",
+                    "W7",
+                    "W8"
+                  ],
+                  "series": [
+                    {
+                      "label": "direct",
+                      "values": [
+                        60,
+                        80,
+                        75,
+                        90,
+                        110,
+                        120,
+                        100,
+                        95
+                      ]
+                    },
+                    {
+                      "label": "organic",
+                      "values": [
+                        40,
+                        55,
+                        70,
+                        85,
+                        90,
+                        95,
+                        110,
+                        130
+                      ]
+                    },
+                    {
+                      "label": "referral",
+                      "values": [
+                        20,
+                        30,
+                        28,
+                        45,
+                        55,
+                        60,
+                        70,
+                        80
+                      ]
+                    }
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -607,6 +755,196 @@
                   ]
                 }
               ]
+            },
+            {
+              "title": "density",
+              "href": "#chart-density",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "density",
+                  "title": "Response time density",
+                  "values": [
+                    120,
+                    130,
+                    145,
+                    150,
+                    155,
+                    160,
+                    162,
+                    168,
+                    170,
+                    172,
+                    175,
+                    178,
+                    180,
+                    180,
+                    183,
+                    188,
+                    190,
+                    195,
+                    200,
+                    210,
+                    215,
+                    225,
+                    240,
+                    260,
+                    290,
+                    340,
+                    400,
+                    520,
+                    150,
+                    165,
+                    180,
+                    195,
+                    220
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "violin",
+              "href": "#chart-violin",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "violin",
+                  "title": "Latency by region",
+                  "distributions": [
+                    {
+                      "label": "us-east",
+                      "color": "accent",
+                      "values": [
+                        120,
+                        125,
+                        128,
+                        130,
+                        135,
+                        138,
+                        140,
+                        142,
+                        145,
+                        148,
+                        150,
+                        150,
+                        155,
+                        160,
+                        162,
+                        168,
+                        170,
+                        175,
+                        180,
+                        200
+                      ]
+                    },
+                    {
+                      "label": "eu-west",
+                      "color": "success",
+                      "values": [
+                        80,
+                        82,
+                        85,
+                        90,
+                        92,
+                        95,
+                        98,
+                        100,
+                        102,
+                        105,
+                        108,
+                        110,
+                        110,
+                        112,
+                        115,
+                        118,
+                        120,
+                        125,
+                        130,
+                        140
+                      ]
+                    },
+                    {
+                      "label": "ap-south",
+                      "color": "warn",
+                      "values": [
+                        200,
+                        210,
+                        215,
+                        220,
+                        225,
+                        230,
+                        235,
+                        240,
+                        245,
+                        248,
+                        250,
+                        252,
+                        255,
+                        260,
+                        270,
+                        280,
+                        290,
+                        310,
+                        340,
+                        400
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "beeswarm",
+              "href": "#chart-beeswarm",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "beeswarm",
+                  "title": "Survey scores",
+                  "values": [
+                    3,
+                    5,
+                    4,
+                    6,
+                    7,
+                    8,
+                    7,
+                    6,
+                    7,
+                    8,
+                    8,
+                    9,
+                    7,
+                    6,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    8,
+                    7,
+                    6,
+                    7,
+                    8,
+                    9,
+                    5,
+                    4,
+                    6,
+                    7,
+                    8,
+                    7,
+                    8,
+                    9,
+                    10,
+                    7,
+                    8,
+                    6,
+                    5,
+                    7,
+                    8
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -707,6 +1045,52 @@
                       "label": "todo",
                       "count": 58,
                       "color": "muted"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "marimekko",
+              "href": "#chart-marimekko",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "marimekko",
+                  "title": "Revenue mix by quarter",
+                  "categories": [
+                    "Q1",
+                    "Q2",
+                    "Q3",
+                    "Q4"
+                  ],
+                  "series": [
+                    {
+                      "label": "new",
+                      "values": [
+                        120,
+                        180,
+                        240,
+                        290
+                      ]
+                    },
+                    {
+                      "label": "renewal",
+                      "values": [
+                        260,
+                        280,
+                        320,
+                        360
+                      ]
+                    },
+                    {
+                      "label": "upsell",
+                      "values": [
+                        60,
+                        90,
+                        140,
+                        180
+                      ]
                     }
                   ]
                 }
@@ -1061,6 +1445,56 @@
                   ]
                 }
               ]
+            },
+            {
+              "title": "sunburst",
+              "href": "#chart-sunburst",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "sunburst",
+                  "title": "Compute budget",
+                  "tree": {
+                    "label": "root",
+                    "children": [
+                      {
+                        "label": "infra",
+                        "children": [
+                          {
+                            "label": "compute",
+                            "value": 34
+                          },
+                          {
+                            "label": "storage",
+                            "value": 18
+                          },
+                          {
+                            "label": "network",
+                            "value": 12
+                          }
+                        ]
+                      },
+                      {
+                        "label": "product",
+                        "children": [
+                          {
+                            "label": "web",
+                            "value": 22
+                          },
+                          {
+                            "label": "api",
+                            "value": 28
+                          },
+                          {
+                            "label": "jobs",
+                            "value": 14
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
             }
           ]
         },
@@ -1202,6 +1636,536 @@
               ]
             }
           ]
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-dot-plot",
+          "title": "type: dot-plot"
+        },
+        {
+          "kind": "paragraph",
+          "content": "One row per category, a single dot at the value. Compact comparison shape — like a horizontal bar stripped to just the endpoint. Use when bar length itself adds visual noise (ratios near each other, ordered lists)."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"dot-plot\",\n  \"title\": \"Adoption by team\",\n  \"rows\": [\n    {\n      \"label\": \"infra\",\n      \"value\": 84,\n      \"color\": \"accent\"\n    },\n    {\n      \"label\": \"platform\",\n      \"value\": 72,\n      \"color\": \"accent\"\n    },\n    {\n      \"label\": \"growth\",\n      \"value\": 58,\n      \"color\": \"warn\"\n    },\n    {\n      \"label\": \"ops\",\n      \"value\": 49,\n      \"color\": \"warn\"\n    },\n    {\n      \"label\": \"billing\",\n      \"value\": 31,\n      \"color\": \"danger\"\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "dot-plot",
+            "title": "Adoption by team",
+            "rows": [
+              {
+                "label": "infra",
+                "value": 84,
+                "color": "accent"
+              },
+              {
+                "label": "platform",
+                "value": 72,
+                "color": "accent"
+              },
+              {
+                "label": "growth",
+                "value": 58,
+                "color": "warn"
+              },
+              {
+                "label": "ops",
+                "value": 49,
+                "color": "warn"
+              },
+              {
+                "label": "billing",
+                "value": 31,
+                "color": "danger"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-density",
+          "title": "type: density"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Smoothed histogram via Gaussian KDE. Reads like a histogram without the bin-boundary artefacts. Default bandwidth is Silverman's rule; override with bandwidth for tighter or smoother curves."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"density\",\n  \"title\": \"Response time density\",\n  \"values\": [\n    120,\n    130,\n    145,\n    150,\n    155,\n    160,\n    162,\n    168,\n    170,\n    172,\n    175,\n    178,\n    180,\n    180,\n    183,\n    188,\n    190,\n    195,\n    200,\n    210,\n    215,\n    225,\n    240,\n    260,\n    290,\n    340,\n    400,\n    520,\n    150,\n    165,\n    180,\n    195,\n    220\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "density",
+            "title": "Response time density",
+            "values": [
+              120,
+              130,
+              145,
+              150,
+              155,
+              160,
+              162,
+              168,
+              170,
+              172,
+              175,
+              178,
+              180,
+              180,
+              183,
+              188,
+              190,
+              195,
+              200,
+              210,
+              215,
+              225,
+              240,
+              260,
+              290,
+              340,
+              400,
+              520,
+              150,
+              165,
+              180,
+              195,
+              220
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-candlestick",
+          "title": "type: candlestick"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Financial OHLC. Each entry is one trading period; up days (close ≥ open) in success colour, down days in danger. Body from open→close, wick from low→high."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"candlestick\",\n  \"title\": \"Daily price action\",\n  \"entries\": [\n    {\n      \"date\": \"Mon\",\n      \"open\": 100,\n      \"high\": 108,\n      \"low\": 98,\n      \"close\": 105\n    },\n    {\n      \"date\": \"Tue\",\n      \"open\": 105,\n      \"high\": 112,\n      \"low\": 102,\n      \"close\": 110\n    },\n    {\n      \"date\": \"Wed\",\n      \"open\": 110,\n      \"high\": 115,\n      \"low\": 99,\n      \"close\": 101\n    },\n    {\n      \"date\": \"Thu\",\n      \"open\": 101,\n      \"high\": 104,\n      \"low\": 92,\n      \"close\": 94\n    },\n    {\n      \"date\": \"Fri\",\n      \"open\": 94,\n      \"high\": 102,\n      \"low\": 92,\n      \"close\": 100\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "candlestick",
+            "title": "Daily price action",
+            "entries": [
+              {
+                "date": "Mon",
+                "open": 100,
+                "high": 108,
+                "low": 98,
+                "close": 105
+              },
+              {
+                "date": "Tue",
+                "open": 105,
+                "high": 112,
+                "low": 102,
+                "close": 110
+              },
+              {
+                "date": "Wed",
+                "open": 110,
+                "high": 115,
+                "low": 99,
+                "close": 101
+              },
+              {
+                "date": "Thu",
+                "open": 101,
+                "high": 104,
+                "low": 92,
+                "close": 94
+              },
+              {
+                "date": "Fri",
+                "open": 94,
+                "high": 102,
+                "low": 92,
+                "close": 100
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-sunburst",
+          "title": "type: sunburst"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Radial hierarchy. Concentric arcs per depth ring; arc length proportional to node value sum. Like a treemap but radial — reads better for shallow, broad trees with named outer leaves."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sunburst\",\n  \"title\": \"Compute budget\",\n  \"tree\": {\n    \"label\": \"root\",\n    \"children\": [\n      {\n        \"label\": \"infra\",\n        \"children\": [\n          {\n            \"label\": \"compute\",\n            \"value\": 34\n          },\n          {\n            \"label\": \"storage\",\n            \"value\": 18\n          },\n          {\n            \"label\": \"network\",\n            \"value\": 12\n          }\n        ]\n      },\n      {\n        \"label\": \"product\",\n        \"children\": [\n          {\n            \"label\": \"web\",\n            \"value\": 22\n          },\n          {\n            \"label\": \"api\",\n            \"value\": 28\n          },\n          {\n            \"label\": \"jobs\",\n            \"value\": 14\n          }\n        ]\n      }\n    ]\n  }\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "sunburst",
+            "title": "Compute budget",
+            "tree": {
+              "label": "root",
+              "children": [
+                {
+                  "label": "infra",
+                  "children": [
+                    {
+                      "label": "compute",
+                      "value": 34
+                    },
+                    {
+                      "label": "storage",
+                      "value": 18
+                    },
+                    {
+                      "label": "network",
+                      "value": 12
+                    }
+                  ]
+                },
+                {
+                  "label": "product",
+                  "children": [
+                    {
+                      "label": "web",
+                      "value": 22
+                    },
+                    {
+                      "label": "api",
+                      "value": 28
+                    },
+                    {
+                      "label": "jobs",
+                      "value": 14
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-marimekko",
+          "title": "type: marimekko"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Variable-width stacked bar — each column's WIDTH is proportional to that column's total, so the chart shows both within-column proportions AND across-column magnitudes in one view."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"marimekko\",\n  \"title\": \"Revenue mix by quarter\",\n  \"categories\": [\n    \"Q1\",\n    \"Q2\",\n    \"Q3\",\n    \"Q4\"\n  ],\n  \"series\": [\n    {\n      \"label\": \"new\",\n      \"values\": [\n        120,\n        180,\n        240,\n        290\n      ]\n    },\n    {\n      \"label\": \"renewal\",\n      \"values\": [\n        260,\n        280,\n        320,\n        360\n      ]\n    },\n    {\n      \"label\": \"upsell\",\n      \"values\": [\n        60,\n        90,\n        140,\n        180\n      ]\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "marimekko",
+            "title": "Revenue mix by quarter",
+            "categories": [
+              "Q1",
+              "Q2",
+              "Q3",
+              "Q4"
+            ],
+            "series": [
+              {
+                "label": "new",
+                "values": [
+                  120,
+                  180,
+                  240,
+                  290
+                ]
+              },
+              {
+                "label": "renewal",
+                "values": [
+                  260,
+                  280,
+                  320,
+                  360
+                ]
+              },
+              {
+                "label": "upsell",
+                "values": [
+                  60,
+                  90,
+                  140,
+                  180
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-stream",
+          "title": "type: stream"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Centered stacked area. Each layer is centred on the x-axis instead of stacking from the bottom. Useful for showing composition trends where the total varies; the centred shape reads as a flowing stream."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"stream\",\n  \"title\": \"Page views by source\",\n  \"categories\": [\n    \"W1\",\n    \"W2\",\n    \"W3\",\n    \"W4\",\n    \"W5\",\n    \"W6\",\n    \"W7\",\n    \"W8\"\n  ],\n  \"series\": [\n    {\n      \"label\": \"direct\",\n      \"values\": [\n        60,\n        80,\n        75,\n        90,\n        110,\n        120,\n        100,\n        95\n      ]\n    },\n    {\n      \"label\": \"organic\",\n      \"values\": [\n        40,\n        55,\n        70,\n        85,\n        90,\n        95,\n        110,\n        130\n      ]\n    },\n    {\n      \"label\": \"referral\",\n      \"values\": [\n        20,\n        30,\n        28,\n        45,\n        55,\n        60,\n        70,\n        80\n      ]\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "stream",
+            "title": "Page views by source",
+            "categories": [
+              "W1",
+              "W2",
+              "W3",
+              "W4",
+              "W5",
+              "W6",
+              "W7",
+              "W8"
+            ],
+            "series": [
+              {
+                "label": "direct",
+                "values": [
+                  60,
+                  80,
+                  75,
+                  90,
+                  110,
+                  120,
+                  100,
+                  95
+                ]
+              },
+              {
+                "label": "organic",
+                "values": [
+                  40,
+                  55,
+                  70,
+                  85,
+                  90,
+                  95,
+                  110,
+                  130
+                ]
+              },
+              {
+                "label": "referral",
+                "values": [
+                  20,
+                  30,
+                  28,
+                  45,
+                  55,
+                  60,
+                  70,
+                  80
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-violin",
+          "title": "type: violin"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Kernel-density box-plot alternative. Per-distribution mirrored density curve (the violin body) + IQR rectangle + median line. Shows shape AND quartiles where the box-plot only shows quartiles."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"violin\",\n  \"title\": \"Latency by region\",\n  \"distributions\": [\n    {\n      \"label\": \"us-east\",\n      \"color\": \"accent\",\n      \"values\": [\n        120,\n        125,\n        128,\n        130,\n        135,\n        138,\n        140,\n        142,\n        145,\n        148,\n        150,\n        150,\n        155,\n        160,\n        162,\n        168,\n        170,\n        175,\n        180,\n        200\n      ]\n    },\n    {\n      \"label\": \"eu-west\",\n      \"color\": \"success\",\n      \"values\": [\n        80,\n        82,\n        85,\n        90,\n        92,\n        95,\n        98,\n        100,\n        102,\n        105,\n        108,\n        110,\n        110,\n        112,\n        115,\n        118,\n        120,\n        125,\n        130,\n        140\n      ]\n    },\n    {\n      \"label\": \"ap-south\",\n      \"color\": \"warn\",\n      \"values\": [\n        200,\n        210,\n        215,\n        220,\n        225,\n        230,\n        235,\n        240,\n        245,\n        248,\n        250,\n        252,\n        255,\n        260,\n        270,\n        280,\n        290,\n        310,\n        340,\n        400\n      ]\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "violin",
+            "title": "Latency by region",
+            "distributions": [
+              {
+                "label": "us-east",
+                "color": "accent",
+                "values": [
+                  120,
+                  125,
+                  128,
+                  130,
+                  135,
+                  138,
+                  140,
+                  142,
+                  145,
+                  148,
+                  150,
+                  150,
+                  155,
+                  160,
+                  162,
+                  168,
+                  170,
+                  175,
+                  180,
+                  200
+                ]
+              },
+              {
+                "label": "eu-west",
+                "color": "success",
+                "values": [
+                  80,
+                  82,
+                  85,
+                  90,
+                  92,
+                  95,
+                  98,
+                  100,
+                  102,
+                  105,
+                  108,
+                  110,
+                  110,
+                  112,
+                  115,
+                  118,
+                  120,
+                  125,
+                  130,
+                  140
+                ]
+              },
+              {
+                "label": "ap-south",
+                "color": "warn",
+                "values": [
+                  200,
+                  210,
+                  215,
+                  220,
+                  225,
+                  230,
+                  235,
+                  240,
+                  245,
+                  248,
+                  250,
+                  252,
+                  255,
+                  260,
+                  270,
+                  280,
+                  290,
+                  310,
+                  340,
+                  400
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-beeswarm",
+          "title": "type: beeswarm"
+        },
+        {
+          "kind": "paragraph",
+          "content": "One-axis distribution rendered as jittered dots, one per data point. Vertical placement is force-balanced so dot density at any x-position visually encodes count. Reads more honestly than a histogram for small samples."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"beeswarm\",\n  \"title\": \"Survey scores\",\n  \"values\": [\n    3,\n    5,\n    4,\n    6,\n    7,\n    8,\n    7,\n    6,\n    7,\n    8,\n    8,\n    9,\n    7,\n    6,\n    5,\n    6,\n    7,\n    8,\n    9,\n    8,\n    7,\n    6,\n    7,\n    8,\n    9,\n    5,\n    4,\n    6,\n    7,\n    8,\n    7,\n    8,\n    9,\n    10,\n    7,\n    8,\n    6,\n    5,\n    7,\n    8\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "beeswarm",
+            "title": "Survey scores",
+            "values": [
+              3,
+              5,
+              4,
+              6,
+              7,
+              8,
+              7,
+              6,
+              7,
+              8,
+              8,
+              9,
+              7,
+              6,
+              5,
+              6,
+              7,
+              8,
+              9,
+              8,
+              7,
+              6,
+              7,
+              8,
+              9,
+              5,
+              4,
+              6,
+              7,
+              8,
+              7,
+              8,
+              9,
+              10,
+              7,
+              8,
+              6,
+              5,
+              7,
+              8
+            ]
+          }
         }
       ]
     },
