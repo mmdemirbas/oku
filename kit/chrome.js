@@ -784,8 +784,25 @@ function applyTheme(mode, persist) {
   var actual = mode === 'system'
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : mode;
-  document.documentElement.setAttribute('data-theme', actual);
-  document.documentElement.setAttribute('data-theme-mode', mode);
+  // Suppress every transition during the swap so the whole page
+  // flips themes in one paint instead of cascading element-by-
+  // element (each independent transition: color / background /
+  // border the kit declares would otherwise animate independently
+  // and produce a visible "part-by-part" wipe).
+  var doc = document.documentElement;
+  doc.classList.add('okt-theme-swapping');
+  doc.setAttribute('data-theme', actual);
+  doc.setAttribute('data-theme-mode', mode);
+  // Force reflow so the class actually takes effect before the
+  // theme repaint runs.
+  void doc.offsetHeight;
+  // Re-enable transitions after two frames — one for the paint,
+  // one to be safe before subsequent transitions are honoured again.
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      doc.classList.remove('okt-theme-swapping');
+    });
+  });
   if (persist) {
     try {
       if (mode === 'system') localStorage.removeItem('theme-pref');

@@ -997,6 +997,21 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   background: var(--border);
   margin: 0 4px;
 }
+
+/* Theme-swap guard — when applyTheme flips the data-theme attribute,
+   this class lands on <html> for two animation frames. Every
+   element inside has its transitions silenced so the page repaints
+   in ONE pass instead of every transition animating independently.
+   Without this guard each `transition: background`, `transition:
+   color`, etc. animates on its own clock and the reader sees a
+   visible cascade. */
+.okt-theme-swapping,
+.okt-theme-swapping *,
+.okt-theme-swapping *::before,
+.okt-theme-swapping *::after {
+  transition: none !important;
+  animation-duration: 0s !important;
+}
 .okt-bar button.flash-ok {
   background: var(--success-soft);
   color: var(--success);
