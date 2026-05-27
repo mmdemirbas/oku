@@ -76,17 +76,31 @@
           "kind": "compare-grid",
           "cards": [
             {
-              "title": "A — code + output labels",
+              "title": "A — code + output labels (schema too)",
               "accent": "success",
               "blocks": [
-                {"kind": "paragraph", "content": "example-pair right column reads **Output** (was 'Render'). Schema field stays `render` for backwards-compat — no doc churn."}
+                {"kind": "paragraph", "content": "example-pair right column reads **Output**. Schema field renamed `render` → `output` (no backward-compat). 73 occurrences across 4 doc files migrated atomically. CSS class `.example-render` → `.example-output`."}
               ]
             },
             {
-              "title": "B — function-grouped picker",
+              "title": "B — function-grouped picker, single-word labels",
               "accent": "success",
               "blocks": [
-                {"kind": "paragraph", "content": "29 chart cards distributed across 8 function groups: Compare values · Show change over time · Show distribution · Show parts of a whole · Show relationships · Show hierarchy · Show flow or movement · Show location. Each card keeps its live tiny render + #anchor jump."}
+                {"kind": "paragraph", "content": "29 chart cards across 8 function groups with single-word labels (per user feedback): **Compare**, **Trend**, **Distribution**, **Composition**, **Relationship**, **Hierarchy**, **Flow**, **Location**. Anchor ids match (`chart-fn-compare` etc.)."}
+              ]
+            },
+            {
+              "title": "Index page — code-output pairs for MD/JSON",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "The 'What a page looks like' section on the index page now shows each JSON / Markdown sample as an example pair — source on the left, the actual rendered block on the right. Five pairs total (callout, kpi-grid, blockquote→callout, inline-formatted list, mermaid diagram)."}
+              ]
+            },
+            {
+              "title": "Reference — markdown-conversion redesigned as a table",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "The 'Markdown → page kinds' compare-grid card (one 15-item bulleted list crammed into a single card) replaced with a two-column table (Markdown / Becomes). Tables sort, filter, and give the reader two scan axes. The card framing added noise without value."}
               ]
             },
             {
@@ -337,25 +351,177 @@
 
     {
       "kind": "section",
-      "id": "type-toggle",
-      "title": "Runtime chart-type toggle (new decision)",
-      "lead": "User raised this mid-stream: when data shape allows, let the reader switch chart type in-place.",
+      "id": "syntax-first-principles",
+      "title": "Is our chart declaration syntax the best?",
+      "lead": "User question (paraphrased): break the system into building blocks; think in units; does the current chart declaration syntax represent the task well? Honest answer below.",
       "blocks": [
         {
           "kind": "callout",
-          "type": "info",
-          "title": "Decision: under design — gated on type unification (task C) landing first",
-          "content": "Same data shape can drive multiple chart shapes. Line / area / scatter all consume `series of {x, y}` — flipping among them is a mark change, not a data change. Bar/column from the same `{x, y}` set is also valid (treating x as category). The user wants a UI control that lets the reader pick — useful both for comparison ('does this look like a trend or a series of points?') and for accommodating a reader's mental-model preference."
+          "type": "caution",
+          "title": "Honest answer: no, not yet. Today's syntax is type-first; the right shape is data + encoding + mark.",
+          "content": "We've collapsed three families to canonical types (plot, arc, bar). The other ~22 types still 'own' their data shape — each renderer expects a custom payload (`slices`, `cells`, `tree`, `nodes+links`, `regions`, ...). That's the drift the unification was meant to reverse, and we only finished part of the job."
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "The building blocks (first principles)"
         },
         {
           "kind": "paragraph",
-          "content": "Implementation shape (proposal): once `type: plot` is canonical (task C), every chart gains an optional `compatible_with: [...]` list of alternative marks. When non-empty, the chart toolbar grows a mark-picker dropdown alongside the existing download / view-data / expand buttons. Switching the picker mutates the live `marks` array and re-renders in place — same x-axis, same data points, different visual encoding. Hover-stickiness handled the same way as today's view-switch on tables (the picker only appears on the chart's hover/focus, per the smart-hide principle)."
+          "content": "Strip every chart down to its atoms and three repeating ideas fall out — true for every chart we render, true for every chart in the catalogue research."
+        },
+        {
+          "kind": "table",
+          "headers": ["Atom", "What it is", "How many forms"],
+          "rows": [
+            ["**Data**",     "A table of records. Same shape every time: array of objects with author-named fields.", "1 universal form"],
+            ["**Encoding**", "Which field of each record drives which visual channel — x, y, color, size, angle, radius, source, target, value, ...",  "~10 channels (most charts use 2–4)"],
+            ["**Mark**",     "The geometric shape drawn for each record — dot, line, area, bar, arc, tile, rect, link, path, ...", "~12 marks (most charts use 1)"]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "What that looks like in JSON",
+          "content": "Today's `type: \"scatter\"` becomes `data + encoding: { x: \"col\", y: \"col\" } + mark: \"dot\"`. Today's `type: \"heatmap\"` becomes the same `data`, `encoding: { x: \"row\", y: \"col\", color: \"value\" }`, `mark: \"tile\"`. Today's `type: \"sankey\"` becomes `data` (the link table), `encoding: { source: \"from\", target: \"to\", value: \"qty\" }`, `mark: \"flow\"`. The author writes one data shape and decides how columns map to channels. The renderer reads encoding + mark and draws."
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "Why this is better than what we have"
+        },
+        {
+          "kind": "compare-grid",
+          "cards": [
+            {
+              "title": "Today (type-first)",
+              "verdict": "bad",
+              "blocks": [
+                {"kind": "list", "style": "bullet", "items": [
+                  "Each of 29 types has a bespoke payload shape — the AI has to remember 29 schemas.",
+                  "Switching chart type often means rewriting the data structure (`series` → `slices` → `cells` → `nodes+links`).",
+                  "Same data → different chart requires copy-paste and re-shaping. The data-shape-derived type switch we just decided to build has to handle every shape's permutation.",
+                  "Catalogue gaps (sunburst, violin, marimekko, ...) each add another bespoke payload."
+                ]}
+              ]
+            },
+            {
+              "title": "First-principles (data + encoding + mark)",
+              "verdict": "good",
+              "blocks": [
+                {"kind": "list", "style": "bullet", "items": [
+                  "One universal data shape. The AI emits a record array — same skill every time.",
+                  "Switching chart type is one field edit: `mark: \"line\"` → `mark: \"bar\"`. No data reshaping.",
+                  "Compatibility falls out for free: any chart whose marks consume the current encoding is compatible.",
+                  "New chart types add a mark grammar entry; the data + encoding shape doesn't change. Sunburst / violin / marimekko stop being big additions."
+                ]}
+              ]
+            }
+          ]
         },
         {
           "kind": "callout",
           "type": "caution",
-          "title": "What it needs first",
-          "content": "Task C must land before this is implementable. The toggle relies on the canonical `marks` axis existing; until then there's nothing to swap between."
+          "title": "But — what makes oku oku is on the line",
+          "content": "Vega-Lite went all the way to this model. Its schema is ~500 pages of options, conditions, layered transforms — perfect for analysts, brutal for AI authors who 'just want a bar chart'. Our advantage today is that `type: \"bar\"` JUST WORKS without thinking about encodings. Lose that and we lose the AI-friendliness that's the whole point of the kit."
+        },
+        {
+          "kind": "callout",
+          "type": "tip",
+          "title": "Proposed direction: dual-form, not replacement",
+          "content": "Keep `type: \"bar\"` / `type: \"line\"` / `type: \"pie\"` etc. as the AI-friendly entry point. ALSO accept the canonical `mark + encoding + data` form for power users and runtime mutation. The alias-desugar pattern we just shipped becomes the convention for the whole kit — type aliases desugar to canonical mark+encoding internally. AI emits `type: \"bar\"`; the runtime translates; the popup mutates the canonical form when the reader switches mark. Two surfaces, one engine."
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "Scope / sequencing"
+        },
+        {
+          "kind": "table",
+          "headers": ["Step", "Effort", "Recommended order"],
+          "rows": [
+            ["Build the live-config popup (decision 6) with data-shape-derived type list",
+             "~2 sessions",
+             "**Next** — it's a smaller proof-of-concept of the mark + encoding model. The popup needs to mutate the chart's mark independently of data, which forces us to internally separate the two."],
+            ["Refactor the renderer to a single mark + encoding pipeline",
+             "~3–5 sessions",
+             "**After the popup proves the idea.** Migrate one family at a time (plot already half-there → bar → arc → categorical (heatmap/waffle/treemap) → flow (sankey/chord/network) → spec (geo, gauge))."],
+            ["Drop `compatible_with` proposal entirely (the user already vetoed it)",
+             "0 effort",
+             "Done — derivation lives in code, not in the schema."]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "Open question for you",
+          "content": "Greenlight the dual-form refactor? It's the right call long-term but it's a multi-session investment with one breakage risk (a poorly-tested mark migration could regress existing pages). I'd run it as: popup first → one family-at-a-time refactor → tests guard every step. Or — defer the refactor, ship just the popup with the current type-first model. Your call."
+        }
+      ]
+    },
+
+    {
+      "kind": "section",
+      "id": "type-toggle",
+      "title": "Live chart configuration (decision 6 — confirmed direction)",
+      "lead": "User direction: hide the type-switch behind a gear button on the chart toolbar; click → live configuration popup positioned near the chart. Type is one configurable knob; mode, marks, arc overrides, etc. live in the same popup so the reader can experiment with the whole rendering live.",
+      "blocks": [
+        {
+          "kind": "callout",
+          "type": "success",
+          "title": "Decision: button → popup, derive compatible types from data shape (no `compatible_with` field needed)",
+          "content": "Quote: \"we shouldn't bother with adding compatible types to every single chart. We already know which chart types are compatible with each other based on the data shape, or to be more accurate: we know which chart types could be used to represent a certain data shape only by looking into the data shape.\""
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "Is the data-shape statement correct?"
+        },
+        {
+          "kind": "paragraph",
+          "content": "**Mostly yes, with one edge case.** Compatibility falls out of data shape for the great majority of types — same shape means the renderer has everything it needs to draw any chart that consumes that shape. A few shapes admit a semantic ambiguity (a sequence of `{x, y}` could be a continuous trend or a categorical comparison — that's an author judgement, not a data fact), but the runtime can offer both options and let the reader pick. We don't need to pre-declare anything."
+        },
+        {
+          "kind": "table",
+          "headers": ["Data shape", "Compatible chart types"],
+          "rows": [
+            ["`series: [{ data: [{ x, y }] }]`", "scatter · line · area · plot (with any marks combo); bar (if author treats x as categorical)"],
+            ["`series: [{ data: [{ x, y, size }] }]`", "bubble · scatter (size becomes a decorative dimension)"],
+            ["`categories: []` + `series: [{ values: [] }]`", "bar · stacked-bar · grouped-bar; line / area (treating category index as x)"],
+            ["`slices: [{ label, value }]`", "pie · donut · waffle · arc (with any mode); horizontal bar (one bar per slice)"],
+            ["`value, min, max, target`", "gauge · bullet · sparkline-as-trend (if a value history is attached)"],
+            ["`bins: [{ lo, hi, count }]`", "histogram · bar (bin index as category); area (smoothed)"],
+            ["`distributions: [{ values: [] }]`", "ridgeline · violin (future) · box-plot (after quartile derivation)"],
+            ["`boxes: [{ min, q1, median, q3, max }]`", "box-plot · bullet (per-box) · candlestick (future, financial framing)"],
+            ["`nodes + links`", "network · sankey · chord · arc-diagram (future)"],
+            ["`tree: nested`", "treemap · sunburst (future) · packed-circles (future)"],
+            ["`cells: [[]]` + row/col labels", "heatmap · calendar-heatmap (if row/col are date axes)"],
+            ["`regions: [{ id, value }]`", "geo only"],
+            ["`variables + records`", "scatter-matrix · parallel-coordinates · radar"]
+          ]
+        },
+        {
+          "kind": "callout",
+          "type": "info",
+          "title": "Implementation",
+          "content": "A single `getCompatibleTypes(block)` function in the renderer inspects the data shape and returns the list of types that consume it. The config popup calls that function to populate its type-switch dropdown. No `compatible_with` field on individual charts — the rule lives in code once."
+        },
+        {
+          "kind": "heading",
+          "level": 4,
+          "title": "Popup shape (proposal)"
+        },
+        {
+          "kind": "list",
+          "style": "bullet",
+          "items": [
+            "**Gear icon** in the chart toolbar (alongside copy / download / expand). Hover-only like the other toolbar buttons.",
+            "**Click → floating popover**, anchored near the chart's top-right corner with viewport-clamp (same logic the tooltip uses).",
+            "**Popup content:** Type dropdown (populated by `getCompatibleTypes`) · mode/marks chips · arc overrides (when applicable) · inner_radius slider · close button.",
+            "**Live re-render:** every popup change mutates the chart's attributes and re-runs `_render()` in place. No reload.",
+            "**Dismiss:** click outside, Esc, or the popup's own × button.",
+            "**Smart-hide:** popup itself is opaque; the gear button follows the same hover-reveal as the rest of the toolbar."
+          ]
         }
       ]
     },
