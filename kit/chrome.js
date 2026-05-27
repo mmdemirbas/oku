@@ -6723,6 +6723,7 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
   }
 
   /* ---------------- Violin ----------------
@@ -6810,6 +6811,7 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: H - pad.bottom, left: pad.left, right: W - pad.right });
   }
 
   /* ---------------- Beeswarm ----------------
