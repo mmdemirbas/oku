@@ -779,7 +779,7 @@
             ["Q10 deeper",
              "Mermaid node-level interactivity — tooltip / open-on-click",
              "Hover-neighbour-highlight + native click + lightbox pan-zoom all shipped.",
-             "Remaining: hover-tooltip with arbitrary author text; click-to-navigate (mermaid's native `click NodeId 'url'` syntax already honoured). Each is a small additive feature, no architectural change needed."]
+             "Remaining: hover-tooltip with arbitrary author text; click-to-navigate (mermaid's native `click NodeId 'url'` syntax already honoured). Each is a small additive feature, no architectural change needed."],
             ["3",
              "Which catalogue-research visualizations to add next?",
              "User picks from the top-8 list.",

@@ -1637,6 +1637,30 @@ def _format_issue(issue: dict, root: Path) -> str:
     return f"  {icon} {rel}:{issue['where']} [{issue['code']}] {issue['message']}"
 
 
+def find_unparseable_json(root: Path) -> list[tuple[Path, str]]:
+    """Scan every .json under root and return (path, parse-error)
+    pairs for files that fail to parse. find_json_pages silently
+    catches JSONDecodeError to avoid breaking the build on a stray
+    `package.json` sibling — but for the lint surface, an authored
+    page that no longer parses is exactly the bug to surface.
+
+    Excludes the same well-known sidecars that find_json_pages
+    excludes (kit.json, site-manifest.json, package.json, tsconfig).
+    """
+    bad: list[tuple[Path, str]] = []
+    extra = project_skip_dirs(root)
+    for p in iter_repo_files(root, (".json",), extra_skip=extra):
+        if p.name in ("kit.json", "site-manifest.json", "package.json", "tsconfig.json"):
+            continue
+        try:
+            json.loads(p.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as err:
+            bad.append((p, f"{err.msg} at line {err.lineno} col {err.colno}"))
+        except OSError as err:
+            bad.append((p, f"read failed: {err}"))
+    return bad
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     """`oku check` — comprehensive doctree lint.
 
@@ -1650,12 +1674,24 @@ def cmd_check(args: argparse.Namespace) -> int:
       1 — at least one error (or any warning when --strict).
     """
     root = Path.cwd()
+    # Unparseable JSON has to be surfaced BEFORE find_json_pages drops
+    # it — otherwise an authored page with a misplaced comma silently
+    # disappears from the nav and check still reports "all clean".
+    bad_json = find_unparseable_json(root)
     pages = find_json_pages(root)
     if not pages:
         print(f"✗ No page-JSON files found under {root}", file=sys.stderr)
         return 1
 
     issues = check_pages(pages, root)
+    for p, err in bad_json:
+        issues.append({
+            "path": p,
+            "severity": "error",
+            "code": "json-parse-failed",
+            "where": "(file)",
+            "message": err,
+        })
 
     if args.json:
         # Emit a machine-parseable stream. Path is serialised relative
