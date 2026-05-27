@@ -808,14 +808,14 @@
       codeCol.className = 'example-code';
       const codeLbl = document.createElement('div');
       codeLbl.className = 'example-col-label';
-      codeLbl.textContent = 'Source';
+      codeLbl.textContent = 'Code';
       codeCol.appendChild(codeLbl);
       if (block.code) codeCol.appendChild(this._renderCode(block.code));
       const renderCol = document.createElement('div');
       renderCol.className = 'example-render';
       const renderLbl = document.createElement('div');
       renderLbl.className = 'example-col-label';
-      renderLbl.textContent = 'Render';
+      renderLbl.textContent = 'Output';
       renderCol.appendChild(renderLbl);
       if (block.render) {
         const renderEl = this._renderContentBlock(block.render);

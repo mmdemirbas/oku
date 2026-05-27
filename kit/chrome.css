@@ -1145,7 +1145,12 @@ code:not(pre code) {
      stats and view-toggle when everything fits on one line. */
   flex-wrap: wrap;
   margin-bottom: 8px;
-  opacity: 0.45;
+  /* Notebook-quiet by default: controls are present but unobtrusive
+     so the table reads as content first, chrome second. Hover or
+     keyboard focus on the wrap lights them up; any active filter /
+     chip / non-default view forces full visibility too so the user
+     can always see the state they're already in. */
+  opacity: 0.15;
   transition: opacity 0.18s ease;
 }
 .okt-table-controls .okt-filter   { order: 0; }
@@ -1158,6 +1163,15 @@ code:not(pre code) {
 .okt-table-controls .okt-groupby { margin-right: auto; }
 .okt-table-wrap:hover .okt-table-controls,
 .okt-table-wrap:focus-within .okt-table-controls { opacity: 1; }
+/* Force-show whenever the table is in a non-default state — an
+   active filter (input has text), an active chip, or a view other
+   than the default table view. The user must always be able to see
+   the state they're already in, even without hovering. */
+.okt-table-wrap:has(.okt-filter input:not(:placeholder-shown)) .okt-table-controls,
+.okt-table-wrap:has(.okt-chip.active) .okt-table-controls,
+.okt-table-wrap[data-view]:not([data-view="table"]) .okt-table-controls {
+  opacity: 1;
+}
 .okt-table-controls button {
   font: 600 11px 'Inter', sans-serif;
   letter-spacing: 0.02em;

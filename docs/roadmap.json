@@ -153,7 +153,7 @@
           "items": [
             "Pick-by-family rewrite — 29 clickable mini-cards (one per variant) with live tiny renders; click goes straight to the variant's full example.",
             "Charts page regrouped into 10 intent families (Cartesian / Categorical / Part-to-whole / Distribution / Trend / Flow / Network / Multivariate / Goal / Geographic).",
-            "Source / render alignment is universally zero-pixel — boxes line up at top across every example-pair on every doc page.",
+            "Code / output alignment is universally zero-pixel — boxes line up at top across every example-pair on every doc page.",
             "Tooltip width is stable across pin states; pinned tooltip gets an × close button; viewport-fixed positioning surfaces it above the fullscreen lightbox.",
             "Cartesian charts gain a synced vertical-dash cursor + a per-position tooltip listing every series value at the cursor's nearest x.",
             "Ridgeline + sparkline cursor handlers update the rich tooltip per cursor position (was static-on-enter).",
@@ -183,7 +183,7 @@
           "items": [
             "Project name = oku (Turkish 'read!'). Every layer reads `oku`: package (src/oku/), kit CSS prefixes (okt- / okc- / okd-), JS globals (__oku*), event names (oku:*), data-attrs (data-oku-*), and custom-element tag names.",
             "GitHub remote URL stays at github.com/mmdemirbas/html-doc — the schema $id, the git-clone example, and the jsdelivr CDN URL all point there. The local repo directory name follows the remote.",
-            "Source / render columns inside example-pair MUST align at the top edge of the box. No 24px spacer for non-pre renders — the visible top edges of source and render columns line up regardless of render kind.",
+            "Code / output columns inside example-pair MUST align at the top edge of the box. No 24px spacer for non-code outputs — the visible top edges of the code and output columns line up regardless of the output kind.",
             "Tooltip width is stable across pin states. Pinned vs unpinned switches the footer text + close-button visibility, NEVER the bounding box.",
             "ext-ref host is NOT a navigation link. Clicking pins the tooltip; the destination URL lives as a clickable domain anchor inside the citation card. One affordance per element.",
             "Pagefind is a Python dep, not a system binary — `oku[search]` extra pulls `pagefind[bin]>=1.5`.",
