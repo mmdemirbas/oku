@@ -3980,7 +3980,15 @@ class OkuChart extends HTMLElement {
       'scatter-matrix': '_renderScatterMatrix',
       'parallel-coordinates': '_renderParallelCoordinates',
       chord: '_renderChord',
-      geo: '_renderGeo'
+      geo: '_renderGeo',
+      'dot-plot':   '_renderDotPlot',
+      density:      '_renderDensity',
+      candlestick:  '_renderCandlestick',
+      sunburst:     '_renderSunburst',
+      marimekko:    '_renderMarimekko',
+      stream:       '_renderStream',
+      violin:       '_renderViolin',
+      beeswarm:     '_renderBeeswarm'
     };
     if (nonCartesian[this._type]) {
       this[nonCartesian[this._type]]();
@@ -6285,6 +6293,511 @@ class OkuChart extends HTMLElement {
     }
     parts.push('<text x="' + lgX + '" y="' + (legendY + lgH + 14) + '" class="okc-geo-legend-tick">' + escapeXml(fmtNum(vMin)) + '</text>');
     parts.push('<text x="' + (lgX + lgW) + '" y="' + (legendY + lgH + 14) + '" text-anchor="end" class="okc-geo-legend-tick">' + escapeXml(fmtNum(vMax)) + '</text>');
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Dot plot ----------------
+     One row per category; a single dot positioned on a continuous
+     x-axis. Compact comparison shape — like a horizontal bar
+     stripped to just the endpoint. Useful when bar length itself
+     adds visual noise (ratios near each other, ordered lists). */
+  _renderDotPlot() {
+    var x = (this._extras && this._extras['dot-plot']) || {};
+    var rows = (x.rows || []).slice();
+    if (!rows.length) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var vMin = x.min !== undefined ? +x.min : Math.min.apply(null, rows.map(function (r) { return +r.value || 0; }));
+    var vMax = x.max !== undefined ? +x.max : Math.max.apply(null, rows.map(function (r) { return +r.value || 0; }));
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    var W = 640, rowH = 28;
+    var pad = { top: this._title ? 36 : 12, bottom: 28, left: 140, right: 24 };
+    var H = pad.top + rows.length * rowH + pad.bottom;
+    var plotW = W - pad.left - pad.right;
+    function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Dot plot') + '" class="okc-svg okc-dot-plot">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Faint baseline + ticks at min/max + midpoint.
+    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
+      var xx = xOf(v);
+      parts.push('<line x1="' + xx.toFixed(1) + '" y1="' + pad.top + '" x2="' + xx.toFixed(1) + '" y2="' + (H - pad.bottom + 4) + '" class="okc-axis" stroke-dasharray="2 3"/>');
+      parts.push('<text x="' + xx.toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    });
+    rows.forEach(function (r, i) {
+      var y = pad.top + i * rowH + rowH / 2;
+      var color = palette[r.color] || palette.accent;
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-dot-plot-label">' + escapeXml(r.label || '') + '</text>');
+      // Connector from axis-left to dot (light) so the row reads as a single beat.
+      parts.push('<line x1="' + pad.left + '" y1="' + y + '" x2="' + xOf(+r.value || 0).toFixed(1) + '" y2="' + y + '" class="okc-dot-plot-track"/>');
+      var payload = JSON.stringify({ label: r.label || '', kv: [{ k: 'value', v: fmtNum(+r.value || 0) }] });
+      parts.push('<circle cx="' + xOf(+r.value || 0).toFixed(1) + '" cy="' + y + '" r="6" fill="' + color + '" class="okc-dot-plot-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtNum(+r.value || 0)) + '</title></circle>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Density plot ----------------
+     Smoothed histogram via Gaussian KDE. Bandwidth defaults to
+     Silverman's rule of thumb (1.06·σ·n^-1/5) — author can override
+     with bandwidth. The curve is sampled at sample_count x-positions
+     (default 100) across the data range. */
+  _renderDensity() {
+    var x = (this._extras && this._extras.density) || {};
+    var values = (x.values || []).map(Number).filter(function (v) { return !isNaN(v); });
+    if (values.length < 2) return;
+    values.sort(function (a, b) { return a - b; });
+    var vMin = x.min !== undefined ? +x.min : values[0];
+    var vMax = x.max !== undefined ? +x.max : values[values.length - 1];
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    // Bandwidth — Silverman's rule on the input range.
+    var mean = values.reduce(function (s, v) { return s + v; }, 0) / values.length;
+    var variance = values.reduce(function (s, v) { return s + (v - mean) * (v - mean); }, 0) / values.length;
+    var stdev = Math.sqrt(variance) || 1;
+    var bw = +x.bandwidth || 1.06 * stdev * Math.pow(values.length, -1 / 5);
+    var sampleCount = +x.sample_count || 100;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)' };
+    var color = palette[x.color] || palette.accent;
+    var W = 640, H = this._title ? 320 : 280;
+    var pad = { top: this._title ? 36 : 16, bottom: 32, left: 36, right: 24 };
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    // Compute density samples.
+    var step = (vMax - vMin) / (sampleCount - 1);
+    var samples = [];
+    var maxDensity = 0;
+    for (var i = 0; i < sampleCount; i++) {
+      var xi = vMin + i * step;
+      var sum = 0;
+      for (var k = 0; k < values.length; k++) {
+        var u = (xi - values[k]) / bw;
+        sum += Math.exp(-0.5 * u * u);
+      }
+      var d = sum / (values.length * bw * Math.sqrt(2 * Math.PI));
+      samples.push({ x: xi, d: d });
+      if (d > maxDensity) maxDensity = d;
+    }
+    if (maxDensity === 0) maxDensity = 1;
+    function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
+    function yOf(d) { return pad.top + plotH - (d / maxDensity) * plotH; }
+    var pathD = samples.map(function (s, idx) {
+      return (idx === 0 ? 'M ' : 'L ') + xOf(s.x).toFixed(1) + ' ' + yOf(s.d).toFixed(1);
+    }).join(' ');
+    var areaD = pathD + ' L ' + xOf(samples[samples.length - 1].x).toFixed(1) + ' ' + (pad.top + plotH).toFixed(1) +
+                ' L ' + xOf(samples[0].x).toFixed(1) + ' ' + (pad.top + plotH).toFixed(1) + ' Z';
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Density') + '" class="okc-svg okc-density">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // X-axis ticks at vMin / mid / vMax.
+    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
+      var xx = xOf(v);
+      parts.push('<text x="' + xx.toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    });
+    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    parts.push('<path d="' + areaD + '" fill="' + color + '" fill-opacity="0.22" stroke="none"/>');
+    parts.push('<path d="' + pathD + '" stroke="' + color + '" stroke-width="2" fill="none" class="okc-density-line"/>');
+    // Tiny rug at the bottom to show actual data positions.
+    var rugY = pad.top + plotH + 3;
+    values.forEach(function (v) {
+      parts.push('<line x1="' + xOf(v).toFixed(1) + '" y1="' + rugY + '" x2="' + xOf(v).toFixed(1) + '" y2="' + (rugY + 6) + '" stroke="' + color + '" stroke-opacity="0.45"/>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Candlestick ----------------
+     Financial OHLC. Each entry: { date, open, high, low, close }.
+     Up day (close > open) renders in success; down day in danger.
+     Bar from open→close + wick from low→high. */
+  _renderCandlestick() {
+    var x = (this._extras && this._extras.candlestick) || {};
+    var entries = (x.entries || []).slice();
+    if (!entries.length) return;
+    var allValues = [];
+    entries.forEach(function (e) {
+      allValues.push(+e.low, +e.high);
+    });
+    var vMin = Math.min.apply(null, allValues);
+    var vMax = Math.max.apply(null, allValues);
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 48, right: 12 };
+    var W = 640, H = this._title ? 360 : 320;
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    var step = plotW / entries.length;
+    var bw = Math.min(step * 0.7, 22);
+    function yOf(v) { return pad.top + plotH - (v - vMin) / (vMax - vMin) * plotH; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Candlestick') + '" class="okc-svg okc-candlestick">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Y-axis ticks (5).
+    var ticks = 5;
+    for (var t = 0; t <= ticks; t++) {
+      var v = vMin + (t / ticks) * (vMax - vMin);
+      var ty = yOf(v);
+      parts.push('<line x1="' + pad.left + '" y1="' + ty.toFixed(1) + '" x2="' + (W - pad.right) + '" y2="' + ty.toFixed(1) + '" class="okc-axis" stroke-dasharray="2 3"/>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4).toFixed(1) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    }
+    entries.forEach(function (e, i) {
+      var cx = pad.left + step * (i + 0.5);
+      var up = (+e.close) >= (+e.open);
+      var color = up ? 'var(--success)' : 'var(--danger)';
+      var yOpen = yOf(+e.open), yClose = yOf(+e.close);
+      var yHigh = yOf(+e.high), yLow = yOf(+e.low);
+      var bodyTop = Math.min(yOpen, yClose);
+      var bodyH = Math.max(1, Math.abs(yClose - yOpen));
+      var payload = JSON.stringify({
+        label: e.date || '',
+        kv: [
+          { k: 'O', v: fmtNum(+e.open) },
+          { k: 'H', v: fmtNum(+e.high) },
+          { k: 'L', v: fmtNum(+e.low) },
+          { k: 'C', v: fmtNum(+e.close) }
+        ]
+      });
+      // Wick.
+      parts.push('<line x1="' + cx.toFixed(1) + '" y1="' + yHigh.toFixed(1) + '" x2="' + cx.toFixed(1) + '" y2="' + yLow.toFixed(1) + '" stroke="' + color + '" stroke-width="1.2" class="okc-candle-wick"/>');
+      // Body.
+      parts.push('<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + bodyTop.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + bodyH.toFixed(1) + '" fill="' + color + '" fill-opacity="' + (up ? '0.85' : '0.95') + '" stroke="' + color + '" class="okc-candle-body" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((e.date || '') + ' O ' + e.open + ' H ' + e.high + ' L ' + e.low + ' C ' + e.close) + '</title></rect>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Sunburst ----------------
+     Radial hierarchy chart. Each tree node renders as an arc at its
+     depth ring; arc length is proportional to the node's value sum.
+     Input tree: nested { label, value, children }. */
+  _renderSunburst() {
+    var x = (this._extras && this._extras.sunburst) || {};
+    var root = x.tree || x.root || (Array.isArray(x.tree) ? { children: x.tree } : null);
+    if (!root) return;
+    // Compute per-node value rollup.
+    function rollup(node) {
+      if (!node.children || !node.children.length) {
+        node._value = Math.max(0, +node.value || 0);
+        return node._value;
+      }
+      node._value = 0;
+      node.children.forEach(function (c) { node._value += rollup(c); });
+      return node._value;
+    }
+    // Single-root or multi-root: unify to { children: [...] }.
+    var rootNode = Array.isArray(root) ? { children: root } : root;
+    if (Array.isArray(rootNode.children)) {
+      rootNode._value = 0;
+      rootNode.children.forEach(function (c) { rootNode._value += rollup(c); });
+    } else {
+      rollup(rootNode);
+    }
+    if (!rootNode._value) return;
+    function maxDepth(node, d) {
+      if (!node.children || !node.children.length) return d;
+      var m = d;
+      node.children.forEach(function (c) { m = Math.max(m, maxDepth(c, d + 1)); });
+      return m;
+    }
+    var depth = maxDepth(rootNode, 0);
+    if (depth < 1) return;
+    var palette = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)', 'var(--series-9)', 'var(--series-10)'];
+    var W = 480, H = 480;
+    var cx = W / 2, cy = H / 2;
+    var rMax = Math.min(W, H) / 2 - 12;
+    var rMin = 36;
+    var ringW = (rMax - rMin) / depth;
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Sunburst') + '" class="okc-svg okc-sunburst">');
+    if (this._title) parts.push('<text x="' + cx + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    function arcPath(rIn, rOut, a0, a1) {
+      var large = (a1 - a0) > Math.PI ? 1 : 0;
+      var p0 = [cx + rOut * Math.cos(a0), cy + rOut * Math.sin(a0)];
+      var p1 = [cx + rOut * Math.cos(a1), cy + rOut * Math.sin(a1)];
+      var p2 = [cx + rIn  * Math.cos(a1), cy + rIn  * Math.sin(a1)];
+      var p3 = [cx + rIn  * Math.cos(a0), cy + rIn  * Math.sin(a0)];
+      return 'M ' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) +
+             ' A ' + rOut + ' ' + rOut + ' 0 ' + large + ' 1 ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1) +
+             ' L ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1) +
+             ' A ' + rIn  + ' ' + rIn  + ' 0 ' + large + ' 0 ' + p3[0].toFixed(1) + ' ' + p3[1].toFixed(1) + ' Z';
+    }
+    // Walk + paint per ring.
+    var paletteIdx = 0;
+    function walk(node, d, a0, a1, color) {
+      if (d > 0) {
+        var label = node.label || '';
+        var payload = JSON.stringify({ label: label, kv: [{ k: 'value', v: fmtNum(node._value) }] });
+        var rIn = rMin + (d - 1) * ringW;
+        var rOut = rIn + ringW;
+        parts.push('<path d="' + arcPath(rIn, rOut, a0, a1) + '" fill="' + color + '" fill-opacity="' + (0.55 + d * 0.07).toFixed(2) + '" stroke="var(--bg)" stroke-width="1" class="okc-sunburst-arc" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · ' + fmtNum(node._value)) + '</title></path>');
+      }
+      if (!node.children || !node.children.length) return;
+      var span = a1 - a0;
+      var offset = 0;
+      node.children.forEach(function (c) {
+        var frac = node._value > 0 ? (c._value / node._value) : 0;
+        var ca0 = a0 + offset * span;
+        var ca1 = a0 + (offset + frac) * span;
+        var childColor = d === 0 ? palette[paletteIdx++ % palette.length] : color;
+        walk(c, d + 1, ca0, ca1, childColor);
+        offset += frac;
+      });
+    }
+    walk(rootNode, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2, palette[0]);
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Marimekko (variable-width stacked bar) ----------------
+     Like stacked-bar except each column's WIDTH is proportional to
+     that column's total — so the chart shows both within-column
+     proportions and across-column magnitudes in one read. */
+  _renderMarimekko() {
+    var x = (this._extras && this._extras.marimekko) || {};
+    var categories = x.categories || [];
+    var series = x.series || [];
+    if (!categories.length || !series.length) return;
+    var palette = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)'];
+    // Column totals = sum across series for each category.
+    var colTotals = categories.map(function (_, i) {
+      return series.reduce(function (s, ser) { return s + Math.max(0, +(ser.values && ser.values[i]) || 0); }, 0);
+    });
+    var grandTotal = colTotals.reduce(function (s, v) { return s + v; }, 0) || 1;
+    var W = 640, H = this._title ? 360 : 320;
+    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 16, right: 16 };
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Marimekko') + '" class="okc-svg okc-marimekko">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    var xCursor = pad.left;
+    categories.forEach(function (cat, ci) {
+      var colW = (colTotals[ci] / grandTotal) * plotW;
+      if (colW <= 0) return;
+      var colTotal = colTotals[ci] || 1;
+      var yCursor = pad.top;
+      series.forEach(function (ser, si) {
+        var v = Math.max(0, +(ser.values && ser.values[ci]) || 0);
+        var segH = (v / colTotal) * plotH;
+        var color = palette[si % palette.length];
+        var payload = JSON.stringify({
+          label: (ser.label || '') + ' · ' + cat,
+          kv: [
+            { k: 'value', v: fmtNum(v) },
+            { k: '% of col', v: Math.round((v / colTotal) * 100) + '%' }
+          ]
+        });
+        parts.push('<rect x="' + xCursor.toFixed(1) + '" y="' + yCursor.toFixed(1) + '" width="' + colW.toFixed(1) + '" height="' + segH.toFixed(1) + '" fill="' + color + '" stroke="var(--bg)" stroke-width="1" class="okc-marimekko-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((ser.label || '') + ' · ' + cat + ' · ' + fmtNum(v)) + '</title></rect>');
+        yCursor += segH;
+      });
+      // Category label at the bottom of the column.
+      parts.push('<text x="' + (xCursor + colW / 2).toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(cat) + '</text>');
+      xCursor += colW;
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Stream graph (centered stacked area) ----------------
+     Same data shape as stacked-bar (categories + series.values) but
+     each layer is centered on the x-axis instead of stacked from the
+     bottom. Useful for showing composition trends where the total
+     varies. */
+  _renderStream() {
+    var x = (this._extras && this._extras.stream) || {};
+    var categories = x.categories || [];
+    var series = x.series || [];
+    if (categories.length < 2 || !series.length) return;
+    var palette = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)'];
+    // Per-category total — used to centre each column's stack.
+    var totals = categories.map(function (_, i) {
+      return series.reduce(function (s, ser) { return s + Math.max(0, +(ser.values && ser.values[i]) || 0); }, 0);
+    });
+    var maxTotal = Math.max.apply(null, totals.concat([1]));
+    var W = 640, H = this._title ? 320 : 280;
+    var pad = { top: this._title ? 36 : 16, bottom: 30, left: 36, right: 12 };
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    function xOf(i) { return pad.left + (i / (categories.length - 1)) * plotW; }
+    function scaleY(v) { return (v / maxTotal) * plotH; }
+    // Per-series, compute the top and bottom edges across categories.
+    var bands = series.map(function () { return { top: [], bottom: [] }; });
+    for (var i = 0; i < categories.length; i++) {
+      var total = totals[i];
+      var halfTotal = scaleY(total) / 2;
+      var midY = pad.top + plotH / 2;
+      var cursor = midY - halfTotal;
+      for (var s = 0; s < series.length; s++) {
+        var v = Math.max(0, +(series[s].values && series[s].values[i]) || 0);
+        var h = scaleY(v);
+        bands[s].top.push({ x: xOf(i), y: cursor });
+        bands[s].bottom.push({ x: xOf(i), y: cursor + h });
+        cursor += h;
+      }
+    }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Stream graph') + '" class="okc-svg okc-stream">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    bands.forEach(function (b, si) {
+      var color = palette[si % palette.length];
+      var d = b.top.map(function (p, j) {
+        return (j === 0 ? 'M ' : 'L ') + p.x.toFixed(1) + ' ' + p.y.toFixed(1);
+      }).join(' ');
+      for (var j = b.bottom.length - 1; j >= 0; j--) {
+        d += ' L ' + b.bottom[j].x.toFixed(1) + ' ' + b.bottom[j].y.toFixed(1);
+      }
+      d += ' Z';
+      var payload = JSON.stringify({ label: series[si].label || '', kv: [{ k: 'series', v: series[si].label || '' }] });
+      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.78" stroke="var(--bg)" stroke-width="0.6" class="okc-stream-band" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(series[si].label || '') + '</title></path>');
+    });
+    // Category ticks at bottom.
+    categories.forEach(function (c, i) {
+      parts.push('<text x="' + xOf(i).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(c) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Violin ----------------
+     Kernel-density box-plot alternative. One violin per distribution.
+     Shape: mirrored density curve, with median + IQR marked. */
+  _renderViolin() {
+    var x = (this._extras && this._extras.violin) || {};
+    var distributions = (x.distributions || []).slice();
+    if (!distributions.length) return;
+    // Compute global range across all values.
+    var allValues = [];
+    distributions.forEach(function (d) {
+      (d.values || []).forEach(function (v) { if (!isNaN(+v)) allValues.push(+v); });
+    });
+    if (allValues.length < 2) return;
+    var vMin = Math.min.apply(null, allValues);
+    var vMax = Math.max.apply(null, allValues);
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    var W = 640, H = 80 + distributions.length * 80;
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 120, right: 20 };
+    var plotW = W - pad.left - pad.right;
+    var rowH = (H - pad.top - pad.bottom) / distributions.length;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Violin') + '" class="okc-svg okc-violin">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    distributions.forEach(function (dist, di) {
+      var values = (dist.values || []).map(Number).filter(function (v) { return !isNaN(v); });
+      if (values.length < 2) return;
+      values.sort(function (a, b) { return a - b; });
+      var color = palette[dist.color] || palette.accent;
+      var rowMid = pad.top + di * rowH + rowH / 2;
+      // KDE setup — Silverman bandwidth per distribution.
+      var mean = values.reduce(function (s, v) { return s + v; }, 0) / values.length;
+      var variance = values.reduce(function (s, v) { return s + (v - mean) * (v - mean); }, 0) / values.length;
+      var stdev = Math.sqrt(variance) || 1;
+      var bw = 1.06 * stdev * Math.pow(values.length, -1 / 5);
+      var sampleCount = 80;
+      var samples = [];
+      var maxD = 0;
+      var step = (vMax - vMin) / (sampleCount - 1);
+      for (var i = 0; i < sampleCount; i++) {
+        var xi = vMin + i * step;
+        var sum = 0;
+        for (var k = 0; k < values.length; k++) {
+          var u = (xi - values[k]) / bw;
+          sum += Math.exp(-0.5 * u * u);
+        }
+        var d = sum / (values.length * bw * Math.sqrt(2 * Math.PI));
+        samples.push({ x: xi, d: d });
+        if (d > maxD) maxD = d;
+      }
+      if (maxD === 0) return;
+      var halfH = rowH * 0.4;
+      // Build mirrored violin polygon.
+      var topPath = samples.map(function (s, idx) {
+        var y = rowMid - (s.d / maxD) * halfH;
+        return (idx === 0 ? 'M ' : 'L ') + xOf(s.x).toFixed(1) + ' ' + y.toFixed(1);
+      }).join(' ');
+      var bottomPath = '';
+      for (var j = samples.length - 1; j >= 0; j--) {
+        var y = rowMid + (samples[j].d / maxD) * halfH;
+        bottomPath += ' L ' + xOf(samples[j].x).toFixed(1) + ' ' + y.toFixed(1);
+      }
+      parts.push('<path d="' + topPath + bottomPath + ' Z" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-violin-body"/>');
+      // Quartile + median markers.
+      function quantile(p) {
+        var pos = (values.length - 1) * p;
+        var i = Math.floor(pos);
+        var frac = pos - i;
+        return values[i] + frac * ((values[i + 1] || values[i]) - values[i]);
+      }
+      var q1 = quantile(0.25), median = quantile(0.5), q3 = quantile(0.75);
+      // IQR box.
+      parts.push('<rect x="' + xOf(q1).toFixed(1) + '" y="' + (rowMid - 5).toFixed(1) + '" width="' + (xOf(q3) - xOf(q1)).toFixed(1) + '" height="10" fill="' + color + '" fill-opacity="0.7" stroke="none"/>');
+      // Median line.
+      parts.push('<line x1="' + xOf(median).toFixed(1) + '" y1="' + (rowMid - 10).toFixed(1) + '" x2="' + xOf(median).toFixed(1) + '" y2="' + (rowMid + 10).toFixed(1) + '" stroke="var(--bg)" stroke-width="2"/>');
+      // Label on the left.
+      parts.push('<text x="' + (pad.left - 12) + '" y="' + (rowMid + 4).toFixed(1) + '" text-anchor="end" class="okc-violin-label">' + escapeXml(dist.label || '') + '</text>');
+    });
+    // Bottom axis ticks at vMin / mid / vMax.
+    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
+      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Beeswarm ----------------
+     One-axis distribution rendered as jittered dots, one per data
+     point. Vertical position is force-balanced to avoid overlap so
+     the dot density at any x-position visually encodes count. */
+  _renderBeeswarm() {
+    var x = (this._extras && this._extras.beeswarm) || {};
+    var values = (x.values || []).map(Number).filter(function (v) { return !isNaN(v); });
+    if (values.length < 1) return;
+    var vMin = Math.min.apply(null, values);
+    var vMax = Math.max.apply(null, values);
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    var W = 640, H = this._title ? 240 : 200;
+    var pad = { top: this._title ? 36 : 16, bottom: 32, left: 24, right: 24 };
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    var dotR = +x.dot_radius || 5;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)' };
+    var color = palette[x.color] || palette.accent;
+    function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
+    // Place dots greedily: for each value, compute its x. Then assign
+    // y by checking existing placed dots in x-neighbourhood and
+    // bumping above/below to avoid overlap. Output y centred around
+    // the row mid.
+    var placed = [];
+    var mid = pad.top + plotH / 2;
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    sorted.forEach(function (v) {
+      var cx = xOf(v);
+      var y = mid;
+      var direction = 1; // try alternating up/down
+      var step = 0;
+      var safeIters = 200;
+      while (safeIters-- > 0) {
+        var clash = false;
+        for (var i = 0; i < placed.length; i++) {
+          var dx = placed[i].x - cx;
+          var dy = placed[i].y - y;
+          if (dx * dx + dy * dy < (dotR * 2.1) * (dotR * 2.1)) { clash = true; break; }
+        }
+        if (!clash) break;
+        step++;
+        y = mid + direction * step * (dotR * 1.4);
+        direction *= -1;
+        if (Math.abs(y - mid) > plotH / 2 - dotR) {
+          y = mid + (Math.random() - 0.5) * (plotH - 2 * dotR);
+        }
+      }
+      placed.push({ x: cx, y: y, v: v });
+    });
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Beeswarm') + '" class="okc-svg okc-beeswarm">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    placed.forEach(function (p) {
+      var payload = JSON.stringify({ label: '', kv: [{ k: 'value', v: fmtNum(p.v) }] });
+      parts.push('<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + dotR + '" fill="' + color + '" fill-opacity="0.78" class="okc-beeswarm-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(fmtNum(p.v)) + '</title></circle>');
+    });
+    // Bottom axis ticks at min / mid / max.
+    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
+      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
   }

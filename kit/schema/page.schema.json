@@ -444,7 +444,7 @@
       "properties": {
         "kind": { "const": "chart" },
         "type": {
-          "enum": ["plot", "arc", "scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "pie", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo"],
+          "enum": ["plot", "arc", "scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "pie", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo", "dot-plot", "density", "candlestick", "sunburst", "marimekko", "stream", "violin", "beeswarm"],
           "description": "Render mode. Canonical types: plot (Cartesian, marks-composed) and arc (radial slice, mode-switched). Sugar aliases — scatter/line/area desugar to plot+marks; pie/donut desugar to arc+mode; stacked-bar/grouped-bar desugar to bar+mode. Aliases keep working AND let the author override any preset (e.g. type=pie + arc.end=270 for a 3/4 pie). Other types (bubble / quadrant / bar / heatmap / sparkline / waffle / gauge / radar / box-plot / bullet / slope / histogram / calendar-heatmap / treemap / ridgeline / funnel / sankey / network / scatter-matrix / parallel-coordinates / chord / geo) keep their existing payload shapes."
         },
         "marks": {
@@ -920,7 +920,57 @@
             }
           },
           "minItems": 1
-        }
+        },
+        "rows_dot": {
+          "type": "array",
+          "description": "dot-plot — { rows: [{ label, value, color? }] }. Compact one-axis comparison; one row per dot."
+        },
+        "values_dist": {
+          "type": "array",
+          "description": "density / beeswarm / violin support — { values: [...] } at the chart root for density + beeswarm, or { distributions: [{ label, values, color? }] } for violin (and ridgeline)."
+        },
+        "ohlc": {
+          "type": "array",
+          "description": "candlestick — { entries: [{ date, open, high, low, close }] }."
+        },
+        "tree_sunburst": {
+          "type": "object",
+          "description": "sunburst — { tree: nested { label, value, children } } (or root). Same shape as treemap."
+        },
+        "marimekko_payload": {
+          "type": "object",
+          "description": "marimekko — { categories, series: [{ label, values }] }. Same shape as stacked-bar; column widths scale with column totals."
+        },
+        "stream_payload": {
+          "type": "object",
+          "description": "stream — { categories, series: [{ label, values }] }. Same shape as stacked-bar; layers centre around the x-axis."
+        },
+        "values": {
+          "type": "array",
+          "description": "Shared key carrying raw numeric values for distribution / sparkline charts: density / beeswarm / sparkline / histogram (binning needed)."
+        },
+        "distributions": {
+          "type": "array",
+          "description": "Shared key carrying per-distribution payloads for ridgeline / violin: [{ label, values, color? }]."
+        },
+        "entries": {
+          "type": "array",
+          "description": "candlestick — list of { date, open, high, low, close }."
+        },
+        "tree": {
+          "description": "treemap / sunburst — nested tree of { label, value, children? }."
+        },
+        "bandwidth": {
+          "type": "number",
+          "description": "density / violin — KDE bandwidth override (defaults to Silverman's rule)."
+        },
+        "sample_count": {
+          "type": "integer",
+          "description": "density — number of x-positions to sample (default 100)."
+        },
+        "min":           { "type": "number" },
+        "max":           { "type": "number" },
+        "dot_radius":    { "type": "number", "description": "beeswarm — dot radius in px (default 5)." }
       },
       "allOf": [
         {

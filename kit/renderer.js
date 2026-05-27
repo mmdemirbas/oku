@@ -470,7 +470,15 @@
         'scatter-matrix': { variables: block.variables, records: block.records },
         'parallel-coordinates': { variables: block.variables, records: block.records },
         chord: { groups: block.groups, matrix: block.matrix },
-        geo: { regions: block.regions }
+        geo: { regions: block.regions },
+        'dot-plot':   { rows: block.rows, min: block.min, max: block.max },
+        density:      { values: block.values, min: block.min, max: block.max, bandwidth: block.bandwidth, sample_count: block.sample_count, color: block.color },
+        candlestick:  { entries: block.entries },
+        sunburst:     { tree: block.tree },
+        marimekko:    { categories: block.categories, series: block.series },
+        stream:       { categories: block.categories, series: block.series },
+        violin:       { distributions: block.distributions },
+        beeswarm:     { values: block.values, min: block.min, max: block.max, color: block.color, dot_radius: block.dot_radius }
       };
       if (extraMap[type]) {
         const x = document.createElement('script');
