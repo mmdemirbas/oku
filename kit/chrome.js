@@ -4327,6 +4327,47 @@ class OkuChart extends HTMLElement {
      tooltip with one row per series — "at x = ?, series A is ?,
      series B is ?" — so the reader compares all series at the same
      x in a single glance. */
+  /* Generic vertical cursor for any SVG chart with a numeric or
+     categorical x-axis. Renders a dashed accent line that follows
+     the pointer between the supplied plotBounds. Cheap to opt into
+     from a renderer — pass the plot rectangle and the rest is
+     wiring. Used by box-plot / histogram / candlestick / density /
+     beeswarm / dot-plot. The richer Cartesian cursor (with nearest-
+     point lookup + multi-series tooltip) is a separate method. */
+  _wireGenericVerticalCursor(plotBounds) {
+    var self = this;
+    var svg = self.querySelector('svg.okc-svg');
+    if (!svg) return;
+    var existing = svg.querySelector('.okc-generic-cursor');
+    if (existing) existing.remove();
+    var cursor = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    cursor.setAttribute('class', 'okc-generic-cursor');
+    cursor.setAttribute('y1', plotBounds.top);
+    cursor.setAttribute('y2', plotBounds.bottom);
+    cursor.setAttribute('visibility', 'hidden');
+    cursor.setAttribute('pointer-events', 'none');
+    svg.appendChild(cursor);
+    function svgX(ev) {
+      var pt = svg.createSVGPoint();
+      pt.x = ev.clientX; pt.y = ev.clientY;
+      var ctm = svg.getScreenCTM();
+      return ctm ? pt.matrixTransform(ctm.inverse()).x : null;
+    }
+    svg.addEventListener('mousemove', function (ev) {
+      var x = svgX(ev);
+      if (x === null || x < plotBounds.left || x > plotBounds.right) {
+        cursor.setAttribute('visibility', 'hidden');
+        return;
+      }
+      cursor.setAttribute('x1', x);
+      cursor.setAttribute('x2', x);
+      cursor.setAttribute('visibility', 'visible');
+    });
+    svg.addEventListener('mouseleave', function () {
+      cursor.setAttribute('visibility', 'hidden');
+    });
+  }
+
   _wireCartesianCursor(opts) {
     var self = this;
     var svg = self.querySelector('svg.okc-svg');
@@ -5124,6 +5165,7 @@ class OkuChart extends HTMLElement {
     }
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: H - pad.bottom, left: pad.left, right: W - pad.right });
   }
 
   _renderBullet() {
@@ -5268,6 +5310,7 @@ class OkuChart extends HTMLElement {
     parts.push('<text x="' + xMax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(hi)) + '</text>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
   }
 
   _renderCalendarHeatmap() {
@@ -6362,6 +6405,7 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: H - pad.bottom, left: pad.left, right: W - pad.right });
   }
 
   /* ---------------- Density plot ----------------
@@ -6429,6 +6473,7 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
   }
 
   /* ---------------- Candlestick ----------------
@@ -6487,6 +6532,7 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
   }
 
   /* ---------------- Sunburst ----------------
@@ -6827,6 +6873,7 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
   }
 
   _attachToolbar() {

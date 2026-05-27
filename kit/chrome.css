@@ -3902,6 +3902,18 @@ oku-chart .okc-label-overlay {
   pointer-events: none;
   transition: opacity 0.18s ease;
 }
+
+/* Generic vertical cursor (box-plot, histogram, candlestick,
+   density, beeswarm, dot-plot, …). Sibling concept to the
+   Cartesian charts' .okc-cartesian-cursor. Dashed accent line
+   that follows the pointer's x-position within the plot region. */
+oku-chart .okc-generic-cursor {
+  stroke: var(--accent);
+  stroke-width: 1.2;
+  stroke-opacity: 0.55;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
 oku-chart:has(.okc-dot:hover) .okc-label-overlay,
 oku-chart:has(.okc-bubble:hover) .okc-label-overlay,
 oku-chart:has(.okc-slice:hover) .okc-label-overlay,
