@@ -1840,8 +1840,11 @@ function initReadingAids() {
       wrap.appendChild(board);
 
       // State
-      var sortCol = -1;
-      var sortDir = 0;       // 1 asc, -1 desc, 0 none
+      // Multi-column sort stack: [{ col, dir }, ...]. Click toggles
+      // the primary (replaces stack). Shift-click adds/toggles a
+      // secondary so the reader can sort by, e.g. owner asc + days
+      // desc. Empty = source order.
+      var sortStack = [];
       var filterText = '';
       var tbody = table.querySelector('tbody') || table;
       // Group-by state: 'author' (use the JSON-declared groups), 'none'
@@ -1966,20 +1969,25 @@ function initReadingAids() {
       }
 
       function entriesSorted(visible) {
-        if (sortCol < 0 || sortDir === 0) return visible;
+        if (!sortStack.length) return visible;
         // Sort rows within each group block; preserve group order.
         var out = [];
         var bucket = [];
-        function flush() {
-          bucket.sort(function (a, b) {
-            var av = stripHtml(a.cells[sortCol] || '');
-            var bv = stripHtml(b.cells[sortCol] || '');
+        function compareCells(a, b) {
+          for (var s = 0; s < sortStack.length; s++) {
+            var entry = sortStack[s];
+            var av = stripHtml(a.cells[entry.col] || '');
+            var bv = stripHtml(b.cells[entry.col] || '');
             var nA = parseFloat(av), nB = parseFloat(bv);
             var numeric = !isNaN(nA) && !isNaN(nB) &&
                           /^-?\$?[\d.,%]+\s*$/.test(av) && /^-?\$?[\d.,%]+\s*$/.test(bv);
             var cmp = numeric ? (nA - nB) : av.toLowerCase().localeCompare(bv.toLowerCase());
-            return sortDir * cmp;
-          });
+            if (cmp !== 0) return entry.dir * cmp;
+          }
+          return 0;
+        }
+        function flush() {
+          bucket.sort(compareCells);
           bucket.forEach(function (r) { out.push(r); });
           bucket = [];
         }
@@ -2304,10 +2312,23 @@ function initReadingAids() {
           var th = ths[i];
           th.removeAttribute('aria-sort');
           th.classList.remove('okt-sort-asc', 'okt-sort-desc');
-          if (i === sortCol) {
-            if (sortDir === 1)  { th.classList.add('okt-sort-asc');  th.setAttribute('aria-sort', 'ascending'); }
-            if (sortDir === -1) { th.classList.add('okt-sort-desc'); th.setAttribute('aria-sort', 'descending'); }
+          th.removeAttribute('data-sort-rank');
+          var stackIdx = -1;
+          for (var s = 0; s < sortStack.length; s++) {
+            if (sortStack[s].col === i) { stackIdx = s; break; }
           }
+          if (stackIdx < 0) continue;
+          var entry = sortStack[stackIdx];
+          if (entry.dir === 1) {
+            th.classList.add('okt-sort-asc');
+            th.setAttribute('aria-sort', 'ascending');
+          } else if (entry.dir === -1) {
+            th.classList.add('okt-sort-desc');
+            th.setAttribute('aria-sort', 'descending');
+          }
+          // Rank badge only meaningful when more than one column is
+          // active — keeps the indicator quiet for the common case.
+          if (sortStack.length > 1) th.setAttribute('data-sort-rank', String(stackIdx + 1));
         }
       }
 
@@ -2448,15 +2469,41 @@ function initReadingAids() {
         th.classList.add('okt-sortable');
         if (!th.hasAttribute('tabindex')) th.setAttribute('tabindex', '0');
         if (!th.hasAttribute('role'))     th.setAttribute('role', 'button');
-        function toggleSort() {
-          if (sortCol !== idx) { sortCol = idx; sortDir = 1; }
-          else if (sortDir === 1) sortDir = -1;
-          else { sortCol = -1; sortDir = 0; }
+        function findStackIdx() {
+          for (var s = 0; s < sortStack.length; s++) {
+            if (sortStack[s].col === idx) return s;
+          }
+          return -1;
+        }
+        function toggleSort(shift) {
+          var existing = findStackIdx();
+          if (shift) {
+            // Shift-click: add or cycle a secondary sort. Each
+            // subsequent column appends to the stack; clicking an
+            // already-stacked column toggles asc → desc → remove.
+            if (existing < 0) {
+              sortStack.push({ col: idx, dir: 1 });
+            } else if (sortStack[existing].dir === 1) {
+              sortStack[existing].dir = -1;
+            } else {
+              sortStack.splice(existing, 1);
+            }
+          } else {
+            // Plain click: collapse the stack to just this column,
+            // cycling its direction independently of any prior state.
+            if (existing < 0 || sortStack.length > 1) {
+              sortStack = [{ col: idx, dir: 1 }];
+            } else if (sortStack[0].dir === 1) {
+              sortStack = [{ col: idx, dir: -1 }];
+            } else {
+              sortStack = [];
+            }
+          }
           render();
         }
-        th.addEventListener('click', toggleSort);
+        th.addEventListener('click', function (e) { toggleSort(e.shiftKey); });
         th.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort(); }
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSort(e.shiftKey); }
         });
       });
 
