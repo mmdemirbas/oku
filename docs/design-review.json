@@ -57,10 +57,10 @@
              "render → output wording",
              "**Use code + output** instead of source + render.",
              "Shipped"],
-            ["6 (new)",
+            ["6",
              "Runtime chart-type toggle in the UI when data shape allows it",
-             "**Considering** — line/area/scatter share shape, could let the reader flip in-place. Bar / column from the same data too. Separate from unification but easier after it.",
-             "Open — design pending"]
+             "**Yes** — gear button on every chart toolbar → floating live-config popover. Type dropdown derived from data shape (no per-chart `compatible_with` field). Mode chips + marks chips + arc-end input populate the rest of the popover. Live re-render on every change via host swap.",
+             "Shipped"]
           ]
         }
       ]
@@ -101,6 +101,13 @@
               "accent": "success",
               "blocks": [
                 {"kind": "paragraph", "content": "The 'Markdown → page kinds' compare-grid card (one 15-item bulleted list crammed into a single card) replaced with a two-column table (Markdown / Becomes). Tables sort, filter, and give the reader two scan axes. The card framing added noise without value."}
+              ]
+            },
+            {
+              "title": "Decision 6 — live config popover",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Gear button on every chart's toolbar opens a floating popover anchored near the chart. Type dropdown populated by data-shape derivation (no per-chart `compatible_with` field). Live re-render on every change via host swap — the chart visibly transforms in place. Mode chips, marks chips, and an arc-end input round out the popover for the unified families."}
               ]
             },
             {
@@ -616,9 +623,9 @@
           "headers": ["#", "Question", "Gated on", "Recommendation"],
           "rows": [
             ["1",
-             "Implement decision 6 (runtime chart-type toggle UI)?",
-             "Task C landed.",
-             "Now unblocked. Reuses the canonical `marks` axis."],
+             "Greenlight the dual-form refactor (data + encoding + mark)?",
+             "Popup proof-of-concept landed.",
+             "Big call. Multi-session investment. Right long-term per first-principles. Could also defer indefinitely if the current type-first model + popover combo is judged sufficient."],
             ["3",
              "Which catalogue-research visualizations to add next?",
              "User picks from the top-8 list.",
