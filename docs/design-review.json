@@ -60,7 +60,19 @@
             ["6",
              "Runtime chart-type toggle in the UI when data shape allows it",
              "**Yes** — gear button on every chart toolbar → floating live-config popover. Type dropdown derived from data shape (no per-chart `compatible_with` field). Mode chips + marks chips + arc-end input populate the rest of the popover. Live re-render on every change via host swap.",
-             "Shipped"]
+             "Shipped"],
+            ["T",
+             "Same gear pattern on tables — hide view + group-by in a popover; add per-column filters; surface sort more visibly + support multi-column",
+             "**Yes** — popover hosts view toggle + group-by (moved out of the toolbar at open, returned at close); per-column filter section AND'd with the global filter; sort cycles primary on click, adds secondary on shift-click, rank badge appears when stack > 1.",
+             "Shipped"],
+            ["V",
+             "Add the top-8 catalogue visualizations",
+             "**Yes — all eight.** dot-plot, density, candlestick, sunburst, marimekko, stream, violin, beeswarm. Each gets a renderer, a schema entry, a doc section, an example pair, and a card in the appropriate function group. Chart-type count: 29 → 37.",
+             "Shipped"],
+            ["S (the big one)",
+             "First-principles refactor — dual-form: keep type aliases for AI, ALSO expose canonical `mark + encoding + data`",
+             "**Greenlit by the user.** Multi-session work. Plot family is the obvious starting point (already half there via the marks unification). Other families follow one at a time, with tests guarding every step.",
+             "Open — R1 in progress (plot family proof of concept)"]
           ]
         }
       ]
@@ -108,6 +120,34 @@
               "accent": "success",
               "blocks": [
                 {"kind": "paragraph", "content": "Gear button on every chart's toolbar opens a floating popover anchored near the chart. Type dropdown populated by data-shape derivation (no per-chart `compatible_with` field). Live re-render on every change via host swap — the chart visibly transforms in place. Mode chips, marks chips, and an arc-end input round out the popover for the unified families."}
+              ]
+            },
+            {
+              "title": "T1 — table gear popover (group + view)",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Same gear pattern on every table. Click → floating popover holding the view toggle and group-by select (moved out of the toolbar at open, returned at close — same DOM, same listeners). Toolbar at rest is now two affordances: filter + gear."}
+              ]
+            },
+            {
+              "title": "T2 — per-column filter inputs",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Filter-columns section in the table popover: one input per header. Combines with the global text filter and chip-rack via AND. Verified: typing in one column input narrows 16 rows → 4; clear restores all."}
+              ]
+            },
+            {
+              "title": "T3 — multi-column sort with rank badge",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Click cycles primary sort; shift-click adds a secondary, then tertiary, etc. The arrow indicator stays; a small accent-coloured rank badge appears only when more than one column is active so single-column tables stay quiet."}
+              ]
+            },
+            {
+              "title": "8 new visualizations",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "From the catalogue-research top-8: **dot-plot · density · candlestick · sunburst · marimekko · stream · violin · beeswarm**. Each has a doc section + an example pair + a card in the appropriate function group. Chart-type count rises from 29 to 37."}
               ]
             },
             {
@@ -623,9 +663,9 @@
           "headers": ["#", "Question", "Gated on", "Recommendation"],
           "rows": [
             ["1",
-             "Greenlight the dual-form refactor (data + encoding + mark)?",
-             "Popup proof-of-concept landed.",
-             "Big call. Multi-session investment. Right long-term per first-principles. Could also defer indefinitely if the current type-first model + popover combo is judged sufficient."],
+             "Continue the dual-form refactor family-by-family (after plot)",
+             "Plot family migration ships first; arc / bar / categorical / flow follow.",
+             "Each family takes ~1 session. Tests guard each step (the alias surface keeps every existing page rendering identically)."],
             ["3",
              "Which catalogue-research visualizations to add next?",
              "User picks from the top-8 list.",
