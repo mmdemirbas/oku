@@ -4010,7 +4010,13 @@ class OkuChart extends HTMLElement {
       marimekko:    '_renderMarimekko',
       stream:       '_renderStream',
       violin:       '_renderViolin',
-      beeswarm:     '_renderBeeswarm'
+      beeswarm:     '_renderBeeswarm',
+      waterfall:    '_renderWaterfall',
+      lollipop:     '_renderLollipop',
+      dumbbell:     '_renderDumbbell',
+      'polar-area': '_renderPolarArea',
+      gantt:        '_renderGantt',
+      bump:         '_renderBump'
     };
     if (nonCartesian[this._type]) {
       this[nonCartesian[this._type]]();
@@ -6872,6 +6878,347 @@ class OkuChart extends HTMLElement {
     // Bottom axis ticks at min / mid / max.
     [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
       parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
+  }
+
+  /* ---------------- Waterfall chart ----------------
+     Incremental changes connecting two totals: start → +A → −B →
+     +C → end. Each step is a coloured bar floating at the running
+     cumulative; positive bars rise from the prior cumulative,
+     negative bars drop. Bookend bars (start / end) stand on the
+     baseline. Bridges connect step tops to clarify the running
+     line. */
+  _renderWaterfall() {
+    var x = (this._extras && this._extras.waterfall) || {};
+    var steps = x.steps || [];
+    if (!steps.length) return;
+    // Pre-compute cumulative + per-step body extent.
+    // step.kind: 'start' | 'plus' | 'minus' | 'end'
+    var running = 0;
+    var entries = steps.map(function (s) {
+      var v = +s.value || 0;
+      var top, bottom, kind = s.kind || (v >= 0 ? 'plus' : 'minus');
+      if (kind === 'start' || kind === 'total') {
+        top = v; bottom = 0; running = v;
+      } else if (kind === 'end') {
+        top = running; bottom = 0;
+      } else if (kind === 'minus' || v < 0) {
+        bottom = running;
+        top = running + v;
+        running += v;
+      } else {
+        bottom = running;
+        top = running + v;
+        running += v;
+      }
+      return { label: s.label || '', kind: kind, value: v, top: top, bottom: bottom, running: running };
+    });
+    var allValues = entries.flatMap(function (e) { return [e.top, e.bottom, 0]; });
+    var vMin = Math.min.apply(null, allValues);
+    var vMax = Math.max.apply(null, allValues);
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 56, right: 16 };
+    var W = 640, H = this._title ? 360 : 320;
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    var step = plotW / entries.length;
+    var bw = Math.min(step * 0.65, 48);
+    function yOf(v) { return pad.top + plotH - (v - vMin) / (vMax - vMin) * plotH; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Waterfall') + '" class="okc-svg okc-waterfall">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Y-axis ticks (5).
+    for (var t = 0; t <= 4; t++) {
+      var v = vMin + (t / 4) * (vMax - vMin);
+      var ty = yOf(v);
+      parts.push('<line x1="' + pad.left + '" y1="' + ty.toFixed(1) + '" x2="' + (W - pad.right) + '" y2="' + ty.toFixed(1) + '" class="okc-axis" stroke-dasharray="2 3"/>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4).toFixed(1) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    }
+    // Zero baseline.
+    parts.push('<line x1="' + pad.left + '" y1="' + yOf(0).toFixed(1) + '" x2="' + (W - pad.right) + '" y2="' + yOf(0).toFixed(1) + '" class="okc-axis"/>');
+    // Bridges first (under the bars).
+    entries.forEach(function (e, i) {
+      if (i === 0) return;
+      var prevRight = pad.left + step * i - (step - bw) / 2;
+      var thisLeft  = pad.left + step * i + (step - bw) / 2;
+      var prevRun = entries[i - 1].running;
+      parts.push('<line x1="' + prevRight.toFixed(1) + '" y1="' + yOf(prevRun).toFixed(1) + '" x2="' + thisLeft.toFixed(1) + '" y2="' + yOf(prevRun).toFixed(1) + '" class="okc-waterfall-bridge" stroke-dasharray="2 3"/>');
+    });
+    entries.forEach(function (e, i) {
+      var cx = pad.left + step * (i + 0.5);
+      var color, kindClass;
+      if (e.kind === 'start' || e.kind === 'end' || e.kind === 'total') {
+        color = 'var(--accent)'; kindClass = 'okc-waterfall-total';
+      } else if (e.kind === 'minus' || e.value < 0) {
+        color = 'var(--danger)'; kindClass = 'okc-waterfall-minus';
+      } else {
+        color = 'var(--success)'; kindClass = 'okc-waterfall-plus';
+      }
+      var yT = yOf(Math.max(e.top, e.bottom));
+      var yB = yOf(Math.min(e.top, e.bottom));
+      var h  = Math.max(2, yB - yT);
+      var payload = JSON.stringify({
+        label: e.label,
+        kv: [
+          { k: 'change',     v: (e.value >= 0 ? '+' : '') + fmtNum(e.value) },
+          { k: 'cumulative', v: fmtNum(e.running) }
+        ]
+      });
+      parts.push('<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + yT.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2" fill="' + color + '" class="okc-waterfall-bar ' + kindClass + '" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(e.label + ' · ' + (e.value >= 0 ? '+' : '') + fmtNum(e.value) + ' → ' + fmtNum(e.running)) + '</title></rect>');
+      parts.push('<text x="' + cx.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(e.label) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
+  }
+
+  /* ---------------- Lollipop chart ----------------
+     Variant of dot-plot — same data shape, with a thin stem
+     from the axis to the dot. Reads as a less-noisy bar chart
+     when the value comparison is the headline. */
+  _renderLollipop() {
+    var x = (this._extras && this._extras.lollipop) || {};
+    var rows = (x.rows || []).slice();
+    if (!rows.length) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var vMin = x.min !== undefined ? +x.min : Math.min(0, Math.min.apply(null, rows.map(function (r) { return +r.value || 0; })));
+    var vMax = x.max !== undefined ? +x.max : Math.max.apply(null, rows.map(function (r) { return +r.value || 0; }));
+    if (vMin === vMax) { vMax += 1; }
+    var W = 640, rowH = 28;
+    var pad = { top: this._title ? 36 : 12, bottom: 28, left: 140, right: 24 };
+    var H = pad.top + rows.length * rowH + pad.bottom;
+    var plotW = W - pad.left - pad.right;
+    function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
+    var x0 = xOf(0);
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Lollipop') + '" class="okc-svg okc-lollipop">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    parts.push('<line x1="' + x0.toFixed(1) + '" y1="' + pad.top + '" x2="' + x0.toFixed(1) + '" y2="' + (H - pad.bottom) + '" class="okc-axis"/>');
+    rows.forEach(function (r, i) {
+      var y = pad.top + i * rowH + rowH / 2;
+      var color = palette[r.color] || palette.accent;
+      var cx = xOf(+r.value || 0);
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-lollipop-label">' + escapeXml(r.label || '') + '</text>');
+      parts.push('<line x1="' + x0.toFixed(1) + '" y1="' + y + '" x2="' + cx.toFixed(1) + '" y2="' + y + '" stroke="' + color + '" stroke-width="2" class="okc-lollipop-stem"/>');
+      var payload = JSON.stringify({ label: r.label || '', kv: [{ k: 'value', v: fmtNum(+r.value || 0) }] });
+      parts.push('<circle cx="' + cx.toFixed(1) + '" cy="' + y + '" r="6" fill="' + color + '" class="okc-lollipop-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtNum(+r.value || 0)) + '</title></circle>');
+    });
+    // Bottom ticks.
+    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
+      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: H - pad.bottom, left: pad.left, right: W - pad.right });
+  }
+
+  /* ---------------- Dumbbell / arrow plot ----------------
+     Two dots per category joined by a line — before/after,
+     men/women, 2010/2020. Compact alternative to the slope chart
+     when many categories don't fit a slope layout. */
+  _renderDumbbell() {
+    var x = (this._extras && this._extras.dumbbell) || {};
+    var rows = (x.rows || []).slice();
+    if (!rows.length) return;
+    var allVals = [];
+    rows.forEach(function (r) { allVals.push(+r.from || 0, +r.to || 0); });
+    var vMin = Math.min.apply(null, allVals);
+    var vMax = Math.max.apply(null, allVals);
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var fromColor = palette[x.from_color] || palette.muted;
+    var toColor   = palette[x.to_color]   || palette.accent;
+    var W = 640, rowH = 32;
+    var pad = { top: this._title ? 36 : 12, bottom: 40, left: 140, right: 24 };
+    var H = pad.top + rows.length * rowH + pad.bottom;
+    var plotW = W - pad.left - pad.right;
+    function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Dumbbell') + '" class="okc-svg okc-dumbbell">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    rows.forEach(function (r, i) {
+      var y = pad.top + i * rowH + rowH / 2;
+      var fromX = xOf(+r.from || 0);
+      var toX   = xOf(+r.to   || 0);
+      var change = (+r.to || 0) - (+r.from || 0);
+      var connectorColor = change >= 0 ? 'var(--success)' : 'var(--danger)';
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-dumbbell-label">' + escapeXml(r.label || '') + '</text>');
+      parts.push('<line x1="' + fromX.toFixed(1) + '" y1="' + y + '" x2="' + toX.toFixed(1) + '" y2="' + y + '" stroke="' + connectorColor + '" stroke-width="3" stroke-opacity="0.4" class="okc-dumbbell-connector"/>');
+      var fromPayload = JSON.stringify({ label: r.label + ' · ' + (x.from_label || 'from'), kv: [{ k: 'value', v: fmtNum(+r.from || 0) }] });
+      var toPayload   = JSON.stringify({ label: r.label + ' · ' + (x.to_label || 'to'), kv: [{ k: 'value', v: fmtNum(+r.to || 0) }, { k: 'Δ', v: (change >= 0 ? '+' : '') + fmtNum(change) }] });
+      parts.push('<circle cx="' + fromX.toFixed(1) + '" cy="' + y + '" r="5" fill="' + fromColor + '" class="okc-dumbbell-dot okc-dumbbell-from" tabindex="0" data-hover-payload="' + escapeXml(fromPayload) + '"><title>' + escapeXml((x.from_label || 'from') + ': ' + fmtNum(+r.from || 0)) + '</title></circle>');
+      parts.push('<circle cx="' + toX.toFixed(1)   + '" cy="' + y + '" r="6" fill="' + toColor   + '" class="okc-dumbbell-dot okc-dumbbell-to"   tabindex="0" data-hover-payload="' + escapeXml(toPayload)   + '"><title>' + escapeXml((x.to_label   || 'to')   + ': ' + fmtNum(+r.to   || 0)) + '</title></circle>');
+    });
+    // Bottom ticks + legend.
+    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
+      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    });
+    if (x.from_label || x.to_label) {
+      var lyt = H - 10;
+      parts.push('<circle cx="' + (pad.left + 4) + '" cy="' + lyt + '" r="4" fill="' + fromColor + '"/>');
+      parts.push('<text x="' + (pad.left + 14) + '" y="' + (lyt + 4) + '" class="okc-tick">' + escapeXml(x.from_label || 'from') + '</text>');
+      parts.push('<circle cx="' + (pad.left + 90) + '" cy="' + lyt + '" r="5" fill="' + toColor + '"/>');
+      parts.push('<text x="' + (pad.left + 100) + '" y="' + (lyt + 4) + '" class="okc-tick">' + escapeXml(x.to_label || 'to') + '</text>');
+    }
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: H - pad.bottom, left: pad.left, right: W - pad.right });
+  }
+
+  /* ---------------- Polar area / Nightingale rose ----------------
+     Bars laid out around a circle. Cyclical categorical data
+     (months, hours, compass directions) where the cyclic shape
+     itself carries meaning. Distinct from radar — bars not polygon. */
+  _renderPolarArea() {
+    var x = (this._extras && this._extras['polar-area']) || {};
+    var sectors = x.sectors || [];
+    if (!sectors.length) return;
+    var palette = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)'];
+    var vMax = Math.max.apply(null, sectors.map(function (s) { return +s.value || 0; }).concat([1]));
+    var W = 420, H = 380;
+    var cx = W / 2, cy = H / 2 + (this._title ? 8 : 0);
+    var rMax = Math.min(W, H) / 2 - 36;
+    var angleStep = (Math.PI * 2) / sectors.length;
+    var startAngle = -Math.PI / 2 - angleStep / 2;
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Polar area') + '" class="okc-svg okc-polar-area">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Reference rings.
+    [0.25, 0.5, 0.75, 1].forEach(function (f) {
+      parts.push('<circle cx="' + cx + '" cy="' + cy + '" r="' + (rMax * f).toFixed(1) + '" fill="none" stroke="var(--border-soft)" stroke-dasharray="2 3"/>');
+    });
+    sectors.forEach(function (s, i) {
+      var v = Math.max(0, +s.value || 0);
+      var r = (v / vMax) * rMax;
+      var a0 = startAngle + i * angleStep;
+      var a1 = a0 + angleStep;
+      var p0 = [cx + r * Math.cos(a0), cy + r * Math.sin(a0)];
+      var p1 = [cx + r * Math.cos(a1), cy + r * Math.sin(a1)];
+      var large = angleStep > Math.PI ? 1 : 0;
+      var d = 'M ' + cx + ' ' + cy +
+              ' L ' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) +
+              ' A ' + r.toFixed(1) + ' ' + r.toFixed(1) + ' 0 ' + large + ' 1 ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1) +
+              ' Z';
+      var color = palette[i % palette.length];
+      var payload = JSON.stringify({ label: s.label || '', kv: [{ k: 'value', v: fmtNum(v) }] });
+      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.72" stroke="var(--bg)" stroke-width="1" class="okc-polar-area-sector" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + fmtNum(v)) + '</title></path>');
+      // Label on outer perimeter.
+      var labelA = a0 + angleStep / 2;
+      var labelR = rMax + 14;
+      var lx = cx + labelR * Math.cos(labelA);
+      var ly = cy + labelR * Math.sin(labelA);
+      var anchor = Math.cos(labelA) > 0.1 ? 'start' : Math.cos(labelA) < -0.1 ? 'end' : 'middle';
+      parts.push('<text x="' + lx.toFixed(1) + '" y="' + (ly + 3).toFixed(1) + '" text-anchor="' + anchor + '" class="okc-polar-area-label">' + escapeXml(s.label || '') + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Gantt chart ----------------
+     Horizontal bars positioned on a time axis, one per task.
+     Tasks: { label, start, end, color?, group? }. start/end are
+     numeric (interpret as days, hours, or unitless ticks per the
+     author's data — the renderer treats them as continuous). */
+  _renderGantt() {
+    var x = (this._extras && this._extras.gantt) || {};
+    var tasks = (x.tasks || []).slice();
+    if (!tasks.length) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var vMin = Math.min.apply(null, tasks.map(function (t) { return +t.start || 0; }));
+    var vMax = Math.max.apply(null, tasks.map(function (t) { return +t.end   || 0; }));
+    if (vMin === vMax) { vMax += 1; }
+    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 160, right: 16 };
+    var rowH = 26;
+    var W = 720, H = pad.top + tasks.length * rowH + pad.bottom;
+    var plotW = W - pad.left - pad.right;
+    function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Gantt') + '" class="okc-svg okc-gantt">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Vertical grid lines (5).
+    for (var t = 0; t <= 4; t++) {
+      var v = vMin + (t / 4) * (vMax - vMin);
+      var gx = xOf(v);
+      parts.push('<line x1="' + gx.toFixed(1) + '" y1="' + pad.top + '" x2="' + gx.toFixed(1) + '" y2="' + (H - pad.bottom) + '" class="okc-axis" stroke-dasharray="2 3"/>');
+      parts.push('<text x="' + gx.toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + (x.tick_format === 'date' ? new Date(+v).toISOString().slice(0, 10) : escapeXml(fmtNum(v))) + '</text>');
+    }
+    tasks.forEach(function (task, i) {
+      var y = pad.top + i * rowH + 4;
+      var bx = xOf(+task.start || 0);
+      var bw = Math.max(2, xOf(+task.end || 0) - bx);
+      var color = palette[task.color] || palette.accent;
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 14) + '" text-anchor="end" class="okc-gantt-label">' + escapeXml(task.label || '') + '</text>');
+      var payload = JSON.stringify({
+        label: task.label || '',
+        kv: [
+          { k: 'start',    v: x.tick_format === 'date' ? new Date(+task.start).toISOString().slice(0,10) : fmtNum(+task.start || 0) },
+          { k: 'end',      v: x.tick_format === 'date' ? new Date(+task.end).toISOString().slice(0,10)   : fmtNum(+task.end   || 0) },
+          { k: 'duration', v: fmtNum((+task.end || 0) - (+task.start || 0)) }
+        ]
+      });
+      parts.push('<rect x="' + bx.toFixed(1) + '" y="' + y + '" width="' + bw.toFixed(1) + '" height="18" rx="3" fill="' + color + '" class="okc-gantt-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((task.label || '') + ' · ' + fmtNum(+task.start || 0) + ' → ' + fmtNum(+task.end || 0)) + '</title></rect>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor({ top: pad.top, bottom: H - pad.bottom, left: pad.left, right: W - pad.right });
+  }
+
+  /* ---------------- Bump chart ----------------
+     Line chart where the y-axis is RANK instead of value. Each
+     series has values per category (e.g. years); the chart plots
+     the series' rank-position at each category. "Who was #1 each
+     year" — leaderboards, popularity drift. */
+  _renderBump() {
+    var x = (this._extras && this._extras.bump) || {};
+    var categories = x.categories || [];
+    var series = (x.series || []).slice();
+    if (categories.length < 2 || !series.length) return;
+    var palette = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)'];
+    // Compute per-category ranks. Rank 1 = highest value at that
+    // category index. Ties get the same rank (stable).
+    var ranks = categories.map(function (_, ci) {
+      var vals = series.map(function (s, si) { return { i: si, v: +(s.values && s.values[ci]) || 0 }; });
+      vals.sort(function (a, b) { return b.v - a.v; });
+      var rankBySeries = {};
+      vals.forEach(function (entry, idx) { rankBySeries[entry.i] = idx + 1; });
+      return rankBySeries;
+    });
+    var nSeries = series.length;
+    var W = 720, H = this._title ? 320 : 280;
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 110, right: 110 };
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    function xOf(i) { return pad.left + (i / (categories.length - 1)) * plotW; }
+    function yOf(rank) { return pad.top + ((rank - 1) / Math.max(1, nSeries - 1)) * plotH; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Bump') + '" class="okc-svg okc-bump">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Series ranking lines.
+    series.forEach(function (s, si) {
+      var color = palette[si % palette.length];
+      var pathD = categories.map(function (_, ci) {
+        return (ci === 0 ? 'M ' : 'L ') + xOf(ci).toFixed(1) + ' ' + yOf(ranks[ci][si]).toFixed(1);
+      }).join(' ');
+      parts.push('<path d="' + pathD + '" stroke="' + color + '" stroke-width="2.5" fill="none" stroke-linejoin="round" class="okc-bump-line"/>');
+      // Dots at each rank.
+      categories.forEach(function (_, ci) {
+        var rank = ranks[ci][si];
+        var payload = JSON.stringify({ label: (s.label || '') + ' · ' + categories[ci], kv: [
+          { k: 'rank', v: '#' + rank },
+          { k: 'value', v: fmtNum(+(s.values && s.values[ci]) || 0) }
+        ]});
+        parts.push('<circle cx="' + xOf(ci).toFixed(1) + '" cy="' + yOf(rank).toFixed(1) + '" r="5" fill="' + color + '" class="okc-bump-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + categories[ci] + ' · #' + rank) + '</title></circle>');
+      });
+      // Series label at each end.
+      var firstRank = ranks[0][si];
+      var lastRank  = ranks[categories.length - 1][si];
+      parts.push('<text x="' + (pad.left - 8) + '" y="' + (yOf(firstRank) + 4) + '" text-anchor="end" class="okc-bump-end-label" fill="' + color + '">' + escapeXml(s.label || '') + '</text>');
+      parts.push('<text x="' + (W - pad.right + 8) + '" y="' + (yOf(lastRank) + 4) + '" text-anchor="start" class="okc-bump-end-label" fill="' + color + '">' + escapeXml(s.label || '') + '</text>');
+    });
+    // Category ticks at bottom.
+    categories.forEach(function (c, i) {
+      parts.push('<text x="' + xOf(i).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(c) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));

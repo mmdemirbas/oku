@@ -526,7 +526,13 @@
         marimekko:    { categories: block.categories, series: block.series },
         stream:       { categories: block.categories, series: block.series },
         violin:       { distributions: block.distributions },
-        beeswarm:     { values: block.values, min: block.min, max: block.max, color: block.color, dot_radius: block.dot_radius }
+        beeswarm:     { values: block.values, min: block.min, max: block.max, color: block.color, dot_radius: block.dot_radius },
+        waterfall:    { steps: block.steps },
+        lollipop:     { rows: block.rows, min: block.min, max: block.max },
+        dumbbell:     { rows: block.rows, from_label: block.from_label, to_label: block.to_label, from_color: block.from_color, to_color: block.to_color },
+        'polar-area': { sectors: block.sectors },
+        gantt:        { tasks: block.tasks, tick_format: block.tick_format },
+        bump:         { categories: block.categories, series: block.series }
       };
       if (extraMap[type]) {
         const x = document.createElement('script');

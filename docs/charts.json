@@ -382,6 +382,129 @@
                   ]
                 }
               ]
+            },
+            {
+              "title": "waterfall",
+              "href": "#chart-waterfall",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "waterfall",
+                  "title": "Q1 → Q2 revenue",
+                  "steps": [
+                    {
+                      "label": "Q1 start",
+                      "value": 100,
+                      "kind": "start"
+                    },
+                    {
+                      "label": "+ new",
+                      "value": 35,
+                      "kind": "plus"
+                    },
+                    {
+                      "label": "− churn",
+                      "value": -18,
+                      "kind": "minus"
+                    },
+                    {
+                      "label": "+ upsell",
+                      "value": 22,
+                      "kind": "plus"
+                    },
+                    {
+                      "label": "− refund",
+                      "value": -7,
+                      "kind": "minus"
+                    },
+                    {
+                      "label": "Q2 end",
+                      "value": 132,
+                      "kind": "end"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "lollipop",
+              "href": "#chart-lollipop",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "lollipop",
+                  "title": "Endpoints by p95 latency (ms)",
+                  "rows": [
+                    {
+                      "label": "/v1/auth",
+                      "value": 24,
+                      "color": "success"
+                    },
+                    {
+                      "label": "/v1/search",
+                      "value": 78,
+                      "color": "accent"
+                    },
+                    {
+                      "label": "/v1/recommend",
+                      "value": 142,
+                      "color": "warn"
+                    },
+                    {
+                      "label": "/v1/checkout",
+                      "value": 240,
+                      "color": "danger"
+                    },
+                    {
+                      "label": "/v1/report",
+                      "value": 510,
+                      "color": "danger"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "dumbbell",
+              "href": "#chart-dumbbell",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "dumbbell",
+                  "title": "Q1 → Q2 adoption",
+                  "from_label": "Q1",
+                  "to_label": "Q2",
+                  "from_color": "muted",
+                  "to_color": "accent",
+                  "rows": [
+                    {
+                      "label": "infra",
+                      "from": 64,
+                      "to": 88
+                    },
+                    {
+                      "label": "platform",
+                      "from": 52,
+                      "to": 72
+                    },
+                    {
+                      "label": "growth",
+                      "from": 58,
+                      "to": 45
+                    },
+                    {
+                      "label": "ops",
+                      "from": 41,
+                      "to": 60
+                    },
+                    {
+                      "label": "billing",
+                      "from": 22,
+                      "to": 38
+                    }
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -626,6 +749,66 @@
                         28,
                         45,
                         55,
+                        60,
+                        70,
+                        80
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "bump",
+              "href": "#chart-bump",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "bump",
+                  "title": "Top-3 cities by visits",
+                  "categories": [
+                    "2020",
+                    "2021",
+                    "2022",
+                    "2023",
+                    "2024"
+                  ],
+                  "series": [
+                    {
+                      "label": "Berlin",
+                      "values": [
+                        80,
+                        75,
+                        90,
+                        95,
+                        92
+                      ]
+                    },
+                    {
+                      "label": "Lisbon",
+                      "values": [
+                        70,
+                        85,
+                        75,
+                        80,
+                        88
+                      ]
+                    },
+                    {
+                      "label": "Krakow",
+                      "values": [
+                        60,
+                        70,
+                        80,
+                        65,
+                        75
+                      ]
+                    },
+                    {
+                      "label": "Tallinn",
+                      "values": [
+                        40,
+                        50,
                         60,
                         70,
                         80
@@ -1091,6 +1274,47 @@
                         140,
                         180
                       ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "polar-area",
+              "href": "#chart-polar-area",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "polar-area",
+                  "title": "Issues by day of week",
+                  "sectors": [
+                    {
+                      "label": "Mon",
+                      "value": 28
+                    },
+                    {
+                      "label": "Tue",
+                      "value": 42
+                    },
+                    {
+                      "label": "Wed",
+                      "value": 56
+                    },
+                    {
+                      "label": "Thu",
+                      "value": 38
+                    },
+                    {
+                      "label": "Fri",
+                      "value": 30
+                    },
+                    {
+                      "label": "Sat",
+                      "value": 9
+                    },
+                    {
+                      "label": "Sun",
+                      "value": 6
                     }
                   ]
                 }
@@ -1579,6 +1803,49 @@
                       "source": "b",
                       "target": "d",
                       "value": 6
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "title": "gantt",
+              "href": "#chart-gantt",
+              "blocks": [
+                {
+                  "kind": "chart",
+                  "type": "gantt",
+                  "title": "Release plan (weeks)",
+                  "tasks": [
+                    {
+                      "label": "Discovery",
+                      "start": 0,
+                      "end": 3,
+                      "color": "accent"
+                    },
+                    {
+                      "label": "Design",
+                      "start": 2,
+                      "end": 6,
+                      "color": "accent"
+                    },
+                    {
+                      "label": "Build",
+                      "start": 5,
+                      "end": 14,
+                      "color": "success"
+                    },
+                    {
+                      "label": "Integrate",
+                      "start": 12,
+                      "end": 16,
+                      "color": "warn"
+                    },
+                    {
+                      "label": "QA + launch",
+                      "start": 15,
+                      "end": 20,
+                      "color": "danger"
                     }
                   ]
                 }
@@ -2375,6 +2642,165 @@
               }
             ]
           }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-waterfall",
+          "title": "type: waterfall"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Incremental gains and losses connecting two totals. Start bar + positive/negative steps + end bar; dashed bridges link cumulative tops. Canonical 'what changed between these two numbers' chart — financial bridge, retention loss-explanation, performance breakdown."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"waterfall\",\n  \"title\": \"Q1 \\u2192 Q2 revenue\",\n  \"steps\": [\n    {\n      \"label\": \"Q1 start\",\n      \"value\": 100,\n      \"kind\": \"start\"\n    },\n    {\n      \"label\": \"+ new\",\n      \"value\": 35,\n      \"kind\": \"plus\"\n    },\n    {\n      \"label\": \"\\u2212 churn\",\n      \"value\": -18,\n      \"kind\": \"minus\"\n    },\n    {\n      \"label\": \"+ upsell\",\n      \"value\": 22,\n      \"kind\": \"plus\"\n    },\n    {\n      \"label\": \"\\u2212 refund\",\n      \"value\": -7,\n      \"kind\": \"minus\"\n    },\n    {\n      \"label\": \"Q2 end\",\n      \"value\": 132,\n      \"kind\": \"end\"\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "waterfall",
+            "title": "Q1 → Q2 revenue",
+            "steps": [
+              {
+                "label": "Q1 start",
+                "value": 100,
+                "kind": "start"
+              },
+              {
+                "label": "+ new",
+                "value": 35,
+                "kind": "plus"
+              },
+              {
+                "label": "− churn",
+                "value": -18,
+                "kind": "minus"
+              },
+              {
+                "label": "+ upsell",
+                "value": 22,
+                "kind": "plus"
+              },
+              {
+                "label": "− refund",
+                "value": -7,
+                "kind": "minus"
+              },
+              {
+                "label": "Q2 end",
+                "value": 132,
+                "kind": "end"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-lollipop",
+          "title": "type: lollipop"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Variant of dot-plot — same data shape, with a thin stem from the axis to the dot. Reads as a less-noisy bar chart when the value comparison is the headline."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"lollipop\",\n  \"title\": \"Endpoints by p95 latency (ms)\",\n  \"rows\": [\n    {\n      \"label\": \"/v1/auth\",\n      \"value\": 24,\n      \"color\": \"success\"\n    },\n    {\n      \"label\": \"/v1/search\",\n      \"value\": 78,\n      \"color\": \"accent\"\n    },\n    {\n      \"label\": \"/v1/recommend\",\n      \"value\": 142,\n      \"color\": \"warn\"\n    },\n    {\n      \"label\": \"/v1/checkout\",\n      \"value\": 240,\n      \"color\": \"danger\"\n    },\n    {\n      \"label\": \"/v1/report\",\n      \"value\": 510,\n      \"color\": \"danger\"\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "lollipop",
+            "title": "Endpoints by p95 latency (ms)",
+            "rows": [
+              {
+                "label": "/v1/auth",
+                "value": 24,
+                "color": "success"
+              },
+              {
+                "label": "/v1/search",
+                "value": 78,
+                "color": "accent"
+              },
+              {
+                "label": "/v1/recommend",
+                "value": 142,
+                "color": "warn"
+              },
+              {
+                "label": "/v1/checkout",
+                "value": 240,
+                "color": "danger"
+              },
+              {
+                "label": "/v1/report",
+                "value": 510,
+                "color": "danger"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-dumbbell",
+          "title": "type: dumbbell"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Two dots per category joined by a line — before/after, men/women, 2010/2020. Compact alternative to the slope chart when many categories don't fit a slope layout. Connector colour signals direction (success up, danger down)."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"dumbbell\",\n  \"title\": \"Q1 \\u2192 Q2 adoption\",\n  \"from_label\": \"Q1\",\n  \"to_label\": \"Q2\",\n  \"from_color\": \"muted\",\n  \"to_color\": \"accent\",\n  \"rows\": [\n    {\n      \"label\": \"infra\",\n      \"from\": 64,\n      \"to\": 88\n    },\n    {\n      \"label\": \"platform\",\n      \"from\": 52,\n      \"to\": 72\n    },\n    {\n      \"label\": \"growth\",\n      \"from\": 58,\n      \"to\": 45\n    },\n    {\n      \"label\": \"ops\",\n      \"from\": 41,\n      \"to\": 60\n    },\n    {\n      \"label\": \"billing\",\n      \"from\": 22,\n      \"to\": 38\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "dumbbell",
+            "title": "Q1 → Q2 adoption",
+            "from_label": "Q1",
+            "to_label": "Q2",
+            "from_color": "muted",
+            "to_color": "accent",
+            "rows": [
+              {
+                "label": "infra",
+                "from": 64,
+                "to": 88
+              },
+              {
+                "label": "platform",
+                "from": 52,
+                "to": 72
+              },
+              {
+                "label": "growth",
+                "from": 58,
+                "to": 45
+              },
+              {
+                "label": "ops",
+                "from": 41,
+                "to": 60
+              },
+              {
+                "label": "billing",
+                "from": 22,
+                "to": 38
+              }
+            ]
+          }
         }
       ]
     },
@@ -2641,6 +3067,59 @@
                 }
               ]
             }
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-polar-area",
+          "title": "type: polar-area"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Bars laid out around a circle. Cyclical categorical data (days of week, months, hours of day, compass directions) where the cyclic shape itself carries meaning. Distinct from radar — radar = filled polygon over multi-vars; polar-area = sector per category."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"polar-area\",\n  \"title\": \"Issues by day of week\",\n  \"sectors\": [\n    {\n      \"label\": \"Mon\",\n      \"value\": 28\n    },\n    {\n      \"label\": \"Tue\",\n      \"value\": 42\n    },\n    {\n      \"label\": \"Wed\",\n      \"value\": 56\n    },\n    {\n      \"label\": \"Thu\",\n      \"value\": 38\n    },\n    {\n      \"label\": \"Fri\",\n      \"value\": 30\n    },\n    {\n      \"label\": \"Sat\",\n      \"value\": 9\n    },\n    {\n      \"label\": \"Sun\",\n      \"value\": 6\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "polar-area",
+            "title": "Issues by day of week",
+            "sectors": [
+              {
+                "label": "Mon",
+                "value": 28
+              },
+              {
+                "label": "Tue",
+                "value": 42
+              },
+              {
+                "label": "Wed",
+                "value": 56
+              },
+              {
+                "label": "Thu",
+                "value": 38
+              },
+              {
+                "label": "Fri",
+                "value": 30
+              },
+              {
+                "label": "Sat",
+                "value": 9
+              },
+              {
+                "label": "Sun",
+                "value": 6
+              }
+            ]
           }
         }
       ]
@@ -3386,6 +3865,78 @@
               }
             ]
           }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-bump",
+          "title": "type: bump"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Line chart where the Y axis is RANK instead of value. Each series gets ranked across categories; lines cross when the leaderboard reorders. 'Who was #1 each year' — popularity drift, market-share leaders, sports standings."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"bump\",\n  \"title\": \"Top-3 cities by visits\",\n  \"categories\": [\n    \"2020\",\n    \"2021\",\n    \"2022\",\n    \"2023\",\n    \"2024\"\n  ],\n  \"series\": [\n    {\n      \"label\": \"Berlin\",\n      \"values\": [\n        80,\n        75,\n        90,\n        95,\n        92\n      ]\n    },\n    {\n      \"label\": \"Lisbon\",\n      \"values\": [\n        70,\n        85,\n        75,\n        80,\n        88\n      ]\n    },\n    {\n      \"label\": \"Krakow\",\n      \"values\": [\n        60,\n        70,\n        80,\n        65,\n        75\n      ]\n    },\n    {\n      \"label\": \"Tallinn\",\n      \"values\": [\n        40,\n        50,\n        60,\n        70,\n        80\n      ]\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "bump",
+            "title": "Top-3 cities by visits",
+            "categories": [
+              "2020",
+              "2021",
+              "2022",
+              "2023",
+              "2024"
+            ],
+            "series": [
+              {
+                "label": "Berlin",
+                "values": [
+                  80,
+                  75,
+                  90,
+                  95,
+                  92
+                ]
+              },
+              {
+                "label": "Lisbon",
+                "values": [
+                  70,
+                  85,
+                  75,
+                  80,
+                  88
+                ]
+              },
+              {
+                "label": "Krakow",
+                "values": [
+                  60,
+                  70,
+                  80,
+                  65,
+                  75
+                ]
+              },
+              {
+                "label": "Tallinn",
+                "values": [
+                  40,
+                  50,
+                  60,
+                  70,
+                  80
+                ]
+              }
+            ]
+          }
         }
       ]
     },
@@ -3538,6 +4089,61 @@
                 "source": "plan",
                 "target": "docs",
                 "value": 3
+              }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-gantt",
+          "title": "type: gantt"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Horizontal bars on a time axis, one per task. Project schedules, release plans, roadmap windows. start / end are numeric — author picks the unit (days, weeks, hours, or Unix ms with tick_format='date')."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"gantt\",\n  \"title\": \"Release plan (weeks)\",\n  \"tasks\": [\n    {\n      \"label\": \"Discovery\",\n      \"start\": 0,\n      \"end\": 3,\n      \"color\": \"accent\"\n    },\n    {\n      \"label\": \"Design\",\n      \"start\": 2,\n      \"end\": 6,\n      \"color\": \"accent\"\n    },\n    {\n      \"label\": \"Build\",\n      \"start\": 5,\n      \"end\": 14,\n      \"color\": \"success\"\n    },\n    {\n      \"label\": \"Integrate\",\n      \"start\": 12,\n      \"end\": 16,\n      \"color\": \"warn\"\n    },\n    {\n      \"label\": \"QA + launch\",\n      \"start\": 15,\n      \"end\": 20,\n      \"color\": \"danger\"\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "gantt",
+            "title": "Release plan (weeks)",
+            "tasks": [
+              {
+                "label": "Discovery",
+                "start": 0,
+                "end": 3,
+                "color": "accent"
+              },
+              {
+                "label": "Design",
+                "start": 2,
+                "end": 6,
+                "color": "accent"
+              },
+              {
+                "label": "Build",
+                "start": 5,
+                "end": 14,
+                "color": "success"
+              },
+              {
+                "label": "Integrate",
+                "start": 12,
+                "end": 16,
+                "color": "warn"
+              },
+              {
+                "label": "QA + launch",
+                "start": 15,
+                "end": 20,
+                "color": "danger"
               }
             ]
           }

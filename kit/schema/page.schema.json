@@ -444,7 +444,7 @@
       "properties": {
         "kind": { "const": "chart" },
         "type": {
-          "enum": ["plot", "arc", "scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "pie", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo", "dot-plot", "density", "candlestick", "sunburst", "marimekko", "stream", "violin", "beeswarm"],
+          "enum": ["plot", "arc", "scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "pie", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo", "dot-plot", "density", "candlestick", "sunburst", "marimekko", "stream", "violin", "beeswarm", "waterfall", "lollipop", "dumbbell", "polar-area", "gantt", "bump"],
           "description": "Render mode. Canonical types: plot (Cartesian, marks-composed) and arc (radial slice, mode-switched). Sugar aliases — scatter/line/area desugar to plot+marks; pie/donut desugar to arc+mode; stacked-bar/grouped-bar desugar to bar+mode. Aliases keep working AND let the author override any preset (e.g. type=pie + arc.end=270 for a 3/4 pie). Other types (bubble / quadrant / bar / heatmap / sparkline / waffle / gauge / radar / box-plot / bullet / slope / histogram / calendar-heatmap / treemap / ridgeline / funnel / sankey / network / scatter-matrix / parallel-coordinates / chord / geo) keep their existing payload shapes."
         },
         "marks": {
@@ -530,16 +530,18 @@
         },
         "rows": {
           "type": "array",
-          "description": "Bar only. Required when type is bar. One row per bar.",
+          "description": "Shared key carrying per-row payloads for bar (single bar per row), dot-plot, lollipop, dumbbell. Each row's required fields vary by chart type: bar / dot-plot / lollipop need {label, value}; dumbbell needs {label, from, to}. Color is a kit token where supported.",
           "items": {
             "type": "object",
-            "required": ["label", "value"],
-            "additionalProperties": false,
+            "required": ["label"],
+            "additionalProperties": true,
             "properties": {
               "label": { "type": "string" },
               "value": { "type": "number" },
+              "from":  { "type": "number", "description": "dumbbell only — left dot value." },
+              "to":    { "type": "number", "description": "dumbbell only — right dot value." },
               "display": { "type": "string", "description": "Override the right-hand readout (e.g. '95 / 100' instead of '95')." },
-              "color": { "enum": ["accent", "warn", "danger", "success"], "default": "accent" }
+              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
             }
           }
         },
@@ -992,7 +994,27 @@
         },
         "min":           { "type": "number" },
         "max":           { "type": "number" },
-        "dot_radius":    { "type": "number", "description": "beeswarm — dot radius in px (default 5)." }
+        "dot_radius":    { "type": "number", "description": "beeswarm — dot radius in px (default 5)." },
+        "steps": {
+          "type": "array",
+          "description": "waterfall — [{label, value, kind?: 'start'|'plus'|'minus'|'total'|'end'}]."
+        },
+        "sectors": {
+          "type": "array",
+          "description": "polar-area — [{label, value}] per radial sector."
+        },
+        "tasks": {
+          "type": "array",
+          "description": "gantt — [{label, start, end, color?}]. start/end are numeric (interpret per data)."
+        },
+        "tick_format": {
+          "enum": ["number", "date"],
+          "description": "gantt — 'date' formats numeric ticks as ISO YYYY-MM-DD (treating numbers as Unix ms)."
+        },
+        "from_label":    { "type": "string" },
+        "to_label":      { "type": "string" },
+        "from_color":    { "enum": ["accent", "warn", "danger", "success", "muted"] },
+        "to_color":      { "enum": ["accent", "warn", "danger", "success", "muted"] }
       },
       "allOf": [
         {
