@@ -4051,9 +4051,21 @@ oku-chart.okc-legend-hovering[data-legend-hover="0"] .okc-radar-series[data-seri
 oku-chart.okc-legend-hovering[data-legend-hover="1"] .okc-radar-series[data-series-idx="1"],
 oku-chart.okc-legend-hovering[data-legend-hover="2"] .okc-radar-series[data-series-idx="2"],
 oku-chart.okc-legend-hovering[data-legend-hover="3"] .okc-radar-series[data-series-idx="3"] {
+  /* Earlier this rule used `drop-shadow(0 0 6px var(--accent))` —
+     the halo bled across the inter-slice gap into the neighbour's
+     color and made the unit boundary harder to see, not easier.
+     Replaced with a non-bleeding emphasis:
+       - accent stroke (paints the slice's own edge — doesn't extend
+         past it)
+       - brightness(1.12) on the fill (pops the colour without
+         leaking sideways)
+       - stroke-width matched to the default bg-stroke so the slice
+         keeps its visual proportions
+     Adjacent slices stay put; the inter-slice gap reads at full
+     contrast. */
   stroke: var(--accent);
   stroke-width: 2.5;
-  filter: drop-shadow(0 0 6px var(--accent));
+  filter: brightness(1.12);
 }
 
 /* General label-overlay collision avoidance — any chart label that
