@@ -2845,8 +2845,8 @@ a.compare-card-link:hover {
    the SVG inside each card centres in the same visual frame
    regardless of its native aspect. */
 .compare-card.compare-card-link {
-  padding: 10px 12px 14px;
-  height: 170px;
+  padding: 12px 14px 16px;
+  height: 220px;
   display: grid;
   grid-template-rows: auto 1fr;
   align-items: stretch;
@@ -2880,18 +2880,61 @@ a.compare-card-link:hover {
 }
 .compare-card.compare-card-link svg.okc-svg,
 .compare-card.compare-card-link .okc-sparkline-row {
-  max-height: 100px;
+  max-height: 160px;
   display: block;
   margin: 0 auto;
 }
 .compare-card.compare-card-link .okt-bar {
   display: none;
 }
+/* Picker-preview styling:
+   - No legends. The picker label IS the chart name; in-chart
+     legends are noise at this size.
+   - Thicker strokes + bigger dots so the structural shape reads
+     at a glance from across the page. Strokes/dots get bumped
+     proportionally per chart family.
+   - Hide axis ticks + small labels — preview is about SHAPE, not
+     exact values. */
+.compare-card.compare-card-link .okc-series-legend,
+.compare-card.compare-card-link .okc-gauge-zone-chip,
+.compare-card.compare-card-link .okc-radar-legend,
+.compare-card.compare-card-link .okc-donut-legend,
+.compare-card.compare-card-link .okc-waffle-legend,
+.compare-card.compare-card-link .okc-legend,
+.compare-card.compare-card-link .okc-legend-backdrop,
+.compare-card.compare-card-link .okc-title,
+.compare-card.compare-card-link .okc-tick,
+.compare-card.compare-card-link .okc-axis-label,
+.compare-card.compare-card-link .okc-quadrant-label,
+.compare-card.compare-card-link .okc-slope-col,
+.compare-card.compare-card-link .okc-slope-readout,
+.compare-card.compare-card-link .okc-radar-label,
+.compare-card.compare-card-link .okc-polar-area-label,
+.compare-card.compare-card-link .okc-bump-end-label,
+.compare-card.compare-card-link .okc-bullet-label,
+.compare-card.compare-card-link .okc-bullet-readout,
+.compare-card.compare-card-link .okc-bar-chart-title,
+.compare-card.compare-card-link .bar-chart-legend,
+.compare-card.compare-card-link .bar-chart-title,
+.compare-card.compare-card-link .bar-label,
+.compare-card.compare-card-link .bar-value {
+  display: none !important;
+}
+/* Thicker strokes + bigger dots for preview legibility. */
+.compare-card.compare-card-link .okc-svg .okc-dot,
+.compare-card.compare-card-link .okc-svg .okc-bump-dot {
+  r: 5;
+}
+.compare-card.compare-card-link .okc-svg path,
+.compare-card.compare-card-link .okc-svg polyline,
+.compare-card.compare-card-link .okc-svg line:not(.okc-axis):not(.okc-quadrant):not(.okc-bullet-target) {
+  stroke-width: 2.5 !important;
+}
 /* Tighter grid for the family picker — 5 columns on wide viewports,
    responsive auto-fit fallback. */
 .compare-grid:has(> a.compare-card-link) {
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
 }
 .compare-card.bad,
 .compare-card.danger  { border-top: 4px solid var(--danger); }
