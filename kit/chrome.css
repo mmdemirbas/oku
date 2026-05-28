@@ -3766,20 +3766,16 @@ oku-chart .okc-quadrant {
   opacity: 0.6;
   fill: none;
 }
+/* Quadrant region labels (QUICK WINS / RE-EVALUATE / etc.). Rendered
+   OUTSIDE the plot bounds — top labels above the top axis, bottom
+   labels below the x-tick row — so a data point can never overlap
+   them at rest. No more backing pill or .okc-label-overlay fade —
+   labels live in their own gutter. */
 oku-chart .okc-quadrant-label {
-  fill: var(--text);
+  fill: var(--text-soft);
   font: 600 10.5px 'Inter', sans-serif;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-/* Opaque backing pill behind every quadrant label. Combined with
-   the chart drawing order (lines + ticks first, plot region next,
-   labels LAST) the pill is always on top of data dots — no garble. */
-oku-chart .okc-quadrant-label-pill {
-  fill: var(--surface);
-  fill-opacity: 0.94;
-  stroke: var(--border);
-  stroke-width: 0.5;
 }
 oku-chart .okc-legend {
   /* Same halo trick for legend chip text — keeps the label readable
@@ -4288,10 +4284,9 @@ oku-chart .okc-cartesian-cursor {
   opacity: 0.6;
   pointer-events: none;
 }
-oku-chart .okc-gauge-zone-label {
-  font: 600 9.5px 'Inter', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+/* Gauge zone-chip row (bottom of the gauge, never on the arc). */
+oku-chart .okc-gauge-zone-chip text {
+  fill: var(--text-soft);
 }
 oku-chart .okc-gauge-cursor {
   fill: var(--accent-strong);

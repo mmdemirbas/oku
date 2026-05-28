@@ -4097,7 +4097,18 @@ class OkuChart extends HTMLElement {
     if (this._yScale === 'log' && yMin <= 0) yMin = Math.max(1e-6, ys.filter(function (v) { return v > 0; })[0] || 1e-6);
 
     this._W = 640; this._H = 360;
-    this._pad = { top: this._title ? 32 : 16, right: 24, bottom: this._xLabel ? 50 : 32, left: this._yLabel ? 56 : 40 };
+    // Quadrant charts need extra top/bottom padding so the corner
+    // region labels (TL/TR/BL/BR) can sit OUTSIDE the plot bounds.
+    // Earlier rounds placed them inside at the corners + faded them
+    // on hover — a workaround. The right answer is to never put them
+    // where data can land.
+    var isQuadrant = this._type === 'quadrant';
+    this._pad = {
+      top: (this._title ? 32 : 16) + (isQuadrant ? 22 : 0),
+      right: 24,
+      bottom: (this._xLabel ? 50 : 32) + (isQuadrant ? 22 : 0),
+      left: this._yLabel ? 56 : 40,
+    };
     this._plotW = this._W - this._pad.left - this._pad.right;
     this._plotH = this._H - this._pad.top  - this._pad.bottom;
 
@@ -4200,28 +4211,25 @@ class OkuChart extends HTMLElement {
       }
       if (Array.isArray(q.labels)) {
         var ql = q.labels;
-        // Order: [TL, TR, BL, BR]. Each label gets an opaque backing
-        // pill so even when a dot sits behind it, the text remains
-        // legible. Labels render last (post-dots) — pill background
-        // covers the dot, the high-contrast text reads cleanly.
-        function pillLabel(text, x, y, anchor) {
-          var padX = 8;
-          // Approximate width — short label, sans-serif.
-          var charW = 6.4;
-          var w = Math.min(200, text.length * charW + padX * 2);
-          var rx = anchor === 'end' ? x - w : x;
-          // Both pill + text carry the generic .okc-label-overlay
-          // class so the chart's :has(data-hover) CSS rule can fade
-          // them out of the way when the reader is interacting with
-          // a data point underneath. Pointer-events:none lets clicks
-          // pass through.
-          quadrantLabelParts.push('<rect x="' + rx + '" y="' + (y - 12) + '" width="' + w + '" height="18" rx="4" class="okc-quadrant-label-pill okc-label-overlay"/>');
-          quadrantLabelParts.push('<text x="' + (anchor === 'end' ? x - padX : x + padX) + '" y="' + (y + 1) + '" text-anchor="' + (anchor === 'end' ? 'end' : 'start') + '" class="okc-quadrant-label okc-label-overlay">' + escapeXml(text) + '</text>');
+        // Order: [TL, TR, BL, BR]. Labels sit OUTSIDE the plot
+        // bounds: TL/TR above the top axis, BL/BR below the bottom
+        // x-tick row. That guarantees no data point can ever land
+        // on top of them — earlier rounds put them inside the
+        // corners and tried to fade-on-hover, which still left
+        // them occluding data at rest. Out-of-plot is the only
+        // honest fix.
+        function regionLabel(text, x, y, anchor) {
+          quadrantLabelParts.push(
+            '<text x="' + x + '" y="' + y + '" text-anchor="' + anchor + '" class="okc-quadrant-label">' +
+            escapeXml(text) + '</text>'
+          );
         }
-        if (ql[0]) pillLabel(ql[0], pad.left + 6,           pad.top + 16,            'start');
-        if (ql[1]) pillLabel(ql[1], W - pad.right - 6,      pad.top + 16,            'end');
-        if (ql[2]) pillLabel(ql[2], pad.left + 6,           pad.top + plotH - 10,    'start');
-        if (ql[3]) pillLabel(ql[3], W - pad.right - 6,      pad.top + plotH - 10,    'end');
+        var topLabelY    = pad.top - 8;
+        var bottomLabelY = pad.top + plotH + (self._xLabel ? 42 : 28);
+        if (ql[0]) regionLabel(ql[0], pad.left,                topLabelY,    'start');
+        if (ql[1]) regionLabel(ql[1], W - pad.right,           topLabelY,    'end');
+        if (ql[2]) regionLabel(ql[2], pad.left,                bottomLabelY, 'start');
+        if (ql[3]) regionLabel(ql[3], W - pad.right,           bottomLabelY, 'end');
       }
     }
 
@@ -5000,8 +5008,17 @@ class OkuChart extends HTMLElement {
     var mn = +x.min || 0;
     var mx = +x.max;
     if (typeof mx !== 'number' || mx <= mn) return;
-    var W = 320, H = 200;
-    var cx = W / 2, cy = H - 36, r = 110, sr = 88;
+    // Earlier rounds rendered zone labels (BREACHING / CAUTION /
+    // HEALTHY) AROUND the arc rim at zone-midangle. The labels
+    // routinely overlapped the arc band itself because text-anchor
+    // middle on a left-half label always extends rightward into the
+    // arc. Replaced with a stable horizontal legend ROW under the
+    // arc — same row as the value readout, well-defined location,
+    // no arc collision. H bumped to fit the row.
+    var zones = (x.zones || []);
+    var hasZoneLegend = zones.some(function (z) { return !!z.label; });
+    var W = 320, H = hasZoneLegend ? 230 : 200;
+    var cx = W / 2, cy = (hasZoneLegend ? H - 66 : H - 36), r = 110, sr = 88;
     function angleOf(v) {
       var t = Math.max(0, Math.min(1, (v - mn) / (mx - mn)));
       return Math.PI + t * Math.PI; // 180° = mn, 360° = mx (semicircular)
@@ -5023,20 +5040,10 @@ class OkuChart extends HTMLElement {
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Background arc — full semicircle.
     parts.push('<path d="' + arcPath(angleOf(mn), angleOf(mx)) + '" fill="var(--surface-soft, rgba(127,127,127,0.18))" class="okc-gauge-bg"/>');
-    // Zone bands + per-zone label (when provided). The label sits
-    // ABOVE the arc band, anchored at the band's mid-angle so the
-    // reader can name each zone instead of guessing what "the
-    // green slice" means. Without labels the three zones are
-    // visually distinct but semantically opaque (user feedback).
-    (x.zones || []).forEach(function (z) {
+    // Zone bands only — labels go in the row below the value
+    // readout, never on / around the arc.
+    zones.forEach(function (z) {
       parts.push('<path d="' + arcPath(angleOf(z.from), angleOf(z.to)) + '" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.32" class="okc-gauge-zone"><title>' + escapeXml((z.label || z.tone || 'zone') + ': ' + fmtNum(z.from) + ' – ' + fmtNum(z.to)) + '</title></path>');
-      if (z.label) {
-        var mid = (angleOf(z.from) + angleOf(z.to)) / 2;
-        var lr = r + 14;
-        var lx = cx + lr * Math.cos(mid);
-        var ly = cy + lr * Math.sin(mid);
-        parts.push('<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" class="okc-gauge-zone-label" fill="' + (palette[z.tone] || palette.muted) + '">' + escapeXml(z.label) + '</text>');
-      }
     });
     // Value arc — rich hover surfaces value / target / range.
     var zoneSummary = (x.zones || []).map(function (z) { return (z.label || z.tone) + ': ' + fmtNum(z.from) + '–' + fmtNum(z.to); }).join(', ');
@@ -5061,6 +5068,30 @@ class OkuChart extends HTMLElement {
     // Centre readout.
     parts.push('<text x="' + cx + '" y="' + (cy - 12) + '" text-anchor="middle" class="okc-gauge-value-text">' + escapeXml(fmtNum(val)) + '</text>');
     if (x.label) parts.push('<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" class="okc-gauge-label">' + escapeXml(x.label) + '</text>');
+    // Zone legend row (when at least one zone has a label). Fixed
+    // location at the bottom of the SVG — same shape as marimekko /
+    // stream legends. No arc-rim collision because it lives in its
+    // own row.
+    if (hasZoneLegend) {
+      var lgY = H - 24;
+      var swatch = 11, gap = 14, fontPx = 11;
+      var chips = zones.filter(function (z) { return !!z.label; });
+      // Measure-and-centre: estimate total width, lay chips out
+      // around cx.
+      var charW = 5.6;
+      var widths = chips.map(function (z) { return swatch + 4 + Math.ceil(z.label.length * charW); });
+      var totalW = widths.reduce(function (s, w) { return s + w; }, 0) + (chips.length - 1) * gap;
+      var rowX = Math.max(8, cx - totalW / 2);
+      chips.forEach(function (z, i) {
+        var w = widths[i];
+        var color = palette[z.tone] || palette.muted;
+        parts.push('<g class="okc-gauge-zone-chip">');
+        parts.push('<rect x="' + rowX + '" y="' + (lgY) + '" width="' + swatch + '" height="' + swatch + '" rx="2" fill="' + color + '"/>');
+        parts.push('<text x="' + (rowX + swatch + 4) + '" y="' + (lgY + swatch - 1) + '" font-size="' + fontPx + '" class="okc-legend">' + escapeXml(z.label) + '</text>');
+        parts.push('</g>');
+        rowX += w + gap;
+      });
+    }
     // Cursor-driven inspector: hover anywhere on the arc and the
     // tooltip surfaces the value at the cursor's angle, plus which
     // zone that value falls in. Lets the reader read "if we hit 65
