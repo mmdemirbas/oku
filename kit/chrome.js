@@ -6728,11 +6728,17 @@ class OkuChart extends HTMLElement {
     var depth = maxDepth(rootNode, 0);
     if (depth < 1) return;
     var palette = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)', 'var(--series-9)', 'var(--series-10)'];
-    var W = 480, H = 480;
-    var cx = W / 2, cy = H / 2;
-    var rMax = Math.min(W, H) / 2 - 12;
+    // Reserve room for the title above the wheel so the outermost
+    // ring doesn't run under the title text. Without the offset the
+    // title (y=20) and the top of the outer arc (cy-rMax) collided
+    // for any non-trivial wheel.
+    var titleH = this._title ? 28 : 8;
+    var W = 480, H = 480 + titleH;
+    var cx = W / 2, cy = (H + titleH) / 2;
+    var rMax = Math.min(W, H - titleH) / 2 - 12;
     var rMin = 36;
     var ringW = (rMax - rMin) / depth;
+    var totalValue = rootNode._value;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Sunburst') + '" class="okc-svg okc-sunburst">');
     if (this._title) parts.push('<text x="' + cx + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
@@ -6752,10 +6758,19 @@ class OkuChart extends HTMLElement {
     function walk(node, d, a0, a1, color) {
       if (d > 0) {
         var label = node.label || '';
-        var payload = JSON.stringify({ label: label, kv: [{ k: 'value', v: fmtNum(node._value) }] });
+        var sharePct = totalValue > 0 ? Math.round((node._value / totalValue) * 100) : 0;
+        var payload = JSON.stringify({
+          label: label,
+          kv: [
+            { k: 'value', v: fmtNum(node._value) },
+            { k: 'share', v: sharePct + '%' },
+            { k: 'depth', v: String(d) }
+          ],
+          footer: 'of ' + fmtNum(totalValue)
+        });
         var rIn = rMin + (d - 1) * ringW;
         var rOut = rIn + ringW;
-        parts.push('<path d="' + arcPath(rIn, rOut, a0, a1) + '" fill="' + color + '" fill-opacity="' + (0.55 + d * 0.07).toFixed(2) + '" stroke="var(--bg)" stroke-width="1" class="okc-sunburst-arc" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · ' + fmtNum(node._value)) + '</title></path>');
+        parts.push('<path d="' + arcPath(rIn, rOut, a0, a1) + '" fill="' + color + '" fill-opacity="' + (0.55 + d * 0.07).toFixed(2) + '" stroke="var(--bg)" stroke-width="1" class="okc-sunburst-arc" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · ' + fmtNum(node._value) + ' (' + sharePct + '%)') + '</title></path>');
       }
       if (!node.children || !node.children.length) return;
       var span = a1 - a0;
@@ -7252,6 +7267,7 @@ class OkuChart extends HTMLElement {
     if (!sectors.length) return;
     var palette = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)', 'var(--series-8)'];
     var vMax = Math.max.apply(null, sectors.map(function (s) { return +s.value || 0; }).concat([1]));
+    var totalValue = sectors.reduce(function (s, c) { return s + Math.max(0, +c.value || 0); }, 0) || 1;
     var W = 420, H = 380;
     var cx = W / 2, cy = H / 2 + (this._title ? 8 : 0);
     var rMax = Math.min(W, H) / 2 - 36;
@@ -7277,8 +7293,16 @@ class OkuChart extends HTMLElement {
               ' A ' + r.toFixed(1) + ' ' + r.toFixed(1) + ' 0 ' + large + ' 1 ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1) +
               ' Z';
       var color = palette[i % palette.length];
-      var payload = JSON.stringify({ label: s.label || '', kv: [{ k: 'value', v: fmtNum(v) }] });
-      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.72" stroke="var(--bg)" stroke-width="1" class="okc-polar-area-sector" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + fmtNum(v)) + '</title></path>');
+      var sharePct = Math.round((v / totalValue) * 100);
+      var payload = JSON.stringify({
+        label: s.label || '',
+        kv: [
+          { k: 'value', v: fmtNum(v) },
+          { k: 'share', v: sharePct + '%' }
+        ],
+        footer: 'of ' + fmtNum(totalValue)
+      });
+      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.72" stroke="var(--bg)" stroke-width="1" class="okc-polar-area-sector" tabindex="0" data-slice-idx="' + i + '" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + fmtNum(v) + ' (' + sharePct + '%)') + '</title></path>');
       // Label on outer perimeter.
       var labelA = a0 + angleStep / 2;
       var labelR = rMax + 14;
