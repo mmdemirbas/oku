@@ -1861,7 +1861,7 @@
         },
         {
           "kind": "paragraph",
-          "content": "Values placed on a real-world map."
+          "content": "Values laid out on a coarse tile grid that approximates the world by region. NOT a real choropleth — every region is a fixed-size tile labelled by its ISO code. Use when the reader needs to scan regional differences at a glance without the visual budget (or the topojson dependency) of a real map."
         },
         {
           "kind": "compare-grid",
@@ -4762,18 +4762,18 @@
     {
       "kind": "section",
       "id": "family-geo",
-      "title": "Geographic",
-      "lead": "Value per region laid out on a rough world grid. Use for at-a-glance regional breakdowns without the visual budget of a real choropleth.",
+      "title": "Tile cartograms",
+      "lead": "Value per region laid out on a coarse world tile grid. NOT a real map — country outlines are not drawn — but the visual rhythm is enough for at-a-glance regional comparisons. The honest name is <code>tile-map</code>; <code>geo</code> stays as an alias.",
       "blocks": [
         {
           "kind": "heading",
           "level": 3,
           "id": "chart-geo",
-          "title": "type: geo"
+          "title": "type: tile-map (alias: geo)"
         },
         {
           "kind": "paragraph",
-          "content": "Tile cartogram. <code>regions[]</code> is a list of <code>{id, value, label?}</code> where <code>id</code> is an ISO 3166-1 Alpha-2 country code (US, GB, DE, BR, ...) or the synthetic <code>OTH</code> bucket. The kit ships a fixed tile grid (~60 cells) that approximates a flat world map; absent regions render as faint placeholder outlines so the geography stays visible. Cell fill scales with value in a single-hue sequential ramp."
+          "content": "Tile cartogram. <code>regions[]</code> is a list of <code>{id, value, label?}</code> where <code>id</code> is an ISO 3166-1 Alpha-2 country code (US, GB, DE, BR, ...) or the synthetic <code>OTH</code> bucket. The kit ships a fixed tile grid (~60 cells) that approximates a flat world; absent regions render as faint placeholder outlines so the layout reads. Cell fill scales with value in a single-hue sequential ramp. This is intentionally NOT a choropleth — no country outlines, no topojson dependency."
         },
         {
           "kind": "example",

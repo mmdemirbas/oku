@@ -4116,6 +4116,11 @@ class OkuChart extends HTMLElement {
       'parallel-coordinates': '_renderParallelCoordinates',
       chord: '_renderChord',
       geo: '_renderGeo',
+      // `tile-map` is the honest name for what this renderer actually
+      // builds: a tile cartogram (one cell per region in a coarse 11×7
+      // grid). `geo` stays an alias because every existing doc page
+      // emits that type — no breakage. New pages should use tile-map.
+      'tile-map': '_renderGeo',
       'dot-plot':   '_renderDotPlot',
       density:      '_renderDensity',
       candlestick:  '_renderCandlestick',
