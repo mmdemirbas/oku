@@ -1433,10 +1433,22 @@ code:not(pre code) {
   align-items: center;
   justify-content: center;
 }
-.okt-table-controls button[data-expand] { padding: 4px 6px; }
+.okt-table-controls button[data-expand],
+.okt-table-controls button[data-copy]    { padding: 4px 6px; }
 .okt-table-controls button[data-expand] svg,
-.okt-table-controls button[data-cfg] svg { width: 14px; height: 14px; }
+.okt-table-controls button[data-cfg] svg,
+.okt-table-controls button[data-copy] svg { width: 14px; height: 14px; }
 .okt-table-controls button[data-cfg]     { padding: 4px 6px; }
+.okt-table-controls button.okt-flash-ok {
+  background: var(--success-soft, color-mix(in srgb, var(--success) 24%, var(--surface)));
+  border-color: var(--success);
+  color: var(--success);
+}
+.okt-table-controls button.okt-flash-fail {
+  background: color-mix(in srgb, var(--danger) 24%, var(--surface));
+  border-color: var(--danger);
+  color: var(--danger);
+}
 .okt-table-controls button.active,
 .okt-table-controls button:hover {
   background: var(--accent-soft);

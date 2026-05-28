@@ -1881,10 +1881,20 @@ function initReadingAids() {
     // The separator marker carries no semantic role; CSS draws the
     // 1px divider between the data-shaping controls (filter / stats)
     // and the chart-side affordances (gear / expand).
+    // Charts have a "Copy data (TSV)" button; tables deserve the same.
+    // Reads the visible <tr>'s cells (skipping group headers), tabs
+    // between cells, newlines between rows, prepends the <thead>
+    // labels — paste-ready into a spreadsheet or scratch doc.
+    var copyBtnHTML =
+      '<button data-copy type="button" title="Copy data (TSV)" aria-label="Copy data as TSV">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>' +
+      '</button>';
+
     ctrl.innerHTML =
       filterInputHTML +
       statsHTML +
       '<span class="okt-ctrl-sep-after" aria-hidden="true"></span>' +
+      copyBtnHTML +
       gearBtnHTML +
       '<button data-expand type="button" aria-pressed="false" title="Toggle full-width / fit to column">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
@@ -2708,6 +2718,50 @@ function initReadingAids() {
        Default in-page shape is contained + horizontally scrollable —
        no auto-bleed (that visual was heavy and clashed with the sidebar
        grid). The user opts in to fullscreen explicitly via this button. */
+    // Copy data (TSV) — mirrors charts' "Copy data (TSV)" affordance.
+    // Reads the current <thead> labels + every visible (non-hidden,
+    // non-group-header) <tbody> row's textContent, tabs between cells,
+    // newlines between rows. Hidden / filtered-out rows are skipped,
+    // so the clipboard reflects what the user is actually looking at.
+    var copyBtn = ctrl.querySelector('[data-copy]');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        var headers = Array.prototype.map.call(
+          table.querySelectorAll('thead th'),
+          function (th) { return (th.textContent || '').trim().replace(/[\t\n\r]+/g, ' '); }
+        );
+        var rows = [headers.join('\t')];
+        Array.prototype.forEach.call(
+          table.querySelectorAll('tbody tr'),
+          function (tr) {
+            if (tr.classList.contains('group-header') ||
+                tr.classList.contains('okt-row-hidden') ||
+                tr.hidden) return;
+            var cells = Array.prototype.map.call(tr.cells, function (td) {
+              return (td.textContent || '').trim().replace(/[\t\n\r]+/g, ' ');
+            });
+            if (cells.length) rows.push(cells.join('\t'));
+          }
+        );
+        var tsv = rows.join('\n');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(tsv).then(
+            function () { copyBtn.classList.add('okt-flash-ok'); setTimeout(function () { copyBtn.classList.remove('okt-flash-ok'); }, 1200); },
+            function () { copyBtn.classList.add('okt-flash-fail'); setTimeout(function () { copyBtn.classList.remove('okt-flash-fail'); }, 1200); }
+          );
+        } else {
+          // Pre-clipboard-API fallback: select a hidden textarea + execCommand.
+          var ta = document.createElement('textarea');
+          ta.value = tsv;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch (e) { /* noop */ }
+          document.body.removeChild(ta);
+        }
+      });
+    }
     var expBtn = ctrl.querySelector('[data-expand]');
     if (expBtn) {
       expBtn.title = 'Expand to fullscreen';
