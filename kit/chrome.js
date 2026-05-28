@@ -5359,6 +5359,28 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    // Vertical cursor sweeping the plot region. seriesLookup converts
+    // cursor.x into a "% of track max" reading per row, so a hover
+    // at the cursor's x position surfaces "what fraction of the track
+    // would this be?" for every metric simultaneously. The tracks can
+    // have different `max` values, so we report each as a percentage
+    // of its own scale.
+    var pBottom = H - 12;
+    this._wireGenericVerticalCursor(
+      { top: pad.top, bottom: pBottom, left: pad.left, right: W - pad.right },
+      {
+        seriesLookup: function (svgX) {
+          var pct = Math.max(0, Math.min(1, (svgX - pad.left) / plotW));
+          return {
+            label: Math.round(pct * 100) + '% of track',
+            kv: tracks.map(function (t) {
+              var trackMax = +t.max || 100;
+              return { k: t.label || 'metric', v: fmtNum(pct * trackMax) + ' / ' + fmtNum(trackMax) };
+            })
+          };
+        }
+      }
+    );
   }
 
   _renderSlope() {
