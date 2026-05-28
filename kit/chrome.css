@@ -4694,17 +4694,49 @@ oku-diagram .okd-render { display: block; min-height: 60px; color: var(--text-so
    the renderer already honours. Pan/zoom in fullscreen is the
    shared lightbox lightbox-stage. */
 oku-diagram .okd-render svg .node,
-oku-diagram .okd-render svg [class*="node"] {
+oku-diagram .okd-render svg [class*="node"],
+oku-diagram .okd-render svg .actor,
+oku-diagram .okd-render svg .actor-box,
+oku-diagram .okd-render svg .statediagram-state,
+oku-diagram .okd-render svg .classGroup,
+oku-diagram .okd-render svg .entityBox,
+oku-diagram .okd-render svg .task,
+oku-diagram .okd-render svg .task-rect,
+oku-diagram .okd-render svg .pieCircle,
+oku-diagram .okd-render svg .pieTitleText + path,
+oku-diagram .okd-render svg .section,
+oku-diagram .okd-render svg .mindmap-node,
+oku-diagram .okd-render svg .note {
   cursor: pointer;
   transition: filter 0.15s ease;
 }
-oku-diagram .okd-render svg .node:hover {
+oku-diagram .okd-render svg .node:hover,
+oku-diagram .okd-render svg .actor:hover,
+oku-diagram .okd-render svg .actor-box:hover,
+oku-diagram .okd-render svg .statediagram-state:hover,
+oku-diagram .okd-render svg .classGroup:hover,
+oku-diagram .okd-render svg .entityBox:hover,
+oku-diagram .okd-render svg .task:hover,
+oku-diagram .okd-render svg .task-rect:hover,
+oku-diagram .okd-render svg .pieCircle:hover,
+oku-diagram .okd-render svg .section:hover,
+oku-diagram .okd-render svg .mindmap-node:hover,
+oku-diagram .okd-render svg .note:hover {
   filter: drop-shadow(0 0 4px var(--accent));
 }
 oku-diagram .okd-render svg .node:hover > rect,
 oku-diagram .okd-render svg .node:hover > circle,
 oku-diagram .okd-render svg .node:hover > polygon,
-oku-diagram .okd-render svg .node:hover > path {
+oku-diagram .okd-render svg .node:hover > path,
+oku-diagram .okd-render svg .statediagram-state:hover > rect,
+oku-diagram .okd-render svg .classGroup:hover > rect,
+oku-diagram .okd-render svg .entityBox:hover,
+oku-diagram .okd-render svg .actor:hover,
+oku-diagram .okd-render svg .actor-box:hover,
+oku-diagram .okd-render svg .task:hover rect,
+oku-diagram .okd-render svg .task-rect:hover,
+oku-diagram .okd-render svg .pieCircle:hover,
+oku-diagram .okd-render svg .note:hover rect {
   stroke: var(--accent) !important;
   stroke-width: 2px;
 }
