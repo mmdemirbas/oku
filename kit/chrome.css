@@ -4264,6 +4264,43 @@ oku-chart .okc-slope .okc-slope-readout {
   font: 500 12px 'Inter', sans-serif;
   dominant-baseline: middle;
 }
+/* Slope-line hover — same emphasis pattern as Cartesian series.
+   The line thickens + brightens; un-hovered siblings dim so the
+   target reads as the selected line. tabindex on the renderer makes
+   it keyboard-focusable too. */
+oku-chart .okc-slope .okc-slope-line {
+  cursor: pointer;
+  transition: stroke-width 0.12s ease, opacity 0.12s ease;
+}
+oku-chart .okc-slope:has(.okc-slope-line:hover) .okc-slope-line {
+  opacity: 0.35;
+}
+oku-chart .okc-slope:has(.okc-slope-line:hover) .okc-slope-line:hover,
+oku-chart .okc-slope:has(.okc-slope-line:focus-visible) .okc-slope-line:focus-visible {
+  stroke-width: 4;
+  opacity: 1;
+  outline: none;
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+
+/* Parallel-coordinates polylines — same hover pattern as slope.
+   The record being read pops; the rest fade so the trail through
+   each axis reads cleanly. */
+oku-chart .okc-parcoord .okc-parcoord-line {
+  cursor: pointer;
+  transition: stroke-width 0.12s ease, opacity 0.12s ease;
+  fill: none;
+}
+oku-chart .okc-parcoord:has(.okc-parcoord-line:hover) .okc-parcoord-line {
+  opacity: 0.18;
+}
+oku-chart .okc-parcoord:has(.okc-parcoord-line:hover) .okc-parcoord-line:hover,
+oku-chart .okc-parcoord:has(.okc-parcoord-line:focus-visible) .okc-parcoord-line:focus-visible {
+  stroke-width: 3;
+  opacity: 1;
+  outline: none;
+  filter: drop-shadow(0 0 3px var(--accent));
+}
 
 oku-chart .okc-histogram .okc-histogram-bar {
   transition: fill-opacity 0.12s ease;

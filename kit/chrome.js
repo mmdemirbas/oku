@@ -6302,7 +6302,7 @@ class OkuChart extends HTMLElement {
       }
       var color = palette[r._color] || palette.accent;
       var payload = JSON.stringify({ label: r._label || ('record ' + (ri + 1)), kv: vars.map(function (v) { return { k: v.label || v.key, v: fmtNum(+r[v.key]) }; }) });
-      parts.push('<polyline points="' + pts.join(' ') + '" stroke="' + color + '" class="okc-parcoord-line" data-hover-payload="' + escapeXml(payload) + '"/>');
+      parts.push('<polyline points="' + pts.join(' ') + '" stroke="' + color + '" fill="none" stroke-width="1.5" class="okc-parcoord-line" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(r._label || ('record ' + (ri + 1))) + '</title></polyline>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
