@@ -3628,20 +3628,23 @@
           }
         },
         {
-          "kind": "chart",
-          "type": "sparkline",
-          "values": [
-            4,
-            8,
-            12,
-            9,
-            14,
-            6,
-            11,
-            8
-          ],
-          "variant": "bar",
-          "end_label": "11 events"
+          "kind": "paragraph",
+          "content": "Column variant — same flat `values` payload, set <code>\"variant\": \"bar\"</code> for per-value mini-bars. Use when each value is a discrete event (a count per day, hits per minute) rather than a continuous trend."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"sparkline\",\n  \"values\": [4, 8, 12, 9, 14, 6, 11, 8],\n  \"variant\": \"bar\",\n  \"end_label\": \"11 events\"\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "sparkline",
+            "values": [4, 8, 12, 9, 14, 6, 11, 8],
+            "variant": "bar",
+            "end_label": "11 events"
+          }
         },
         {
           "kind": "heading",
