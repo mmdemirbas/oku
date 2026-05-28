@@ -3906,6 +3906,25 @@ oku-chart .okc-radar .okc-radar-series.okc-hidden {
   transition: opacity 0.18s ease;
 }
 
+/* Radar polygon hover — pop the hovered series to the front + dim
+   the rest, so a multi-series radar reads as one shape at a time
+   when comparing. Same emphasis pattern as slope/parcoord. */
+oku-chart .okc-radar .okc-radar-series {
+  cursor: pointer;
+  transition: opacity 0.15s ease, fill-opacity 0.18s ease, stroke-width 0.12s ease;
+}
+oku-chart .okc-radar:has(.okc-radar-series:hover) .okc-radar-series {
+  opacity: 0.25;
+}
+oku-chart .okc-radar:has(.okc-radar-series:hover) .okc-radar-series:hover,
+oku-chart .okc-radar:has(.okc-radar-series:focus-visible) .okc-radar-series:focus-visible {
+  opacity: 1;
+  fill-opacity: 0.45;
+  stroke-width: 2.6;
+  outline: none;
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+
 /* Legend hover highlight — **emphasize** the hovered series rather
    than dim the others. Earlier behaviour faded the non-matching
    series to opacity 0.18; the reader's attention then tracked the

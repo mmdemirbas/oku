@@ -4735,52 +4735,25 @@
           "code": {
             "kind": "code",
             "language": "json",
-            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"radar\",\n  \"title\": \"Tool shortlist — five criteria\",\n  \"axes\": [\n    { \"label\": \"Speed\"   },\n    { \"label\": \"UX\"      },\n    { \"label\": \"Cost\"    },\n    { \"label\": \"Docs\"    },\n    { \"label\": \"Support\" }\n  ],\n  \"series\": [\n    { \"label\": \"Option A\", \"color\": \"accent\",  \"values\": [8, 9, 6, 7, 8] },\n    { \"label\": \"Option B\", \"color\": \"success\", \"values\": [6, 7, 9, 5, 6] }\n  ]\n}"
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"radar\",\n  \"title\": \"Database shortlist — seven criteria\",\n  \"axes\": [\n    { \"label\": \"Throughput\" },\n    { \"label\": \"Latency p99\" },\n    { \"label\": \"Cost\"     },\n    { \"label\": \"Docs\"     },\n    { \"label\": \"Operability\" },\n    { \"label\": \"Ecosystem\" },\n    { \"label\": \"Recovery\" }\n  ],\n  \"series\": [\n    { \"label\": \"Postgres\",  \"color\": \"accent\",  \"values\": [8, 7, 9, 9, 8, 9, 8] },\n    { \"label\": \"Cassandra\", \"color\": \"success\", \"values\": [9, 8, 6, 6, 5, 7, 6] },\n    { \"label\": \"DynamoDB\",  \"color\": \"warn\",    \"values\": [9, 9, 4, 8, 9, 6, 9] }\n  ]\n}"
           },
           "output": {
             "kind": "chart",
             "type": "radar",
-            "title": "Tool shortlist — five criteria",
+            "title": "Database shortlist — seven criteria",
             "axes": [
-              {
-                "label": "Speed"
-              },
-              {
-                "label": "UX"
-              },
-              {
-                "label": "Cost"
-              },
-              {
-                "label": "Docs"
-              },
-              {
-                "label": "Support"
-              }
+              { "label": "Throughput" },
+              { "label": "Latency p99" },
+              { "label": "Cost" },
+              { "label": "Docs" },
+              { "label": "Operability" },
+              { "label": "Ecosystem" },
+              { "label": "Recovery" }
             ],
             "series": [
-              {
-                "label": "Option A",
-                "color": "accent",
-                "values": [
-                  8,
-                  9,
-                  6,
-                  7,
-                  8
-                ]
-              },
-              {
-                "label": "Option B",
-                "color": "success",
-                "values": [
-                  6,
-                  7,
-                  9,
-                  5,
-                  6
-                ]
-              }
+              { "label": "Postgres",  "color": "accent",  "values": [8, 7, 9, 9, 8, 9, 8] },
+              { "label": "Cassandra", "color": "success", "values": [9, 8, 6, 6, 5, 7, 6] },
+              { "label": "DynamoDB",  "color": "warn",    "values": [9, 9, 4, 8, 9, 6, 9] }
             ]
           }
         }
