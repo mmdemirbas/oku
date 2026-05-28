@@ -497,3 +497,117 @@ def test_project_docs_pass_check_strict(repo_root: Path) -> None:
     warnings = [i for i in issues if i["severity"] == "warning"]
     assert errors == [], f"Doctree has errors: {errors}"
     assert warnings == [], f"Doctree has warnings (run `oku check`): {warnings}"
+
+
+# ---------- find_unparseable_json + cmd_check JSON-parse hard-fail ----------
+#
+# Regression net for an actual incident: design-review.json silently
+# disappeared from the site nav for a session because a single missing
+# comma made json.loads raise — find_json_pages caught it and dropped
+# the page without surfacing the error. We now scan separately and
+# fold parse failures into the issue stream as `json-parse-failed`
+# errors. The tests below pin that behaviour.
+
+def test_find_unparseable_json_returns_bad_file(tmp_path: Path) -> None:
+    """A page-shaped .json with a syntax error must surface from
+    find_unparseable_json so cmd_check can promote it to a hard error."""
+    bad = tmp_path / "page-broken.json"
+    # Missing comma between two object literals — same shape as the
+    # incident that hid design-review.html.
+    bad.write_text(
+        '{"kind": "page", "title": "T", "blocks": [{"kind": "paragraph"} {"kind": "paragraph"}]}',
+        encoding="utf-8",
+    )
+    out = cli.find_unparseable_json(tmp_path)
+    paths = [str(p) for p, _ in out]
+    assert str(bad) in paths
+    # Error message should be specific, not generic.
+    err_for_bad = next(err for p, err in out if p == bad)
+    assert "line" in err_for_bad.lower()
+
+
+def test_find_unparseable_json_skips_sidecars(tmp_path: Path) -> None:
+    """kit.json / site-manifest.json / package.json / tsconfig.json
+    are NOT page sources; the scanner must not surface parse errors
+    in those well-known sidecars — find_json_pages already skips them,
+    so they never reach the check pipeline. (User-authored pages
+    fail loud; framework sidecars stay quiet.)"""
+    (tmp_path / "kit.json").write_text("{ bad json", encoding="utf-8")
+    (tmp_path / "package.json").write_text("{ bad", encoding="utf-8")
+    (tmp_path / "real-page.json").write_text(
+        '{"kind": "page", "title": "ok", "blocks": []}', encoding="utf-8"
+    )
+    out = cli.find_unparseable_json(tmp_path)
+    assert out == [], f"Expected no findings for sidecars, got: {out}"
+
+
+def test_find_unparseable_json_returns_empty_when_clean(tmp_path: Path) -> None:
+    (tmp_path / "page.json").write_text(
+        '{"kind": "page", "title": "T", "blocks": []}', encoding="utf-8"
+    )
+    assert cli.find_unparseable_json(tmp_path) == []
+
+
+def test_cmd_check_promotes_parse_failure_to_error(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """cmd_check must surface json-parse-failed as an error so the
+    user sees the file in the report instead of having it silently
+    drop from the page list. Before the fix this test would run with
+    one valid page, report '1 page(s) clean', and exit 0 — hiding the
+    broken sibling."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "good.json").write_text(
+        '{"kind": "page", "title": "T", "blocks": []}', encoding="utf-8"
+    )
+    (tmp_path / "design-review.json").write_text(
+        '{"kind": "page", "title": "T", "blocks": [] "extra": "bad"}',
+        encoding="utf-8",
+    )
+
+    class _Args:
+        json = False
+        strict = False
+        verbose = False
+        errors_only = False
+
+    rc = cli.cmd_check(_Args())
+    out = capsys.readouterr().out
+    assert rc == 1, "cmd_check must exit non-zero when a page-shaped JSON fails to parse"
+    assert "design-review.json" in out
+    assert "json-parse-failed" in out
+
+
+# ---------- find_kit_json placement priority ----------
+#
+# kit.json belongs next to the docs root per the schema description.
+# A prior fix accidentally moved it to the project root; that worked
+# for `oku build` but broke `oku serve` against the source tree
+# because chrome.js resolves kit.json from /docs/ (the parent of
+# _kit/). find_kit_json probes docs/ first, falls back to root, so
+# both authoring locations work and both serve paths succeed.
+
+def test_find_kit_json_prefers_docs_subdir(tmp_path: Path) -> None:
+    """When kit.json sits at docs/kit.json AND root/kit.json, the
+    docs/ copy wins. This is the canonical home per the schema."""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "kit.json").write_text('{"name": "docs-copy"}', encoding="utf-8")
+    (tmp_path / "kit.json").write_text('{"name": "root-copy"}', encoding="utf-8")
+    p = cli.find_kit_json(tmp_path)
+    assert p is not None
+    assert p == docs / "kit.json"
+    # And the contents reflect the docs/ copy, not the root one.
+    import json as _json
+    assert _json.loads(p.read_text(encoding="utf-8"))["name"] == "docs-copy"
+
+
+def test_find_kit_json_falls_back_to_root(tmp_path: Path) -> None:
+    """When only root/kit.json exists (legacy authoring location,
+    or a project where root IS the docs root), the helper returns
+    that path."""
+    (tmp_path / "kit.json").write_text('{"name": "root-only"}', encoding="utf-8")
+    p = cli.find_kit_json(tmp_path)
+    assert p == tmp_path / "kit.json"
+
+
+def test_find_kit_json_returns_none_when_absent(tmp_path: Path) -> None:
+    assert cli.find_kit_json(tmp_path) is None

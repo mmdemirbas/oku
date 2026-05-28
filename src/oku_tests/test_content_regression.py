@@ -1689,3 +1689,230 @@ class TestChromeKitMarkers:
             "document-level page-toc adoption fallback missing — page-toc "
             "authored outside .layout will render at page bottom"
         )
+
+
+class TestDesignReviewPage:
+    """The design-review page is the live decision log the user keeps
+    flipping back to. A silent drop from the site nav (because of a
+    JSON parse error, a missing meta field, or a build skip) is the
+    bug we want this class to catch."""
+
+    def test_design_review_json_parses(self, repo_root: Path) -> None:
+        p = repo_root / "docs" / "design-review.json"
+        assert p.exists(), "docs/design-review.json missing — site nav loses the live decision log"
+        # If json.loads raises, pytest surfaces the line+col, which is
+        # already much better than the silent drop we used to ship.
+        data = json.loads(p.read_text(encoding="utf-8"))
+        assert data.get("kind") == "page", "design-review.json is not a page (kind != 'page')"
+        assert data.get("title"), "design-review.json missing title — nav entry would render with the filename"
+
+    def test_design_review_in_site_manifest_after_build(self, tmp_path: Path, repo_root: Path) -> None:
+        """End-to-end: build the project and verify design-review appears
+        in dist/site/site-manifest.json. Earlier regression: a stray
+        comma in design-review.json silently dropped the page from the
+        manifest while every other check still reported 'clean'."""
+        from oku import cli
+        # Stage a minimal project that includes a design-review-shaped
+        # page so we don't depend on real docs/.
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "design-review.json").write_text(
+            json.dumps({"kind": "page", "title": "Design review", "blocks": []}),
+            encoding="utf-8",
+        )
+        (tmp_path / "docs" / "index.html").write_text(
+            "<!doctype html><html><body></body></html>", encoding="utf-8"
+        )
+        (tmp_path / "docs" / "index.json").write_text(
+            json.dumps({"kind": "page", "title": "Home", "blocks": []}),
+            encoding="utf-8",
+        )
+        pages = cli.find_json_pages(tmp_path)
+        out_dir = tmp_path / "dist"
+        out_dir.mkdir()
+        cli.build_manifest(tmp_path, out_dir=out_dir, pages=pages)
+        m = json.loads((out_dir / "site-manifest.json").read_text(encoding="utf-8"))
+        page_paths = [p["path"] for p in m.get("pages", [])]
+        assert any("design-review" in p for p in page_paths), (
+            f"design-review.html missing from manifest. Pages: {page_paths}"
+        )
+
+
+class TestMultiSeriesChartsHaveLegendExtras:
+    """marimekko and stream chart blocks must keep their multi-series
+    payload shape (categories + series with values) so the SVG renderer
+    has data to build a legend over. A regression that flattened
+    series → a single bare values list would remove the legend.
+
+    The legend rendering itself is in chrome.js (`_renderSeriesLegend`);
+    the precondition for it being meaningful is series.length ≥ 2
+    AND every series carrying a `label`."""
+
+    def _find_chart(self, reference: dict, chart_type: str) -> dict | None:
+        return _find_block(reference, lambda b: b.get("kind") == "chart" and b.get("type") == chart_type)
+
+    def test_marimekko_keeps_multi_series_with_labels(self, reference: dict) -> None:
+        block = self._find_chart(reference, "marimekko")
+        assert block, "marimekko chart block missing from docs/"
+        series = block.get("series") or []
+        assert len(series) >= 2, f"marimekko needs ≥2 series for a legend; got {len(series)}"
+        labelled = [s for s in series if s.get("label")]
+        assert len(labelled) == len(series), (
+            "every marimekko series must have a `label` — otherwise the legend "
+            "swatch row would be missing entries"
+        )
+
+    def test_stream_keeps_multi_series_with_labels(self, reference: dict) -> None:
+        block = self._find_chart(reference, "stream")
+        assert block, "stream chart block missing from docs/"
+        series = block.get("series") or []
+        assert len(series) >= 2, f"stream needs ≥2 series for a legend; got {len(series)}"
+        labelled = [s for s in series if s.get("label")]
+        assert len(labelled) == len(series), (
+            "every stream series must have a `label` — otherwise the legend "
+            "swatch row would be missing entries"
+        )
+
+
+class TestChartConfigMarksAndCompat:
+    """The chart-config popover's correctness invariants live in
+    chrome.js source. These tests pin the load-bearing patterns so a
+    future refactor can't silently re-introduce the bugs the user
+    flagged this round:
+
+      1. A marks delta must normalise to type=plot + marks attr —
+         setting marks on a host that's still type=scatter is a
+         no-op since the dispatcher only honours marks when
+         type=plot.
+      2. Quadrant must be in the Cartesian compat list so users
+         can round-trip back to it after switching to scatter/line/
+         area. (User explicitly couldn't get back to quadrant.)
+      3. The marks chip row must show for bubble + quadrant — they
+         share the Cartesian payload."""
+
+    def test_marks_delta_normalises_to_plot(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # Look for the apply-marks branch: must set type to 'plot' and
+        # set marks attr together. Without this, marks toggle is a no-op.
+        assert re.search(
+            r"if\s*\(\s*delta\.marks\s*\)\s*\{[^}]*setAttribute\('type',\s*'plot'\)[^}]*setAttribute\('marks',",
+            js,
+            re.DOTALL,
+        ), (
+            "applyChange in __okuChartConfig must normalise a marks delta to "
+            "type='plot' + marks attr together. Setting marks alone won't "
+            "re-render the host."
+        )
+
+    def test_cartesian_compat_includes_quadrant(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # getCompatibleTypes' hasXY branch must list quadrant alongside
+        # scatter/line/area so the user can switch back to quadrant from
+        # any Cartesian shape.
+        m = re.search(
+            r"if\s*\(\s*hasXY\s*\)\s*\{(.*?)return\s+opts\s*;",
+            js,
+            re.DOTALL,
+        )
+        assert m, "getCompatibleTypes hasXY branch not found"
+        body = m.group(1)
+        assert "type: 'quadrant'" in body or "type: \"quadrant\"" in body, (
+            "Cartesian compat list must include quadrant — the user explicitly "
+            "asked for round-trip from scatter/line/area back to quadrant"
+        )
+
+    def test_marks_ui_shows_for_bubble_and_quadrant(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # The render() branch that emits the marks chip row must include
+        # bubble and quadrant in its type-guard.
+        m = re.search(
+            r"// Cartesian — marks combo.*?if\s*\((host\._type === [^)]*)\)\s*\{",
+            js,
+            re.DOTALL,
+        )
+        assert m, "marks chip render branch not found"
+        guard = m.group(1)
+        for t in ("scatter", "line", "area", "plot", "bubble", "quadrant"):
+            assert f"'{t}'" in guard, f"marks chip render must show for {t}; guard was: {guard}"
+
+
+class TestMermaidSvgIntrinsicSize:
+    """OkuDiagram must declare width/height from the rendered SVG's
+    viewBox so the SVG renders at 1:1 instead of scaling up to fill
+    its container. The scale-up was the root cause of state + ER
+    diagrams rendering foreignObject labels at ~26-30px (visually
+    twice their authored size)."""
+
+    def test_oku_diagram_sets_explicit_width_height_from_viewbox(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # Must read the viewBox + assign both width and height attrs
+        # in the post-mermaid-render path.
+        assert re.search(
+            r"var\s+vb\s*=\s*\(svg\.getAttribute\('viewBox'\)[^;]*split\s*\(",
+            js,
+        ), "OkuDiagram must parse the SVG's viewBox to derive intrinsic size"
+        assert "svg.setAttribute('width', String(vb[2]))" in js, (
+            "OkuDiagram must set explicit width from viewBox[2] so the SVG "
+            "renders at 1:1; otherwise foreignObject text scales with the SVG"
+        )
+        assert "svg.setAttribute('height', String(vb[3]))" in js, (
+            "OkuDiagram must set explicit height from viewBox[3]"
+        )
+
+
+class TestMermaidNeighborHighlight:
+    """The mermaid flowchart neighbor-highlight wiring (data-id +
+    LS-/LE- class adjacency map) was added this session. Pin the
+    load-bearing pieces so a future refactor can't break the
+    hover-emphasises-the-active-subgraph affordance."""
+
+    def test_wire_neighbor_highlight_present(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "_wireNeighborHighlight" in js, (
+            "OkuDiagram._wireNeighborHighlight removed — flowchart neighbor "
+            "highlight will no longer wire"
+        )
+        # Must call it from the connected-callback render path so first-
+        # render diagrams get the wiring, not just re-renders.
+        # The hook lives inside the .then(out) handler after svg attrs
+        # are pinned.
+        assert "self._wireNeighborHighlight(svg)" in js, (
+            "_wireNeighborHighlight must be called in the post-render path"
+        )
+
+    def test_neighbor_highlight_indexes_on_data_id_and_ls_le_classes(
+        self, repo_root: Path
+    ) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # The wiring leans on Mermaid v10's own conventions: nodes carry
+        # data-id="<NodeId>"; edges carry LS-<source> + LE-<target>.
+        # Both must be present for the adjacency map to build.
+        assert ".node[data-id]" in js, (
+            "neighbor highlight must select nodes by `[data-id]` — "
+            "the convention Mermaid v10 emits"
+        )
+        assert "LS-" in js and "LE-" in js, (
+            "neighbor highlight must parse LS-<source> + LE-<target> "
+            "classes from each edge; both substrings must remain in the "
+            "wiring source"
+        )
+
+
+class TestPickerCardUniformity:
+    """The chart-variant picker grid is unusable if one row sits at
+    136px while another sits at 178px. Pin the load-bearing CSS rule
+    so a future "polish" pass can't silently strip the fixed-height
+    contract."""
+
+    def test_picker_card_has_fixed_height(self, repo_root: Path) -> None:
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        m = re.search(
+            r"\.compare-card\.compare-card-link\s*\{([^}]+)\}",
+            css,
+        )
+        assert m, ".compare-card.compare-card-link rule missing"
+        body = m.group(1)
+        assert re.search(r"height\s*:\s*\d+px", body), (
+            "picker card .compare-card.compare-card-link must declare an "
+            "explicit `height` so every variant tile lands in the same row "
+            "frame; without it the grid staggers by family"
+        )

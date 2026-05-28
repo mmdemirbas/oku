@@ -109,6 +109,38 @@ class TestBuildSite:
         assert not (out_dir / "site-manifest.js").exists()
         assert not (out_dir / "llms.txt").exists()
 
+    def test_copies_kit_json_from_docs_subdir(self, tmp_path: Path) -> None:
+        """Canonical kit.json home is docs/kit.json (per the schema's
+        own description). build_site must find it via find_kit_json
+        and copy it to the dist root, sibling of _kit/. Earlier
+        regression: build looked only at root/kit.json, so authoring
+        at docs/ silently shipped no kit.json — runtime then 404'd on
+        /docs/kit.json (dev server) or /kit.json (dist site)."""
+        src_root = tmp_path / "src"
+        docs = src_root / "docs"
+        docs.mkdir(parents=True)
+        # Pages laid out under docs/.
+        pages: list[tuple[Path, str, dict | None]] = []
+        for stem, title in (("index", "Index"), ("about", "About")):
+            html_path = docs / f"{stem}.html"
+            html_text = SAMPLE_STUB.format(title=title)
+            html_path.write_text(html_text, encoding="utf-8")
+            (docs / f"{stem}.json").write_text(
+                json.dumps({"kind": "page", "title": title, "blocks": []}), encoding="utf-8"
+            )
+            pages.append((html_path, html_text, None))
+        # Authored kit.json under docs/, NOT at src_root.
+        (docs / "kit.json").write_text(
+            json.dumps({"name": "from-docs", "domains": []}), encoding="utf-8"
+        )
+        out_dir = tmp_path / "out"
+        cli.build_site(pages, out_dir, src_root)
+        # The copied kit.json lands at the dist root (sibling of _kit/),
+        # regardless of whether it was authored at docs/ or root/.
+        assert (out_dir / "kit.json").exists()
+        contents = json.loads((out_dir / "kit.json").read_text(encoding="utf-8"))
+        assert contents["name"] == "from-docs"
+
     def test_copies_html_and_json_pages(self, tmp_path: Path) -> None:
         src_root = tmp_path / "src"
         out_dir = tmp_path / "out"
