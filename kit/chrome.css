@@ -2602,7 +2602,16 @@ details.info-tip > *:not(summary) p:last-child { margin-bottom: 0; }
 .bar-chart-grouped-bar .bar-row .bar-fill {
   height: 6px;
   border-radius: 3px;
-  background: var(--accent);
+  /* Don't set background here. The parent `.bar-row .bar-fill`
+     rule (`background: var(--accent)`) is the default; token
+     variants (`.warn`, `.danger`, `.success`) apply through the
+     same-specificity `.bar-row .bar-fill.<token>` rule. Earlier
+     this rule set `background: var(--accent)` unconditionally,
+     which has the same specificity as the token rules but ships
+     LATER in the cascade — so every grouped-bar fill rendered
+     in accent regardless of its series's color. Inline
+     `style.background = 'var(--series-N)'` for unnamed series
+     still wins because inline > class. */
 }
 
 /* Step-flow — numbered horizontal flow that wraps to a stack. */
