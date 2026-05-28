@@ -2824,9 +2824,34 @@ a.compare-card-link:hover {
    in the middle, click anywhere on the card to jump to the variant
    anchor. pointer-events:none on the inner chart so hover doesn't
    pin the mini's tooltip when the user clearly meant to click the
-   card. */
+   card.
+
+   Cards are normalised to a fixed height so every family row in
+   the picker grid shares the same visual rhythm. Without this,
+   square shapes (chord, polar-area, sunburst, scatter-matrix) push
+   their row to ~178px while wide-flat shapes (bullet, sparkline,
+   calendar-heatmap) sit in a 136-143px row — a 42px stagger that
+   reads as "some charts are bigger and thicker than others".
+   With a fixed 170px and `align-items:center` on the chart slot,
+   the SVG inside each card centres in the same visual frame
+   regardless of its native aspect. */
 .compare-card.compare-card-link {
   padding: 10px 12px 14px;
+  height: 170px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-items: stretch;
+}
+.compare-card.compare-card-link > oku-chart,
+.compare-card.compare-card-link > .bar-chart,
+.compare-card.compare-card-link > .bar-chart-multi,
+.compare-card.compare-card-link > oku-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0; /* allow shrinking inside the grid track */
+  width: 100%;
+  overflow: hidden;
 }
 .compare-card.compare-card-link h4 {
   margin: 0 0 6px;
