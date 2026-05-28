@@ -8730,8 +8730,23 @@ class OkuDiagram extends HTMLElement {
           // than Mermaid's natural render size.
           var svg = renderHost.querySelector('svg');
           if (svg) {
-            svg.removeAttribute('width');
-            svg.removeAttribute('height');
+            // Pin width/height to the viewBox dimensions instead of
+            // letting CSS auto-size the SVG. Auto-size lets the SVG
+            // scale UP to fill its container, which enlarges every
+            // foreignObject-rendered text label proportionally — a
+            // 13px label inside a tall mermaid state diagram could
+            // become ~26px once the SVG was stretched 2× to fit the
+            // column. CSS max-width:100% still scales DOWN large
+            // diagrams; tall narrow ones now render at their authored
+            // size so labels stay readable instead of cartoonish.
+            var vb = (svg.getAttribute('viewBox') || '').split(/\s+/).map(parseFloat);
+            if (vb.length === 4 && !isNaN(vb[2]) && !isNaN(vb[3])) {
+              svg.setAttribute('width', String(vb[2]));
+              svg.setAttribute('height', String(vb[3]));
+            } else {
+              svg.removeAttribute('width');
+              svg.removeAttribute('height');
+            }
             svg.style.removeProperty('max-width');
             svg.style.removeProperty('width');
             svg.style.removeProperty('height');
