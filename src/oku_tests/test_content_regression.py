@@ -1916,3 +1916,499 @@ class TestPickerCardUniformity:
             "explicit `height` so every variant tile lands in the same row "
             "frame; without it the grid staggers by family"
         )
+
+
+# =====================================================================
+# Round 14 regressions — every fix from the user's "fix everything"
+# audit gets a test that names the incident, so a future refactor can't
+# silently undo it.
+# =====================================================================
+
+
+class TestQuadrantLabelsOutsidePlot:
+    """Quadrant region labels (QUICK WINS / RE-EVALUATE) must render
+    OUTSIDE the plot bounds — earlier rounds put them inside the
+    corners and tried to fade-on-hover, which still left data points
+    occluded at rest. The pad bump + region-label code is the
+    contract; the .okc-quadrant-label-pill backing rect is gone."""
+
+    def test_quadrant_bumps_pad_top_and_bottom(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "var isQuadrant = this._type === 'quadrant';" in js, (
+            "OkuChart must branch on `_type === 'quadrant'` to allocate "
+            "extra pad.top + pad.bottom for region labels"
+        )
+        # The +22 bump moves region labels out of the plot.
+        assert "isQuadrant ? 22 : 0" in js, (
+            "Quadrant pad.top and pad.bottom must add 22 viewBox units "
+            "of gutter to fit corner labels above/below the plot"
+        )
+
+    def test_quadrant_label_pill_rect_dropped(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # The fade-on-hover workaround is gone — labels live in their
+        # own gutter, no need for a backing pill. (We allow the class
+        # to appear in a `//` historical comment but not in any
+        # actual JS string / DOM emission.)
+        # Strip JS line comments so the historical note doesn't trip
+        # the test.
+        js_no_comments = re.sub(r"//[^\n]*\n", "\n", js)
+        assert "okc-quadrant-label-pill" not in js_no_comments, (
+            "okc-quadrant-label-pill (backing rect for in-plot labels) "
+            "must be removed — labels are now outside the plot bounds"
+        )
+
+
+class TestGaugeZoneLabelsAsLegendRow:
+    """Gauge zone labels (BREACHING / CAUTION / HEALTHY) used to render
+    around the arc rim at zone mid-angle, where text-anchor:middle
+    pushed left-half labels into the arc band. Now they live as a
+    horizontal legend ROW below the value readout — same shape as
+    marimekko / stream legends."""
+
+    def test_gauge_emits_zone_chip_row(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "okc-gauge-zone-chip" in js, (
+            "Gauge must emit the bottom-row .okc-gauge-zone-chip group "
+            "for each zone label; without it labels collide with the arc"
+        )
+
+    def test_gauge_height_grows_with_legend(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # When at least one zone has a label, H bumps to fit the row.
+        assert "hasZoneLegend ? 230 : 200" in js, (
+            "Gauge SVG height must grow to 230 when zone labels are "
+            "present so the bottom legend row has room"
+        )
+
+
+class TestBarTooltipViewportPlacement:
+    """Bar chart tooltip MUST use viewport-clamped placement because
+    .okc-tooltip is `position: fixed`. Earlier the bar enhancer used
+    host-relative coords (a number near 0), which placed the tooltip
+    at the viewport's LEFT edge regardless of which bar was hovered.
+    The fix is to call the module-level __okuPlaceTooltipAt helper
+    with viewport coords."""
+
+    def test_bar_enhancer_uses_module_level_helper(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "function __okuPlaceTooltipAt" in js, (
+            "Module-level __okuPlaceTooltipAt missing — bar enhancer "
+            "would need to re-implement viewport clamping"
+        )
+        # The bar enhancer must call it with viewport coords, not
+        # host-relative deltas.
+        assert "__okuPlaceTooltipAt(t, aRect.left + aRect.width / 2, aRect.top - 8)" in js, (
+            "bar tooltip placement must use the viewport-clamped helper "
+            "— host-relative coords end up at the viewport's left edge"
+        )
+
+
+class TestVerticalCursorPlotAreaConstraint:
+    """The SVG vertical cursor must check BOTH x AND y bounds before
+    showing — earlier only x was checked, so hovering the title row
+    still flashed the cursor. Bar cursor was full-height of host;
+    now it's clipped to first/last .bar-row range."""
+
+    def test_generic_cursor_checks_y_bounds(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # Both axis-bound checks must appear together in the cursor's
+        # mousemove handler.
+        assert "y < plotBounds.top" in js, (
+            "Vertical cursor must hide when pointer y < plotBounds.top "
+            "(so it doesn't show over the title row)"
+        )
+        assert "y > plotBounds.bottom" in js, (
+            "Vertical cursor must hide when pointer y > plotBounds.bottom"
+        )
+
+    def test_bar_cursor_clips_to_bar_rows(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "function plotYBounds" in js, (
+            "Bar enhancer must derive plot y-bounds from first/last "
+            ".bar-row so cursor doesn't span title + legend"
+        )
+
+    def test_cursor_visual_is_visible(self, repo_root: Path) -> None:
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        # SVG generic cursor — stroke-width must be ≥ 1.5 to read clearly.
+        m = re.search(r"\.okc-generic-cursor\s*\{([^}]*)\}", css)
+        assert m, ".okc-generic-cursor rule missing"
+        body = m.group(1)
+        sw = re.search(r"stroke-width\s*:\s*([\d.]+)", body)
+        assert sw and float(sw.group(1)) >= 1.5, (
+            f"vertical-cursor stroke-width must be ≥1.5 for legibility, "
+            f"got {sw.group(1) if sw else 'none'}"
+        )
+
+
+class TestGroupedBarCascadeFix:
+    """`.bar-chart-grouped-bar .bar-row .bar-fill` MUST NOT set
+    background unconditionally — that cascade-fights the
+    `.bar-row .bar-fill.success`-style token rules (same specificity,
+    grouped-bar wins by source order) and turns every series into
+    accent. The fix is to drop the unconditional background; defaults
+    fall through from the parent rule, token classes apply normally."""
+
+    def test_grouped_bar_does_not_force_accent(self, repo_root: Path) -> None:
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        m = re.search(
+            r"\.bar-chart-grouped-bar\s+\.bar-row\s+\.bar-fill\s*\{([^}]+)\}",
+            css,
+        )
+        assert m, ".bar-chart-grouped-bar bar-fill rule missing"
+        body = m.group(1)
+        # Strip CSS comments so the phrase appearing inside a `/* ... */`
+        # explanation doesn't trigger the assertion. Only an actual
+        # `background: var(--accent);` property declaration should fail.
+        body_no_comments = re.sub(r"/\*.*?\*/", "", body, flags=re.DOTALL)
+        # Background must NOT be set as a real declaration ending with
+        # `;` or the rule's closing brace.
+        bg = re.search(r"background\s*:\s*var\(--accent\)\s*[;}]", body_no_comments)
+        assert not bg, (
+            "`.bar-chart-grouped-bar .bar-row .bar-fill` must NOT set "
+            "background: var(--accent); same-specificity token rules "
+            "ship later than this selector and would lose. Result: every "
+            "series renders in accent regardless of its color field."
+        )
+
+
+class TestSunburstPolarAreaInteractivity:
+    """Sunburst arcs and polar-area sectors must carry rich
+    data-hover-payload AND visible class hooks for the CSS hover-emphasis
+    rules. Sunburst payload must include share (% of total) — the user
+    reported "no visible values" for the wheel."""
+
+    def _read_chrome(self, repo_root: Path) -> str:
+        return (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+
+    def test_sunburst_payload_includes_share(self, repo_root: Path) -> None:
+        js = self._read_chrome(repo_root)
+        # The payload-building line must include both `value` and `share`
+        # in the kv array.
+        assert "k: 'share'" in js, (
+            "Sunburst hover payload must include `share: N%` of total "
+            "— the user reported 'no visible values' on the wheel"
+        )
+
+    def test_sunburst_reserves_title_gutter(self, repo_root: Path) -> None:
+        js = self._read_chrome(repo_root)
+        # The title-clearance block must reserve a top gutter so the
+        # outer ring doesn't run under the title.
+        assert "titleH = this._title ? 28 : 8" in js, (
+            "Sunburst must reserve 28 viewBox units of title gutter so "
+            "the title text and the outer ring don't overlap"
+        )
+
+    def test_polar_area_payload_includes_share(self, repo_root: Path) -> None:
+        js = self._read_chrome(repo_root)
+        # Polar-area's payload-building section must produce a share kv.
+        # The total-sum computation must exist for the share %.
+        assert "totalValue = sectors.reduce" in js, (
+            "Polar-area must sum total sector value to compute share %"
+        )
+
+
+class TestSlopeParcoordInteractivity:
+    """Slope lines + parallel-coords polylines must have visible hover
+    emphasis. Parcoord polyline also needs explicit fill='none' so
+    SVG doesn't paint it as a black blob (polyline default fill is
+    black)."""
+
+    def test_parcoord_polyline_has_no_fill(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # The parcoord render must emit `fill="none"` on every polyline.
+        assert "okc-parcoord-line" in js
+        assert 'fill="none"' in js, (
+            "Parcoord polyline must set fill='none' explicitly — SVG "
+            "polyline defaults to black fill and renders the line "
+            "as a closed blob otherwise"
+        )
+
+    def test_slope_and_parcoord_have_hover_emphasis(self, repo_root: Path) -> None:
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        # Both selectors must appear with :has() + :hover for the
+        # dim-others-pop-target pattern.
+        assert ".okc-slope:has(.okc-slope-line:hover)" in css, (
+            "Slope must have :has()-based hover emphasis"
+        )
+        assert ".okc-parcoord:has(.okc-parcoord-line:hover)" in css, (
+            "Parallel-coordinates must have :has()-based hover emphasis"
+        )
+
+
+class TestBulletVerticalCursor:
+    """The bullet renderer must wire the generic vertical cursor with
+    a seriesLookup callback so a hover at any x reports each track's
+    `pct * trackMax` reading."""
+
+    def test_bullet_wires_cursor_with_series_lookup(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # Find the bullet renderer block and check it calls
+        # _wireGenericVerticalCursor with a seriesLookup option.
+        m = re.search(
+            r"_renderBullet\(\)\s*\{.*?_wireGenericVerticalCursor\([^)]*\{(?:[^{}]|\{[^{}]*\})*seriesLookup",
+            js,
+            re.DOTALL,
+        )
+        assert m, (
+            "_renderBullet must call _wireGenericVerticalCursor with a "
+            "seriesLookup callback so the cursor surfaces per-track "
+            "readouts at the pointer's x position"
+        )
+
+
+class TestRadarRichSample:
+    """The radar example in docs/charts.json must be a richer sample
+    (≥6 axes, ≥3 series) so the polygons actually compare meaningfully.
+    Before the fix it was 5 axes × 2 generic A/B series — looked like
+    decoration."""
+
+    def test_radar_example_has_real_data(self, repo_root: Path) -> None:
+        import json as _json
+        data = _json.loads((repo_root / "docs" / "charts.json").read_text(encoding="utf-8"))
+        # Walk to find the radar example output
+        def walk(node):
+            if isinstance(node, dict):
+                if node.get("kind") == "chart" and node.get("type") == "radar":
+                    yield node
+                for v in node.values():
+                    yield from walk(v)
+            elif isinstance(node, list):
+                for x in node:
+                    yield from walk(x)
+        radars = list(walk(data))
+        # Find the main chart-radar (excluding the picker's tiny preview)
+        main = [r for r in radars if isinstance(r.get("axes"), list) and len(r.get("axes", [])) >= 6]
+        assert main, (
+            f"Radar example must have ≥6 axes; found radars with "
+            f"{[len(r.get('axes', [])) for r in radars]} axes"
+        )
+        sample = main[0]
+        series = sample.get("series", [])
+        assert len(series) >= 3, (
+            f"Radar example must have ≥3 series to compare polygon "
+            f"shapes; got {len(series)}"
+        )
+        for s in series:
+            assert s.get("label"), "every radar series must have a label"
+
+
+class TestPickerOverhaul:
+    """Pick-by-family preview cards must be at least 200 px tall
+    (was 170), the chart inside max 160 px (was 100), and every
+    legend variant must be display:none inside the picker."""
+
+    def test_picker_card_taller(self, repo_root: Path) -> None:
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        m = re.search(
+            r"\.compare-card\.compare-card-link\s*\{([^}]+)\}",
+            css,
+        )
+        assert m
+        h = re.search(r"height\s*:\s*(\d+)px", m.group(1))
+        assert h and int(h.group(1)) >= 200, (
+            f"picker card height must be ≥200px for readability; "
+            f"got {h.group(1) if h else 'none'}"
+        )
+
+    def test_picker_chart_legends_hidden(self, repo_root: Path) -> None:
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        # Every legend variant must be in the display:none block
+        # scoped to .compare-card-link.
+        for lg in (
+            ".okc-series-legend",
+            ".okc-radar-legend",
+            ".okc-donut-legend",
+            ".okc-waffle-legend",
+            ".okc-legend-backdrop",
+            ".bar-chart-legend",
+        ):
+            assert (
+                f".compare-card.compare-card-link {lg}" in css
+            ), f"picker must hide {lg} (preview shouldn't include legends)"
+
+
+class TestTableCopyTSV:
+    """Every table toolbar must emit a Copy data (TSV) button. Same
+    affordance charts have."""
+
+    def test_table_renders_copy_button(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "title=\"Copy data (TSV)\"" in js, (
+            "Table toolbar must include a Copy data (TSV) button"
+        )
+        # Click handler must write headers + visible rows as TSV
+        # via navigator.clipboard.writeText.
+        assert "navigator.clipboard.writeText(tsv)" in js, (
+            "Copy button must use navigator.clipboard.writeText to "
+            "send the TSV to the clipboard"
+        )
+
+
+class TestMermaidUniversalHover:
+    """Hover emphasis must apply to every Mermaid diagram type, not
+    only flowchart. Earlier the `.node:hover` rule only matched
+    flowcharts; state / class / ER / sequence / gantt / pie etc.
+    had no hover at all."""
+
+    def test_hover_targets_each_type(self, repo_root: Path) -> None:
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        # The hover rule must include selectors for major diagram types.
+        for sel in (
+            ".actor",                  # sequence
+            ".statediagram-state",    # state
+            ".classGroup",             # class
+            ".entityBox",              # ER
+            ".task",                   # gantt + journey
+        ):
+            assert (
+                f"oku-diagram .okd-render svg {sel}:hover" in css
+            ), (
+                f"Mermaid hover rule must include {sel} so {sel}-shaped "
+                f"diagrams (state / class / ER / sequence / gantt) "
+                f"react to hover"
+            )
+
+    def test_gantt_sample_is_realistic(self, repo_root: Path) -> None:
+        import json as _json
+        diagrams = _json.loads((repo_root / "docs" / "diagrams.json").read_text(encoding="utf-8"))
+        # Walk to find gantt example
+        src = ""
+        def walk(node):
+            nonlocal src
+            if isinstance(node, dict):
+                s = node.get("source", "")
+                if isinstance(s, str) and s.startswith("gantt"):
+                    src = s
+                for v in node.values():
+                    walk(v)
+            elif isinstance(node, list):
+                for x in node:
+                    walk(x)
+        walk(diagrams)
+        assert "after a" in src or "after w" in src, (
+            "Gantt sample should chain tasks via `after <id>` to show "
+            "dependencies — bare back-to-back tasks don't demonstrate "
+            "Gantt's value as a chart type"
+        )
+        assert "milestone" in src, (
+            "Gantt sample should include at least one :milestone task "
+            "to show the full vocabulary"
+        )
+
+
+class TestLightboxZoomSmoothness:
+    """Lightbox wheel zoom must use a deltaY-proportional factor, not
+    a flat per-tick step. Toolbar buttons softened to ×1.2."""
+
+    def test_wheel_zoom_uses_exponential_factor(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # The exponential mapping is the load-bearing math — must remain.
+        assert "Math.exp(-dy * 0.0025)" in js, (
+            "Lightbox wheel zoom must use exp(-dy * 0.0025) factor for "
+            "proportional smoothness on trackpads"
+        )
+
+    def test_toolbar_buttons_use_softer_step(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # Toolbar +/- buttons must use ×1.2, not the old ×1.4.
+        assert "zoomAt(cx, cy, 1.2)" in js, (
+            "Lightbox toolbar Zoom-in button must use ×1.2 step"
+        )
+        assert "zoomAt(cx, cy, 1 / 1.2)" in js, (
+            "Lightbox toolbar Zoom-out button must use ÷1.2 step"
+        )
+
+
+class TestCurveSmoothing:
+    """Line + area charts support `curve: "smooth"` for Catmull-Rom
+    splines. Schema must allow it, renderer must pass it through,
+    OkuChart must read it, and the path builder must emit cubic
+    Bezier when smooth is active."""
+
+    def test_schema_includes_curve_field(self, repo_root: Path) -> None:
+        import json as _json
+        schema = _json.loads((repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8"))
+        # Locate the chart kind's properties — schema is nested.
+        text = (repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8")
+        assert '"curve"' in text, "schema must declare a `curve` property"
+        assert '"smooth"' in text and '"linear"' in text, (
+            "curve enum must include both `linear` and `smooth`"
+        )
+
+    def test_renderer_passes_curve_attribute(self, repo_root: Path) -> None:
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "el.setAttribute('curve'" in rjs, (
+            "renderer.js must pipe block.curve onto the oku-chart host "
+            "as a `curve` attribute"
+        )
+
+    def test_oku_chart_reads_curve_and_builds_catmull_rom(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "this._curve" in js, (
+            "OkuChart must read the `curve` attribute into this._curve"
+        )
+        # Catmull-Rom-to-Bezier formula — control points use the
+        # canonical 1/6 tension. Both control points should appear.
+        assert "(p2.x - p0.x) / 6" in js, (
+            "Catmull-Rom Bezier control-point math must use the canonical "
+            "(P_next - P_prev) / 6 tension formula"
+        )
+
+
+class TestGeoHonestNaming:
+    """The geo cartogram is a tile grid, not a real map. Schema must
+    include `tile-map` as an alias and the docs must drop the
+    'real-world map' claim."""
+
+    def test_schema_includes_tile_map_alias(self, repo_root: Path) -> None:
+        schema_text = (repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8")
+        assert '"tile-map"' in schema_text, (
+            "schema enum must include `tile-map` as an honest alias for `geo`"
+        )
+
+    def test_oku_chart_dispatches_tile_map_to_geo_renderer(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "'tile-map': '_renderGeo'" in js, (
+            "OkuChart's non-Cartesian dispatch must route `tile-map` to "
+            "_renderGeo (same as the `geo` alias)"
+        )
+
+    def test_docs_drop_real_world_map_claim(self, repo_root: Path) -> None:
+        text = (repo_root / "docs" / "charts.json").read_text(encoding="utf-8")
+        assert "Values placed on a real-world map." not in text, (
+            "Docs must NOT claim the geo chart is a 'real-world map' — "
+            "it's a tile cartogram; calling it a map overpromises"
+        )
+
+
+class TestLegendHoverNoBleed:
+    """Legend hover emphasis for non-Cartesian shapes (donut / waffle)
+    must NOT use drop-shadow halos that bleed across the inter-slice
+    gap. Use filter:brightness + accent stroke instead."""
+
+    def test_slice_emphasis_does_not_drop_shadow(self, repo_root: Path) -> None:
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        # Find the block that styles the matching slice/waffle/radar
+        # under legend-hover.
+        m = re.search(
+            r"oku-chart\.okc-legend-hovering\[data-legend-hover=\"0\"\]\s+\.okc-slice\[data-slice-idx=\"0\"\],"
+            r".*?\}",
+            css,
+            re.DOTALL,
+        )
+        assert m, "non-Cartesian legend-hover rule missing"
+        body = m.group(0)
+        # Strip CSS comments so the comment discussing the old approach
+        # doesn't trigger the assertion. Only an actual `drop-shadow(...)`
+        # in a property declaration should fail.
+        body_no_comments = re.sub(r"/\*.*?\*/", "", body, flags=re.DOTALL)
+        assert "drop-shadow" not in body_no_comments, (
+            "Donut slice / waffle cell legend-hover emphasis must NOT "
+            "use drop-shadow (bleeds across the inter-slice gap). Use "
+            "filter:brightness + accent stroke instead."
+        )
+        assert "brightness" in body_no_comments, (
+            "Use filter:brightness for fill emphasis without bleeding"
+        )

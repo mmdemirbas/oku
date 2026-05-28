@@ -4684,7 +4684,10 @@ class OkuChart extends HTMLElement {
     // Any candidate label box that overlaps one of these gets pushed
     // off the corner (offset cycle below). If no offset clears, hide.
     var noFly = [];
-    svg.querySelectorAll('.okc-quadrant-label-pill, .okc-legend-backdrop').forEach(function (rect) {
+    // .okc-quadrant-label-pill is gone — quadrant labels live outside
+    // the plot now. The legend backdrop is the only remaining no-fly
+    // zone for label deconfliction.
+    svg.querySelectorAll('.okc-legend-backdrop').forEach(function (rect) {
       var x = +rect.getAttribute('x') || 0;
       var y = +rect.getAttribute('y') || 0;
       var w = +rect.getAttribute('width') || 0;
