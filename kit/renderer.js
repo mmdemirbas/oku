@@ -471,6 +471,12 @@
       if (block.title) el.setAttribute('title', block.title);
       if (block.x_label) el.setAttribute('x-label', block.x_label);
       if (block.y_label) el.setAttribute('y-label', block.y_label);
+      // Curve style for line / area connectors. Author opts into
+      // a smoother shape via `curve: "smooth"` (Catmull-Rom) or
+      // sticks with the default `"linear"`. Other values silently
+      // fall back to linear so an unknown curve never breaks
+      // rendering.
+      if (block.curve) el.setAttribute('curve', String(block.curve));
       // Cartesian data: stash series as JSON.
       const data = document.createElement('script');
       data.type = 'application/json';

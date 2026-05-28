@@ -1989,7 +1989,7 @@
         },
         {
           "kind": "paragraph",
-          "content": "Same series-of-points contract as scatter — but the renderer connects consecutive points with a polyline. Use when the x-axis is ordered (time, build-number, sequence) and the reader should see slope, not just position. Two or more series stack on the same axes; legend chips at the top-right toggle visibility."
+          "content": "Same series-of-points contract as scatter — but the renderer connects consecutive points with a polyline. Use when the x-axis is ordered (time, build-number, sequence) and the reader should see slope, not just position. Two or more series stack on the same axes; legend chips at the top-right toggle visibility. Add <code>\"curve\": \"smooth\"</code> for a Catmull-Rom spline through the points (default is <code>linear</code>); applies to <code>type: area</code> too."
         },
         {
           "kind": "example",

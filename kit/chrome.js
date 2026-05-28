@@ -4083,6 +4083,9 @@ class OkuChart extends HTMLElement {
     this._arcEnd   = arcEndAttr   !== null ? parseFloat(arcEndAttr)   : null;
     var innerRadiusAttr = this.getAttribute('inner-radius');
     this._innerRadius = innerRadiusAttr !== null ? parseFloat(innerRadiusAttr) : null;
+    // Curve shape for line/area connectors. "smooth" => Catmull-Rom
+    // spline through the points; anything else falls back to linear.
+    this._curve = (this.getAttribute('curve') || 'linear').toLowerCase();
 
     this.innerHTML = '';
     if (dataNode) this.appendChild(dataNode);
@@ -4321,9 +4324,39 @@ class OkuChart extends HTMLElement {
       if (drawsConnector) {
         var data = s.data || [];
         if (data.length) {
-          var d = data.map(function (p, idx) {
-            return (idx === 0 ? 'M ' : 'L ') + sx(p.x) + ' ' + sy(p.y);
-          }).join(' ');
+          // Curve style — author opts into "smooth" for Catmull-Rom
+          // splines through the points; default is linear. The two
+          // builders return a valid SVG `d` string starting with M.
+          // Smooth path is computed only when there are ≥2 points
+          // (a single-point connector has no shape to smooth).
+          var d;
+          if (self._curve === 'smooth' && data.length >= 2) {
+            // Catmull-Rom → Cubic Bezier conversion. Tension=0.5
+            // is the canonical default (matches d3.curveCatmullRom).
+            // Endpoints reflect (P0 = P1; P_n = P_n-1) so the curve
+            // starts/ends without a leading derivative kink.
+            var pts = data.map(function (p) { return { x: sx(p.x), y: sy(p.y) }; });
+            var n = pts.length;
+            var dParts = ['M ' + pts[0].x + ' ' + pts[0].y];
+            for (var k = 0; k < n - 1; k++) {
+              var p0 = pts[k - 1 < 0 ? 0 : k - 1];
+              var p1 = pts[k];
+              var p2 = pts[k + 1];
+              var p3 = pts[k + 2 >= n ? n - 1 : k + 2];
+              var cp1x = p1.x + (p2.x - p0.x) / 6;
+              var cp1y = p1.y + (p2.y - p0.y) / 6;
+              var cp2x = p2.x - (p3.x - p1.x) / 6;
+              var cp2y = p2.y - (p3.y - p1.y) / 6;
+              dParts.push('C ' + cp1x.toFixed(2) + ' ' + cp1y.toFixed(2) +
+                          ' ' + cp2x.toFixed(2) + ' ' + cp2y.toFixed(2) +
+                          ' ' + p2.x.toFixed(2) + ' ' + p2.y.toFixed(2));
+            }
+            d = dParts.join(' ');
+          } else {
+            d = data.map(function (p, idx) {
+              return (idx === 0 ? 'M ' : 'L ') + sx(p.x) + ' ' + sy(p.y);
+            }).join(' ');
+          }
           if (drawsFill) {
             // Close down to a baseline so the polygon is filled. Use
             // y=0 when the range straddles zero, otherwise the y-axis

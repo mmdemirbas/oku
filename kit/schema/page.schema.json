@@ -496,6 +496,11 @@
         "title": { "type": "string" },
         "x_label": { "type": "string", "description": "Cartesian only (scatter / line / area / bubble / quadrant)." },
         "y_label": { "type": "string", "description": "Cartesian only." },
+        "curve": {
+          "enum": ["linear", "smooth"],
+          "default": "linear",
+          "description": "Connector style for line / area charts. `linear` (default) joins points with straight segments; `smooth` builds a Catmull-Rom spline so the curve flows through the points without corners. Ignored on chart types that don't draw a connector (scatter / bubble / quadrant)."
+        },
         "series": {
           "type": "array",
           "description": "Cartesian or stacked-bar / grouped-bar series. For Cartesian: each series carries `data: [{x, y, label, size?}]`. For stacked-bar / grouped-bar: each series carries `values: [number]` aligned to `categories`.",
