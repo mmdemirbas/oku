@@ -250,6 +250,23 @@
               ]
             },
             {
+              "title": "Q13 round — hygiene, popover, UX inversions, picker uniformity, mermaid fonts, theme audit",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Big round triggered by the user's audit checklist. Six landings, two structural, four UX:"},
+                {"kind": "list", "items": [
+                  "**Repo hygiene** — dropped stale screenshots (dark-bar-*.png), broken `pagefind` symlink at root, auto-materialised JSON siblings of the .md sources (CLAUDE.json, README.json, notes/*.json, examples/markdown-demo.json, skill/SKILL.json), and the legacy `skill/examples/engineering-review.html`. The .md sources are authoritative; `find_json_pages` synthesises page-JSON from them at runtime. Plus: new `find_unparseable_json` lint that surfaces JSON-parse failures as errors in `oku check` (was silent-drop). Caught a stray comma that had hidden design-review.html from the nav.",
+                  "**Popover marks toggle + quadrant round-trip** — toggling a mark chip now normalises to `type=plot` + marks attr so the renderer actually re-runs. Pure type changes drop any inherited marks. Cartesian compat list extended with quadrant; bubble + quadrant gained the marks chip row.",
+                  "**Marimekko + stream legends** — new `_renderSeriesLegend` SVG helper emits a horizontal swatch row with auto-wrap. Both charts had multi-series fills with no colour key; now indexed via the existing legend-hover wiring.",
+                  "**Legend hover invert + Cmd/Ctrl+click solo** — hovering a legend entry now EMPHASIZES the matching series (thicker stroke, larger dots, accent halo) instead of dimming the others. The target moves; the rest stays still. Modifier-click solos a single series across Cartesian, non-Cartesian, and bar legends.",
+                  "**Vertical-cursor intersection values** — `_wireGenericVerticalCursor` accepts an optional `seriesLookup(svgX)` callback returning `{label, kv}`. Wired into stream (category + value per series) and bump (category + #rank per series). Distribution-shape charts pass no callback (cursor stays line-only as before).",
+                  "**Mermaid foreignObject fonts** — state and ER diagrams rendered labels at ~26-30 px because the SVG was scaled 2× to fill the column, dragging foreignObject contents up with it. Replaced the strip-width/height step with explicit `width`/`height` copied from the viewBox; the SVG now renders at 1:1, labels at the authored 13 px. Wide diagrams still hit max-width:100% and shrink to fit.",
+                  "**Picker-card uniformity** — the chart-variant picker grid had cards ranging from 136 px (wide-flat shapes) to 178 px (square shapes), a 42 px stagger by row. Pinned every card to 170 px with `align-items:center` on the chart slot so every SVG centres in the same frame regardless of native aspect. All 43 cards now exactly 170 px.",
+                  "**Theme audit** — walked every full-size chart in light + dark via Playwright. Numeric assertion: 0 text labels under 2:1 contrast against page bg in either theme. Every shape uses `var()` tokens; theme swap works automatically. Visual sweep at desktop width confirmed parity."
+                ]}
+              ]
+            },
+            {
               "title": "V4 — 6 more visualizations (43 total)",
               "accent": "success",
               "blocks": [
