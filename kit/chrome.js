@@ -4450,10 +4450,21 @@ class OkuChart extends HTMLElement {
       return ctm ? pt.matrixTransform(ctm.inverse()).x : null;
     }
     var seriesLookup = opts && opts.seriesLookup;
+    function svgY(ev) {
+      var pt = svg.createSVGPoint();
+      pt.x = ev.clientX; pt.y = ev.clientY;
+      var ctm = svg.getScreenCTM();
+      return ctm ? pt.matrixTransform(ctm.inverse()).y : null;
+    }
     svg.addEventListener('mousemove', function (ev) {
       if (self._tipPinned) return;
-      var x = svgX(ev);
-      if (x === null || x < plotBounds.left || x > plotBounds.right) {
+      var x = svgX(ev), y = svgY(ev);
+      // Constrain to the plot area on BOTH axes — earlier rounds
+      // checked x only, so hovering the title row or the margin
+      // above the plot still flashed the cursor. The user reported
+      // that as "vertical cursor shows over the title".
+      if (x === null || x < plotBounds.left || x > plotBounds.right ||
+          y === null || y < plotBounds.top  || y > plotBounds.bottom) {
         cursor.setAttribute('visibility', 'hidden');
         if (self._hideCursorTip) self._hideCursorTip();
         return;
@@ -8158,6 +8169,28 @@ if (!customElements.get('oku-chart')) customElements.define('oku-chart', OkuChar
  * DIV-based charts by walking .bar-fill elements and reading their
  * data-hover-payload JSON.
  * --------------------------------------------------------------------- */
+/* Same viewport-clamped placement as OkuChart's tooltip — exposed
+   at module scope so the bar enhancer (and any future DIV-based
+   chart family) can use it without re-implementing the clamp math.
+   The tooltip is `position: fixed`, so left/top are VIEWPORT coords,
+   not document coords. */
+function __okuPlaceTooltipAt(tip, anchorX, anchorY) {
+  tip.style.left = anchorX + 'px';
+  tip.style.top  = anchorY + 'px';
+  requestAnimationFrame(function () {
+    var rect = tip.getBoundingClientRect();
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var pad = 8;
+    var left = anchorX, top = anchorY;
+    if (rect.left < pad) left += (pad - rect.left);
+    else if (rect.right > vw - pad) left -= (rect.right - (vw - pad));
+    if (rect.top < pad) top += (rect.height + 16);
+    else if (rect.bottom > vh - pad) top -= (rect.bottom - (vh - pad));
+    tip.style.left = left + 'px';
+    tip.style.top  = top  + 'px';
+  });
+}
+
 function __okuEnhanceBarCharts(root) {
   var charts = (root || document).querySelectorAll('.bar-chart, .bar-chart-multi');
   charts.forEach(function (host) {
@@ -8171,13 +8204,32 @@ function __okuEnhanceBarCharts(root) {
     cursor.className = 'okc-bar-cursor';
     cursor.setAttribute('aria-hidden', 'true');
     host.appendChild(cursor);
+    // Plot region is the .bar-row stack — exclude the title (.bar-chart-title)
+    // and the legend rack so the cursor never extends over them.
+    function plotYBounds() {
+      var rows = host.querySelectorAll('.bar-row');
+      if (!rows.length) return null;
+      var hostRect = host.getBoundingClientRect();
+      var firstRect = rows[0].getBoundingClientRect();
+      var lastRect = rows[rows.length - 1].getBoundingClientRect();
+      return {
+        top: firstRect.top - hostRect.top,
+        bottom: lastRect.bottom - hostRect.top,
+      };
+    }
     host.addEventListener('mousemove', function (ev) {
       var r = host.getBoundingClientRect();
       var x = ev.clientX - r.left;
-      if (x < 0 || x > r.width) {
+      var y = ev.clientY - r.top;
+      var pyb = plotYBounds();
+      if (x < 0 || x > r.width || !pyb || y < pyb.top || y > pyb.bottom) {
         cursor.style.opacity = '0';
         return;
       }
+      // Recompute on every move so a window resize / fold doesn't
+      // leave the cursor stuck at the prior plot extent.
+      cursor.style.top    = pyb.top + 'px';
+      cursor.style.height = (pyb.bottom - pyb.top) + 'px';
       cursor.style.left = x + 'px';
       cursor.style.opacity = '1';
     });
@@ -8211,10 +8263,16 @@ function __okuEnhanceBarCharts(root) {
       html += '<span class="okc-tt-pin-hint">click to pin</span>';
       t.innerHTML = html;
       t.setAttribute('aria-hidden', 'false');
-      var hostRect = host.getBoundingClientRect();
+      // `.okc-tooltip` is `position: fixed`, so style.left/top must be
+      // **viewport** coords, not host-relative. The earlier code
+      // computed `aRect.left - hostRect.left + aRect.width/2` — a
+      // host-relative number near 0 — which placed the tooltip at the
+      // viewport's left edge, far away from the chart. Use the
+      // module-level viewport-clamped helper the SVG charts use.
       var aRect = anchor.getBoundingClientRect();
-      t.style.left = (aRect.left - hostRect.left + aRect.width / 2) + 'px';
-      t.style.top  = (aRect.top  - hostRect.top  - 8) + 'px';
+      __okuPlaceTooltipAt(t, aRect.left + aRect.width / 2, aRect.top - 8);
+      t.__okuAnchor = anchor;
+      t.__okuAnchorOffset = 8;
       t.classList.add('visible');
     }
     function hide(force) {
