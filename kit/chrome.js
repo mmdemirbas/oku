@@ -257,10 +257,23 @@ var __okuPanZoom = (function () {
       apply();
     }
     function reset() { scale = 1; tx = 0; ty = 0; apply(); }
-    // Wheel zoom.
+    // Wheel zoom — factor scales smoothly with deltaY so trackpad
+    // and mouse-wheel both feel proportional. Earlier code used a
+    // flat ×1.15 step per tick, which on a trackpad (many high-
+    // frequency ticks) compounded to ×4-6 per gesture and made
+    // precision impossible. Exponential mapping `exp(-deltaY *
+    // 0.0025)` gives ~1.05 for a typical wheel notch and tiny
+    // increments for trackpad scrolls.
     stage.addEventListener('wheel', function (ev) {
       ev.preventDefault();
-      var factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
+      // Normalize deltaMode (lines vs pixels) to a pixel-ish quantity.
+      var dy = ev.deltaY;
+      if (ev.deltaMode === 1) dy *= 16; // line → px
+      if (ev.deltaMode === 2) dy *= 100; // page → px
+      // Cap per-event delta so a single huge wheel event doesn't
+      // jump 2× — keeps the gesture feel predictable.
+      dy = Math.max(-120, Math.min(120, dy));
+      var factor = Math.exp(-dy * 0.0025);
       zoomAt(ev.clientX, ev.clientY, factor);
     }, { passive: false });
     // Drag to pan.
@@ -335,8 +348,12 @@ var __okuPanZoom = (function () {
       var cx = r.left + r.width / 2;
       var cy = r.top + r.height / 2;
       var act = btn.getAttribute('data-pz');
-      if (act === 'in')         zoomAt(cx, cy, 1.4);
-      else if (act === 'out')   zoomAt(cx, cy, 1 / 1.4);
+      // Toolbar +/- buttons use a softer ×1.2 step so a casual
+      // multi-click doesn't blow past the content's natural size.
+      // Earlier the buttons used ×1.4 — felt like skipping zoom
+      // ticks instead of stepping through them.
+      if (act === 'in')         zoomAt(cx, cy, 1.2);
+      else if (act === 'out')   zoomAt(cx, cy, 1 / 1.2);
       else if (act === 'reset') reset();
     });
     // Keyboard shortcuts while the stage is focused.
@@ -345,8 +362,9 @@ var __okuPanZoom = (function () {
       var r = stage.getBoundingClientRect();
       var cx = r.left + r.width / 2;
       var cy = r.top + r.height / 2;
-      if (ev.key === '+' || ev.key === '=') { ev.preventDefault(); zoomAt(cx, cy, 1.4); }
-      else if (ev.key === '-')              { ev.preventDefault(); zoomAt(cx, cy, 1 / 1.4); }
+      // +/- key zoom factor matched to the toolbar buttons.
+      if (ev.key === '+' || ev.key === '=') { ev.preventDefault(); zoomAt(cx, cy, 1.2); }
+      else if (ev.key === '-')              { ev.preventDefault(); zoomAt(cx, cy, 1 / 1.2); }
       else if (ev.key === '0')              { ev.preventDefault(); reset(); }
       else if (ev.key === 'ArrowLeft')      { ev.preventDefault(); tx += 40; apply(); }
       else if (ev.key === 'ArrowRight')     { ev.preventDefault(); tx -= 40; apply(); }
