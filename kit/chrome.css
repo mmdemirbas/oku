@@ -4715,9 +4715,21 @@ oku-diagram .okd-render svg .entityBox,
 oku-diagram .okd-render svg .task,
 oku-diagram .okd-render svg .task-rect,
 oku-diagram .okd-render svg .pieCircle,
+/* Mermaid pie's interactive shapes are the wedges, not the outer
+   circle. The `slice` class is the actual fan-shaped <path>. */
+oku-diagram .okd-render svg .slice,
 oku-diagram .okd-render svg .pieTitleText + path,
 oku-diagram .okd-render svg .section,
+/* Gantt + journey sections come through as .section0 / .section1 /
+   .section2 etc. (no hyphen), so a plain `.section` selector misses
+   them. Match anything that starts with `section` followed by a
+   digit. */
+oku-diagram .okd-render svg [class*="section"],
 oku-diagram .okd-render svg .mindmap-node,
+/* Timeline emits .timeline-node + .taskWrapper / .lineWrapper /
+   .eventWrapper — none of which match anything above. */
+oku-diagram .okd-render svg .timeline-node,
+oku-diagram .okd-render svg .taskWrapper,
 oku-diagram .okd-render svg .note {
   cursor: pointer;
   transition: filter 0.15s ease;
@@ -4731,8 +4743,12 @@ oku-diagram .okd-render svg .entityBox:hover,
 oku-diagram .okd-render svg .task:hover,
 oku-diagram .okd-render svg .task-rect:hover,
 oku-diagram .okd-render svg .pieCircle:hover,
+oku-diagram .okd-render svg .slice:hover,
 oku-diagram .okd-render svg .section:hover,
+oku-diagram .okd-render svg [class*="section"]:hover,
 oku-diagram .okd-render svg .mindmap-node:hover,
+oku-diagram .okd-render svg .timeline-node:hover,
+oku-diagram .okd-render svg .taskWrapper:hover,
 oku-diagram .okd-render svg .note:hover {
   filter: drop-shadow(0 0 4px var(--accent));
 }
@@ -4748,6 +4764,9 @@ oku-diagram .okd-render svg .actor-box:hover,
 oku-diagram .okd-render svg .task:hover rect,
 oku-diagram .okd-render svg .task-rect:hover,
 oku-diagram .okd-render svg .pieCircle:hover,
+oku-diagram .okd-render svg .slice:hover,
+oku-diagram .okd-render svg .timeline-node:hover rect,
+oku-diagram .okd-render svg .taskWrapper:hover rect,
 oku-diagram .okd-render svg .note:hover rect {
   stroke: var(--accent) !important;
   stroke-width: 2px;

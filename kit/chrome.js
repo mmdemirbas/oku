@@ -4400,7 +4400,13 @@ class OkuChart extends HTMLElement {
         );
         if (p.label) {
           var goRight = px < plotMidX;
-          var lx = goRight ? (px + 8) : (px - 8);
+          // Bubbles can be 4-28 px in radius; a fixed 8 px offset
+          // landed labels INSIDE the bubble for the larger ones
+          // (user's "Auth"/"Logging" overlap). Scale the offset to
+          // r + 8 so the label clears the bubble edge regardless of
+          // size; scatter (r=4) still ends up at a tight 12 px.
+          var labelOffset = r + 8;
+          var lx = goRight ? (px + labelOffset) : (px - labelOffset);
           var anchor = goRight ? 'start' : 'end';
           parts.push(
             '<text x="' + lx + '" y="' + (py + 4) +
