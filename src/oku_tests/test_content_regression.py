@@ -2412,3 +2412,50 @@ class TestLegendHoverNoBleed:
         assert "brightness" in body_no_comments, (
             "Use filter:brightness for fill emphasis without bleeding"
         )
+
+
+class TestSelfReviewMisses:
+    """Self-review of the audit round surfaced four cases the round
+    missed. Pin each so they can't silently regress."""
+
+    def test_bubble_label_offset_scales_with_radius(self, repo_root: Path) -> None:
+        """Point-label x-offset must account for the bubble's actual
+        radius — a flat 8 px puts labels INSIDE large bubbles. The
+        user's "Auth"/"Logging" overlap was exactly this."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "var labelOffset = r + 8;" in js, (
+            "Cartesian point label must compute `r + 8` for its x-offset "
+            "so the label clears the bubble's edge regardless of size"
+        )
+
+    def test_mermaid_hover_targets_slice_for_pie(self, repo_root: Path) -> None:
+        """Pie's interactive shapes are .slice (the wedges), not
+        .pieCircle (the outer ring)."""
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert "oku-diagram .okd-render svg .slice" in css, (
+            "Mermaid hover rule must include .slice — the wedge class "
+            "is where pie's interaction actually lives"
+        )
+        assert "oku-diagram .okd-render svg .slice:hover" in css, (
+            "Mermaid hover rule must give .slice a :hover styling"
+        )
+
+    def test_mermaid_hover_targets_timeline_classes(self, repo_root: Path) -> None:
+        """Timeline emits .timeline-node + .taskWrapper, neither of
+        which matches the earlier generic selectors."""
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        for sel in (".timeline-node", ".taskWrapper"):
+            assert f"oku-diagram .okd-render svg {sel}" in css, (
+                f"Mermaid hover rule must include {sel} — timeline "
+                f"diagrams have no other matching selector"
+            )
+
+    def test_mermaid_section_substring_match(self, repo_root: Path) -> None:
+        """Gantt + journey + mindmap section classes come through as
+        `.section0` / `.section--1` / etc. without a hyphen separator.
+        Substring match `[class*="section"]` catches them."""
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert 'oku-diagram .okd-render svg [class*="section"]' in css, (
+            "Mermaid hover rule must use `[class*=\"section\"]` to "
+            "catch .section0 / .section--1 / .section-edge-N variants"
+        )
