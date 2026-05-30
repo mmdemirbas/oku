@@ -5375,6 +5375,9 @@ class OkuChart extends HTMLElement {
     var x = (this._extras && this._extras['box-plot']) || {};
     var boxes = x.boxes || [];
     if (!boxes.length) return;
+    if (this.getAttribute('orientation') === 'vertical' || x.orientation === 'vertical') {
+      return this._renderBoxPlotVertical(boxes);
+    }
     var W = 640, H = 80 + boxes.length * 56;
     var pad = { top: this._title ? 36 : 16, bottom: 28, left: 140, right: 24 };
     var plotW = W - pad.left - pad.right;
@@ -5429,6 +5432,73 @@ class OkuChart extends HTMLElement {
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
     this._wireGenericVerticalCursor({ top: pad.top, bottom: H - pad.bottom, left: pad.left, right: W - pad.right });
+  }
+
+  /* Vertical box-plot — one column per distribution, value range
+     runs up the Y axis. Same payload + colour palette as the
+     horizontal default; orientation: "vertical" opt-in. Useful
+     when comparing many distributions side-by-side (the typical
+     box-plot shape in academic / statistical contexts). */
+  _renderBoxPlotVertical(boxes) {
+    var W = Math.max(360, 80 + boxes.length * 64);
+    var H = 320;
+    var pad = { top: this._title ? 36 : 16, bottom: 44, left: 56, right: 24 };
+    var colW = (W - pad.left - pad.right) / boxes.length;
+    var allVals = [];
+    boxes.forEach(function (b) {
+      allVals.push(+b.min, +b.q1, +b.median, +b.q3, +b.max);
+      (b.outliers || []).forEach(function (o) { allVals.push(+o); });
+    });
+    var vmin = Math.min.apply(null, allVals);
+    var vmax = Math.max.apply(null, allVals);
+    if (vmin === vmax) { vmin -= 1; vmax += 1; }
+    var span = vmax - vmin;
+    function sy(v) { return pad.top + (H - pad.top - pad.bottom) - ((v - vmin) / span) * (H - pad.top - pad.bottom); }
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Box plot') + '" class="okc-svg okc-boxplot">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Y axis + ticks (5).
+    for (var t = 0; t <= 4; t++) {
+      var vv = vmin + (t / 4) * span;
+      var yy = sy(vv);
+      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + yy + '" x2="' + pad.left + '" y2="' + yy + '" class="okc-axis"/>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (yy + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(vv)) + '</text>');
+    }
+    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (H - pad.bottom) + '" class="okc-axis"/>');
+    boxes.forEach(function (b, i) {
+      var cx = pad.left + colW * (i + 0.5);
+      var bw = Math.min(colW * 0.55, 36);
+      var color = palette[b.color] || palette.accent;
+      // Whisker (vertical).
+      parts.push('<line x1="' + cx + '" y1="' + sy(+b.min) + '" x2="' + cx + '" y2="' + sy(+b.max) + '" class="okc-boxplot-whisker"/>');
+      parts.push('<line x1="' + (cx - 7) + '" y1="' + sy(+b.min) + '" x2="' + (cx + 7) + '" y2="' + sy(+b.min) + '" class="okc-boxplot-whisker"/>');
+      parts.push('<line x1="' + (cx - 7) + '" y1="' + sy(+b.max) + '" x2="' + (cx + 7) + '" y2="' + sy(+b.max) + '" class="okc-boxplot-whisker"/>');
+      // IQR box — rich hover surfaces all 5 quartile stats.
+      var bpPayload = JSON.stringify({
+        label: b.label || ('Box ' + (i + 1)),
+        kv: [
+          { k: 'min',    v: fmtNum(+b.min) },
+          { k: 'q1',     v: fmtNum(+b.q1) },
+          { k: 'median', v: fmtNum(+b.median) },
+          { k: 'q3',     v: fmtNum(+b.q3) },
+          { k: 'max',    v: fmtNum(+b.max) }
+        ].concat((b.outliers || []).length ? [{ k: 'outliers', v: (b.outliers || []).map(fmtNum).join(', ') }] : [])
+      });
+      var top = sy(+b.q3), bot = sy(+b.q1);
+      parts.push('<rect x="' + (cx - bw / 2) + '" y="' + top + '" width="' + bw + '" height="' + (bot - top) + '" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="okc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtNum(+b.min) + ', q1 ' + fmtNum(+b.q1) + ', med ' + fmtNum(+b.median) + ', q3 ' + fmtNum(+b.q3) + ', max ' + fmtNum(+b.max)) + '</title></rect>');
+      // Median line (horizontal).
+      parts.push('<line x1="' + (cx - bw / 2) + '" y1="' + sy(+b.median) + '" x2="' + (cx + bw / 2) + '" y2="' + sy(+b.median) + '" stroke="' + color + '" stroke-width="2" class="okc-boxplot-median"/>');
+      (b.outliers || []).forEach(function (o) {
+        parts.push('<circle cx="' + cx + '" cy="' + sy(+o) + '" r="3" fill="' + color + '" class="okc-boxplot-outlier"><title>' + escapeXml(String(o)) + '</title></circle>');
+      });
+      // Category label at the bottom.
+      parts.push('<text x="' + cx + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-boxplot-label">' + escapeXml(b.label || '') + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    // Horizontal cursor would make sense here but is not part of
+    // the generic helper; skip for now.
   }
 
   _renderBullet() {
