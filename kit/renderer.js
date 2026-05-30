@@ -544,7 +544,11 @@
         'population-pyramid': { categories: block.categories, left: block.left, right: block.right },
         // Connected scatter uses standard `series` payload; no extras
         // needed. The renderer reads this._series directly.
-        'tile-map':   { regions: block.regions }
+        'tile-map':   { regions: block.regions },
+        // Compressed time series (catalogue gap item, Q37).
+        horizon:      { categories: block.categories, series: block.series, bands: block.bands },
+        // Density-by-cell alternative to scatter for high N (Q38).
+        hexbin:       { points: block.points, radius: block.radius, scale: block.scale }
       };
       if (extraMap[type]) {
         const x = document.createElement('script');

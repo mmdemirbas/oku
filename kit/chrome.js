@@ -4211,7 +4211,9 @@ class OkuChart extends HTMLElement {
       gantt:        '_renderGantt',
       bump:         '_renderBump',
       'population-pyramid': '_renderPopulationPyramid',
-      'connected-scatter':  '_renderConnectedScatter'
+      'connected-scatter':  '_renderConnectedScatter',
+      horizon:              '_renderHorizon',
+      hexbin:               '_renderHexbin'
     };
     if (nonCartesian[this._type]) {
       this[nonCartesian[this._type]]();
@@ -8091,6 +8093,207 @@ class OkuChart extends HTMLElement {
           parts.push('<text x="' + (px + 8) + '" y="' + (py - 6) + '" class="okc-conn-label">' + escapeXml(String(p.label)) + '</text>');
         }
       });
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Horizon chart ----------------
+     Compressed time series — each series rendered as a thin lane
+     where extreme values fold into deeper color bands. Lets the
+     reader compare many time series stacked vertically at a fraction
+     of the height a single line/area chart would need.
+
+     Payload:
+       extras.horizon = {
+         categories: [...],  // shared x-axis (time/sequence)
+         series: [
+           { label, color?, values: [...] },
+           ...
+         ],
+         bands: 3            // optional, default 3 (bands above zero)
+       }
+
+     Each lane is `laneH` px tall. The series's value is mapped to a
+     fraction of the band range; values outside the first band fold
+     into the next deeper band, plotted as overlapped, deeper-colored
+     bands. Negative values mirror below the baseline in a contrasting
+     hue. */
+  _renderHorizon() {
+    var x = (this._extras && this._extras.horizon) || {};
+    var categories = x.categories || [];
+    var series = x.series || [];
+    var bandCount = +x.bands || 3;
+    if (categories.length < 2 || !series.length) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var W = 640, laneH = 36;
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 100, right: 16 };
+    var H = pad.top + series.length * laneH + pad.bottom;
+    var plotW = W - pad.left - pad.right;
+    // Determine max abs value across all series for shared scale.
+    var maxAbs = 0;
+    series.forEach(function (s) {
+      (s.values || []).forEach(function (v) {
+        var n = Math.abs(+v) || 0;
+        if (n > maxAbs) maxAbs = n;
+      });
+    });
+    if (maxAbs <= 0) maxAbs = 1;
+    var bandSize = maxAbs / bandCount;
+    function xOf(i) {
+      if (categories.length <= 1) return pad.left + plotW / 2;
+      return pad.left + (i / (categories.length - 1)) * plotW;
+    }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Horizon') + '" class="okc-svg okc-horizon">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    series.forEach(function (s, si) {
+      var laneTop = pad.top + si * laneH;
+      var laneMid = laneTop + laneH / 2;
+      var color = palette[s.color] || palette.accent;
+      // Background bg lane stripe so blank periods read as a row.
+      parts.push('<rect x="' + pad.left + '" y="' + laneTop + '" width="' + plotW + '" height="' + (laneH - 2) + '" fill="var(--surface-soft, rgba(127,127,127,0.06))" class="okc-horizon-lane"/>');
+      // Label.
+      parts.push('<text x="' + (pad.left - 8) + '" y="' + (laneMid + 4) + '" text-anchor="end" class="okc-horizon-label">' + escapeXml(s.label || ('series ' + (si + 1))) + '</text>');
+      var values = (s.values || []).map(Number);
+      // For each band, draw a path with values clipped to that band's range.
+      for (var b = 0; b < bandCount; b++) {
+        var bandFloor = b * bandSize;
+        var pathPts = ['M ' + xOf(0) + ' ' + (laneTop + laneH - 2)];
+        values.forEach(function (v, i) {
+          var abs = Math.abs(v) || 0;
+          var clip = Math.max(0, Math.min(bandSize, abs - bandFloor));
+          var frac = clip / bandSize;
+          var y = (laneTop + laneH - 2) - frac * (laneH - 2);
+          pathPts.push('L ' + xOf(i) + ' ' + y.toFixed(1));
+        });
+        pathPts.push('L ' + xOf(categories.length - 1) + ' ' + (laneTop + laneH - 2) + ' Z');
+        // Deeper bands → higher opacity for the same fill color.
+        var opacity = (0.32 + b * 0.22).toFixed(2);
+        parts.push('<path d="' + pathPts.join(' ') + '" fill="' + color + '" fill-opacity="' + opacity + '" class="okc-horizon-band"/>');
+      }
+      // Hover-payload rects sit on top of each x slice so the cursor
+      // tooltip pulls the right value per category.
+      values.forEach(function (v, i) {
+        var w = plotW / categories.length;
+        var rectX = xOf(i) - w / 2;
+        var payload = JSON.stringify({
+          label: (s.label || '') + ' · ' + categories[i],
+          kv: [{ k: 'value', v: fmtNum(v) }]
+        });
+        parts.push('<rect x="' + rectX + '" y="' + laneTop + '" width="' + w + '" height="' + (laneH - 2) + '" fill="transparent" class="okc-horizon-hit" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + categories[i] + ' · ' + fmtNum(v)) + '</title></rect>');
+      });
+    });
+    // X-axis category ticks at the bottom, sampled (≤6).
+    var stride = Math.max(1, Math.floor(categories.length / 6));
+    categories.forEach(function (c, i) {
+      if (i % stride !== 0 && i !== categories.length - 1) return;
+      parts.push('<text x="' + xOf(i) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(c) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    this._wireGenericVerticalCursor(
+      { top: pad.top, bottom: pad.top + series.length * laneH, left: pad.left, right: W - pad.right },
+      {
+        seriesLookup: function (svgX) {
+          var nearest = 0;
+          var bestDelta = Math.abs(xOf(0) - svgX);
+          for (var i = 1; i < categories.length; i++) {
+            var d = Math.abs(xOf(i) - svgX);
+            if (d < bestDelta) { bestDelta = d; nearest = i; }
+          }
+          var rows = series.map(function (s) {
+            return { k: s.label || '', v: fmtNum(+(s.values && s.values[nearest]) || 0) };
+          });
+          return { label: categories[nearest], kv: rows };
+        }
+      }
+    );
+  }
+
+  /* ---------------- Hexbin ----------------
+     Tile the plot region with hexagonal cells, color each by the
+     count of data points falling inside. Useful when scatter
+     overplots — e.g. 10,000+ points where each individual marker
+     loses meaning.
+
+     Payload:
+       extras.hexbin = {
+         points: [{x, y}, ...],
+         radius: 14,        // optional, viewBox px per hex
+         scale: 'count'     // optional (only mode for now)
+       }
+
+     Uses pointy-top hexagons; each hex centre at (col*sqrt(3)*r,
+     row*1.5*r) with col offset by 0.5 on odd rows. */
+  _renderHexbin() {
+    var x = (this._extras && this._extras.hexbin) || {};
+    var points = (x.points || []).filter(function (p) { return !isNaN(+p.x) && !isNaN(+p.y); });
+    if (points.length < 1) return;
+    var radius = +x.radius || 14;
+    var xMin = Math.min.apply(null, points.map(function (p) { return +p.x; }));
+    var xMax = Math.max.apply(null, points.map(function (p) { return +p.x; }));
+    var yMin = Math.min.apply(null, points.map(function (p) { return +p.y; }));
+    var yMax = Math.max.apply(null, points.map(function (p) { return +p.y; }));
+    if (xMin === xMax) { xMin -= 1; xMax += 1; }
+    if (yMin === yMax) { yMin -= 1; yMax += 1; }
+    var W = 640, H = 360;
+    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 48, right: 16 };
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    function sx(v) { return pad.left + ((v - xMin) / (xMax - xMin)) * plotW; }
+    function sy(v) { return pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH; }
+    // Hex geometry — pointy-top.
+    var hexW = Math.sqrt(3) * radius;
+    var hexH = 2 * radius;
+    function hexAt(col, row) {
+      var hx = pad.left + col * hexW + (row % 2 ? hexW / 2 : 0);
+      var hy = pad.top + row * (hexH * 0.75);
+      return {hx: hx, hy: hy};
+    }
+    // Map each point to its containing hex by inverse transform.
+    var bins = {};
+    points.forEach(function (p) {
+      var px = sx(+p.x), py = sy(+p.y);
+      var row = Math.round((py - pad.top) / (hexH * 0.75));
+      var rowOffset = row % 2 ? hexW / 2 : 0;
+      var col = Math.round((px - pad.left - rowOffset) / hexW);
+      var key = col + '|' + row;
+      bins[key] = (bins[key] || 0) + 1;
+    });
+    var maxCount = 0;
+    Object.keys(bins).forEach(function (k) { if (bins[k] > maxCount) maxCount = bins[k]; });
+    if (maxCount === 0) maxCount = 1;
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Hexbin') + '" class="okc-svg okc-hexbin">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Axes.
+    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    // Axis ticks (5 each).
+    for (var t = 0; t <= 4; t++) {
+      var vx = xMin + (t / 4) * (xMax - xMin);
+      var vy = yMin + (t / 4) * (yMax - yMin);
+      var tx = sx(vx), ty = sy(vy);
+      parts.push('<text x="' + tx + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(vx)) + '</text>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(vy)) + '</text>');
+    }
+    // Build hex path once.
+    function hexPath(cx, cy) {
+      var pts = [];
+      for (var i = 0; i < 6; i++) {
+        var ang = (Math.PI / 3) * i + Math.PI / 6;
+        pts.push((cx + radius * Math.cos(ang)).toFixed(1) + ',' + (cy + radius * Math.sin(ang)).toFixed(1));
+      }
+      return 'M ' + pts.join(' L ') + ' Z';
+    }
+    Object.keys(bins).forEach(function (key) {
+      var parts2 = key.split('|');
+      var col = +parts2[0], row = +parts2[1];
+      var h = hexAt(col, row);
+      var count = bins[key];
+      var alpha = (0.25 + (count / maxCount) * 0.7).toFixed(2);
+      var payload = JSON.stringify({ label: 'cell', kv: [{ k: 'count', v: String(count) }] });
+      parts.push('<path d="' + hexPath(h.hx, h.hy) + '" fill="var(--accent)" fill-opacity="' + alpha + '" stroke="var(--bg)" stroke-width="0.6" class="okc-hex-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>count: ' + count + '</title></path>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
