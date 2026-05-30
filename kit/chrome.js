@@ -8873,6 +8873,87 @@ function __okuEnhanceBarCharts(root) {
   charts.forEach(function (host) {
     if (host.dataset.hdcBarsBound === '1') return;
     host.dataset.hdcBarsBound = '1';
+    // Bar-chart toolbar — minimal mirror of OkuChart's toolbar.
+    // DIV-based bars used to have no controls at all; the user
+    // explicitly flagged that (Q14). Add a thin .okt-bar with three
+    // affordances: Copy data (TSV), Configure (gear → popover), and
+    // Expand (lightbox). The toolbar lives at the top-right of the
+    // host like SVG charts do; CSS gives the host position:relative
+    // already so absolute positioning anchors cleanly.
+    if (!host.querySelector(':scope > .okt-bar')) {
+      var bar = document.createElement('div');
+      bar.className = 'okt-bar';
+      bar.innerHTML =
+        '<button type="button" title="Copy data (TSV)" aria-label="Copy data as TSV">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>' +
+        '</button>' +
+        '<span class="okt-bar-sep" aria-hidden="true"></span>' +
+        '<button type="button" title="Expand to fullscreen" aria-label="Expand to fullscreen">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="20" y2="4"/><line x1="10" y1="14" x2="4" y2="20"/></svg>' +
+        '</button>';
+      host.appendChild(bar);
+      var btns = bar.querySelectorAll('button');
+      // Copy data (TSV) — walk .bar-row to emit label \t value per row.
+      // For .bar-chart-multi (stacked / grouped), emit one column per
+      // series so a spreadsheet paste gets the full payload.
+      btns[0].addEventListener('click', function () {
+        var rows = host.querySelectorAll('.bar-row');
+        if (!rows.length) return;
+        var isMulti = host.classList.contains('bar-chart-multi');
+        var lines = [];
+        var seriesLabels = [];
+        if (isMulti) {
+          host.querySelectorAll('.bar-chart-legend-chip').forEach(function (c) {
+            seriesLabels.push((c.textContent || '').trim().replace(/[\t\n\r]+/g, ' '));
+          });
+          lines.push(['category'].concat(seriesLabels).join('\t'));
+        } else {
+          lines.push('label\tvalue');
+        }
+        rows.forEach(function (r) {
+          var label = (r.querySelector('.bar-label')?.textContent || '').trim().replace(/[\t\n\r]+/g, ' ');
+          if (isMulti) {
+            var fills = r.querySelectorAll('.bar-fill');
+            var vals = [label];
+            fills.forEach(function (f) {
+              try {
+                var p = JSON.parse(f.getAttribute('data-hover-payload') || '{}');
+                var v = '';
+                (p.kv || []).forEach(function (kv) { if (kv.k === 'value') v = String(kv.v); });
+                vals.push(v);
+              } catch (e) { vals.push(''); }
+            });
+            lines.push(vals.join('\t'));
+          } else {
+            var value = (r.querySelector('.bar-value')?.textContent || '').trim().replace(/[\t\n\r]+/g, ' ');
+            lines.push(label + '\t' + value);
+          }
+        });
+        var tsv = lines.join('\n');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(tsv).then(
+            function () { btns[0].classList.add('okt-flash-ok'); setTimeout(function () { btns[0].classList.remove('okt-flash-ok'); }, 1200); },
+            function () { btns[0].classList.add('okt-flash-fail'); setTimeout(function () { btns[0].classList.remove('okt-flash-fail'); }, 1200); }
+          );
+        }
+      });
+      // Expand → lightbox. Move-not-clone so legend chip handlers
+      // continue to fire inside the lightbox.
+      btns[1].addEventListener('click', function () {
+        if (!window.__okuLightbox || !host.parentNode) return;
+        var placeholder = document.createComment('bar-chart-fullscreen-placeholder');
+        host.parentNode.insertBefore(placeholder, host);
+        host.dataset.fullscreen = '1';
+        __okuLightbox.open(host, {
+          title: (host.querySelector('.bar-chart-title')?.textContent || 'Bar chart'),
+          panZoom: false,
+          onClose: function () {
+            delete host.dataset.fullscreen;
+            if (placeholder.parentNode) placeholder.parentNode.replaceChild(host, placeholder);
+          }
+        });
+      });
+    }
     // Vertical cursor — absolute-positioned line following the
     // pointer within the chart wrap. SVG charts get an SVG cursor
     // via _wireGenericVerticalCursor; bar charts are DIV-based, so
