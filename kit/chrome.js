@@ -5565,6 +5565,9 @@ class OkuChart extends HTMLElement {
     var x = (this._extras && this._extras.histogram) || {};
     var bins = x.bins || [];
     if (!bins.length) return;
+    var horizontal = this.getAttribute('orientation') === 'horizontal' ||
+                     (x.orientation === 'horizontal');
+    if (horizontal) return this._renderHistogramHorizontal(bins);
     var W = 640, H = 280;
     var pad = { top: this._title ? 36 : 16, bottom: 36, left: 48, right: 16 };
     var plotW = W - pad.left - pad.right;
@@ -5609,6 +5612,61 @@ class OkuChart extends HTMLElement {
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
     this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
+  }
+
+  /* Horizontal histogram — bins stack along the Y axis, bars
+     extend rightward. Useful on narrow viewports or when the
+     reader wants to compare side-by-side with other vertical
+     readouts (e.g. a slope chart's row labels). Same payload
+     shape as the vertical default; orientation:"horizontal"
+     opt-in. */
+  _renderHistogramHorizontal(bins) {
+    var W = 480, H = Math.max(240, 32 + bins.length * 22);
+    var pad = { top: this._title ? 36 : 16, bottom: 30, left: 80, right: 16 };
+    var plotW = W - pad.left - pad.right;
+    var plotH = H - pad.top - pad.bottom;
+    var lo = +bins[0].lo, hi = +bins[bins.length - 1].hi;
+    var counts = bins.map(function (b) { return +b.count || 0; });
+    var maxCount = Math.max.apply(null, counts);
+    if (maxCount <= 0) maxCount = 1;
+    function sy(v) { return pad.top + ((v - lo) / (hi - lo || 1)) * plotH; }
+    function sx(v) { return pad.left + (v / maxCount) * plotW; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Histogram') + '" class="okc-svg okc-histogram">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // X axis baseline (count axis at the BOTTOM, but we run it
+    // through the left edge of the plot for consistency).
+    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    // Count ticks along the bottom (X axis = count).
+    for (var t = 0; t <= 4; t++) {
+      var v = maxCount * (t / 4);
+      var xc = sx(v);
+      parts.push('<line x1="' + xc + '" y1="' + (pad.top + plotH) + '" x2="' + xc + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
+      parts.push('<text x="' + xc + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    }
+    // Bins as horizontal bars.
+    bins.forEach(function (b, i) {
+      var y0 = sy(+b.lo), y1 = sy(+b.hi);
+      var w = sx(+b.count || 0) - pad.left;
+      var payload = JSON.stringify({
+        label: '[' + fmtNum(+b.lo) + ', ' + fmtNum(+b.hi) + ')',
+        kv: [{ k: 'count', v: fmtNum(+b.count || 0) }]
+      });
+      parts.push('<rect x="' + pad.left + '" y="' + (y0 + 0.5) + '" width="' + w + '" height="' + (y1 - y0 - 1) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
+      // Y tick label (bin lower bound) at every other bin to avoid clutter.
+      if (i === 0 || i === bins.length - 1 || (i % Math.max(1, Math.floor(bins.length / 6))) === 0) {
+        parts.push('<line x1="' + (pad.left - 4) + '" y1="' + y0 + '" x2="' + pad.left + '" y2="' + y0 + '" class="okc-axis"/>');
+        parts.push('<text x="' + (pad.left - 6) + '" y="' + (y0 + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(+b.lo)) + '</text>');
+      }
+    });
+    var yMax = sy(hi);
+    parts.push('<line x1="' + (pad.left - 4) + '" y1="' + yMax + '" x2="' + pad.left + '" y2="' + yMax + '" class="okc-axis"/>');
+    parts.push('<text x="' + (pad.left - 6) + '" y="' + (yMax + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(hi)) + '</text>');
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    // Cursor is meaningless on a horizontal histogram (bins are
+    // discrete, no continuous sweep along x). Skip wiring.
   }
 
   _renderCalendarHeatmap() {
