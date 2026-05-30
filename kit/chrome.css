@@ -2962,6 +2962,39 @@ a.compare-card-link:hover {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 14px;
 }
+
+/* Small multiples — repeat the same chart across N panels in a grid.
+   The grid is responsive auto-fit by default; the renderer can lock
+   to an explicit column count via `style="grid-template-columns: …"`
+   inline when block.cols is provided. */
+.okt-chart-grid {
+  margin: 18px 0;
+}
+.okt-chart-grid-title {
+  margin: 0 0 12px 0;
+  font: 600 15px 'Inter', sans-serif;
+  color: var(--text);
+}
+.okt-chart-grid-cells {
+  display: grid;
+  gap: 16px;
+}
+.okt-chart-grid-cell {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 0; /* allow flex/grid children to shrink */
+}
+.okt-chart-grid-cell oku-chart,
+.okt-chart-grid-cell .bar-chart,
+.okt-chart-grid-cell .bar-chart-multi {
+  display: block;
+}
+.okt-chart-grid-cell svg.okc-svg {
+  max-height: 180px;
+  width: 100%;
+}
 .compare-card.bad,
 .compare-card.danger  { border-top: 4px solid var(--danger); }
 .compare-card.bad:hover,

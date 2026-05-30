@@ -111,6 +111,7 @@
         { "$ref": "#/$defs/step-flow" },
         { "$ref": "#/$defs/compare-grid" },
         { "$ref": "#/$defs/chart" },
+        { "$ref": "#/$defs/chartGrid" },
         { "$ref": "#/$defs/diagram" },
         { "$ref": "#/$defs/live-snippet" },
         { "$ref": "#/$defs/example" }
@@ -1134,6 +1135,24 @@
         "label": { "type": "string" },
         "source": { "type": "string" }
       }
+    },
+
+    "chartGrid": {
+      "type": "object",
+      "description": "Small multiples — render the same chart shape across N data panels in a grid. Each panel becomes a chart block; per-panel `label` is used as the chart title, `values`/other fields are piped through to the child chart's payload.",
+      "additionalProperties": false,
+      "properties": {
+        "kind":       { "const": "chart-grid" },
+        "title":      { "type": "string" },
+        "cols":       { "type": "integer", "minimum": 1, "maximum": 12, "description": "Optional explicit column count. Default is auto-fit with 220 px min cell width." },
+        "child_type": { "type": "string", "default": "sparkline", "description": "Chart `type` applied to every panel. Any chart type the kit ships is valid." },
+        "panels": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "required": ["kind", "panels"]
     },
 
     "richString": {

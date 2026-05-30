@@ -320,6 +320,10 @@
         case 'chart':        el = this._renderChart(block); break;
         case 'diagram':      el = this._renderDiagram(block); break;
         case 'live-snippet': el = this._renderLiveSnippet(block); break;
+        // Small multiples — render the same chart shape across N
+        // data-slice panels in a CSS grid. Each panel is itself a
+        // chart block emitted via the same _renderChart pipeline.
+        case 'chart-grid':   el = this._renderChartGrid(block); break;
         default:             el = this._unknown(block); break;
       }
       // Propagate `bind` so chrome.js's data-bind hover-sync pairs work
@@ -827,6 +831,79 @@
       code.textContent = block.source || '';
       pre.appendChild(code);
       return pre;
+    }
+
+    /* Small multiples — repeat the same chart shape across N data
+       panels in a CSS grid. The reader compares facets side-by-side
+       (e.g. p95 latency by region, conversion rate by experiment arm).
+
+       Shape:
+         {
+           "kind": "chart-grid",
+           "title": "p95 by region",
+           "cols": 4,                  // optional, default auto-fit
+           "child_type": "sparkline",  // applied to every panel
+           "panels": [
+             { "label": "us-east-1", "values": [...] },
+             { "label": "eu-west-1", "values": [...] },
+             ...
+           ]
+         }
+
+       Each panel becomes a chart block: type = block.child_type,
+       title = panel.label, plus every other field on the panel piped
+       through (so a panel can specialise its color, data shape, or
+       extras independently). The result is just a grid of fully-
+       featured charts — every per-chart hover/cursor/tooltip the kit
+       offers applies inside each panel.
+
+       Panel field aliases:
+         panel.label    → chart.title (matches sparkline's end_label
+                          convention authors already use)
+         panel.values   → chart.values (sparkline) or piped onto the
+                          extras key for the child_type.
+       Anything else on the panel object is shallow-merged into the
+       constructed chart block. */
+    _renderChartGrid(block) {
+      const wrap = document.createElement('div');
+      wrap.className = 'okt-chart-grid';
+      if (block.title) {
+        const h = document.createElement('h4');
+        h.className = 'okt-chart-grid-title';
+        h.textContent = block.title;
+        wrap.appendChild(h);
+      }
+      const grid = document.createElement('div');
+      grid.className = 'okt-chart-grid-cells';
+      // Grid columns: explicit cols, or auto-fit with a 220 px minmax.
+      const cols = +block.cols;
+      if (cols && cols > 0) {
+        grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
+      } else {
+        grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
+      }
+      const childType = block.child_type || 'sparkline';
+      (block.panels || []).forEach((panel) => {
+        if (!panel || typeof panel !== 'object') return;
+        // Build a chart block from the panel. Author can pass any
+        // chart property (color, mode, marks, …) on the panel; it
+        // overrides the inferred title/type below.
+        const childBlock = Object.assign(
+          { kind: 'chart', type: childType, title: panel.label || '' },
+          panel
+        );
+        // Compatibility: `label` is a panel-level convenience for
+        // "use as the chart title"; remove so the chart renderer
+        // doesn't see an unknown field.
+        delete childBlock.label;
+        const cell = document.createElement('div');
+        cell.className = 'okt-chart-grid-cell';
+        const chartEl = this._renderChart(childBlock);
+        if (chartEl) cell.appendChild(chartEl);
+        grid.appendChild(cell);
+      });
+      wrap.appendChild(grid);
+      return wrap;
     }
 
     _renderTable(block) {
