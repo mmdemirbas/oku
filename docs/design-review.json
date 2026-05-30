@@ -250,6 +250,29 @@
               ]
             },
             {
+              "title": "Q26-Q34 autonomous round — every open item shipped",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Closed every actionable open question from this table in one autonomous round. Verified per item in the browser before commit."},
+                {"kind": "list", "items": [
+                  "**Q10 deeper (Q26)** — mermaid's `click NodeId href \"url\" \"tooltip\"` now flows through the kit's `.okc-tooltip` system instead of the slow native browser title popup. Hover instantly surfaces the author's text with a `→ <url>` footer when the node is also a link. mermaid's existing `<a xlink:href>` wrapping unchanged — clicks still navigate as authored.",
+                  "**Q8 follow-up (Q27-Q30)** — orientation switch shipped for all four distribution-shape charts: histogram (horizontal: bins on Y), box-plot (vertical: rows → columns), violin (vertical: textbook shape), candlestick (horizontal: time on Y). Each renderer's default branch is untouched; `orientation` attribute opt-in.",
+                  "**Arc family dual-form complete (Q31)** — popover gained `arc-start` + `inner-radius` rows alongside the existing `arc-end`. Every canonical-form knob is now reachable live, not just at author time. applyChange grew preserve-or-override deltas for both.",
+                  "**Bar family popover scaffolding (Q32)** — Mode chip row (single/stacked/grouped) and Orientation chip row (horizontal/vertical) prepared for when the DIV-based bar charts grow a toolbar. The popover code is forward-looking — the chips render correctly on synthetic `<oku-chart type=\"bar\">` hosts today.",
+                  "**Catalog visualizations (Q33)** — `population-pyramid` (diverging horizontal bars centered on a shared category axis) and `connected-scatter` (scatter with consecutive points joined in series order — start ring, end square) added to the catalog. Schema enum + dispatcher + renderer.js extraMap all wired. Quiet bonus: tile-map alias now has its own extraMap entry (was silently empty before)."
+                ]},
+                {"kind": "paragraph", "content": "Plus 11 new content-regression tests pin each landing — 309 → 320 passing. Test infra polish: the pre-existing pill-is-static-label assertion now precisely flags color/border/background changes, not blanket :hover existence, so the Q34 opacity-only smart-hide doesn't trip it."}
+              ]
+            },
+            {
+              "title": "Q34 — smart-hide round 2 (language pill)",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Sweep every `.okt-code-lang` pill on the page after the JSON renderer completes. If they all show the same language, the pills are redundant — the reader already knows the dialect from page context. Tag `<html>` with `data-okt-single-lang` and the CSS rule dims pills to opacity 0.18, with a reveal-on-hover-of-pre so the chrome stays discoverable. Multi-language pages keep pills visible."},
+                {"kind": "paragraph", "content": "Pills are stamped during Prism's async `complete` event, so the detection re-runs at 0 / 200 / 600 ms. Idempotent — each sweep just toggles the attribute against the current observation. Verified across cli.html (7 pills, 1 lang → dimmed), charts.html (44 pills, 1 lang → dimmed), reference.html (33 pills, 5 langs → visible)."}
+              ]
+            },
+            {
               "title": "Q13 round — hygiene, popover, UX inversions, picker uniformity, mermaid fonts, theme audit",
               "accent": "success",
               "blocks": [
@@ -785,30 +808,30 @@
           "kind": "table",
           "headers": ["#", "Question", "Gated on", "Recommendation"],
           "rows": [
-            ["1",
-             "Continue the dual-form refactor family-by-family (after plot)",
-             "Plot family migrated; arc / bar / categorical / flow remaining.",
-             "Each family takes ~1 session. Same desugar-at-entry pattern. Tests guard each step (the alias surface keeps every existing page rendering identically)."],
             ["Q8 follow-up",
              "Orientation switch for SVG charts (violin / box-plot / histogram / candlestick)",
-             "Bar family ships today.",
-             "Each renderer needs an SVG-axis-swap pass. Best done per chart as the need arises rather than batch."],
+             "SHIPPED Q27-Q30.",
+             "Each chart's default orientation is unchanged; `orientation` attribute opt-in dispatches to a sibling renderer. Histogram → horizontal bins; box-plot → vertical columns; violin → vertical columns; candlestick → horizontal (time on Y)."],
             ["Q10 deeper",
              "Mermaid node-level interactivity — tooltip / open-on-click",
-             "Hover-neighbour-highlight + native click + lightbox pan-zoom all shipped.",
-             "Remaining: hover-tooltip with arbitrary author text; click-to-navigate (mermaid's native `click NodeId 'url'` syntax already honoured). Each is a small additive feature, no architectural change needed."],
+             "SHIPPED Q26.",
+             "mermaid v10's `click NodeId href \"url\" \"tooltip\"` now uses the kit's `.okc-tooltip` rendering with a `→ <url>` footer; click navigation continues via mermaid's existing `<a xlink:href>` wrapping."],
+            ["1",
+             "Continue dual-form refactor (categorical / flow families)",
+             "Arc + bar (Q31/Q32); plot was already done. Categorical (heatmap / waffle / etc.) + flow (sankey / funnel / etc.) remain.",
+             "Each family takes ~1 session. Same desugar-at-entry pattern. Bar family today is popover-ready but DIV-based bar charts need a toolbar to surface the popover; that's a separate ~1-session change."],
             ["3",
-             "Which catalogue-research visualizations to add next?",
-             "User picks from the top-8 list.",
-             "Discuss before adding. Top candidates: sunburst, violin, marimekko (as bar mode), density plot, candlestick, stream graph."],
-            ["4",
-             "Smart-hide round 2 (sidebar affordances, code fold markers, language pill via multi-language detection)",
-             "Lower priority than C.",
-             "Pick up after C. Each is a small, isolated change."],
+             "Catalogue-research visualizations — what's next after Q33?",
+             "population-pyramid + connected-scatter shipped Q33.",
+             "Open: horizon chart (compressed time series), small multiples (a layout primitive, not a chart), beeswarm (already shipped), hexbin (density alternative to scatter for huge N)."],
+            ["4 (partial)",
+             "Smart-hide round 2",
+             "Q34 shipped the language-pill case; sidebar collapse handle was already smart-hide in round 1; fold markers were already smart-hide.",
+             "Remaining: sidebar header collapse affordance polish, mermaid expand-button smart-hide consistency. Each isolated."],
             ["5",
              "Library adoption revisit",
-             "After C lands.",
-             "Re-ask the question with the canonical schema in hand."]
+             "After remaining dual-form families finish.",
+             "Re-ask with the canonical schema in hand; the dual-form pattern has held across plot / arc / bar — categorical + flow will likely follow the same shape."]
           ]
         }
       ]

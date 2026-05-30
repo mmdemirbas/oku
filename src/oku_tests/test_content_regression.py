@@ -896,13 +896,33 @@ class TestChromeKitMarkers:
         made the pill change color and border, signaling "click me" when
         it's actually pointer-events: none. The user wanted a static
         label flush to the top-left edge. Lock in:
-        - No `pre:hover > .okt-code-lang` rule.
+        - No `pre:hover > .okt-code-lang` rule that changes COLOR /
+          BORDER (signaling click-me).
         - top: 0, left: 0 (corner-flush, not 7px / 10px inset).
         - border-radius drops corner-rounding except the inner one.
+
+        Exception (Q34): a single `html[data-okt-single-lang] pre:hover
+        > .okt-code-lang` rule is allowed for the smart-hide reveal —
+        opacity-only, doesn't change color/border, only emerges on
+        single-language pages where the pill is dimmed at rest.
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        assert "pre:hover > .okt-code-lang" not in css, (
-            "lang pill must not have a hover state — it's a label, not a button"
+        # Find every `pre:hover > .okt-code-lang` rule and check none
+        # of them change color / border / background. Opacity-only
+        # is allowed for smart-hide reveal.
+        offenders = []
+        for m in re.finditer(
+            r"(?:html\[data-okt-single-lang\]\s+)?pre:hover\s*>\s*\.okt-code-lang\s*(?:,[^{]*)?\{([^}]+)\}",
+            css,
+        ):
+            body = m.group(1)
+            for prop in ("color", "background", "border"):
+                if re.search(rf"\b{prop}\s*:", body):
+                    offenders.append((prop, body.strip()[:120]))
+        assert not offenders, (
+            "lang pill hover rule must not change color/border/background — "
+            "it's a label, not a button. Smart-hide opacity-only reveal is OK. "
+            f"Offenders: {offenders}"
         )
         m = re.search(r"pre\s*>\s*\.okt-code-lang\s*\{([^}]+)\}", css)
         assert m, "base lang pill rule missing"
@@ -2458,4 +2478,192 @@ class TestSelfReviewMisses:
         assert 'oku-diagram .okd-render svg [class*="section"]' in css, (
             "Mermaid hover rule must use `[class*=\"section\"]` to "
             "catch .section0 / .section--1 / .section-edge-N variants"
+        )
+
+
+# =====================================================================
+# Round Q26-Q34 — autonomous round.  Pin each landing.
+# =====================================================================
+
+
+class TestMermaidNodeTooltip:
+    """mermaid's `click NodeId href "url" "tooltip"` tooltip is now
+    rendered via the kit's .okc-tooltip system instead of the browser's
+    slow native title popup. Wiring lives in OkuDiagram._wireNodeTooltips."""
+
+    def test_wire_node_tooltips_defined_and_called(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "_wireNodeTooltips(svg)" in js, (
+            "OkuDiagram must define _wireNodeTooltips(svg)"
+        )
+        # Must be called from both render paths.
+        # Initial render path:
+        assert "self._wireNodeTooltips(svg);" in js, (
+            "_wireNodeTooltips must be called in the initial render path"
+        )
+
+    def test_tooltips_strip_native_title(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # The wiring must remove `title` so the browser doesn't paint
+        # its slow native tooltip on top of ours.
+        assert "el.removeAttribute('title')" in js, (
+            "_wireNodeTooltips must strip the native `title` after "
+            "stashing it in dataset.okdTooltip — otherwise both popups fire"
+        )
+
+
+class TestOrientationSwitches:
+    """Histogram / box-plot / violin / candlestick gained per-chart
+    vertical or horizontal orientation. Each renderer must dispatch
+    to its alternate when the attribute is set."""
+
+    def test_histogram_dispatches_horizontal(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "if (horizontal) return this._renderHistogramHorizontal" in js, (
+            "Histogram must dispatch to _renderHistogramHorizontal when "
+            "orientation === 'horizontal'"
+        )
+        assert "_renderHistogramHorizontal(bins)" in js, (
+            "Histogram horizontal renderer must be defined"
+        )
+
+    def test_box_plot_dispatches_vertical(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "return this._renderBoxPlotVertical(boxes)" in js, (
+            "Box-plot must dispatch to _renderBoxPlotVertical when "
+            "orientation === 'vertical'"
+        )
+
+    def test_violin_dispatches_vertical(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "return this._renderViolinVertical(distributions)" in js, (
+            "Violin must dispatch to _renderViolinVertical when "
+            "orientation === 'vertical'"
+        )
+
+    def test_candlestick_dispatches_horizontal(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "return this._renderCandlestickHorizontal(entries)" in js, (
+            "Candlestick must dispatch to _renderCandlestickHorizontal "
+            "when orientation === 'horizontal'"
+        )
+
+
+class TestArcFamilyPopoverComplete:
+    """Arc-family popover gained arc-start + inner-radius rows so every
+    canonical-form knob is reachable live, not just at author time."""
+
+    def test_arc_start_input_present(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert 'data-cfg="arc-start"' in js, (
+            "Arc-family popover must render an arc-start input"
+        )
+        assert 'data-cfg="inner-radius"' in js, (
+            "Arc-family popover must render an inner-radius input"
+        )
+
+    def test_apply_change_handles_new_arc_deltas(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "if (delta.arcStart !== undefined)" in js, (
+            "applyChange must honor arcStart delta from the popover"
+        )
+        assert "if (delta.innerRadius !== undefined)" in js, (
+            "applyChange must honor innerRadius delta from the popover"
+        )
+
+
+class TestBarPopoverScaffolding:
+    """Bar-family popover scaffolding — mode and orientation chip rows
+    exist for type=bar / stacked-bar / grouped-bar. The chip code is
+    forward-looking (bar charts don't yet have a toolbar to open the
+    popover) but the popover render must emit the rows."""
+
+    def test_bar_mode_chips_emitted(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "data-bar-mode" in js, (
+            "Bar-family popover must emit data-bar-mode chip row"
+        )
+        assert "[['single', 'bar'], ['stacked', 'stacked-bar'], ['grouped', 'grouped-bar']]" in js, (
+            "Bar mode chips must map single/stacked/grouped to their "
+            "respective types"
+        )
+
+    def test_bar_orientation_chips_emitted(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # data-orient appears for bar / distribution-shape orientation.
+        assert 'data-cfg="bar-orient"' in js, (
+            "Bar-family popover must emit data-cfg=\"bar-orient\" chips"
+        )
+
+
+class TestNewVisualizations:
+    """population-pyramid + connected-scatter dispatched and wired."""
+
+    def test_dispatch_population_pyramid(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "'population-pyramid': '_renderPopulationPyramid'" in js, (
+            "population-pyramid type must dispatch to _renderPopulationPyramid"
+        )
+        assert "_renderPopulationPyramid()" in js, (
+            "_renderPopulationPyramid implementation must exist"
+        )
+
+    def test_dispatch_connected_scatter(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "'connected-scatter':  '_renderConnectedScatter'" in js, (
+            "connected-scatter type must dispatch to _renderConnectedScatter"
+        )
+        assert "_renderConnectedScatter()" in js, (
+            "_renderConnectedScatter implementation must exist"
+        )
+
+    def test_schema_enum_includes_new_types(self, repo_root: Path) -> None:
+        schema_text = (repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8")
+        for t in ("population-pyramid", "connected-scatter"):
+            assert f'"{t}"' in schema_text, (
+                f"schema enum must include `{t}` so authors can use it"
+            )
+
+    def test_renderer_extra_map_for_population_pyramid(self, repo_root: Path) -> None:
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "'population-pyramid'" in rjs, (
+            "renderer.js extraMap must include population-pyramid so "
+            "categories + left + right are piped to the chart"
+        )
+
+    def test_renderer_extra_map_tile_map_alias(self, repo_root: Path) -> None:
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "'tile-map'" in rjs, (
+            "renderer.js extraMap must include `tile-map` so the alias "
+            "isn't silently empty-payloaded (the dispatcher was wired "
+            "but extras weren't)"
+        )
+
+
+class TestLanguagePillSmartHide:
+    """When the page has code blocks in only ONE language, the language
+    pill is redundant. Tag the document and dim the pill via CSS."""
+
+    def test_post_render_sweep_function_exists(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "__okuPostRenderLanguagePillSmartHide" in js, (
+            "Language-pill smart-hide must run after the JSON renderer"
+        )
+
+    def test_attribute_toggled_on_html(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "data-okt-single-lang" in js, (
+            "Detection must set the html attribute data-okt-single-lang"
+        )
+
+    def test_pill_dimmed_when_single_lang(self, repo_root: Path) -> None:
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        # The attr selector + the dimming opacity must both appear.
+        assert "html[data-okt-single-lang] pre > .okt-code-lang" in css, (
+            "CSS must dim pills when data-okt-single-lang is set on html"
+        )
+        # And the hover-reveal so the pill stays discoverable.
+        assert "html[data-okt-single-lang] pre:hover > .okt-code-lang" in css, (
+            "Pill must reveal-on-hover so it remains discoverable when "
+            "the page is single-language"
         )
