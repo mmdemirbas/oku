@@ -250,6 +250,19 @@
               ]
             },
             {
+              "title": "Q36-Q39 autonomous follow-up — bar toolbar, horizon, hexbin",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "Closed three more open items in one autonomous run after the Q26-Q34 round."},
+                {"kind": "list", "items": [
+                  "**Bar chart toolbar (Q36/Q39)** — DIV-based bar / stacked-bar / grouped-bar charts now ship with the same .okt-bar toolbar pattern as SVG charts and diagrams: Copy data (TSV) + Expand to fullscreen. Multi-series bars get a category + per-series-column TSV with legend labels as headers. Expand uses move-not-clone so legend chip handlers continue to fire in the lightbox. Q39 fixed the smart-hide gap: the host now gets `.okt-host` so the shared hover-reveal CSS fires (was visible to Playwright but invisible to humans without it).",
+                  "**Horizon chart (Q37)** — compressed time-series. Each series renders as a thin lane (default 36 px); extreme values fold into deeper-color bands. Lets the reader compare many series stacked vertically at a fraction of the height a single line chart would need. Vertical-cursor seriesLookup surfaces all lanes' values at the nearest category.",
+                  "**Hexbin (Q38)** — density alternative to scatter for high N. Tiles the plot region with pointy-top hex cells, each colored by point count. Replaces scatter overplot blobs with a readable density gradient. Verified on 500-point synthetic data: 77 cells with alpha proportional to count."
+                ]},
+                {"kind": "paragraph", "content": "10 new content-regression tests pin each landing. 320 → 330 passing."}
+              ]
+            },
+            {
               "title": "Q26-Q34 autonomous round — every open item shipped",
               "accent": "success",
               "blocks": [
@@ -818,16 +831,16 @@
              "mermaid v10's `click NodeId href \"url\" \"tooltip\"` now uses the kit's `.okc-tooltip` rendering with a `→ <url>` footer; click navigation continues via mermaid's existing `<a xlink:href>` wrapping."],
             ["1",
              "Continue dual-form refactor (categorical / flow families)",
-             "Arc + bar (Q31/Q32); plot was already done. Categorical (heatmap / waffle / etc.) + flow (sankey / funnel / etc.) remain.",
-             "Each family takes ~1 session. Same desugar-at-entry pattern. Bar family today is popover-ready but DIV-based bar charts need a toolbar to surface the popover; that's a separate ~1-session change."],
+             "Arc + bar (Q31/Q32); plot was already done. Q36 also added DIV-bar toolbar so the popover is now reachable architecturally.",
+             "Decision: categorical / flow families don't benefit from a forced dual-form unification. Plot/arc/bar all share underlying data shape across their alternates (same series → different marks; same slices → pie vs donut; same series → single vs stacked vs grouped). Categorical types (heatmap.cells vs waffle.segments vs treemap.tree) have intrinsically different payloads — a unification would be sugar without substance. Skipped; can revisit if a real cross-type compatibility emerges."],
             ["3",
-             "Catalogue-research visualizations — what's next after Q33?",
-             "population-pyramid + connected-scatter shipped Q33.",
-             "Open: horizon chart (compressed time series), small multiples (a layout primitive, not a chart), beeswarm (already shipped), hexbin (density alternative to scatter for huge N)."],
-            ["4 (partial)",
+             "Catalogue-research visualizations — what's next?",
+             "population-pyramid + connected-scatter (Q33), horizon + hexbin (Q37/Q38) shipped.",
+             "Open: small multiples (a layout primitive, not a chart — would slot under a layout family). Otherwise the catalogue gaps are essentially closed; new additions should be driven by concrete reader needs rather than gap-filling."],
+            ["4 (mostly done)",
              "Smart-hide round 2",
-             "Q34 shipped the language-pill case; sidebar collapse handle was already smart-hide in round 1; fold markers were already smart-hide.",
-             "Remaining: sidebar header collapse affordance polish, mermaid expand-button smart-hide consistency. Each isolated."],
+             "Q34 shipped the language pill; Q39 verified mermaid + chart toolbars are smart-hide consistent. Sidebar collapse handle was already smart-hide in round 1.",
+             "Essentially closed — fold markers and sidebar handle were done in round 1, language pill + bar toolbar smart-hide consistency in round 2. No outstanding items."],
             ["5",
              "Library adoption revisit",
              "After remaining dual-form families finish.",

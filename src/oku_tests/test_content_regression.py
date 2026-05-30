@@ -2667,3 +2667,104 @@ class TestLanguagePillSmartHide:
             "Pill must reveal-on-hover so it remains discoverable when "
             "the page is single-language"
         )
+
+
+# =====================================================================
+# Round Q36-Q39 — autonomous follow-up: bar toolbar, horizon, hexbin
+# =====================================================================
+
+
+class TestBarChartToolbar:
+    """DIV-based bar charts gained a minimal toolbar with Copy and
+    Expand affordances, matching the SVG-chart / diagram pattern."""
+
+    def test_bar_enhancer_stamps_toolbar(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # The enhancer must create the .okt-bar element if absent.
+        assert "bar.className = 'okt-bar';" in js, (
+            "Bar enhancer must stamp a .okt-bar toolbar"
+        )
+
+    def test_bar_host_gets_okt_host_class(self, repo_root: Path) -> None:
+        """The shared `.okt-host:hover .okt-bar` rule keys on the
+        okt-host class — without it the toolbar can't reveal on hover."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "host.classList.add('okt-host');" in js, (
+            "Bar enhancer must add .okt-host so the existing hover-reveal "
+            "rule fires (was missing in the initial landing — visible "
+            "to tests but invisible to humans)"
+        )
+
+    def test_bar_toolbar_copy_button_writes_tsv(self, repo_root: Path) -> None:
+        """Copy button must walk .bar-row + write a TSV via
+        navigator.clipboard.writeText."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert 'title="Copy data (TSV)"' in js, (
+            "Bar toolbar must include a Copy data (TSV) button"
+        )
+        assert "navigator.clipboard.writeText(tsv)" in js, (
+            "Copy button must call navigator.clipboard.writeText"
+        )
+
+    def test_bar_toolbar_expand_button_moves_into_lightbox(
+        self, repo_root: Path
+    ) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        # Move-not-clone is required so the legend chip listeners
+        # and tooltip wiring keep working inside the lightbox.
+        assert "__okuLightbox.open(host" in js, (
+            "Bar expand button must move (not clone) the host into the "
+            "lightbox via __okuLightbox.open"
+        )
+
+
+class TestHorizonChart:
+    """Compressed time-series — each series renders as a thin lane
+    with extreme values folded into deeper-color bands."""
+
+    def test_dispatch_horizon(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "horizon:              '_renderHorizon'" in js, (
+            "horizon type must dispatch to _renderHorizon"
+        )
+        assert "_renderHorizon()" in js, (
+            "_renderHorizon implementation must exist"
+        )
+
+    def test_horizon_extras_map(self, repo_root: Path) -> None:
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "horizon:" in rjs, (
+            "renderer.js extraMap must include horizon entry"
+        )
+
+    def test_horizon_in_schema_enum(self, repo_root: Path) -> None:
+        schema_text = (repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8")
+        assert '"horizon"' in schema_text, (
+            "schema enum must include horizon"
+        )
+
+
+class TestHexbinChart:
+    """Density alternative to scatter — tile the plot region with
+    hexagonal cells, color each by point count."""
+
+    def test_dispatch_hexbin(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "hexbin:               '_renderHexbin'" in js, (
+            "hexbin type must dispatch to _renderHexbin"
+        )
+        assert "_renderHexbin()" in js, (
+            "_renderHexbin implementation must exist"
+        )
+
+    def test_hexbin_extras_map(self, repo_root: Path) -> None:
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "hexbin:" in rjs, (
+            "renderer.js extraMap must include hexbin entry"
+        )
+
+    def test_hexbin_in_schema_enum(self, repo_root: Path) -> None:
+        schema_text = (repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8")
+        assert '"hexbin"' in schema_text, (
+            "schema enum must include hexbin"
+        )
