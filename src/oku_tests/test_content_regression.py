@@ -2827,3 +2827,39 @@ class TestSmallMultiples:
             ".okt-chart-grid-cell must declare a border so the panel "
             "reads as a discrete unit"
         )
+
+
+class TestEveryChartTypeIsDocumented:
+    """Every chart type in the schema enum must have a worked example
+    in docs/charts.json. New types added to the kit without a docs
+    section silently rot — the doc page is how authors discover the
+    payload shape. Aliases (e.g. tile-map↔geo, plot↔scatter,
+    arc↔pie/donut, bar↔stacked-bar) share a docs anchor by design;
+    the alias map below names which alias carries the doc."""
+
+    # Map from a chart type → the chart-* anchor that documents it.
+    # When two types desugar to the same surface, both point at the
+    # canonical anchor so adding a new alias does not require a new
+    # docs section.
+    ALIAS_TO_DOC = {
+        "tile-map": "chart-geo",
+        "plot": "chart-scatter",
+        "arc": "chart-pie",
+        "stacked-bar": "chart-stacked",
+        "grouped-bar": "chart-grouped",
+    }
+
+    def test_every_enum_type_has_doc_section(self, repo_root: Path) -> None:
+        schema = json.loads((repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8"))
+        # Reach into $defs.chart.properties.type.enum.
+        enum = schema["$defs"]["chart"]["properties"]["type"]["enum"]
+        charts_json = (repo_root / "docs" / "charts.json").read_text(encoding="utf-8")
+        missing: list[str] = []
+        for t in enum:
+            anchor = self.ALIAS_TO_DOC.get(t, f"chart-{t}")
+            if f'"id": "{anchor}"' not in charts_json:
+                missing.append(f"{t} → expected id={anchor}")
+        assert not missing, (
+            "Chart types missing docs section in docs/charts.json:\n  "
+            + "\n  ".join(missing)
+        )

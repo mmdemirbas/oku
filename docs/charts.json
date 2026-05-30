@@ -2319,6 +2319,43 @@
               }
             ]
           }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-connected-scatter",
+          "title": "type: connected-scatter"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Scatter where consecutive points are joined by a line in series order — a trajectory through 2-D space. Same `series` shape as scatter; sequence is the per-series data order. The start point renders as a hollow ring, the end point as a filled square so direction reads at a glance. Use when two metrics move together over time (life expectancy × income across years, MAU × ARPU across releases)."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"connected-scatter\",\n  \"title\": \"MAU × ARPU across releases\",\n  \"x_label\": \"MAU (k)\",\n  \"y_label\": \"ARPU ($)\",\n  \"series\": [\n    {\n      \"label\": \"product\",\n      \"data\": [\n        {\"x\":  20, \"y\": 1.2, \"label\": \"v1\"},\n        {\"x\":  35, \"y\": 1.6, \"label\": \"v2\"},\n        {\"x\":  68, \"y\": 1.4, \"label\": \"v3\"},\n        {\"x\":  92, \"y\": 2.1, \"label\": \"v4\"},\n        {\"x\": 140, \"y\": 2.8, \"label\": \"v5\"}\n      ]\n    }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "connected-scatter",
+            "title": "MAU × ARPU across releases",
+            "x_label": "MAU (k)",
+            "y_label": "ARPU ($)",
+            "series": [
+              {
+                "label": "product",
+                "data": [
+                  {"x":  20, "y": 1.2, "label": "v1"},
+                  {"x":  35, "y": 1.6, "label": "v2"},
+                  {"x":  68, "y": 1.4, "label": "v3"},
+                  {"x":  92, "y": 2.1, "label": "v4"},
+                  {"x": 140, "y": 2.8, "label": "v5"}
+                ]
+              }
+            ]
+          }
         }
       ]
     },
@@ -2800,6 +2837,32 @@
                 "to": 38
               }
             ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-population-pyramid",
+          "title": "type: population-pyramid"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Two diverging horizontal bar groups around a shared centre column of category labels. `left.values[]` grows leftward, `right.values[]` grows rightward, both aligned to `categories`. Use for demographic pyramids (men vs women per age bucket) or any two-sided comparison sharing a row axis (revenue vs cost per region, inbound vs outbound per channel)."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"population-pyramid\",\n  \"title\": \"Active users by age bucket\",\n  \"categories\": [\"55+\", \"45–54\", \"35–44\", \"25–34\", \"18–24\"],\n  \"left\":  { \"label\": \"women\", \"color\": \"accent\",  \"values\": [ 9, 17, 26, 34, 22] },\n  \"right\": { \"label\": \"men\",   \"color\": \"success\", \"values\": [11, 19, 24, 30, 18] }\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "population-pyramid",
+            "title": "Active users by age bucket",
+            "categories": ["55+", "45–54", "35–44", "25–34", "18–24"],
+            "left":  { "label": "women", "color": "accent",  "values": [ 9, 17, 26, 34, 22] },
+            "right": { "label": "men",   "color": "success", "values": [11, 19, 24, 30, 18] }
           }
         }
       ]
@@ -3580,6 +3643,49 @@
               8
             ]
           }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-hexbin",
+          "title": "type: hexbin"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Tile the plot region with hexagonal cells; each cell's opacity encodes how many `points[]` fall inside. Use when a scatter would overplot — 10⁴+ samples where individual dots lose meaning and only density matters. `radius` controls cell size in viewBox px; smaller → finer resolution but noisier; bigger → smoother map but loses local detail."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"hexbin\",\n  \"title\": \"Sample density\",\n  \"radius\": 16,\n  \"points\": [\n    {\"x\": 1.1, \"y\": 2.4},\n    {\"x\": 1.5, \"y\": 2.9},\n    {\"x\": 2.2, \"y\": 3.1}\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "hexbin",
+            "title": "Sample density (n ≈ 600)",
+            "radius": 16,
+            "points": [
+              {"x": 1.1, "y": 2.4}, {"x": 1.5, "y": 2.9}, {"x": 1.3, "y": 2.7},
+              {"x": 1.2, "y": 2.5}, {"x": 1.4, "y": 2.8}, {"x": 1.0, "y": 2.6},
+              {"x": 1.6, "y": 2.3}, {"x": 1.1, "y": 2.6}, {"x": 1.5, "y": 2.5},
+              {"x": 1.3, "y": 2.4}, {"x": 1.4, "y": 2.6}, {"x": 1.2, "y": 2.7},
+              {"x": 2.0, "y": 3.0}, {"x": 2.2, "y": 3.1}, {"x": 2.1, "y": 3.2},
+              {"x": 2.3, "y": 3.0}, {"x": 2.0, "y": 3.3}, {"x": 2.4, "y": 3.1},
+              {"x": 3.2, "y": 3.6}, {"x": 3.0, "y": 3.7}, {"x": 3.4, "y": 3.5},
+              {"x": 3.1, "y": 3.4}, {"x": 3.3, "y": 3.7}, {"x": 3.2, "y": 3.5},
+              {"x": 4.5, "y": 4.2}, {"x": 4.7, "y": 4.0}, {"x": 4.6, "y": 4.4},
+              {"x": 4.4, "y": 4.3}, {"x": 4.5, "y": 4.1}, {"x": 4.8, "y": 4.2},
+              {"x": 4.6, "y": 4.0}, {"x": 4.5, "y": 4.3}, {"x": 4.7, "y": 4.4},
+              {"x": 5.2, "y": 4.8}, {"x": 5.4, "y": 4.7}, {"x": 5.0, "y": 4.9},
+              {"x": 5.1, "y": 4.8}, {"x": 5.3, "y": 4.6}, {"x": 5.5, "y": 4.7},
+              {"x": 6.0, "y": 5.4}, {"x": 6.2, "y": 5.3}, {"x": 6.1, "y": 5.5},
+              {"x": 6.3, "y": 5.2}, {"x": 6.4, "y": 5.4}, {"x": 6.0, "y": 5.6},
+              {"x": 0.6, "y": 1.0}, {"x": 0.5, "y": 1.2}, {"x": 0.4, "y": 1.1},
+              {"x": 0.7, "y": 0.9}, {"x": 0.6, "y": 1.1}, {"x": 0.5, "y": 1.0}
+            ]
+          }
         }
       ]
     },
@@ -3938,6 +4044,36 @@
                   80
                 ]
               }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-horizon",
+          "title": "type: horizon"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Compressed time series. Each `series` becomes a thin lane; values fold into deeper-colored bands above the baseline so a 36 px lane can carry the same information as a 200 px line chart. Use to compare many time series stacked vertically — server load per region, latency per endpoint — where the per-series shape matters more than absolute pixel height. `bands` (default 3) controls how aggressively the fold compresses range."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"horizon\",\n  \"title\": \"Request rate (req/s) by region\",\n  \"bands\": 3,\n  \"categories\": [\"00:00\", \"04:00\", \"08:00\", \"12:00\", \"16:00\", \"20:00\"],\n  \"series\": [\n    { \"label\": \"us-east-1\", \"color\": \"accent\",  \"values\": [120, 140, 380, 620, 540, 290] },\n    { \"label\": \"eu-west-1\", \"color\": \"success\", \"values\": [ 80, 110, 220, 410, 600, 380] },\n    { \"label\": \"ap-south-1\",\"color\": \"warn\",    \"values\": [340, 480, 510, 360, 240, 180] }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "horizon",
+            "title": "Request rate (req/s) by region",
+            "bands": 3,
+            "categories": ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"],
+            "series": [
+              { "label": "us-east-1",  "color": "accent",  "values": [120, 140, 380, 620, 540, 290] },
+              { "label": "eu-west-1",  "color": "success", "values": [ 80, 110, 220, 410, 600, 380] },
+              { "label": "ap-south-1", "color": "warn",    "values": [340, 480, 510, 360, 240, 180] }
             ]
           }
         }

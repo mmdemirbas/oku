@@ -1020,7 +1020,57 @@
         "from_label":    { "type": "string" },
         "to_label":      { "type": "string" },
         "from_color":    { "enum": ["accent", "warn", "danger", "success", "muted"] },
-        "to_color":      { "enum": ["accent", "warn", "danger", "success", "muted"] }
+        "to_color":      { "enum": ["accent", "warn", "danger", "success", "muted"] },
+        "left": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "population-pyramid — left-side diverging bar group. `values[]` aligns to `categories`.",
+          "required": ["values"],
+          "properties": {
+            "label":  { "type": "string" },
+            "color":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" },
+            "values": { "type": "array", "items": { "type": "number" }, "minItems": 1 }
+          }
+        },
+        "right": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "population-pyramid — right-side diverging bar group. Same shape as `left`.",
+          "required": ["values"],
+          "properties": {
+            "label":  { "type": "string" },
+            "color":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "success" },
+            "values": { "type": "array", "items": { "type": "number" }, "minItems": 1 }
+          }
+        },
+        "bands": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "default": 3,
+          "description": "horizon — number of color bands above and below the baseline. Each band carries `maxAbs/bands` of value range; deeper bands fold from values exceeding the previous band."
+        },
+        "points": {
+          "type": "array",
+          "description": "hexbin — raw 2-D points. Each: `{x, y}`; density is computed per hex cell.",
+          "items": {
+            "type": "object",
+            "required": ["x", "y"],
+            "additionalProperties": false,
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" }
+            }
+          },
+          "minItems": 1
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 60,
+          "default": 14,
+          "description": "hexbin — viewBox px per hex cell (controls cell size and therefore density resolution)."
+        }
       },
       "allOf": [
         {
@@ -1108,8 +1158,24 @@
           "then": { "required": ["groups", "matrix"] }
         },
         {
-          "if": { "properties": { "type": { "const": "geo" } }, "required": ["type"] },
+          "if": { "properties": { "type": { "enum": ["geo", "tile-map"] } }, "required": ["type"] },
           "then": { "required": ["regions"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "population-pyramid" } }, "required": ["type"] },
+          "then": { "required": ["categories", "left", "right"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "connected-scatter" } }, "required": ["type"] },
+          "then": { "required": ["series"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "horizon" } }, "required": ["type"] },
+          "then": { "required": ["categories", "series"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "hexbin" } }, "required": ["type"] },
+          "then": { "required": ["points"] }
         }
       ]
     },
