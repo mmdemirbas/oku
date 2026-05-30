@@ -2864,6 +2864,67 @@
             "left":  { "label": "women", "color": "accent",  "values": [ 9, 17, 26, 34, 22] },
             "right": { "label": "men",   "color": "success", "values": [11, 19, 24, 30, 18] }
           }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-range-bar",
+          "title": "type: range-bar"
+        },
+        {
+          "kind": "paragraph",
+          "content": "One row per item; each row carries a `[low, high]` interval drawn as a horizontal band with optional `mid` tick. Use when the *interval* is the data — confidence intervals, election polls (margin of error), salary ranges, price floors and ceilings, error bars in summary form. The right-hand readout shows the numeric range; hover surfaces low / high / mid in the tooltip."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"range-bar\",\n  \"title\": \"P50 latency, 95% CI (ms)\",\n  \"ranges\": [\n    { \"label\": \"us-east-1\",  \"low\":  42, \"mid\":  48, \"high\":  56 },\n    { \"label\": \"eu-west-1\",  \"low\":  58, \"mid\":  64, \"high\":  72 },\n    { \"label\": \"ap-south-1\", \"low\":  88, \"mid\":  96, \"high\": 110, \"color\": \"warn\" },\n    { \"label\": \"sa-east-1\",  \"low\": 105, \"mid\": 118, \"high\": 132, \"color\": \"danger\" }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "range-bar",
+            "title": "P50 latency, 95% CI (ms)",
+            "ranges": [
+              { "label": "us-east-1",  "low":  42, "mid":  48, "high":  56 },
+              { "label": "eu-west-1",  "low":  58, "mid":  64, "high":  72 },
+              { "label": "ap-south-1", "low":  88, "mid":  96, "high": 110, "color": "warn" },
+              { "label": "sa-east-1",  "low": 105, "mid": 118, "high": 132, "color": "danger" }
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-pareto",
+          "title": "type: pareto"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Bars sorted descending by `value` + a cumulative-percentage line on a secondary axis. The classic 80/20 reading shape — surfaces \"the top N causes account for 80% of the total\" in operations, defect root-cause audits, support-ticket triage. The renderer sorts rows for you; the dashed 80% guide reads against the right-hand percentage axis."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"pareto\",\n  \"title\": \"Support tickets by category (last 30 d)\",\n  \"rows\": [\n    { \"label\": \"auth\",     \"value\": 142 },\n    { \"label\": \"billing\",  \"value\":  88 },\n    { \"label\": \"latency\",  \"value\":  72, \"color\": \"warn\" },\n    { \"label\": \"ui-bug\",   \"value\":  46 },\n    { \"label\": \"data\",     \"value\":  28 },\n    { \"label\": \"feature\",  \"value\":  18 },\n    { \"label\": \"other\",    \"value\":  12, \"color\": \"muted\" }\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "pareto",
+            "title": "Support tickets by category (last 30 d)",
+            "rows": [
+              { "label": "auth",     "value": 142 },
+              { "label": "billing",  "value":  88 },
+              { "label": "latency",  "value":  72, "color": "warn" },
+              { "label": "ui-bug",   "value":  46 },
+              { "label": "data",     "value":  28 },
+              { "label": "feature",  "value":  18 },
+              { "label": "other",    "value":  12, "color": "muted" }
+            ]
+          }
         }
       ]
     },
@@ -4436,6 +4497,48 @@
                 1,
                 0
               ]
+            ]
+          }
+        },
+        {
+          "kind": "heading",
+          "level": 3,
+          "id": "chart-arc-diagram",
+          "title": "type: arc-diagram"
+        },
+        {
+          "kind": "paragraph",
+          "content": "Nodes positioned evenly on a horizontal baseline; each link draws a semicircular arc above the baseline connecting its source and target. Same `nodes` + `links` payload as <code>network</code>/<code>sankey</code> — what changes is the layout. Use when the *order* of nodes carries meaning (genealogy, chronology, sentence-level word adjacency) and a force-relaxed network would obscure that order. Arc thickness scales with `links[].value`; arc color follows the source node's color token."
+        },
+        {
+          "kind": "example",
+          "code": {
+            "kind": "code",
+            "language": "json",
+            "source": "{\n  \"kind\": \"chart\",\n  \"type\": \"arc-diagram\",\n  \"title\": \"Talk references (in slide order)\",\n  \"nodes\": [\n    {\"id\": \"intro\",       \"label\": \"Intro\"},\n    {\"id\": \"problem\",     \"label\": \"Problem\"},\n    {\"id\": \"prior\",       \"label\": \"Prior work\"},\n    {\"id\": \"method\",      \"label\": \"Method\",   \"color\": \"success\"},\n    {\"id\": \"results\",     \"label\": \"Results\",  \"color\": \"warn\"},\n    {\"id\": \"discussion\",  \"label\": \"Discussion\"},\n    {\"id\": \"conclusion\",  \"label\": \"Conclusion\"}\n  ],\n  \"links\": [\n    {\"source\": \"intro\",       \"target\": \"problem\",    \"value\": 2},\n    {\"source\": \"problem\",     \"target\": \"prior\",      \"value\": 4},\n    {\"source\": \"problem\",     \"target\": \"method\",     \"value\": 6},\n    {\"source\": \"prior\",       \"target\": \"method\",     \"value\": 3},\n    {\"source\": \"method\",      \"target\": \"results\",    \"value\": 8},\n    {\"source\": \"results\",     \"target\": \"discussion\", \"value\": 5},\n    {\"source\": \"discussion\",  \"target\": \"conclusion\", \"value\": 3},\n    {\"source\": \"prior\",       \"target\": \"discussion\", \"value\": 2}\n  ]\n}"
+          },
+          "output": {
+            "kind": "chart",
+            "type": "arc-diagram",
+            "title": "Talk references (in slide order)",
+            "nodes": [
+              {"id": "intro",       "label": "Intro"},
+              {"id": "problem",     "label": "Problem"},
+              {"id": "prior",       "label": "Prior work"},
+              {"id": "method",      "label": "Method",   "color": "success"},
+              {"id": "results",     "label": "Results",  "color": "warn"},
+              {"id": "discussion",  "label": "Discussion"},
+              {"id": "conclusion",  "label": "Conclusion"}
+            ],
+            "links": [
+              {"source": "intro",       "target": "problem",    "value": 2},
+              {"source": "problem",     "target": "prior",      "value": 4},
+              {"source": "problem",     "target": "method",     "value": 6},
+              {"source": "prior",       "target": "method",     "value": 3},
+              {"source": "method",      "target": "results",    "value": 8},
+              {"source": "results",     "target": "discussion", "value": 5},
+              {"source": "discussion",  "target": "conclusion", "value": 3},
+              {"source": "prior",       "target": "discussion", "value": 2}
             ]
           }
         }

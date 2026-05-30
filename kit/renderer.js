@@ -552,7 +552,15 @@
         // Compressed time series (catalogue gap item, Q37).
         horizon:      { categories: block.categories, series: block.series, bands: block.bands },
         // Density-by-cell alternative to scatter for high N (Q38).
-        hexbin:       { points: block.points, radius: block.radius, scale: block.scale }
+        hexbin:       { points: block.points, radius: block.radius, scale: block.scale },
+        // Nodes on a baseline with arcs above for links.
+        'arc-diagram': { nodes: block.nodes, links: block.links },
+        // [low, high] band per row; optional `mid` tick. Renderer reads
+        // `ranges` (not `rows`) to keep the schema row-shape unambiguous
+        // versus bar / dot-plot / lollipop / dumbbell.
+        'range-bar':  { ranges: block.ranges },
+        // Descending bars + cumulative-% line — the 80/20 shape.
+        pareto:       { rows: block.rows }
       };
       if (extraMap[type]) {
         const x = document.createElement('script');

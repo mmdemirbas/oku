@@ -2829,6 +2829,135 @@ class TestSmallMultiples:
         )
 
 
+class TestArcDiagram:
+    """Nodes on a baseline, semicircular arcs above for links."""
+
+    def test_dispatch(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "'arc-diagram':        '_renderArcDiagram'" in js, (
+            "arc-diagram type must dispatch to _renderArcDiagram"
+        )
+        assert "_renderArcDiagram()" in js, (
+            "_renderArcDiagram implementation must exist"
+        )
+
+    def test_extras_map(self, repo_root: Path) -> None:
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "'arc-diagram': { nodes: block.nodes, links: block.links }" in rjs, (
+            "renderer.js extraMap must wire arc-diagram nodes+links"
+        )
+
+    def test_schema_required(self, repo_root: Path) -> None:
+        schema_text = (repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8")
+        assert '"const": "arc-diagram"' in schema_text, (
+            "schema must declare arc-diagram in an if/then required-fields rule"
+        )
+
+    def test_uses_nodes_and_links_payload(self, repo_root: Path) -> None:
+        """arc-diagram reuses the network/sankey nodes+links shape so
+        authors don't have to learn a third payload for a third graph
+        layout. The doc example must explicitly use both keys."""
+        doc = (repo_root / "docs" / "charts.json").read_text(encoding="utf-8")
+        m = re.search(
+            r'"id":\s*"chart-arc-diagram".+?"output":\s*\{(.*?)\n\s+\}\s*\n\s+\}\s*,?\s*\n\s+\{',
+            doc, re.DOTALL,
+        )
+        assert m and '"nodes"' in m.group(1) and '"links"' in m.group(1), (
+            "chart-arc-diagram worked example must use nodes + links"
+        )
+
+
+class TestRangeBar:
+    """[low, high] interval per row; optional mid tick. Schema uses
+    `ranges` (not `rows`) to avoid colliding with bar/dot-plot/lollipop/
+    dumbbell row shapes."""
+
+    def test_dispatch(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "'range-bar':          '_renderRangeBar'" in js, (
+            "range-bar type must dispatch to _renderRangeBar"
+        )
+        assert "_renderRangeBar()" in js, (
+            "_renderRangeBar implementation must exist"
+        )
+
+    def test_extras_map_uses_ranges_not_rows(self, repo_root: Path) -> None:
+        """Schema-bookkeeping note: the existing `rows` field has
+        additionalProperties: false on the item shape, allowing
+        label/value/from/to/display/color — but NOT low/high/mid.
+        Adding low/high/mid to `rows` would pollute every other
+        chart that uses rows. So range-bar gets its own field."""
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "'range-bar':  { ranges: block.ranges }" in rjs, (
+            "renderer.js extraMap must wire range-bar.ranges (NOT rows)"
+        )
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "_renderRangeBar() {" in js
+        # The renderer must read the `ranges` field, not `rows`, so
+        # that authors author { ranges: [...] } and validation passes.
+        assert "this._extras['range-bar']" in js
+        assert "x.ranges" in js, (
+            "_renderRangeBar must read .ranges from extras, not .rows"
+        )
+
+    def test_schema_required(self, repo_root: Path) -> None:
+        schema_text = (repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8")
+        assert '"const": "range-bar"' in schema_text, (
+            "schema must declare range-bar in an if/then required-fields rule"
+        )
+        assert '"ranges"' in schema_text, (
+            "schema must declare a `ranges` array property for range-bar"
+        )
+
+
+class TestPareto:
+    """Bars descending + cumulative-% line + 80% guide."""
+
+    def test_dispatch(self, repo_root: Path) -> None:
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "pareto:               '_renderPareto'" in js, (
+            "pareto type must dispatch to _renderPareto"
+        )
+        assert "_renderPareto()" in js, (
+            "_renderPareto implementation must exist"
+        )
+
+    def test_renderer_sorts_descending(self, repo_root: Path) -> None:
+        """The caller can pass rows in any order — the renderer must
+        sort descending by value so the cumulative curve is monotone."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        m = re.search(r"_renderPareto\(\) \{(.+?)\n  \}", js, re.DOTALL)
+        assert m, "Could not isolate _renderPareto body"
+        body = m.group(1)
+        assert "sort(function (a, b) { return (+b.value || 0) - (+a.value || 0); })" in body, (
+            "Pareto renderer must explicitly sort rows descending by value"
+        )
+
+    def test_extras_map(self, repo_root: Path) -> None:
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "pareto:       { rows: block.rows }" in rjs, (
+            "renderer.js extraMap must wire pareto rows"
+        )
+
+    def test_schema_required(self, repo_root: Path) -> None:
+        schema_text = (repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8")
+        assert '"const": "pareto"' in schema_text, (
+            "schema must declare pareto in an if/then required-fields rule"
+        )
+
+    def test_has_80pct_guide(self, repo_root: Path) -> None:
+        """80% is the 'Pareto principle' threshold — it's the entire
+        point of the chart. The dashed guide at y(0.8) must be in the
+        emitted SVG so the 80/20 reading is one glance."""
+        js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        m = re.search(r"_renderPareto\(\) \{(.+?)\n  \}", js, re.DOTALL)
+        assert m
+        body = m.group(1)
+        assert "cumY(0.8)" in body and "80%" in body, (
+            "Pareto must emit the 80% guide line + label"
+        )
+
+
 class TestEveryChartTypeIsDocumented:
     """Every chart type in the schema enum must have a worked example
     in docs/charts.json. New types added to the kit without a docs

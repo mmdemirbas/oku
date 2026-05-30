@@ -4213,7 +4213,10 @@ class OkuChart extends HTMLElement {
       'population-pyramid': '_renderPopulationPyramid',
       'connected-scatter':  '_renderConnectedScatter',
       horizon:              '_renderHorizon',
-      hexbin:               '_renderHexbin'
+      hexbin:               '_renderHexbin',
+      'arc-diagram':        '_renderArcDiagram',
+      'range-bar':          '_renderRangeBar',
+      pareto:               '_renderPareto'
     };
     if (nonCartesian[this._type]) {
       this[nonCartesian[this._type]]();
@@ -8294,6 +8297,246 @@ class OkuChart extends HTMLElement {
       var alpha = (0.25 + (count / maxCount) * 0.7).toFixed(2);
       var payload = JSON.stringify({ label: 'cell', kv: [{ k: 'count', v: String(count) }] });
       parts.push('<path d="' + hexPath(h.hx, h.hy) + '" fill="var(--accent)" fill-opacity="' + alpha + '" stroke="var(--bg)" stroke-width="0.6" class="okc-hex-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>count: ' + count + '</title></path>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Arc diagram ----------------
+     Nodes positioned evenly on a horizontal baseline; each link is a
+     semicircular arc above the baseline connecting its source and
+     target nodes. Arc thickness scales with link value (default
+     min/max mapped to 1.5–6 px stroke). Arc colour follows the
+     source node's colour token.
+
+     Same nodes + links payload as sankey/network — what changes is
+     the layout. Use when the *order* of nodes matters (genealogy,
+     chronology, sentence-level word adjacency, co-author timeline)
+     and a force-relaxed network would obscure that order. */
+  _renderArcDiagram() {
+    var x = (this._extras && this._extras['arc-diagram']) || {};
+    var nodes = x.nodes || [];
+    var links = x.links || [];
+    if (nodes.length < 2 || !links.length) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var W = 640, H = 320;
+    var pad = { top: this._title ? 32 : 12, bottom: 64, left: 32, right: 32 };
+    var baselineY = H - pad.bottom;
+    var nodeSpacingW = W - pad.left - pad.right;
+    var idIndex = {};
+    nodes.forEach(function (n, i) { idIndex[n.id] = i; });
+    function xOf(i) {
+      if (nodes.length <= 1) return pad.left + nodeSpacingW / 2;
+      return pad.left + (i / (nodes.length - 1)) * nodeSpacingW;
+    }
+    // Stroke width = 1.5 + 4.5 * (val/maxVal); if no values given, use 2.
+    var maxVal = 0;
+    links.forEach(function (l) { var v = +l.value || 0; if (v > maxVal) maxVal = v; });
+    function strokeOf(v) {
+      if (!maxVal) return 2;
+      return (1.5 + ((+v || 0) / maxVal) * 4.5).toFixed(1);
+    }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Arc diagram') + '" class="okc-svg okc-arc-diagram">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Draw arcs first so node markers render on top.
+    links.forEach(function (l) {
+      var si = idIndex[l.source], ti = idIndex[l.target];
+      if (si == null || ti == null) return;
+      var sx = xOf(si), tx = xOf(ti);
+      var x1 = Math.min(sx, tx), x2 = Math.max(sx, tx);
+      var rx = (x2 - x1) / 2;
+      var srcNode = nodes[si];
+      var color = palette[srcNode && srcNode.color] || palette.accent;
+      // SVG arc — sweep above the baseline. A is elliptical with rx,ry,
+      // x-axis-rotation, large-arc-flag, sweep-flag, x, y.
+      var d = 'M ' + x1.toFixed(1) + ' ' + baselineY + ' A ' + rx.toFixed(1) + ' ' + rx.toFixed(1) + ' 0 0 1 ' + x2.toFixed(1) + ' ' + baselineY;
+      var label = (srcNode.label || l.source) + ' → ' + ((nodes[ti] && nodes[ti].label) || l.target);
+      var v = +l.value || 0;
+      var payload = JSON.stringify({ label: label, kv: v ? [{ k: 'value', v: fmtNum(v) }] : [] });
+      parts.push('<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="' + strokeOf(v) + '" stroke-opacity="0.62" class="okc-arc-link" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + (v ? ' · ' + fmtNum(v) : '')) + '</title></path>');
+    });
+    // Node markers + labels (rotated 35° so long labels do not collide).
+    nodes.forEach(function (n, i) {
+      var nx = xOf(i);
+      var color = palette[n.color] || palette.accent;
+      var label = n.label || n.id;
+      var payload = JSON.stringify({ label: label, kv: [] });
+      parts.push('<circle cx="' + nx.toFixed(1) + '" cy="' + baselineY + '" r="5" fill="' + color + '" stroke="var(--bg)" stroke-width="1.5" class="okc-arc-node" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label) + '</title></circle>');
+      parts.push('<text x="' + nx.toFixed(1) + '" y="' + (baselineY + 16) + '" text-anchor="end" transform="rotate(-35 ' + nx.toFixed(1) + ' ' + (baselineY + 16) + ')" class="okc-arc-label">' + escapeXml(label) + '</text>');
+    });
+    // Baseline.
+    parts.push('<line x1="' + pad.left + '" y1="' + baselineY + '" x2="' + (W - pad.right) + '" y2="' + baselineY + '" class="okc-axis"/>');
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Range bar ----------------
+     One row per item; each row carries a [low, high] interval drawn
+     as a horizontal band, with an optional `mid` point marked as a
+     vertical tick inside the band. Use for confidence intervals,
+     election polls (margin of error), price ranges, salary bands —
+     anything where the *interval* is the data, not a single value.
+
+     Payload:
+       extras.range-bar = {
+         rows: [{ label, low, high, mid?, color? }, ...]
+       }
+     Domain auto-derived from min(low) and max(high). The renderer
+     reuses the bar-family x-axis ticks and styling so it sits visually
+     next to other bar charts on the same page. */
+  _renderRangeBar() {
+    var x = (this._extras && this._extras['range-bar']) || {};
+    var rows = x.ranges || [];
+    if (!rows.length) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var W = 640, H = Math.max(180, 60 + rows.length * 32);
+    var pad = { top: this._title ? 40 : 16, bottom: 32, left: 130, right: 24 };
+    var plotW = W - pad.left - pad.right;
+    var rowH = (H - pad.top - pad.bottom) / rows.length;
+    var bandH = Math.min(rowH * 0.55, 18);
+    // Derive domain.
+    var lo = Infinity, hi = -Infinity;
+    rows.forEach(function (r) {
+      var rl = +r.low, rh = +r.high;
+      if (!isNaN(rl)) { if (rl < lo) lo = rl; if (rl > hi) hi = rl; }
+      if (!isNaN(rh)) { if (rh < lo) lo = rh; if (rh > hi) hi = rh; }
+    });
+    if (!isFinite(lo) || !isFinite(hi) || lo === hi) {
+      lo = isFinite(lo) ? lo - 1 : 0;
+      hi = isFinite(hi) ? hi + 1 : 1;
+    }
+    function sx(v) { return pad.left + ((v - lo) / (hi - lo)) * plotW; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Range bar') + '" class="okc-svg okc-range-bar">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // X-axis baseline at top of plot area.
+    parts.push('<line x1="' + pad.left + '" y1="' + (H - pad.bottom) + '" x2="' + (W - pad.right) + '" y2="' + (H - pad.bottom) + '" class="okc-axis"/>');
+    // Ticks at lo, mid, hi.
+    [lo, (lo + hi) / 2, hi].forEach(function (v) {
+      var tx = sx(v);
+      parts.push('<line x1="' + tx + '" y1="' + (H - pad.bottom) + '" x2="' + tx + '" y2="' + (H - pad.bottom + 4) + '" class="okc-axis"/>');
+      parts.push('<text x="' + tx + '" y="' + (H - pad.bottom + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    });
+    rows.forEach(function (r, i) {
+      var rowY = pad.top + i * rowH + rowH / 2;
+      var color = palette[r.color] || palette.accent;
+      var rl = +r.low, rh = +r.high;
+      if (isNaN(rl) || isNaN(rh)) return;
+      var xLo = sx(rl), xHi = sx(rh);
+      var label = r.label || ('row ' + (i + 1));
+      var midDisplay = r.mid != null ? fmtNum(+r.mid) : '';
+      var payload = JSON.stringify({
+        label: label,
+        kv: [
+          { k: 'low', v: fmtNum(rl) },
+          { k: 'high', v: fmtNum(rh) }
+        ].concat(midDisplay ? [{ k: 'mid', v: midDisplay }] : [])
+      });
+      // Row label on the left.
+      parts.push('<text x="' + (pad.left - 8) + '" y="' + (rowY + 4) + '" text-anchor="end" class="okc-range-row-label">' + escapeXml(label) + '</text>');
+      // Range band — filled rect.
+      parts.push('<rect x="' + xLo.toFixed(1) + '" y="' + (rowY - bandH / 2) + '" width="' + (xHi - xLo).toFixed(1) + '" height="' + bandH + '" rx="3" fill="' + color + '" fill-opacity="0.45" stroke="' + color + '" stroke-opacity="0.85" class="okc-range-band" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · [' + fmtNum(rl) + ', ' + fmtNum(rh) + ']' + (midDisplay ? ' · mid ' + midDisplay : '')) + '</title></rect>');
+      // Optional midpoint tick.
+      if (r.mid != null && !isNaN(+r.mid)) {
+        var mx = sx(+r.mid);
+        parts.push('<line x1="' + mx.toFixed(1) + '" y1="' + (rowY - bandH / 2 - 3) + '" x2="' + mx.toFixed(1) + '" y2="' + (rowY + bandH / 2 + 3) + '" stroke="' + color + '" stroke-width="2" class="okc-range-mid"/>');
+      }
+      // Endpoint readout on the right.
+      parts.push('<text x="' + (W - pad.right) + '" y="' + (rowY + 4) + '" text-anchor="end" class="okc-range-readout">' + escapeXml(fmtNum(rl) + '–' + fmtNum(rh)) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Pareto chart ----------------
+     Bars sorted descending by value + a cumulative-percentage line
+     on a secondary axis. Classic 80/20 reading shape — "the top N
+     causes account for X% of issues" in operations, defect-cause
+     audits, support-ticket triage.
+
+     Payload:
+       extras.pareto = { rows: [{ label, value, color? }, ...] }
+     Sort is enforced by the renderer (caller can pass any order;
+     descending by value is computed here). The cumulative line
+     rides over the bars touching each bar's top-right corner. */
+  _renderPareto() {
+    var x = (this._extras && this._extras.pareto) || {};
+    var rows = (x.rows || []).filter(function (r) { return !isNaN(+r.value); });
+    if (!rows.length) return;
+    rows = rows.slice().sort(function (a, b) { return (+b.value || 0) - (+a.value || 0); });
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var total = rows.reduce(function (s, r) { return s + Math.max(0, +r.value || 0); }, 0);
+    if (total <= 0) return;
+    // Cumulative % per row.
+    var cum = 0;
+    var cumPct = rows.map(function (r) { cum += Math.max(0, +r.value || 0); return cum / total; });
+    var W = 640, H = 320;
+    var pad = { top: this._title ? 40 : 16, bottom: 56, left: 56, right: 56 };
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    var maxVal = +rows[0].value || 1;
+    var barGap = 4;
+    var barW = (plotW - barGap * (rows.length + 1)) / rows.length;
+    function barTop(v) { return pad.top + plotH - (v / maxVal) * plotH; }
+    function cumY(p) { return pad.top + plotH - p * plotH; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Pareto') + '" class="okc-svg okc-pareto">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Axes.
+    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    parts.push('<line x1="' + (W - pad.right) + '" y1="' + pad.top + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    // Y ticks (left = absolute value, right = cumulative %).
+    for (var t = 0; t <= 4; t++) {
+      var v = (maxVal * t) / 4;
+      var ty = barTop(v);
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<line x1="' + pad.left + '" y1="' + ty + '" x2="' + (pad.left + 4) + '" y2="' + ty + '" class="okc-axis"/>');
+      var pctY = cumY(t / 4);
+      parts.push('<text x="' + (W - pad.right + 6) + '" y="' + (pctY + 4) + '" class="okc-tick">' + escapeXml(Math.round((t / 4) * 100) + '%') + '</text>');
+      parts.push('<line x1="' + (W - pad.right - 4) + '" y1="' + pctY + '" x2="' + (W - pad.right) + '" y2="' + pctY + '" class="okc-axis"/>');
+    }
+    // 80% guide.
+    var y80 = cumY(0.8);
+    parts.push('<line x1="' + pad.left + '" y1="' + y80.toFixed(1) + '" x2="' + (W - pad.right) + '" y2="' + y80.toFixed(1) + '" stroke="var(--text-soft)" stroke-width="1" stroke-dasharray="3 4" class="okc-pareto-80"/>');
+    parts.push('<text x="' + (W - pad.right - 6) + '" y="' + (y80 - 4) + '" text-anchor="end" class="okc-pareto-80-label" fill="var(--text-soft)">80%</text>');
+    // Bars + cumulative line points.
+    var lineCoords = [];
+    rows.forEach(function (r, i) {
+      var v = Math.max(0, +r.value || 0);
+      var color = palette[r.color] || palette.accent;
+      var bx = pad.left + barGap + i * (barW + barGap);
+      var by = barTop(v);
+      var bh = pad.top + plotH - by;
+      var payload = JSON.stringify({
+        label: r.label || ('row ' + (i + 1)),
+        kv: [
+          { k: 'value', v: fmtNum(v) },
+          { k: 'cumulative', v: Math.round(cumPct[i] * 100) + '%' }
+        ]
+      });
+      parts.push('<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="2" fill="' + color + '" fill-opacity="0.78" class="okc-pareto-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtNum(v) + ' · cum ' + Math.round(cumPct[i] * 100) + '%') + '</title></rect>');
+      // Category label below the bar (rotated -30° if many rows).
+      var labelX = bx + barW / 2;
+      var labelY = pad.top + plotH + 14;
+      var labelText = r.label || ('row ' + (i + 1));
+      var labelRotate = rows.length > 6 ? ' transform="rotate(-30 ' + labelX.toFixed(1) + ' ' + labelY + ')"' : '';
+      var labelAnchor = rows.length > 6 ? 'end' : 'middle';
+      parts.push('<text x="' + labelX.toFixed(1) + '" y="' + labelY + '" text-anchor="' + labelAnchor + '"' + labelRotate + ' class="okc-pareto-cat-label">' + escapeXml(labelText) + '</text>');
+      lineCoords.push({ x: bx + barW, y: cumY(cumPct[i]) });
+    });
+    // Cumulative line — starts at the baseline (0%) on the left edge.
+    var pathParts = ['M ' + (pad.left).toFixed(1) + ' ' + (pad.top + plotH).toFixed(1)];
+    lineCoords.forEach(function (p) {
+      pathParts.push('L ' + p.x.toFixed(1) + ' ' + p.y.toFixed(1));
+    });
+    parts.push('<path d="' + pathParts.join(' ') + '" fill="none" stroke="var(--danger)" stroke-width="2" class="okc-pareto-line"/>');
+    lineCoords.forEach(function (p, i) {
+      var payload = JSON.stringify({
+        label: rows[i].label || '',
+        kv: [{ k: 'cumulative', v: Math.round(cumPct[i] * 100) + '%' }]
+      });
+      parts.push('<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="3" fill="var(--bg)" stroke="var(--danger)" stroke-width="2" class="okc-pareto-line-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>cum ' + Math.round(cumPct[i] * 100) + '%</title></circle>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));

@@ -445,7 +445,7 @@
       "properties": {
         "kind": { "const": "chart" },
         "type": {
-          "enum": ["plot", "arc", "scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "pie", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo", "tile-map", "dot-plot", "density", "candlestick", "sunburst", "marimekko", "stream", "violin", "beeswarm", "waterfall", "lollipop", "dumbbell", "polar-area", "gantt", "bump", "population-pyramid", "connected-scatter", "horizon", "hexbin"],
+          "enum": ["plot", "arc", "scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "pie", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo", "tile-map", "dot-plot", "density", "candlestick", "sunburst", "marimekko", "stream", "violin", "beeswarm", "waterfall", "lollipop", "dumbbell", "polar-area", "gantt", "bump", "population-pyramid", "connected-scatter", "horizon", "hexbin", "arc-diagram", "range-bar", "pareto"],
           "description": "Render mode. Canonical types: plot (Cartesian, marks-composed) and arc (radial slice, mode-switched). Sugar aliases — scatter/line/area desugar to plot+marks; pie/donut desugar to arc+mode; stacked-bar/grouped-bar desugar to bar+mode. Aliases keep working AND let the author override any preset (e.g. type=pie + arc.end=270 for a 3/4 pie). Other types (bubble / quadrant / bar / heatmap / sparkline / waffle / gauge / radar / box-plot / bullet / slope / histogram / calendar-heatmap / treemap / ridgeline / funnel / sankey / network / scatter-matrix / parallel-coordinates / chord / geo) keep their existing payload shapes."
         },
         "marks": {
@@ -1070,6 +1070,23 @@
           "maximum": 60,
           "default": 14,
           "description": "hexbin — viewBox px per hex cell (controls cell size and therefore density resolution)."
+        },
+        "ranges": {
+          "type": "array",
+          "description": "range-bar — one row per item, each carrying a [low, high] interval. Optional `mid` renders as a vertical tick inside the band.",
+          "items": {
+            "type": "object",
+            "required": ["label", "low", "high"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "low":   { "type": "number" },
+              "high":  { "type": "number" },
+              "mid":   { "type": "number" },
+              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+            }
+          },
+          "minItems": 1
         }
       },
       "allOf": [
@@ -1176,6 +1193,18 @@
         {
           "if": { "properties": { "type": { "const": "hexbin" } }, "required": ["type"] },
           "then": { "required": ["points"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "arc-diagram" } }, "required": ["type"] },
+          "then": { "required": ["nodes", "links"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "range-bar" } }, "required": ["type"] },
+          "then": { "required": ["ranges"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "pareto" } }, "required": ["type"] },
+          "then": { "required": ["rows"] }
         }
       ]
     },

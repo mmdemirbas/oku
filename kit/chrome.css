@@ -5464,6 +5464,82 @@ oku-chart .okc-geo .okc-geo-legend-tick {
   font-variant-numeric: tabular-nums;
 }
 
+/* ============ Arc diagram — nodes on baseline, arcs above ============ */
+oku-chart .okc-arc-diagram .okc-arc-link {
+  cursor: pointer;
+  transition: stroke-opacity 0.15s ease, stroke-width 0.15s ease;
+}
+oku-chart .okc-arc-diagram .okc-arc-link:hover,
+oku-chart .okc-arc-diagram .okc-arc-link:focus-visible {
+  stroke-opacity: 0.95;
+  outline: none;
+}
+oku-chart .okc-arc-diagram .okc-arc-node {
+  cursor: pointer;
+  transition: r 0.15s ease, stroke-width 0.15s ease;
+}
+oku-chart .okc-arc-diagram .okc-arc-node:hover,
+oku-chart .okc-arc-diagram .okc-arc-node:focus-visible {
+  stroke-width: 2.5;
+  outline: none;
+}
+oku-chart .okc-arc-diagram .okc-arc-label {
+  fill: var(--text);
+  font: 500 10.5px 'Inter', sans-serif;
+  stroke: var(--bg);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+}
+
+/* ============ Range bar — [low, high] interval per row ============ */
+oku-chart .okc-range-bar .okc-range-band {
+  cursor: pointer;
+  transition: fill-opacity 0.15s ease;
+}
+oku-chart .okc-range-bar .okc-range-band:hover,
+oku-chart .okc-range-bar .okc-range-band:focus-visible {
+  fill-opacity: 0.70;
+  outline: none;
+}
+oku-chart .okc-range-bar .okc-range-row-label {
+  fill: var(--text);
+  font: 500 11.5px 'Inter', sans-serif;
+}
+oku-chart .okc-range-bar .okc-range-readout {
+  fill: var(--text-soft);
+  font: 500 10.5px 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============ Pareto — bars + cumulative-% line ============ */
+oku-chart .okc-pareto .okc-pareto-bar {
+  cursor: pointer;
+  transition: fill-opacity 0.15s ease;
+}
+oku-chart .okc-pareto .okc-pareto-bar:hover,
+oku-chart .okc-pareto .okc-pareto-bar:focus-visible {
+  fill-opacity: 0.95;
+  outline: none;
+}
+oku-chart .okc-pareto .okc-pareto-line {
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+oku-chart .okc-pareto .okc-pareto-line-dot {
+  cursor: pointer;
+}
+oku-chart .okc-pareto .okc-pareto-cat-label {
+  fill: var(--text-soft);
+  font: 500 10.5px 'Inter', sans-serif;
+}
+oku-chart .okc-pareto .okc-pareto-80-label {
+  font: 500 10px 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
 
 /* ============ Chart tooltip pin-hint + pinned state ============ */
 .okc-tooltip .okc-tt-pin-hint {
