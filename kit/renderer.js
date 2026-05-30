@@ -538,7 +538,13 @@
         dumbbell:     { rows: block.rows, from_label: block.from_label, to_label: block.to_label, from_color: block.from_color, to_color: block.to_color },
         'polar-area': { sectors: block.sectors },
         gantt:        { tasks: block.tasks, tick_format: block.tick_format },
-        bump:         { categories: block.categories, series: block.series }
+        bump:         { categories: block.categories, series: block.series },
+        // Diverging horizontal bars centered on a category axis;
+        // left/right each carry { label, color, values }.
+        'population-pyramid': { categories: block.categories, left: block.left, right: block.right },
+        // Connected scatter uses standard `series` payload; no extras
+        // needed. The renderer reads this._series directly.
+        'tile-map':   { regions: block.regions }
       };
       if (extraMap[type]) {
         const x = document.createElement('script');

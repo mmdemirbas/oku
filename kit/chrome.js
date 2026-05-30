@@ -4209,7 +4209,9 @@ class OkuChart extends HTMLElement {
       dumbbell:     '_renderDumbbell',
       'polar-area': '_renderPolarArea',
       gantt:        '_renderGantt',
-      bump:         '_renderBump'
+      bump:         '_renderBump',
+      'population-pyramid': '_renderPopulationPyramid',
+      'connected-scatter':  '_renderConnectedScatter'
     };
     if (nonCartesian[this._type]) {
       this[nonCartesian[this._type]]();
@@ -7939,6 +7941,159 @@ class OkuChart extends HTMLElement {
         }
       }
     );
+  }
+
+  /* ---------------- Population pyramid ----------------
+     Diverging horizontal bar chart with a shared category axis
+     down the middle. Two sides (typically male vs female, but
+     can be any A/B comparison) extend outward from a zero line.
+     Useful for any L/R demographic comparison.
+
+     Payload:
+       extras['population-pyramid'] = {
+         categories: ['0-9', '10-19', '20-29', ...],
+         left:  { label: 'Male',   values: [...], color: 'accent' },
+         right: { label: 'Female', values: [...], color: 'success' }
+       }
+     Same values-length-aligned-to-categories shape as stacked-bar
+     so authors who already use that pattern feel at home. */
+  _renderPopulationPyramid() {
+    var x = (this._extras && this._extras['population-pyramid']) || {};
+    var categories = x.categories || [];
+    var left = x.left || {};
+    var right = x.right || {};
+    var leftVals = (left.values || []).map(Number);
+    var rightVals = (right.values || []).map(Number);
+    if (!categories.length || !leftVals.length || !rightVals.length) return;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var W = 640, H = Math.max(280, 60 + categories.length * 26);
+    var pad = { top: this._title ? 50 : 24, bottom: 36, left: 24, right: 24 };
+    var centerLabelW = 76;
+    var sideW = ((W - pad.left - pad.right) - centerLabelW) / 2;
+    var maxAbs = Math.max.apply(null, leftVals.concat(rightVals).map(Math.abs));
+    if (maxAbs <= 0) maxAbs = 1;
+    var rowH = (H - pad.top - pad.bottom) / categories.length;
+    var barH = Math.min(rowH * 0.7, 22);
+    var leftColor = palette[left.color] || palette.accent;
+    var rightColor = palette[right.color] || palette.success;
+    var centerX = pad.left + sideW + centerLabelW / 2;
+    var leftStart = pad.left + sideW; // bars grow LEFTWARD from here
+    var rightStart = centerX + centerLabelW / 2; // bars grow RIGHTWARD from here
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Population pyramid') + '" class="okc-svg okc-pop-pyramid">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Legend chips at the top: left label on the left side, right label on the right.
+    if (left.label) parts.push('<g><rect x="' + (pad.left) + '" y="' + (this._title ? 32 : 6) + '" width="11" height="11" rx="2" fill="' + leftColor + '"/><text x="' + (pad.left + 16) + '" y="' + (this._title ? 41 : 15) + '" class="okc-legend">' + escapeXml(left.label) + '</text></g>');
+    if (right.label) parts.push('<g><rect x="' + (W - pad.right - 11 - 6 * (right.label.length || 1) - 16) + '" y="' + (this._title ? 32 : 6) + '" width="11" height="11" rx="2" fill="' + rightColor + '"/><text x="' + (W - pad.right) + '" y="' + (this._title ? 41 : 15) + '" text-anchor="end" class="okc-legend">' + escapeXml(right.label) + '</text></g>');
+    // Center axis line.
+    parts.push('<line x1="' + centerX + '" y1="' + pad.top + '" x2="' + centerX + '" y2="' + (H - pad.bottom) + '" class="okc-axis"/>');
+    categories.forEach(function (cat, i) {
+      var rowY = pad.top + i * rowH + rowH / 2;
+      var lv = Math.abs(leftVals[i] || 0);
+      var rv = Math.abs(rightVals[i] || 0);
+      var lw = (lv / maxAbs) * sideW;
+      var rw = (rv / maxAbs) * sideW;
+      var leftPayload = JSON.stringify({ label: (left.label || 'Left') + ' · ' + cat, kv: [{ k: 'value', v: fmtNum(lv) }] });
+      var rightPayload = JSON.stringify({ label: (right.label || 'Right') + ' · ' + cat, kv: [{ k: 'value', v: fmtNum(rv) }] });
+      // Left bar — extends leftward from leftStart.
+      parts.push('<rect x="' + (leftStart - lw) + '" y="' + (rowY - barH / 2) + '" width="' + lw + '" height="' + barH + '" rx="2" fill="' + leftColor + '" fill-opacity="0.78" class="okc-pop-bar" tabindex="0" data-hover-payload="' + escapeXml(leftPayload) + '"><title>' + escapeXml((left.label || 'left') + ' · ' + cat + ' · ' + fmtNum(lv)) + '</title></rect>');
+      // Right bar — extends rightward from rightStart.
+      parts.push('<rect x="' + rightStart + '" y="' + (rowY - barH / 2) + '" width="' + rw + '" height="' + barH + '" rx="2" fill="' + rightColor + '" fill-opacity="0.78" class="okc-pop-bar" tabindex="0" data-hover-payload="' + escapeXml(rightPayload) + '"><title>' + escapeXml((right.label || 'right') + ' · ' + cat + ' · ' + fmtNum(rv)) + '</title></rect>');
+      // Category label in the centre.
+      parts.push('<text x="' + centerX + '" y="' + (rowY + 4) + '" text-anchor="middle" class="okc-pop-cat">' + escapeXml(cat) + '</text>');
+    });
+    // Bottom axis ticks (max & 0 on each side).
+    [0, maxAbs].forEach(function (v) {
+      var lx = leftStart - (v / maxAbs) * sideW;
+      var rx = rightStart + (v / maxAbs) * sideW;
+      parts.push('<text x="' + lx + '" y="' + (H - pad.bottom + 14) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + rx + '" y="' + (H - pad.bottom + 14) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+  }
+
+  /* ---------------- Connected scatter ----------------
+     Scatter where consecutive points (per series) are joined by
+     a line in sequence order. Shows a trajectory through 2D space
+     over time — classic for life expectancy × income across years,
+     or any "where did we move" comparison.
+
+     Same series-of-points payload as scatter/line; the renderer
+     uses series order as the connection sequence. */
+  _renderConnectedScatter() {
+    var series = this._series || [];
+    if (!series.length) return;
+    var allPts = [];
+    series.forEach(function (s) {
+      (s.data || []).forEach(function (p) {
+        if (!isNaN(+p.x) && !isNaN(+p.y)) allPts.push({x: +p.x, y: +p.y});
+      });
+    });
+    if (allPts.length < 2) return;
+    var xMin = Math.min.apply(null, allPts.map(function (p) { return p.x; }));
+    var xMax = Math.max.apply(null, allPts.map(function (p) { return p.x; }));
+    var yMin = Math.min.apply(null, allPts.map(function (p) { return p.y; }));
+    var yMax = Math.max.apply(null, allPts.map(function (p) { return p.y; }));
+    if (xMin === xMax) { xMin -= 1; xMax += 1; }
+    if (yMin === yMax) { yMin -= 1; yMax += 1; }
+    var W = 640, H = 360;
+    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 48, right: 16 };
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    function sx(v) { return pad.left + ((v - xMin) / (xMax - xMin)) * plotW; }
+    function sy(v) { return pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Connected scatter') + '" class="okc-svg okc-conn-scatter">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Axes.
+    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    // Y ticks (5).
+    for (var t = 0; t <= 4; t++) {
+      var vy = yMin + (t / 4) * (yMax - yMin);
+      var ty = sy(vy);
+      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + ty + '" x2="' + pad.left + '" y2="' + ty + '" class="okc-axis"/>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(vy)) + '</text>');
+    }
+    // X ticks (5).
+    for (var u = 0; u <= 4; u++) {
+      var vx = xMin + (u / 4) * (xMax - xMin);
+      var tx = sx(vx);
+      parts.push('<line x1="' + tx + '" y1="' + (pad.top + plotH) + '" x2="' + tx + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
+      parts.push('<text x="' + tx + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(vx)) + '</text>');
+    }
+    series.forEach(function (s, si) {
+      var color = __okuPickColor(s.color, si);
+      var pts = (s.data || []).filter(function (p) { return !isNaN(+p.x) && !isNaN(+p.y); });
+      if (pts.length < 2) return;
+      // Connecting polyline — series order IS the sequence.
+      var dPath = pts.map(function (p, i) {
+        return (i === 0 ? 'M ' : 'L ') + sx(+p.x).toFixed(1) + ' ' + sy(+p.y).toFixed(1);
+      }).join(' ');
+      parts.push('<path d="' + dPath + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round" class="okc-conn-line"/>');
+      // Dots at each point. First point gets a hollow ring, last gets an arrowhead-ish square.
+      pts.forEach(function (p, i) {
+        var px = sx(+p.x), py = sy(+p.y);
+        var isFirst = i === 0;
+        var isLast = i === pts.length - 1;
+        var payload = JSON.stringify({
+          label: (s.label || ('series ' + (si + 1))) + (p.label ? ' · ' + p.label : ''),
+          kv: [{ k: 'x', v: fmtNum(+p.x) }, { k: 'y', v: fmtNum(+p.y) }, { k: 'step', v: String(i + 1) + '/' + pts.length }]
+        });
+        if (isFirst) {
+          parts.push('<circle cx="' + px + '" cy="' + py + '" r="5" fill="var(--bg)" stroke="' + color + '" stroke-width="2" class="okc-conn-dot okc-conn-start" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>start: (' + fmtNum(+p.x) + ', ' + fmtNum(+p.y) + ')</title></circle>');
+        } else if (isLast) {
+          parts.push('<rect x="' + (px - 4) + '" y="' + (py - 4) + '" width="8" height="8" fill="' + color + '" class="okc-conn-dot okc-conn-end" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>end: (' + fmtNum(+p.x) + ', ' + fmtNum(+p.y) + ')</title></rect>');
+        } else {
+          parts.push('<circle cx="' + px + '" cy="' + py + '" r="4" fill="' + color + '" class="okc-conn-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>(' + fmtNum(+p.x) + ', ' + fmtNum(+p.y) + ')</title></circle>');
+        }
+        if (p.label) {
+          parts.push('<text x="' + (px + 8) + '" y="' + (py - 6) + '" class="okc-conn-label">' + escapeXml(String(p.label)) + '</text>');
+        }
+      });
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
   }
 
   _attachToolbar() {
