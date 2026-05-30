@@ -550,8 +550,16 @@ var __okuChartConfig = (function () {
         '</div>' +
       '</div>');
       rows.push('<div class="okc-cfg-row">' +
+        '<span class="okc-cfg-label">Arc start (deg)</span>' +
+        '<input type="number" class="okc-cfg-num" data-cfg="arc-start" min="-360" max="720" step="15" value="' + (host._arcStart !== null && host._arcStart !== undefined ? host._arcStart : 0) + '">' +
+      '</div>');
+      rows.push('<div class="okc-cfg-row">' +
         '<span class="okc-cfg-label">Arc end (deg)</span>' +
         '<input type="number" class="okc-cfg-num" data-cfg="arc-end" min="-360" max="720" step="15" value="' + (host._arcEnd !== null && host._arcEnd !== undefined ? host._arcEnd : 360) + '">' +
+      '</div>');
+      rows.push('<div class="okc-cfg-row">' +
+        '<span class="okc-cfg-label">Inner radius</span>' +
+        '<input type="number" class="okc-cfg-num" data-cfg="inner-radius" min="0" max="0.95" step="0.05" value="' + (host._innerRadius !== null && host._innerRadius !== undefined ? host._innerRadius : (host._type === 'pie' ? 0 : 0.55)) + '">' +
       '</div>');
     }
     popover.innerHTML = rows.join('');
@@ -581,6 +589,14 @@ var __okuChartConfig = (function () {
     var arcEnd = popover.querySelector('input[data-cfg="arc-end"]');
     if (arcEnd) arcEnd.addEventListener('input', function () {
       applyChange(host, { arcEnd: arcEnd.value });
+    });
+    var arcStart = popover.querySelector('input[data-cfg="arc-start"]');
+    if (arcStart) arcStart.addEventListener('input', function () {
+      applyChange(host, { arcStart: arcStart.value });
+    });
+    var innerRadius = popover.querySelector('input[data-cfg="inner-radius"]');
+    if (innerRadius) innerRadius.addEventListener('input', function () {
+      applyChange(host, { innerRadius: innerRadius.value });
     });
   }
 
@@ -627,6 +643,20 @@ var __okuChartConfig = (function () {
     } else {
       var oldArcEnd = oldHost.getAttribute('arc-end');
       if (oldArcEnd) newHost.setAttribute('arc-end', oldArcEnd);
+    }
+    // Arc-start mirrors arc-end's preserve-or-override pattern.
+    if (delta.arcStart !== undefined) {
+      newHost.setAttribute('arc-start', String(delta.arcStart));
+    } else {
+      var oldArcStart = oldHost.getAttribute('arc-start');
+      if (oldArcStart) newHost.setAttribute('arc-start', oldArcStart);
+    }
+    // Inner-radius likewise.
+    if (delta.innerRadius !== undefined) {
+      newHost.setAttribute('inner-radius', String(delta.innerRadius));
+    } else {
+      var oldInner = oldHost.getAttribute('inner-radius');
+      if (oldInner) newHost.setAttribute('inner-radius', oldInner);
     }
     // Carry over data + extras scripts.
     Array.from(oldHost.querySelectorAll('script[type="application/json"]')).forEach(function (s) {
