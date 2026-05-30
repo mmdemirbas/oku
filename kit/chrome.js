@@ -6910,6 +6910,9 @@ class OkuChart extends HTMLElement {
     var x = (this._extras && this._extras.candlestick) || {};
     var entries = (x.entries || []).slice();
     if (!entries.length) return;
+    if (this.getAttribute('orientation') === 'horizontal' || x.orientation === 'horizontal') {
+      return this._renderCandlestickHorizontal(entries);
+    }
     var allValues = [];
     entries.forEach(function (e) {
       allValues.push(+e.low, +e.high);
@@ -6959,6 +6962,64 @@ class OkuChart extends HTMLElement {
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
     this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
+  }
+
+  /* Horizontal candlestick — time runs down the Y axis, OHLC
+     candles extend left-right. Less common than vertical but
+     useful when stacking many tickers/periods in a column or
+     comparing alongside other time-series displays that read
+     top-to-bottom. */
+  _renderCandlestickHorizontal(entries) {
+    var allValues = [];
+    entries.forEach(function (e) { allValues.push(+e.low, +e.high); });
+    var vMin = Math.min.apply(null, allValues);
+    var vMax = Math.max.apply(null, allValues);
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 90, right: 24 };
+    var W = 480, H = Math.max(320, 80 + entries.length * 22);
+    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    var step = plotH / entries.length;
+    var bh = Math.min(step * 0.7, 18);
+    function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Candlestick') + '" class="okc-svg okc-candlestick">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // X-axis ticks (5) — value scale runs horizontally now.
+    var ticks = 5;
+    for (var t = 0; t <= ticks; t++) {
+      var v = vMin + (t / ticks) * (vMax - vMin);
+      var tx = xOf(v);
+      parts.push('<line x1="' + tx.toFixed(1) + '" y1="' + pad.top + '" x2="' + tx.toFixed(1) + '" y2="' + (pad.top + plotH) + '" class="okc-axis" stroke-dasharray="2 3"/>');
+      parts.push('<text x="' + tx.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    }
+    entries.forEach(function (e, i) {
+      var cy = pad.top + step * (i + 0.5);
+      var up = (+e.close) >= (+e.open);
+      var color = up ? 'var(--success)' : 'var(--danger)';
+      var xOpen = xOf(+e.open), xClose = xOf(+e.close);
+      var xHigh = xOf(+e.high), xLow = xOf(+e.low);
+      var bodyLeft = Math.min(xOpen, xClose);
+      var bodyW = Math.max(1, Math.abs(xClose - xOpen));
+      var payload = JSON.stringify({
+        label: e.date || '',
+        kv: [
+          { k: 'O', v: fmtNum(+e.open) },
+          { k: 'H', v: fmtNum(+e.high) },
+          { k: 'L', v: fmtNum(+e.low) },
+          { k: 'C', v: fmtNum(+e.close) }
+        ]
+      });
+      // Wick (horizontal).
+      parts.push('<line x1="' + xLow.toFixed(1) + '" y1="' + cy.toFixed(1) + '" x2="' + xHigh.toFixed(1) + '" y2="' + cy.toFixed(1) + '" stroke="' + color + '" stroke-width="1.2" class="okc-candle-wick"/>');
+      // Body (rectangle spanning open→close on the x-axis).
+      parts.push('<rect x="' + bodyLeft.toFixed(1) + '" y="' + (cy - bh / 2).toFixed(1) + '" width="' + bodyW.toFixed(1) + '" height="' + bh.toFixed(1) + '" fill="' + color + '" fill-opacity="' + (up ? '0.85' : '0.95') + '" stroke="' + color + '" class="okc-candle-body" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((e.date || '') + ' O ' + e.open + ' H ' + e.high + ' L ' + e.low + ' C ' + e.close) + '</title></rect>');
+      // Row label (date) on the left margin.
+      if (e.date) {
+        parts.push('<text x="' + (pad.left - 8) + '" y="' + (cy + 4).toFixed(1) + '" text-anchor="end" class="okc-tick">' + escapeXml(String(e.date)) + '</text>');
+      }
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
   }
 
   /* ---------------- Sunburst ----------------
