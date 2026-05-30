@@ -537,6 +537,31 @@ var __okuChartConfig = (function () {
         '</div>' +
       '</div>');
     }
+    // Bar — mode (single / stacked / grouped) + orientation switch.
+    // The renderer already wires the same data attributes for all
+    // three modes; the popover just surfaces them.
+    if (host._type === 'bar' || host._type === 'stacked-bar' || host._type === 'grouped-bar') {
+      var barMode = host._type === 'stacked-bar' ? 'stacked' : host._type === 'grouped-bar' ? 'grouped' : 'single';
+      rows.push('<div class="okc-cfg-row">' +
+        '<span class="okc-cfg-label">Mode</span>' +
+        '<div class="okc-cfg-chips" data-cfg="bar-mode">' +
+          [['single', 'bar'], ['stacked', 'stacked-bar'], ['grouped', 'grouped-bar']].map(function (pair) {
+            var on = pair[0] === barMode;
+            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-bar-mode="' + pair[1] + '">' + pair[0] + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>');
+      var barOrient = host.getAttribute('orientation') || 'horizontal';
+      rows.push('<div class="okc-cfg-row">' +
+        '<span class="okc-cfg-label">Orientation</span>' +
+        '<div class="okc-cfg-chips" data-cfg="bar-orient">' +
+          ['horizontal', 'vertical'].map(function (o) {
+            var on = o === barOrient;
+            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-orient="' + o + '">' + o + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>');
+    }
     // Arc — mode + arc start/end.
     if (host._type === 'donut' || host._type === 'pie') {
       var mode = host._type === 'pie' ? 'pie' : 'donut';
@@ -584,6 +609,18 @@ var __okuChartConfig = (function () {
     popover.querySelectorAll('.okc-cfg-chip[data-mode]').forEach(function (chip) {
       chip.addEventListener('click', function () {
         applyChange(host, { type: chip.getAttribute('data-mode') });
+      });
+    });
+    // Bar mode chip — type swap among bar / stacked-bar / grouped-bar.
+    popover.querySelectorAll('.okc-cfg-chip[data-bar-mode]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        applyChange(host, { type: chip.getAttribute('data-bar-mode') });
+      });
+    });
+    // Bar orientation chip — horizontal ↔ vertical (column).
+    popover.querySelectorAll('.okc-cfg-chip[data-orient]').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        applyChange(host, { orientation: chip.getAttribute('data-orient') });
       });
     });
     var arcEnd = popover.querySelector('input[data-cfg="arc-end"]');
@@ -657,6 +694,14 @@ var __okuChartConfig = (function () {
     } else {
       var oldInner = oldHost.getAttribute('inner-radius');
       if (oldInner) newHost.setAttribute('inner-radius', oldInner);
+    }
+    // Orientation — bar mode + distribution-shape charts both
+    // read this attribute. Preserve unless replaced.
+    if (delta.orientation !== undefined) {
+      newHost.setAttribute('orientation', String(delta.orientation));
+    } else {
+      var oldOrient = oldHost.getAttribute('orientation');
+      if (oldOrient) newHost.setAttribute('orientation', oldOrient);
     }
     // Carry over data + extras scripts.
     Array.from(oldHost.querySelectorAll('script[type="application/json"]')).forEach(function (s) {
