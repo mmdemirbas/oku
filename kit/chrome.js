@@ -9006,6 +9006,7 @@ class OkuDiagram extends HTMLElement {
             svg.style.removeProperty('height');
             svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
             self._wireNeighborHighlight(svg);
+            self._wireNodeTooltips(svg);
           }
           self._rendered = true;
           self._attachToolbar();
@@ -9162,6 +9163,76 @@ class OkuDiagram extends HTMLElement {
       if (!n.hasAttribute('tabindex')) n.setAttribute('tabindex', '0');
     });
   }
+  /* Author-defined tooltips for mermaid nodes. mermaid v10's `click`
+     syntax accepts an optional trailing string:
+       click NodeId href "/url" "tooltip text"
+       click NodeId callback "tooltip text"
+     Mermaid renders the tooltip text as the node's `title` attribute,
+     which the browser shows as a native tooltip — slow (~500ms),
+     small, and stylistically unmatched to the rest of the kit.
+
+     Replace the native popup with the kit's `.okc-tooltip` styling
+     so hover surfaces the author's text immediately, in the same
+     visual language as chart/table tooltips. mermaid's existing
+     `<a xlink:href="">` wrapping for navigation is left untouched —
+     click still navigates exactly as authored. */
+  _wireNodeTooltips(svg) {
+    var host = this;
+    // Reuse a single .okc-tooltip per diagram host.
+    var tip = host.querySelector(':scope > .okc-tooltip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.className = 'okc-tooltip';
+      tip.setAttribute('role', 'tooltip');
+      tip.setAttribute('aria-hidden', 'true');
+      host.appendChild(tip);
+    }
+    // mermaid puts the title on the inner <g class="node ...">, AND
+    // on the wrapping <a> for clickable nodes. Walk both so we catch
+    // every annotated node regardless of `click` shape.
+    var candidates = svg.querySelectorAll('[title]');
+    candidates.forEach(function (el) {
+      var raw = el.getAttribute('title');
+      if (!raw) return;
+      // Stash the original and clear the attribute so the browser
+      // doesn't paint its own slow native tooltip in addition to ours.
+      el.dataset.okdTooltip = raw;
+      el.removeAttribute('title');
+      el.addEventListener('mouseenter', function () {
+        var html = '<div class="okc-tt-label">' + escapeXml(raw) + '</div>';
+        // Walk parents looking for an <a> with xlink:href or href.
+        // The xlink:href attribute uses a namespace so attribute
+        // selectors with backslash escapes are unreliable across
+        // browsers — walk explicitly instead.
+        var p = el;
+        var url = null;
+        while (p && p !== svg) {
+          if (p.tagName && p.tagName.toLowerCase() === 'a') {
+            url = p.getAttribute('xlink:href') || p.getAttribute('href');
+            if (url) break;
+          }
+          p = p.parentElement;
+        }
+        if (url) {
+          html += '<div class="okc-tt-coords">→ ' + escapeXml(url) + '</div>';
+        }
+        tip.innerHTML = html;
+        tip.setAttribute('aria-hidden', 'false');
+        var aRect = el.getBoundingClientRect();
+        __okuPlaceTooltipAt(tip, aRect.left + aRect.width / 2, aRect.top - 8);
+        tip.__okuAnchor = el;
+        tip.__okuAnchorOffset = 8;
+        tip.classList.add('visible');
+      });
+      el.addEventListener('mouseleave', function () {
+        tip.classList.remove('visible');
+        tip.setAttribute('aria-hidden', 'true');
+        tip.__okuAnchor = null;
+      });
+      el.addEventListener('focus', function () { el.dispatchEvent(new Event('mouseenter')); });
+      el.addEventListener('blur', function () { el.dispatchEvent(new Event('mouseleave')); });
+    });
+  }
   rerender() {
     if (!this._src) return;
     var renderHost = this.querySelector('.okd-render');
@@ -9172,7 +9243,10 @@ class OkuDiagram extends HTMLElement {
       return mermaid.render(id, self._src).then(function (out) {
         renderHost.innerHTML = out.svg;
         var svg = renderHost.querySelector('svg');
-        if (svg) self._wireNeighborHighlight(svg);
+        if (svg) {
+          self._wireNeighborHighlight(svg);
+          self._wireNodeTooltips(svg);
+        }
         self._attachToolbar();
       });
     }).catch(function () { /* swallow */ });
