@@ -9084,6 +9084,11 @@ function __okuEnhanceBarCharts(root) {
     // host like SVG charts do; CSS gives the host position:relative
     // already so absolute positioning anchors cleanly.
     if (!host.querySelector(':scope > .okt-bar')) {
+      // .okt-host is the class the shared `.okt-host:hover .okt-bar`
+      // CSS rule keys off — without it the toolbar stays at opacity 0
+      // even on hover. The diagram and SVG-chart toolbars get it via
+      // __okuVisualTools.makeToolbar; we stamp it directly here.
+      host.classList.add('okt-host');
       var bar = document.createElement('div');
       bar.className = 'okt-bar';
       bar.innerHTML =
