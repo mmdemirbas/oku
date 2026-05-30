@@ -2768,3 +2768,62 @@ class TestHexbinChart:
         assert '"hexbin"' in schema_text, (
             "schema enum must include hexbin"
         )
+
+
+class TestSmallMultiples:
+    """`chart-grid` block kind renders the same chart type across N
+    data panels in a CSS grid. Closes the last catalog-gap item."""
+
+    def test_renderer_dispatches_chart_grid(self, repo_root: Path) -> None:
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "case 'chart-grid':" in rjs, (
+            "renderer.js must dispatch chart-grid block kind to _renderChartGrid"
+        )
+        assert "_renderChartGrid(block)" in rjs, (
+            "_renderChartGrid implementation must exist"
+        )
+
+    def test_panel_label_becomes_child_title(self, repo_root: Path) -> None:
+        """Per the contract: panel.label → child chart title. Without
+        this the auto-naming for facets breaks."""
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "title: panel.label || ''" in rjs, (
+            "panel.label must be assigned as the child chart's title"
+        )
+
+    def test_panel_label_deleted_from_child_block(self, repo_root: Path) -> None:
+        """The chart renderer doesn't understand `label` as a top-level
+        field — it must be stripped after being lifted to title, else
+        additionalProperties:false validation would fail."""
+        rjs = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
+        assert "delete childBlock.label" in rjs, (
+            "Renderer must delete panel.label after using it as the title "
+            "so additionalProperties validation passes on the child chart"
+        )
+
+    def test_schema_includes_chart_grid_ref(self, repo_root: Path) -> None:
+        schema_text = (repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8")
+        # The contentBlock oneOf list must reference $defs/chartGrid.
+        assert '"#/$defs/chartGrid"' in schema_text, (
+            "contentBlock oneOf must include $ref to chartGrid"
+        )
+        # And the chartGrid $def must exist.
+        assert '"chartGrid": {' in schema_text, (
+            "$defs/chartGrid definition must exist"
+        )
+
+    def test_css_grid_has_resting_and_explicit_modes(self, repo_root: Path) -> None:
+        """The grid cells container must declare a default auto-fit
+        track template; the renderer applies `style="grid-template-
+        columns: …"` inline when block.cols is provided."""
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        assert ".okt-chart-grid-cells" in css, (
+            ".okt-chart-grid-cells CSS rule missing"
+        )
+        # The cell-level border + surface should be present so each
+        # facet reads as a unit.
+        m = re.search(r"\.okt-chart-grid-cell\s*\{([^}]+)\}", css)
+        assert m and "border" in m.group(1), (
+            ".okt-chart-grid-cell must declare a border so the panel "
+            "reads as a discrete unit"
+        )

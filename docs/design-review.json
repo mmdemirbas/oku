@@ -250,6 +250,14 @@
               ]
             },
             {
+              "title": "Q41 — small multiples (last catalog item) + open-questions table closed",
+              "accent": "success",
+              "blocks": [
+                {"kind": "paragraph", "content": "New `chart-grid` block kind renders the same chart shape across N data panels in a CSS grid. Each panel becomes a full chart block via the same _renderChart pipeline — every per-chart affordance (hover, cursor, tooltip, toolbar, popover) works inside each panel. Per-panel fields override: `panel.label` → chart title; everything else shallow-merges so authors can specialise per-panel color / mode / extras independently."},
+                {"kind": "paragraph", "content": "Schema-validates via a new `$defs/chartGrid`; CSS auto-fits with `minmax(220px, 1fr)` by default, locks to N tracks when `cols` is provided. 5 new content-regression tests pin the load-bearing pieces. With this landing the open-questions table is closed except for the explicitly-deferred library adoption revisit."}
+              ]
+            },
+            {
               "title": "Q36-Q39 autonomous follow-up — bar toolbar, horizon, hexbin",
               "accent": "success",
               "blocks": [
@@ -833,18 +841,18 @@
              "Continue dual-form refactor (categorical / flow families)",
              "Arc + bar (Q31/Q32); plot was already done. Q36 also added DIV-bar toolbar so the popover is now reachable architecturally.",
              "Decision: categorical / flow families don't benefit from a forced dual-form unification. Plot/arc/bar all share underlying data shape across their alternates (same series → different marks; same slices → pie vs donut; same series → single vs stacked vs grouped). Categorical types (heatmap.cells vs waffle.segments vs treemap.tree) have intrinsically different payloads — a unification would be sugar without substance. Skipped; can revisit if a real cross-type compatibility emerges."],
-            ["3",
+            ["3 (closed)",
              "Catalogue-research visualizations — what's next?",
-             "population-pyramid + connected-scatter (Q33), horizon + hexbin (Q37/Q38) shipped.",
-             "Open: small multiples (a layout primitive, not a chart — would slot under a layout family). Otherwise the catalogue gaps are essentially closed; new additions should be driven by concrete reader needs rather than gap-filling."],
-            ["4 (mostly done)",
+             "All actionable items shipped.",
+             "population-pyramid + connected-scatter (Q33), horizon + hexbin (Q37/Q38), small multiples (Q41). Catalogue gaps closed; new additions should be driven by concrete reader needs."],
+            ["4 (closed)",
              "Smart-hide round 2",
-             "Q34 shipped the language pill; Q39 verified mermaid + chart toolbars are smart-hide consistent. Sidebar collapse handle was already smart-hide in round 1.",
-             "Essentially closed — fold markers and sidebar handle were done in round 1, language pill + bar toolbar smart-hide consistency in round 2. No outstanding items."],
-            ["5",
+             "All actionable items shipped.",
+             "Fold markers + sidebar collapse handle were already smart-hide in round 1; Q34 added language-pill smart-hide; Q39 added bar toolbar smart-hide parity. No outstanding items."],
+            ["5 (deferred by user)",
              "Library adoption revisit",
-             "After remaining dual-form families finish.",
-             "Re-ask with the canonical schema in hand; the dual-form pattern has held across plot / arc / bar — categorical + flow will likely follow the same shape."]
+             "User instruction: defer.",
+             "Re-ask when there is a concrete pain the kit's own renderers can't address. The kit ships ~50 chart types now, none requiring an external library."]
           ]
         }
       ]
