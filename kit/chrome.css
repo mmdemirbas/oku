@@ -683,6 +683,20 @@ pre > .okt-code-lang {
   user-select: none;
   pointer-events: none;
   z-index: 2;
+  transition: opacity 0.18s ease;
+}
+
+/* Smart-hide round 2: when the page contains code blocks in only
+   ONE language, the pills are redundant chrome — the reader already
+   knows what they're looking at. Reveal-on-hover-of-pre so the pill
+   stays discoverable. Multi-language pages keep pills visible at
+   rest. */
+html[data-okt-single-lang] pre > .okt-code-lang {
+  opacity: 0.18;
+}
+html[data-okt-single-lang] pre:hover > .okt-code-lang,
+html[data-okt-single-lang] pre:focus-within > .okt-code-lang {
+  opacity: 1;
 }
 
 /* When at least one fold is collapsed, hint at it via the marker

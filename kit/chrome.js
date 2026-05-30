@@ -11244,4 +11244,34 @@ window.addEventListener('oku:rendered', function () {
   var tocList = document.querySelector('page-toc .toc-list');
   if (tocList) buildTOC(tocList);
   initReadingAids();
+  __okuPostRenderLanguagePillSmartHide();
 });
+
+/* Smart-hide for the .okt-code-lang language pills.
+   Sweep every visible language pill on the page. If they all show
+   the same language, the pills are redundant chrome — the reader
+   already knows what they're looking at. Tag the document with
+   `data-okt-single-lang` so the CSS rule dims the pills to
+   opacity 0.18 (still hover-revealable).
+   Multi-language pages keep the pills visible at full opacity so
+   the dialect markers actually help the reader disambiguate.
+
+   Pills are stamped during Prism's `complete` event (async), so a
+   single sync sweep on `oku:rendered` may run before any pill exists.
+   Re-scan a few times across the next ~600 ms so we settle the
+   attribute once Prism has finished. Idempotent — the attribute is
+   either set or cleared based on the current observation. */
+function __okuPostRenderLanguagePillSmartHide() {
+  function sweep() {
+    var pills = document.querySelectorAll('.okt-code-lang');
+    var langs = new Set();
+    pills.forEach(function (p) {
+      var t = (p.textContent || '').trim().toLowerCase();
+      if (t) langs.add(t);
+    });
+    document.documentElement.toggleAttribute('data-okt-single-lang', pills.length >= 2 && langs.size === 1);
+  }
+  sweep();
+  setTimeout(sweep, 200);
+  setTimeout(sweep, 600);
+}
