@@ -7198,6 +7198,9 @@ class OkuChart extends HTMLElement {
     var x = (this._extras && this._extras.violin) || {};
     var distributions = (x.distributions || []).slice();
     if (!distributions.length) return;
+    if (this.getAttribute('orientation') === 'vertical' || x.orientation === 'vertical') {
+      return this._renderViolinVertical(distributions);
+    }
     // Compute global range across all values.
     var allValues = [];
     distributions.forEach(function (d) {
@@ -7277,6 +7280,96 @@ class OkuChart extends HTMLElement {
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
     this._wireGenericVerticalCursor({ top: pad.top, bottom: H - pad.bottom, left: pad.left, right: W - pad.right });
+  }
+
+  /* Vertical violin — value runs up the Y axis, each distribution
+     gets its own column. The textbook violin shape in statistical
+     contexts. */
+  _renderViolinVertical(distributions) {
+    var allValues = [];
+    distributions.forEach(function (d) {
+      (d.values || []).forEach(function (v) { if (!isNaN(+v)) allValues.push(+v); });
+    });
+    if (allValues.length < 2) return;
+    var vMin = Math.min.apply(null, allValues);
+    var vMax = Math.max.apply(null, allValues);
+    if (vMin === vMax) { vMin -= 1; vMax += 1; }
+    var W = Math.max(360, 80 + distributions.length * 96);
+    var H = 360;
+    var pad = { top: this._title ? 36 : 16, bottom: 40, left: 56, right: 20 };
+    var plotH = H - pad.top - pad.bottom;
+    var colW = (W - pad.left - pad.right) / distributions.length;
+    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    function yOf(v) { return pad.top + plotH - (v - vMin) / (vMax - vMin) * plotH; }
+    var parts = [];
+    parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Violin') + '" class="okc-svg okc-violin">');
+    if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    // Y axis ticks (5).
+    for (var t = 0; t <= 4; t++) {
+      var v = vMin + (t / 4) * (vMax - vMin);
+      var y = yOf(v);
+      parts.push('<line x1="' + (pad.left - 4) + '" y1="' + y + '" x2="' + pad.left + '" y2="' + y + '" class="okc-axis"/>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    }
+    parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    distributions.forEach(function (dist, di) {
+      var values = (dist.values || []).map(Number).filter(function (v) { return !isNaN(v); });
+      if (values.length < 2) return;
+      values.sort(function (a, b) { return a - b; });
+      var color = palette[dist.color] || palette.accent;
+      var colMid = pad.left + colW * (di + 0.5);
+      // KDE on the value axis.
+      var mean = values.reduce(function (s, v) { return s + v; }, 0) / values.length;
+      var variance = values.reduce(function (s, v) { return s + (v - mean) * (v - mean); }, 0) / values.length;
+      var stdev = Math.sqrt(variance) || 1;
+      var bw = 1.06 * stdev * Math.pow(values.length, -1 / 5);
+      var sampleCount = 80;
+      var samples = [];
+      var maxD = 0;
+      var step = (vMax - vMin) / (sampleCount - 1);
+      for (var i = 0; i < sampleCount; i++) {
+        var vi = vMin + i * step;
+        var sum = 0;
+        for (var k = 0; k < values.length; k++) {
+          var u = (vi - values[k]) / bw;
+          sum += Math.exp(-0.5 * u * u);
+        }
+        var d = sum / (values.length * bw * Math.sqrt(2 * Math.PI));
+        samples.push({ v: vi, d: d });
+        if (d > maxD) maxD = d;
+      }
+      if (maxD === 0) return;
+      var halfW = Math.min(colW * 0.4, 32);
+      // Build mirrored violin polygon — left side then right.
+      var leftPath = samples.map(function (s, idx) {
+        var xx = colMid - (s.d / maxD) * halfW;
+        return (idx === 0 ? 'M ' : 'L ') + xx.toFixed(1) + ' ' + yOf(s.v).toFixed(1);
+      }).join(' ');
+      var rightPath = '';
+      for (var j = samples.length - 1; j >= 0; j--) {
+        var xx = colMid + (samples[j].d / maxD) * halfW;
+        rightPath += ' L ' + xx.toFixed(1) + ' ' + yOf(samples[j].v).toFixed(1);
+      }
+      parts.push('<path d="' + leftPath + rightPath + ' Z" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-violin-body"/>');
+      // Quartile + median markers.
+      function quantile(p) {
+        var pos = (values.length - 1) * p;
+        var i = Math.floor(pos);
+        var frac = pos - i;
+        return values[i] + frac * ((values[i + 1] || values[i]) - values[i]);
+      }
+      var q1 = quantile(0.25), median = quantile(0.5), q3 = quantile(0.75);
+      // IQR box (vertical).
+      parts.push('<rect x="' + (colMid - 5).toFixed(1) + '" y="' + yOf(q3).toFixed(1) + '" width="10" height="' + (yOf(q1) - yOf(q3)).toFixed(1) + '" fill="' + color + '" fill-opacity="0.7" stroke="none"/>');
+      // Median line.
+      parts.push('<line x1="' + (colMid - 10) + '" y1="' + yOf(median).toFixed(1) + '" x2="' + (colMid + 10) + '" y2="' + yOf(median).toFixed(1) + '" stroke="var(--bg)" stroke-width="2"/>');
+      // Category label at bottom.
+      parts.push('<text x="' + colMid + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-violin-label">' + escapeXml(dist.label || '') + '</text>');
+    });
+    parts.push('</svg>');
+    this.appendChild(document.createRange().createContextualFragment(parts.join('')));
+    // Horizontal cursor would be the right affordance here but
+    // we don't have a generic helper for that orientation yet.
   }
 
   /* ---------------- Beeswarm ----------------
