@@ -209,13 +209,16 @@ block — a `.then()` chain after `highlightAll()` races and loses.
 **Add a regression test with every fix.** The user has explicitly
 called out that bugs keep recurring because tests don't cover the
 surface. For Python CLI behaviour use pytest under
-`src/oku_tests/`. For JSON-content regressions use
+`src/oku_tests/`. For doc-content regressions use
 `src/oku_tests/test_content_regression.py` (walk the doc tree,
 assert on shape). For runtime browser behaviour add Playwright tests
-under `src/oku_tests/browser/` (not yet wired — install
-`pytest-playwright` + `playwright install` first). Whatever the
-layer, the rule is: a bug found by the user must have a test that
-fails before the fix and passes after.
+under `src/oku_tests/browser/` — wired and running in the default
+suite against the real serve handler in headless chromium
+(`test_invariants.py` pins the numeric UI invariants below; the
+package auto-skips where chromium isn't installed, enable with
+`uv run playwright install chromium`). Whatever the layer, the rule
+is: a bug found by the user must have a test that fails before the
+fix and passes after.
 
 ## UI invariants — numeric, enforced
 

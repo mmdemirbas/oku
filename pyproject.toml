@@ -28,6 +28,10 @@ dev = [
     "pagefind[bin]>=1.5",
     "ruff>=0.5",
     "pytest>=7.0",
+    # Browser-level regression tests under src/oku_tests/browser/ —
+    # they auto-skip when the chromium binary isn't installed
+    # (`playwright install chromium` to enable).
+    "pytest-playwright>=0.5",
 ]
 
 [project.urls]
@@ -80,6 +84,9 @@ target-version = "py310"
 testpaths = ["src/oku_tests"]
 pythonpath = ["src"]
 addopts = "-ra --strict-markers"
+markers = [
+    "browser: headless-chromium UI-invariant tests (skip with -m 'not browser')",
+]
 
 [dependency-groups]
 dev = [
