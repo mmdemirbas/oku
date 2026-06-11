@@ -128,9 +128,7 @@ class TestBuildLlmsTxt:
         assert "- [Alpha](a.html): First page" in text
 
     def test_uses_kit_json_name_and_description(self, tmp_path: Path) -> None:
-        (tmp_path / "kit.json").write_text(
-            json.dumps({"name": "MyDocs", "description": "A test kit"})
-        )
+        (tmp_path / "kit.json").write_text(json.dumps({"name": "MyDocs", "description": "A test kit"}))
         _write_page(tmp_path / "a.json")
         text = cli.build_llms_txt(tmp_path).read_text(encoding="utf-8")
         assert text.startswith("# MyDocs")

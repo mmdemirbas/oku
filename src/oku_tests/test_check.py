@@ -18,8 +18,8 @@ from oku import cli
 
 # ---------- helpers ----------
 
-def _issues_of(issues: list[dict], *, code: str | None = None,
-               severity: str | None = None) -> list[dict]:
+
+def _issues_of(issues: list[dict], *, code: str | None = None, severity: str | None = None) -> list[dict]:
     """Filter issues by code and/or severity."""
     out = issues
     if code is not None:
@@ -29,8 +29,7 @@ def _issues_of(issues: list[dict], *, code: str | None = None,
     return out
 
 
-def _run(page_dict: dict, *, filename: str = "page.json",
-         tmp_path: Path | None = None) -> list[dict]:
+def _run(page_dict: dict, *, filename: str = "page.json", tmp_path: Path | None = None) -> list[dict]:
     """Run check_pages against a single in-memory page dict and return
     the issue list."""
     p = (tmp_path or Path("/tmp")) / filename
@@ -38,6 +37,7 @@ def _run(page_dict: dict, *, filename: str = "page.json",
 
 
 # ---------- clean baseline ----------
+
 
 def test_clean_minimal_page(tmp_path: Path) -> None:
     page = {
@@ -61,6 +61,7 @@ def test_clean_minimal_page(tmp_path: Path) -> None:
 
 
 # ---------- deprecated kinds ----------
+
 
 def test_flags_deprecated_bar_chart(tmp_path: Path) -> None:
     page = {
@@ -111,6 +112,7 @@ def test_flags_deprecated_scope_grid(tmp_path: Path) -> None:
 
 
 # ---------- chart shape ----------
+
 
 def test_chart_bar_without_rows_errors(tmp_path: Path) -> None:
     page = {
@@ -166,22 +168,23 @@ def test_chart_unknown_type_errors(tmp_path: Path) -> None:
 
 # ---------- Tier-1 / Tier-3 chart shape sanity ----------
 
+
 @pytest.mark.parametrize(
     "ctype, code",
     [
-        ("heatmap",          "chart-heatmap-missing-cells"),
-        ("sparkline",        "chart-sparkline-missing-values"),
-        ("waffle",           "chart-waffle-missing-segments"),
-        ("gauge",            "chart-gauge-missing-fields"),
-        ("radar",            "chart-radar-missing-fields"),
-        ("box-plot",         "chart-boxplot-missing-boxes"),
-        ("bullet",           "chart-bullet-missing-tracks"),
-        ("slope",            "chart-slope-missing-items"),
-        ("histogram",        "chart-histogram-missing-bins"),
+        ("heatmap", "chart-heatmap-missing-cells"),
+        ("sparkline", "chart-sparkline-missing-values"),
+        ("waffle", "chart-waffle-missing-segments"),
+        ("gauge", "chart-gauge-missing-fields"),
+        ("radar", "chart-radar-missing-fields"),
+        ("box-plot", "chart-boxplot-missing-boxes"),
+        ("bullet", "chart-bullet-missing-tracks"),
+        ("slope", "chart-slope-missing-items"),
+        ("histogram", "chart-histogram-missing-bins"),
         ("calendar-heatmap", "chart-calendar-missing-date-values"),
-        ("treemap",          "chart-treemap-missing-tree"),
-        ("ridgeline",        "chart-ridgeline-missing-distributions"),
-        ("funnel",           "chart-funnel-missing-stages"),
+        ("treemap", "chart-treemap-missing-tree"),
+        ("ridgeline", "chart-ridgeline-missing-distributions"),
+        ("funnel", "chart-funnel-missing-stages"),
     ],
 )
 def test_chart_extension_missing_payload_flagged(tmp_path: Path, ctype: str, code: str) -> None:
@@ -233,9 +236,7 @@ def test_chart_gauge_with_value_and_max_passes(tmp_path: Path) -> None:
                 "kind": "section",
                 "id": "s",
                 "title": "S",
-                "blocks": [
-                    {"kind": "chart", "type": "gauge", "value": 62, "max": 100}
-                ],
+                "blocks": [{"kind": "chart", "type": "gauge", "value": 62, "max": 100}],
             }
         ],
     }
@@ -318,6 +319,7 @@ def test_chart_calendar_heatmap_with_date_values_passes(tmp_path: Path) -> None:
 
 # ---------- duplicate anchors ----------
 
+
 def test_duplicate_section_ids_flagged(tmp_path: Path) -> None:
     page = {
         "kind": "page",
@@ -332,6 +334,7 @@ def test_duplicate_section_ids_flagged(tmp_path: Path) -> None:
 
 
 # ---------- forbidden prose ----------
+
 
 def test_round_breadcrumb_in_lead_flagged(tmp_path: Path) -> None:
     page = {
@@ -380,6 +383,7 @@ def test_round_breadcrumb_in_inline_text_flagged(tmp_path: Path) -> None:
 
 # ---------- glossary / extref resolution ----------
 
+
 def test_unresolved_glossary_term_flagged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Point KIT_DIR to an empty fixture dir so no term resolves.
     fixture = tmp_path / "kit_empty"
@@ -411,11 +415,15 @@ def test_known_glossary_term_passes(tmp_path: Path) -> None:
     fixture = tmp_path / "kit"
     (fixture / "glossary").mkdir(parents=True)
     (fixture / "extrefs").mkdir(parents=True)
-    (fixture / "glossary" / "test.json").write_text(json.dumps({
-        "domain": "test",
-        "version": 1,
-        "entries": {"Iceberg": {"en": {"summary": "..."}}},
-    }))
+    (fixture / "glossary" / "test.json").write_text(
+        json.dumps(
+            {
+                "domain": "test",
+                "version": 1,
+                "entries": {"Iceberg": {"en": {"summary": "..."}}},
+            }
+        )
+    )
     page = {
         "kind": "page",
         "title": "T",
@@ -439,6 +447,7 @@ def test_known_glossary_term_passes(tmp_path: Path) -> None:
 
 # ---------- stray demo pages ----------
 
+
 def test_stray_demo_filename_flagged(tmp_path: Path) -> None:
     page = {"kind": "page", "title": "T", "blocks": []}
     issues = cli.check_pages([(tmp_path / "table-demo.json", page)], tmp_path)
@@ -454,6 +463,7 @@ def test_markdown_demo_filename_is_allowed(tmp_path: Path) -> None:
 
 
 # ---------- metadata nudges ----------
+
 
 def test_missing_summary_is_info(tmp_path: Path) -> None:
     page = {"kind": "page", "title": "T", "blocks": []}
@@ -483,12 +493,14 @@ def test_code_block_without_language_is_info(tmp_path: Path) -> None:
 
 # ---------- end-to-end against the live repo ----------
 
+
 def test_project_docs_pass_check_strict(repo_root: Path) -> None:
     """The kit's own docs must pass `oku check --strict`.
 
     This is the canonical regression net for the oku skill's
     auto-verify step: the kit's own dogfooding must remain clean."""
     import importlib
+
     importlib.reload(cli)  # ensure fresh schema cache for the run
     pages = cli.find_json_pages(repo_root)
     assert pages, "Expected to find at least one page-JSON under repo_root"
@@ -507,6 +519,7 @@ def test_project_docs_pass_check_strict(repo_root: Path) -> None:
 # the page without surfacing the error. We now scan separately and
 # fold parse failures into the issue stream as `json-parse-failed`
 # errors. The tests below pin that behaviour.
+
 
 def test_find_unparseable_json_returns_bad_file(tmp_path: Path) -> None:
     """A page-shaped .json with a syntax error must surface from
@@ -542,22 +555,20 @@ def test_find_unparseable_json_skips_sidecars(tmp_path: Path) -> None:
 
 
 def test_find_unparseable_json_returns_empty_when_clean(tmp_path: Path) -> None:
-    (tmp_path / "page.json").write_text(
-        '{"kind": "page", "title": "T", "blocks": []}', encoding="utf-8"
-    )
+    (tmp_path / "page.json").write_text('{"kind": "page", "title": "T", "blocks": []}', encoding="utf-8")
     assert cli.find_unparseable_json(tmp_path) == []
 
 
-def test_cmd_check_promotes_parse_failure_to_error(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cmd_check_promotes_parse_failure_to_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """cmd_check must surface json-parse-failed as an error so the
     user sees the file in the report instead of having it silently
     drop from the page list. Before the fix this test would run with
     one valid page, report '1 page(s) clean', and exit 0 — hiding the
     broken sibling."""
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "good.json").write_text(
-        '{"kind": "page", "title": "T", "blocks": []}', encoding="utf-8"
-    )
+    (tmp_path / "good.json").write_text('{"kind": "page", "title": "T", "blocks": []}', encoding="utf-8")
     (tmp_path / "design-review.json").write_text(
         '{"kind": "page", "title": "T", "blocks": [] "extra": "bad"}',
         encoding="utf-8",
@@ -585,6 +596,7 @@ def test_cmd_check_promotes_parse_failure_to_error(tmp_path: Path, capsys: pytes
 # _oku/). find_kit_json probes docs/ first, falls back to root, so
 # both authoring locations work and both serve paths succeed.
 
+
 def test_find_kit_json_prefers_docs_subdir(tmp_path: Path) -> None:
     """When kit.json sits at docs/kit.json AND root/kit.json, the
     docs/ copy wins. This is the canonical home per the schema."""
@@ -597,6 +609,7 @@ def test_find_kit_json_prefers_docs_subdir(tmp_path: Path) -> None:
     assert p == docs / "kit.json"
     # And the contents reflect the docs/ copy, not the root one.
     import json as _json
+
     assert _json.loads(p.read_text(encoding="utf-8"))["name"] == "docs-copy"
 
 

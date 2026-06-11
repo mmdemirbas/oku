@@ -107,9 +107,12 @@ def test_flatten_inline_deep_list_does_not_overflow() -> None:
 def test_md_block_section_with_deep_nested_sections() -> None:
     # Nested sections (used in long-form pages). The recursive emitter
     # walks every level.
-    inner: dict = {"kind": "section", "id": "deep", "title": "Deep", "blocks": [
-        {"kind": "paragraph", "content": "Innermost"}
-    ]}
+    inner: dict = {
+        "kind": "section",
+        "id": "deep",
+        "title": "Deep",
+        "blocks": [{"kind": "paragraph", "content": "Innermost"}],
+    }
     for i in range(5):
         inner = {"kind": "section", "id": f"s{i}", "title": f"S{i}", "blocks": [inner]}
     out = "\n".join(cli._md_block(inner))
@@ -206,22 +209,26 @@ def test_md_block_chart_without_title_uses_kind_fallback() -> None:
 
 
 def test_md_block_table_with_pipe_in_cell_escapes_correctly() -> None:
-    out = cli._md_block({
-        "kind": "table",
-        "headers": ["A"],
-        "rows": [["x | y"]],
-    })
+    out = cli._md_block(
+        {
+            "kind": "table",
+            "headers": ["A"],
+            "rows": [["x | y"]],
+        }
+    )
     # A literal | inside a cell would break the markdown table — must escape.
     cell_row = next(line for line in out if line.startswith("| x"))
     assert "\\|" in cell_row
 
 
 def test_md_block_table_with_newline_in_cell_collapses_to_space() -> None:
-    out = cli._md_block({
-        "kind": "table",
-        "headers": ["A"],
-        "rows": [["line1\nline2"]],
-    })
+    out = cli._md_block(
+        {
+            "kind": "table",
+            "headers": ["A"],
+            "rows": [["line1\nline2"]],
+        }
+    )
     cell_row = next(line for line in out if line.startswith("| line"))
     assert "\n" not in cell_row
     assert "line1 line2" in cell_row

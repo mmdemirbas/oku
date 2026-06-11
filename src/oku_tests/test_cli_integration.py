@@ -52,8 +52,12 @@ def sample_project(tmp_path: Path, repo_root: Path) -> Path:
                     "title": title,
                     "meta": {"summary": f"{title} page"},
                     "blocks": [
-                        {"kind": "section", "id": "s", "title": "S",
-                         "blocks": [{"kind": "paragraph", "content": f"Body of {title}"}]}
+                        {
+                            "kind": "section",
+                            "id": "s",
+                            "title": "S",
+                            "blocks": [{"kind": "paragraph", "content": f"Body of {title}"}],
+                        }
                     ],
                 }
             ),
@@ -69,11 +73,16 @@ class TestCLIBuild:
         assert proc.returncode == 0, f"build failed:\n{proc.stderr}\n{proc.stdout}"
         # Source dir stays clean — manifest / llms.txt / page.md twins
         # / .html stubs all live under dist/ only.
-        for offender in ("site-manifest.json", "site-manifest.js", "llms.txt",
-                         "index.md", "about.md", "index.html", "about.html"):
-            assert not (docs / offender).exists(), (
-                f"{offender} leaked into source: must live under dist/"
-            )
+        for offender in (
+            "site-manifest.json",
+            "site-manifest.js",
+            "llms.txt",
+            "index.md",
+            "about.md",
+            "index.html",
+            "about.html",
+        ):
+            assert not (docs / offender).exists(), f"{offender} leaked into source: must live under dist/"
         # dist/ trees carry the actual artifacts the runtime needs.
         assert (docs / "dist" / "standalone" / "index.html").exists()
         assert (docs / "dist" / "site" / "index.html").exists()
@@ -99,9 +108,7 @@ class TestCLIBuild:
     def test_manifest_lists_both_pages(self, sample_project: Path, repo_root: Path) -> None:
         docs = sample_project / "docs"
         _run_cli(docs, "build", repo_root=repo_root)
-        manifest = json.loads(
-            (docs / "dist" / "site" / "site-manifest.json").read_text(encoding="utf-8")
-        )
+        manifest = json.loads((docs / "dist" / "site" / "site-manifest.json").read_text(encoding="utf-8"))
         titles = {entry["title"] for entry in manifest["pages"]}
         assert titles == {"Index", "About"}
 
@@ -117,9 +124,7 @@ class TestCLIBuild:
         # The page body text shows up in the inlined JSON.
         assert "Body of Index" in body
 
-    def test_site_html_has_pagefind_body_injection(
-        self, sample_project: Path, repo_root: Path
-    ) -> None:
+    def test_site_html_has_pagefind_body_injection(self, sample_project: Path, repo_root: Path) -> None:
         docs = sample_project / "docs"
         _run_cli(docs, "build", repo_root=repo_root)
         body = (docs / "dist" / "site" / "index.html").read_text(encoding="utf-8")
@@ -234,19 +239,17 @@ class TestCLIInit:
         proc = _run_cli(tmp_path, "init", repo_root=repo_root)
         assert proc.returncode == 0
         body = (tmp_path / "index.html").read_text(encoding="utf-8")
-        assert re.search(r'_oku/chrome\.css\?v=\d+', body), body
-        assert re.search(r'_oku/chrome\.js\?v=\d+', body), body
-        assert re.search(r'_oku/chrome-boot\.js\?v=\d+', body), body
-        assert re.search(r'_oku/renderer\.js\?v=\d+', body), body
+        assert re.search(r"_oku/chrome\.css\?v=\d+", body), body
+        assert re.search(r"_oku/chrome\.js\?v=\d+", body), body
+        assert re.search(r"_oku/chrome-boot\.js\?v=\d+", body), body
+        assert re.search(r"_oku/renderer\.js\?v=\d+", body), body
 
-    def test_init_refreshes_default_stub_with_new_cache_buster(
-        self, tmp_path: Path, repo_root: Path
-    ) -> None:
+    def test_init_refreshes_default_stub_with_new_cache_buster(self, tmp_path: Path, repo_root: Path) -> None:
         # An on-disk stub generated long ago has a stale ?v=N. Re-running
         # init must rewrite the URLs so the new kit mtime takes effect —
         # provided the stub is still default-shaped (empty body).
         stale = (
-            '<!DOCTYPE html>\n<html><head>'
+            "<!DOCTYPE html>\n<html><head>"
             '<script src="_oku/chrome-boot.js?v=1"></script>'
             '<link rel="stylesheet" href="_oku/chrome.css?v=1">'
             '<script src="_oku/chrome.js?v=1" defer></script>'
@@ -259,8 +262,8 @@ class TestCLIInit:
         refreshed = (tmp_path / "index.html").read_text(encoding="utf-8")
         # The stale ?v=1 must be gone; whichever fresh mtime got stamped,
         # it's almost certainly > 1.
-        assert "?v=1\"" not in refreshed
-        m = re.search(r'_oku/chrome\.js\?v=(\d+)', refreshed)
+        assert '?v=1"' not in refreshed
+        m = re.search(r"_oku/chrome\.js\?v=(\d+)", refreshed)
         assert m is not None
         assert int(m.group(1)) > 1
 
@@ -298,9 +301,7 @@ class TestCLIInit:
         assert not (tmp_path / "guide.json").exists(), "init must not generate a .json twin"
         assert not (tmp_path / "nested" / "deep.json").exists(), "init must not generate a .json twin"
 
-    def test_init_does_not_overwrite_hand_authored_json(
-        self, tmp_path: Path, repo_root: Path
-    ) -> None:
+    def test_init_does_not_overwrite_hand_authored_json(self, tmp_path: Path, repo_root: Path) -> None:
         # A hand-authored .json sibling of an .md takes precedence — init
         # must not clobber it.
         (tmp_path / "guide.md").write_text("# From MD", encoding="utf-8")
@@ -324,9 +325,7 @@ class TestCLIInit:
         new = after - before
         # Allowed new entries: _oku symlink + index.html.
         new_names = {p.name for p in new}
-        assert new_names <= {"_oku", "index.html"}, (
-            f"init produced unexpected files: {new_names}"
-        )
+        assert new_names <= {"_oku", "index.html"}, f"init produced unexpected files: {new_names}"
 
 
 class TestCLIHelp:

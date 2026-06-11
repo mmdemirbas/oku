@@ -40,9 +40,7 @@ def test_starter_template_validates(page_schema: dict, repo_root: Path) -> None:
     """src/oku/templates/starter.json — emitted to fresh projects
     via `oku init`. A starter that doesn't pass schema would
     mislead every new author."""
-    data = json.loads(
-        (repo_root / "src" / "oku" / "templates" / "starter.json").read_text(encoding="utf-8")
-    )
+    data = json.loads((repo_root / "src" / "oku" / "templates" / "starter.json").read_text(encoding="utf-8"))
     jsonschema.validate(data, page_schema)
 
 

@@ -35,9 +35,7 @@ SAMPLE_STUB = """<!DOCTYPE html>
 """
 
 
-def _scaffold_project(
-    root: Path, *, with_kit_json: bool = True
-) -> list[tuple[Path, str, dict | None]]:
+def _scaffold_project(root: Path, *, with_kit_json: bool = True) -> list[tuple[Path, str, dict | None]]:
     """Lay out a minimal site under root: two HTML + sibling JSON pages,
     optional kit.json. Returns the iter_page_stubs-shaped tuple list
     (path, html_text, page_data | None) that build_site / build_standalone
@@ -55,8 +53,12 @@ def _scaffold_project(
                     "kind": "page",
                     "title": title,
                     "blocks": [
-                        {"kind": "section", "id": "x", "title": "X",
-                         "blocks": [{"kind": "paragraph", "content": f"Body of {title}"}]}
+                        {
+                            "kind": "section",
+                            "id": "x",
+                            "title": "X",
+                            "blocks": [{"kind": "paragraph", "content": f"Body of {title}"}],
+                        }
                     ],
                 }
             ),
@@ -64,9 +66,7 @@ def _scaffold_project(
         )
         pages.append((html_path, html_text, None))
     if with_kit_json:
-        (docs / "kit.json").write_text(
-            json.dumps({"name": "Test kit", "domains": []}), encoding="utf-8"
-        )
+        (docs / "kit.json").write_text(json.dumps({"name": "Test kit", "domains": []}), encoding="utf-8")
     return pages
 
 
@@ -130,9 +130,7 @@ class TestBuildSite:
             )
             pages.append((html_path, html_text, None))
         # Authored kit.json under docs/, NOT at src_root.
-        (docs / "kit.json").write_text(
-            json.dumps({"name": "from-docs", "domains": []}), encoding="utf-8"
-        )
+        (docs / "kit.json").write_text(json.dumps({"name": "from-docs", "domains": []}), encoding="utf-8")
         out_dir = tmp_path / "out"
         cli.build_site(pages, out_dir, src_root)
         # The copied kit.json lands at the dist root (sibling of _oku/),
@@ -166,7 +164,7 @@ class TestBuildSite:
         assert 'data-pagefind-meta="title"' in body
         # The original kit references remain untouched (no inlining at this
         # step — that's build_standalone's job).
-        assert '_oku/chrome.css' in body
+        assert "_oku/chrome.css" in body
 
     def test_preserves_nested_directory_structure(self, tmp_path: Path) -> None:
         src_root = tmp_path / "src"
@@ -177,9 +175,7 @@ class TestBuildSite:
         (src_root / "guides" / "intro.json").write_text(
             json.dumps({"kind": "page", "title": "Intro", "blocks": []}), encoding="utf-8"
         )
-        cli.build_site(
-            [(src_root / "guides" / "intro.html", html_text, None)], out_dir, src_root
-        )
+        cli.build_site([(src_root / "guides" / "intro.html", html_text, None)], out_dir, src_root)
         assert (out_dir / "guides" / "intro.html").exists()
         assert (out_dir / "guides" / "intro.json").exists()
 
@@ -192,9 +188,7 @@ class TestBuildKitBundle:
         assert cli.build_kit_bundle(tmp_path) is None
 
     def test_returns_json_blob_with_kit_block(self, tmp_path: Path) -> None:
-        (tmp_path / "kit.json").write_text(
-            json.dumps({"name": "X", "domains": []}), encoding="utf-8"
-        )
+        (tmp_path / "kit.json").write_text(json.dumps({"name": "X", "domains": []}), encoding="utf-8")
         blob = cli.build_kit_bundle(tmp_path)
         assert isinstance(blob, str)
         parsed = json.loads(blob)
@@ -217,9 +211,7 @@ class TestBuildKitBundle:
     def test_includes_real_domain_entries(self, tmp_path: Path) -> None:
         # web/ is one of the kit's bundled glossary domains; assert its
         # entries surface when declared.
-        (tmp_path / "kit.json").write_text(
-            json.dumps({"name": "X", "domains": ["web"]}), encoding="utf-8"
-        )
+        (tmp_path / "kit.json").write_text(json.dumps({"name": "X", "domains": ["web"]}), encoding="utf-8")
         blob = cli.build_kit_bundle(tmp_path)
         parsed = json.loads(blob)
         assert "web" in parsed["glossary"]
@@ -271,10 +263,11 @@ class TestBuildStandalone:
                     "title": "T",
                     "blocks": [
                         {
-                            "kind": "section", "id": "x", "title": "X",
+                            "kind": "section",
+                            "id": "x",
+                            "title": "X",
                             "blocks": [
-                                {"kind": "code", "language": "html",
-                                 "source": "<script>alert(1)</script>"}
+                                {"kind": "code", "language": "html", "source": "<script>alert(1)</script>"}
                             ],
                         }
                     ],
@@ -282,9 +275,7 @@ class TestBuildStandalone:
             ),
             encoding="utf-8",
         )
-        cli.build_standalone(
-            [(src_root / "tricky.html", tricky_html, None)], out_dir, src_root
-        )
+        cli.build_standalone([(src_root / "tricky.html", tricky_html, None)], out_dir, src_root)
         body = (out_dir / "tricky.html").read_text(encoding="utf-8")
         # The inlined JSON block should NOT contain a raw </script that
         # would terminate the surrounding inline script tag.
@@ -313,9 +304,7 @@ class TestBuildStandalone:
         (src_root / "guides" / "intro.json").write_text(
             json.dumps({"kind": "page", "title": "Intro", "blocks": []}), encoding="utf-8"
         )
-        cli.build_standalone(
-            [(src_root / "guides" / "intro.html", intro_html, None)], out_dir, src_root
-        )
+        cli.build_standalone([(src_root / "guides" / "intro.html", intro_html, None)], out_dir, src_root)
         assert (out_dir / "guides" / "intro.html").exists()
 
 
@@ -346,9 +335,7 @@ jsonschema = pytest.importorskip("jsonschema")
 class TestValidatePages:
     def test_clean_pages_return_empty_errors(self, tmp_path: Path) -> None:
         good = tmp_path / "good.json"
-        good.write_text(
-            json.dumps({"kind": "page", "title": "Good", "blocks": []}), encoding="utf-8"
-        )
+        good.write_text(json.dumps({"kind": "page", "title": "Good", "blocks": []}), encoding="utf-8")
         pages = [(good, json.loads(good.read_text(encoding="utf-8")))]
         # When jsonschema is installed, validate_pages walks each page;
         # the empty list means no errors.
