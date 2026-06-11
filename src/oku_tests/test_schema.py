@@ -37,11 +37,14 @@ def test_docs_page_validates(doc_name: str, page_schema: dict, repo_root: Path) 
 
 
 def test_starter_template_validates(page_schema: dict, repo_root: Path) -> None:
-    """src/oku/templates/starter.json — emitted to fresh projects
-    via `oku init`. A starter that doesn't pass schema would
-    mislead every new author."""
-    data = json.loads((repo_root / "src" / "oku" / "templates" / "starter.json").read_text(encoding="utf-8"))
-    jsonschema.validate(data, page_schema)
+    """src/oku/templates/starter.md — the pair authors copy for a new
+    page. A starter whose converted page doesn't pass schema would
+    mislead every new author. {{ }} placeholders are schema-neutral
+    (plain strings), so the conversion validates as-is."""
+    from oku.cli import md_to_v2_page
+
+    text = (repo_root / "src" / "oku" / "templates" / "starter.md").read_text(encoding="utf-8")
+    jsonschema.validate(md_to_v2_page(text), page_schema)
 
 
 def test_table_chip_columns_validate(page_schema: dict) -> None:

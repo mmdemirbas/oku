@@ -401,24 +401,6 @@ def iter_page_stubs(root: Path, json_pages: list | None = None):
 # vocabulary the converter passes it through as text rather than
 # producing invalid kit JSON.
 
-_MD_REL_LINK_RE = re.compile(r"^(?!\w+:|//|#|/)(.+?)\.md(#[^\s]*)?$", re.IGNORECASE)
-_HTML_REL_LINK_RE = re.compile(r"^(?!\w+:|//|#|/)(.+?)\.html(#[^\s]*)?$", re.IGNORECASE)
-
-
-def _page_md_link_href(href: str) -> str:
-    """Inverse of _md_link_href. Used when emitting Markdown twins for
-    the dist/markdown/ tree: relative `.html` hrefs become `.md` so a
-    reader following links inside the markdown tree lands on the
-    sibling markdown twin, not on the (absent) HTML. Same exclusions
-    as _md_link_href — absolute URLs, fragment-only refs, and absolute
-    paths pass through. Trailing fragment preserved."""
-    if not href:
-        return href
-    m = _HTML_REL_LINK_RE.match(href)
-    if not m:
-        return href
-    return m.group(1) + ".md" + (m.group(2) or "")
-
 
 def _md_slug(text: str) -> str:
     """ATX-heading style id: lowercase, non-alnum → '-', trimmed."""
@@ -619,6 +601,53 @@ def _md_page_from_file(p: Path) -> dict | None:
     if not front_meta.get("title"):
         page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
     return page
+
+
+def _front_matter_value(v) -> str:
+    """Render one front-matter value the minimal parser reads back."""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    s = str(v)
+    # The reader strips wrapping quotes; quote only when the raw form
+    # would coerce or trim differently than intended.
+    if s != s.strip() or s.lower() in {"true", "false"}:
+        return '"' + s + '"'
+    return s
+
+
+def page_to_md(page: dict) -> str:
+    """Emit a v3 markdown source from a page dict — the inverse of
+    md_to_v2_page. v1 pages are shimmed to v2 first. Markdown strings
+    land verbatim; typed blocks become ```oku-<kind> fences with a
+    compact JSON body; diagrams become ```mermaid fences with the
+    italic caption line. md_to_v2_page(page_to_md(p)) round-trips."""
+    if page.get("kind") == "page" and "k" not in page:
+        page = _v1_to_v2(page)
+    meta = page.get("m") or {}
+    fm: list[str] = ["---", f"title: {_front_matter_value(page.get('t', ''))}"]
+    for key, v in meta.items():
+        if key.startswith("_") or "\n" in str(v):
+            continue
+        fm.append(f"{key}: {_front_matter_value(v)}")
+    fm.append("---")
+    parts: list[str] = ["\n".join(fm)]
+    for blk in page.get("b") or []:
+        if isinstance(blk, str):
+            parts.append(blk.strip("\n"))
+            continue
+        if not isinstance(blk, dict):
+            continue
+        kind = blk.get("k")
+        if kind == "diagram" and isinstance(blk.get("src"), str) and set(blk) <= {"k", "src", "caption"}:
+            seg = "```mermaid\n" + blk["src"] + "\n```"
+            if blk.get("caption"):
+                seg += "\n\n*" + str(blk["caption"]) + "*"
+            parts.append(seg)
+            continue
+        payload = {kk: v for kk, v in blk.items() if kk != "k"}
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        parts.append(f"```oku-{kind}\n{body}\n```")
+    return "\n\n".join(parts) + "\n"
 
 
 def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
@@ -1949,278 +1978,6 @@ def build_manifest(root: Path, *, out_dir: Path | None = None, pages: list | Non
 
 
 # ---------- LLM-friendly markdown twin per JSON page ----------
-def _flatten_inline(content) -> str:
-    """Walk a rich-string (string / list / dict node) into plain markdown."""
-    if content is None:
-        return ""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return "".join(_flatten_inline(c) for c in content)
-    if isinstance(content, dict):
-        kind = content.get("kind") or content.get("type")
-        body = content.get("text") or content.get("content", "")
-        body = _flatten_inline(body)
-        href = content.get("href") or content.get("link", "")
-        if kind in ("em", "i"):
-            return "*" + body + "*"
-        if kind in ("strong", "b"):
-            return "**" + body + "**"
-        if kind == "code":
-            return "`" + body + "`"
-        if kind == "link":
-            # Rewrite relative .html → .md so internal links stay
-            # navigable inside the dist/markdown/ tree.
-            return f"[{body}]({_page_md_link_href(href)})" if href else body
-        if kind == "ext-ref":
-            # ext-refs target external URLs (citations, RFCs) — pass
-            # through. The relative-.html rewrite would no-op anyway
-            # but the explicit non-call documents the intent.
-            return f"[{body}]({href})" if href else body
-        if kind == "glossary-term":
-            return body
-        if kind == "br":
-            return "\n"
-        return body
-    return str(content)
-
-
-def _md_block(block: dict, depth: int = 0) -> list[str]:
-    """Render a JSON content block as a list of markdown lines.
-
-    Best-effort — known kinds get semantic markdown; unknown / visually-
-    rich kinds (charts, diagrams) get a parenthetical placeholder so the
-    consuming LLM still sees the structure. Empty list means "skip"."""
-    if not isinstance(block, dict):
-        return []
-    kind = block.get("kind", "")
-    out: list[str] = []
-
-    if kind == "section":
-        title = _flatten_inline(block.get("title") or "")
-        if title:
-            out.append("## " + title)
-            out.append("")
-        for child in block.get("blocks", []):
-            out.extend(_md_block(child, depth + 1))
-            out.append("")
-        return out
-
-    if kind == "heading":
-        level = max(2, int(block.get("level", 2)))
-        # Schema uses `title`; some legacy authored pages emit `text` —
-        # accept either so the twin stays useful across both.
-        text = block.get("title") or block.get("text", "")
-        out.append("#" * level + " " + _flatten_inline(text))
-        return out
-
-    if kind == "paragraph":
-        out.append(_flatten_inline(block.get("content", "")))
-        return out
-
-    if kind in ("callout", "tldr", "insight", "info-tip"):
-        type_label = (block.get("type") or kind).upper()
-        body = _flatten_inline(block.get("content") or block.get("lead", "") or block.get("body", ""))
-        title = _flatten_inline(block.get("title") or "")
-        header = f"> **{type_label}: {title}**" if title else f"> **{type_label}**"
-        out.append(header)
-        for line in body.split("\n"):
-            out.append("> " + line if line else ">")
-        return out
-
-    if kind == "list":
-        items = block.get("items") or block.get("bullets") or []
-        ordered = block.get("ordered") is True
-        for i, item in enumerate(items, 1):
-            text = _flatten_inline(
-                item if not isinstance(item, dict) else (item.get("text") or item.get("content") or "")
-            )
-            prefix = f"{i}. " if ordered else "- "
-            out.append(prefix + text)
-        return out
-
-    if kind == "code":
-        lang = block.get("language") or block.get("lang") or ""
-        body = block.get("source") or block.get("content") or block.get("code", "")
-        out.append("```" + lang)
-        out.append(body)
-        out.append("```")
-        return out
-
-    if kind == "annotated-code":
-        lang = block.get("language") or ""
-        body = block.get("source") or ""
-        out.append("```" + lang)
-        out.append(body)
-        out.append("```")
-        annos = block.get("annotations") or []
-        if annos:
-            out.append("")
-            for a in annos:
-                if not isinstance(a, dict):
-                    continue
-                aid = a.get("id", "")
-                # Strip inline HTML for markdown — keep the structure but
-                # avoid raw <code> / <strong> tags in the .md.
-                content = re.sub(r"<[^>]+>", "", a.get("content", ""))
-                out.append(f"{aid}. {content}")
-        return out
-
-    if kind == "table":
-
-        def _header_label(h):
-            # Object form: { label, filter: "chips", values: [...] }.
-            if isinstance(h, dict):
-                return _flatten_inline(h.get("label") or "")
-            return _flatten_inline(h)
-
-        def _cell_text(c):
-            # Object form: { value?, values: [...] }. Prefer explicit `value`;
-            # fall back to the comma-joined chip values.
-            if isinstance(c, dict) and "values" in c:
-                if c.get("value") is not None:
-                    return _flatten_inline(c["value"])
-                return ", ".join(c.get("values") or [])
-            return _flatten_inline(c)
-
-        headers = [_header_label(h) for h in (block.get("headers") or [])]
-        if headers:
-            out.append("| " + " | ".join(headers) + " |")
-            out.append("| " + " | ".join(["---"] * len(headers)) + " |")
-
-        def emit_row(row):
-            cells = row.get("cells") if isinstance(row, dict) else row
-            md_cells = [_cell_text(c).replace("|", "\\|").replace("\n", " ") for c in (cells or [])]
-            out.append("| " + " | ".join(md_cells) + " |")
-
-        if block.get("groups"):
-            for g in block["groups"]:
-                title = _flatten_inline(g.get("title") or "")
-                if title:
-                    out.append("")
-                    out.append("### " + title)
-                    if headers:
-                        out.append("")
-                        out.append("| " + " | ".join(headers) + " |")
-                        out.append("| " + " | ".join(["---"] * len(headers)) + " |")
-                for row in g.get("rows") or []:
-                    emit_row(row)
-        else:
-            for row in block.get("rows") or []:
-                emit_row(row)
-        return out
-
-    if kind == "kpi-grid":
-        for item in block.get("tiles") or block.get("items") or []:
-            num = item.get("num", "")
-            label = _flatten_inline(item.get("label", ""))
-            out.append(f"- **{num}** — {label}")
-        return out
-
-    if kind == "compare-grid":
-        for card in block.get("cards") or []:
-            t = _flatten_inline(card.get("title", ""))
-            body = _flatten_inline(card.get("content") or "")
-            if t:
-                out.append("### " + t)
-            if body:
-                out.append(body)
-            for it in card.get("items") or []:
-                out.append("- " + _flatten_inline(it))
-        return out
-
-    if kind == "step-flow":
-        for i, step in enumerate(block.get("steps") or [], 1):
-            t = _flatten_inline(step.get("title", ""))
-            body = _flatten_inline(step.get("content") or step.get("summary") or "")
-            out.append(f"{i}. **{t}**")
-            if body:
-                for line in body.split("\n"):
-                    out.append("   " + line)
-        return out
-
-    if kind == "chart":
-        title = _flatten_inline(block.get("title") or "chart")
-        # Bar-chart shape emits as a definition list so the markdown
-        # twin still carries the label/value pairs; scatter / line are
-        # rendered as a placeholder line (no useful textual form).
-        if block.get("type") == "bar":
-            out.append("### " + title)
-            for row in block.get("rows") or []:
-                label = _flatten_inline(row.get("label", ""))
-                value = row.get("value", "")
-                display = row.get("display")
-                out.append(f"- {label}: {display if display is not None else value}")
-            return out
-        out.append(f"_[chart: {title}]_")
-        return out
-
-    if kind == "diagram":
-        title = _flatten_inline(block.get("caption") or "diagram")
-        out.append(f"_[diagram: {title}]_")
-        return out
-
-    if kind == "live-snippet":
-        out.append("_[interactive snippet]_")
-        return out
-
-    # Unknown — emit a placeholder so the structure isn't lost.
-    out.append(f"_[{kind or 'block'}]_")
-    return out
-
-
-def render_page_markdown(page_json: dict) -> str:
-    """Render a JSON page as semantic markdown for the /page.md LLM twin."""
-    lines: list[str] = []
-    title = page_json.get("title") or ""
-    if title:
-        lines.append("# " + title)
-        lines.append("")
-    meta = page_json.get("meta") or {}
-    subtitle = _flatten_inline(meta.get("subtitle") or "")
-    if subtitle:
-        lines.append("*" + subtitle + "*")
-        lines.append("")
-    bits: list[str] = []
-    for key in ("date", "audience", "read_time"):
-        if meta.get(key):
-            bits.append(str(meta[key]))
-    if meta.get("updated"):
-        bits.append("Updated: " + str(meta["updated"]))
-    if bits:
-        lines.append("> " + " · ".join(bits))
-        lines.append("")
-    for block in page_json.get("blocks", []):
-        lines.extend(_md_block(block))
-        lines.append("")
-    return "\n".join(lines).rstrip() + "\n"
-
-
-def build_markdown_twins(root: Path, dest_root: Path | None = None, *, pages: list | None = None) -> int:
-    """For each JSON page under root, emit <name>.md (LLM-readable twin).
-
-    By default writes under ``dest_root`` (defaults to ``root`` for
-    backward compat). Pass ``dest_root=dist/site/`` to keep generated
-    .md files out of the source dirs — the user-stated policy is
-    "generated files live under a well-known path (dist/), not mixed
-    with the original .json content".
-    """
-    n = 0
-    target_root = dest_root if dest_root is not None else root
-    if pages is None:
-        pages = find_json_pages(root)
-    for p, data in pages:
-        rel = p.relative_to(root)
-        out_path = target_root / rel.with_suffix(".md")
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            out_path.write_text(render_page_markdown(data), encoding="utf-8")
-            n += 1
-        except OSError:
-            continue
-    return n
-
-
 def compute_llms_txt(root: Path, *, pages: list | None = None) -> str:
     """Return the llms.txt body (llmstxt.org convention) — sitemap for
     LLM consumers. One line per page: link + summary. No body copy
@@ -2638,10 +2395,12 @@ def cmd_build(args: argparse.Namespace) -> int:
     dist = root / "dist"
     standalone = dist / "standalone"
     site = dist / "site"
-    markdown = dist / "markdown"
+    legacy_markdown = dist / "markdown"
 
-    # Clean previous outputs to avoid stale files
-    for tree in (standalone, site, markdown):
+    # Clean previous outputs to avoid stale files (legacy_markdown is
+    # gone as a build product — sources are markdown; remove leftovers
+    # from older builds so the tree doesn't linger half-stale).
+    for tree in (standalone, site, legacy_markdown):
         if tree.exists():
             shutil.rmtree(tree)
 
@@ -2652,18 +2411,17 @@ def cmd_build(args: argparse.Namespace) -> int:
     #   standalone/  humans, file:// — every HTML inlines its own
     #                window.__okuManifest, so no sidecar is needed.
     #   site/        humans, HTTP — chrome.js fetches site-manifest.json
-    #                from the docs root.
-    #   markdown/    AI / LLM consumers — page.md twins + llms.txt.
+    #                from the docs root; llms.txt at the docs root
+    #                serves AI/LLM consumers (the .md SOURCES are the
+    #                canonical AI surface — no twin tree needed).
     rel_docs = docs_dir.relative_to(root)
     rel_display = "" if rel_docs == Path(".") else rel_docs.as_posix() + "/"
 
     build_manifest(docs_dir, out_dir=site / rel_docs, pages=json_pages)
     print(f"✓ Wrote dist/site/{rel_display}site-manifest.json ({len(json_pages)} JSON page(s))")
 
-    md_count = build_markdown_twins(docs_dir, dest_root=markdown / rel_docs, pages=json_pages)
-    build_llms_txt(docs_dir, out_dir=markdown / rel_docs, pages=json_pages)
-    if md_count:
-        print(f"✓ Wrote {md_count} page.md twin(s) + llms.txt under dist/markdown/{rel_display}")
+    build_llms_txt(docs_dir, out_dir=site / rel_docs, pages=json_pages)
+    print(f"✓ Wrote dist/site/{rel_display}llms.txt")
 
     # Synthesized stubs (from .json or .md sources with no on-disk
     # .html sibling) are emitted inline by build_site / build_standalone
@@ -2686,10 +2444,6 @@ def cmd_build(args: argparse.Namespace) -> int:
     report("site root:", site)
     for src, _, _ in srcs:
         report("", site / src.relative_to(root))
-    if md_count:
-        print()
-        print("  markdown (LLM twins + llms.txt):")
-        report("markdown root:", markdown)
     return 0
 
 
@@ -3255,11 +3009,18 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 # ---------- main ----------
 def cmd_migrate(args: argparse.Namespace) -> int:
-    """`oku migrate [path]` — convert v1 page JSON files to v2 in place.
+    """`oku migrate [path]` — convert page-JSON sources (v1 or v2) to
+    v3 markdown.
 
-    The renderer accepts both shapes, so migration is optional. Run this
-    when you want the on-disk source to match the latest authoring shape
-    (compact keys + markdown strings) — usually for editing ergonomics.
+    Each page `foo.json` becomes `foo.md` next to it and the JSON file
+    is removed (`--keep-json` retains it; note a kept .json shadows the
+    .md — the walkers prefer the real JSON sibling). The .html stub is
+    untouched: it fetches `foo.json`, which `oku serve` and `oku build`
+    synthesize from the .md source.
+
+    The renderer accepts v1/v2 pages indefinitely, so migration is
+    optional — run it when you want the on-disk source in the current
+    authoring format.
 
     Exit codes:
       0 — done (zero or more files migrated; --dry-run also returns 0).
@@ -3280,10 +3041,10 @@ def cmd_migrate(args: argparse.Namespace) -> int:
                 data = json.loads(p.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 continue
-            if isinstance(data, dict) and data.get("kind") == "page" and "k" not in data:
+            if _is_page(data):
                 candidates.append(p)
     if not candidates:
-        print(f"✓ No v1 pages found under {target}")
+        print(f"✓ No page-JSON files found under {target}")
         return 0
     migrated = 0
     for p in candidates:
@@ -3292,27 +3053,24 @@ def cmd_migrate(args: argparse.Namespace) -> int:
         except (json.JSONDecodeError, OSError) as e:
             print(f"  skip {p}: {e}", file=sys.stderr)
             continue
-        if not (isinstance(data, dict) and data.get("kind") == "page"):
-            print(f"  skip {p.name}: not a v1 page")
+        if not _is_page(data):
+            print(f"  skip {p.name}: not a page")
             continue
-        v2 = _v1_to_v2(data)
+        md_path = p.with_suffix(".md")
         try:
             rel = p.relative_to(target if target.is_dir() else target.parent)
         except ValueError:
             rel = p
+        if md_path.exists():
+            print(f"  skip {rel}: {md_path.name} already exists")
+            continue
         if args.dry_run:
-            print(f"  would migrate {rel}")
+            print(f"  would migrate {rel} → {md_path.name}")
         else:
-            # Pretty-printed by default so the result is reviewable; the
-            # storage policy says compact is preferred for AI-authored
-            # pages but a migrated file is read by humans at least once.
-            payload = (
-                json.dumps(v2, ensure_ascii=False, indent=2)
-                if args.pretty
-                else json.dumps(v2, ensure_ascii=False, separators=(",", ":"))
-            )
-            p.write_text(payload + "\n", encoding="utf-8")
-            print(f"  migrated {rel}")
+            md_path.write_text(page_to_md(data), encoding="utf-8")
+            if not args.keep_json:
+                p.unlink()
+            print(f"  migrated {rel} → {md_path.name}")
         migrated += 1
     label = "Would migrate" if args.dry_run else "Migrated"
     print(f"\n{label} {migrated} page(s).")
@@ -3330,7 +3088,7 @@ def main() -> int:
     sub.add_parser("clean", help="remove dist/ from the current project")
     migrate_parser = sub.add_parser(
         "migrate",
-        help="convert v1 page JSON files to v2 (compact keys + markdown strings)",
+        help="convert page-JSON sources (v1/v2) to v3 markdown",
     )
     migrate_parser.add_argument(
         "path",
@@ -3344,9 +3102,9 @@ def main() -> int:
         help="list files that would change without writing",
     )
     migrate_parser.add_argument(
-        "--pretty",
+        "--keep-json",
         action="store_true",
-        help="indent the output JSON for human review (default is compact)",
+        help="keep the source .json next to the emitted .md (it shadows the .md until removed)",
     )
     check_parser = sub.add_parser(
         "check",

@@ -135,28 +135,6 @@ class TestBuildLlmsTxt:
         assert "> A test kit" in text
 
 
-# ---------- build_markdown_twins ----------
-
-
-class TestBuildMarkdownTwins:
-    def test_writes_md_alongside_each_page(self, tmp_path: Path) -> None:
-        _write_page(tmp_path / "a.json", title="Alpha")
-        _write_page(tmp_path / "sub" / "b.json", title="Beta")
-        count = cli.build_markdown_twins(tmp_path)
-        assert count == 2
-        assert (tmp_path / "a.md").exists()
-        assert (tmp_path / "sub" / "b.md").exists()
-
-    def test_md_starts_with_h1_title(self, tmp_path: Path) -> None:
-        _write_page(tmp_path / "a.json", title="Alpha")
-        cli.build_markdown_twins(tmp_path)
-        text = (tmp_path / "a.md").read_text(encoding="utf-8")
-        assert text.startswith("# Alpha\n")
-
-    def test_returns_zero_when_no_pages(self, tmp_path: Path) -> None:
-        assert cli.build_markdown_twins(tmp_path) == 0
-
-
 # ---------- extract_page_text ----------
 
 

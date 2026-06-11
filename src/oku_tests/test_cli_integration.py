@@ -97,13 +97,11 @@ class TestCLIBuild:
         # via <script src>) is no longer emitted in either tree.
         assert not (docs / "dist" / "site" / "site-manifest.js").exists()
         assert not (docs / "dist" / "standalone" / "site-manifest.js").exists()
-        # .md twins + llms.txt live under dist/markdown/ only — one
-        # canonical home for LLM consumers, no duplication.
-        assert (docs / "dist" / "markdown" / "index.md").exists()
-        assert (docs / "dist" / "markdown" / "llms.txt").exists()
-        for tree in ("standalone", "site"):
-            assert not (docs / "dist" / tree / "index.md").exists()
-            assert not (docs / "dist" / tree / "llms.txt").exists()
+        # llms.txt lives at the site docs root; the .md SOURCES are the
+        # canonical AI surface — no dist/markdown twin tree.
+        assert (docs / "dist" / "site" / "llms.txt").exists()
+        assert not (docs / "dist" / "markdown").exists()
+        assert not (docs / "dist" / "standalone" / "llms.txt").exists()
 
     def test_manifest_lists_both_pages(self, sample_project: Path, repo_root: Path) -> None:
         docs = sample_project / "docs"
@@ -134,7 +132,7 @@ class TestCLIBuild:
     def test_llms_txt_has_pages_section(self, sample_project: Path, repo_root: Path) -> None:
         docs = sample_project / "docs"
         _run_cli(docs, "build", repo_root=repo_root)
-        text = (docs / "dist" / "markdown" / "llms.txt").read_text(encoding="utf-8")
+        text = (docs / "dist" / "site" / "llms.txt").read_text(encoding="utf-8")
         assert "## Pages" in text
         assert "Index" in text
         assert "About" in text
