@@ -1,226 +1,74 @@
 {
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
-  "kind": "page",
-  "schema_version": 1,
-  "title": "Glossary & external refs",
-  "accent": "teal",
-  "meta": {
+  "k": "page",
+  "t": "Glossary & external refs",
+  "m": {
     "eyebrow": "Reference",
     "subtitle": "How the multi-domain, multi-language glossary registry works. File layout, project-level overrides, disambiguation, the resolution algorithm.",
     "audience": "Author",
     "date": "2026-05-18",
     "read_time": "~6 min read",
     "order": 30,
-    "summary": "Multi-domain glossary architecture and how to extend it."
+    "summary": "Multi-domain glossary architecture and how to extend it.",
+    "accent": "teal"
   },
-  "blocks": [
+  "b": [
+    "> [!TLDR]\n> Glossary and ext-ref entries live in per-domain files under _oku/glossary/ and _oku/extrefs/. Each project's kit.json activates a subset of domains in priority order and can add local overrides. Resolution walks active domains, falls back through preferred languages, surfaces unknowns via the forward-compat warning indicator.\n>\n> - Per-domain files — separate ACID in data-platforms from ACID in chemistry, separate RSD in adhd from RSD in radio.\n> - Per-entry multi-language variants — { \"en\": {...}, \"tr\": {...} }. The canonical link can differ per language.\n> - Project kit.json declares active domains + preferred language + project-local entries. Local entries always win on conflict.\n> - Unknown terms surface in the forward-compat warning indicator; add the entry to project kit.json or push to central.",
+    "## File layout {#layout}\n\nCentral glossaries ship with the kit; projects extend via kit.json or by adding their own domain files.\n\n```text\noku/                          # the kit repo\n├── glossary/\n│   ├── data-platforms.json\n│   ├── web.json\n│   ├── ai-llm.json\n│   ├── adhd.json    (structural stub — populate as needed)\n│   ├── hadith.json\n│   └── voice.json\n├── extrefs/\n│   ├── doc-tooling.json\n│   ├── data-platforms.json\n│   ├── web.json\n│   └── ai-llm.json\n└── ...\n\nyour-project/\n└── docs/\n    ├── _oku -> /path/to/oku   # symlink\n    ├── kit.json                    # active domains + overrides\n    ├── page-a.html / page-a.json\n    └── ...\n\n```",
+    "## Entry shape {#entry-shape}\n\nEach entry is a dict of language → { def, link }. def supports inline HTML (strong, em, br, code) because it's rendered as the tooltip body. The trust boundary is documented in chrome.js — kit-controlled files only.\n\n```json\n// _oku/glossary/data-platforms.json\n{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/glossary.schema.json\",\n  \"domain\": \"data-platforms\",\n  \"version\": 1,\n  \"entries\": {\n    \"ACID\": {\n      \"en\": {\n        \"def\": \"<strong>Atomicity, consistency, isolation, durability.</strong> Transaction guarantees.\",\n        \"link\": \"https://en.wikipedia.org/wiki/ACID\"\n      },\n      \"tr\": {\n        \"def\": \"Veritabanı işlemlerinde atomiklik, tutarlılık, izolasyon, dayanıklılık garantileri.\"\n      }\n    }\n  }\n}\n```\n\n> [!NEUTRAL] ext-refs use the same shape\n> _oku/extrefs/<domain>.json uses identical structure — each entry has language variants with name, summary, link. Same resolution algorithm, separate registry.",
+    "## Project configuration — kit.json {#project-config}\n\nEach project's docs/kit.json declares which domains are active and in what priority order, the preferred language with fallback chain, and any local additions or overrides.\n\n```json\n// docs/kit.json — Iceberg-team project\n{\n  \"name\": \"Spark+Iceberg notes\",\n  \"domains\": [\"data-platforms\", \"web\", \"ai-llm\"],\n  \"lang\": \"en\",\n  \"lang_fallback\": [\"en\"],\n  \"glossary\": {\n    \"data-platforms\": {\n      \"OurInternalTerm\": {\n        \"en\": { \"def\": \"Defined in this project only.\" }\n      }\n    }\n  }\n}\n```\n\n```json\n// docs/kit.json — personal-notes project in Turkish\n{\n  \"name\": \"Notlar\",\n  \"domains\": [\"adhd\", \"hadith\", \"voice\"],\n  \"lang\": \"tr\",\n  \"lang_fallback\": [\"en\"]\n}\n```\n\n> [!TIP] Local entries always win on conflict\n> When the same term appears in both `kit.json`'s `glossary[\"data-platforms\"]` AND in the central `_oku/glossary/data-platforms.json`, the project version is used. Merge happens after the central file loads, so a project override is never silently discarded by a later registry fetch.",
+    "## Disambiguation — same term, different domains {#disambiguation}\n\nWhen two active domains define the same term, the author can qualify with the in attribute. Default behavior is \"first matching domain wins\" so most usage is unqualified.\n\n```json\n// In page JSON, inside a paragraph.content array:\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\" }                       // first match wins\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"in\": \"chemistry\" }    // explicit\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"lang\": \"tr\" }         // override language\n```\n\nThe `in` attribute restricts lookup to one domain even if it's not first in the project's domains list. The `lang` attribute overrides the project's preferred language for that instance — useful when one term in a TR-default project needs an English-source citation.",
+    "## Resolution algorithm {#resolution}\n\nImplemented in chrome.js as __okuKit.resolveGlossary and resolveExtRef.",
     {
-      "kind": "tldr",
-      "summary": "Glossary and ext-ref entries live in per-domain files under _kit/glossary/ and _kit/extrefs/. Each project's kit.json activates a subset of domains in priority order and can add local overrides. Resolution walks active domains, falls back through preferred languages, surfaces unknowns via the forward-compat warning indicator.",
-      "bullets": [
-        "Per-domain files — separate ACID in data-platforms from ACID in chemistry, separate RSD in adhd from RSD in radio.",
-        "Per-entry multi-language variants — { \"en\": {...}, \"tr\": {...} }. The canonical link can differ per language.",
-        "Project kit.json declares active domains + preferred language + project-local entries. Local entries always win on conflict.",
-        "Unknown terms surface in the forward-compat warning indicator; add the entry to project kit.json or push to central."
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "layout",
-      "title": "File layout",
-      "lead": "Central glossaries ship with the kit; projects extend via kit.json or by adding their own domain files.",
-      "blocks": [
+      "k": "step-flow",
+      "steps": [
         {
-          "kind": "code",
-          "language": "text",
-          "source": "oku/                          # the kit repo\n├── glossary/\n│   ├── data-platforms.json\n│   ├── web.json\n│   ├── ai-llm.json\n│   ├── adhd.json    (structural stub — populate as needed)\n│   ├── hadith.json\n│   └── voice.json\n├── extrefs/\n│   ├── doc-tooling.json\n│   ├── data-platforms.json\n│   ├── web.json\n│   └── ai-llm.json\n└── ...\n\nyour-project/\n└── docs/\n    ├── _kit -> /path/to/oku   # symlink\n    ├── kit.json                    # active domains + overrides\n    ├── page-a.html / page-a.json\n    └── ...\n"
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "entry-shape",
-      "title": "Entry shape",
-      "lead": "Each entry is a dict of language → { def, link }. def supports inline HTML (strong, em, br, code) because it's rendered as the tooltip body. The trust boundary is documented in chrome.js — kit-controlled files only.",
-      "blocks": [
-        {
-          "kind": "code",
-          "language": "json",
-          "source": "// _kit/glossary/data-platforms.json\n{\n  \"$schema\": \"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/glossary.schema.json\",\n  \"domain\": \"data-platforms\",\n  \"version\": 1,\n  \"entries\": {\n    \"ACID\": {\n      \"en\": {\n        \"def\": \"<strong>Atomicity, consistency, isolation, durability.</strong> Transaction guarantees.\",\n        \"link\": \"https://en.wikipedia.org/wiki/ACID\"\n      },\n      \"tr\": {\n        \"def\": \"Veritabanı işlemlerinde atomiklik, tutarlılık, izolasyon, dayanıklılık garantileri.\"\n      }\n    }\n  }\n}"
+          "t": "Domain selection",
+          "b": "If the in attribute is set, lookup is restricted to that one domain. Otherwise walk the project's domains array in declared order."
         },
         {
-          "kind": "callout",
-          "type": "neutral",
-          "title": "ext-refs use the same shape",
-          "content": "_kit/extrefs/<domain>.json uses identical structure — each entry has language variants with name, summary, link. Same resolution algorithm, separate registry."
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "project-config",
-      "title": "Project configuration — kit.json",
-      "lead": "Each project's docs/kit.json declares which domains are active and in what priority order, the preferred language with fallback chain, and any local additions or overrides.",
-      "blocks": [
-        {
-          "kind": "code",
-          "language": "json",
-          "source": "// docs/kit.json — Iceberg-team project\n{\n  \"name\": \"Spark+Iceberg notes\",\n  \"domains\": [\"data-platforms\", \"web\", \"ai-llm\"],\n  \"lang\": \"en\",\n  \"lang_fallback\": [\"en\"],\n  \"glossary\": {\n    \"data-platforms\": {\n      \"OurInternalTerm\": {\n        \"en\": { \"def\": \"Defined in this project only.\" }\n      }\n    }\n  }\n}"
+          "t": "Per-domain lookup",
+          "b": "For each candidate domain, check project-local overrides first, then the central _oku/glossary/<domain>.json. First match wins."
         },
         {
-          "kind": "code",
-          "language": "json",
-          "source": "// docs/kit.json — personal-notes project in Turkish\n{\n  \"name\": \"Notlar\",\n  \"domains\": [\"adhd\", \"hadith\", \"voice\"],\n  \"lang\": \"tr\",\n  \"lang_fallback\": [\"en\"]\n}"
+          "t": "Language pick",
+          "b": "Try the preferred language (from lang attribute or kit.json's lang). If absent, walk kit.json's lang_fallback list. If still absent, use the first available language and mark data-lang-shown so the tooltip displays the actual language tag."
         },
         {
-          "kind": "info-tip",
-          "summary": "Local entries always win on conflict",
-          "content": [
-            {
-              "kind": "paragraph",
-              "content": [
-                "When the same term appears in both ",
-                {
-                  "kind": "code",
-                  "text": "kit.json"
-                },
-                "'s ",
-                {
-                  "kind": "code",
-                  "text": "glossary[\"data-platforms\"]"
-                },
-                " AND in the central ",
-                {
-                  "kind": "code",
-                  "text": "_kit/glossary/data-platforms.json"
-                },
-                ", the project version is used. Merge happens after the central file loads, so a project override is never silently discarded by a later registry fetch."
-              ]
-            }
-          ]
+          "t": "Unknown — surface a warning",
+          "b": "If no entry found anywhere, emit an unknown-glossary-term (or unknown-ext-ref) warning event. The forward-compat indicator counts it; the element gets the .unknown class with amber-dotted styling."
         }
       ]
     },
+    "## Adding new entries {#extending}\n\nTwo paths — project-local for quick iteration, central PR when the term proves general.",
     {
-      "kind": "section",
-      "id": "disambiguation",
-      "title": "Disambiguation — same term, different domains",
-      "lead": "When two active domains define the same term, the author can qualify with the in attribute. Default behavior is \"first matching domain wins\" so most usage is unqualified.",
-      "blocks": [
+      "k": "compare-grid",
+      "cards": [
         {
-          "kind": "code",
-          "language": "json",
-          "source": "// In page JSON, inside a paragraph.content array:\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\" }                       // first match wins\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"in\": \"chemistry\" }    // explicit\n{ \"kind\": \"glossary-term\", \"term\": \"ACID\", \"lang\": \"tr\" }         // override language"
+          "t": "Project-local first",
+          "b": "Add to your project's docs/kit.json under glossary[<domain>][<term>]. Takes effect immediately. No commits to the kit needed. Works for project-specific terms and quick experimentation.",
+          "verdict": "good"
         },
         {
-          "kind": "paragraph",
-          "content": [
-            "The ",
-            {
-              "kind": "code",
-              "text": "in"
-            },
-            " attribute restricts lookup to one domain even if it's not first in the project's domains list. The ",
-            {
-              "kind": "code",
-              "text": "lang"
-            },
-            " attribute overrides the project's preferred language for that instance — useful when one term in a TR-default project needs an English-source citation."
-          ]
+          "t": "Promote to central",
+          "b": "When a term proves general (used in two or three projects, or clearly belongs in the domain), commit it to _oku/glossary/<domain>.json. Remove the project-local copy when central lands.",
+          "verdict": "neutral"
         }
       ]
     },
+    "> [!SUCCESS] Forward-compat warning surfaces unknowns\n> When the AI emits a term that's not in any active domain, the warning indicator lights up with code: \"unknown-glossary-term\". Click to see the missing entry name. Fast feedback that an addition is overdue.",
+    "## Bundled starter content {#starter}\n\nThree domains arrive populated; three are empty structural stubs ready to fill in.",
     {
-      "kind": "section",
-      "id": "resolution",
-      "title": "Resolution algorithm",
-      "lead": "Implemented in chrome.js as __okuKit.resolveGlossary and resolveExtRef.",
-      "blocks": [
+      "k": "compare-grid",
+      "cards": [
         {
-          "kind": "step-flow",
-          "steps": [
-            {
-              "num": "1",
-              "title": "Domain selection",
-              "content": "If the in attribute is set, lookup is restricted to that one domain. Otherwise walk the project's domains array in declared order."
-            },
-            {
-              "num": "2",
-              "title": "Per-domain lookup",
-              "content": "For each candidate domain, check project-local overrides first, then the central _kit/glossary/<domain>.json. First match wins."
-            },
-            {
-              "num": "3",
-              "title": "Language pick",
-              "content": "Try the preferred language (from lang attribute or kit.json's lang). If absent, walk kit.json's lang_fallback list. If still absent, use the first available language and mark data-lang-shown so the tooltip displays the actual language tag."
-            },
-            {
-              "num": "4",
-              "title": "Unknown — surface a warning",
-              "content": "If no entry found anywhere, emit an unknown-glossary-term (or unknown-ext-ref) warning event. The forward-compat indicator counts it; the element gets the .unknown class with amber-dotted styling."
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "extending",
-      "title": "Adding new entries",
-      "lead": "Two paths — project-local for quick iteration, central PR when the term proves general.",
-      "blocks": [
-        {
-          "kind": "compare-grid",
-          "cards": [
-            {
-              "verdict": "good",
-              "title": "Project-local first",
-              "content": "Add to your project's docs/kit.json under glossary[<domain>][<term>]. Takes effect immediately. No commits to the kit needed. Works for project-specific terms and quick experimentation."
-            },
-            {
-              "verdict": "neutral",
-              "title": "Promote to central",
-              "content": "When a term proves general (used in two or three projects, or clearly belongs in the domain), commit it to _kit/glossary/<domain>.json. Remove the project-local copy when central lands."
-            }
-          ]
+          "t": "Populated",
+          "b": "- data-platforms — ACID, MVCC, Iceberg, Spark, Flink, Paimon, Catalog, Snapshot, Compaction, Time travel (with TR translations on the most common)\n- web — Custom Elements, Shadow DOM, FOUC, Viewport, Visual Viewport, prefers-color-scheme, localStorage, History API, IntersectionObserver, CSS variable\n- ai-llm — RAG, Tokenization, Prompt cache, Context window, Embedding, Vector DB, Function calling, Hallucination, Few-shot, Top-k / Top-p",
+          "verdict": "in"
         },
         {
-          "kind": "callout",
-          "type": "success",
-          "title": "Forward-compat warning surfaces unknowns",
-          "content": "When the AI emits a term that's not in any active domain, the warning indicator lights up with code: \"unknown-glossary-term\". Click to see the missing entry name. Fast feedback that an addition is overdue."
-        }
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "starter",
-      "title": "Bundled starter content",
-      "lead": "Three domains arrive populated; three are empty structural stubs ready to fill in.",
-      "blocks": [
-        {
-          "kind": "compare-grid",
-          "cards": [
-            {
-              "verdict": "in",
-              "title": "Populated",
-              "items": [
-                "data-platforms — ACID, MVCC, Iceberg, Spark, Flink, Paimon, Catalog, Snapshot, Compaction, Time travel (with TR translations on the most common)",
-                "web — Custom Elements, Shadow DOM, FOUC, Viewport, Visual Viewport, prefers-color-scheme, localStorage, History API, IntersectionObserver, CSS variable",
-                "ai-llm — RAG, Tokenization, Prompt cache, Context window, Embedding, Vector DB, Function calling, Hallucination, Few-shot, Top-k / Top-p"
-              ]
-            },
-            {
-              "verdict": "out",
-              "title": "Structural stubs",
-              "items": [
-                "adhd — populate with RSD, hyperfocus, executive dysfunction, etc.",
-                "hadith — populate with isnad, matn, sahih, da'if, etc.",
-                "voice — populate with phoneme, prosody, formant, etc.",
-                "Add new domains by dropping a new <domain>.json file in glossary/ and listing it in your project's kit.json"
-              ]
-            }
-          ]
+          "t": "Structural stubs",
+          "b": "- adhd — populate with RSD, hyperfocus, executive dysfunction, etc.\n- hadith — populate with isnad, matn, sahih, da'if, etc.\n- voice — populate with phoneme, prosody, formant, etc.\n- Add new domains by dropping a new <domain>.json file in glossary/ and listing it in your project's kit.json",
+          "verdict": "out"
         }
       ]
     }

@@ -1,222 +1,136 @@
 {
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
-  "kind": "page",
-  "schema_version": 1,
-  "title": "oku",
-  "accent": "teal",
-  "meta": {
+  "k": "page",
+  "t": "oku",
+  "m": {
     "eyebrow": "Documentation kit · oku",
     "subtitle": "Renders JSON or Markdown pages in the browser. Single-source content, no build step for authoring, multi-page site with full-text search when you want one.",
     "audience": "Author",
     "order": 1,
-    "summary": "What the kit is, how it's organised, where the documentation lives."
+    "summary": "What the kit is, how it's organised, where the documentation lives.",
+    "accent": "teal"
   },
-  "blocks": [
+  "b": [
+    "> [!TLDR]\n> Pages are JSON or Markdown. The browser renders them via Custom Elements; no build step needed to read. Run oku build to emit a multi-page site (with Pagefind search) or a standalone single file for offline reading.\n>\n> - Source: <name>.json (kit schema) or <name>.md (existing Markdown drops in unchanged).\n> - Runtime: chrome.js + renderer.js load from a _oku symlink. No copies, no version drift.\n> - Primitives: callout, kpi-grid, table, compare-grid, step-flow, chart, diagram, live-snippet, annotated-code, glossary tooltips, citation cards.\n> - Output: dist/site/ (multi-page + Pagefind) and dist/standalone/ (single file with inline page JSON for email / archive).",
+    "## Documentation {#docs}\n\nEight pages. Cards link straight to each — Reference covers core primitives; Charts / Tables / Diagrams break out the heavy ones; Glossary / Architecture / CLI go deeper.",
     {
-      "kind": "tldr",
-      "summary": "Pages are JSON or Markdown. The browser renders them via Custom Elements; no build step needed to read. Run oku build to emit a multi-page site (with Pagefind search) or a standalone single file for offline reading.",
-      "bullets": [
-        "Source: <name>.json (kit schema) or <name>.md (existing Markdown drops in unchanged).",
-        "Runtime: chrome.js + renderer.js load from a _kit symlink. No copies, no version drift.",
-        "Primitives: callout, kpi-grid, table, compare-grid, step-flow, chart, diagram, live-snippet, annotated-code, glossary tooltips, citation cards.",
-        "Output: dist/site/ (multi-page + Pagefind) and dist/standalone/ (single file with inline page JSON for email / archive)."
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "docs",
-      "title": "Documentation",
-      "lead": "Eight pages. Cards link straight to each — Reference covers core primitives; Charts / Tables / Diagrams break out the heavy ones; Glossary / Architecture / CLI go deeper.",
-      "blocks": [
+      "k": "step-flow",
+      "steps": [
         {
-          "kind": "step-flow",
-          "steps": [
-            {
-              "num": "1",
-              "title": "Reference",
-              "meta": "start here · prose, layout, inline",
-              "href": "reference.html",
-              "content": "Project setup, page anatomy, Markdown sources, the prose / emphasis / structured-layout primitives, per-page metadata, build outputs."
-            },
-            {
-              "num": "2",
-              "title": "Tables",
-              "meta": "flat · grouped · chips · board",
-              "href": "tables.html",
-              "content": "table primitive — flat rows, grouped rows, chip filters, board / kanban view, sticky headers, drag-resize columns, word-wrap by default."
-            },
-            {
-              "num": "3",
-              "title": "Charts",
-              "meta": "37 variants · 8 function groups",
-              "href": "charts.html",
-              "content": "Every chart variant with a tiny live sample, grouped by what you're trying to show (compare · trend · distribution · composition · relationship · hierarchy · flow · location) plus rich hover, click-to-pin, pan/zoom fullscreen, and the live configure popover."
-            },
-            {
-              "num": "4",
-              "title": "Diagrams",
-              "meta": "Mermaid catalog",
-              "href": "diagrams.html",
-              "content": "diagram primitive + every Mermaid v10 type the kit forwards (flowchart, sequence, state, ER, class, gantt, pie, journey, mindmap, timeline, sankey-beta, ...). Theme tokens flow through."
-            },
-            {
-              "num": "5",
-              "title": "Glossary & ext-refs",
-              "meta": "multi-domain registry",
-              "href": "glossary.html",
-              "content": "File layout, multi-language entries, project overrides, disambiguation syntax, resolution algorithm."
-            },
-            {
-              "num": "6",
-              "title": "Architecture",
-              "meta": "internals · developer audience",
-              "href": "architecture.html",
-              "content": "How the kit fits together at runtime — render flow, tooltip controller, kit loader, build pipeline, standalone bundle. Read this when extending or debugging the kit itself."
-            },
-            {
-              "num": "7",
-              "title": "CLI reference",
-              "meta": "init · build · clean · check · serve",
-              "href": "cli.html",
-              "content": "Five commands. What each does, what output to expect, the doctree linter's severity table, the optional Pagefind and jsonschema dependencies."
-            },
-            {
-              "num": "8",
-              "title": "Roadmap",
-              "meta": "what's next · oku 1.0",
-              "href": "roadmap.html",
-              "content": "Ten phases, every tracked item, the principles driving the rewrite, and the open questions still on the table."
-            }
-          ]
+          "t": "Reference",
+          "b": "Project setup, page anatomy, Markdown sources, the prose / emphasis / structured-layout primitives, per-page metadata, build outputs.",
+          "meta": "start here · prose, layout, inline",
+          "href": "reference.html"
+        },
+        {
+          "t": "Tables",
+          "b": "table primitive — flat rows, grouped rows, chip filters, board / kanban view, sticky headers, drag-resize columns, word-wrap by default.",
+          "meta": "flat · grouped · chips · board",
+          "href": "tables.html"
+        },
+        {
+          "t": "Charts",
+          "b": "Every chart variant with a tiny live sample, grouped by what you're trying to show (compare · trend · distribution · composition · relationship · hierarchy · flow · location) plus rich hover, click-to-pin, pan/zoom fullscreen, and the live configure popover.",
+          "meta": "37 variants · 8 function groups",
+          "href": "charts.html"
+        },
+        {
+          "t": "Diagrams",
+          "b": "diagram primitive + every Mermaid v10 type the kit forwards (flowchart, sequence, state, ER, class, gantt, pie, journey, mindmap, timeline, sankey-beta, ...). Theme tokens flow through.",
+          "meta": "Mermaid catalog",
+          "href": "diagrams.html"
+        },
+        {
+          "t": "Glossary & ext-refs",
+          "b": "File layout, multi-language entries, project overrides, disambiguation syntax, resolution algorithm.",
+          "meta": "multi-domain registry",
+          "href": "glossary.html"
+        },
+        {
+          "t": "Architecture",
+          "b": "How the kit fits together at runtime — render flow, tooltip controller, kit loader, build pipeline, standalone bundle. Read this when extending or debugging the kit itself.",
+          "meta": "internals · developer audience",
+          "href": "architecture.html"
+        },
+        {
+          "t": "CLI reference",
+          "b": "Five commands. What each does, what output to expect, the doctree linter's severity table, the optional Pagefind and jsonschema dependencies.",
+          "meta": "init · build · clean · check · migrate · serve",
+          "href": "cli.html"
+        },
+        {
+          "t": "Roadmap",
+          "b": "Ten phases, every tracked item, the principles driving the rewrite, and the open questions still on the table.",
+          "meta": "what's next · oku 1.0",
+          "href": "roadmap.html"
         }
       ]
     },
+    "## What a page looks like {#shape}\n\nTwo source formats produce the same rendered page. Pick whichever fits the content — JSON for kit-native authoring, Markdown for prose that should drop in unchanged. Code on the left, the actual rendered output on the right.\n\n### JSON source {#shape-json}\n\nHand-authored or AI-emitted. Every block declares its kind explicitly; nothing has to be guessed. Validated against the kit schema before it ships.",
     {
-      "kind": "section",
-      "id": "shape",
-      "title": "What a page looks like",
-      "lead": "Two source formats produce the same rendered page. Pick whichever fits the content — JSON for kit-native authoring, Markdown for prose that should drop in unchanged. Code on the left, the actual rendered output on the right.",
-      "blocks": [
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "shape-json",
-          "title": "JSON source"
-        },
-        {
-          "kind": "paragraph",
-          "content": "Hand-authored or AI-emitted. Every block declares its kind explicitly; nothing has to be guessed. Validated against the kit schema before it ships."
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "json",
-            "source": "{\n  \"kind\": \"callout\",\n  \"type\": \"info\",\n  \"title\": \"Heads up\",\n  \"content\": \"Callouts carry one of seven tones: info, tip, note, neutral, success, caution, danger.\"\n}"
-          },
-          "output": {
-            "kind": "callout",
-            "type": "info",
-            "title": "Heads up",
-            "content": "Callouts carry one of seven tones: info, tip, note, neutral, success, caution, danger."
-          }
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "json",
-            "source": "{\n  \"kind\": \"kpi-grid\",\n  \"tiles\": [\n    { \"num\": \"29\",   \"label\": \"chart variants\" },\n    { \"num\": \"JSON\", \"label\": \"single source\" },\n    { \"num\": \"0\",    \"label\": \"build steps for content\" }\n  ]\n}"
-          },
-          "output": {
-            "kind": "kpi-grid",
-            "tiles": [
-              { "num": "29",   "label": "chart variants" },
-              { "num": "JSON", "label": "single source" },
-              { "num": "0",    "label": "build steps for content" }
-            ]
-          }
-        },
-        {
-          "kind": "heading",
-          "level": 3,
-          "id": "shape-md",
-          "title": "Markdown source"
-        },
-        {
-          "kind": "paragraph",
-          "content": "Drop existing .md files into the docs root. ATX headings, code fences (mermaid included), lists, tables, blockquotes, inline formatting all convert. Relative .md links retarget to .html. README / CHANGELOG / CLAUDE.md and friends are surfaced as pages too."
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "markdown",
-            "source": "> Blockquotes become neutral callouts.\n>\n> Multiple lines stay grouped inside the same callout body."
-          },
-          "output": {
-            "kind": "callout",
-            "type": "neutral",
-            "content": "Blockquotes become neutral callouts.\n\nMultiple lines stay grouped inside the same callout body."
-          }
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "markdown",
-            "source": "- *emphasis* and **strong** work inline\n- `inline code` renders with the kit's monospace font\n- bullets and numbered lists fold straight in"
-          },
-          "output": {
-            "kind": "list",
-            "style": "bullet",
-            "items": [
-              "*emphasis* and **strong** work inline",
-              "`inline code` renders with the kit's monospace font",
-              "bullets and numbered lists fold straight in"
-            ]
-          }
-        },
-        {
-          "kind": "example",
-          "code": {
-            "kind": "code",
-            "language": "markdown",
-            "source": "```mermaid\nflowchart LR\n  A[\"Markdown\"] --> B[\"oku\"]\n  B --> C[\"Rendered diagram\"]\n```"
-          },
-          "output": {
-            "kind": "diagram",
-            "source": "flowchart LR\n  A[\"Markdown\"] --> B[\"oku\"]\n  B --> C[\"Rendered diagram\"]\n"
-          }
-        }
-      ]
+      "k": "example",
+      "code": {
+        "k": "code",
+        "src": "{\n  \"kind\": \"callout\",\n  \"type\": \"info\",\n  \"title\": \"Heads up\",\n  \"content\": \"Callouts carry one of seven tones: info, tip, note, neutral, success, caution, danger.\"\n}",
+        "lang": "json"
+      },
+      "output": "> [!INFO] Heads up\n> Callouts carry one of seven tones: info, tip, note, neutral, success, caution, danger."
     },
     {
-      "kind": "section",
-      "id": "quickstart",
-      "title": "Quickstart",
-      "lead": "Three commands. Adopt the kit for an existing docs/ directory without rewriting anything.",
-      "blocks": [
-        {
-          "kind": "code",
-          "language": "bash",
-          "source": "cd path/to/your-project/docs\noku init     # creates _kit symlink + index.html\noku serve    # http://localhost:9876 with live reload"
-        },
-        {
-          "kind": "paragraph",
-          "content": [
-            "After ",
-            { "kind": "code", "text": "init" },
-            ", any ",
-            { "kind": "code", "text": ".json" },
-            " or ",
-            { "kind": "code", "text": ".md" },
-            " file in the docs tree is a page. The sidebar lists them; the on-page TOC builds from H2 / H3; full-text search builds with ",
-            { "kind": "code", "text": "oku build" },
-            " (if Pagefind is on PATH)."
-          ]
-        }
-      ]
-    }
+      "k": "example",
+      "code": {
+        "k": "code",
+        "src": "{\n  \"kind\": \"kpi-grid\",\n  \"tiles\": [\n    { \"num\": \"29\",   \"label\": \"chart variants\" },\n    { \"num\": \"JSON\", \"label\": \"single source\" },\n    { \"num\": \"0\",    \"label\": \"build steps for content\" }\n  ]\n}",
+        "lang": "json"
+      },
+      "output": {
+        "k": "kpi-grid",
+        "tiles": [
+          {
+            "num": "29",
+            "label": "chart variants"
+          },
+          {
+            "num": "JSON",
+            "label": "single source"
+          },
+          {
+            "num": "0",
+            "label": "build steps for content"
+          }
+        ]
+      }
+    },
+    "### Markdown source {#shape-md}\n\nDrop existing .md files into the docs root. ATX headings, code fences (mermaid included), lists, tables, blockquotes, inline formatting all convert. Relative .md links retarget to .html. README / CHANGELOG / CLAUDE.md and friends are surfaced as pages too.",
+    {
+      "k": "example",
+      "code": {
+        "k": "code",
+        "src": "> Blockquotes become neutral callouts.\n>\n> Multiple lines stay grouped inside the same callout body.",
+        "lang": "markdown"
+      },
+      "output": "> [!NEUTRAL]\n> Blockquotes become neutral callouts.\n> \n> Multiple lines stay grouped inside the same callout body."
+    },
+    {
+      "k": "example",
+      "code": {
+        "k": "code",
+        "src": "- *emphasis* and **strong** work inline\n- `inline code` renders with the kit's monospace font\n- bullets and numbered lists fold straight in",
+        "lang": "markdown"
+      },
+      "output": "- *emphasis* and **strong** work inline\n- `inline code` renders with the kit's monospace font\n- bullets and numbered lists fold straight in"
+    },
+    {
+      "k": "example",
+      "code": {
+        "k": "code",
+        "src": "```mermaid\nflowchart LR\n  A[\"Markdown\"] --> B[\"oku\"]\n  B --> C[\"Rendered diagram\"]\n```",
+        "lang": "markdown"
+      },
+      "output": {
+        "k": "diagram",
+        "src": "flowchart LR\n  A[\"Markdown\"] --> B[\"oku\"]\n  B --> C[\"Rendered diagram\"]\n"
+      }
+    },
+    "## Quickstart {#quickstart}\n\nThree commands. Adopt the kit for an existing docs/ directory without rewriting anything.\n\n```bash\ncd path/to/your-project/docs\noku init     # creates _oku symlink + index.html\noku serve    # http://localhost:9876 with live reload\n```\n\nAfter `init`, any `.json` or `.md` file in the docs tree is a page. The sidebar lists them; the on-page TOC builds from H2 / H3; full-text search builds with `oku build` (if Pagefind is on PATH)."
   ]
 }

@@ -100,7 +100,8 @@ def _kit_version() -> int:
             latest = mt
     return int(latest)
 SKIP_DIRS = {
-    "dist", "_kit", "node_modules", ".git", "venv", ".venv",
+    # `_kit` kept alongside `_oku` so legacy projects still skip the symlink dir.
+    "dist", "_oku", "_kit", "node_modules", ".git", "venv", ".venv",
     "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".idea",
     # templates/ ships the starter pair for `oku init` (now under
     # src/oku/templates/). Walking it earlier produced stray
@@ -244,7 +245,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     or descends into a "docs" subdir; cwd IS the docs root.
     """
     root = Path.cwd()
-    kit_link = root / "_kit"
+    kit_link = root / "_oku"
 
     if kit_link.is_symlink():
         # Resolve before comparing — the on-disk symlink may be relative
@@ -266,16 +267,11 @@ def cmd_init(args: argparse.Namespace) -> int:
         kit_link.symlink_to(KIT_DIR)
         print(f"✓ Linked {kit_link} -> {KIT_DIR}")
 
-    # Materialise the page-JSON for every .md page in the tree BEFORE
-    # writing index.html. The runtime renderer fetches `<page>.json`
-    # for every manifest entry; for MD-sourced pages this file is
-    # otherwise virtual (only `oku serve` synthesises it). Without
-    # the on-disk JSON, IDE static servers return 404 and the page
-    # renders empty. Idempotent; overwrites with current MD content.
-    md_count = _materialise_md_pages(root)
-    if md_count:
-        print(f"✓ Materialised {md_count} page-JSON file(s) from Markdown sources")
-
+    # `oku init` deliberately does NOT generate .json twins of .md files.
+    # The source of truth stays the .md (or hand-authored .json) — no
+    # duplication on disk. `oku serve` synthesises the .json view in
+    # memory; `oku build` emits dist/ artifacts. IDE static servers
+    # need either oku serve OR a build artifact to render .md pages.
     index_html = root / "index.html"
     title = "Documentation"
     index_json = root / "index.json"
@@ -310,68 +306,14 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-def _materialise_md_pages(root: Path) -> int:
-    """Write page-JSON next to every .md the walker would discover.
-
-    Mirrors find_json_pages's MD-walking logic exactly so the on-disk
-    JSONs match what the runtime renderer expects. Returns the count of
-    files written.
-
-    Skips:
-    - SKIP_DIRS (dist, _kit, .git, .venv, node_modules, ...).
-    - .md files whose .json sibling is a hand-authored page-JSON
-      (kind=page) — never clobber author work with a synthesis.
-
-    Output is content-stable: a no-op re-write of the same MD produces
-    byte-identical JSON, so VCS doesn't see spurious churn.
-    """
-    written = 0
-    extra = project_skip_dirs(root)
-    for md in sorted(iter_repo_files(root, (".md",), extra_skip=extra)):
-        json_sibling = md.with_suffix(".json")
-        existing_text: str | None = None
-        if json_sibling.exists():
-            # Don't clobber a hand-authored page-JSON sibling. We
-            # distinguish materialised output by a sentinel under
-            # ``meta._materialised_by`` (which the schema allows via
-            # ``additionalProperties: true`` on ``meta``). Anything
-            # without the sentinel is treated as author-owned.
-            try:
-                existing_text = json_sibling.read_text(encoding="utf-8")
-                existing = json.loads(existing_text)
-                if isinstance(existing, dict):
-                    meta = existing.get("meta") or {}
-                    if meta.get("_materialised_by") != "oku-init":
-                        continue
-            except (json.JSONDecodeError, OSError):
-                # Unreadable sibling — overwrite is fine.
-                existing_text = None
-        try:
-            text = md.read_text(encoding="utf-8")
-            page = md_to_page(text, default_title=md.stem)
-        except (OSError, ValueError):
-            continue
-        meta = page.setdefault("meta", {})
-        meta["_materialised_by"] = "oku-init"
-        new_text = json.dumps(page, ensure_ascii=False, indent=2) + "\n"
-        # Skip the write when the rendered JSON matches what's already
-        # on disk — saves a syscall per MD file AND avoids triggering
-        # IDE / file-watcher reloads on a no-op init.
-        if existing_text == new_text:
-            continue
-        json_sibling.write_text(new_text, encoding="utf-8")
-        written += 1
-    return written
-
-
 # ---------- build ----------
 # The href/src may carry an optional ?v=<n> cache-buster — match it
 # greedily so the standalone-build inliner can swap the tag whether or
 # not the stub generator stamped a version on it.
-LINK_TO_KIT_CSS = re.compile(r'<link\s+rel="stylesheet"\s+href="_kit/chrome\.css(?:\?[^"]*)?"\s*/?>', re.I)
-SCRIPT_TO_KIT_BOOT = re.compile(r'<script\s+src="_kit/chrome-boot\.js(?:\?[^"]*)?"\s*></script>', re.I)
-SCRIPT_TO_KIT_MAIN = re.compile(r'<script\s+src="_kit/chrome\.js(?:\?[^"]*)?"\s+defer\s*></script>', re.I)
-SCRIPT_TO_KIT_RENDERER = re.compile(r'<script\s+src="_kit/renderer\.js(?:\?[^"]*)?"\s+defer\s*></script>', re.I)
+LINK_TO_KIT_CSS = re.compile(r'<link\s+rel="stylesheet"\s+href="_oku/chrome\.css(?:\?[^"]*)?"\s*/?>', re.I)
+SCRIPT_TO_KIT_BOOT = re.compile(r'<script\s+src="_oku/chrome-boot\.js(?:\?[^"]*)?"\s*></script>', re.I)
+SCRIPT_TO_KIT_MAIN = re.compile(r'<script\s+src="_oku/chrome\.js(?:\?[^"]*)?"\s+defer\s*></script>', re.I)
+SCRIPT_TO_KIT_RENDERER = re.compile(r'<script\s+src="_oku/renderer\.js(?:\?[^"]*)?"\s+defer\s*></script>', re.I)
 
 
 def find_html_files(root: Path):
@@ -390,7 +332,7 @@ def find_html_files(root: Path):
             head = p.read_text(encoding="utf-8", errors="ignore")[:2048]
         except OSError:
             continue
-        if "_kit/chrome.js" not in head and "_kit/chrome-boot.js" not in head:
+        if "_oku/chrome.js" not in head and "_oku/chrome-boot.js" not in head:
             continue
         out.append(p)
     return sorted(out, key=lambda x: str(x).lower())
@@ -735,11 +677,19 @@ def md_to_page(text: str, default_title: str = "Untitled") -> dict:
         return j, {"kind": "paragraph", "content": content}
 
     def take_code_fence(start: int) -> tuple[int, dict]:
-        m = re.match(r"^```(\S*)\s*$", lines[start])
-        lang = (m.group(1) if m else "").lower()
+        # Variable-length fence: a fence of N backticks closes only at a
+        # line of N (or more) backticks. Lets authors nest a 3-tick code
+        # block inside a 4-tick outer fence (the CommonMark-compliant
+        # way to show markdown code samples that contain code fences).
+        m = re.match(r"^(`{3,})(\S*)\s*$", lines[start])
+        if not m:
+            return start + 1, {"kind": "code", "source": ""}
+        open_len = len(m.group(1))
+        lang = (m.group(2) or "").lower()
+        close_re = re.compile(r"^`{" + str(open_len) + r",}\s*$")
         body: list = []
         j = start + 1
-        while j < len(lines) and not re.match(r"^```\s*$", lines[j]):
+        while j < len(lines) and not close_re.match(lines[j]):
             body.append(lines[j])
             j += 1
         source = "\n".join(body)
@@ -1050,10 +1000,10 @@ def _stub_for(title: str, *, inline_manifest: dict | None = None) -> str:
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
         f'<title>{html_escape(title)}</title>\n'
         f'{manifest_block}'
-        f'<script src="_kit/chrome-boot.js?v={v}"></script>\n'
-        f'<link rel="stylesheet" href="_kit/chrome.css?v={v}">\n'
-        f'<script src="_kit/chrome.js?v={v}" defer></script>\n'
-        f'<script src="_kit/renderer.js?v={v}" defer></script>\n'
+        f'<script src="_oku/chrome-boot.js?v={v}"></script>\n'
+        f'<link rel="stylesheet" href="_oku/chrome.css?v={v}">\n'
+        f'<script src="_oku/chrome.js?v={v}" defer></script>\n'
+        f'<script src="_oku/renderer.js?v={v}" defer></script>\n'
         '</head>\n<body></body>\n</html>\n'
     )
 
@@ -1077,15 +1027,15 @@ def html_escape(s: str) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-_KIT_URL_RE = re.compile(r'((?:src|href)=")(_kit/)', re.I)
+_KIT_URL_RE = re.compile(r'((?:src|href)=")(_oku/)', re.I)
 
 
 def _retarget_kit_urls(html: str, depth: int) -> str:
-    """Rewrite ``_kit/`` URLs in a stub for a page nested ``depth``
+    """Rewrite ``_oku/`` URLs in a stub for a page nested ``depth``
     levels deep (depth 0 = top-level dist page).
 
     Pages at e.g. dist/site/examples/storage/iceberg-detail.html need
-    `_kit/chrome.js` to resolve to `dist/site/_kit/chrome.js` —
+    `_oku/chrome.js` to resolve to `dist/site/_oku/chrome.js` —
     that's two levels up. This rewriter prefixes the kit URL with the
     right number of `../`.
     """
@@ -1093,6 +1043,309 @@ def _retarget_kit_urls(html: str, depth: int) -> str:
         return html
     prefix = "../" * depth
     return _KIT_URL_RE.sub(lambda m: m.group(1) + prefix + m.group(2), html)
+
+
+def _is_page(data) -> bool:
+    """True for either v1 ({kind:'page'}) or v2 ({k:'page'}) shape."""
+    return isinstance(data, dict) and (data.get("k") == "page" or data.get("kind") == "page")
+
+
+def _page_title(data: dict) -> str:
+    return data.get("t") or data.get("title") or ""
+
+
+def _page_meta(data: dict) -> dict:
+    m = data.get("m") if data.get("m") is not None else data.get("meta")
+    return m if isinstance(m, dict) else {}
+
+
+def _page_blocks(data: dict) -> list:
+    b = data.get("b") if data.get("b") is not None else data.get("blocks")
+    return b if isinstance(b, list) else []
+
+
+# ---------------------------------------------------------------------------
+# v1 → v2 conversion
+#
+# Pages on disk authored against the v1 schema (kind/title/blocks/section/
+# paragraph/heading/list/callout/tldr/info-tip/rich-strings) are converted
+# into the compact v2 shape (k/t/m/b with markdown strings inside b[]).
+# The kit's renderer.js carries the same logic so unmigrated pages still
+# render. `oku migrate` runs this on disk so the source becomes v2 too.
+# ---------------------------------------------------------------------------
+
+
+def _rich_to_md(rich) -> str:
+    if rich is None:
+        return ""
+    if isinstance(rich, str):
+        return rich
+    if not isinstance(rich, list):
+        return ""
+    out: list[str] = []
+    for seg in rich:
+        if isinstance(seg, str):
+            out.append(seg)
+            continue
+        if not isinstance(seg, dict):
+            continue
+        k = seg.get("kind")
+        text = seg.get("text") or ""
+        if k == "em":
+            out.append(f"*{text}*")
+        elif k == "strong":
+            out.append(f"**{text}**")
+        elif k == "code":
+            out.append(f"`{text}`")
+        elif k == "link":
+            out.append(f"[{text or seg.get('href', '')}]({seg.get('href', '')})")
+        elif k == "glossary-term":
+            term = seg.get("term") or ""
+            out.append(f"[{text or term}](#g/{term})")
+        elif k == "ext-ref":
+            name = seg.get("name") or ""
+            out.append(f"[{text or name}](#x/{name})")
+        elif k == "html":
+            out.append(text)
+    return "".join(out)
+
+
+def _v1_to_v2_th(h):
+    if isinstance(h, dict) and not isinstance(h, list) and "label" in h:
+        out = dict(h)
+        out["label"] = _rich_to_md(h["label"])
+        return out
+    return _rich_to_md(h)
+
+
+def _v1_to_v2_tc(c):
+    if isinstance(c, dict) and not isinstance(c, list) and isinstance(c.get("values"), list):
+        out = dict(c)
+        if "value" in c:
+            out["value"] = _rich_to_md(c["value"])
+        return out
+    return _rich_to_md(c)
+
+
+def _v1_to_v2_tr(r):
+    if isinstance(r, list):
+        return [_v1_to_v2_tc(c) for c in r]
+    if isinstance(r, dict) and "cells" in r:
+        out = dict(r)
+        out["cells"] = [_v1_to_v2_tc(c) for c in r["cells"]]
+        return out
+    return r
+
+
+def _v1_to_v2_block(blk):
+    """Convert one v1 content-block into either a markdown string or a v2 typed block dict."""
+    if not isinstance(blk, dict):
+        return None
+    k = blk.get("kind")
+    if k == "paragraph":
+        return _rich_to_md(blk.get("content"))
+    if k == "heading":
+        lvl = max(3, min(6, blk.get("level") or 3))
+        out = "#" * lvl + " " + (blk.get("title") or "")
+        if blk.get("id"):
+            out += " {#" + blk["id"] + "}"
+        return out
+    if k == "list":
+        style = blk.get("style") or "bullet"
+        items = blk.get("items") or []
+        lines = []
+        for i, it in enumerate(items):
+            marker = f"{i + 1}." if style == "numbered" else "-"
+            lines.append(f"{marker} {_rich_to_md(it)}")
+        return "\n".join(lines)
+    if k == "callout":
+        typ = (blk.get("type") or "note").upper()
+        title = blk.get("title") or ""
+        body = ""
+        if blk.get("content") is not None:
+            md = _rich_to_md(blk["content"])
+            if md:
+                body = "\n" + "\n".join("> " + ln for ln in md.split("\n"))
+        return f"> [!{typ}]" + (f" {title}" if title else "") + body
+    if k == "tldr":
+        body = ""
+        if blk.get("summary"):
+            body += "\n> " + _rich_to_md(blk["summary"])
+        if isinstance(blk.get("bullets"), list) and blk["bullets"]:
+            body += "\n>"
+            for bl in blk["bullets"]:
+                body += "\n> - " + _rich_to_md(bl)
+        title = blk.get("title") or ""
+        return "> [!TLDR]" + (f" {title}" if title else "") + body
+    if k == "info-tip":
+        parts: list[str] = []
+        for sub in blk.get("content") or []:
+            c = _v1_to_v2_block(sub)
+            if isinstance(c, str):
+                parts.append(c)
+        body = ""
+        if parts:
+            chunks = "\n\n".join(parts)
+            body = "\n" + "\n".join("> " + ln for ln in chunks.split("\n"))
+        return "> [!TIP]" + (f" {blk.get('summary')}" if blk.get("summary") else "") + body
+    if k == "insight":
+        return {"k": "insight", "b": _rich_to_md(blk.get("content"))}
+    if k == "code":
+        lang = blk.get("language") or ""
+        return f"```{lang}\n{blk.get('source') or ''}\n```"
+    if k == "diagram":
+        out_d = {"k": "diagram", "src": blk.get("source") or ""}
+        if blk.get("caption"):
+            out_d["caption"] = blk["caption"]
+        return out_d
+    if k == "live-snippet":
+        out_l = {"k": "live-snippet", "src": blk.get("source") or ""}
+        if blk.get("language"):
+            out_l["lang"] = blk["language"]
+        if blk.get("label"):
+            out_l["label"] = blk["label"]
+        return out_l
+    if k == "annotated-code":
+        out_a = {"k": "annotated-code", "src": blk.get("source") or ""}
+        if blk.get("language"):
+            out_a["lang"] = blk["language"]
+        if blk.get("annotations"):
+            out_a["annotations"] = blk["annotations"]
+        return out_a
+    if k == "table":
+        out_t: dict = {"k": "table"}
+        if blk.get("view"):
+            out_t["view"] = blk["view"]
+        if blk.get("headers"):
+            out_t["headers"] = [_v1_to_v2_th(h) for h in blk["headers"]]
+        if blk.get("rows"):
+            out_t["rows"] = [_v1_to_v2_tr(r) for r in blk["rows"]]
+        if blk.get("groups"):
+            out_t["groups"] = [
+                {
+                    "t": _rich_to_md(g.get("title")) if g.get("title") else "",
+                    "rows": [_v1_to_v2_tr(r) for r in (g.get("rows") or [])],
+                }
+                for g in blk["groups"]
+            ]
+        return out_t
+    if k == "kpi-grid":
+        return {"k": "kpi-grid", "tiles": blk.get("tiles") or []}
+    if k == "step-flow":
+        steps = []
+        for s in blk.get("steps") or []:
+            o = {"t": s.get("title") or ""}
+            if s.get("content") is not None:
+                o["b"] = _rich_to_md(s["content"])
+            if s.get("meta"):
+                o["meta"] = s["meta"]
+            if s.get("href"):
+                o["href"] = s["href"]
+            steps.append(o)
+        return {"k": "step-flow", "steps": steps}
+    if k == "compare-grid":
+        cards = []
+        for c in blk.get("cards") or []:
+            o = {"t": c.get("title") or ""}
+            parts = []
+            if c.get("content") is not None:
+                parts.append(_rich_to_md(c["content"]))
+            if c.get("items"):
+                parts.append("\n".join(f"- {_rich_to_md(it)}" for it in c["items"]))
+            if c.get("blocks"):
+                for sub in c["blocks"]:
+                    conv = _v1_to_v2_block(sub)
+                    if isinstance(conv, str):
+                        parts.append(conv)
+            o["b"] = "\n\n".join(p for p in parts if p)
+            if c.get("verdict"):
+                o["verdict"] = c["verdict"]
+            if c.get("accent"):
+                o["accent"] = c["accent"]
+            if c.get("href"):
+                o["href"] = c["href"]
+            cards.append(o)
+        return {"k": "compare-grid", "cards": cards}
+    if k == "chart":
+        out_c = dict(blk)
+        out_c.pop("kind", None)
+        out_c["k"] = "chart"
+        return out_c
+    if k == "chart-grid":
+        out_cg = dict(blk)
+        out_cg.pop("kind", None)
+        out_cg["k"] = "chart-grid"
+        return out_cg
+    if k == "example":
+        o2: dict = {"k": "example"}
+        if blk.get("title"):
+            o2["t"] = blk["title"]
+        if blk.get("code"):
+            cc = blk["code"]
+            o2["code"] = {"k": "code", "src": cc.get("source") or ""}
+            if cc.get("language"):
+                o2["code"]["lang"] = cc["language"]
+        if blk.get("output"):
+            o2["output"] = _v1_to_v2_block(blk["output"])
+        return o2
+    return None
+
+
+def _v1_to_v2(data: dict) -> dict:
+    """Convert a v1 page dict to v2 in-memory. Idempotent — v2 input passes through."""
+    if not isinstance(data, dict):
+        return data
+    if data.get("k") == "page":
+        return data
+    if data.get("kind") != "page":
+        return data
+    out: dict = {"k": "page"}
+    if data.get("title"):
+        out["t"] = data["title"]
+    meta = dict(data.get("meta") or {})
+    if data.get("accent") and "accent" not in meta:
+        meta["accent"] = data["accent"]
+    # Drop materialised marker noise that came from md_to_page seeding.
+    if meta:
+        out["m"] = meta
+    b: list = []
+    buf: list[str] = []
+
+    def flush() -> None:
+        if buf:
+            joined = "\n\n".join(x for x in buf if x.strip())
+            if joined:
+                b.append(joined)
+            buf.clear()
+
+    for top in data.get("blocks") or []:
+        if not isinstance(top, dict):
+            continue
+        if top.get("kind") == "section":
+            flush()
+            head = "## " + (top.get("title") or "")
+            if top.get("id"):
+                head += " {#" + top["id"] + "}"
+            buf.append(head)
+            if top.get("lead"):
+                buf.append(_rich_to_md(top["lead"]))
+            for sub in top.get("blocks") or []:
+                conv = _v1_to_v2_block(sub)
+                if isinstance(conv, str):
+                    buf.append(conv)
+                elif conv is not None:
+                    flush()
+                    b.append(conv)
+        else:
+            conv = _v1_to_v2_block(top)
+            if isinstance(conv, str):
+                buf.append(conv)
+            elif conv is not None:
+                flush()
+                b.append(conv)
+    flush()
+    out["b"] = b
+    return out
 
 
 def find_json_pages(root: Path):
@@ -1117,7 +1370,7 @@ def find_json_pages(root: Path):
             data = json.loads(p.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             continue
-        if isinstance(data, dict) and data.get("kind") == "page":
+        if _is_page(data):
             pages.append((p, data))
             real_json.add(p)
     # Also walk .md files — convert each into a synthesized page dict
@@ -1205,7 +1458,11 @@ def validate_pages(pages) -> list:
         return []
     errors: list[tuple[Path, str]] = []
     for p, data in pages:
-        for err in validator.iter_errors(data):
+        # v1 pages still on disk validate against the v2 schema by
+        # converting in-memory first. Migration to disk via `oku migrate`
+        # is optional — this keeps `oku check` accurate for either shape.
+        v2 = _v1_to_v2(data) if isinstance(data, dict) and data.get("k") != "page" else data
+        for err in validator.iter_errors(v2):
             field = ".".join(str(x) for x in err.absolute_path) or "(root)"
             errors.append((p, f"{field}: {err.message}"))
             # Match the single-error-per-page behaviour the old
@@ -1616,11 +1873,11 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     f"Unknown inline kind '{inline.get('kind')}'.")
 
         # 9. Page-level metadata sanity.
-        meta = page.get("meta") or {}
+        meta = _page_meta(page)
         if not meta.get("summary"):
             add(p, "info", "no-summary", "meta.summary",
                 "Page has no meta.summary — site-manifest tooltips + llms.txt lose the one-line description.")
-        if not page.get("title"):
+        if not _page_title(page):
             add(p, "error", "no-title", "title",
                 "Page has no title; the document <title> and cover <h1> will be empty.")
 
@@ -1761,7 +2018,7 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
         rel = p.relative_to(root)
         nav_path = rel.with_suffix(".html").as_posix()
         path_parent = rel.parent.as_posix() if rel.parent != Path(".") else None
-        meta = data.get("meta") or {}
+        meta = _page_meta(data)
         # `p` is always a .json virtual path. For .md-derived pages the
         # .json file doesn't exist on disk; the real source is the
         # sibling .md. Report whichever is real so the manifest's source
@@ -1771,15 +2028,11 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
             md_sibling = p.with_suffix(".md")
             if md_sibling.exists():
                 source_rel = md_sibling.relative_to(root)
-        # parent comes from one of (in priority): meta.parent (author
-        # opt-in to logical nesting, e.g. charts.json under
-        # reference), then the actual folder path. Lets a flat docs
-        # tree still represent a hierarchical nav.
         parent = meta.get("parent", path_parent)
         entry = {
             "path": nav_path,
             "source": source_rel.as_posix(),
-            "title": data.get("title") or p.stem,
+            "title": _page_title(data) or p.stem,
             "parent": parent,
         }
         if "order" in meta:
@@ -2115,11 +2368,11 @@ def compute_llms_txt(root: Path, *, pages: list | None = None) -> str:
     for p, data in pages:
         rel = p.relative_to(root)
         nav_path = rel.with_suffix(".html").as_posix()
-        meta = data.get("meta") or {}
+        meta = _page_meta(data)
         entries.append(
             {
                 "path": nav_path,
-                "title": data.get("title") or p.stem,
+                "title": _page_title(data) or p.stem,
                 "parent": rel.parent.as_posix() if rel.parent != Path(".") else "",
                 "order": meta.get("order", 1000),
                 "summary": meta.get("summary", ""),
@@ -2229,9 +2482,10 @@ def extract_page_text(page_json: dict) -> str:
     """
     parts = []
 
-    if isinstance(page_json.get("title"), str):
-        parts.append(page_json["title"])
-    meta = page_json.get("meta") or {}
+    title = _page_title(page_json)
+    if title:
+        parts.append(title)
+    meta = _page_meta(page_json)
     for k in ("subtitle", "summary", "eyebrow"):
         if isinstance(meta.get(k), str):
             parts.append(meta[k])
@@ -2290,7 +2544,7 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
 
     Layout:
       dist/site/
-        _kit/              ← chrome.{css,js}, chrome-boot.js, renderer.js,
+        _oku/              ← chrome.{css,js}, chrome-boot.js, renderer.js,
                              glossary/, extrefs/, schema/
         kit.json           ← copied from src_root if present
         site-manifest.json ← copied from src_root
@@ -2303,13 +2557,13 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
     Pagefind index has real content to chew on.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    kit_out = out_dir / "_kit"
+    kit_out = out_dir / "_oku"
     kit_out.mkdir(exist_ok=True)
 
-    # Runtime chrome files → _kit/
+    # Runtime chrome files → _oku/
     for f in KIT_FILES:
         shutil.copy(KIT_DIR / f, kit_out / f)
-    # Shared registry directories → _kit/<name>/
+    # Shared registry directories → _oku/<name>/
     for d in ("glossary", "extrefs", "schema"):
         src_dir = KIT_DIR / d
         if src_dir.exists():
@@ -2326,8 +2580,8 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
         shutil.copy(kit_json, out_dir / "kit.json")
 
     # Page sources (HTML stubs + JSON content) — preserve directory structure.
-    # For nested pages, rewrite `_kit/...` URLs in the stub to climb the
-    # right number of levels up to the dist's single _kit/ at out_dir/.
+    # For nested pages, rewrite `_oku/...` URLs in the stub to climb the
+    # right number of levels up to the dist's single _oku/ at out_dir/.
     for src, html, page_data in srcs:
         rel = src.relative_to(src_root)
         dest_html = out_dir / rel
@@ -2354,9 +2608,9 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
                     json.dumps(page, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
-            if isinstance(page, dict) and page.get("kind") == "page":
+            if _is_page(page):
                 text = extract_page_text(page)
-                title = page.get("title") or src.stem
+                title = _page_title(page) or src.stem
                 html = inject_pagefind_body(html, text, title)
         dest_html.write_text(html, encoding="utf-8")
 
@@ -2578,7 +2832,7 @@ def find_project_root(start: Path) -> Path:
     """Walk up to find the directory containing docs/_kit; fallback to start."""
     cur = start.resolve()
     for ancestor in [cur, *cur.parents]:
-        if (ancestor / "docs" / "_kit").exists():
+        if (ancestor / "docs" / "_oku").exists():
             return ancestor
     return start
 
@@ -2672,7 +2926,7 @@ def _sse_broadcast(msg: str = "change") -> None:
 
 
 _WATCH_SKIP = {
-    "dist", "_kit", ".git", "node_modules", ".venv", "venv",
+    "dist", "_oku", ".git", "node_modules", ".venv", "venv",
     "__pycache__", ".idea", ".vscode", ".pytest_cache", ".ruff_cache",
     ".mypy_cache", ".tox", "target", "build", ".gradle", "out",
 }
@@ -2839,7 +3093,7 @@ def _make_serve_handler(root: Path):
                     body = json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8")
                     content_type = "application/json; charset=utf-8"
                 else:
-                    body = _stub_for(page.get("title") or md_path.stem).encode("utf-8")
+                    body = _stub_for(_page_title(page) or md_path.stem).encode("utf-8")
                     content_type = "text/html; charset=utf-8"
             elif url_path.endswith(".html") and json_path.exists():
                 # The .json file IS on disk; only the .html shell is missing.
@@ -2848,9 +3102,9 @@ def _make_serve_handler(root: Path):
                     page = json.loads(json_path.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, OSError):
                     return False
-                if not (isinstance(page, dict) and page.get("kind") == "page"):
+                if not _is_page(page):
                     return False
-                body = _stub_for(page.get("title") or json_path.stem).encode("utf-8")
+                body = _stub_for(_page_title(page) or json_path.stem).encode("utf-8")
                 content_type = "text/html; charset=utf-8"
             else:
                 return False
@@ -2956,11 +3210,11 @@ def _make_serve_handler(root: Path):
 
 def _pick_open_target(htmls: list[Path], user_cwd: Path, root: Path) -> Path | None:
     """Choose the page to auto-open. Preference order:
-    1. <user_cwd>/index.html (the user ran serve from a docs dir).
-    2. First index.html anywhere under user_cwd.
-    3. First HTML directly under user_cwd.
-    4. First HTML in the repo, ignoring internal/scaffolding dirs.
-    5. First HTML anywhere.
+    1. First page in the site tree (manifest order: parent, meta.order,
+       title) — this is what the sidebar would show as "page 1", so the
+       user lands on real content instead of an empty index.
+    2. <user_cwd>/index.html if it's on disk under the user's directory.
+    3. Fallbacks: first index.html under user_cwd, first HTML, etc.
     """
     if not htmls:
         return None
@@ -2969,7 +3223,32 @@ def _pick_open_target(htmls: list[Path], user_cwd: Path, root: Path) -> Path | N
     except ValueError:
         rel_user = Path(".")
     user_prefix = (root / rel_user).resolve()
+    html_set = {h.resolve() for h in htmls}
 
+    # Primary: the first page in the manifest. compute_manifest already
+    # sorts by (parent, meta.order, title.lower()), so manifest[0] is
+    # the natural top-of-tree page — the one a user would open first if
+    # browsing the sidebar.
+    try:
+        manifest = compute_manifest(root)
+        entries = manifest.get("pages") or []
+        for entry in entries:
+            cand = (root / entry["path"]).resolve()
+            if cand in html_set:
+                # Prefer pages under the user's cwd when one matches,
+                # so `cd subdir && oku serve` opens that subdir's first.
+                if user_prefix in cand.parents or cand == user_prefix:
+                    return cand
+        # No user-cwd-local match; fall through to the first entry.
+        for entry in entries:
+            cand = (root / entry["path"]).resolve()
+            if cand in html_set:
+                return cand
+    except (OSError, ValueError, KeyError):
+        pass
+
+    # Fallback chain — same as before, in case manifest computation
+    # fails or returns nothing.
     direct = user_prefix / "index.html"
     if direct.exists():
         return direct
@@ -3076,6 +3355,67 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 
 # ---------- main ----------
+def cmd_migrate(args: argparse.Namespace) -> int:
+    """`oku migrate [path]` — convert v1 page JSON files to v2 in place.
+
+    The renderer accepts both shapes, so migration is optional. Run this
+    when you want the on-disk source to match the latest authoring shape
+    (compact keys + markdown strings) — usually for editing ergonomics.
+
+    Exit codes:
+      0 — done (zero or more files migrated; --dry-run also returns 0).
+      1 — input path missing.
+    """
+    target = Path(args.path or ".").resolve()
+    if not target.exists():
+        print(f"✗ {target} not found", file=sys.stderr)
+        return 1
+    candidates: list[Path] = []
+    if target.is_file():
+        candidates = [target]
+    else:
+        for p in iter_repo_files(target, (".json",), extra_skip=project_skip_dirs(target)):
+            if p.name in ("kit.json", "site-manifest.json", "package.json", "tsconfig.json"):
+                continue
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            if isinstance(data, dict) and data.get("kind") == "page" and "k" not in data:
+                candidates.append(p)
+    if not candidates:
+        print(f"✓ No v1 pages found under {target}")
+        return 0
+    migrated = 0
+    for p in candidates:
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"  skip {p}: {e}", file=sys.stderr)
+            continue
+        if not (isinstance(data, dict) and data.get("kind") == "page"):
+            print(f"  skip {p.name}: not a v1 page")
+            continue
+        v2 = _v1_to_v2(data)
+        try:
+            rel = p.relative_to(target if target.is_dir() else target.parent)
+        except ValueError:
+            rel = p
+        if args.dry_run:
+            print(f"  would migrate {rel}")
+        else:
+            # Pretty-printed by default so the result is reviewable; the
+            # storage policy says compact is preferred for AI-authored
+            # pages but a migrated file is read by humans at least once.
+            payload = json.dumps(v2, ensure_ascii=False, indent=2) if args.pretty else json.dumps(v2, ensure_ascii=False, separators=(",", ":"))
+            p.write_text(payload + "\n", encoding="utf-8")
+            print(f"  migrated {rel}")
+        migrated += 1
+    label = "Would migrate" if args.dry_run else "Migrated"
+    print(f"\n{label} {migrated} page(s).")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="oku",
@@ -3085,6 +3425,26 @@ def main() -> int:
     sub.add_parser("init", help="create docs/_kit symlink in the current project")
     sub.add_parser("build", help="build dist/{standalone,site,markdown}/ from current dir")
     sub.add_parser("clean", help="remove dist/ from the current project")
+    migrate_parser = sub.add_parser(
+        "migrate",
+        help="convert v1 page JSON files to v2 (compact keys + markdown strings)",
+    )
+    migrate_parser.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="file or directory to migrate (defaults to cwd)",
+    )
+    migrate_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="list files that would change without writing",
+    )
+    migrate_parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="indent the output JSON for human review (default is compact)",
+    )
     check_parser = sub.add_parser(
         "check",
         help="lint every page-JSON in the project (schema + structural + content)",
@@ -3133,6 +3493,8 @@ def main() -> int:
         return cmd_clean(args)
     if args.cmd == "check":
         return cmd_check(args)
+    if args.cmd == "migrate":
+        return cmd_migrate(args)
     if args.cmd == "serve":
         return cmd_serve(args)
     parser.print_help()

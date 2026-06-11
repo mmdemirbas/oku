@@ -582,7 +582,7 @@ def test_cmd_check_promotes_parse_failure_to_error(tmp_path: Path, capsys: pytes
 # A prior fix accidentally moved it to the project root; that worked
 # for `oku build` but broke `oku serve` against the source tree
 # because chrome.js resolves kit.json from /docs/ (the parent of
-# _kit/). find_kit_json probes docs/ first, falls back to root, so
+# _oku/). find_kit_json probes docs/ first, falls back to root, so
 # both authoring locations work and both serve paths succeed.
 
 def test_find_kit_json_prefers_docs_subdir(tmp_path: Path) -> None:

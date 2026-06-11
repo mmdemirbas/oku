@@ -22,10 +22,10 @@ SAMPLE_STUB = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <title>{title}</title>
-<link rel="stylesheet" href="_kit/chrome.css">
-<script src="_kit/chrome-boot.js"></script>
-<script src="_kit/chrome.js" defer></script>
-<script src="_kit/renderer.js" defer></script>
+<link rel="stylesheet" href="_oku/chrome.css">
+<script src="_oku/chrome-boot.js"></script>
+<script src="_oku/chrome.js" defer></script>
+<script src="_oku/renderer.js" defer></script>
 </head>
 <body>
 <page-chrome></page-chrome>
@@ -81,7 +81,7 @@ class TestBuildSite:
         pages = _scaffold_project(src_root)
         cli.build_site(pages, out_dir, src_root)
         for f in cli.KIT_FILES:
-            assert (out_dir / "_kit" / f).exists(), f"missing kit asset: {f}"
+            assert (out_dir / "_oku" / f).exists(), f"missing kit asset: {f}"
 
     def test_copies_kit_registry_dirs_when_present(self, tmp_path: Path) -> None:
         src_root = tmp_path / "src"
@@ -90,8 +90,8 @@ class TestBuildSite:
         pages = _scaffold_project(src_root)
         cli.build_site(pages, out_dir, src_root)
         # Runtime JS/CSS and shared registries (schema/glossary/extrefs)
-        # both live under _kit/. schema/ is always shipped.
-        assert (out_dir / "_kit" / "schema").is_dir()
+        # both live under _oku/. schema/ is always shipped.
+        assert (out_dir / "_oku" / "schema").is_dir()
 
     def test_copies_kit_json_when_present(self, tmp_path: Path) -> None:
         # build_site copies the user-authored kit.json. site-manifest /
@@ -112,7 +112,7 @@ class TestBuildSite:
     def test_copies_kit_json_from_docs_subdir(self, tmp_path: Path) -> None:
         """Canonical kit.json home is docs/kit.json (per the schema's
         own description). build_site must find it via find_kit_json
-        and copy it to the dist root, sibling of _kit/. Earlier
+        and copy it to the dist root, sibling of _oku/. Earlier
         regression: build looked only at root/kit.json, so authoring
         at docs/ silently shipped no kit.json — runtime then 404'd on
         /docs/kit.json (dev server) or /kit.json (dist site)."""
@@ -135,7 +135,7 @@ class TestBuildSite:
         )
         out_dir = tmp_path / "out"
         cli.build_site(pages, out_dir, src_root)
-        # The copied kit.json lands at the dist root (sibling of _kit/),
+        # The copied kit.json lands at the dist root (sibling of _oku/),
         # regardless of whether it was authored at docs/ or root/.
         assert (out_dir / "kit.json").exists()
         contents = json.loads((out_dir / "kit.json").read_text(encoding="utf-8"))
@@ -166,7 +166,7 @@ class TestBuildSite:
         assert 'data-pagefind-meta="title"' in body
         # The original kit references remain untouched (no inlining at this
         # step — that's build_standalone's job).
-        assert '_kit/chrome.css' in body
+        assert '_oku/chrome.css' in body
 
     def test_preserves_nested_directory_structure(self, tmp_path: Path) -> None:
         src_root = tmp_path / "src"
@@ -238,8 +238,8 @@ class TestBuildStandalone:
         cli.build_standalone(pages, out_dir, src_root)
         body = (out_dir / "index.html").read_text(encoding="utf-8")
         # External kit references gone — replaced with inline <style>/<script>.
-        assert 'href="_kit/chrome.css"' not in body
-        assert 'src="_kit/chrome.js"' not in body
+        assert 'href="_oku/chrome.css"' not in body
+        assert 'src="_oku/chrome.js"' not in body
         assert "<style>" in body
         # Each kit script tag becomes <script>...</script> (count covers boot,
         # main, renderer, plus the inlined JSON tags).

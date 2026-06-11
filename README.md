@@ -138,7 +138,7 @@ oku serve --no-search            # skip background Pagefind index
 
 - `dist/standalone/` — every HTML inlines kit + page JSON +
   `window.__okuManifest`. Open via `file://`, attach to email.
-- `dist/site/` — multi-page site with shared `_kit/` assets and a
+- `dist/site/` — multi-page site with shared `_oku/` assets and a
   Pagefind index. One `site-manifest.json` sits at the docs root for
   the runtime page-nav fetch. Drop on any static host.
 - `dist/markdown/` — one `<name>.md` twin per JSON page plus a single
@@ -204,7 +204,7 @@ design — every artifact respects them at both layers.
 Glossaries are per-domain, each with multi-language entries:
 
 ```
-_kit/glossary/
+_oku/glossary/
   data-platforms.json    # Iceberg, Spark, Flink, ACID, MVCC, ...
   web.json               # Custom Elements, Shadow DOM, FOUC, ...
   ai-llm.json            # RAG, tokenization, embedding, ...
@@ -232,7 +232,7 @@ Disambiguation when two domains define the same term:
 { "kind": "glossary-term", "term": "ACID", "in": "chemistry" }
 ```
 
-External references in `_kit/extrefs/<domain>.json` carry the same
+External references in `_oku/extrefs/<domain>.json` carry the same
 shape with an optional `type` (paper / rfc / release / blog / other),
 `author`, and `published` for citation-card metadata.
 

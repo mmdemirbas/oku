@@ -1763,15 +1763,15 @@ code:not(pre code) {
 .okt-chip-clear:hover { color: var(--accent-strong); background: var(--accent-soft); }
 
 .okt-table-scroll {
-  /* Default: no scroll context. `overflow-x: auto` would implicitly
-     promote `overflow-y` to `auto` too (per CSS spec), which then
-     breaks `position: sticky` on thead th — the sticky element would
-     be contained by this box instead of pinning to the viewport.
-     Cells wrap (white-space: normal + overflow-wrap: anywhere on td)
-     so default tables don't overflow horizontally. Opt-in `okt-nowrap`
-     re-introduces horizontal scroll for tables that genuinely need
-     unbreakable columns (and accept losing sticky as the trade). */
-  overflow-x: visible;
+  /* Default: horizontal scroll on overflow so cells keep their 9ch
+     readable floor even when a many-column table's natural width
+     exceeds the container. Cells still word-wrap inside their column
+     (white-space: normal + overflow-wrap: anywhere on td); the scroll
+     only kicks in when even the minimum column widths can't fit.
+     Trade-off: this scroll context contains `position: sticky` thead
+     to the wrapper, not the viewport — acceptable since the wrapper
+     itself is tall enough that thead still feels sticky while scrolling. */
+  overflow-x: auto;
   border-radius: 8px;
   background: var(--surface);
 }
@@ -2752,10 +2752,20 @@ table td {
   vertical-align: top;
   /* Word-wrap by default so long cell content folds inside the
      column instead of forcing horizontal scroll. Tables that want
-     single-line cells can opt out per-row via the okt-nowrap class. */
+     single-line cells can opt out per-row via the okt-nowrap class.
+     Each cell has a readable floor (~9ch ≈ 70 px) so many-column
+     tables don't squash columns to one-char lines — when the natural
+     minimum exceeds container width, the wrapper's horizontal scroll
+     takes over instead of producing illegible word-breaks. */
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: normal;
+  min-width: 9ch;
+}
+table th {
+  /* Headers earn the same readable floor so labelled columns don't
+     collapse below the label length. */
+  min-width: 9ch;
 }
 table tr.okt-nowrap td,
 table.okt-nowrap td { white-space: nowrap; overflow-wrap: normal; }
@@ -3765,39 +3775,55 @@ body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
    when the source fails to parse. Source is still reachable via the
    toolbar; the warning panel also lists this entry with a Jump-to. */
 .okd-render.okd-error {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 120px;
-  padding: 18px;
+  display: block;
+  padding: 14px;
   background: var(--surface-2);
   border: 1px dashed var(--warning);
   border-radius: 8px;
 }
 .okd-error-card {
-  max-width: 520px;
   font-size: 13px;
   color: var(--text-soft);
   line-height: 1.5;
 }
-.okd-error-card strong {
-  display: block;
-  color: var(--warning);
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-.okd-error-card .okd-error-hint {
-  color: var(--text-faint);
+.okd-error-card .okd-error-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 8px;
 }
-.okd-error-card details summary {
+.okd-error-card strong {
+  color: var(--warning);
+  font-size: 13px;
+}
+.okd-error-card .okd-error-msg {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.okd-error-card .okd-error-source {
+  margin: 0 0 8px 0;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  white-space: pre;
+  overflow-x: auto;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.okd-error-card details.okd-error-detail summary {
   cursor: pointer;
-  color: var(--text-soft);
+  color: var(--text-faint);
   font-size: 12px;
   user-select: none;
 }
-.okd-error-card details[open] summary { margin-bottom: 6px; }
-.okd-error-card details pre {
+.okd-error-card details.okd-error-detail[open] summary { margin-bottom: 6px; }
+.okd-error-card details.okd-error-detail pre {
   margin: 0;
   padding: 8px 10px;
   background: var(--surface);

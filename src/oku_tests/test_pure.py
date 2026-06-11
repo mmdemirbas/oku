@@ -341,6 +341,32 @@ class TestMdToPage:
         assert "intro" in ids, "implicit intro section missing"
         assert "first" in ids, "h2 'First' did not become a section with id='first'"
 
+    def test_nested_code_fences_use_variable_length(self) -> None:
+        """A 3-tick fence inside a 4-tick outer fence is valid CommonMark
+        and must parse as a single outer code block whose body literally
+        contains the inner 3-tick lines. Regression — the parser used to
+        hardcode `^```$` close, so the inner ``` closed the outer early
+        and the markdown rendered garbled."""
+        md = (
+            "## H\n\n"
+            "````markdown\n"
+            "```js\n"
+            "console.log('inner');\n"
+            "```\n"
+            "````\n"
+        )
+        page = cli.md_to_page(md)
+        section = page["blocks"][0]
+        code_blocks = [b for b in section["blocks"] if b["kind"] == "code"]
+        assert len(code_blocks) == 1, (
+            f"expected one outer code block, got {len(code_blocks)}: {code_blocks}"
+        )
+        body = code_blocks[0]["source"]
+        # The outer fence preserved the inner 3-tick fence verbatim.
+        assert "```js" in body, "inner fence lost from outer fence body"
+        assert "console.log('inner');" in body, "inner code lost"
+        assert "```" in body.split("\n")[-1] or "```" in body, "inner closing fence lost"
+
     def test_hr_is_dropped_not_emitted(self) -> None:
         """Markdown `---` produced `{"kind": "hr"}` which the schema
         rejects (no `hr` kind) and the renderer ignores. Drop it."""

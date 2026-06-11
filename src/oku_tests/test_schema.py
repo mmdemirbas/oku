@@ -51,31 +51,21 @@ def test_table_chip_columns_validate(page_schema: dict) -> None:
     cells) are accepted by the schema. Locked here so a future schema
     refactor that drops the alternatives is caught immediately."""
     page = {
-        "kind": "page",
-        "title": "Chip table",
-        "blocks": [
+        "k": "page",
+        "t": "Chip table",
+        "b": [
+            "## S {#s}",
             {
-                "kind": "section",
-                "id": "s",
-                "title": "S",
-                "blocks": [
-                    {
-                        "kind": "table",
-                        "headers": [
-                            "Engine",
-                            {
-                                "label": "Tags",
-                                "filter": "chips",
-                                "values": ["a", "b"],
-                            },
-                        ],
-                        "rows": [
-                            ["Iceberg", {"value": "a, b", "values": ["a", "b"]}],
-                            ["Hudi", {"values": ["a"]}],
-                        ],
-                    }
+                "k": "table",
+                "headers": [
+                    "Engine",
+                    {"label": "Tags", "filter": "chips", "values": ["a", "b"]},
                 ],
-            }
+                "rows": [
+                    ["Iceberg", {"value": "a, b", "values": ["a", "b"]}],
+                    ["Hudi", {"values": ["a"]}],
+                ],
+            },
         ],
     }
     jsonschema.validate(page, page_schema)
@@ -85,23 +75,15 @@ def test_table_chip_header_requires_values(page_schema: dict) -> None:
     """A chip header without a values list is rejected — every chip
     column must declare its enumeration up front."""
     page = {
-        "kind": "page",
-        "title": "X",
-        "blocks": [
+        "k": "page",
+        "t": "X",
+        "b": [
+            "## S {#s}",
             {
-                "kind": "section",
-                "id": "s",
-                "title": "S",
-                "blocks": [
-                    {
-                        "kind": "table",
-                        "headers": [
-                            {"label": "Tags", "filter": "chips"},
-                        ],
-                        "rows": [["x"]],
-                    }
-                ],
-            }
+                "k": "table",
+                "headers": [{"label": "Tags", "filter": "chips"}],
+                "rows": [["x"]],
+            },
         ],
     }
     with pytest.raises(jsonschema.ValidationError):

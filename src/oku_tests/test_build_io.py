@@ -51,8 +51,8 @@ class TestFindHelpers:
     def test_find_json_pages_skips_dist_and_kit_dirs(self, tmp_path: Path) -> None:
         _write_page(tmp_path / "docs" / "p1.json")
         _write_page(tmp_path / "dist" / "site" / "p1.json")
-        (tmp_path / "_kit").mkdir()
-        _write_page(tmp_path / "_kit" / "schema-example.json")
+        (tmp_path / "_oku").mkdir()
+        _write_page(tmp_path / "_oku" / "schema-example.json")
         pages = cli.find_json_pages(tmp_path)
         assert {p.relative_to(tmp_path).as_posix() for p, _ in pages} == {"docs/p1.json"}
 

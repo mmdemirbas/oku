@@ -156,9 +156,9 @@ For the strict gate before delivery, use `oku check --strict`
    anymore. The minimal HTML head is:
 
    ```html
-   <script src="_kit/chrome-boot.js"></script>
-   <link rel="stylesheet" href="_kit/chrome.css">
-   <script src="_kit/chrome.js" defer></script>
+   <script src="_oku/chrome-boot.js"></script>
+   <link rel="stylesheet" href="_oku/chrome.css">
+   <script src="_oku/chrome.js" defer></script>
    ```
 
    And the minimal body shape is:
@@ -205,7 +205,7 @@ For the strict gate before delivery, use `oku check --strict`
    Do **not** suggest `oku serve`, "open the file in a browser",
    "run a local server", or any other preview step. The user's flow
    is IDE-direct: they click the file in their IDE to render it. The
-   kit boots from `_kit/` and the inline manifest you just refreshed
+   kit boots from `_oku/` and the inline manifest you just refreshed
    in step 3; nothing else is needed. Just name the file and stop.
 
 ## Visual-first communication — the load-bearing principle

@@ -1,166 +1,746 @@
-/* oku · renderer.js
+/* oku · renderer.js (v2)
  *
- * Walks a JSON page tree and emits DOM into the host element. Custom
- * Elements (glossary-term, ext-ref, etc.) are registered in chrome.js
- * and provide their own behavior; the renderer just instantiates them.
+ * Walks the compact v2 page tree { k:'page', t, m, b } and emits DOM into
+ * the host element. Strings inside b[] are parsed as GFM markdown; objects
+ * are typed primitives. Sections are implicit from heading levels inside
+ * markdown.
  *
- * Entry point: OkuRenderer.renderFromUrl(url, host?)
- *
- * Schema reference: ../schema/page.schema.json
+ * Entry: OkuRenderer.renderFromUrl(url, host?)
+ * Schema: ../schema/page.schema.json
  */
 
 (function () {
   'use strict';
 
-  /* ---------------------------------------------------------------- *
+  /* ================================================================ *
+   * v1 → v2 shim
+   * Older pages authored against the v1 schema ({kind:"page", title,
+   * accent, meta, blocks: [{kind:"section",…}, {kind:"paragraph",…}, …]})
+   * load through this converter so they keep rendering. New pages skip
+   * it. The same transformation logic lives in `oku migrate` for the
+   * persistent disk-side update.
+   * ================================================================ */
+
+  function richToMd(rich) {
+    if (rich == null) return '';
+    if (typeof rich === 'string') return rich;
+    if (!Array.isArray(rich)) return '';
+    return rich.map(seg => {
+      if (typeof seg === 'string') return seg;
+      if (!seg || !seg.kind) return '';
+      switch (seg.kind) {
+        case 'em':       return '*' + (seg.text || '') + '*';
+        case 'strong':   return '**' + (seg.text || '') + '**';
+        case 'code':     return '`' + (seg.text || '') + '`';
+        case 'link':     return '[' + (seg.text || seg.href || '') + '](' + (seg.href || '') + ')';
+        case 'glossary-term': return '[' + (seg.text || seg.term || '') + '](#g/' + (seg.term || '') + ')';
+        case 'ext-ref':  return '[' + (seg.text || seg.name || '') + '](#x/' + (seg.name || '') + ')';
+        case 'html':     return seg.text || '';
+        default:         return '';
+      }
+    }).join('');
+  }
+
+  function richToBlockquoteBody(rich) {
+    return richToMd(rich).split('\n').map(l => '> ' + l).join('\n');
+  }
+
+  function convertV1Block(b) {
+    if (!b || !b.kind) return null;
+    switch (b.kind) {
+      case 'paragraph': return richToMd(b.content);
+      case 'heading': {
+        const lvl = '#'.repeat(Math.max(3, Math.min(6, b.level || 3)));
+        return lvl + ' ' + (b.title || '') + (b.id ? ' {#' + b.id + '}' : '');
+      }
+      case 'list': {
+        const items = (b.items || []).map((it, i) => {
+          const marker = b.style === 'numbered' ? (i + 1) + '.' : '-';
+          return marker + ' ' + richToMd(it);
+        });
+        return items.join('\n');
+      }
+      case 'callout': {
+        const type = (b.type || 'note').toUpperCase();
+        const titleSuffix = b.title ? ' ' + b.title : '';
+        const body = b.content !== undefined ? '\n' + richToBlockquoteBody(b.content) : '';
+        return '> [!' + type + ']' + titleSuffix + body;
+      }
+      case 'tldr': {
+        let body = '';
+        if (b.summary) body += '\n> ' + richToMd(b.summary);
+        if (Array.isArray(b.bullets) && b.bullets.length) {
+          body += '\n>';
+          for (const bl of b.bullets) body += '\n> - ' + richToMd(bl);
+        }
+        const tt = b.title ? ' ' + b.title : '';
+        return '> [!TLDR]' + tt + body;
+      }
+      case 'info-tip': {
+        const parts = [];
+        for (const sub of (b.content || [])) {
+          const c = convertV1Block(sub);
+          if (typeof c === 'string') parts.push(c);
+        }
+        const body = parts.length ? '\n' + parts.join('\n\n').split('\n').map(l => '> ' + l).join('\n') : '';
+        return '> [!TIP]' + (b.summary ? ' ' + b.summary : '') + body;
+      }
+      case 'insight':
+        return { k: 'insight', b: richToMd(b.content) };
+      case 'code':
+        return '```' + (b.language || '') + '\n' + (b.source || '') + '\n```';
+      case 'diagram': {
+        const o = { k: 'diagram', src: b.source || '' };
+        if (b.caption) o.caption = b.caption;
+        return o;
+      }
+      case 'live-snippet': {
+        const o = { k: 'live-snippet', src: b.source || '' };
+        if (b.language) o.lang = b.language;
+        if (b.label) o.label = b.label;
+        return o;
+      }
+      case 'annotated-code': {
+        const o = { k: 'annotated-code', src: b.source || '' };
+        if (b.language) o.lang = b.language;
+        if (b.annotations) o.annotations = b.annotations;
+        return o;
+      }
+      case 'table': {
+        const o = { k: 'table' };
+        if (b.view) o.view = b.view;
+        if (b.headers) o.headers = b.headers.map(convertV1TableHeader);
+        if (b.rows) o.rows = b.rows.map(convertV1TableRow);
+        if (b.groups) o.groups = b.groups.map(g => ({
+          t: g.title ? richToMd(g.title) : '',
+          rows: (g.rows || []).map(convertV1TableRow)
+        }));
+        return o;
+      }
+      case 'kpi-grid':
+        return { k: 'kpi-grid', tiles: (b.tiles || []) };
+      case 'step-flow':
+        return {
+          k: 'step-flow',
+          steps: (b.steps || []).map(s => {
+            const o = { t: s.title || '' };
+            if (s.content !== undefined) o.b = richToMd(s.content);
+            if (s.meta) o.meta = s.meta;
+            if (s.href) o.href = s.href;
+            return o;
+          })
+        };
+      case 'compare-grid':
+        return {
+          k: 'compare-grid',
+          cards: (b.cards || []).map(c => {
+            const o = { t: c.title || '' };
+            const parts = [];
+            if (c.content !== undefined) parts.push(richToMd(c.content));
+            if (Array.isArray(c.items) && c.items.length) {
+              parts.push(c.items.map(it => '- ' + richToMd(it)).join('\n'));
+            }
+            if (Array.isArray(c.blocks) && c.blocks.length) {
+              for (const sub of c.blocks) {
+                const conv = convertV1Block(sub);
+                if (typeof conv === 'string') parts.push(conv);
+              }
+            }
+            o.b = parts.join('\n\n');
+            if (c.verdict) o.verdict = c.verdict;
+            if (c.accent) o.accent = c.accent;
+            if (c.href) o.href = c.href;
+            return o;
+          })
+        };
+      case 'chart': {
+        const o = Object.assign({}, b);
+        delete o.kind; o.k = 'chart';
+        return o;
+      }
+      case 'chart-grid': {
+        const o = Object.assign({}, b);
+        delete o.kind; o.k = 'chart-grid';
+        return o;
+      }
+      case 'example': {
+        const o = { k: 'example' };
+        if (b.title) o.t = b.title;
+        if (b.code) o.code = { k: 'code', src: b.code.source || '', lang: b.code.language };
+        if (b.output) {
+          const conv = convertV1Block(b.output);
+          o.output = conv;
+        }
+        return o;
+      }
+      default:
+        return null;
+    }
+  }
+
+  function convertV1TableHeader(h) {
+    if (h && typeof h === 'object' && !Array.isArray(h) && h.label !== undefined) {
+      const o = Object.assign({}, h);
+      o.label = richToMd(h.label);
+      return o;
+    }
+    return richToMd(h);
+  }
+
+  function convertV1TableRow(r) {
+    if (Array.isArray(r)) return r.map(convertV1TableCell);
+    if (r && typeof r === 'object' && r.cells) {
+      const o = Object.assign({}, r);
+      o.cells = r.cells.map(convertV1TableCell);
+      return o;
+    }
+    return r;
+  }
+
+  function convertV1TableCell(c) {
+    if (c && typeof c === 'object' && !Array.isArray(c) && Array.isArray(c.values)) {
+      const o = Object.assign({}, c);
+      if (c.value !== undefined) o.value = richToMd(c.value);
+      return o;
+    }
+    return richToMd(c);
+  }
+
+  function convertV1ToV2(page) {
+    const out = { k: 'page' };
+    if (page.title) out.t = page.title;
+    const meta = Object.assign({}, page.meta || {});
+    if (page.accent && !meta.accent) meta.accent = page.accent;
+    if (Object.keys(meta).length) out.m = meta;
+    const b = [];
+    let buf = '';
+    const flush = () => {
+      const s = buf.replace(/\n+$/, '').replace(/^\n+/, '');
+      if (s) b.push(s);
+      buf = '';
+    };
+    const appendMd = (md) => {
+      if (!md) return;
+      if (buf) buf += '\n\n';
+      buf += md;
+    };
+    for (const top of (page.blocks || [])) {
+      if (top && top.kind === 'section') {
+        flush();
+        let head = '## ' + (top.title || '');
+        if (top.id) head += ' {#' + top.id + '}';
+        appendMd(head);
+        if (top.lead) appendMd(richToMd(top.lead));
+        for (const sub of (top.blocks || [])) {
+          const conv = convertV1Block(sub);
+          if (typeof conv === 'string') appendMd(conv);
+          else if (conv) { flush(); b.push(conv); }
+        }
+      } else {
+        const conv = convertV1Block(top);
+        if (typeof conv === 'string') appendMd(conv);
+        else if (conv) { flush(); b.push(conv); }
+      }
+    }
+    flush();
+    out.b = b;
+    return out;
+  }
+
+  /* ================================================================ *
+   * Inline markdown parser
+   * Handles *em*, **strong**, `code`, [text](href). The href prefixes
+   * `#g/` and `#x/` rewrite into <glossary-term> and <ext-ref> elements
+   * so glossary / ext-ref tooltips keep working from markdown.
+   * ================================================================ */
+
+  function parseInline(text, host) {
+    // Order: code (literal — protect from other rules) → strong → em → link.
+    // We do this in one regex pass over the input so positions are tracked.
+    const re = /`([^`]+?)`|\*\*([^*]+?)\*\*|__([^_]+?)__|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\(([^)\s]+?)\)/g;
+    let pos = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > pos) host.appendChild(document.createTextNode(text.slice(pos, m.index)));
+      if (m[1] !== undefined) {
+        const e = document.createElement('code'); e.textContent = m[1]; host.appendChild(e);
+      } else if (m[2] !== undefined || m[3] !== undefined) {
+        const e = document.createElement('strong'); e.textContent = m[2] !== undefined ? m[2] : m[3]; host.appendChild(e);
+      } else if (m[4] !== undefined || m[5] !== undefined) {
+        const e = document.createElement('em'); e.textContent = m[4] !== undefined ? m[4] : m[5]; host.appendChild(e);
+      } else if (m[6] !== undefined) {
+        host.appendChild(renderLink(m[6], m[7]));
+      }
+      pos = m.index + m[0].length;
+    }
+    if (pos < text.length) host.appendChild(document.createTextNode(text.slice(pos)));
+  }
+
+  function renderLink(label, href) {
+    // Kit-extension prefixes: #g/term-id  → <glossary-term>
+    //                        #x/source-id → <ext-ref>
+    if (href.startsWith('#g/')) {
+      const e = document.createElement('glossary-term');
+      e.setAttribute('term', href.slice(3));
+      e.textContent = label;
+      return e;
+    }
+    if (href.startsWith('#x/')) {
+      const e = document.createElement('ext-ref');
+      e.setAttribute('name', href.slice(3));
+      e.textContent = label;
+      return e;
+    }
+    const a = document.createElement('a');
+    a.textContent = label;
+    a.setAttribute('href', href);
+    if (/^https?:/i.test(href)) {
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener');
+    }
+    return a;
+  }
+
+  /* ================================================================ *
+   * Block markdown parser
+   * Splits the source into block-level nodes. Each node has a kind and
+   * payload; the caller walks them and emits DOM. Headings are returned
+   * as their own nodes so the outer walker can use h2 to open sections.
+   * ================================================================ */
+
+  // Slugify a heading title for a default anchor id.
+  function slugify(text) {
+    return String(text).toLowerCase()
+      .replace(/[^a-z0-9\s-]+/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+  }
+
+  function parseMarkdown(src) {
+    const lines = String(src || '').split('\n');
+    const out = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      // Blank line — skip.
+      if (!line.trim()) { i++; continue; }
+      // Horizontal rule.
+      if (/^-{3,}\s*$/.test(line)) { out.push({ k: 'hr' }); i++; continue; }
+      // Fenced code block. Variable-length: a fence of N backticks
+      // closes only at a line of N (or more) backticks. Lets authors
+      // nest a 3-tick fenced sample inside a 4-tick outer fence — the
+      // CommonMark-compliant way to show markdown code samples that
+      // contain code fences.
+      const fence = line.match(/^(`{3,})\s*([\w-]*)\s*$/);
+      if (fence) {
+        const openLen = fence[1].length;
+        const lang = fence[2] || '';
+        const body = [];
+        i++;
+        const closeRe = new RegExp('^`{' + openLen + ',}\\s*$');
+        while (i < lines.length && !closeRe.test(lines[i])) {
+          body.push(lines[i]);
+          i++;
+        }
+        i++; // skip closing fence
+        out.push({ k: 'code', lang: lang, src: body.join('\n') });
+        continue;
+      }
+      // Heading.
+      const head = line.match(/^(#{1,6})\s+(.+?)(?:\s+\{#([\w-]+)\})?\s*$/);
+      if (head) {
+        const level = head[1].length;
+        const title = head[2];
+        const id = head[3] || slugify(title);
+        out.push({ k: 'heading', level: level, title: title, id: id });
+        i++;
+        continue;
+      }
+      // Blockquote — gather all consecutive `> ` lines, then check for admonition.
+      if (/^>\s?/.test(line)) {
+        const block = [];
+        while (i < lines.length && /^>\s?/.test(lines[i])) {
+          block.push(lines[i].replace(/^>\s?/, ''));
+          i++;
+        }
+        // Admonition extension: first non-empty line is `[!TYPE]` or `[!TYPE] Title`.
+        const adm = block[0] && block[0].match(/^\[!([A-Z]+)\](?:\s+(.+))?$/);
+        if (adm) {
+          out.push({ k: 'admonition', type: adm[1].toLowerCase(), title: adm[2] || '', body: block.slice(1).join('\n') });
+        } else {
+          out.push({ k: 'quote', body: block.join('\n') });
+        }
+        continue;
+      }
+      // Pipe table — header row, separator row, data rows.
+      if (line.indexOf('|') >= 0 && i + 1 < lines.length && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1])) {
+        const hdr = splitTableRow(line);
+        i += 2; // skip header + separator
+        const rows = [];
+        while (i < lines.length && lines[i].indexOf('|') >= 0 && lines[i].trim()) {
+          rows.push(splitTableRow(lines[i]));
+          i++;
+        }
+        out.push({ k: 'table', headers: hdr, rows: rows });
+        continue;
+      }
+      // List — bullet (- / *) or numbered (1. / 1)).
+      if (/^(\s*)([-*]|\d+[.)])\s+/.test(line)) {
+        const consumed = parseList(lines, i);
+        out.push(consumed.node);
+        i = consumed.next;
+        continue;
+      }
+      // Paragraph — gather until blank line or block-start.
+      const para = [line];
+      i++;
+      while (i < lines.length && lines[i].trim() && !isBlockStart(lines[i]) && !(i + 1 < lines.length && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1]))) {
+        para.push(lines[i]);
+        i++;
+      }
+      out.push({ k: 'paragraph', text: para.join(' ').replace(/\s+/g, ' ').trim() });
+    }
+    return out;
+  }
+
+  function isBlockStart(line) {
+    return /^#{1,6}\s/.test(line)
+      || /^>\s?/.test(line)
+      || /^```/.test(line)
+      || /^-{3,}\s*$/.test(line)
+      || /^(\s*)([-*]|\d+[.)])\s+/.test(line);
+  }
+
+  function splitTableRow(line) {
+    // Trim leading/trailing pipes, then split on |. Backtick-protected
+    // pipes (inside `code`) escape from the split.
+    let s = line.trim();
+    if (s.startsWith('|')) s = s.slice(1);
+    if (s.endsWith('|')) s = s.slice(0, -1);
+    const cells = [];
+    let cur = '';
+    let inCode = false;
+    for (const c of s) {
+      if (c === '`') { inCode = !inCode; cur += c; }
+      else if (c === '|' && !inCode) { cells.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    cells.push(cur.trim());
+    return cells;
+  }
+
+  function parseList(lines, start) {
+    // Walks lines starting at `start`. Returns { node, next }.
+    // Supports bullet (- / *) and ordered (1. / 1)) at any indent depth.
+    const items = [];
+    let i = start;
+    const first = lines[start].match(/^(\s*)([-*]|\d+[.)])\s+/);
+    const baseIndent = first[1].length;
+    const ordered = /\d/.test(first[2]);
+    while (i < lines.length) {
+      const m = lines[i].match(/^(\s*)([-*]|\d+[.)])\s+(.*)$/);
+      if (m && m[1].length === baseIndent) {
+        const itemLines = [m[3]];
+        i++;
+        while (i < lines.length) {
+          const continuation = lines[i].match(/^(\s+)(.*)$/);
+          if (continuation && continuation[1].length > baseIndent && !/^(\s*)([-*]|\d+[.)])\s+/.test(lines[i])) {
+            itemLines.push(lines[i].trim());
+            i++;
+          } else if (continuation && /^(\s*)([-*]|\d+[.)])\s+/.test(lines[i]) && continuation[1].length > baseIndent) {
+            // Nested list start — collect lines while still indented past base.
+            const subStart = i;
+            while (i < lines.length) {
+              const sub = lines[i].match(/^(\s+)/);
+              if (!sub || sub[1].length <= baseIndent) break;
+              i++;
+            }
+            // Capture the nested-list source for recursive parse.
+            const nested = lines.slice(subStart, i).map(l => l.slice(baseIndent + 2));
+            itemLines.push({ __nested: nested });
+          } else {
+            break;
+          }
+        }
+        items.push(itemLines);
+      } else if (lines[i].trim() === '') {
+        // Blank inside list — peek; if next is still a list item, continue.
+        if (i + 1 < lines.length && /^(\s*)([-*]|\d+[.)])\s+/.test(lines[i + 1])) {
+          i++;
+          continue;
+        }
+        break;
+      } else {
+        break;
+      }
+    }
+    return { node: { k: 'list', ordered: ordered, items: items }, next: i };
+  }
+
+  /* ================================================================ *
+   * Markdown → DOM
+   * Emits block-level DOM into the given host. Returns nothing; caller
+   * handles section-opening when heading nodes appear.
+   * ================================================================ */
+
+  function emitMarkdown(host, blocks, openSection) {
+    for (const node of blocks) {
+      switch (node.k) {
+        case 'heading': {
+          if (node.level === 2 && openSection) {
+            openSection(node);
+            break;
+          }
+          const h = document.createElement('h' + Math.min(6, Math.max(1, node.level)));
+          if (node.id) h.id = node.id;
+          parseInline(node.title, h);
+          host.appendChild(h);
+          break;
+        }
+        case 'paragraph': {
+          const p = document.createElement('p');
+          parseInline(node.text, p);
+          host.appendChild(p);
+          break;
+        }
+        case 'code': {
+          const pre = document.createElement('pre');
+          const code = document.createElement('code');
+          if (node.lang) code.className = 'language-' + node.lang;
+          code.textContent = node.src;
+          pre.appendChild(code);
+          host.appendChild(pre);
+          break;
+        }
+        case 'hr': {
+          host.appendChild(document.createElement('hr'));
+          break;
+        }
+        case 'quote': {
+          const bq = document.createElement('blockquote');
+          const sub = parseMarkdown(node.body);
+          emitMarkdown(bq, sub, null);
+          host.appendChild(bq);
+          break;
+        }
+        case 'admonition': {
+          host.appendChild(renderAdmonition(node));
+          break;
+        }
+        case 'list': {
+          host.appendChild(renderList(node));
+          break;
+        }
+        case 'table': {
+          host.appendChild(renderMarkdownTable(node));
+          break;
+        }
+      }
+    }
+  }
+
+  // Map admonition types to kit callout classes. Standard GFM types
+  // (note, tip, important, warning, caution) map directly; TLDR is the
+  // one kit extension and gets its own special layout.
+  const ADM_CLASS = {
+    note: 'note',
+    tip: 'tip',
+    important: 'important',
+    warning: 'warning',
+    caution: 'caution',
+    tldr: 'tldr'
+  };
+
+  function renderAdmonition(node) {
+    const type = ADM_CLASS[node.type] || 'note';
+    if (type === 'tldr') {
+      // TLDR keeps the legacy .tldr layout — h2 + summary + bullets.
+      const section = document.createElement('section');
+      section.id = 'tldr';
+      const tldr = document.createElement('div');
+      tldr.className = 'tldr';
+      const lab = document.createElement('span');
+      lab.className = 'tldr-label';
+      lab.textContent = 'TL;DR';
+      tldr.appendChild(lab);
+      const h2 = document.createElement('h2');
+      h2.textContent = node.title || 'TL;DR';
+      tldr.appendChild(h2);
+      // Body is a markdown sub-document — first paragraph becomes the
+      // summary line; any list becomes the bullet block.
+      const sub = parseMarkdown(node.body);
+      let summarised = false;
+      for (const s of sub) {
+        if (s.k === 'paragraph' && !summarised) {
+          const p = document.createElement('p');
+          p.className = 'one-line';
+          parseInline(s.text, p);
+          tldr.appendChild(p);
+          summarised = true;
+        } else if (s.k === 'list') {
+          tldr.appendChild(renderList(s));
+        } else {
+          emitMarkdown(tldr, [s], null);
+        }
+      }
+      section.appendChild(tldr);
+      return section;
+    }
+    const c = document.createElement('div');
+    c.className = 'callout ' + type;
+    c.setAttribute('data-callout-symbol', type);
+    if (node.title) {
+      const h = document.createElement('h4');
+      h.textContent = node.title;
+      c.appendChild(h);
+    }
+    const sub = parseMarkdown(node.body);
+    emitMarkdown(c, sub, null);
+    return c;
+  }
+
+  function renderList(node) {
+    const tag = node.ordered ? 'ol' : 'ul';
+    const list = document.createElement(tag);
+    for (const item of node.items) {
+      const li = document.createElement('li');
+      // Item is an array of strings and {__nested: lines} objects.
+      const text = [];
+      const sub = [];
+      for (const seg of item) {
+        if (typeof seg === 'string') text.push(seg);
+        else if (seg.__nested) sub.push(seg.__nested.join('\n'));
+      }
+      parseInline(text.join(' ').trim(), li);
+      for (const ns of sub) {
+        const parsed = parseMarkdown(ns);
+        emitMarkdown(li, parsed, null);
+      }
+      list.appendChild(li);
+    }
+    return list;
+  }
+
+  function renderMarkdownTable(node) {
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const htr = document.createElement('tr');
+    for (const h of node.headers) {
+      const th = document.createElement('th');
+      parseInline(h, th);
+      htr.appendChild(th);
+    }
+    thead.appendChild(htr);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    for (const row of node.rows) {
+      const tr = document.createElement('tr');
+      for (const cell of row) {
+        const td = document.createElement('td');
+        parseInline(cell, td);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  /* ================================================================ *
    * Public API
-   * ---------------------------------------------------------------- */
+   * ================================================================ */
 
   class OkuRenderer {
     constructor(opts) {
       opts = opts || {};
-      this.host = opts.host || null; // resolved at render() time if absent
-      this.lang = opts.lang || (document.documentElement.lang) || 'en';
+      this.host = opts.host || null;
+      this.lang = opts.lang || document.documentElement.lang || 'en';
       this.warnings = [];
     }
 
-    /* Split an authored prose string into a mixed [string, inline-node]
-       array when it contains <code>…</code> / <em>…</em> / <strong>…</strong>
-       tags. Author convenience — lets a writer keep flat strings for
-       paragraphs that only carry inline-code without paying the cost of
-       a content array. Match is non-greedy + restricted to three known
-       tags so element-name documentation like "<callout>" stays literal. */
-    static _splitInlineTags(text) {
-      // Two distinct passes:
-      //   1) Plain tags (code / em / strong / kbd / samp / mark) that
-      //      carry only text content. Cheap regex.
-      //   2) Anchor tags (<a href="...">text</a>) — emit a link
-      //      inline node so the kit's standard link styling applies.
-      //   3) Anything else from the allowlist (span / sup / sub /
-      //      br / del / ins / abbr) becomes an html-pass-through.
-      //
-      // The pass walks left-to-right and picks the FIRST matching
-      // tag at each position so nested tags inside an outer
-      // pass-through render via innerHTML rather than double-
-      // processing.
-      const plainRe = /<(code|em|strong|kbd|samp|mark)>([\s\S]*?)<\/\1>/g;
-      const anchorRe = /<a\s+(?:[^>]*?\s+)?href=(?:"([^"]*)"|'([^']*)')(?:\s+[^>]*)?>([\s\S]*?)<\/a>/g;
-      const passRe = /<(span|sup|sub|del|ins|abbr)(?:\s+[^>]*)?>([\s\S]*?)<\/\1>|<br\s*\/?>/g;
-      const tokens = [];
-      function addMatches(re, makeNode) {
-        re.lastIndex = 0;
-        let mm;
-        while ((mm = re.exec(text)) !== null) {
-          tokens.push({ start: mm.index, end: mm.index + mm[0].length, node: makeNode(mm) });
-        }
-      }
-      addMatches(plainRe, function (mm) { return { kind: mm[1], text: mm[2] }; });
-      addMatches(anchorRe, function (mm) { return { kind: 'link', text: mm[3], href: mm[1] || mm[2] }; });
-      addMatches(passRe,   function (mm) { return { kind: 'html', text: mm[0] }; });
-      // Sort by start, drop overlaps (later matches inside an earlier match get skipped).
-      tokens.sort(function (a, b) { return a.start - b.start; });
-      const filtered = [];
-      let cursor = 0;
-      tokens.forEach(function (t) {
-        if (t.start < cursor) return;
-        filtered.push(t);
-        cursor = t.end;
-      });
-      if (!filtered.length) return [text];
-      const out = [];
-      let pos = 0;
-      filtered.forEach(function (t) {
-        if (t.start > pos) out.push(text.slice(pos, t.start));
-        out.push(t.node);
-        pos = t.end;
-      });
-      if (pos < text.length) out.push(text.slice(pos));
-      return out;
-    }
-
-    /* Inline-markdown split. Mirrors Python's `_md_inline` so an author
-       can write `**bold**`, `*italic*`, `_italic_`, ``code``,
-       `[text](url)` directly inside a content / lead / summary string —
-       same vocabulary as a Markdown-twin source.
-
-       Returns null when the string has no markdown markers (caller
-       short-circuits to a plain text node). Order matters: bold (**)
-       checked before italic (*) so `**a**` doesn't match as italic. */
-    static _splitInlineMd(text) {
-      const re = /\*\*([^*]+?)\*\*|\*([^*\s][^*]*?)\*|__([^_]+?)__|_([^_\s][^_]*?)_|`([^`]+?)`|\[([^\]]+?)\]\(([^)\s]+?)\)/g;
-      const out = [];
-      let pos = 0;
-      let m;
-      while ((m = re.exec(text)) !== null) {
-        if (m.index > pos) out.push(text.slice(pos, m.index));
-        if (m[1] !== undefined)      out.push({ kind: 'strong', text: m[1] });
-        else if (m[2] !== undefined) out.push({ kind: 'em',     text: m[2] });
-        else if (m[3] !== undefined) out.push({ kind: 'strong', text: m[3] });
-        else if (m[4] !== undefined) out.push({ kind: 'em',     text: m[4] });
-        else if (m[5] !== undefined) out.push({ kind: 'code',   text: m[5] });
-        else if (m[6] !== undefined) out.push({ kind: 'link',   text: m[6], href: m[7] });
-        pos = m.index + m[0].length;
-      }
-      if (pos === 0) return null;
-      if (pos < text.length) out.push(text.slice(pos));
-      return out;
-    }
-
-    /** Fetch JSON, parse, and render into the host. */
     async renderFromUrl(url, host) {
       let page;
-      const wa = (window.__okuWithAuth || ((u) => u));
+      const wa = window.__okuWithAuth || ((u) => u);
       try {
         const res = await fetch(wa(url), { cache: 'no-cache' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         page = await res.json();
       } catch (e) {
-        this._fail('page-fetch-failed', 'Could not load page ' + url + ': ' + e.message);
+        this._fail('page-fetch-failed', 'Could not load ' + url + ': ' + e.message);
         return;
       }
       this.render(page, host);
     }
 
-    /** Render an already-parsed page object into the host. */
     render(page, host) {
       this.host = host || this.host || document.querySelector('main#main-content') || document.querySelector('main') || document.body;
       this.warnings = [];
 
-      if (!page || page.kind !== 'page') {
-        this._fail('schema-mismatch', 'Page root is not kind="page"', page);
+      // v1 → v2 shim. Older pages still on disk (or in other projects
+      // sharing this kit) keep rendering — no migrate run required.
+      if (page && page.kind === 'page' && !page.k) {
+        page = convertV1ToV2(page);
+      }
+
+      if (!page || page.k !== 'page') {
+        this._fail('schema-mismatch', 'Page root is not { k: "page" }', page);
         return;
       }
-      if (page.schema_version && page.schema_version > 1) {
-        this._fail('schema-future', 'Page schema_version ' + page.schema_version + ' newer than this renderer (1)');
-      }
 
-      // document-level setup
-      if (page.title) {
-        document.title = page.title;
+      const meta = page.m || {};
+      if (page.t) document.title = page.t;
+      if (meta.lang) {
+        document.documentElement.lang = meta.lang;
+        this.lang = meta.lang;
       }
-      if (page.meta && page.meta.lang) {
-        document.documentElement.lang = page.meta.lang;
-        this.lang = page.meta.lang;
-      }
-      if (page.accent) {
-        this._applyAccent(page.accent);
-      }
+      if (meta.accent) this._applyAccent(meta.accent);
 
-      // render
       const main = this.host;
       main.innerHTML = '';
       main.appendChild(this._renderCover(page));
-      const blocks = page.blocks || [];
-      for (const block of blocks) {
-        const el = this._renderTopBlock(block);
-        if (el) main.appendChild(el);
+
+      let currentSection = null;
+      const openSection = (heading) => {
+        const section = document.createElement('section');
+        if (heading.id) section.id = heading.id;
+        const h2 = document.createElement('h2');
+        h2.textContent = heading.title;
+        section.appendChild(h2);
+        main.appendChild(section);
+        currentSection = section;
+      };
+      const target = () => currentSection || main;
+
+      for (const block of (page.b || [])) {
+        if (typeof block === 'string') {
+          const parsed = parseMarkdown(block);
+          // Walk node-by-node so h2 can open a section mid-string.
+          let buffer = [];
+          const flush = () => {
+            if (buffer.length) {
+              emitMarkdown(target(), buffer, null);
+              buffer = [];
+            }
+          };
+          for (const node of parsed) {
+            if (node.k === 'heading' && node.level === 2) {
+              flush();
+              openSection(node);
+            } else {
+              buffer.push(node);
+            }
+          }
+          flush();
+        } else if (block && typeof block === 'object') {
+          const el = this._renderTyped(block);
+          if (el) target().appendChild(el);
+        }
       }
 
-      // expose warnings for forward-compat indicator
       if (this.warnings.length) {
         window.dispatchEvent(new CustomEvent('oku:warnings', { detail: this.warnings }));
       }
-      // tell chrome.js to (re)build TOC, init reading aids
       window.dispatchEvent(new CustomEvent('oku:rendered', { detail: { page: page } }));
     }
 
@@ -171,7 +751,7 @@
     _renderCover(page) {
       const cover = document.createElement('header');
       cover.className = 'cover';
-      const meta = page.meta || {};
+      const meta = page.m || {};
       if (meta.eyebrow) {
         const eb = document.createElement('div');
         eb.className = 'eyebrow';
@@ -179,7 +759,7 @@
         cover.appendChild(eb);
       }
       const h1 = document.createElement('h1');
-      h1.textContent = page.title || '';
+      h1.textContent = page.t || '';
       cover.appendChild(h1);
       if (meta.subtitle) {
         const sub = document.createElement('p');
@@ -197,8 +777,6 @@
         m.textContent = metaParts.join(' · ');
         cover.appendChild(m);
       }
-      // "Last updated" line — trust signal lifted from Vercel / VitePress /
-      // Stripe. Quietly rendered below the main meta row in faint type.
       if (meta.updated) {
         const u = document.createElement('div');
         u.className = 'meta meta-updated';
@@ -209,52 +787,74 @@
     }
 
     /* -------------------------------------------------------------- *
-     * Top-level blocks
+     * Typed primitives
      * -------------------------------------------------------------- */
 
-    _renderTopBlock(block) {
-      if (!block || !block.kind) return this._unknown(block);
-      switch (block.kind) {
-        case 'tldr':     return this._renderTldr(block);
-        case 'kpi-grid': return this._renderKpiGrid(block);
-        case 'section':  return this._renderSection(block);
-        default:         return this._renderContentBlock(block); // tolerant: allow content-blocks at top level
+    _renderTyped(block) {
+      if (!block || !block.k) return this._unknown(block);
+      let el;
+      switch (block.k) {
+        case 'diagram':        el = this._renderDiagram(block); break;
+        case 'code':           el = this._renderCode(block); break;
+        case 'annotated-code': el = this._renderAnnotatedCode(block); break;
+        case 'live-snippet':   el = this._renderLiveSnippet(block); break;
+        case 'table':          el = this._renderTable(block); break;
+        case 'kpi-grid':       el = this._renderKpiGrid(block); break;
+        case 'step-flow':      el = this._renderStepFlow(block); break;
+        case 'compare-grid':   el = this._renderCompareGrid(block); break;
+        case 'chart':          el = this._renderChart(block); break;
+        case 'chart-grid':     el = this._renderChartGrid(block); break;
+        case 'example':        el = this._renderExample(block); break;
+        case 'insight':        el = this._renderInsight(block); break;
+        default:               el = this._unknown(block); break;
       }
+      return el;
     }
 
-    _renderTldr(block) {
-      const section = document.createElement('section');
-      section.id = 'tldr';
-      const tldr = document.createElement('div');
-      tldr.className = 'tldr';
-      const label = document.createElement('span');
-      label.className = 'tldr-label';
-      label.textContent = 'TL;DR';
-      tldr.appendChild(label);
-      // Always emit an h2 so the TOC has an entry; default to "TL;DR".
-      // Without it the buildTOC pass would still find the h2 inside .tldr
-      // (descendant search) but it would be empty — and an empty TOC
-      // entry takes up the "1." slot and shifts everything else.
-      const h2 = document.createElement('h2');
-      h2.textContent = block.title || 'TL;DR';
-      tldr.appendChild(h2);
-      if (block.summary) {
-        const p = document.createElement('p');
-        p.className = 'one-line';
-        p.appendChild(this._renderRich(block.summary));
-        tldr.appendChild(p);
+    _renderDiagram(block) {
+      const el = document.createElement('oku-diagram');
+      if (block.caption) el.setAttribute('caption', block.caption);
+      const src = document.createElement('script');
+      src.type = 'text/x-mermaid';
+      src.textContent = block.src || '';
+      el.appendChild(src);
+      return el;
+    }
+
+    _renderCode(block) {
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      if (block.lang) code.className = 'language-' + block.lang;
+      code.textContent = block.src || '';
+      pre.appendChild(code);
+      return pre;
+    }
+
+    _renderAnnotatedCode(block) {
+      const el = document.createElement('oku-annotated-code');
+      if (block.lang) el.setAttribute('language', block.lang);
+      const src = document.createElement('script');
+      src.setAttribute('type', 'text/x-code');
+      src.textContent = block.src || '';
+      el.appendChild(src);
+      if (Array.isArray(block.annotations) && block.annotations.length) {
+        const data = document.createElement('script');
+        data.setAttribute('type', 'application/json');
+        data.textContent = JSON.stringify(block.annotations);
+        el.appendChild(data);
       }
-      if (block.bullets && block.bullets.length) {
-        const ul = document.createElement('ul');
-        for (const b of block.bullets) {
-          const li = document.createElement('li');
-          li.appendChild(this._renderRich(b));
-          ul.appendChild(li);
-        }
-        tldr.appendChild(ul);
-      }
-      section.appendChild(tldr);
-      return section;
+      return el;
+    }
+
+    _renderLiveSnippet(block) {
+      const el = document.createElement('oku-snippet');
+      if (block.label) el.setAttribute('label', block.label);
+      el.setAttribute('language', block.lang || 'html-css-js');
+      const src = document.createElement('script');
+      src.type = 'text/plain';
+      src.textContent = block.src || '';
+      el.appendChild(src);
+      return el;
     }
 
     _renderKpiGrid(block) {
@@ -276,87 +876,198 @@
       return grid;
     }
 
-    _renderSection(block) {
-      const section = document.createElement('section');
-      if (block.id) section.id = block.id;
-      const h2 = document.createElement('h2');
-      h2.textContent = block.title || '';
-      section.appendChild(h2);
-      if (block.lead) {
-        const lead = document.createElement('p');
-        lead.className = 'section-lead';
-        lead.appendChild(this._renderRich(block.lead));
-        section.appendChild(lead);
+    _renderStepFlow(block) {
+      const wrap = document.createElement('div');
+      wrap.className = 'step-cards';
+      (block.steps || []).forEach((s, i) => {
+        const card = document.createElement(s.href ? 'a' : 'div');
+        card.className = 'step-card' + (s.href ? ' step-card-link' : '');
+        if (s.href) {
+          card.setAttribute('href', s.href);
+          if (/^https?:/i.test(s.href)) {
+            card.setAttribute('target', '_blank');
+            card.setAttribute('rel', 'noopener');
+          }
+        }
+        const num = document.createElement('span');
+        num.className = 'step-num';
+        num.textContent = String(i + 1);
+        card.appendChild(num);
+        const body = document.createElement('div');
+        const h = document.createElement('h4');
+        h.textContent = s.t || '';
+        body.appendChild(h);
+        if (s.meta) {
+          const m = document.createElement('div');
+          m.className = 'step-meta';
+          m.textContent = s.meta;
+          body.appendChild(m);
+        }
+        if (s.b !== undefined && s.b !== '') {
+          const sub = parseMarkdown(s.b);
+          emitMarkdown(body, sub, null);
+        }
+        card.appendChild(body);
+        wrap.appendChild(card);
+      });
+      return wrap;
+    }
+
+    _renderCompareGrid(block) {
+      const grid = document.createElement('div');
+      grid.className = 'compare-grid';
+      for (const c of (block.cards || [])) {
+        const card = document.createElement(c.href ? 'a' : 'div');
+        const styleKey = c.accent || c.verdict || 'neutral';
+        card.className = 'compare-card ' + styleKey + (c.href ? ' compare-card-link' : '');
+        if (c.href) card.setAttribute('href', c.href);
+        if (c.t) {
+          const h = document.createElement('h4');
+          h.textContent = c.t;
+          card.appendChild(h);
+        }
+        if (c.b) {
+          const sub = parseMarkdown(c.b);
+          emitMarkdown(card, sub, null);
+        }
+        grid.appendChild(card);
       }
-      for (const sub of (block.blocks || [])) {
-        const el = this._renderContentBlock(sub);
-        if (el) section.appendChild(el);
+      return grid;
+    }
+
+    _renderInsight(block) {
+      const ins = document.createElement('aside');
+      ins.className = 'insight';
+      if (block.b) {
+        const sub = parseMarkdown(block.b);
+        emitMarkdown(ins, sub, null);
       }
-      return section;
+      return ins;
+    }
+
+    _renderExample(block) {
+      const wrap = document.createElement('div');
+      wrap.className = 'example-pair';
+      if (block.t) {
+        const t = document.createElement('div');
+        t.className = 'example-title';
+        t.textContent = block.t;
+        wrap.appendChild(t);
+      }
+      const codeCol = document.createElement('div');
+      codeCol.className = 'example-code';
+      const codeLbl = document.createElement('div');
+      codeLbl.className = 'example-col-label';
+      codeLbl.textContent = 'Code';
+      codeCol.appendChild(codeLbl);
+      if (block.code) codeCol.appendChild(this._renderCode(block.code));
+      const outputCol = document.createElement('div');
+      outputCol.className = 'example-output';
+      const outputLbl = document.createElement('div');
+      outputLbl.className = 'example-col-label';
+      outputLbl.textContent = 'Output';
+      outputCol.appendChild(outputLbl);
+      if (typeof block.output === 'string') {
+        const sub = parseMarkdown(block.output);
+        emitMarkdown(outputCol, sub, null);
+      } else if (block.output) {
+        const outputEl = this._renderTyped(block.output);
+        if (outputEl) outputCol.appendChild(outputEl);
+      }
+      wrap.appendChild(codeCol);
+      wrap.appendChild(outputCol);
+      return wrap;
     }
 
     /* -------------------------------------------------------------- *
-     * Content blocks (allowed inside sections)
+     * Table (typed, sortable/filterable form)
      * -------------------------------------------------------------- */
 
-    _renderContentBlock(block) {
-      if (!block || !block.kind) return this._unknown(block);
-      let el;
-      switch (block.kind) {
-        case 'paragraph':    el = this._renderParagraph(block); break;
-        case 'heading':      el = this._renderHeading(block); break;
-        case 'callout':      el = this._renderCallout(block); break;
-        case 'insight':      el = this._renderInsight(block); break;
-        case 'info-tip':     el = this._renderInfoTip(block); break;
-        case 'list':         el = this._renderList(block); break;
-        case 'code':         el = this._renderCode(block); break;
-        case 'annotated-code': el = this._renderAnnotatedCode(block); break;
-        case 'example':      el = this._renderExample(block); break;
-        case 'table':        el = this._renderTable(block); break;
-        case 'tldr':         el = this._renderTldr(block); break;
-        case 'kpi-grid':     el = this._renderKpiGrid(block); break;
-        case 'step-flow':    el = this._renderStepFlow(block); break;
-        case 'compare-grid': el = this._renderCompareGrid(block); break;
-        case 'chart':        el = this._renderChart(block); break;
-        case 'diagram':      el = this._renderDiagram(block); break;
-        case 'live-snippet': el = this._renderLiveSnippet(block); break;
-        // Small multiples — render the same chart shape across N
-        // data-slice panels in a CSS grid. Each panel is itself a
-        // chart block emitted via the same _renderChart pipeline.
-        case 'chart-grid':   el = this._renderChartGrid(block); break;
-        default:             el = this._unknown(block); break;
+    _renderTable(block) {
+      const table = document.createElement('table');
+      if (block.view) table.setAttribute('data-default-view', block.view);
+      const headers = block.headers || [];
+      const wrapColumn = headers.map(h =>
+        h && typeof h === 'object' && !Array.isArray(h) && h.wrap === true
+      );
+      if (headers.length) {
+        const thead = document.createElement('thead');
+        const tr = document.createElement('tr');
+        for (const h of headers) {
+          const th = document.createElement('th');
+          if (h && typeof h === 'object' && !Array.isArray(h)) {
+            if (h.filter === 'chips') {
+              th.setAttribute('data-filter', 'chips');
+              if (Array.isArray(h.values)) th.setAttribute('data-values', h.values.join('|'));
+            }
+            if (Array.isArray(h.boardOrder) && h.boardOrder.length) {
+              th.setAttribute('data-board-order', h.boardOrder.join('|'));
+            }
+            if (h.wrap === true) th.setAttribute('data-wrap', '1');
+            parseInline(h.label || '', th);
+          } else {
+            parseInline(h || '', th);
+          }
+          tr.appendChild(th);
+        }
+        thead.appendChild(tr);
+        table.appendChild(thead);
       }
-      // Propagate `bind` so chrome.js's data-bind hover-sync pairs work
-      // for any block kind the author wants to pair (paragraph ↔ code
-      // ↔ callout ↔ chart, etc.).
-      if (el && block.bind) el.setAttribute('data-bind', block.bind);
-      return el;
+      const tbody = document.createElement('tbody');
+      const cellCount = headers.length || 1;
+
+      const renderCell = (cell, colIdx) => {
+        const td = document.createElement('td');
+        if (wrapColumn[colIdx]) td.setAttribute('data-wrap', '1');
+        if (cell && typeof cell === 'object' && !Array.isArray(cell) && Array.isArray(cell.values)) {
+          td.setAttribute('data-values', cell.values.join('|'));
+          parseInline(cell.value != null ? cell.value : cell.values.join(', '), td);
+        } else {
+          parseInline(typeof cell === 'string' ? cell : '', td);
+        }
+        return td;
+      };
+
+      const renderRow = (row) => {
+        const tr = document.createElement('tr');
+        if (row && typeof row === 'object' && !Array.isArray(row) && row.href) {
+          tr.setAttribute('data-href', row.href);
+          tr.style.cursor = 'pointer';
+          tr.addEventListener('click', () => { window.location.href = row.href; });
+        }
+        const cells = (row && row.cells) || row;
+        for (let ci = 0; ci < cells.length; ci++) {
+          tr.appendChild(renderCell(cells[ci], ci));
+        }
+        tbody.appendChild(tr);
+      };
+
+      const renderGroupHeader = (title) => {
+        const tr = document.createElement('tr');
+        tr.className = 'group';
+        const th = document.createElement('th');
+        th.colSpan = cellCount;
+        parseInline(title || '', th);
+        tr.appendChild(th);
+        tbody.appendChild(tr);
+      };
+
+      if (Array.isArray(block.groups) && block.groups.length) {
+        for (const g of block.groups) {
+          if (g.t) renderGroupHeader(g.t);
+          for (const row of (g.rows || [])) renderRow(row);
+        }
+      } else {
+        for (const row of (block.rows || [])) renderRow(row);
+      }
+      table.appendChild(tbody);
+      return table;
     }
 
-    /* Chart-type unification: aliases desugar to canonical types with
-       defaults the author can still override. Operates in a copy of
-       the block so callers' object stays untouched.
+    /* -------------------------------------------------------------- *
+     * Chart family — unchanged dispatch, key renames only
+     * -------------------------------------------------------------- */
 
-       Canonical → alias mapping:
-         plot   ← scatter (marks=[dots]), line (marks=[line]),
-                  area (marks=[line, area])
-         arc    ← pie (mode=pie, inner_radius=0),
-                  donut (mode=donut, inner_radius≈0.55)
-         bar    ← bar (mode=single),
-                  stacked-bar (mode=stacked),
-                  grouped-bar (mode=grouped)
-
-       Explicit fields on the block win over alias defaults — e.g.
-       type=pie + arc.end=270 produces a 3/4 pie, type=scatter +
-       marks=["dots","line"] adds a connecting line to a scatter.
-       Aliases stay as the rendered type so the existing renderer
-       branches keep matching; canonical types translate to their
-       canonical alias-form before render dispatch. */
-    /* Canonical record-array → legacy `series` desugar. Lets plot
-       authors emit a flat record table + encoding map (the Vega-Lite
-       shape) instead of the series-of-series shape the renderer was
-       originally built for. Currently scoped to the plot family; other
-       families follow as they're migrated. */
     _normaliseChartData(block) {
       if (!block || !Array.isArray(block.data) || !block.data.length) return block;
       const enc = block.encoding || {};
@@ -365,14 +1076,8 @@
       const colorField = enc.color || null;
       const sizeField  = enc.size  || null;
       const labelField = enc.label || null;
-      // Only desugar when the chart actually uses series-shape charts.
-      // Plot / scatter / line / area / bubble / quadrant all consume
-      // `series: [{label, color, data: [{x, y}]}]`.
       const cartesian = /^(plot|scatter|line|area|bubble|quadrant)$/i.test(String(block.type || ''));
       if (!cartesian) return block;
-      // Group records by encoding.color (if set) into one series per
-      // distinct value. With no color encoding, all records collapse
-      // into a single anonymous series.
       const series = new Map();
       const seriesPalette = ['accent', 'success', 'warn', 'danger', 'muted'];
       block.data.forEach((rec) => {
@@ -392,8 +1097,6 @@
       });
       const out = Object.assign({}, block);
       out.series = Array.from(series.values());
-      // Strip the canonical fields so the downstream renderer sees the
-      // legacy shape and doesn't double-count.
       delete out.data;
       delete out.encoding;
       return out;
@@ -403,13 +1106,9 @@
       block = this._normaliseChartData(block);
       const out = Object.assign({}, block || {});
       const t = String(out.type || 'scatter').toLowerCase();
-      // Canonical inputs: translate to the equivalent legacy alias so
-      // existing renderer code paths keep working. Author overrides
-      // (mode / marks / arc / inner_radius) carry through.
       if (t === 'plot') {
         const marks = Array.isArray(out.marks) && out.marks.length ? out.marks : ['dots'];
         out.marks = marks;
-        // Pick the closest alias for the renderer dispatch.
         if (marks.includes('area'))      out.type = 'area';
         else if (marks.includes('line')) out.type = 'line';
         else                              out.type = 'scatter';
@@ -424,9 +1123,6 @@
         else if (mode === 'grouped') out.type = 'grouped-bar';
         else out.type = 'bar';
       } else {
-        // Sugar aliases — fill in the canonical-equivalent defaults so
-        // the OkuChart Custom Element receives the same payload either
-        // way. Author overrides are preserved.
         if (t === 'scatter') out.marks = Array.isArray(out.marks) ? out.marks : ['dots'];
         else if (t === 'line') out.marks = Array.isArray(out.marks) ? out.marks : ['line'];
         else if (t === 'area') out.marks = Array.isArray(out.marks) ? out.marks : ['line', 'area'];
@@ -439,23 +1135,7 @@
     }
 
     _renderChart(block) {
-      // Normalise canonical-or-alias type first. The unification lets
-      // authors emit either form:
-      //   - canonical: type=plot/arc/bar + marks/mode/arc/inner_radius
-      //   - sugar alias: type=scatter/line/area/pie/donut/stacked-bar/
-      //     grouped-bar (presets baked in; explicit fields still win)
-      // Both shapes route to the same renderer; the alias just supplies
-      // defaults the author can override.
       block = this._normaliseChartType(block);
-
-      // Dispatch by type. Three rendering paths:
-      //
-      // - bar / stacked-bar / grouped-bar — DIV-based horizontal CSS
-      //   bars. Real DOM text, fluid resizing, no JS after first paint.
-      // - scatter / line / area / bubble / quadrant / donut — the
-      //   oku-chart Custom Element, which owns SVG + pan/zoom +
-      //   PNG export. The element parses its data + extras from child
-      //   <script> tags (avoids attribute-encoding pain).
       const type = block.type || 'scatter';
       if (type === 'bar') return this._renderBars(block);
       if (type === 'stacked-bar' || type === 'grouped-bar') {
@@ -475,19 +1155,11 @@
       if (block.title) el.setAttribute('title', block.title);
       if (block.x_label) el.setAttribute('x-label', block.x_label);
       if (block.y_label) el.setAttribute('y-label', block.y_label);
-      // Curve style for line / area connectors. Author opts into
-      // a smoother shape via `curve: "smooth"` (Catmull-Rom) or
-      // sticks with the default `"linear"`. Other values silently
-      // fall back to linear so an unknown curve never breaks
-      // rendering.
       if (block.curve) el.setAttribute('curve', String(block.curve));
-      // Cartesian data: stash series as JSON.
       const data = document.createElement('script');
       data.type = 'application/json';
       data.textContent = JSON.stringify(block.series || []);
       el.appendChild(data);
-      // Quadrant overlay: ship the {x, y, labels} as a second JSON
-      // script tag; the element looks for `script[data-extras]`.
       if (type === 'quadrant' && block.quadrants) {
         const q = document.createElement('script');
         q.type = 'application/json';
@@ -495,8 +1167,6 @@
         q.textContent = JSON.stringify(block.quadrants);
         el.appendChild(q);
       }
-      // Donut / pie slices: separate payload from `series` (both share
-      // the renderer; pie is just rInner=0).
       if ((type === 'donut' || type === 'pie') && Array.isArray(block.slices)) {
         const d = document.createElement('script');
         d.type = 'application/json';
@@ -504,11 +1174,6 @@
         d.textContent = JSON.stringify(block.slices);
         el.appendChild(d);
       }
-      // Tier-1/3 extension types — each ships its own payload under
-      // data-extras. The Custom Element switches by `type` in
-      // connectedCallback and reads only the extras its renderer cares
-      // about; unknown extras are ignored so the data shape can grow
-      // without breaking older clients.
       const extraMap = {
         heatmap: { cells: block.cells, row_labels: block.row_labels, col_labels: block.col_labels, scale: block.scale, domain: block.domain },
         sparkline: { values: block.values, variant: block.variant, end_label: block.end_label },
@@ -543,23 +1208,12 @@
         'polar-area': { sectors: block.sectors },
         gantt:        { tasks: block.tasks, tick_format: block.tick_format },
         bump:         { categories: block.categories, series: block.series },
-        // Diverging horizontal bars centered on a category axis;
-        // left/right each carry { label, color, values }.
         'population-pyramid': { categories: block.categories, left: block.left, right: block.right },
-        // Connected scatter uses standard `series` payload; no extras
-        // needed. The renderer reads this._series directly.
         'tile-map':   { regions: block.regions },
-        // Compressed time series (catalogue gap item, Q37).
         horizon:      { categories: block.categories, series: block.series, bands: block.bands },
-        // Density-by-cell alternative to scatter for high N (Q38).
         hexbin:       { points: block.points, radius: block.radius, scale: block.scale },
-        // Nodes on a baseline with arcs above for links.
         'arc-diagram': { nodes: block.nodes, links: block.links },
-        // [low, high] band per row; optional `mid` tick. Renderer reads
-        // `ranges` (not `rows`) to keep the schema row-shape unambiguous
-        // versus bar / dot-plot / lollipop / dumbbell.
         'range-bar':  { ranges: block.ranges },
-        // Descending bars + cumulative-% line — the 80/20 shape.
         pareto:       { rows: block.rows }
       };
       if (extraMap[type]) {
@@ -573,10 +1227,6 @@
     }
 
     _renderMultiBars(block, mode) {
-      // Horizontal multi-series bar render. Each category is a row;
-      // within the row, each series contributes either a stacked
-      // segment (mode=stacked-bar) or a side-by-side mini-bar
-      // (mode=grouped-bar). Layout is CSS-only — no SVG, no JS.
       const categories = block.categories || [];
       const series = block.series || [];
       const wrap = document.createElement('div');
@@ -589,28 +1239,13 @@
         h.textContent = block.title;
         wrap.appendChild(h);
       }
-      // Per-series colour resolution. Named tokens (accent / warn /
-      // danger / success / muted) get a class on the swatch and the
-      // bar fill so existing CSS rules apply. Unnamed series rotate
-      // through the --series-1..10 ramp inline so a multi-series
-      // chart without explicit colours doesn't render every series
-      // in accent (the historic default that made grouped-bar reads
-      // as single-series).
       const TOKEN_COLORS = ['accent', 'warn', 'danger', 'success', 'muted'];
       function resolveSeriesColor(s, idx) {
-        if (s && TOKEN_COLORS.indexOf(s.color) >= 0) {
-          return { className: s.color, inlineBackground: null };
-        }
-        // Custom CSS color string passed through; honour it inline.
-        if (s && s.color) {
-          return { className: '', inlineBackground: s.color };
-        }
+        if (s && TOKEN_COLORS.indexOf(s.color) >= 0) return { className: s.color, inlineBackground: null };
+        if (s && s.color) return { className: '', inlineBackground: s.color };
         const slot = (idx % 10) + 1;
         return { className: '', inlineBackground: 'var(--series-' + slot + ')' };
       }
-      // Legend chip rack at the top — one entry per series.
-      // Each chip carries data-series-idx so chrome.js can wire a
-      // click-toggle that dims the matching .bar-fill[data-series=N].
       if (series.some(s => s.label)) {
         const legend = document.createElement('div');
         legend.className = 'bar-chart-legend';
@@ -632,12 +1267,9 @@
         });
         wrap.appendChild(legend);
       }
-      // Compute the scale max.
       let scaleMax;
-      if (block.max !== undefined) {
-        scaleMax = block.max;
-      } else if (mode === 'stacked-bar') {
-        // Sum across series per category, then take the max.
+      if (block.max !== undefined) scaleMax = block.max;
+      else if (mode === 'stacked-bar') {
         scaleMax = 0;
         for (let ci = 0; ci < categories.length; ci++) {
           let sum = 0;
@@ -645,15 +1277,10 @@
           if (sum > scaleMax) scaleMax = sum;
         }
       } else {
-        // grouped: largest single value across all series.
         scaleMax = 1;
-        for (const s of series) {
-          for (const v of (s.values || [])) if (v > scaleMax) scaleMax = v;
-        }
+        for (const s of series) for (const v of (s.values || [])) if (v > scaleMax) scaleMax = v;
       }
       if (scaleMax <= 0) scaleMax = 1;
-      // Per-category row totals — needed both for the readout and
-      // for each fill's hover payload (share-of-category).
       const rowTotals = categories.map((_, ci) => {
         let t = 0;
         for (const s of series) t += (s.values && s.values[ci]) || 0;
@@ -677,13 +1304,8 @@
           if (colorInfo.inlineBackground) fill.style.background = colorInfo.inlineBackground;
           fill.setAttribute('data-series', String(si));
           const pct = Math.max(0, Math.min(100, (v / scaleMax) * 100));
-          // Set both --bar-pct (used by vertical CSS) and width
-          // (used by horizontal default) so the same DOM works for
-          // either orientation. CSS picks which one applies.
           fill.style.setProperty('--bar-pct', String(pct));
           fill.style.width = pct + '%';
-          // Rich hover payload — chrome.js wires .bar-chart-multi
-          // .bar-fill to the shared tooltip controller.
           const share = rowTotal > 0 ? v / rowTotal : 0;
           fill.setAttribute('data-hover-payload', JSON.stringify({
             series: s.label || '',
@@ -707,375 +1329,9 @@
       return wrap;
     }
 
-    _renderDiagram(block) {
-      const el = document.createElement('oku-diagram');
-      if (block.caption) el.setAttribute('caption', block.caption);
-      const src = document.createElement('script');
-      src.type = 'text/x-mermaid';
-      src.textContent = block.source || '';
-      el.appendChild(src);
-      return el;
-    }
-
-    _renderLiveSnippet(block) {
-      const el = document.createElement('oku-snippet');
-      if (block.label) el.setAttribute('label', block.label);
-      el.setAttribute('language', block.language || 'html-css-js');
-      const src = document.createElement('script');
-      src.type = 'text/plain';
-      src.textContent = block.source || '';
-      el.appendChild(src);
-      return el;
-    }
-
-    _renderParagraph(block) {
-      const p = document.createElement('p');
-      p.appendChild(this._renderRich(block.content));
-      return p;
-    }
-
-    /* Helper for blocks (callout, insight) that may carry richString
-       content. Two shapes survive in the wild:
-
-       - Single rich string OR mixed-inline array — render as ONE <p>.
-       - Array of plain strings (no inline-kind objects) — author meant
-         multiple paragraphs; render as N <p>s. Without this rule
-         authors get a wall of run-together sentences whenever they
-         pass a list of strings into a callout's content.
-
-       The detector is mechanical: an array with at least one item that
-       is itself an inline-kind object (eg {kind:'code',text:'x'}) is
-       inline-shape, so single paragraph. An all-plain-string array of
-       length ≥ 2 is multi-paragraph. */
-    _appendRichAsParagraphs(host, content) {
-      if (content === undefined || content === null) return;
-      if (Array.isArray(content) && content.length > 1 &&
-          content.every(function (it) { return typeof it === 'string'; })) {
-        for (const text of content) {
-          const p = document.createElement('p');
-          p.appendChild(this._renderRich(text));
-          host.appendChild(p);
-        }
-        return;
-      }
-      const p = document.createElement('p');
-      p.appendChild(this._renderRich(content));
-      host.appendChild(p);
-    }
-
-    _renderHeading(block) {
-      const level = Math.max(3, Math.min(4, block.level || 3));
-      const h = document.createElement('h' + level);
-      if (block.id) h.id = block.id;
-      h.textContent = block.title || '';
-      return h;
-    }
-
-    _renderCallout(block) {
-      const c = document.createElement('div');
-      const type = block.type || 'neutral';
-      c.className = 'callout ' + type;
-      // Standard symbol per callout type so the reader sees the
-      // semantic class at a glance, not just a colored border. The
-      // CSS applies the symbol via ::before on .callout, keyed by
-      // the type class — no DOM symbol needed here.
-      c.setAttribute('data-callout-symbol', this._calloutSymbol(type));
-      if (block.title) {
-        const h = document.createElement('h4');
-        h.textContent = block.title;
-        c.appendChild(h);
-      }
-      if (block.content !== undefined) {
-        this._appendRichAsParagraphs(c, block.content);
-      }
-      return c;
-    }
-
-    _calloutSymbol(type) {
-      // Compact line-style glyphs rendered as inline SVG via CSS
-      // background-image (set per-type in chrome.css). The render
-      // here only carries the semantic type so the stylesheet can
-      // swap in the right icon — same trick chrome.js uses for the
-      // chevron / drawer / theme icons. Returning the type keeps
-      // the data-attr small + makes the symbol fully theme-aware.
-      return type;
-    }
-
-    _renderInsight(block) {
-      const ins = document.createElement('aside');
-      ins.className = 'insight';
-      this._appendRichAsParagraphs(ins, block.content);
-      return ins;
-    }
-
-    _renderInfoTip(block) {
-      const det = document.createElement('details');
-      det.className = 'info-tip';
-      const sum = document.createElement('summary');
-      sum.textContent = block.summary || 'Details';
-      det.appendChild(sum);
-      for (const sub of (block.content || [])) {
-        const el = this._renderContentBlock(sub);
-        if (el) det.appendChild(el);
-      }
-      return det;
-    }
-
-    _renderList(block) {
-      const tag = block.style === 'numbered' ? 'ol' : 'ul';
-      const list = document.createElement(tag);
-      for (const item of (block.items || [])) {
-        const li = document.createElement('li');
-        li.appendChild(this._renderRich(item));
-        list.appendChild(li);
-      }
-      return list;
-    }
-
-    _renderCode(block) {
-      const pre = document.createElement('pre');
-      const code = document.createElement('code');
-      if (block.language) code.className = 'language-' + block.language;
-      code.textContent = block.source || '';
-      pre.appendChild(code);
-      return pre;
-    }
-
-    /* Small multiples — repeat the same chart shape across N data
-       panels in a CSS grid. The reader compares facets side-by-side
-       (e.g. p95 latency by region, conversion rate by experiment arm).
-
-       Shape:
-         {
-           "kind": "chart-grid",
-           "title": "p95 by region",
-           "cols": 4,                  // optional, default auto-fit
-           "child_type": "sparkline",  // applied to every panel
-           "panels": [
-             { "label": "us-east-1", "values": [...] },
-             { "label": "eu-west-1", "values": [...] },
-             ...
-           ]
-         }
-
-       Each panel becomes a chart block: type = block.child_type,
-       title = panel.label, plus every other field on the panel piped
-       through (so a panel can specialise its color, data shape, or
-       extras independently). The result is just a grid of fully-
-       featured charts — every per-chart hover/cursor/tooltip the kit
-       offers applies inside each panel.
-
-       Panel field aliases:
-         panel.label    → chart.title (matches sparkline's end_label
-                          convention authors already use)
-         panel.values   → chart.values (sparkline) or piped onto the
-                          extras key for the child_type.
-       Anything else on the panel object is shallow-merged into the
-       constructed chart block. */
-    _renderChartGrid(block) {
-      const wrap = document.createElement('div');
-      wrap.className = 'okt-chart-grid';
-      if (block.title) {
-        const h = document.createElement('h4');
-        h.className = 'okt-chart-grid-title';
-        h.textContent = block.title;
-        wrap.appendChild(h);
-      }
-      const grid = document.createElement('div');
-      grid.className = 'okt-chart-grid-cells';
-      // Grid columns: explicit cols, or auto-fit with a 220 px minmax.
-      const cols = +block.cols;
-      if (cols && cols > 0) {
-        grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
-      } else {
-        grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
-      }
-      const childType = block.child_type || 'sparkline';
-      (block.panels || []).forEach((panel) => {
-        if (!panel || typeof panel !== 'object') return;
-        // Build a chart block from the panel. Author can pass any
-        // chart property (color, mode, marks, …) on the panel; it
-        // overrides the inferred title/type below.
-        const childBlock = Object.assign(
-          { kind: 'chart', type: childType, title: panel.label || '' },
-          panel
-        );
-        // Compatibility: `label` is a panel-level convenience for
-        // "use as the chart title"; remove so the chart renderer
-        // doesn't see an unknown field.
-        delete childBlock.label;
-        const cell = document.createElement('div');
-        cell.className = 'okt-chart-grid-cell';
-        const chartEl = this._renderChart(childBlock);
-        if (chartEl) cell.appendChild(chartEl);
-        grid.appendChild(cell);
-      });
-      wrap.appendChild(grid);
-      return wrap;
-    }
-
-    _renderTable(block) {
-      // Two valid shapes:
-      //   { headers: [...], rows: [[c1, c2, ...], ...] }
-      //   { headers: [...], groups: [{title, rows: [[...], ...]}, ...] }
-      // The chrome.js post-processor (UX6) discovers groups by class /
-      // colspan markers, so we emit those even from the JSON path.
-      //
-      // Header object form `{ label, filter: "chips", values: [...] }`
-      // and cell object form `{ value, values: [...] }` are surfaced as
-      // `data-filter` / `data-values` attributes so chrome.js can build
-      // the chip rack without re-reading the JSON.
-      //
-      // Optional block.view ∈ {table, list, cards, board}: pins the
-      // initial view shown by the table-chrome view toggle. Falls
-      // through to 'table' when unset (the historical default).
-      const table = document.createElement('table');
-      if (block.view) table.setAttribute('data-default-view', block.view);
-      const headers = block.headers || [];
-      // Per-column `wrap: true` lets authors mark which columns honour
-      // explicit newlines in their cell content. Cells in a wrap
-      // column render with `white-space: pre-line` so `\n` in the
-      // source becomes a visible line break. The flag is read into
-      // a parallel array so renderCell can stamp each <td> with the
-      // matching data attribute.
-      const wrapColumn = headers.map(h =>
-        h && typeof h === 'object' && !Array.isArray(h) && h.wrap === true
-      );
-      if (headers.length) {
-        const thead = document.createElement('thead');
-        const tr = document.createElement('tr');
-        for (const h of headers) {
-          const th = document.createElement('th');
-          if (h && typeof h === 'object' && !Array.isArray(h)) {
-            if (h.filter === 'chips') {
-              th.setAttribute('data-filter', 'chips');
-              if (Array.isArray(h.values)) th.setAttribute('data-values', h.values.join('|'));
-            }
-            if (Array.isArray(h.boardOrder) && h.boardOrder.length) {
-              th.setAttribute('data-board-order', h.boardOrder.join('|'));
-            }
-            if (h.wrap === true) th.setAttribute('data-wrap', '1');
-            th.appendChild(this._renderRich(h.label));
-          } else {
-            th.appendChild(this._renderRich(h));
-          }
-          tr.appendChild(th);
-        }
-        thead.appendChild(tr);
-        table.appendChild(thead);
-      }
-      const tbody = document.createElement('tbody');
-      const cellCount = headers.length || 1;
-
-      const renderCell = (cell, colIdx) => {
-        const td = document.createElement('td');
-        if (wrapColumn[colIdx]) td.setAttribute('data-wrap', '1');
-        if (cell && typeof cell === 'object' && !Array.isArray(cell) && Array.isArray(cell.values)) {
-          td.setAttribute('data-values', cell.values.join('|'));
-          td.appendChild(this._renderRich(cell.value != null ? cell.value : cell.values.join(', ')));
-        } else {
-          td.appendChild(this._renderRich(cell));
-        }
-        return td;
-      };
-
-      const renderRow = (row, opts) => {
-        const tr = document.createElement('tr');
-        if (opts && opts.bind) tr.setAttribute('data-bind', opts.bind);
-        if (opts && opts.href) {
-          // tr's don't have an href attribute, but the click handler can
-          // read it from a data-href dataset.
-          tr.setAttribute('data-href', opts.href);
-          tr.style.cursor = 'pointer';
-          tr.addEventListener('click', () => { window.location.href = opts.href; });
-        }
-        const cells = row.cells || row;
-        for (let ci = 0; ci < cells.length; ci++) {
-          tr.appendChild(renderCell(cells[ci], ci));
-        }
-        tbody.appendChild(tr);
-      };
-
-      const renderGroupHeader = (title) => {
-        const tr = document.createElement('tr');
-        tr.className = 'group';
-        const th = document.createElement('th');
-        th.colSpan = cellCount;
-        th.appendChild(this._renderRich(title));
-        tr.appendChild(th);
-        tbody.appendChild(tr);
-      };
-
-      if (Array.isArray(block.groups) && block.groups.length) {
-        for (const g of block.groups) {
-          if (g.title) renderGroupHeader(g.title);
-          for (const row of (g.rows || [])) renderRow(row);
-        }
-      } else {
-        for (const row of (block.rows || [])) renderRow(row);
-      }
-      table.appendChild(tbody);
-      return table;
-    }
-
-    _renderAnnotatedCode(block) {
-      const el = document.createElement('oku-annotated-code');
-      if (block.language) el.setAttribute('language', block.language);
-      const src = document.createElement('script');
-      src.setAttribute('type', 'text/x-code');
-      src.textContent = block.source || '';
-      el.appendChild(src);
-      if (Array.isArray(block.annotations) && block.annotations.length) {
-        const data = document.createElement('script');
-        data.setAttribute('type', 'application/json');
-        data.textContent = JSON.stringify(block.annotations);
-        el.appendChild(data);
-      }
-      return el;
-    }
-
-    _renderExample(block) {
-      // Code + rendered-result pair. Two-column on wide screens (CSS
-      // grid via .example-pair), stacked under ~900px. Each cell gets
-      // its own label so the reader knows which side is which.
-      const wrap = document.createElement('div');
-      wrap.className = 'example-pair';
-      if (block.title) {
-        const t = document.createElement('div');
-        t.className = 'example-title';
-        t.textContent = block.title;
-        wrap.appendChild(t);
-      }
-      const codeCol = document.createElement('div');
-      codeCol.className = 'example-code';
-      const codeLbl = document.createElement('div');
-      codeLbl.className = 'example-col-label';
-      codeLbl.textContent = 'Code';
-      codeCol.appendChild(codeLbl);
-      if (block.code) codeCol.appendChild(this._renderCode(block.code));
-      const outputCol = document.createElement('div');
-      outputCol.className = 'example-output';
-      const outputLbl = document.createElement('div');
-      outputLbl.className = 'example-col-label';
-      outputLbl.textContent = 'Output';
-      outputCol.appendChild(outputLbl);
-      if (block.output) {
-        const outputEl = this._renderContentBlock(block.output);
-        if (outputEl) outputCol.appendChild(outputEl);
-      }
-      wrap.appendChild(codeCol);
-      wrap.appendChild(outputCol);
-      return wrap;
-    }
-
     _renderBars(block) {
-      // Horizontal CSS-bar markup. Used by chart type=bar (and
-      // historically by the standalone bar-chart kind, which folded
-      // into chart). One .bar-row per data row: [label] [track > fill]
-      // [readout]. Width is derived from block.max (or auto-derived
-      // from the largest value).
       const rows = block.rows || [];
-      const max = block.max !== undefined ? block.max : Math.max.apply(null, rows.map(function (r) { return r.value || 0; }).concat([1]));
+      const max = block.max !== undefined ? block.max : Math.max.apply(null, rows.map(r => r.value || 0).concat([1]));
       const wrap = document.createElement('div');
       wrap.className = 'bar-chart' + (block.orientation === 'vertical' ? ' bar-chart-vertical' : '');
       wrap.setAttribute('role', 'img');
@@ -1086,7 +1342,6 @@
         h.textContent = block.title;
         wrap.appendChild(h);
       }
-      // Total for share-of-total readouts in hover tooltips.
       const total = rows.reduce((s, r) => s + (+r.value || 0), 0);
       for (const r of rows) {
         const row = document.createElement('div');
@@ -1122,216 +1377,43 @@
       return wrap;
     }
 
-    _renderStepFlow(block) {
+    _renderChartGrid(block) {
       const wrap = document.createElement('div');
-      wrap.className = 'step-cards';
-      (block.steps || []).forEach((s, i) => {
-        // When href is set, the entire card becomes a single anchor so
-        // it is keyboard-reachable AND clickable anywhere inside —
-        // matching the visual cue that "this card opens that page".
-        const card = document.createElement(s.href ? 'a' : 'div');
-        card.className = 'step-card' + (s.href ? ' step-card-link' : '');
-        if (s.href) {
-          card.setAttribute('href', s.href);
-          if (/^https?:/i.test(s.href)) {
-            card.setAttribute('target', '_blank');
-            card.setAttribute('rel', 'noopener');
-          }
-        }
-        const num = document.createElement('span');
-        num.className = 'step-num';
-        num.textContent = String(s.num !== undefined ? s.num : i + 1);
-        card.appendChild(num);
-        const body = document.createElement('div');
+      wrap.className = 'okt-chart-grid';
+      if (block.title) {
         const h = document.createElement('h4');
-        h.textContent = s.title || '';
-        body.appendChild(h);
-        if (s.meta) {
-          const m = document.createElement('div');
-          m.className = 'step-meta';
-          m.textContent = s.meta;
-          body.appendChild(m);
-        }
-        if (s.content !== undefined) {
-          const p = document.createElement('p');
-          p.appendChild(this._renderRich(s.content));
-          body.appendChild(p);
-        }
-        card.appendChild(body);
-        wrap.appendChild(card);
+        h.className = 'okt-chart-grid-title';
+        h.textContent = block.title;
+        wrap.appendChild(h);
+      }
+      const grid = document.createElement('div');
+      grid.className = 'okt-chart-grid-cells';
+      const cols = +block.cols;
+      if (cols && cols > 0) {
+        grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
+      } else {
+        grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
+      }
+      const childType = block.child_type || 'sparkline';
+      (block.panels || []).forEach((panel) => {
+        if (!panel || typeof panel !== 'object') return;
+        const childBlock = Object.assign({ k: 'chart', type: childType, title: panel.label || '' }, panel);
+        delete childBlock.label;
+        const cell = document.createElement('div');
+        cell.className = 'okt-chart-grid-cell';
+        const chartEl = this._renderChart(childBlock);
+        if (chartEl) cell.appendChild(chartEl);
+        grid.appendChild(cell);
       });
+      wrap.appendChild(grid);
       return wrap;
     }
 
-    _renderCompareGrid(block) {
-      // Unified comparison grid. Each card can carry:
-      //   verdict: good | bad | neutral | in | out (legacy shorthand)
-      //   accent:  accent | warn | danger | success | muted | neutral
-      //     accent wins over verdict when both are present.
-      //   content: rich-string body
-      //   items:   array of rich-strings rendered as a <ul> inside the card
-      //   blocks:  array of contentBlock — rich blocks (callouts,
-      //            code, charts, tables) rendered after items.
-      // Every payload field is optional. Order on the card is:
-      // title → content → items → blocks.
-      const grid = document.createElement('div');
-      grid.className = 'compare-grid';
-      for (const c of (block.cards || [])) {
-        // When a card declares `href`, render the card as an <a> so
-        // the whole tile becomes clickable (used by Pick-by-family
-        // grid → each variant mini-card jumps to its full example).
-        // Otherwise the card is a plain <div>.
-        const card = document.createElement(c.href ? 'a' : 'div');
-        const styleKey = c.accent || c.verdict || 'neutral';
-        card.className = 'compare-card ' + styleKey + (c.href ? ' compare-card-link' : '');
-        if (c.href) card.setAttribute('href', c.href);
-        if (c.title) {
-          const h = document.createElement('h4');
-          h.textContent = c.title;
-          card.appendChild(h);
-        }
-        if (c.content !== undefined) {
-          const p = document.createElement('p');
-          p.appendChild(this._renderRich(c.content));
-          card.appendChild(p);
-        }
-        if (Array.isArray(c.items) && c.items.length) {
-          const ul = document.createElement('ul');
-          for (const it of c.items) {
-            const li = document.createElement('li');
-            li.appendChild(this._renderRich(it));
-            ul.appendChild(li);
-          }
-          card.appendChild(ul);
-        }
-        if (Array.isArray(c.blocks) && c.blocks.length) {
-          for (const sub of c.blocks) {
-            const el = this._renderContentBlock(sub);
-            if (el) card.appendChild(el);
-          }
-        }
-        grid.appendChild(card);
-      }
-      return grid;
-    }
-
     /* -------------------------------------------------------------- *
-     * Rich text (paragraph content arrays)
-     * -------------------------------------------------------------- */
-
-    _renderRich(rich) {
-      const frag = document.createDocumentFragment();
-      if (rich === undefined || rich === null) return frag;
-      // Common pipeline used by both the plain-string branch and each
-      // string entry inside the array branch: first try pseudo-HTML tag
-      // detection (<code>…</code>), then markdown inline (**bold**,
-      // *italic*, `code`, [text](url)). Either branch may yield nothing
-      // (no matches) — in that case the whole string renders as a text
-      // node.
-      const self = this;
-      const renderString = function (text) {
-        const tags = OkuRenderer._splitInlineTags(text);
-        for (const part of tags) {
-          if (typeof part === 'string') {
-            const mds = OkuRenderer._splitInlineMd(part);
-            if (mds) {
-              for (const sub of mds) {
-                if (typeof sub === 'string') frag.appendChild(document.createTextNode(sub));
-                else { const el = self._renderInline(sub); if (el) frag.appendChild(el); }
-              }
-            } else {
-              frag.appendChild(document.createTextNode(part));
-            }
-          } else {
-            const el = self._renderInline(part);
-            if (el) frag.appendChild(el);
-          }
-        }
-      };
-      if (typeof rich === 'string') {
-        renderString(rich);
-        return frag;
-      }
-      if (!Array.isArray(rich)) {
-        this._warn('rich-string-invalid', 'Expected string or array', rich);
-        return frag;
-      }
-      for (const item of rich) {
-        if (typeof item === 'string') {
-          renderString(item);
-        } else if (item && item.kind) {
-          const el = this._renderInline(item);
-          if (el) frag.appendChild(el);
-        } else {
-          this._warn('rich-item-invalid', 'Unexpected inline item', item);
-        }
-      }
-      return frag;
-    }
-
-    _renderInline(node) {
-      switch (node.kind) {
-        case 'glossary-term': {
-          const e = document.createElement('glossary-term');
-          if (node.term) e.setAttribute('term', node.term);
-          if (node.in)   e.setAttribute('in',   node.in);
-          if (node.lang) e.setAttribute('lang', node.lang);
-          e.textContent = node.text || node.term || '';
-          return e;
-        }
-        case 'ext-ref': {
-          const e = document.createElement('ext-ref');
-          if (node.name) e.setAttribute('name', node.name);
-          if (node.in)   e.setAttribute('in',   node.in);
-          if (node.lang) e.setAttribute('lang', node.lang);
-          e.textContent = node.text || node.name || '';
-          return e;
-        }
-        case 'code': {
-          const e = document.createElement('code');
-          e.textContent = node.text || '';
-          return e;
-        }
-        case 'em': {
-          const e = document.createElement('em');
-          e.textContent = node.text || '';
-          return e;
-        }
-        case 'strong': {
-          const e = document.createElement('strong');
-          e.textContent = node.text || '';
-          return e;
-        }
-        case 'link': {
-          const e = document.createElement('a');
-          e.textContent = node.text || node.href || '';
-          if (node.href) e.setAttribute('href', node.href);
-          if (node.href && /^https?:/.test(node.href)) {
-            e.setAttribute('target', '_blank');
-            e.setAttribute('rel', 'noopener');
-          }
-          return e;
-        }
-        case 'html': {
-          // Sanitised inline HTML pass-through. Schema + Markdown
-          // converter both restrict the tag vocabulary upstream;
-          // here we just drop the string into a span via innerHTML
-          // so the browser parses it as nodes.
-          const span = document.createElement('span');
-          span.innerHTML = node.text || '';
-          return span;
-        }
-        default:
-          return this._unknownInline(node);
-      }
-    }
-
-    /* -------------------------------------------------------------- *
-     * Helpers
+     * Accent + helpers
      * -------------------------------------------------------------- */
 
     _applyAccent(accent) {
-      // Named tokens map to known palettes; CSS hex passes through.
       const palettes = {
         teal:   { light: '#0f766e', soft: '#ccfbf1', strong: '#115e59', dark: '#2dd4bf', darkSoft: '#042f2e', darkStrong: '#5eead4' },
         amber:  { light: '#b45309', soft: '#fef3c7', strong: '#b45309', dark: '#fbbf24', darkSoft: '#422006', darkStrong: '#fcd34d' },
@@ -1349,50 +1431,31 @@
           ':root { --accent: ' + p.light + '; --accent-soft: ' + p.soft + '; --accent-strong: ' + p.strong + '; }' +
           ':root[data-theme="dark"] { --accent: ' + p.dark + '; --accent-soft: ' + p.darkSoft + '; --accent-strong: ' + p.darkStrong + '; }';
       } else {
-        // Treat as a raw color; user can override via richer CSS if needed.
         style.textContent = ':root { --accent: ' + accent + '; }';
       }
     }
 
     _unknown(block) {
-      this._warn('unknown-block-kind', 'Unknown block.kind: ' + (block && block.kind), block);
-      return null;
-    }
-
-    _unknownInline(node) {
-      this._warn('unknown-inline-kind', 'Unknown inline.kind: ' + (node && node.kind), node);
+      this._warn('unknown-block', 'Unknown block.k: ' + (block && block.k), block);
       return null;
     }
 
     _warn(code, msg, payload) {
       this.warnings.push({ code: code, msg: msg, payload: payload, level: 'warn' });
-      // eslint-disable-next-line no-console
       console.warn('[oku] ' + code + ': ' + msg, payload);
     }
 
     _fail(code, msg, payload) {
       this.warnings.push({ code: code, msg: msg, payload: payload, level: 'error' });
-      // eslint-disable-next-line no-console
       console.error('[oku] ' + code + ': ' + msg, payload);
     }
   }
 
-  /**
-   * Auto-boot: pick up inline JSON if present, else fetch by URL.
-   *
-   *   <script type="application/json" id="__oku_page__">
-   *     { "kind": "page", "title": "...", ... }
-   *   </script>
-   *
-   * Standalone builds (oku build → dist/standalone/) inline the
-   * JSON via that tag so the page renders without a network fetch.
-   * Dev pages and the dist/site/ build fall through to fetching the
-   * sibling *.json file derived from the current URL.
-   */
+  /* ================================================================ *
+   * Auto-boot
+   * ================================================================ */
+
   OkuRenderer.autoBoot = function (opts) {
-    // Idempotent: legacy stubs include an inline autoBoot script that
-    // races with the self-trigger below. Skip the second call so we
-    // don't render twice.
     if (OkuRenderer._autoBootRan) return OkuRenderer._autoBootRan;
     const inline = document.getElementById('__oku_page__');
     let result;
@@ -1405,11 +1468,6 @@
       }
     }
     if (result === undefined) {
-      // Hash-based routing: when URL is "...index.html#architecture.html",
-      // render that target instead of index.json. chrome.js's hashchange
-      // handler covers subsequent navigation; this branch only handles
-      // the very first paint so we don't show index then flash to the
-      // requested page.
       const rawHash = (window.location.hash || '').replace(/^#/, '');
       const sep = rawHash.indexOf(':');
       const hashPage = sep >= 0 ? rawHash.slice(0, sep) : rawHash;
@@ -1423,20 +1481,13 @@
         pagePath = last.endsWith('.html') ? last : 'index.html';
         jsonName = last.replace(/\.html$/, '.json') || 'index.json';
       }
-      // Set BEFORE renderFromUrl so chrome.js's render-event handlers
-      // (e.g., buildTOC) namespace anchors to the right page.
       window.__okuCurrentPage = pagePath;
       result = new OkuRenderer(opts || {}).renderFromUrl(jsonName);
-      // Honor the in-page anchor on first paint: refresh on
-      // "#architecture.html:perf" should land at #perf, not page-top.
-      // hashchange doesn't fire on reload (URL is unchanged), so scroll
-      // explicitly here once render resolves.
       const trailingAnchor = sep >= 0 ? rawHash.slice(sep + 1) : '';
       if (trailingAnchor && result && typeof result.then === 'function') {
         result.then(function () {
           requestAnimationFrame(function () {
-            const el = document.getElementById(trailingAnchor)
-              || document.querySelector('[id="' + trailingAnchor + '"]');
+            const el = document.getElementById(trailingAnchor) || document.querySelector('[id="' + trailingAnchor + '"]');
             if (el) el.scrollIntoView();
           });
         });
@@ -1448,9 +1499,6 @@
 
   window.OkuRenderer = OkuRenderer;
 
-  // Self-trigger so per-page stubs don't need an inline autoBoot script.
-  // The legacy inline form remains compatible — autoBoot itself is
-  // idempotent (see _autoBootRan guard above).
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () { OkuRenderer.autoBoot(); });
   } else {

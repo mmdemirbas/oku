@@ -1,39 +1,4 @@
-{
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
-  "kind": "page",
-  "schema_version": 1,
-  "title": "{{ TITLE }}",
-  "accent": "teal",
-  "meta": {
-    "eyebrow": "{{ EYEBROW }}",
-    "subtitle": "{{ SUBTITLE }}",
-    "audience": "{{ AUDIENCE }}",
-    "date": "{{ DATE }}",
-    "read_time": "{{ READ_TIME }}",
-    "order": 10,
-    "summary": "{{ ONE_LINE_SUMMARY }}"
-  },
-  "blocks": [
-    {
-      "kind": "tldr",
-      "summary": "{{ ONE_LINE_SUMMARY }}",
-      "bullets": [
-        "{{ KEY_POINT_1 }}",
-        "{{ KEY_POINT_2 }}",
-        "{{ KEY_POINT_3 }}"
-      ]
-    },
-    {
-      "kind": "section",
-      "id": "overview",
-      "title": "{{ SECTION_1_TITLE }}",
-      "lead": "{{ SECTION_1_LEAD }}",
-      "blocks": [
-        {
-          "kind": "paragraph",
-          "content": "{{ PROSE }}"
-        }
-      ]
-    }
-  ]
-}
+{"$schema":"https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json","k":"page","t":"{{ TITLE }}","m":{"accent":"teal","eyebrow":"{{ EYEBROW }}","subtitle":"{{ SUBTITLE }}","audience":"{{ AUDIENCE }}","date":"{{ DATE }}","read_time":"{{ READ_TIME }}","order":10,"summary":"{{ ONE_LINE_SUMMARY }}"},"b":[
+"> [!TLDR]\n> {{ ONE_LINE_SUMMARY }}\n>\n> - {{ KEY_POINT_1 }}\n> - {{ KEY_POINT_2 }}\n> - {{ KEY_POINT_3 }}",
+"## {{ SECTION_1_TITLE }} {#overview}\n{{ SECTION_1_LEAD }}\n\n{{ PROSE }}"
+]}

@@ -1,85 +1,131 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
-  "title": "oku page",
-  "description": "Source of truth for one renderable page. Authored as JSON; the kit's renderer maps the tree to Custom-Element DOM at load time.",
+  "title": "oku page v2",
+  "description": "Compact authoring shape. A page is { k:'page', t, m?, b }. The b array carries markdown strings interleaved with typed primitive objects. Sections are implicit from heading levels inside markdown.",
   "type": "object",
-  "required": ["kind", "title", "blocks"],
+  "required": ["k", "t", "b"],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string", "description": "Optional schema URL for editor autocomplete." },
-    "schema_version": { "type": "integer", "default": 1, "description": "Reader uses this to detect forward-compat issues." },
-    "kind": { "const": "page" },
-    "title": { "type": "string", "description": "Becomes the document <title> and the page cover's <h1>." },
-    "meta": { "$ref": "#/$defs/meta" },
-    "accent": {
-      "type": "string",
-      "description": "Per-page accent token. Either a kit-known name (teal, amber, indigo, ...) or a CSS color value."
-    },
-    "blocks": {
+    "$schema": { "type": "string", "description": "Optional URL for editor autocomplete." },
+    "k": { "const": "page" },
+    "t": { "type": "string", "description": "Document title — drives <title> and the cover h1." },
+    "m": { "$ref": "#/$defs/meta" },
+    "b": {
       "type": "array",
-      "description": "Top-level content sequence: cover-level elements (tldr) then sections.",
-      "items": { "$ref": "#/$defs/topBlock" }
+      "description": "Sequence of blocks. A string is parsed as GFM markdown. An object is a typed primitive.",
+      "items": { "$ref": "#/$defs/block" }
     }
   },
   "$defs": {
     "meta": {
       "type": "object",
       "additionalProperties": true,
+      "description": "Page-level metadata. accent picks the page color token; the rest are surfaced in cover, nav tooltips, and llms.txt.",
       "properties": {
-        "eyebrow": { "type": "string", "description": "Small label above the title, e.g. 'Implementation plan'." },
+        "accent": { "type": "string", "description": "Kit color token (teal/amber/indigo/rose/violet/green/slate) or any CSS color." },
+        "eyebrow": { "type": "string" },
         "subtitle": { "type": "string" },
         "audience": { "type": "string" },
-        "date": { "type": "string", "description": "ISO date or human string." },
-        "updated": { "type": "string", "description": "Last-updated date — quiet trust signal under the cover meta row." },
-        "read_time": { "type": "string", "description": "Like '~10 min read'." },
-        "lang": { "type": "string", "description": "Per-page language override; otherwise project default applies." },
-        "summary": { "type": "string", "description": "One-line summary, surfaced in nav tooltips and llms.txt." }
+        "date": { "type": "string" },
+        "updated": { "type": "string" },
+        "read_time": { "type": "string" },
+        "lang": { "type": "string" },
+        "order": { "type": "number" },
+        "summary": { "type": "string" }
       }
     },
 
-    "topBlock": {
+    "block": {
+      "description": "A string (parsed as GFM markdown) or a typed primitive object.",
       "oneOf": [
-        { "$ref": "#/$defs/section" },
-        { "$ref": "#/$defs/tldr" },
-        { "$ref": "#/$defs/kpi-grid" }
+        { "type": "string" },
+        { "$ref": "#/$defs/diagram" },
+        { "$ref": "#/$defs/code" },
+        { "$ref": "#/$defs/annotated-code" },
+        { "$ref": "#/$defs/table" },
+        { "$ref": "#/$defs/kpi-grid" },
+        { "$ref": "#/$defs/step-flow" },
+        { "$ref": "#/$defs/compare-grid" },
+        { "$ref": "#/$defs/chart" },
+        { "$ref": "#/$defs/chart-grid" },
+        { "$ref": "#/$defs/live-snippet" },
+        { "$ref": "#/$defs/example" },
+        { "$ref": "#/$defs/insight" }
       ]
     },
 
-    "section": {
+    "diagram": {
       "type": "object",
-      "required": ["kind", "id", "title", "blocks"],
+      "required": ["k", "src"],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "section" },
-        "id": { "type": "string", "description": "Anchor + TOC key. Should be unique within the page." },
-        "title": { "type": "string" },
-        "lead": { "type": "string", "description": "Optional one-paragraph lead under the heading." },
-        "blocks": {
+        "k": { "const": "diagram" },
+        "src": { "type": "string", "description": "Mermaid source." },
+        "caption": { "type": "string" }
+      }
+    },
+
+    "code": {
+      "type": "object",
+      "required": ["k", "src"],
+      "additionalProperties": false,
+      "description": "Annotated / multi-feature code block. Plain code should use a markdown fenced block inside a string in b[] instead.",
+      "properties": {
+        "k": { "const": "code" },
+        "src": { "type": "string" },
+        "lang": { "type": "string" }
+      }
+    },
+
+    "annotated-code": {
+      "type": "object",
+      "required": ["k", "src"],
+      "additionalProperties": false,
+      "properties": {
+        "k": { "const": "annotated-code" },
+        "lang": { "type": "string" },
+        "src": { "type": "string", "description": "Code body. Use (1), (2)… markers or external line/match specs in annotations." },
+        "annotations": {
           "type": "array",
-          "items": { "$ref": "#/$defs/contentBlock" }
+          "items": {
+            "type": "object",
+            "required": ["id", "content"],
+            "additionalProperties": false,
+            "properties": {
+              "id":      { "type": "integer", "minimum": 1 },
+              "content": { "type": "string", "description": "HTML snippet (allow-list: code, strong, em, a)." },
+              "lines":   { "type": "string", "description": "Line spec — '3', '1-3', '1,5-7'." },
+              "match":   {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+                ]
+              }
+            }
+          }
         }
       }
     },
 
-    "tldr": {
+    "live-snippet": {
       "type": "object",
-      "required": ["kind"],
+      "required": ["k", "src"],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "tldr" },
-        "title": { "type": "string", "default": "TL;DR" },
-        "summary": { "type": "string", "description": "Single-line headline." },
-        "bullets": { "type": "array", "items": { "$ref": "#/$defs/richString" } }
+        "k": { "const": "live-snippet" },
+        "lang": { "enum": ["html-css-js"], "default": "html-css-js" },
+        "label": { "type": "string" },
+        "src": { "type": "string" }
       }
     },
 
     "kpi-grid": {
       "type": "object",
-      "required": ["kind", "tiles"],
+      "required": ["k", "tiles"],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "kpi-grid" },
+        "k": { "const": "kpi-grid" },
         "tiles": {
           "type": "array",
           "items": {
@@ -87,7 +133,7 @@
             "required": ["num", "label"],
             "additionalProperties": false,
             "properties": {
-              "num": { "type": ["string", "number"] },
+              "num":   { "type": ["string", "number"] },
               "label": { "type": "string" }
             }
           }
@@ -95,146 +141,92 @@
       }
     },
 
-    "contentBlock": {
-      "oneOf": [
-        { "$ref": "#/$defs/paragraph" },
-        { "$ref": "#/$defs/heading" },
-        { "$ref": "#/$defs/callout" },
-        { "$ref": "#/$defs/insight" },
-        { "$ref": "#/$defs/info-tip" },
-        { "$ref": "#/$defs/list" },
-        { "$ref": "#/$defs/code" },
-        { "$ref": "#/$defs/annotated-code" },
-        { "$ref": "#/$defs/table" },
-        { "$ref": "#/$defs/tldr" },
-        { "$ref": "#/$defs/kpi-grid" },
-        { "$ref": "#/$defs/step-flow" },
-        { "$ref": "#/$defs/compare-grid" },
-        { "$ref": "#/$defs/chart" },
-        { "$ref": "#/$defs/chartGrid" },
-        { "$ref": "#/$defs/diagram" },
-        { "$ref": "#/$defs/live-snippet" },
-        { "$ref": "#/$defs/example" }
-      ]
-    },
-
-    "example": {
+    "step-flow": {
       "type": "object",
-      "required": ["kind", "code", "output"],
+      "required": ["k", "steps"],
       "additionalProperties": false,
-      "description": "Code + rendered-result pair. Renders as a two-column grid (code on the left, live output on the right) on wide screens; collapses to a stacked layout below ~900px. Use to document every primitive in reference.json so the JSON shape and the visible result sit side-by-side.",
       "properties": {
-        "kind": { "const": "example" },
-        "title": { "type": "string", "description": "Optional small label shown above the pair." },
-        "code": { "$ref": "#/$defs/code" },
-        "output": { "$ref": "#/$defs/contentBlock", "description": "The block that the code on the left produces when run. Schema accepts any contentBlock, so a code example can demonstrate a callout, a chart, a table, etc." }
+        "k": { "const": "step-flow" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["t"],
+            "additionalProperties": false,
+            "properties": {
+              "t":    { "type": "string", "description": "Step title." },
+              "b":    { "type": "string", "description": "Step body as markdown." },
+              "meta": { "type": "string", "description": "Small meta line (estimate, files, risk)." },
+              "href": { "type": "string", "description": "When set, the step card wraps in an anchor to this target." }
+            }
+          }
+        }
       }
     },
 
-    "paragraph": {
+    "compare-grid": {
       "type": "object",
-      "required": ["kind", "content"],
+      "required": ["k", "cards"],
       "additionalProperties": false,
+      "description": "N-card comparison grid. Card body is a markdown string.",
       "properties": {
-        "kind": { "const": "paragraph" },
-        "content": { "$ref": "#/$defs/richString" },
-        "bind": { "type": "string", "description": "Shared key for the cross-block hover-sync feature. Any two blocks with the same bind key flash together when either is hovered or focused." }
-      }
-    },
-
-    "heading": {
-      "type": "object",
-      "required": ["kind", "level", "title"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": { "const": "heading" },
-        "level": { "type": "integer", "minimum": 3, "maximum": 4 },
-        "title": { "type": "string" },
-        "id": { "type": "string" },
-        "bind": { "type": "string" }
-      }
-    },
-
-    "callout": {
-      "type": "object",
-      "required": ["kind"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": { "const": "callout" },
-        "type": { "enum": ["warn", "warning", "caution", "danger", "success", "tip", "neutral", "note", "info"], "default": "neutral" },
-        "title": { "type": "string" },
-        "content": { "$ref": "#/$defs/richString" },
-        "bind": { "type": "string" }
+        "k": { "const": "compare-grid" },
+        "cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["t"],
+            "additionalProperties": false,
+            "properties": {
+              "t":       { "type": "string", "description": "Card title." },
+              "b":      { "type": "string", "description": "Card body as markdown." },
+              "verdict": { "enum": ["good", "bad", "neutral", "in", "out"], "default": "neutral" },
+              "accent":  { "enum": ["accent", "warn", "danger", "success", "muted", "neutral"] },
+              "href":    { "type": "string" }
+            }
+          }
+        }
       }
     },
 
     "insight": {
       "type": "object",
-      "required": ["kind", "content"],
+      "required": ["k", "b"],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "insight" },
-        "content": { "$ref": "#/$defs/richString" }
+        "k": { "const": "insight" },
+        "b": { "type": "string", "description": "Insight body as markdown." }
       }
     },
 
-    "info-tip": {
+    "example": {
       "type": "object",
-      "required": ["kind", "summary", "content"],
+      "required": ["k", "code", "output"],
       "additionalProperties": false,
+      "description": "Code + rendered-result pair. Code on the left, output on the right.",
       "properties": {
-        "kind": { "const": "info-tip" },
-        "summary": { "type": "string", "description": "The collapsed label." },
-        "content": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/contentBlock" }
-        }
-      }
-    },
-
-    "list": {
-      "type": "object",
-      "required": ["kind", "items"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": { "const": "list" },
-        "style": { "enum": ["bullet", "numbered"], "default": "bullet" },
-        "items": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/richString" }
-        }
-      }
-    },
-
-    "code": {
-      "type": "object",
-      "required": ["kind", "source"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": { "const": "code" },
-        "language": { "type": "string" },
-        "source": { "type": "string" }
+        "k":      { "const": "example" },
+        "t":      { "type": "string", "description": "Optional label above the pair." },
+        "code":   { "$ref": "#/$defs/code" },
+        "output": { "$ref": "#/$defs/block" }
       }
     },
 
     "table": {
       "type": "object",
-      "required": ["kind"],
+      "required": ["k"],
       "additionalProperties": false,
+      "description": "Sortable / filterable / chippable table. Plain non-interactive tables should use markdown pipe-table syntax inside a string.",
       "properties": {
-        "kind":    { "const": "table" },
-        "view": {
-          "enum": ["table", "list", "cards", "board"],
-          "description": "Pin the initial view shown by the table-chrome view toggle. Defaults to 'table'. Use 'board' on tables whose primary point is the kanban grouping — otherwise the reader sees a flat table by default and the kanban shape stays one click away."
-        },
+        "k":    { "const": "table" },
+        "view": { "enum": ["table", "list", "cards", "board"] },
         "headers": {
           "type": "array",
           "items": { "$ref": "#/$defs/tableHeader" }
         },
         "rows": {
           "type": "array",
-          "items": { "$ref": "#/$defs/tableRow" },
-          "description": "Flat row form. Use either rows OR groups, not both."
+          "items": { "$ref": "#/$defs/tableRow" }
         },
         "groups": {
           "type": "array",
@@ -243,49 +235,32 @@
             "required": ["rows"],
             "additionalProperties": false,
             "properties": {
-              "title": { "$ref": "#/$defs/richString" },
-              "rows":  {
+              "t":    { "type": "string", "description": "Group title (markdown inline allowed)." },
+              "rows": {
                 "type": "array",
                 "items": { "$ref": "#/$defs/tableRow" }
               }
             }
-          },
-          "description": "Grouped row form — chrome.js renders each group title as a subhead row across the views."
+          }
         }
       }
     },
 
     "tableHeader": {
-      "description": "Either a plain header label (string / inline-array) or an object form with optional chip-filter and/or board-lane-order declarations.",
       "oneOf": [
-        { "$ref": "#/$defs/richString" },
+        { "type": "string" },
         {
           "type": "object",
           "required": ["label"],
           "additionalProperties": false,
           "properties": {
-            "label":  { "$ref": "#/$defs/richString" },
-            "filter": { "const": "chips" },
-            "values": {
-              "type": "array",
-              "items": { "type": "string" },
-              "minItems": 1,
-              "description": "Ordered chip values for chip-filter columns. Cells should declare one (or more) of these via the object cell form."
-            },
-            "boardOrder": {
-              "type": "array",
-              "items": { "type": "string" },
-              "minItems": 1,
-              "description": "When this column drives the board view's group-by, render lanes in this order. Values present in row data but missing from boardOrder render at the end in first-occurrence order."
-            },
-            "wrap": {
-              "type": "boolean",
-              "description": "When true, cells in this column honour explicit newlines (\\n) in source content via `white-space: pre-line`. Use for narrative columns where the author wants multi-line cell content without inlining <br> tags."
-            }
+            "label":      { "type": "string" },
+            "filter":     { "const": "chips" },
+            "values":     { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+            "boardOrder": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+            "wrap":       { "type": "boolean" }
           },
-          "dependentRequired": {
-            "filter": ["values"]
-          },
+          "dependentRequired": { "filter": ["values"] },
           "anyOf": [
             { "required": ["filter"] },
             { "required": ["boardOrder"] },
@@ -296,7 +271,6 @@
     },
 
     "tableRow": {
-      "description": "Row payload — either a positional array of cells or an object with cells + optional row-level affordances (link target, classes).",
       "oneOf": [
         {
           "type": "array",
@@ -317,267 +291,114 @@
     },
 
     "tableCell": {
-      "description": "Either a plain rich-string value or an object form carrying explicit chip values (supports multi-valued cells).",
       "oneOf": [
-        { "$ref": "#/$defs/richString" },
+        { "type": "string" },
         {
           "type": "object",
           "required": ["values"],
           "additionalProperties": false,
           "properties": {
-            "value": { "$ref": "#/$defs/richString" },
-            "values": {
-              "type": "array",
-              "items": { "type": "string" },
-              "minItems": 1,
-              "description": "Chip values for this cell. May contain multiple to mark the row against more than one chip."
-            }
+            "value":  { "type": "string" },
+            "values": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
           }
         }
       ]
     },
 
-    "annotated-code": {
-      "type": "object",
-      "required": ["kind", "source"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": { "const": "annotated-code" },
-        "language": { "type": "string" },
-        "source": { "type": "string", "description": "Code body. Use (1), (2)... as inline markers; each matches an annotation by id. Annotations may also declare `lines` / `match` externally and skip the inline marker." },
-        "annotations": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["id", "content"],
-            "additionalProperties": false,
-            "properties": {
-              "id":      { "type": "integer", "minimum": 1 },
-              "content": { "type": "string", "description": "HTML snippet. Allowed inline markup: <code>, <strong>, <em>, <a>." },
-              "lines": {
-                "type": "string",
-                "description": "Optional line spec — '3' for a single line, '1-3' for a range, '1,5-7' for mixed. Hovering the marker highlights every listed line; when no inline (N) marker is present, the chip auto-places on the first listed line. Line numbers are 1-based and match the gutter."
-              },
-              "match": {
-                "oneOf": [
-                  { "type": "string" },
-                  { "type": "array", "items": { "type": "string" }, "minItems": 1 }
-                ],
-                "description": "Optional substring(s) of the source. Each occurrence is highlighted on marker hover, so you can point at a token without polluting the source with (N)."
-              }
-            }
-          }
-        }
-      }
-    },
-
-    "step-flow": {
-      "type": "object",
-      "required": ["kind", "steps"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": { "const": "step-flow" },
-        "steps": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["title"],
-            "additionalProperties": false,
-            "properties": {
-              "num": { "type": ["string", "number"] },
-              "title": { "type": "string" },
-              "meta": { "type": "string", "description": "Small meta line (estimate, files, risk)." },
-              "content": { "$ref": "#/$defs/richString" },
-              "href": { "type": "string", "description": "Optional. When set, the entire step card is wrapped in an anchor pointing here — keyboard reachable, click-targetable, no 'Open X' link text needed in content." }
-            }
-          }
-        }
-      }
-    },
-
-    "compare-grid": {
-      "type": "object",
-      "required": ["kind", "cards"],
-      "additionalProperties": false,
-      "description": "N-card comparison grid. Pick the card accent via verdict (or accent — alias). Mix content (rich text body), items (bullet list), and blocks (any contentBlock — callouts, code, charts, tables) freely; they render in source order. Both verdict and accent are optional and default to neutral.",
-      "properties": {
-        "kind": { "const": "compare-grid" },
-        "cards": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["title"],
-            "additionalProperties": false,
-            "properties": {
-              "verdict": {
-                "enum": ["good", "bad", "neutral", "in", "out"],
-                "default": "neutral",
-                "description": "Quality / scope shorthand: good (success border), bad (danger), in (success — was scope-grid status:in), out (muted), neutral (default). Use `accent` instead when you need to match the broader kit token vocabulary; both fields are honoured but accent wins on conflict."
-              },
-              "accent": {
-                "enum": ["accent", "warn", "danger", "success", "muted", "neutral"],
-                "description": "Card accent in the kit's standard color tokens. Wins over verdict if both are set. Use this when verdict's good/bad/in/out feels too arbitrary — accent maps directly to the same colour vocabulary as charts and callouts."
-              },
-              "title": { "type": "string" },
-              "href": { "type": "string", "description": "Optional anchor (e.g. `#chart-line`) — when set, the whole card becomes a clickable link to that target. Used by the charts page Pick-by-family grid so each variant mini-card jumps to its full example." },
-              "content": { "$ref": "#/$defs/richString", "description": "Rich-text body. Combine with items / blocks, or use any subset alone." },
-              "items": {
-                "type": "array",
-                "items": { "$ref": "#/$defs/richString" },
-                "description": "Bullet list inside the card. Renders below content when both are present."
-              },
-              "blocks": {
-                "type": "array",
-                "items": { "$ref": "#/$defs/contentBlock" },
-                "description": "Rich block content inside the card — callouts, code samples, tables, charts, anything from contentBlock. Renders after items. Use blocks when a card needs a worked example or a structured comparison; use items for a plain bullet list."
-              }
-            }
-          }
-        }
-      }
-    },
-
     "chart": {
       "type": "object",
-      "required": ["kind", "type"],
+      "required": ["k", "type"],
       "additionalProperties": false,
-      "description": "Data-driven chart. The `type` field picks the render mode: Cartesian (scatter / line / area / bubble / quadrant) share an SVG plot with axes, pan, zoom, log scale, and PNG export; bar variants render label/value bars; donut renders a distribution arc. Each type has its own payload shape — the renderer dispatches by `type` so unused fields are simply ignored.",
+      "description": "Data-driven chart. type selects render mode; payload fields vary per type.",
       "properties": {
-        "kind": { "const": "chart" },
+        "k":    { "const": "chart" },
         "type": {
-          "enum": ["plot", "arc", "scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "pie", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo", "tile-map", "dot-plot", "density", "candlestick", "sunburst", "marimekko", "stream", "violin", "beeswarm", "waterfall", "lollipop", "dumbbell", "polar-area", "gantt", "bump", "population-pyramid", "connected-scatter", "horizon", "hexbin", "arc-diagram", "range-bar", "pareto"],
-          "description": "Render mode. Canonical types: plot (Cartesian, marks-composed) and arc (radial slice, mode-switched). Sugar aliases — scatter/line/area desugar to plot+marks; pie/donut desugar to arc+mode; stacked-bar/grouped-bar desugar to bar+mode. Aliases keep working AND let the author override any preset (e.g. type=pie + arc.end=270 for a 3/4 pie). Other types (bubble / quadrant / bar / heatmap / sparkline / waffle / gauge / radar / box-plot / bullet / slope / histogram / calendar-heatmap / treemap / ridgeline / funnel / sankey / network / scatter-matrix / parallel-coordinates / chord / geo) keep their existing payload shapes."
+          "enum": ["plot", "arc", "scatter", "line", "area", "bubble", "quadrant", "bar", "stacked-bar", "grouped-bar", "donut", "pie", "heatmap", "sparkline", "waffle", "gauge", "radar", "box-plot", "bullet", "slope", "histogram", "calendar-heatmap", "treemap", "ridgeline", "funnel", "sankey", "network", "scatter-matrix", "parallel-coordinates", "chord", "geo", "tile-map", "dot-plot", "density", "candlestick", "sunburst", "marimekko", "stream", "violin", "beeswarm", "waterfall", "lollipop", "dumbbell", "polar-area", "gantt", "bump", "population-pyramid", "connected-scatter", "horizon", "hexbin", "arc-diagram", "range-bar", "pareto"]
         },
-        "marks": {
-          "type": "array",
-          "items": { "enum": ["dots", "line", "area"] },
-          "description": "For Cartesian (canonical type=plot, or alias scatter/line/area): which marks to draw. dots = scatter points, line = connecting line, area = fill under the line. Combine freely (e.g. [\"dots\", \"line\"] = line with point markers). Defaults: scatter→[dots], line→[line], area→[line, area], plot→[dots]."
-        },
-        "data": {
-          "type": "array",
-          "description": "Canonical record-array input — alternative to the legacy `series: [{data: [{x, y}]}]` shape. Each record is a flat object; the `encoding` field maps column names to visual channels. Mark-composition uses the same `marks` list. Currently supported for the plot family (canonical type=plot or alias scatter/line/area). Desugars internally to series-grouped-by-encoding.color.",
-          "items": { "type": "object" }
-        },
-        "encoding": {
+        "marks":       { "type": "array", "items": { "enum": ["dots", "line", "area"] } },
+        "data":        { "type": "array", "items": { "type": "object" } },
+        "encoding":    {
           "type": "object",
           "additionalProperties": false,
-          "description": "Field-to-channel mapping for canonical record-array input. Names of fields in each `data` record drive the visual channels.",
           "properties": {
-            "x":     { "type": "string", "description": "Field name for the x-axis position." },
-            "y":     { "type": "string", "description": "Field name for the y-axis position." },
-            "color": { "type": "string", "description": "Field name that groups records into colour series (one rendered series per distinct value)." },
-            "size":  { "type": "string", "description": "Field name for the bubble-size channel (when relevant)." },
-            "label": { "type": "string", "description": "Field name carrying a per-record label (shown in tooltips)." }
+            "x":     { "type": "string" },
+            "y":     { "type": "string" },
+            "color": { "type": "string" },
+            "size":  { "type": "string" },
+            "label": { "type": "string" }
           }
         },
-        "mode": {
-          "type": "string",
-          "description": "Sub-mode for canonical types. bar: single | stacked | grouped. arc: pie | donut. Defaults inferred from legacy alias when applicable (stacked-bar→stacked, donut→donut)."
-        },
-        "arc": {
+        "mode":        { "type": "string" },
+        "arc":         {
           "type": "object",
           "additionalProperties": false,
-          "description": "Arc-family geometry overrides for type=arc / pie / donut. Defaults to a full 360° starting at 12 o'clock. Set start/end in degrees (clockwise from 12) for a partial arc.",
           "properties": {
             "start": { "type": "number" },
             "end":   { "type": "number" }
           }
         },
-        "inner_radius": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 0.95,
-          "description": "For type=arc / pie / donut: inner-ring radius as fraction of outer radius. 0 = pie, ~0.55 = donut. Override the mode default — e.g. type=pie + inner_radius=0.3 renders a thick ring."
-        },
-        "orientation": {
-          "enum": ["horizontal", "vertical"],
-          "default": "horizontal",
-          "description": "For charts whose layout has both forms (bar / column = horizontal vs vertical bars; histogram / column-histogram; box-plot rotation; violin rotation): switch the layout axis. Bar charts default to horizontal (rows). Set 'vertical' for column charts. Charts that don't support both axes ignore this property."
-        },
-        "title": { "type": "string" },
-        "x_label": { "type": "string", "description": "Cartesian only (scatter / line / area / bubble / quadrant)." },
-        "y_label": { "type": "string", "description": "Cartesian only." },
-        "curve": {
-          "enum": ["linear", "smooth"],
-          "default": "linear",
-          "description": "Connector style for line / area charts. `linear` (default) joins points with straight segments; `smooth` builds a Catmull-Rom spline so the curve flows through the points without corners. Ignored on chart types that don't draw a connector (scatter / bubble / quadrant)."
-        },
-        "series": {
+        "inner_radius": { "type": "number", "minimum": 0, "maximum": 0.95 },
+        "orientation":  { "enum": ["horizontal", "vertical"], "default": "horizontal" },
+        "title":   { "type": "string" },
+        "x_label": { "type": "string" },
+        "y_label": { "type": "string" },
+        "curve":   { "enum": ["linear", "smooth"], "default": "linear" },
+        "series":  {
           "type": "array",
-          "description": "Cartesian or stacked-bar / grouped-bar series. For Cartesian: each series carries `data: [{x, y, label, size?}]`. For stacked-bar / grouped-bar: each series carries `values: [number]` aligned to `categories`.",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "label": { "type": "string" },
-              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" },
-              "data": {
+              "label":  { "type": "string" },
+              "color":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" },
+              "data":   {
                 "type": "array",
-                "description": "Cartesian payload — list of points.",
                 "items": {
                   "type": "object",
                   "required": ["x", "y"],
                   "additionalProperties": false,
                   "properties": {
-                    "x": { "type": "number" },
-                    "y": { "type": "number" },
+                    "x":     { "type": "number" },
+                    "y":     { "type": "number" },
                     "label": { "type": "string" },
-                    "size": { "type": "number", "description": "Bubble only. Drives the dot radius (sqrt-scaled so dot area is proportional to size)." }
+                    "size":  { "type": "number" }
                   }
                 }
               },
-              "values": {
-                "type": "array",
-                "description": "stacked-bar / grouped-bar payload — one numeric value per entry in `categories`.",
-                "items": { "type": "number" }
-              }
+              "values": { "type": "array", "items": { "type": "number" } }
             }
           }
         },
         "rows": {
           "type": "array",
-          "description": "Shared key carrying per-row payloads for bar (single bar per row), dot-plot, lollipop, dumbbell. Each row's required fields vary by chart type: bar / dot-plot / lollipop need {label, value}; dumbbell needs {label, from, to}. Color is a kit token where supported.",
           "items": {
             "type": "object",
             "required": ["label"],
             "additionalProperties": true,
             "properties": {
-              "label": { "type": "string" },
-              "value": { "type": "number" },
-              "from":  { "type": "number", "description": "dumbbell only — left dot value." },
-              "to":    { "type": "number", "description": "dumbbell only — right dot value." },
-              "display": { "type": "string", "description": "Override the right-hand readout (e.g. '95 / 100' instead of '95')." },
-              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+              "label":   { "type": "string" },
+              "value":   { "type": "number" },
+              "from":    { "type": "number" },
+              "to":      { "type": "number" },
+              "display": { "type": "string" },
+              "color":   { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
             }
           }
         },
-        "max": { "type": "number", "description": "Bar / stacked-bar / grouped-bar — full-width value. Gauge — arc end (required). Defaults to the largest row value (bar) or the largest category total (stacked) / category max (grouped)." },
-        "categories": {
-          "type": "array",
-          "description": "stacked-bar / grouped-bar — ordered list of category labels (rows of the chart). Each series.values[] index aligns to this list.",
-          "items": { "type": "string" },
-          "minItems": 1
-        },
-        "quadrants": {
+        "max":        { "type": "number" },
+        "categories": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "quadrants":  {
           "type": "object",
-          "description": "Quadrant chart only. Splits the plot into four regions with reference lines at (x, y) and optionally names each quadrant.",
           "required": ["x", "y"],
           "additionalProperties": false,
           "properties": {
-            "x": { "type": "number", "description": "Vertical reference line position on the x-axis." },
-            "y": { "type": "number", "description": "Horizontal reference line position on the y-axis." },
-            "labels": {
-              "type": "array",
-              "description": "Four labels in order [top-left, top-right, bottom-left, bottom-right]. Use empty strings to skip a corner.",
-              "items": { "type": "string" },
-              "minItems": 4,
-              "maxItems": 4
-            }
+            "x":      { "type": "number" },
+            "y":      { "type": "number" },
+            "labels": { "type": "array", "items": { "type": "string" }, "minItems": 4, "maxItems": 4 }
           }
         },
         "slices": {
           "type": "array",
-          "description": "donut / pie only. Each slice is a labelled value; the renderer normalises to 100%.",
           "items": {
             "type": "object",
             "required": ["label", "value"],
@@ -590,75 +411,23 @@
           },
           "minItems": 2
         },
-
         "cells": {
           "type": "array",
-          "description": "heatmap only. 2D matrix — outer array is rows, inner array is columns. Length of outer ≥ 1; every inner row must have the same length.",
-          "items": {
-            "type": "array",
-            "items": { "type": "number" }
-          },
+          "items": { "type": "array", "items": { "type": "number" } },
           "minItems": 1
         },
-        "row_labels": {
-          "type": "array",
-          "description": "heatmap row labels (left edge). Length should match cells.length when supplied.",
-          "items": { "type": "string" }
-        },
-        "col_labels": {
-          "type": "array",
-          "description": "heatmap column labels (top edge). Length should match cells[0].length when supplied.",
-          "items": { "type": "string" }
-        },
-        "scale": {
-          "enum": ["sequential", "diverging"],
-          "description": "heatmap palette family. sequential is one-sided (low → high), diverging is two-sided (negative ← centre → positive).",
-          "default": "sequential"
-        },
-        "domain": {
-          "type": "array",
-          "description": "heatmap value domain [min, max] for the colour mapping. Defaults to the data's own min / max.",
-          "items": { "type": "number" },
-          "minItems": 2,
-          "maxItems": 2
-        },
-
-        "values": {
-          "type": "array",
-          "description": "sparkline only. Sequence of numeric values rendered as an inline line / area / bar.",
-          "items": { "type": "number" },
-          "minItems": 1
-        },
-        "variant": {
-          "enum": ["line", "area", "bar"],
-          "description": "sparkline render variant. Defaults to line.",
-          "default": "line"
-        },
-        "end_label": {
-          "type": "string",
-          "description": "sparkline only. Small caption shown to the right of the curve (e.g. ‘62%’, ‘↗’)."
-        },
-
-        "total": {
-          "type": "number",
-          "description": "waffle / bullet — denominator. waffle: cell count when segments don't sum to it. bullet: max value.",
-          "minimum": 1
-        },
-        "grid_rows": {
-          "type": "integer",
-          "description": "waffle grid height (rows). Defaults to 10.",
-          "minimum": 1,
-          "default": 10
-        },
-        "grid_cols": {
-          "type": "integer",
-          "description": "waffle grid width (columns). Defaults to 10.",
-          "minimum": 1,
-          "default": 10
-        },
+        "row_labels": { "type": "array", "items": { "type": "string" } },
+        "col_labels": { "type": "array", "items": { "type": "string" } },
+        "scale":      { "enum": ["sequential", "diverging"], "default": "sequential" },
+        "domain":     { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "values":     { "type": "array", "items": { "type": "number" }, "minItems": 1 },
+        "variant":    { "enum": ["line", "area", "bar"], "default": "line" },
+        "end_label":  { "type": "string" },
+        "total":      { "type": "number", "minimum": 1 },
+        "grid_rows":  { "type": "integer", "minimum": 1, "default": 10 },
+        "grid_cols":  { "type": "integer", "minimum": 1, "default": 10 },
         "segments": {
           "type": "array",
-          "description": "waffle / funnel segments. Each carries a label + count; cells coloured by category.",
           "items": {
             "type": "object",
             "required": ["label", "count"],
@@ -671,48 +440,39 @@
           },
           "minItems": 1
         },
-
-        "value": {
-          "type": "number",
-          "description": "gauge — current value. Mapped onto a semicircular arc between min and max."
-        },
-        "min": { "type": "number", "description": "gauge — arc start (default 0)." },
-        "target": { "type": "number", "description": "gauge / bullet — optional target tick." },
-        "label": { "type": "string", "description": "gauge / bullet — caption rendered under the value." },
+        "value":  { "type": "number" },
+        "min":    { "type": "number" },
+        "target": { "type": "number" },
+        "label":  { "type": "string" },
         "zones": {
           "type": "array",
-          "description": "gauge / bullet — coloured threshold bands rendered behind the value track.",
           "items": {
             "type": "object",
             "required": ["from", "to"],
             "additionalProperties": false,
             "properties": {
-              "from": { "type": "number" },
-              "to":   { "type": "number" },
-              "tone": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "muted" },
-              "label": { "type": "string", "description": "Optional short label rendered above the band (gauge) or in the band's hover title — names the zone so the reader doesn't have to guess what 'the green slice' means." }
+              "from":  { "type": "number" },
+              "to":    { "type": "number" },
+              "tone":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "muted" },
+              "label": { "type": "string" }
             }
           }
         },
-
         "axes": {
           "type": "array",
-          "description": "radar — N spokes radiating from centre. Each carries a label and optional per-axis max.",
           "items": {
             "type": "object",
             "required": ["label"],
             "additionalProperties": false,
             "properties": {
               "label": { "type": "string" },
-              "max":   { "type": "number", "description": "Per-axis maximum (defaults to scale=shared)." }
+              "max":   { "type": "number" }
             }
           },
           "minItems": 3
         },
-
         "boxes": {
           "type": "array",
-          "description": "box-plot — one box per row. Carries quartiles + whiskers + optional outliers.",
           "items": {
             "type": "object",
             "required": ["label", "q1", "median", "q3", "min", "max"],
@@ -730,10 +490,8 @@
           },
           "minItems": 1
         },
-
         "tracks": {
           "type": "array",
-          "description": "bullet — one row per metric. Each: { label, value, target?, max, zones? }.",
           "items": {
             "type": "object",
             "required": ["label", "value", "max"],
@@ -744,7 +502,7 @@
               "target": { "type": "number" },
               "max":    { "type": "number" },
               "color":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" },
-              "zones":  {
+              "zones": {
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -761,29 +519,25 @@
           },
           "minItems": 1
         },
-
-        "from_label": { "type": "string", "description": "slope — left-edge label (default ‘Before’)." },
-        "to_label":   { "type": "string", "description": "slope — right-edge label (default ‘After’)." },
+        "from_label": { "type": "string" },
+        "to_label":   { "type": "string" },
         "items": {
           "type": "array",
-          "description": "slope — one entity per row, two paired values.",
           "items": {
             "type": "object",
             "required": ["label", "from", "to"],
             "additionalProperties": false,
             "properties": {
-              "label":  { "type": "string" },
-              "from":   { "type": "number" },
-              "to":     { "type": "number" },
-              "color":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+              "label": { "type": "string" },
+              "from":  { "type": "number" },
+              "to":    { "type": "number" },
+              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
             }
           },
           "minItems": 1
         },
-
         "bins": {
           "type": "array",
-          "description": "histogram — pre-binned numeric distribution. Each entry: {lo, hi, count}. Bins should be contiguous and sorted by lo.",
           "items": {
             "type": "object",
             "required": ["lo", "hi", "count"],
@@ -796,36 +550,39 @@
           },
           "minItems": 1
         },
-
-        "year": {
-          "type": "integer",
-          "description": "calendar-heatmap — calendar year to render. If absent, derived from the keys of `date_values` (assumes all share the same year)."
-        },
-        "date_values": {
-          "type": "object",
-          "description": "calendar-heatmap — map of ISO date (YYYY-MM-DD) → numeric value. Days absent from the map render as empty cells.",
-          "additionalProperties": { "type": "number" }
-        },
-
+        "year":        { "type": "integer" },
+        "date_values": { "type": "object", "additionalProperties": { "type": "number" } },
         "tree": {
-          "type": "array",
-          "description": "treemap — flat list of leaves; one rectangle per entry, area proportional to `value`. Nested recursion via optional `children` is reserved for a later schema version.",
-          "items": {
-            "type": "object",
-            "required": ["label", "value"],
-            "additionalProperties": false,
-            "properties": {
-              "label": { "type": "string" },
-              "value": { "type": "number", "minimum": 0 },
-              "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+          "description": "treemap (flat array of leaves) OR sunburst (nested object with label/value/children).",
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["label", "value"],
+                "additionalProperties": false,
+                "properties": {
+                  "label": { "type": "string" },
+                  "value": { "type": "number", "minimum": 0 },
+                  "color": { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+                }
+              },
+              "minItems": 1
+            },
+            {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "label":    { "type": "string" },
+                "value":    { "type": "number", "minimum": 0 },
+                "children": { "type": "array" },
+                "color":    { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" }
+              }
             }
-          },
-          "minItems": 1
+          ]
         },
-
         "distributions": {
           "type": "array",
-          "description": "ridgeline — one row per distribution; each is a small histogram-like ridge. `values` is a flat sample (each cell counted with a fixed bin width derived from the global min/max).",
           "items": {
             "type": "object",
             "required": ["label", "values"],
@@ -838,10 +595,8 @@
           },
           "minItems": 2
         },
-
         "stages": {
           "type": "array",
-          "description": "funnel — ordered conversion stages. Each: {label, value, color?}. Drop-off between adjacent stages is shown as a tapered band.",
           "items": {
             "type": "object",
             "required": ["label", "value"],
@@ -854,10 +609,8 @@
           },
           "minItems": 2
         },
-
         "nodes": {
           "type": "array",
-          "description": "sankey / network — node list. Each: {id (string, unique), label?, color?}. For sankey, the renderer derives left-to-right column placement from the link graph (BFS depth). For network, position is force-relaxed at render time from the link adjacency.",
           "items": {
             "type": "object",
             "required": ["id"],
@@ -872,7 +625,6 @@
         },
         "links": {
           "type": "array",
-          "description": "sankey / network — directed link list. Each: {source, target, value?, label?}. source and target reference node ids. value drives the ribbon thickness (sankey) or edge weight (network).",
           "items": {
             "type": "object",
             "required": ["source", "target"],
@@ -888,7 +640,6 @@
         },
         "variables": {
           "type": "array",
-          "description": "scatter-matrix / parallel-coordinates — variable definitions. Each: {key, label?, domain?: [lo, hi]}. domain is optional — when omitted the renderer derives it from records.",
           "items": {
             "type": "object",
             "required": ["key"],
@@ -896,28 +647,14 @@
             "properties": {
               "key":    { "type": "string" },
               "label":  { "type": "string" },
-              "domain": {
-                "type": "array",
-                "minItems": 2,
-                "maxItems": 2,
-                "items": { "type": "number" }
-              }
+              "domain": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" } }
             }
           },
           "minItems": 2
         },
-        "records": {
-          "type": "array",
-          "description": "scatter-matrix / parallel-coordinates — record list. Each record is an object keyed by variable id. Optional `_label` and `_color` (one of accent / warn / danger / success / muted) tag the record visually.",
-          "items": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "minItems": 2
-        },
+        "records": { "type": "array", "items": { "type": "object", "additionalProperties": true }, "minItems": 2 },
         "groups": {
           "type": "array",
-          "description": "chord — node list (each row + column in the flow matrix). Each: {id, label?, color?}. Order in this array defines the perimeter sequence going clockwise from 12 o'clock.",
           "items": {
             "type": "object",
             "required": ["id"],
@@ -930,102 +667,51 @@
           },
           "minItems": 2
         },
-        "matrix": {
-          "type": "array",
-          "description": "chord — N×N flow matrix. Row i carries the outgoing flows from groups[i]; matrix[i][j] is the flow from groups[i] to groups[j]. Cells default to 0 when omitted.",
-          "items": { "type": "array", "items": { "type": "number" } },
-          "minItems": 2
-        },
+        "matrix":  { "type": "array", "items": { "type": "array", "items": { "type": "number" } }, "minItems": 2 },
         "regions": {
           "type": "array",
-          "description": "geo — region values. Each: {id (region code), value, label?}. The renderer looks each id up in its built-in tile cartogram (Alpha-2 country codes plus the synthetic 'OTH' bucket for uncovered regions).",
           "items": {
             "type": "object",
             "required": ["id", "value"],
             "additionalProperties": false,
             "properties": {
-              "id":    { "type": "string", "description": "ISO 3166-1 Alpha-2 country code (US, GB, DE, BR, ...) or one of the kit's synthetic region tokens." },
+              "id":    { "type": "string" },
               "value": { "type": "number" },
               "label": { "type": "string" }
             }
           },
           "minItems": 1
         },
-        "rows_dot": {
-          "type": "array",
-          "description": "dot-plot — { rows: [{ label, value, color? }] }. Compact one-axis comparison; one row per dot."
-        },
-        "values_dist": {
-          "type": "array",
-          "description": "density / beeswarm / violin support — { values: [...] } at the chart root for density + beeswarm, or { distributions: [{ label, values, color? }] } for violin (and ridgeline)."
-        },
-        "ohlc": {
-          "type": "array",
-          "description": "candlestick — { entries: [{ date, open, high, low, close }] }."
-        },
-        "tree_sunburst": {
-          "type": "object",
-          "description": "sunburst — { tree: nested { label, value, children } } (or root). Same shape as treemap."
-        },
-        "marimekko_payload": {
-          "type": "object",
-          "description": "marimekko — { categories, series: [{ label, values }] }. Same shape as stacked-bar; column widths scale with column totals."
-        },
-        "stream_payload": {
-          "type": "object",
-          "description": "stream — { categories, series: [{ label, values }] }. Same shape as stacked-bar; layers centre around the x-axis."
-        },
-        "values": {
-          "type": "array",
-          "description": "Shared key carrying raw numeric values for distribution / sparkline charts: density / beeswarm / sparkline / histogram (binning needed)."
-        },
-        "distributions": {
-          "type": "array",
-          "description": "Shared key carrying per-distribution payloads for ridgeline / violin: [{ label, values, color? }]."
-        },
-        "entries": {
-          "type": "array",
-          "description": "candlestick — list of { date, open, high, low, close }."
-        },
-        "tree": {
-          "description": "treemap / sunburst — nested tree of { label, value, children? }."
-        },
-        "bandwidth": {
-          "type": "number",
-          "description": "density / violin — KDE bandwidth override (defaults to Silverman's rule)."
-        },
-        "sample_count": {
-          "type": "integer",
-          "description": "density — number of x-positions to sample (default 100)."
-        },
-        "min":           { "type": "number" },
-        "max":           { "type": "number" },
-        "dot_radius":    { "type": "number", "description": "beeswarm — dot radius in px (default 5)." },
+        "ohlc":              { "type": "array" },
+        "tree_sunburst":     { "type": "object" },
+        "marimekko_payload": { "type": "object" },
+        "stream_payload":    { "type": "object" },
+        "entries":           { "type": "array" },
+        "bandwidth":         { "type": "number" },
+        "sample_count":      { "type": "integer" },
+        "dot_radius":        { "type": "number" },
         "steps": {
           "type": "array",
-          "description": "waterfall — [{label, value, kind?: 'start'|'plus'|'minus'|'total'|'end'}]."
+          "items": {
+            "type": "object",
+            "required": ["label", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "value": { "type": "number" },
+              "kind":  { "enum": ["start", "plus", "minus", "total", "end"] }
+            }
+          }
         },
-        "sectors": {
-          "type": "array",
-          "description": "polar-area — [{label, value}] per radial sector."
-        },
-        "tasks": {
-          "type": "array",
-          "description": "gantt — [{label, start, end, color?}]. start/end are numeric (interpret per data)."
-        },
-        "tick_format": {
-          "enum": ["number", "date"],
-          "description": "gantt — 'date' formats numeric ticks as ISO YYYY-MM-DD (treating numbers as Unix ms)."
-        },
-        "from_label":    { "type": "string" },
-        "to_label":      { "type": "string" },
-        "from_color":    { "enum": ["accent", "warn", "danger", "success", "muted"] },
-        "to_color":      { "enum": ["accent", "warn", "danger", "success", "muted"] },
+        "sectors": { "type": "array" },
+        "tasks":   { "type": "array" },
+        "tick_format": { "enum": ["number", "date"] },
+        "from_color":  { "enum": ["accent", "warn", "danger", "success", "muted"] },
+        "to_color":    { "enum": ["accent", "warn", "danger", "success", "muted"] },
         "left": {
           "type": "object",
-          "additionalProperties": false,
-          "description": "population-pyramid — left-side diverging bar group. `values[]` aligns to `categories`.",
           "required": ["values"],
+          "additionalProperties": false,
           "properties": {
             "label":  { "type": "string" },
             "color":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "accent" },
@@ -1034,25 +720,17 @@
         },
         "right": {
           "type": "object",
-          "additionalProperties": false,
-          "description": "population-pyramid — right-side diverging bar group. Same shape as `left`.",
           "required": ["values"],
+          "additionalProperties": false,
           "properties": {
             "label":  { "type": "string" },
             "color":  { "enum": ["accent", "warn", "danger", "success", "muted"], "default": "success" },
             "values": { "type": "array", "items": { "type": "number" }, "minItems": 1 }
           }
         },
-        "bands": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 5,
-          "default": 3,
-          "description": "horizon — number of color bands above and below the baseline. Each band carries `maxAbs/bands` of value range; deeper bands fold from values exceeding the previous band."
-        },
+        "bands": { "type": "integer", "minimum": 1, "maximum": 5, "default": 3 },
         "points": {
           "type": "array",
-          "description": "hexbin — raw 2-D points. Each: `{x, y}`; density is computed per hex cell.",
           "items": {
             "type": "object",
             "required": ["x", "y"],
@@ -1064,16 +742,9 @@
           },
           "minItems": 1
         },
-        "radius": {
-          "type": "number",
-          "minimum": 4,
-          "maximum": 60,
-          "default": 14,
-          "description": "hexbin — viewBox px per hex cell (controls cell size and therefore density resolution)."
-        },
+        "radius": { "type": "number", "minimum": 4, "maximum": 60, "default": 14 },
         "ranges": {
           "type": "array",
-          "description": "range-bar — one row per item, each carrying a [low, high] interval. Optional `mid` renders as a vertical tick inside the band.",
           "items": {
             "type": "object",
             "required": ["label", "low", "high"],
@@ -1090,238 +761,54 @@
         }
       },
       "allOf": [
-        {
-          "if": { "properties": { "type": { "const": "bar" } }, "required": ["type"] },
-          "then": { "required": ["rows"] }
-        },
-        {
-          "if": { "properties": { "type": { "enum": ["scatter", "line", "area", "bubble", "quadrant"] } }, "required": ["type"] },
-          "then": { "required": ["series"] }
-        },
-        {
-          "if": { "properties": { "type": { "enum": ["stacked-bar", "grouped-bar"] } }, "required": ["type"] },
-          "then": { "required": ["categories", "series"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "quadrant" } }, "required": ["type"] },
-          "then": { "required": ["quadrants"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "donut" } }, "required": ["type"] },
-          "then": { "required": ["slices"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "heatmap" } }, "required": ["type"] },
-          "then": { "required": ["cells"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "sparkline" } }, "required": ["type"] },
-          "then": { "required": ["values"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "waffle" } }, "required": ["type"] },
-          "then": { "required": ["segments"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "gauge" } }, "required": ["type"] },
-          "then": { "required": ["value", "max"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "radar" } }, "required": ["type"] },
-          "then": { "required": ["axes", "series"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "box-plot" } }, "required": ["type"] },
-          "then": { "required": ["boxes"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "bullet" } }, "required": ["type"] },
-          "then": { "required": ["tracks"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "slope" } }, "required": ["type"] },
-          "then": { "required": ["items"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "histogram" } }, "required": ["type"] },
-          "then": { "required": ["bins"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "calendar-heatmap" } }, "required": ["type"] },
-          "then": { "required": ["date_values"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "treemap" } }, "required": ["type"] },
-          "then": { "required": ["tree"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "ridgeline" } }, "required": ["type"] },
-          "then": { "required": ["distributions"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "funnel" } }, "required": ["type"] },
-          "then": { "required": ["stages"] }
-        },
-        {
-          "if": { "properties": { "type": { "enum": ["sankey", "network"] } }, "required": ["type"] },
-          "then": { "required": ["nodes", "links"] }
-        },
-        {
-          "if": { "properties": { "type": { "enum": ["scatter-matrix", "parallel-coordinates"] } }, "required": ["type"] },
-          "then": { "required": ["variables", "records"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "chord" } }, "required": ["type"] },
-          "then": { "required": ["groups", "matrix"] }
-        },
-        {
-          "if": { "properties": { "type": { "enum": ["geo", "tile-map"] } }, "required": ["type"] },
-          "then": { "required": ["regions"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "population-pyramid" } }, "required": ["type"] },
-          "then": { "required": ["categories", "left", "right"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "connected-scatter" } }, "required": ["type"] },
-          "then": { "required": ["series"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "horizon" } }, "required": ["type"] },
-          "then": { "required": ["categories", "series"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "hexbin" } }, "required": ["type"] },
-          "then": { "required": ["points"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "arc-diagram" } }, "required": ["type"] },
-          "then": { "required": ["nodes", "links"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "range-bar" } }, "required": ["type"] },
-          "then": { "required": ["ranges"] }
-        },
-        {
-          "if": { "properties": { "type": { "const": "pareto" } }, "required": ["type"] },
-          "then": { "required": ["rows"] }
-        }
+        { "if": { "properties": { "type": { "const": "bar" } }, "required": ["type"] }, "then": { "required": ["rows"] } },
+        { "if": { "properties": { "type": { "enum": ["scatter", "line", "area", "bubble", "quadrant"] } }, "required": ["type"] }, "then": { "required": ["series"] } },
+        { "if": { "properties": { "type": { "enum": ["stacked-bar", "grouped-bar"] } }, "required": ["type"] }, "then": { "required": ["categories", "series"] } },
+        { "if": { "properties": { "type": { "const": "quadrant" } }, "required": ["type"] }, "then": { "required": ["quadrants"] } },
+        { "if": { "properties": { "type": { "const": "donut" } }, "required": ["type"] }, "then": { "required": ["slices"] } },
+        { "if": { "properties": { "type": { "const": "heatmap" } }, "required": ["type"] }, "then": { "required": ["cells"] } },
+        { "if": { "properties": { "type": { "const": "sparkline" } }, "required": ["type"] }, "then": { "required": ["values"] } },
+        { "if": { "properties": { "type": { "const": "waffle" } }, "required": ["type"] }, "then": { "required": ["segments"] } },
+        { "if": { "properties": { "type": { "const": "gauge" } }, "required": ["type"] }, "then": { "required": ["value", "max"] } },
+        { "if": { "properties": { "type": { "const": "radar" } }, "required": ["type"] }, "then": { "required": ["axes", "series"] } },
+        { "if": { "properties": { "type": { "const": "box-plot" } }, "required": ["type"] }, "then": { "required": ["boxes"] } },
+        { "if": { "properties": { "type": { "const": "bullet" } }, "required": ["type"] }, "then": { "required": ["tracks"] } },
+        { "if": { "properties": { "type": { "const": "slope" } }, "required": ["type"] }, "then": { "required": ["items"] } },
+        { "if": { "properties": { "type": { "const": "histogram" } }, "required": ["type"] }, "then": { "required": ["bins"] } },
+        { "if": { "properties": { "type": { "const": "calendar-heatmap" } }, "required": ["type"] }, "then": { "required": ["date_values"] } },
+        { "if": { "properties": { "type": { "const": "treemap" } }, "required": ["type"] }, "then": { "required": ["tree"] } },
+        { "if": { "properties": { "type": { "const": "ridgeline" } }, "required": ["type"] }, "then": { "required": ["distributions"] } },
+        { "if": { "properties": { "type": { "const": "funnel" } }, "required": ["type"] }, "then": { "required": ["stages"] } },
+        { "if": { "properties": { "type": { "enum": ["sankey", "network"] } }, "required": ["type"] }, "then": { "required": ["nodes", "links"] } },
+        { "if": { "properties": { "type": { "enum": ["scatter-matrix", "parallel-coordinates"] } }, "required": ["type"] }, "then": { "required": ["variables", "records"] } },
+        { "if": { "properties": { "type": { "const": "chord" } }, "required": ["type"] }, "then": { "required": ["groups", "matrix"] } },
+        { "if": { "properties": { "type": { "enum": ["geo", "tile-map"] } }, "required": ["type"] }, "then": { "required": ["regions"] } },
+        { "if": { "properties": { "type": { "const": "population-pyramid" } }, "required": ["type"] }, "then": { "required": ["categories", "left", "right"] } },
+        { "if": { "properties": { "type": { "const": "connected-scatter" } }, "required": ["type"] }, "then": { "required": ["series"] } },
+        { "if": { "properties": { "type": { "const": "horizon" } }, "required": ["type"] }, "then": { "required": ["categories", "series"] } },
+        { "if": { "properties": { "type": { "const": "hexbin" } }, "required": ["type"] }, "then": { "required": ["points"] } },
+        { "if": { "properties": { "type": { "const": "arc-diagram" } }, "required": ["type"] }, "then": { "required": ["nodes", "links"] } },
+        { "if": { "properties": { "type": { "const": "range-bar" } }, "required": ["type"] }, "then": { "required": ["ranges"] } },
+        { "if": { "properties": { "type": { "const": "pareto" } }, "required": ["type"] }, "then": { "required": ["rows"] } }
       ]
     },
 
-    "diagram": {
+    "chart-grid": {
       "type": "object",
-      "required": ["kind", "source"],
+      "required": ["k", "panels"],
       "additionalProperties": false,
+      "description": "Small multiples — same chart shape across N data panels.",
       "properties": {
-        "kind": { "const": "diagram" },
-        "caption": { "type": "string" },
-        "source": { "type": "string", "description": "Mermaid source. Sequence / flow / state / gantt / class supported." }
-      }
-    },
-
-    "live-snippet": {
-      "type": "object",
-      "required": ["kind", "source"],
-      "additionalProperties": false,
-      "properties": {
-        "kind": { "const": "live-snippet" },
-        "language": { "enum": ["html-css-js"], "default": "html-css-js" },
-        "label": { "type": "string" },
-        "source": { "type": "string" }
-      }
-    },
-
-    "chartGrid": {
-      "type": "object",
-      "description": "Small multiples — render the same chart shape across N data panels in a grid. Each panel becomes a chart block; per-panel `label` is used as the chart title, `values`/other fields are piped through to the child chart's payload.",
-      "additionalProperties": false,
-      "properties": {
-        "kind":       { "const": "chart-grid" },
+        "k":          { "const": "chart-grid" },
         "title":      { "type": "string" },
-        "cols":       { "type": "integer", "minimum": 1, "maximum": 12, "description": "Optional explicit column count. Default is auto-fit with 220 px min cell width." },
-        "child_type": { "type": "string", "default": "sparkline", "description": "Chart `type` applied to every panel. Any chart type the kit ships is valid." },
-        "panels": {
+        "cols":       { "type": "integer", "minimum": 1, "maximum": 12 },
+        "child_type": { "type": "string", "default": "sparkline" },
+        "panels":     {
           "type": "array",
           "minItems": 1,
           "items": { "type": "object", "additionalProperties": true }
         }
-      },
-      "required": ["kind", "panels"]
-    },
-
-    "richString": {
-      "description": "Either a plain string or an array mixing strings with inline nodes.",
-      "oneOf": [
-        { "type": "string" },
-        {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              { "type": "string" },
-              { "$ref": "#/$defs/inlineNode" }
-            ]
-          }
-        }
-      ]
-    },
-
-    "inlineNode": {
-      "oneOf": [
-        {
-          "type": "object",
-          "required": ["kind"],
-          "additionalProperties": false,
-          "properties": {
-            "kind": { "const": "glossary-term" },
-            "term": { "type": "string" },
-            "in": { "type": "string", "description": "Disambiguating domain." },
-            "lang": { "type": "string", "description": "Override the project language for this instance." },
-            "text": { "type": "string", "description": "Visible text; defaults to term." }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["kind", "name"],
-          "additionalProperties": false,
-          "properties": {
-            "kind": { "const": "ext-ref" },
-            "name": { "type": "string" },
-            "in": { "type": "string" },
-            "lang": { "type": "string" },
-            "text": { "type": "string" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["kind", "text"],
-          "additionalProperties": false,
-          "properties": {
-            "kind": { "enum": ["code", "em", "strong"] },
-            "text": { "type": "string" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["kind", "text", "href"],
-          "additionalProperties": false,
-          "properties": {
-            "kind": { "const": "link" },
-            "text": { "type": "string" },
-            "href": { "type": "string" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["kind", "text"],
-          "additionalProperties": false,
-          "description": "Sanitised inline HTML pass-through. The Markdown converter emits this for tags inside the small allowlist (a, code, em, strong, span, sup, sub, br, mark, kbd, samp, del, ins, abbr); the renderer drops the text into an inline span via innerHTML. Authors writing JSON pages should prefer the typed inline kinds — html is the markdown escape hatch, not a recommended primitive.",
-          "properties": {
-            "kind": { "const": "html" },
-            "text": { "type": "string" }
-          }
-        }
-      ]
+      }
     }
   }
 }

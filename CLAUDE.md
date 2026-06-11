@@ -26,8 +26,54 @@ kit is loaded as static assets and `renderer.js` walks the JSON
 tree at page load.
 
 Authoring shape: `docs/<page>.json` (data) + `docs/<page>.html` (thin
-stub that loads the kit and the page JSON). `oku build` produces
-three single-purpose trees under `dist/`:
+stub that loads the kit and the page JSON).
+
+### Page format (v2)
+
+A page is `{k:"page", t, m, b}`. Inside `b[]`, a **string is parsed
+as GitHub-flavored markdown** at render time; an **object is a typed
+primitive** (chart, diagram, table, kpi-grid, step-flow, compare-grid,
+code, annotated-code, live-snippet, example, insight, chart-grid).
+
+```json
+{"k":"page","t":"Architecture","m":{"accent":"teal","date":"2026-06-01"},"b":[
+"> [!TLDR]\n> Short summary.\n>\n> - bullet 1\n> - bullet 2",
+"## Section title {#anchor-id}\nLead paragraph with *emphasis* and `code`.\n\nMore prose.",
+{"k":"chart","type":"bar","rows":[{"label":"a","value":60},{"label":"b","value":80}]},
+"## Next section\nMore prose."
+]}
+```
+
+Heading levels inside markdown strings drive section nesting — `##`
+opens a `<section>`, `###` is a sub-heading inside it. Anchor IDs
+override the auto-slug via `{#id}`. Glossary terms and ext-refs use
+the link-prefix convention: `[label](#g/term-id)` → `<glossary-term>`,
+`[label](#x/source-id)` → `<ext-ref>`.
+
+Storage: **emit compact JSON** (no pretty-printing). One newline per
+top-level item in `b[]` is fine for readability; nothing more.
+
+Admonitions (callouts) are GFM blockquotes with a type tag. Standard
+GFM types: `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`. The kit
+adds one extension: `TLDR` (gets the special TL;DR layout). A title
+after the type tag is a kit extension:
+
+```
+> [!NOTE] Optional title
+> Body line.
+```
+
+### Older pages (v1)
+
+Pages on disk authored against the v1 shape (`kind/title/blocks` with
+`section/paragraph/heading/list/callout/info-tip` nesting) keep
+rendering — `renderer.js` converts them to v2 in memory on load.
+Run `oku migrate [path]` to update the on-disk source to v2 when
+you want the file to match what new pages look like.
+
+### Build outputs
+
+`oku build` produces three single-purpose trees under `dist/`:
 - `dist/standalone/` — self-contained single files (humans, file://).
   Each HTML inlines kit + page JSON + `window.__okuManifest`.
 - `dist/site/` — shared-assets multi-page site with Pagefind search
@@ -41,10 +87,10 @@ three single-purpose trees under `dist/`:
 |---|---|
 | `chrome.js` | Custom Elements (chart with 28 render modes, diagram, live-snippet, annotated-code, glossary-term, ext-ref, page-chrome / page-nav / page-toc), init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring, bar-chart hover/click-pin/legend toggle), Prism + Mermaid lazy loaders, glossary tooltip controller, lightbox with pan/zoom/pinch fullscreen. ~7k LoC. |
 | `chrome.css` | All visual tokens (light/dark, --series-1..--series-10, --prose-width), layout grid (asymmetric bleed, four-mode content width), every primitive's styling. ~3k LoC. |
-| `renderer.js` | JSON → DOM mapping. `_renderTable`, `_renderTldr`, `_renderExample`, `_renderBars`, `_renderMultiBars`, inline kinds including `html`. ~1k LoC. |
+| `renderer.js` | JSON → DOM mapping. Walks `b[]`; strings parsed via inline markdown parser (headings → sections, paragraphs, lists, fences, admonitions); objects dispatched to typed renderers (chart/diagram/table/step-flow/compare-grid/example/insight/kpi-grid/annotated-code/live-snippet/chart-grid). v1→v2 shim at the top lets older pages keep rendering. ~1.5k LoC. |
 | `kit/schema/page.schema.json` | JSON-schema for page sources. Every `docs/*.json` validates against it; the optional `jsonschema` dep makes the check active. |
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
-| `src/oku/cli.py` | `oku init / build / clean / check / serve` plus the markdown converter (front-matter, nested lists, footnotes, def-lists, ref-links, sanitised inline HTML) and the `_md_block` markdown twin emitter. |
+| `src/oku/cli.py` | `oku init / build / clean / check / migrate / serve` plus the markdown converter (front-matter, nested lists, footnotes, def-lists, ref-links, sanitised inline HTML), the `_md_block` markdown twin emitter, and the v1→v2 page converter (`_v1_to_v2`). |
 | `src/oku/templates/` | `starter.{json,html}` — pair to copy when starting a new page. |
 | `bin/oku` | PEP 723 shim — run without install via `uv run bin/oku …`. Points at `oku.cli:main`. |
 | `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.json` tracks open phases. |

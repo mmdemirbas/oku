@@ -2907,7 +2907,7 @@ function initReadingAids() {
 /* ============ Docs-root discovery ============ *
  * Finds the project root by locating any kit reference in the document
  * and stripping the trailing path back to (and including) the directory
- * containing _kit/. Lets pages at any directory depth fetch kit.json
+ * containing _oku/. Lets pages at any directory depth fetch kit.json
  * and site-manifest.json from the same place rather than guessing
  * based on the page's own path.
  * ---------------------------------------------------------------- */
@@ -2931,10 +2931,10 @@ var __okuDocsRoot = (function () {
       return resolved;
     } catch (e) { /* fall through */ }
   }
-  var refs = document.querySelectorAll('link[href*="_kit/"], script[src*="_kit/"]');
+  var refs = document.querySelectorAll('link[href*="_oku/"], script[src*="_oku/"]');
   for (var i = 0; i < refs.length; i++) {
     var url = refs[i].href || refs[i].src || '';
-    var idx = url.indexOf('/_kit/');
+    var idx = url.indexOf('/_oku/');
     if (idx >= 0) return url.slice(0, idx + 1); // includes trailing slash
   }
   // No kit reference found (probably standalone with everything inlined,
@@ -3488,8 +3488,8 @@ var __okuTooltip = (function () {
   // SECURITY: data-def is injected via innerHTML to render rich markup
   // (<strong>, <em>, <br>, inline <a>) inside tooltips. The trust
   // boundary is: data-def must only ever be set by code that reads from
-  // kit-controlled sources — _kit/glossary/<domain>.json and
-  // _kit/extrefs/<domain>.json. The GlossaryTerm and ExtRef
+  // kit-controlled sources — _oku/glossary/<domain>.json and
+  // _oku/extrefs/<domain>.json. The GlossaryTerm and ExtRef
   // connectedCallback handlers are the only setters; both pull from the
   // kit resolver. Do NOT use this controller to render tooltips with
   // arbitrary author input.
@@ -3610,7 +3610,7 @@ var __okuKit = (function () {
       waiters = [];
       return Promise.resolve(kit);
     }
-    // Project config lives at the docs root; domain files live in _kit/.
+    // Project config lives at the docs root; domain files live in _oku/.
     var wa = (window.__okuWithAuth || function (u) { return u; });
     return fetch(wa(__okuDocsRoot + 'kit.json'), { cache: 'no-cache' })
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -3625,13 +3625,13 @@ var __okuKit = (function () {
         // Load each domain file in parallel
         var promises = kit.domains.flatMap(function (d) {
           return [
-            fetch(wa(__okuDocsRoot + '_kit/glossary/' + d + '.json'), { cache: 'no-cache' })
+            fetch(wa(__okuDocsRoot + '_oku/glossary/' + d + '.json'), { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
                 if (j && j.entries) kit.glossary[d] = j.entries;
               }),
-            fetch(wa(__okuDocsRoot + '_kit/extrefs/' + d + '.json'), { cache: 'no-cache' })
+            fetch(wa(__okuDocsRoot + '_oku/extrefs/' + d + '.json'), { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
@@ -10017,10 +10017,38 @@ class OkuDiagram extends HTMLElement {
     var renderHost = this.querySelector('.okd-render');
     var self = this;
     this._src = src;
+    // Best-effort source cleanup. The most common reason Mermaid
+    // explodes ("Syntax error in text") is that HTML entities leaked
+    // into the source during a markdown→DOM round-trip (`&lt;` instead
+    // of `<`, `&amp;` instead of `&`, smart quotes instead of plain
+    // ones). Decode them before parsing; if Mermaid still can't make
+    // sense of the result, our catch handler shows the source and the
+    // error rather than the framework's bomb.
+    var cleanSrc = src
+      .replace(/&lt;/g,   '<')
+      .replace(/&gt;/g,   '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g,  "'")
+      .replace(/&amp;/g,  '&')   // &amp; last — otherwise we'd double-decode
+      .replace(/[“”]/g, '"')   // smart double quotes → "
+      .replace(/[‘’]/g, "'")   // smart single quotes → '
+      .replace(/ /g,         ' ');  // non-breaking space → regular space
+    self._src = cleanSrc;
     __mermaidLoader.load()
       .then(function (mermaid) {
         var id = 'okd-' + Math.random().toString(36).slice(2, 9);
-        return mermaid.render(id, src).then(function (out) {
+        // mermaid.parse() in v10 returns a promise that rejects on
+        // syntax error. mermaid.render() does NOT — it resolves with
+        // an error-bomb SVG, which is the regression the user
+        // reported. Parse first so the catch handler downstream owns
+        // the error path; render() only runs when we know the source
+        // is valid.
+        var parseOk = typeof mermaid.parse === 'function'
+          ? mermaid.parse(cleanSrc, { suppressErrors: false })
+          : Promise.resolve();
+        return parseOk.then(function () {
+          return mermaid.render(id, cleanSrc);
+        }).then(function (out) {
           renderHost.innerHTML = out.svg;
           // Strip Mermaid's intrinsic width/height + inline style so
           // CSS width:100% / height:auto can fit the SVG to the
@@ -10060,16 +10088,22 @@ class OkuDiagram extends HTMLElement {
         // Stable id so the warning panel can jump-link back here.
         if (!self.id) self.id = 'okd-error-' + Math.random().toString(36).slice(2, 9);
         var raw = String((err && err.message) || err);
-        // Replace our own render surface with our error card so the
-        // framework noise doesn't leak through. The toolbar's source
-        // toggle still lets the reader inspect the offending source.
+        // Replace our own render surface with the source-as-fallback
+        // card. The framework's "bomb" SVG is suppressed entirely; the
+        // reader sees the diagram source (still useful — Mermaid
+        // syntax reads like a structured outline) plus the specific
+        // parse error so they can fix it. Best-effort beats "Syntax
+        // error in text" with a giant bomb every time.
         renderHost.classList.add('okd-error');
         renderHost.innerHTML =
           '<div class="okd-error-card" role="alert">' +
-            '<strong>Diagram could not be rendered.</strong>' +
-            '<div class="okd-error-hint">The source is preserved — open it from the toolbar to debug.</div>' +
-            '<details>' +
-              '<summary>Show parse error</summary>' +
+            '<div class="okd-error-head">' +
+              '<strong>Diagram source (failed to render)</strong>' +
+              '<span class="okd-error-msg">' + escapeXml((raw.split('\n')[0] || 'parse error').slice(0, 200)) + '</span>' +
+            '</div>' +
+            '<pre class="okd-error-source"><code class="language-mermaid">' + escapeXml(cleanSrc) + '</code></pre>' +
+            '<details class="okd-error-detail">' +
+              '<summary>Full parse error</summary>' +
               '<pre>' + escapeXml(raw) + '</pre>' +
             '</details>' +
           '</div>';
@@ -11103,7 +11137,7 @@ class PageNav extends HTMLElement {
          that aren't pages. */
       var wa = (window.__okuWithAuth || function (u) { return u; });
       var SKIP = {
-        '_kit': 1, 'kit': 1, 'dist': 1, 'build': 1, 'node_modules': 1,
+        '_oku': 1, 'kit': 1, 'dist': 1, 'build': 1, 'node_modules': 1,
         '.git': 1, '.idea': 1, '.venv': 1, 'venv': 1,
         '__pycache__': 1, '.pytest_cache': 1, '.ruff_cache': 1,
         '.mypy_cache': 1, 'templates': 1, '_internal': 1
@@ -11137,11 +11171,11 @@ class PageNav extends HTMLElement {
           return r.text().then(function (html) {
             var doc = new DOMParser().parseFromString(html, 'text/html');
             // A directory listing has plain anchors to siblings; our own
-            // index.html loads the kit via _kit/. When we hit index.html
+            // index.html loads the kit via _oku/. When we hit index.html
             // (server preferred it over the directory listing), there's
             // nothing to enumerate — return [] and rely on the seed for
             // this level.
-            if (doc.querySelector('script[src*="/_kit/"], link[href*="/_kit/"], page-chrome')) {
+            if (doc.querySelector('script[src*="/_oku/"], link[href*="/_oku/"], page-chrome')) {
               return [];
             }
             var out = [];
@@ -11507,14 +11541,14 @@ var __okuSearch = (function () {
 
   function loadPagefind() {
     if (pagefindPromise) return pagefindPromise;
-    // Resolve pagefind relative to the kit. _kit/../pagefind covers both
+    // Resolve pagefind relative to the kit. _oku/../pagefind covers both
     // the standalone-build layout (where pagefind sits next to the HTML)
     // and a custom override.
     // ES dynamic import needs a relative-resolved URL ('./...') or absolute.
     // Pagefind index lives at the docs root (next to kit.json + site-manifest.json).
     var candidates = [
       __okuDocsRoot + 'pagefind/pagefind.js',
-      __okuDocsRoot + '_kit/pagefind/pagefind.js'
+      __okuDocsRoot + '_oku/pagefind/pagefind.js'
     ];
     pagefindPromise = candidates.reduce(function (acc, abs) {
       return acc.catch(function () {
