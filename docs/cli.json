@@ -64,7 +64,7 @@
         [
           "**warning**",
           "`process-breadcrumb`, `unresolved-glossary`, `unresolved-extref`, `unknown-inline`",
-          "Prose containing round-N / vN review / fixed in round (kit documents current behaviour only). Glossary terms / ext-refs that don't resolve against kit/glossary/ / kit/extrefs/."
+          "Prose containing process/history references (round-N, vN-review, fixed-in-round; kit documents current behaviour only). Glossary terms / ext-refs that don't resolve against kit/glossary/ / kit/extrefs/."
         ],
         [
           "**info**",

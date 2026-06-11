@@ -66,7 +66,7 @@ KIT_DIR = _kit_assets_dir()
 KIT_FILES = ["chrome.css", "chrome.js", "chrome-boot.js", "renderer.js"]
 
 
-_DEFAULT_STUB_BODY_RE = re.compile(r'<body\s*>\s*</body>', re.IGNORECASE)
+_DEFAULT_STUB_BODY_RE = re.compile(r"<body\s*>\s*</body>", re.IGNORECASE)
 
 
 def _is_default_shaped_stub(content: str) -> bool:
@@ -99,10 +99,22 @@ def _kit_version() -> int:
         if mt > latest:
             latest = mt
     return int(latest)
+
+
 SKIP_DIRS = {
     # `_kit` kept alongside `_oku` so legacy projects still skip the symlink dir.
-    "dist", "_oku", "_kit", "node_modules", ".git", "venv", ".venv",
-    "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".idea",
+    "dist",
+    "_oku",
+    "_kit",
+    "node_modules",
+    ".git",
+    "venv",
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".idea",
     # templates/ ships the starter pair for `oku init` (now under
     # src/oku/templates/). Walking it earlier produced stray
     # starter.{md,html} pages in every build.
@@ -199,15 +211,13 @@ def iter_repo_files(root: Path, suffixes: tuple[str, ...], *, extra_skip: frozen
     skip = SKIP_DIRS | (extra_skip or frozenset())
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
         # In-place mutation is the documented way to prune os.walk.
-        dirnames[:] = [
-            d for d in dirnames
-            if d not in skip and not d.startswith(".")
-        ]
+        dirnames[:] = [d for d in dirnames if d not in skip and not d.startswith(".")]
         for fn in filenames:
             for suf in suffixes:
                 if fn.endswith(suf):
                     yield Path(dirpath) / fn
                     break
+
 
 try:
     import jsonschema as _jsonschema  # type: ignore
@@ -313,7 +323,9 @@ def cmd_init(args: argparse.Namespace) -> int:
 LINK_TO_KIT_CSS = re.compile(r'<link\s+rel="stylesheet"\s+href="_oku/chrome\.css(?:\?[^"]*)?"\s*/?>', re.I)
 SCRIPT_TO_KIT_BOOT = re.compile(r'<script\s+src="_oku/chrome-boot\.js(?:\?[^"]*)?"\s*></script>', re.I)
 SCRIPT_TO_KIT_MAIN = re.compile(r'<script\s+src="_oku/chrome\.js(?:\?[^"]*)?"\s+defer\s*></script>', re.I)
-SCRIPT_TO_KIT_RENDERER = re.compile(r'<script\s+src="_oku/renderer\.js(?:\?[^"]*)?"\s+defer\s*></script>', re.I)
+SCRIPT_TO_KIT_RENDERER = re.compile(
+    r'<script\s+src="_oku/renderer\.js(?:\?[^"]*)?"\s+defer\s*></script>', re.I
+)
 
 
 def find_html_files(root: Path):
@@ -389,37 +401,8 @@ def iter_page_stubs(root: Path, json_pages: list | None = None):
 # vocabulary the converter passes it through as text rather than
 # producing invalid kit JSON.
 
-_MD_INLINE_RE = re.compile(
-    r"(\*\*([^*]+)\*\*"          # **bold**
-    r"|\*([^*]+)\*"              # *italic*
-    r"|__([^_]+)__"              # __bold__
-    r"|_([^_]+)_"                # _italic_
-    r"|`([^`]+)`"                # `code`
-    r"|\[([^\]]+)\]\(([^)\s]+)\)"  # [text](inline url)
-    r"|\[([^\]]+)\]\[([^\]]*)\]"   # [text][ref] reference-style
-    r"|\[\^([\w-]+)\]"             # [^id] footnote ref
-    r"|(<(?:a|code|em|strong|span|sup|sub|br|mark|kbd|samp|del|ins|abbr)(?:\s+[^>]*)?/?>(?:[^<]*</(?:a|code|em|strong|span|sup|sub|mark|kbd|samp|del|ins|abbr)>)?)"   # sanitised inline HTML
-    r")"
-)
-
-
 _MD_REL_LINK_RE = re.compile(r"^(?!\w+:|//|#|/)(.+?)\.md(#[^\s]*)?$", re.IGNORECASE)
 _HTML_REL_LINK_RE = re.compile(r"^(?!\w+:|//|#|/)(.+?)\.html(#[^\s]*)?$", re.IGNORECASE)
-
-
-def _md_link_href(href: str) -> str:
-    """Rewrite a markdown link href so `.md` extensions point at the
-    rendered `.html` page. Absolute URLs (http://, https://, mailto:),
-    fragment-only refs (`#foo`), and absolute paths (`/x`) pass
-    through untouched — only relative `.md` paths get retargeted. A
-    trailing fragment is preserved so `[X](foo.md#section)` becomes
-    `foo.html#section`."""
-    if not href:
-        return href
-    m = _MD_REL_LINK_RE.match(href)
-    if not m:
-        return href
-    return m.group(1) + ".html" + (m.group(2) or "")
 
 
 def _page_md_link_href(href: str) -> str:
@@ -435,84 +418,6 @@ def _page_md_link_href(href: str) -> str:
     if not m:
         return href
     return m.group(1) + ".md" + (m.group(2) or "")
-
-
-def _md_inline(text: str, ctx: dict | None = None) -> list:
-    """Split a markdown text fragment into the kit's inline-content
-    array: a sequence of plain strings and inline-block objects
-    ({kind: code|em|strong|link|html}). Returns a flat list. Falls
-    back to a single string when no inline markers are present.
-
-    ``ctx`` carries page-level metadata captured ahead of inline
-    expansion:
-      * ``link_refs``  — {label_lower: (href, title)} for
-        reference-style links ``[text][label]``. Label defaults to
-        the visible text when empty.
-      * ``footnotes``  — {id: definition_block} discovered earlier
-        in the page. Inline ``[^id]`` references become an HTML
-        superscript anchor pointing at ``#fn-<id>`` so the rendered
-        page can backlink to the footnote block emitted at the end.
-    """
-    if not text:
-        return [""]
-    ctx = ctx or {}
-    link_refs = ctx.get("link_refs") or {}
-    footnotes = ctx.get("footnotes") or {}
-    used_footnotes = ctx.get("used_footnotes")
-    parts: list = []
-    pos = 0
-    for m in _MD_INLINE_RE.finditer(text):
-        if m.start() > pos:
-            parts.append(text[pos:m.start()])
-        if m.group(2) is not None:
-            parts.append({"kind": "strong", "text": m.group(2)})
-        elif m.group(3) is not None:
-            parts.append({"kind": "em", "text": m.group(3)})
-        elif m.group(4) is not None:
-            parts.append({"kind": "strong", "text": m.group(4)})
-        elif m.group(5) is not None:
-            parts.append({"kind": "em", "text": m.group(5)})
-        elif m.group(6) is not None:
-            parts.append({"kind": "code", "text": m.group(6)})
-        elif m.group(7) is not None:
-            parts.append({"kind": "link", "text": m.group(7), "href": _md_link_href(m.group(8))})
-        elif m.group(9) is not None:
-            # [text][ref] reference-style link.
-            text_part = m.group(9)
-            ref = (m.group(10) or text_part).lower()
-            target = link_refs.get(ref)
-            if target:
-                parts.append({"kind": "link", "text": text_part, "href": _md_link_href(target[0])})
-            else:
-                # No matching definition — fall through to literal.
-                parts.append(m.group(0))
-        elif m.group(11) is not None:
-            # [^id] footnote ref.
-            fid = m.group(11)
-            if fid in footnotes:
-                if isinstance(used_footnotes, list) and fid not in used_footnotes:
-                    used_footnotes.append(fid)
-                # Numbered sup link — index = first-use order. Falls
-                # back to id when used_footnotes is missing (callers
-                # that bypass the page-level walker).
-                idx = (used_footnotes.index(fid) + 1) if isinstance(used_footnotes, list) else fid
-                parts.append({
-                    "kind": "html",
-                    "text": '<sup class="md-fn-ref"><a href="#fn-' + fid + '">' + str(idx) + '</a></sup>'
-                })
-            else:
-                parts.append(m.group(0))
-        elif m.group(12) is not None:
-            # Sanitised inline HTML pass-through. The regex limits the
-            # allowed tags upfront so authors can't slip a <script>
-            # through the converter.
-            parts.append({"kind": "html", "text": m.group(12)})
-        pos = m.end()
-    if pos < len(text):
-        parts.append(text[pos:])
-    if len(parts) == 1 and isinstance(parts[0], str):
-        return parts
-    return parts
 
 
 def _md_slug(text: str) -> str:
@@ -556,396 +461,164 @@ def _strip_md_front_matter(text: str) -> tuple[str, dict]:
     if j >= len(lines):
         # Unterminated front-matter — back off and keep the text intact.
         return text, {}
-    return "\n".join(lines[j + 1:]), meta
+    return "\n".join(lines[j + 1 :]), meta
 
 
-def md_to_page(text: str, default_title: str = "Untitled") -> dict:
-    """Parse markdown text into a kit page-JSON dict.
+_FENCE_OPEN_RE = re.compile(r"^(`{3,})(\S*)\s*$")
+_MD_FENCE_CAPTION_RE = re.compile(r"^\*([^*].*)\*\s*$")
 
-    Returns ``{"kind": "page", "title": ..., "blocks": [section, ...]}``.
+# Fence tags that lift into typed v2 blocks: ```oku-<kind> with a JSON
+# object body. ```mermaid is the one non-namespaced tag — GitHub and
+# friends render it natively, so the source stays portable.
+_FENCE_KINDS = {
+    "chart",
+    "chart-grid",
+    "table",
+    "kpi-grid",
+    "step-flow",
+    "compare-grid",
+    "insight",
+    "example",
+    "live-snippet",
+    "annotated-code",
+    "diagram",
+    "tldr",
+}
 
-    The kit's schema requires top-level blocks to be sections (or tldr
-    / kpi-grid). md_to_page enforces that shape:
-    - YAML front-matter (``---\\n ... \\n---\\n``) populates page.meta
-      and may set page.title via a top-level ``title:`` field.
-    - First H1 (or default_title) → page title.
-    - Each H2 starts a new section with the H2 text as title + slug id.
-    - Content before the first H2 lands in an implicit "intro" section.
-    - Sub-headings (H3+), paragraphs, code, lists (incl. nested),
-      blockquotes, GFM tables, hr's all nest inside the active
-      section's ``blocks``.
-    - Reference-style links (``[text][ref]`` + ``[ref]: url``) and
-      footnotes (``[^id]`` + ``[^id]: …``) are resolved in two passes:
-      pre-scan collects the definitions, inline expansion substitutes
-      the references. Used footnotes accumulate at the bottom of the
-      page in a dedicated "Footnotes" section.
-    - Definition lists (``term\\n: definition``) emit a `<dl>` via the
-      ``html`` inline kind on a paragraph block.
+
+def _lift_fence_block(lang: str, body: str) -> dict | None:
+    """Map a typed fence to its v2 block, or None when not liftable.
+
+    Not-liftable (bad JSON, non-object payload, unknown kind) is NOT an
+    exception path — the fence stays verbatim in the markdown string so
+    the page still renders as a code block; `oku check` reports it.
     """
-    title = default_title
-    # ---- Front-matter -------------------------------------------------
+    if lang == "mermaid":
+        return {"k": "diagram", "src": body}
+    kind = lang[len("oku-") :]
+    if kind not in _FENCE_KINDS:
+        return None
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    payload.pop("k", None)
+    return {"k": kind, **payload}
+
+
+def md_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
+    """Convert a markdown (v3) page source into a v2 page dict.
+
+    The body is preserved as VERBATIM markdown strings in ``b[]`` — the
+    kit renderer owns markdown parsing, and migration round-trips
+    byte-for-byte. Only typed fences are lifted out of the text:
+
+    - ``` ```oku-<kind> ``` with a JSON object body → ``{"k": <kind>, …}``
+    - ``` ```mermaid ``` → ``{"k": "diagram", "src": …}``
+
+    An italic-only line after a lifted diagram fence (blank lines
+    allowed between, must be followed by a blank line or EOF) becomes
+    the diagram ``caption``. YAML front-matter populates ``m`` and may
+    hoist ``title`` → ``t``. Raw HTML islands and every other markdown
+    construct pass through untouched inside the strings.
+    """
     text, front_meta = _strip_md_front_matter(text)
+    title = default_title
     if isinstance(front_meta.get("title"), str) and front_meta["title"].strip():
         title = front_meta["title"].strip()
+    else:
+        # No front-matter title (README and friends): hoist a leading
+        # `# H1` into the page title so the cover doesn't double it.
+        m = re.match(r"\s*#\s+(.+?)\s*(?:\{#[\w-]+\})?\s*\n", text + "\n")
+        if m:
+            title = m.group(1).strip()
+            text = text[m.end() :]
+
     lines = text.split("\n")
+    n = len(lines)
+    blocks: list = []
+    buf: list[str] = []
+
+    def flush() -> None:
+        chunk = "\n".join(buf)
+        buf.clear()
+        if chunk.strip():
+            blocks.append(chunk.strip("\n"))
+
     i = 0
-
-    # ---- Pre-pass: collect link refs + footnote definitions ----------
-    link_refs: dict = {}
-    footnotes: dict = {}      # id -> definition text
-    used_footnotes: list = []  # accumulates in first-use order
-    # Strip the definition lines from the source so they don't render
-    # as paragraphs. We keep their content for the lookups above.
-    cleaned: list = []
-    LINK_REF_RE = re.compile(r"^\s{0,3}\[([^\]]+)\]:\s*(\S+)(?:\s+\"([^\"]*)\")?\s*$")
-    FN_DEF_RE = re.compile(r"^\s{0,3}\[\^([\w-]+)\]:\s*(.*)$")
-    pending_fn_id: str | None = None
-    for line in lines:
-        m_lr = LINK_REF_RE.match(line)
-        if m_lr:
-            label = m_lr.group(1).strip().lower()
-            link_refs[label] = (m_lr.group(2), m_lr.group(3) or "")
-            pending_fn_id = None
-            continue
-        m_fn = FN_DEF_RE.match(line)
-        if m_fn:
-            pending_fn_id = m_fn.group(1)
-            footnotes[pending_fn_id] = m_fn.group(2).strip()
-            continue
-        if pending_fn_id is not None and line.startswith("    ") and line.strip():
-            # 4-space continuation lines extend the previous footnote
-            # definition. Joined with a space so the inline expander
-            # sees one block of text.
-            footnotes[pending_fn_id] = (footnotes[pending_fn_id] + " " + line.strip()).strip()
-            continue
-        pending_fn_id = None
-        cleaned.append(line)
-    lines = cleaned
-
-    ctx: dict = {
-        "link_refs": link_refs,
-        "footnotes": footnotes,
-        "used_footnotes": used_footnotes,
-    }
-
-    def take_paragraph(start: int) -> tuple[int, dict]:
-        buf: list = []
-        j = start
-        while j < len(lines) and lines[j].strip() != "" and not _is_block_start(lines[j]):
-            buf.append(lines[j].strip())
-            j += 1
-        if j == start:
-            # Forward-progress guard — see commit history for context;
-            # an indented block-looking line that the dispatcher refuses
-            # to route would otherwise hang the loop. Consume one line
-            # as literal text so the outer loop always advances.
-            buf.append(lines[start].strip())
-            j = start + 1
-        # Definition-list detection: paragraph buffer ending with a
-        # follow-up line starting with ":" — convert to a <dl> block
-        # via the html inline kind so the existing renderer ships it.
-        if j < len(lines) and lines[j].lstrip().startswith(": "):
-            dl_terms: list = [(buf[-1] if buf else "", lines[j].lstrip()[2:].rstrip())]
-            preceding = " ".join(buf[:-1]).strip()
-            k = j + 1
-            while k < len(lines):
-                nxt = lines[k]
-                if nxt.strip() == "":
-                    break
-                if nxt.lstrip().startswith(": "):
-                    dl_terms[-1] = (dl_terms[-1][0], dl_terms[-1][1] + " " + nxt.lstrip()[2:].rstrip())
-                    k += 1
-                    continue
-                # Next term + its first definition.
-                kdef = k + 1
-                if kdef < len(lines) and lines[kdef].lstrip().startswith(": "):
-                    dl_terms.append((nxt.strip(), lines[kdef].lstrip()[2:].rstrip()))
-                    k = kdef + 1
-                    continue
-                break
-            html = '<dl class="md-dl">'
-            for term, defn in dl_terms:
-                html += '<dt>' + term + '</dt><dd>' + defn + '</dd>'
-            html += '</dl>'
-            block_content: list = []
-            if preceding:
-                block_content.extend(_md_inline(preceding, ctx))
-                block_content.append({"kind": "html", "text": html})
-                return k, {"kind": "paragraph", "content": block_content}
-            return k, {"kind": "paragraph", "content": [{"kind": "html", "text": html}]}
-        content = _md_inline(" ".join(buf), ctx)
-        return j, {"kind": "paragraph", "content": content}
-
-    def take_code_fence(start: int) -> tuple[int, dict]:
-        # Variable-length fence: a fence of N backticks closes only at a
-        # line of N (or more) backticks. Lets authors nest a 3-tick code
-        # block inside a 4-tick outer fence (the CommonMark-compliant
-        # way to show markdown code samples that contain code fences).
-        m = re.match(r"^(`{3,})(\S*)\s*$", lines[start])
-        if not m:
-            return start + 1, {"kind": "code", "source": ""}
-        open_len = len(m.group(1))
-        lang = (m.group(2) or "").lower()
-        close_re = re.compile(r"^`{" + str(open_len) + r",}\s*$")
-        body: list = []
-        j = start + 1
-        while j < len(lines) and not close_re.match(lines[j]):
-            body.append(lines[j])
-            j += 1
-        source = "\n".join(body)
-        if lang == "mermaid":
-            return j + 1, {"kind": "diagram", "source": source}
-        block: dict = {"kind": "code", "source": source}
-        if lang:
-            block["language"] = lang
-        return j + 1, block
-
-    LIST_RE = re.compile(r"^(\s*)([-*]|\d+\.)\s+(.*)$")
-
-    def take_list(start: int) -> tuple[int, dict]:
-        # Indent-aware nested list parser. Items at the same column
-        # become siblings; items indented deeper become children.
-        # Schema-wise we emit the children as a nested `list` block
-        # appended inline after the parent item's content via the
-        # html inline kind — keeps the list shape flat enough for
-        # the existing renderer while still nesting visually.
-        first = LIST_RE.match(lines[start])
-        if not first:
-            return start + 1, {"kind": "list", "style": "bullet", "items": []}
-        base_indent = len(first.group(1))
-        ordered = bool(re.match(r"\d+\.", first.group(2)))
-        items: list = []
-        j = start
-        while j < len(lines):
-            mm = LIST_RE.match(lines[j])
-            if not mm or lines[j].strip() == "":
-                break
-            indent = len(mm.group(1))
-            if indent < base_indent:
-                break
-            if indent > base_indent:
-                # Should have been consumed by the recursive call below.
-                break
-            content_text = mm.group(3)
-            j += 1
-            # Collect children — any deeper-indented list items
-            # immediately follow.
-            child_lines_start = j
-            while j < len(lines):
-                mm2 = LIST_RE.match(lines[j])
-                if not mm2 or lines[j].strip() == "":
-                    break
-                if len(mm2.group(1)) <= base_indent:
-                    break
-                j += 1
-            if j > child_lines_start:
-                # Recursively parse the child block.
-                _, child_block = take_list(child_lines_start)
-                # Render the child list as nested HTML inside this
-                # item — schema doesn't (yet) accept a nested list,
-                # but html-inline does.
-                child_html = _list_to_html(child_block)
-                items.append([
-                    *(_md_inline(content_text, ctx)),
-                    {"kind": "html", "text": child_html},
-                ])
-            else:
-                items.append(_md_inline(content_text, ctx))
-        return j, {"kind": "list", "style": "numbered" if ordered else "bullet", "items": items}
-
-    def take_blockquote(start: int) -> tuple[int, dict]:
-        buf: list = []
-        j = start
-        while j < len(lines) and lines[j].lstrip().startswith(">"):
-            buf.append(lines[j].lstrip().lstrip("> ").rstrip())
-            j += 1
-        content = " ".join(buf).strip()
-        return j, {"kind": "callout", "type": "note", "content": _md_inline(content, ctx)}
-
-    def take_table(start: int) -> tuple[int, dict] | tuple[int, None]:
-        if start + 1 >= len(lines) or not re.match(r"^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?\s*$", lines[start + 1]):
-            return start, None
-        def cells(line: str) -> list:
-            line = line.strip().strip("|")
-            return [c.strip() for c in line.split("|")]
-        headers = cells(lines[start])
-        rows = []
-        j = start + 2
-        while j < len(lines) and "|" in lines[j] and lines[j].strip() != "":
-            rows.append([_md_inline(c, ctx) for c in cells(lines[j])])
-            j += 1
-        return j, {"kind": "table", "headers": headers, "rows": rows}
-
-    def _is_block_start(line: str) -> bool:
-        s = line.strip()
-        return bool(
-            re.match(r"^#{1,6}\s", line)
-            or re.match(r"^```", line)
-            or re.match(r"^[-*]\s+", line)
-            or re.match(r"^\d+\.\s+", line)
-            or s.startswith(">")
-            or re.match(r"^-{3,}\s*$", line)
-            or s.startswith("|")
-            # Definition-list continuation marker. When a paragraph
-            # body is followed by ": <text>", we want the paragraph
-            # loop to stop *before* the colon so the dl-detection
-            # branch can fire on the next iteration with j pointing
-            # at the marker.
-            or re.match(r"^\s*:\s+\S", line)
-        )
-
-    sections: list = []
-    current_section: dict | None = None
-    used_ids: set = set()
-
-    def _unique_id(slug: str) -> str:
-        if slug not in used_ids:
-            used_ids.add(slug)
-            return slug
-        n = 2
-        while f"{slug}-{n}" in used_ids:
-            n += 1
-        out = f"{slug}-{n}"
-        used_ids.add(out)
-        return out
-
-    def open_section(slug: str, heading_text: str) -> None:
-        nonlocal current_section
-        section_id = _unique_id(slug)
-        current_section = {
-            "kind": "section",
-            "id": section_id,
-            "title": heading_text,
-            "blocks": [],
-        }
-        sections.append(current_section)
-
-    def add_block(block: dict) -> None:
-        nonlocal current_section
-        if current_section is None:
-            open_section("intro", "Intro")
-        current_section["blocks"].append(block)
-
-    while i < len(lines):
+    plain_fence_close: re.Pattern | None = None
+    while i < n:
         line = lines[i]
-        s = line.strip()
-        if s == "":
+        if plain_fence_close is not None:
+            buf.append(line)
+            if plain_fence_close.match(line):
+                plain_fence_close = None
             i += 1
             continue
-        if re.match(r"^-{3,}\s*$", line):
-            i += 1
-            continue
-        if line.startswith("|"):
-            j, table = take_table(i)
-            if table:
-                add_block(table)
-                i = j
+        m = _FENCE_OPEN_RE.match(line)
+        if m:
+            ticks, lang = m.group(1), (m.group(2) or "").lower()
+            if lang == "mermaid" or lang.startswith("oku-"):
+                close_re = re.compile(r"^`{" + str(len(ticks)) + r",}\s*$")
+                body_lines: list[str] = []
+                j = i + 1
+                while j < n and not close_re.match(lines[j]):
+                    body_lines.append(lines[j])
+                    j += 1
+                block = _lift_fence_block(lang, "\n".join(body_lines))
+                if block is None:
+                    buf.append(line)
+                    buf.extend(body_lines)
+                    if j < n:
+                        buf.append(lines[j])
+                    i = j + 1
+                    continue
+                # Italic caption convention — diagrams only (the one
+                # typed block whose schema carries `caption`).
+                if block.get("k") == "diagram" and "caption" not in block:
+                    k = j + 1
+                    while k < n and not lines[k].strip():
+                        k += 1
+                    cap = _MD_FENCE_CAPTION_RE.match(lines[k]) if k < n else None
+                    if cap and (k + 1 >= n or not lines[k + 1].strip()):
+                        block["caption"] = cap.group(1).strip()
+                        j = k
+                flush()
+                blocks.append(block)
+                i = j + 1
                 continue
-        h = re.match(r"^(#{1,6})\s+(.*?)\s*#*\s*$", line)
-        if h:
-            level = len(h.group(1))
-            heading_text = h.group(2)
-            if level == 1 and title == default_title:
-                title = heading_text
-                i += 1
-                continue
-            if level == 2:
-                open_section(_md_slug(heading_text), heading_text)
-                i += 1
-                continue
-            add_block(
-                {
-                    "kind": "heading",
-                    "level": level,
-                    "id": _unique_id(_md_slug(heading_text)),
-                    "title": heading_text,
-                }
-            )
-            i += 1
-            continue
-        if re.match(r"^```", line):
-            i, block = take_code_fence(i)
-            add_block(block)
-            continue
-        if re.match(r"^[-*]\s+", line) or re.match(r"^\d+\.\s+", line):
-            i, block = take_list(i)
-            add_block(block)
-            continue
-        if s.startswith(">"):
-            i, block = take_blockquote(i)
-            add_block(block)
-            continue
-        i, block = take_paragraph(i)
-        add_block(block)
+            plain_fence_close = re.compile(r"^`{" + str(len(ticks)) + r",}\s*$")
+        buf.append(line)
+        i += 1
+    flush()
 
-    # ---- Footnotes section -----------------------------------------
-    # Emit only the footnotes that actually got referenced in the body
-    # (used_footnotes is populated by _md_inline during expansion).
-    if used_footnotes:
-        fn_section = {
-            "kind": "section",
-            "id": _unique_id("footnotes"),
-            "title": "Footnotes",
-            "blocks": [
-                {
-                    "kind": "list",
-                    "style": "numbered",
-                    "items": [
-                        [
-                            {
-                                "kind": "html",
-                                "text": '<span id="fn-' + fid + '"></span>',
-                            },
-                            *_md_inline(footnotes.get(fid, ""), ctx),
-                        ]
-                        for fid in used_footnotes
-                    ],
-                }
-            ],
-        }
-        sections.append(fn_section)
-
-    page: dict = {"kind": "page", "title": title, "blocks": sections}
-    if front_meta:
-        # Strip the title hoist before storing — it's now page.title.
-        meta_copy = {k: v for k, v in front_meta.items() if k != "title"}
-        if meta_copy:
-            page["meta"] = meta_copy
+    page: dict = {"k": "page", "t": title, "b": blocks}
+    meta = {k: v for k, v in front_meta.items() if k != "title"}
+    if meta:
+        page["m"] = meta
     return page
 
 
-def _list_to_html(list_block: dict) -> str:
-    """Render a kit list block as plain HTML for nested-list children
-    inside the markdown converter. Schema-side the list primitive is
-    flat; the converter uses this helper to lift nested children into
-    an html-inline payload so deeper indent levels survive rendering.
+def _md_page_from_file(p: Path) -> dict | None:
+    """Read + convert one markdown source; None when unreadable.
+
+    A source whose front-matter carries a `title` is a hand-authored
+    kit page and gets the full lint. Everything else (README,
+    CHANGELOG, CLAUDE, SKILL.md and friends — no front-matter, or
+    front-matter without `title`) gets the `_materialised_by` tag so
+    the linter's prose rules skip author-owned repo prose.
     """
-    tag = "ol" if list_block.get("style") == "numbered" else "ul"
-    out = "<" + tag + ' class="md-nested">'
-    for item in list_block.get("items", []):
-        out += "<li>"
-        # Items are richString (list of strings + inline nodes).
-        if isinstance(item, list):
-            for piece in item:
-                if isinstance(piece, str):
-                    out += piece
-                elif isinstance(piece, dict):
-                    kind = piece.get("kind")
-                    if kind == "strong":
-                        out += "<strong>" + piece.get("text", "") + "</strong>"
-                    elif kind == "em":
-                        out += "<em>" + piece.get("text", "") + "</em>"
-                    elif kind == "code":
-                        out += "<code>" + piece.get("text", "") + "</code>"
-                    elif kind == "link":
-                        out += '<a href="' + piece.get("href", "") + '">' + piece.get("text", "") + "</a>"
-                    elif kind == "html":
-                        out += piece.get("text", "")
-        elif isinstance(item, str):
-            out += item
-        out += "</li>"
-    out += "</" + tag + ">"
-    return out
+    try:
+        text = p.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    _, front_meta = _strip_md_front_matter(text)
+    page = md_to_v2_page(text, default_title=p.stem)
+    if not front_meta.get("title"):
+        page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
+    return page
 
 
 def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
@@ -960,15 +633,9 @@ def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
     out: list[tuple[Path, dict]] = []
     extra = project_skip_dirs(root)
     for p in iter_repo_files(root, (".md",), extra_skip=extra):
-        try:
-            text = p.read_text(encoding="utf-8")
-            page = md_to_page(text, default_title=p.stem)
-        except (OSError, ValueError):
-            continue
-        meta = page.setdefault("meta", {})
-        if isinstance(meta, dict):
-            meta.setdefault("_materialised_by", "oku-init")
-        out.append((p, page))
+        page = _md_page_from_file(p)
+        if page is not None:
+            out.append((p, page))
     return sorted(out, key=lambda x: str(x[0]).lower())
 
 
@@ -991,20 +658,20 @@ def _stub_for(title: str, *, inline_manifest: dict | None = None) -> str:
     v = _kit_version()
     manifest_block = ""
     if inline_manifest is not None:
-        manifest_json = json.dumps(inline_manifest, ensure_ascii=False, separators=(',', ':'))
-        manifest_block = f'<script>window.__okuManifest={manifest_json};</script>\n'
+        manifest_json = json.dumps(inline_manifest, ensure_ascii=False, separators=(",", ":"))
+        manifest_block = f"<script>window.__okuManifest={manifest_json};</script>\n"
     return (
-        '<!DOCTYPE html>\n'
+        "<!DOCTYPE html>\n"
         '<html lang="en">\n<head>\n'
         '<meta charset="UTF-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-        f'<title>{html_escape(title)}</title>\n'
-        f'{manifest_block}'
+        f"<title>{html_escape(title)}</title>\n"
+        f"{manifest_block}"
         f'<script src="_oku/chrome-boot.js?v={v}"></script>\n'
         f'<link rel="stylesheet" href="_oku/chrome.css?v={v}">\n'
         f'<script src="_oku/chrome.js?v={v}" defer></script>\n'
         f'<script src="_oku/renderer.js?v={v}" defer></script>\n'
-        '</head>\n<body></body>\n</html>\n'
+        "</head>\n<body></body>\n</html>\n"
     )
 
 
@@ -1019,8 +686,6 @@ def _init_time_manifest(root: Path) -> dict:
     manifest = compute_manifest(root)
     manifest.pop("generated_at", None)
     return manifest
-
-
 
 
 def html_escape(s: str) -> str:
@@ -1385,16 +1050,9 @@ def find_json_pages(root: Path):
         # Don't shadow a real .json sibling if both exist.
         if synth_path in real_json:
             continue
-        try:
-            text = p.read_text(encoding="utf-8")
-            page = md_to_page(text, default_title=p.stem)
-        except (OSError, ValueError):
+        page = _md_page_from_file(p)
+        if page is None:
             continue
-        # Tag md-synth pages so the linter can scope rules that only
-        # apply to hand-authored JSON (e.g. process-breadcrumb).
-        meta = page.setdefault("meta", {})
-        if isinstance(meta, dict):
-            meta.setdefault("_materialised_by", "oku-init")
         pages.append((synth_path, page))
     return sorted(pages, key=lambda x: str(x[0]).lower())
 
@@ -1505,9 +1163,23 @@ _DEPRECATED_KINDS = {
 # renderer's switch in kit/renderer.js — keep this list in sync when a
 # kind is added or removed.
 _KNOWN_BLOCK_KINDS = {
-    "section", "paragraph", "heading", "callout", "insight", "info-tip",
-    "list", "code", "annotated-code", "table", "tldr", "kpi-grid",
-    "step-flow", "compare-grid", "chart", "diagram", "live-snippet",
+    "section",
+    "paragraph",
+    "heading",
+    "callout",
+    "insight",
+    "info-tip",
+    "list",
+    "code",
+    "annotated-code",
+    "table",
+    "tldr",
+    "kpi-grid",
+    "step-flow",
+    "compare-grid",
+    "chart",
+    "diagram",
+    "live-snippet",
     "example",
 }
 
@@ -1522,93 +1194,6 @@ _FORBIDDEN_PROSE_PATTERNS = [
     re.compile(r"\bfixed in round\b", re.IGNORECASE),
     re.compile(r"\bsince round\b", re.IGNORECASE),
 ]
-
-
-def _walk_blocks(blocks, path=("blocks",)):
-    """Yield (path_tuple, block_dict) for every block in a JSON page,
-    descending into sections, info-tip content, table groups, and so on.
-    Path tuple is a sequence of (key, index) hops suitable for joining
-    into a JSONPath-like locator.
-    """
-    if not isinstance(blocks, list):
-        return
-    for i, blk in enumerate(blocks):
-        if not isinstance(blk, dict):
-            continue
-        here = path + (i,)
-        yield here, blk
-        # Recurse into structural containers.
-        if blk.get("kind") == "section":
-            yield from _walk_blocks(blk.get("blocks") or [], here + ("blocks",))
-        elif blk.get("kind") == "info-tip":
-            yield from _walk_blocks(blk.get("content") or [], here + ("content",))
-
-
-def _walk_rich(rich):
-    """Yield every inline-node dict embedded in a rich-string (either a
-    plain string, or an array mixing strings with inline objects)."""
-    if isinstance(rich, str):
-        return
-    if not isinstance(rich, list):
-        return
-    for item in rich:
-        if isinstance(item, dict):
-            yield item
-
-
-def _walk_all_rich(page):
-    """Yield every rich-string container's content from a parsed page.
-    Used by inline-resolution checks (glossary terms, ext-refs).
-
-    Block kinds whose `content` field is a sequence of *block dicts*
-    (info-tip is the only one today) are NOT descended into here —
-    `_walk_blocks` already covers them. Otherwise rich-string content
-    looks like a list of strings and inline-objects (`glossary-term`,
-    `ext-ref`, `code`, `em`, `strong`, `link`)."""
-    BLOCK_CONTENT_KINDS = {"info-tip"}  # `content` is list-of-blocks, not rich
-    for _, blk in _walk_blocks(page.get("blocks") or []):
-        kind = blk.get("kind")
-        if kind not in BLOCK_CONTENT_KINDS:
-            if "content" in blk:
-                yield from _walk_rich(blk["content"])
-        if isinstance(blk.get("bullets"), list):
-            for b in blk["bullets"]:
-                yield from _walk_rich(b)
-        if isinstance(blk.get("items"), list):
-            for it in blk["items"]:
-                yield from _walk_rich(it)
-        # compare-grid cards
-        for card in blk.get("cards") or []:
-            if isinstance(card, dict):
-                if "content" in card:
-                    yield from _walk_rich(card["content"])
-                for it in card.get("items") or []:
-                    yield from _walk_rich(it)
-        # step-flow steps
-        for step in blk.get("steps") or []:
-            if isinstance(step, dict) and "content" in step:
-                yield from _walk_rich(step["content"])
-        # table cells (rows + groups)
-        rows = blk.get("rows") or []
-        for r in rows:
-            if isinstance(r, dict):
-                r = r.get("cells") or []
-            for cell in r:
-                if isinstance(cell, dict) and "value" in cell:
-                    yield from _walk_rich(cell["value"])
-                else:
-                    yield from _walk_rich(cell)
-        for grp in blk.get("groups") or []:
-            if isinstance(grp, dict):
-                yield from _walk_rich(grp.get("title"))
-                for r in grp.get("rows") or []:
-                    if isinstance(r, dict):
-                        r = r.get("cells") or []
-                    for cell in r:
-                        if isinstance(cell, dict) and "value" in cell:
-                            yield from _walk_rich(cell["value"])
-                        else:
-                            yield from _walk_rich(cell)
 
 
 def _load_registry(kit_dir: Path, kind: str) -> dict:
@@ -1634,26 +1219,333 @@ def _load_registry(kit_dir: Path, kind: str) -> dict:
     return out
 
 
-def _flatten_text(rich) -> str:
-    """Concatenate all plain text from a rich-string for prose
-    scanning. Inline objects contribute their `text`/`name`/`term` fields
-    so author-emitted code/term content gets scanned too."""
-    if rich is None:
-        return ""
-    if isinstance(rich, str):
-        return rich
-    if not isinstance(rich, list):
-        return ""
-    parts: list[str] = []
-    for it in rich:
-        if isinstance(it, str):
-            parts.append(it)
-        elif isinstance(it, dict):
-            for key in ("text", "name", "term"):
-                v = it.get(key)
-                if isinstance(v, str):
-                    parts.append(v)
-    return " ".join(parts)
+_MD_HEADING_LINE_RE = re.compile(r"^(#{1,6})\s+(.*?)(?:\s*\{#([A-Za-z][\w-]*)\})?\s*$")
+_MD_GLOSS_REF_RE = re.compile(r"\]\(#g/([\w-]+)\)")
+_MD_EXTREF_REF_RE = re.compile(r"\]\(#x/([\w-]+)\)")
+_MD_SETEXT_EQ_RE = re.compile(r"^=+\s*$")
+_MD_HR_RE = re.compile(r"^-{3,}\s*$")
+_MD_HTML_ISLAND_RE = re.compile(r"^<(?:[a-zA-Z][\w-]*)(?:[\s/>]|$)")
+_INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+_PROSE_SKIP_KEYS = {"src", "source", "code", "k", "language", "lang"}
+
+
+def _iter_block_strings(obj):
+    """Yield every string nested anywhere inside a typed block payload."""
+    if isinstance(obj, str):
+        yield obj
+    elif isinstance(obj, list):
+        for x in obj:
+            yield from _iter_block_strings(x)
+    elif isinstance(obj, dict):
+        for key, v in obj.items():
+            if key in _PROSE_SKIP_KEYS:
+                continue
+            yield from _iter_block_strings(v)
+
+
+def _split_md_fences(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, str, str]]]:
+    """Split a markdown string into prose lines and fence records.
+
+    Returns (prose_lines, fences) where prose_lines is [(lineno, line)]
+    OUTSIDE fenced code, and fences is [(lineno, lang, body)] for every
+    fenced block. Line numbers are 1-based within the string.
+    """
+    lines = text.split("\n")
+    prose: list[tuple[int, str]] = []
+    fences: list[tuple[int, str, str]] = []
+    close_re: re.Pattern | None = None
+    fence_start = 0
+    fence_lang = ""
+    fence_body: list[str] = []
+    for i, line in enumerate(lines, start=1):
+        if close_re is not None:
+            if close_re.match(line):
+                fences.append((fence_start, fence_lang, "\n".join(fence_body)))
+                close_re = None
+                fence_body = []
+            else:
+                fence_body.append(line)
+            continue
+        m = _FENCE_OPEN_RE.match(line)
+        if m:
+            close_re = re.compile(r"^`{" + str(len(m.group(1))) + r",}\s*$")
+            fence_start = i
+            fence_lang = (m.group(2) or "").lower()
+            continue
+        prose.append((i, line))
+    if close_re is not None:
+        fences.append((fence_start, fence_lang, "\n".join(fence_body)))
+    return prose, fences
+
+
+def _lint_md_string(
+    text: str, *, skip_prose: bool
+) -> tuple[
+    list[tuple[str, str, str, str]],
+    list[tuple[int, str]],
+    list[str],
+    list[str],
+]:
+    """Lint one markdown b[] string.
+
+    Returns (issues, heading_ids, glossary_terms, extref_names) where
+    issues are (severity, code, locator, message) tuples and
+    heading_ids are (lineno, id) pairs for page-level duplicate checks.
+    Locators are 1-based line numbers within the string.
+
+    Covers the strict-GFM subset (setext headings, ambiguous `---`,
+    indented code candidates, lazy blockquote continuation), the
+    HTML-island audit, and oku-* fences that failed to lift.
+    """
+    issues: list[tuple[str, str, str, str]] = []
+    heading_ids: list[tuple[int, str]] = []
+    prose, fences = _split_md_fences(text)
+
+    for lineno, lang, _body in fences:
+        if lang.startswith("oku-"):
+            issues.append(
+                (
+                    "error",
+                    "fence-not-lifted",
+                    f"line {lineno}",
+                    f"```{lang} fence did not lift to a typed block — the body must be a single JSON object and the kind one of {sorted(_FENCE_KINDS)}.",
+                )
+            )
+        elif not lang:
+            issues.append(
+                (
+                    "info",
+                    "code-no-language",
+                    f"line {lineno}",
+                    "Code fence has no language tag; Prism syntax highlighting and the language pill are skipped.",
+                )
+            )
+
+    prev_nonblank: str | None = None
+    prev_blank = True
+    in_island = False
+    for lineno, line in prose:
+        stripped = line.strip()
+        if not stripped:
+            prev_nonblank = None
+            prev_blank = True
+            in_island = False
+            continue
+        if not in_island and _MD_HTML_ISLAND_RE.match(line):
+            tag = re.split(r"[\s/>]", line[1:], maxsplit=1)[0]
+            issues.append(
+                (
+                    "info",
+                    "html-island",
+                    f"line {lineno}",
+                    f"Raw HTML island <{tag}> — renders fully in the kit, stripped by external markdown viewers.",
+                )
+            )
+            in_island = True
+        if in_island:
+            prev_nonblank = line
+            prev_blank = False
+            continue
+        if _MD_SETEXT_EQ_RE.match(line) and prev_nonblank is not None:
+            issues.append(
+                (
+                    "error",
+                    "setext-heading",
+                    f"line {lineno}",
+                    "Setext heading (`===` underline) is outside the strict-GFM subset — use an ATX `#` heading.",
+                )
+            )
+        elif (
+            _MD_HR_RE.match(line)
+            and prev_nonblank is not None
+            and not prev_nonblank.lstrip().startswith(("|", "-", "#", ">"))
+        ):
+            issues.append(
+                (
+                    "warning",
+                    "ambiguous-hr",
+                    f"line {lineno}",
+                    "`---` directly under a text line is a setext heading in CommonMark but an <hr> in the kit — insert a blank line before it.",
+                )
+            )
+        if (
+            prev_blank
+            and len(line) - len(line.lstrip(" ")) >= 4
+            and not re.match(r"^([-*]|\d+\.|>)", stripped)
+        ):
+            issues.append(
+                (
+                    "warning",
+                    "indented-code",
+                    f"line {lineno}",
+                    "Indented block after a blank line is an indented code block in CommonMark; the kit treats it as a paragraph. Use a ``` fence, or out-dent.",
+                )
+            )
+        if (
+            prev_nonblank is not None
+            and prev_nonblank.lstrip().startswith(">")
+            and not stripped.startswith(">")
+        ):
+            issues.append(
+                (
+                    "warning",
+                    "lazy-continuation",
+                    f"line {lineno}",
+                    "Line continues a blockquote without a `>` marker (lazy continuation) — CommonMark keeps it in the quote, the kit does not. Prefix the line with `> `.",
+                )
+            )
+        hm = _MD_HEADING_LINE_RE.match(line)
+        if hm:
+            heading_ids.append((lineno, hm.group(3) or _md_slug(hm.group(2))))
+        if not skip_prose:
+            for pat in _FORBIDDEN_PROSE_PATTERNS:
+                m = pat.search(line)
+                if m:
+                    issues.append(
+                        (
+                            "warning",
+                            "process-breadcrumb",
+                            f"line {lineno}",
+                            f"Prose contains process/history reference {m.group(0)!r}; the kit documents current behaviour only.",
+                        )
+                    )
+                    break
+        prev_nonblank = line
+        prev_blank = False
+
+    # Inline code spans hold convention samples (`[label](#g/term-id)`)
+    # — never real references; strip before collecting.
+    prose_text = _INLINE_CODE_RE.sub("", "\n".join(line for _, line in prose))
+    gloss = _MD_GLOSS_REF_RE.findall(prose_text)
+    x_refs = _MD_EXTREF_REF_RE.findall(prose_text)
+    return issues, heading_ids, gloss, x_refs
+
+
+def _known_chart_types() -> list[str]:
+    """Chart `type` values, read from the schema enum — the single
+    source of truth. Empty when the schema is unavailable; callers must
+    treat empty as "unknown set", never as "nothing is valid"."""
+    schema = _load_schema()
+    if not isinstance(schema, dict):
+        return []
+    try:
+        enum = schema["$defs"]["chart"]["properties"]["type"]["enum"]
+    except (KeyError, TypeError):
+        return []
+    return [t for t in enum if isinstance(t, str)]
+
+
+def _chart_shape_issues(blk: dict) -> list[tuple[str, str]]:
+    """Chart payload sanity by type — friendlier than the raw schema
+    error. Returns (code, message) tuples."""
+    out: list[tuple[str, str]] = []
+
+    def bad(code: str, message: str) -> None:
+        out.append((code, message))
+
+    ctype = blk.get("type")
+    known = _known_chart_types()
+    if ctype is not None and known and ctype not in known:
+        bad("chart-unknown-type", f"chart type '{ctype}' is not supported. Known: {', '.join(known)}.")
+        return out
+    if ctype == "bar":
+        if not blk.get("rows"):
+            bad("chart-bar-missing-rows", "chart with type:bar requires a `rows` array.")
+    elif ctype in ("scatter", "line", "area", "bubble", "quadrant"):
+        if not blk.get("series"):
+            bad("chart-cartesian-missing-series", f"chart with type:{ctype} requires a `series` array.")
+        if ctype == "quadrant" and not blk.get("quadrants"):
+            bad(
+                "chart-quadrant-missing-quadrants",
+                "chart with type:quadrant requires a `quadrants` object ({x, y, labels?}).",
+            )
+    elif ctype in ("stacked-bar", "grouped-bar"):
+        if not blk.get("categories"):
+            bad(
+                "chart-multi-bar-missing-categories",
+                f"chart with type:{ctype} requires a `categories` array.",
+            )
+        if not blk.get("series"):
+            bad("chart-multi-bar-missing-series", f"chart with type:{ctype} requires a `series` array.")
+    elif ctype in ("donut", "pie"):
+        if not blk.get("slices"):
+            bad("chart-donut-missing-slices", f"chart with type:{ctype} requires a `slices` array.")
+    elif ctype == "heatmap":
+        if not blk.get("cells"):
+            bad("chart-heatmap-missing-cells", "chart with type:heatmap requires a `cells` 2D array.")
+    elif ctype == "sparkline":
+        if not blk.get("values"):
+            bad("chart-sparkline-missing-values", "chart with type:sparkline requires a `values` array.")
+    elif ctype == "waffle":
+        if not blk.get("segments"):
+            bad("chart-waffle-missing-segments", "chart with type:waffle requires a `segments` array.")
+    elif ctype == "gauge":
+        if blk.get("value") is None or blk.get("max") is None:
+            bad("chart-gauge-missing-fields", "chart with type:gauge requires `value` and `max`.")
+    elif ctype == "radar":
+        if not blk.get("axes") or not blk.get("series"):
+            bad("chart-radar-missing-fields", "chart with type:radar requires `axes` and `series`.")
+    elif ctype == "box-plot":
+        if not blk.get("boxes"):
+            bad("chart-boxplot-missing-boxes", "chart with type:box-plot requires a `boxes` array.")
+    elif ctype == "bullet":
+        if not blk.get("tracks"):
+            bad("chart-bullet-missing-tracks", "chart with type:bullet requires a `tracks` array.")
+    elif ctype == "slope":
+        if not blk.get("items"):
+            bad("chart-slope-missing-items", "chart with type:slope requires an `items` array.")
+    elif ctype == "histogram":
+        if not blk.get("bins"):
+            bad(
+                "chart-histogram-missing-bins",
+                "chart with type:histogram requires a `bins` array of {lo, hi, count}.",
+            )
+    elif ctype == "calendar-heatmap":
+        if not blk.get("date_values"):
+            bad(
+                "chart-calendar-missing-date-values",
+                "chart with type:calendar-heatmap requires a `date_values` object (YYYY-MM-DD → number).",
+            )
+    elif ctype == "treemap":
+        if not blk.get("tree"):
+            bad(
+                "chart-treemap-missing-tree",
+                "chart with type:treemap requires a `tree` array of {label, value}.",
+            )
+    elif ctype == "ridgeline":
+        if not blk.get("distributions"):
+            bad(
+                "chart-ridgeline-missing-distributions",
+                "chart with type:ridgeline requires a `distributions` array.",
+            )
+    elif ctype == "funnel":
+        if not blk.get("stages"):
+            bad("chart-funnel-missing-stages", "chart with type:funnel requires a `stages` array.")
+    elif ctype in ("sankey", "network"):
+        if not blk.get("nodes") or not blk.get("links"):
+            bad(
+                "chart-graph-missing-payload",
+                f"chart with type:{ctype} requires both `nodes` and `links` arrays.",
+            )
+    elif ctype in ("scatter-matrix", "parallel-coordinates"):
+        if not blk.get("variables") or not blk.get("records"):
+            bad(
+                "chart-multivariate-missing-payload",
+                f"chart with type:{ctype} requires both `variables` and `records` arrays.",
+            )
+    elif ctype == "chord":
+        if not blk.get("groups") or not blk.get("matrix"):
+            bad(
+                "chart-chord-missing-payload",
+                "chart with type:chord requires both `groups` and `matrix` (N×N flow matrix).",
+            )
+    elif ctype == "geo":
+        if not blk.get("regions"):
+            bad(
+                "chart-geo-missing-regions",
+                "chart with type:geo requires a `regions` array of {id, value, label?}.",
+            )
+    return out
 
 
 def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[dict]:
@@ -1667,13 +1559,15 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
     issues: list[dict] = []
 
     def add(p: Path, severity: str, code: str, where: str, message: str) -> None:
-        issues.append({
-            "path": p,
-            "severity": severity,
-            "code": code,
-            "where": where,
-            "message": message,
-        })
+        issues.append(
+            {
+                "path": p,
+                "severity": severity,
+                "code": code,
+                "where": where,
+                "message": message,
+            }
+        )
 
     # 1. Schema validation — surfaces shape errors before anything else.
     if _HAS_JSONSCHEMA:
@@ -1689,197 +1583,178 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
     for p, _data in pages:
         stem = p.stem
         if stem.endswith("-demo") and stem != "markdown-demo":
-            add(p, "error", "stray-demo", "(filename)",
-                f"Demo page '{p.name}' is forbidden — fold the example into docs/primitives.json instead.")
+            add(
+                p,
+                "error",
+                "stray-demo",
+                "(filename)",
+                f"Demo page '{p.name}' is forbidden — fold the example into docs/primitives.json instead.",
+            )
 
-    # Per-page passes.
+    # Per-page passes — every rule below reads the v2 shape (k/t/m/b).
+    # Legacy v1 pages are shimmed through _v1_to_v2 first so the lint
+    # surface is format-independent: a page authored as markdown, v2
+    # JSON, or v1 JSON gets the same rules.
     for p, page in pages:
-        page_blocks = page.get("blocks") or []
-
-        # Pages materialised from a sibling .md by `oku init`
-        # carry author-owned prose verbatim (README, CHANGELOG, CLAUDE
-        # and friends); the process-breadcrumb rule is meant for
-        # hand-authored kit pages, so skip it for materialised ones.
-        # The check is still applied to deprecated kinds, unknown
-        # kinds, chart shape, etc. — only the prose-rule scope shrinks.
-        is_materialised = (
-            isinstance(page.get("meta"), dict)
-            and page["meta"].get("_materialised_by") == "oku-init"
-        )
-
-        # 3. Forbidden prose / process breadcrumbs — applies to every
-        # rich-string in the page (hand-authored pages only).
-        for blk_path, blk in _walk_blocks(page_blocks):
-            where_prefix = "/".join(str(x) for x in blk_path) + f":kind={blk.get('kind','?')}"
-            if not is_materialised:
-                for key in ("lead", "title", "summary", "content"):
-                    v = blk.get(key)
-                    if v is None:
+        if isinstance(page, dict) and page.get("kind") == "page" and "k" not in page:
+            # Deprecated kinds exist only in the v1 vocabulary and the
+            # shim silently drops them — flag BEFORE shimming.
+            def _walk_v1(blocks, path):
+                for i, blk in enumerate(blocks):
+                    if not isinstance(blk, dict):
                         continue
-                    text = _flatten_text(v) if not isinstance(v, str) else v
-                    for pat in _FORBIDDEN_PROSE_PATTERNS:
-                        m = pat.search(text)
-                        if m:
-                            add(p, "warning", "process-breadcrumb",
-                                where_prefix + f".{key}",
-                                f"Prose contains process/history reference {m.group(0)!r}; the kit documents current behaviour only.")
-                            # One issue per (block, key) is enough — overlapping
-                            # patterns would otherwise pile up on the same line.
-                            break
+                    kind = blk.get("kind")
+                    here = f"{path}[{i}]:kind={kind}"
+                    if kind in _DEPRECATED_KINDS:
+                        add(
+                            p,
+                            "error",
+                            "deprecated-kind",
+                            here,
+                            f"Block kind '{kind}' is no longer supported. Migrate to: {_DEPRECATED_KINDS[kind]}.",
+                        )
+                    if kind == "section":
+                        _walk_v1(blk.get("blocks") or [], here + ".blocks")
+                    elif kind == "info-tip":
+                        _walk_v1(blk.get("content") or [], here + ".content")
 
-            # 4. Deprecated kinds — flag with migration pointer.
-            kind = blk.get("kind")
+            _walk_v1(page.get("blocks") or [], "blocks")
+            page = _v1_to_v2(page)
+        meta = page.get("m") if isinstance(page.get("m"), dict) else {}
+        body = page.get("b") or []
+
+        # Pages materialised from repo markdown without front-matter
+        # (README, CHANGELOG, CLAUDE and friends) carry author-owned
+        # prose verbatim; the process-breadcrumb rule is meant for
+        # hand-authored kit pages, so it is skipped for those. All
+        # structural rules still apply.
+        is_materialised = meta.get("_materialised_by") == "oku-init"
+
+        seen_ids: dict[str, int] = {}
+        gloss_refs: list[tuple[str, str]] = []
+        extref_refs: list[tuple[str, str]] = []
+
+        for idx, blk in enumerate(body):
+            where = f"b[{idx}]"
+            if isinstance(blk, str):
+                # 3. Markdown-string passes: strict-GFM subset, HTML
+                # island audit, unlifted fences, process prose.
+                str_issues, heading_ids, gloss, x_refs = _lint_md_string(blk, skip_prose=is_materialised)
+                for severity, code, loc, message in str_issues:
+                    add(p, severity, code, f"{where} {loc}", message)
+                for lineno, hid in heading_ids:
+                    if hid in seen_ids:
+                        add(
+                            p,
+                            "error",
+                            "duplicate-anchor",
+                            f"{where} line {lineno}",
+                            f"Section / heading id '{hid}' already used in this page.",
+                        )
+                    seen_ids[hid] = seen_ids.get(hid, 0) + 1
+                gloss_refs.extend((where, t) for t in gloss)
+                extref_refs.extend((where, x) for x in x_refs)
+                continue
+            if not isinstance(blk, dict):
+                add(p, "error", "invalid-block", where, "Block must be a markdown string or a typed object.")
+                continue
+
+            kind = blk.get("k")
+            where = f"{where}:k={kind}"
+
+            # 4. Deprecated / unknown kinds — flag with migration pointer.
             if kind in _DEPRECATED_KINDS:
-                add(p, "error", "deprecated-kind", where_prefix,
-                    f"Block kind '{kind}' is no longer supported. Migrate to: {_DEPRECATED_KINDS[kind]}.")
+                add(
+                    p,
+                    "error",
+                    "deprecated-kind",
+                    where,
+                    f"Block kind '{kind}' is no longer supported. Migrate to: {_DEPRECATED_KINDS[kind]}.",
+                )
             elif kind and kind not in _KNOWN_BLOCK_KINDS:
-                add(p, "error", "unknown-kind", where_prefix,
-                    f"Unknown block kind '{kind}'. Known: {sorted(_KNOWN_BLOCK_KINDS)}.")
+                add(
+                    p,
+                    "error",
+                    "unknown-kind",
+                    where,
+                    f"Unknown block kind '{kind}'. Known: {sorted(_KNOWN_BLOCK_KINDS)}.",
+                )
 
-            # 5. Code blocks should declare a language (Prism + the language
-            # pill need it).
+            # 5. Code blocks should declare a language (Prism + the
+            # language pill need it).
             if kind == "code" and not blk.get("language"):
-                add(p, "info", "code-no-language", where_prefix,
-                    "Code block has no `language` field; Prism syntax highlighting and the language pill are skipped.")
+                add(
+                    p,
+                    "info",
+                    "code-no-language",
+                    where,
+                    "Code block has no `language` field; Prism syntax highlighting and the language pill are skipped.",
+                )
 
             # 6. Chart shape sanity by type.
             if kind == "chart":
-                ctype = blk.get("type")
-                if ctype == "bar":
-                    if not blk.get("rows"):
-                        add(p, "error", "chart-bar-missing-rows", where_prefix,
-                            "chart with type:bar requires a `rows` array.")
-                elif ctype in ("scatter", "line", "area", "bubble", "quadrant"):
-                    if not blk.get("series"):
-                        add(p, "error", "chart-cartesian-missing-series", where_prefix,
-                            f"chart with type:{ctype} requires a `series` array.")
-                    if ctype == "quadrant" and not blk.get("quadrants"):
-                        add(p, "error", "chart-quadrant-missing-quadrants", where_prefix,
-                            "chart with type:quadrant requires a `quadrants` object ({x, y, labels?}).")
-                elif ctype in ("stacked-bar", "grouped-bar"):
-                    if not blk.get("categories"):
-                        add(p, "error", "chart-multi-bar-missing-categories", where_prefix,
-                            f"chart with type:{ctype} requires a `categories` array.")
-                    if not blk.get("series"):
-                        add(p, "error", "chart-multi-bar-missing-series", where_prefix,
-                            f"chart with type:{ctype} requires a `series` array.")
-                elif ctype in ("donut", "pie"):
-                    if not blk.get("slices"):
-                        add(p, "error", "chart-donut-missing-slices", where_prefix,
-                            f"chart with type:{ctype} requires a `slices` array.")
-                elif ctype == "heatmap":
-                    if not blk.get("cells"):
-                        add(p, "error", "chart-heatmap-missing-cells", where_prefix,
-                            "chart with type:heatmap requires a `cells` 2D array.")
-                elif ctype == "sparkline":
-                    if not blk.get("values"):
-                        add(p, "error", "chart-sparkline-missing-values", where_prefix,
-                            "chart with type:sparkline requires a `values` array.")
-                elif ctype == "waffle":
-                    if not blk.get("segments"):
-                        add(p, "error", "chart-waffle-missing-segments", where_prefix,
-                            "chart with type:waffle requires a `segments` array.")
-                elif ctype == "gauge":
-                    if blk.get("value") is None or blk.get("max") is None:
-                        add(p, "error", "chart-gauge-missing-fields", where_prefix,
-                            "chart with type:gauge requires `value` and `max`.")
-                elif ctype == "radar":
-                    if not blk.get("axes") or not blk.get("series"):
-                        add(p, "error", "chart-radar-missing-fields", where_prefix,
-                            "chart with type:radar requires `axes` and `series`.")
-                elif ctype == "box-plot":
-                    if not blk.get("boxes"):
-                        add(p, "error", "chart-boxplot-missing-boxes", where_prefix,
-                            "chart with type:box-plot requires a `boxes` array.")
-                elif ctype == "bullet":
-                    if not blk.get("tracks"):
-                        add(p, "error", "chart-bullet-missing-tracks", where_prefix,
-                            "chart with type:bullet requires a `tracks` array.")
-                elif ctype == "slope":
-                    if not blk.get("items"):
-                        add(p, "error", "chart-slope-missing-items", where_prefix,
-                            "chart with type:slope requires an `items` array.")
-                elif ctype == "histogram":
-                    if not blk.get("bins"):
-                        add(p, "error", "chart-histogram-missing-bins", where_prefix,
-                            "chart with type:histogram requires a `bins` array of {lo, hi, count}.")
-                elif ctype == "calendar-heatmap":
-                    if not blk.get("date_values"):
-                        add(p, "error", "chart-calendar-missing-date-values", where_prefix,
-                            "chart with type:calendar-heatmap requires a `date_values` object (YYYY-MM-DD → number).")
-                elif ctype == "treemap":
-                    if not blk.get("tree"):
-                        add(p, "error", "chart-treemap-missing-tree", where_prefix,
-                            "chart with type:treemap requires a `tree` array of {label, value}.")
-                elif ctype == "ridgeline":
-                    if not blk.get("distributions"):
-                        add(p, "error", "chart-ridgeline-missing-distributions", where_prefix,
-                            "chart with type:ridgeline requires a `distributions` array.")
-                elif ctype == "funnel":
-                    if not blk.get("stages"):
-                        add(p, "error", "chart-funnel-missing-stages", where_prefix,
-                            "chart with type:funnel requires a `stages` array.")
-                elif ctype in ("sankey", "network"):
-                    if not blk.get("nodes") or not blk.get("links"):
-                        add(p, "error", "chart-graph-missing-payload", where_prefix,
-                            f"chart with type:{ctype} requires both `nodes` and `links` arrays.")
-                elif ctype in ("scatter-matrix", "parallel-coordinates"):
-                    if not blk.get("variables") or not blk.get("records"):
-                        add(p, "error", "chart-multivariate-missing-payload", where_prefix,
-                            f"chart with type:{ctype} requires both `variables` and `records` arrays.")
-                elif ctype == "chord":
-                    if not blk.get("groups") or not blk.get("matrix"):
-                        add(p, "error", "chart-chord-missing-payload", where_prefix,
-                            "chart with type:chord requires both `groups` and `matrix` (N×N flow matrix).")
-                elif ctype == "geo":
-                    if not blk.get("regions"):
-                        add(p, "error", "chart-geo-missing-regions", where_prefix,
-                            "chart with type:geo requires a `regions` array of {id, value, label?}.")
-                elif ctype is not None:
-                    add(p, "error", "chart-unknown-type", where_prefix,
-                        f"chart type '{ctype}' is not supported. Known: scatter, line, area, bubble, quadrant, bar, stacked-bar, grouped-bar, donut, pie, heatmap, sparkline, waffle, gauge, radar, box-plot, bullet, slope, histogram, calendar-heatmap, treemap, ridgeline, funnel, sankey, network, scatter-matrix, parallel-coordinates, chord, geo.")
+                for code, message in _chart_shape_issues(blk):
+                    add(p, "error", code, where, message)
 
-        # 7. Duplicate section IDs within a page — anchors must be unique.
-        seen_ids: dict[str, int] = {}
-        for blk_path, blk in _walk_blocks(page_blocks):
-            if blk.get("kind") in ("section", "heading"):
-                sid = blk.get("id")
-                if not sid:
-                    continue
-                if sid in seen_ids:
-                    where = "/".join(str(x) for x in blk_path)
-                    add(p, "error", "duplicate-anchor", where,
-                        f"Section / heading id '{sid}' already used in this page.")
-                seen_ids[sid] = seen_ids.get(sid, 0) + 1
+            # Prose nested inside typed payloads (step bodies, card
+            # bodies, table cells, …) is markdown too — same glossary /
+            # ext-ref resolution and process-prose rules.
+            for s in _iter_block_strings(blk):
+                s_refs = _INLINE_CODE_RE.sub("", s)
+                gloss_refs.extend((where, t) for t in _MD_GLOSS_REF_RE.findall(s_refs))
+                extref_refs.extend((where, x) for x in _MD_EXTREF_REF_RE.findall(s_refs))
+                if not is_materialised:
+                    for pat in _FORBIDDEN_PROSE_PATTERNS:
+                        m = pat.search(s)
+                        if m:
+                            add(
+                                p,
+                                "warning",
+                                "process-breadcrumb",
+                                where,
+                                f"Prose contains process/history reference {m.group(0)!r}; the kit documents current behaviour only.",
+                            )
+                            break
 
-        # 8. Glossary + ext-ref resolution — every inline reference must
-        # land on an entry the kit knows about.
-        for inline in _walk_all_rich(page):
-            if inline.get("kind") == "glossary-term":
-                term = inline.get("term") or inline.get("text")
-                if term and term.lower() not in glossary:
-                    add(p, "warning", "unresolved-glossary",
-                        f"glossary-term:{term!r}",
-                        f"Glossary term '{term}' not found in any kit/glossary/*.json registry.")
-            elif inline.get("kind") == "ext-ref":
-                name = inline.get("name")
-                if name and name.lower() not in extrefs:
-                    add(p, "warning", "unresolved-extref",
-                        f"ext-ref:{name!r}",
-                        f"External reference '{name}' not found in any kit/extrefs/*.json registry.")
-            elif inline.get("kind") and inline.get("kind") not in _KNOWN_INLINE_KINDS:
-                add(p, "warning", "unknown-inline",
-                    f"inline:{inline.get('kind')!r}",
-                    f"Unknown inline kind '{inline.get('kind')}'.")
+        # 8. Glossary + ext-ref resolution — every inline reference
+        # must land on an entry the kit knows about.
+        for where, term in gloss_refs:
+            if term.lower() not in glossary:
+                add(
+                    p,
+                    "warning",
+                    "unresolved-glossary",
+                    f"{where} #g/{term}",
+                    f"Glossary term '{term}' not found in any kit/glossary/*.json registry.",
+                )
+        for where, name in extref_refs:
+            if name.lower() not in extrefs:
+                add(
+                    p,
+                    "warning",
+                    "unresolved-extref",
+                    f"{where} #x/{name}",
+                    f"External reference '{name}' not found in any kit/extrefs/*.json registry.",
+                )
 
         # 9. Page-level metadata sanity.
         meta = _page_meta(page)
         if not meta.get("summary"):
-            add(p, "info", "no-summary", "meta.summary",
-                "Page has no meta.summary — site-manifest tooltips + llms.txt lose the one-line description.")
+            add(
+                p,
+                "info",
+                "no-summary",
+                "meta.summary",
+                "Page has no meta.summary — site-manifest tooltips + llms.txt lose the one-line description.",
+            )
         if not _page_title(page):
-            add(p, "error", "no-title", "title",
-                "Page has no title; the document <title> and cover <h1> will be empty.")
+            add(
+                p,
+                "error",
+                "no-title",
+                "title",
+                "Page has no title; the document <title> and cover <h1> will be empty.",
+            )
 
     return issues
 
@@ -1942,13 +1817,15 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     issues = check_pages(pages, root)
     for p, err in bad_json:
-        issues.append({
-            "path": p,
-            "severity": "error",
-            "code": "json-parse-failed",
-            "where": "(file)",
-            "message": err,
-        })
+        issues.append(
+            {
+                "path": p,
+                "severity": "error",
+                "code": "json-parse-failed",
+                "where": "(file)",
+                "message": err,
+            }
+        )
 
     if args.json:
         # Emit a machine-parseable stream. Path is serialised relative
@@ -1959,13 +1836,15 @@ def cmd_check(args: argparse.Namespace) -> int:
                 rel = str(it["path"].relative_to(root))
             except ValueError:
                 rel = str(it["path"])
-            payload.append({
-                "path": rel,
-                "severity": it["severity"],
-                "code": it["code"],
-                "where": it["where"],
-                "message": it["message"],
-            })
+            payload.append(
+                {
+                    "path": rel,
+                    "severity": it["severity"],
+                    "code": it["code"],
+                    "where": it["where"],
+                    "message": it["message"],
+                }
+            )
         print(json.dumps({"page_count": len(pages), "issues": payload}, ensure_ascii=False, indent=2))
     else:
         # Group by severity for the terminal report.
@@ -2701,9 +2580,7 @@ def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
             # glossary/extref entries) so tooltips work offline.
             if kit_bundle:
                 safe_bundle = kit_bundle.replace("</script", "<\\/script")
-                inline += (
-                    f'\n<script type="application/json" id="__oku_kit_bundle__">{safe_bundle}</script>'
-                )
+                inline += f'\n<script type="application/json" id="__oku_kit_bundle__">{safe_bundle}</script>'
             # Lambda replacement avoids re.sub interpreting \n in the JSON
             # content as a backslash escape and turning it into a newline.
             html = _BODY_CLOSE_RE.sub(lambda m: inline + "\n</body>", html, count=1)
@@ -2745,11 +2622,15 @@ def cmd_build(args: argparse.Namespace) -> int:
             for it in errors:
                 print(_format_issue(it, root))
         elif warnings:
-            print(f"✓ Doctree check: {len(json_pages)} page(s) clean (errors); {len(warnings)} warning(s) — run `oku check` for the full report.")
+            print(
+                f"✓ Doctree check: {len(json_pages)} page(s) clean (errors); {len(warnings)} warning(s) — run `oku check` for the full report."
+            )
         else:
             print(f"✓ Doctree check: {len(json_pages)} page(s) clean")
         if not _HAS_JSONSCHEMA:
-            print("  (schema validation skipped — `pip install jsonschema` to enable; structural checks still ran)")
+            print(
+                "  (schema validation skipped — `pip install jsonschema` to enable; structural checks still ran)"
+            )
 
     if not srcs:
         return 0
@@ -2926,9 +2807,23 @@ def _sse_broadcast(msg: str = "change") -> None:
 
 
 _WATCH_SKIP = {
-    "dist", "_oku", ".git", "node_modules", ".venv", "venv",
-    "__pycache__", ".idea", ".vscode", ".pytest_cache", ".ruff_cache",
-    ".mypy_cache", ".tox", "target", "build", ".gradle", "out",
+    "dist",
+    "_oku",
+    ".git",
+    "node_modules",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".idea",
+    ".vscode",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".tox",
+    "target",
+    "build",
+    ".gradle",
+    "out",
 }
 _WATCH_SKIP_SUFFIX = {".pyc", ".swp", ".tmp", ".bak", ".log"}
 _WATCH_SKIP_NAMES = {".DS_Store", "site-manifest.json", "llms.txt"}  # avoid feedback loop
@@ -2940,9 +2835,20 @@ _WATCH_SKIP_NAMES = {".DS_Store", "site-manifest.json", "llms.txt"}  # avoid fee
 # mtime drift caused a reload; the user reported this as "periodic
 # refresh / flicker."
 _WATCH_INCLUDE_SUFFIX = {
-    ".json", ".html", ".htm", ".md", ".markdown",
-    ".css", ".js", ".svg",
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif",
+    ".json",
+    ".html",
+    ".htm",
+    ".md",
+    ".markdown",
+    ".css",
+    ".js",
+    ".svg",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".avif",
 }
 
 
@@ -3084,10 +2990,8 @@ def _make_serve_handler(root: Path):
             content_type: str | None = None
 
             if md_path.exists():
-                try:
-                    text = md_path.read_text(encoding="utf-8")
-                    page = md_to_page(text, default_title=md_path.stem)
-                except (OSError, ValueError):
+                page = _md_page_from_file(md_path)
+                if page is None:
                     return False
                 if url_path.endswith(".json"):
                     body = json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8")
@@ -3146,9 +3050,7 @@ def _make_serve_handler(root: Path):
                 content_type = "text/plain; charset=utf-8"
             else:
                 manifest = compute_manifest(docs_root)
-                body = (
-                    json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
-                ).encode("utf-8")
+                body = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
                 content_type = "application/json; charset=utf-8"
             try:
                 self.send_response(200)
@@ -3301,10 +3203,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
     # Markdown twins, the build's pagefind index, and dist outputs all
     # land under dist/ via `oku build`.
 
-    htmls = sorted(
-        p for p in root.rglob("*.html")
-        if not any(part in SKIP_DIRS for part in p.parts)
-    )
+    htmls = sorted(p for p in root.rglob("*.html") if not any(part in SKIP_DIRS for part in p.parts))
 
     # Serve-time Pagefind index (background, best-effort) so search works
     # without requiring the user to run `oku build` first.
@@ -3407,7 +3306,11 @@ def cmd_migrate(args: argparse.Namespace) -> int:
             # Pretty-printed by default so the result is reviewable; the
             # storage policy says compact is preferred for AI-authored
             # pages but a migrated file is read by humans at least once.
-            payload = json.dumps(v2, ensure_ascii=False, indent=2) if args.pretty else json.dumps(v2, ensure_ascii=False, separators=(",", ":"))
+            payload = (
+                json.dumps(v2, ensure_ascii=False, indent=2)
+                if args.pretty
+                else json.dumps(v2, ensure_ascii=False, separators=(",", ":"))
+            )
             p.write_text(payload + "\n", encoding="utf-8")
             print(f"  migrated {rel}")
         migrated += 1

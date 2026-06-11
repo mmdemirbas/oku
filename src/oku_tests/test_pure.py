@@ -286,226 +286,151 @@ class TestPickOpenTarget:
         assert cli._pick_open_target([], tmp_path, tmp_path) is None
 
 
-# ---------- Markdown link-href rewriting ----------
+# ---------- markdown → v2 page conversion ----------
 
 
-class TestMdLinkHref:
-    """`[text](other.md)` style links must point at the rendered .html
-    page; absolute URLs and fragments must pass through untouched."""
+class TestMdToV2Page:
+    """md_to_v2_page keeps body markdown VERBATIM and lifts only typed
+    fences (```oku-<kind> JSON, ```mermaid) into typed blocks."""
 
-    def test_relative_md_link_rewritten(self) -> None:
-        assert cli._md_link_href("other.md") == "other.html"
+    def test_front_matter_hoists_title_and_meta(self) -> None:
+        md = "---\ntitle: Hello\naccent: teal\norder: 7\n---\n\n## S\n\nbody\n"
+        page = cli.md_to_v2_page(md)
+        assert page["k"] == "page"
+        assert page["t"] == "Hello"
+        assert page["m"]["accent"] == "teal"
+        assert "title" not in page["m"]
 
-    def test_relative_md_link_with_fragment(self) -> None:
-        assert cli._md_link_href("notes/details.md#thing") == "notes/details.html#thing"
+    def test_h1_hoisted_when_no_front_matter_title(self) -> None:
+        page = cli.md_to_v2_page("# Hello\n\nbody")
+        assert page["t"] == "Hello"
+        assert page["b"] == ["body"]
 
-    def test_parent_relative_md_link(self) -> None:
-        assert cli._md_link_href("../sibling.md") == "../sibling.html"
+    def test_body_stays_verbatim(self) -> None:
+        body = "## Sec {#sec}\n\nA *paragraph* with [a ref](#g/iceberg).\n\n- one\n- two"
+        page = cli.md_to_v2_page("---\ntitle: T\n---\n" + body)
+        assert page["b"] == [body]
 
-    def test_absolute_url_passthrough(self) -> None:
-        for href in (
-            "https://example.com/x.md",
-            "http://example.com/x.md",
-            "mailto:foo@bar.md",
-            "//cdn.example.com/x.md",
-        ):
-            assert cli._md_link_href(href) == href, f"absolute URL {href!r} should pass through"
+    def test_oku_chart_fence_lifts_to_typed_block(self) -> None:
+        md = '## S\n\n```oku-chart\n{"type":"bar","rows":[{"label":"a","value":1}]}\n```\n\nafter'
+        page = cli.md_to_v2_page(md)
+        assert page["b"][0] == "## S"
+        assert page["b"][1] == {"k": "chart", "type": "bar", "rows": [{"label": "a", "value": 1}]}
+        assert page["b"][2] == "after"
 
-    def test_fragment_only_passthrough(self) -> None:
-        assert cli._md_link_href("#section") == "#section"
+    def test_mermaid_fence_lifts_to_diagram(self) -> None:
+        page = cli.md_to_v2_page("```mermaid\nflowchart TB\n  A --> B\n```")
+        assert page["b"] == [{"k": "diagram", "src": "flowchart TB\n  A --> B"}]
 
-    def test_root_absolute_path_passthrough(self) -> None:
-        # /a/b.md is a server-relative absolute path; leave it alone —
-        # the kit can't know whether that maps to a rendered .html.
-        assert cli._md_link_href("/docs/foo.md") == "/docs/foo.md"
+    def test_italic_caption_folds_into_diagram(self) -> None:
+        page = cli.md_to_v2_page("```mermaid\nA --> B\n```\n\n*The caption.*\n\nprose")
+        assert page["b"][0] == {"k": "diagram", "src": "A --> B", "caption": "The caption."}
+        assert page["b"][1] == "prose"
 
-    def test_non_md_passthrough(self) -> None:
-        assert cli._md_link_href("other.html") == "other.html"
-        assert cli._md_link_href("data.json") == "data.json"
+    def test_italic_line_in_running_prose_is_not_a_caption(self) -> None:
+        page = cli.md_to_v2_page("```mermaid\nA\n```\n\n*emphasis* opener\nmore prose")
+        assert page["b"][0] == {"k": "diagram", "src": "A"}
+        assert "*emphasis* opener" in page["b"][1]
 
+    def test_bad_json_fence_stays_verbatim(self) -> None:
+        md = "```oku-chart\n{not json}\n```"
+        assert cli.md_to_v2_page(md)["b"] == [md]
 
-# ---------- md_to_page integration ----------
+    def test_unknown_oku_kind_stays_verbatim(self) -> None:
+        md = "```oku-bogus\n{}\n```"
+        assert cli.md_to_v2_page(md)["b"] == [md]
 
+    def test_fence_inside_plain_fence_not_lifted(self) -> None:
+        """A 3-tick typed fence nested in a 4-tick plain fence is a code
+        SAMPLE, not a primitive — it must stay verbatim. Same
+        variable-length close rule as CommonMark."""
+        md = '````markdown\n```oku-chart\n{"type":"bar","rows":[]}\n```\n````'
+        assert cli.md_to_v2_page(md)["b"] == [md]
 
-class TestMdToPage:
-    """End-to-end checks on md_to_page output shape."""
+    def test_mermaid_inside_plain_fence_not_lifted(self) -> None:
+        md = "````markdown\n```mermaid\nA --> B\n```\n````"
+        assert cli.md_to_v2_page(md)["b"] == [md]
 
-    def test_h1_becomes_title(self) -> None:
-        page = cli.md_to_page("# Hello\n\nbody")
-        assert page["kind"] == "page"
-        assert page["title"] == "Hello"
-
-    def test_h2_starts_a_section(self) -> None:
-        page = cli.md_to_page("# X\n\nintro\n\n## First\n\nbody")
-        ids = [b.get("id") for b in page["blocks"] if b.get("kind") == "section"]
-        assert "intro" in ids, "implicit intro section missing"
-        assert "first" in ids, "h2 'First' did not become a section with id='first'"
-
-    def test_nested_code_fences_use_variable_length(self) -> None:
-        """A 3-tick fence inside a 4-tick outer fence is valid CommonMark
-        and must parse as a single outer code block whose body literally
-        contains the inner 3-tick lines. Regression — the parser used to
-        hardcode `^```$` close, so the inner ``` closed the outer early
-        and the markdown rendered garbled."""
-        md = (
-            "## H\n\n"
-            "````markdown\n"
-            "```js\n"
-            "console.log('inner');\n"
-            "```\n"
-            "````\n"
+    def test_html_island_stays_verbatim(self) -> None:
+        body = (
+            '<div class="demo">\n'
+            '  <button id="go">Click</button>\n'
+            "</div>\n"
+            "<script>\n"
+            'console.log("island");\n'
+            "</script>"
         )
-        page = cli.md_to_page(md)
-        section = page["blocks"][0]
-        code_blocks = [b for b in section["blocks"] if b["kind"] == "code"]
-        assert len(code_blocks) == 1, (
-            f"expected one outer code block, got {len(code_blocks)}: {code_blocks}"
-        )
-        body = code_blocks[0]["source"]
-        # The outer fence preserved the inner 3-tick fence verbatim.
-        assert "```js" in body, "inner fence lost from outer fence body"
-        assert "console.log('inner');" in body, "inner code lost"
-        assert "```" in body.split("\n")[-1] or "```" in body, "inner closing fence lost"
+        page = cli.md_to_v2_page("---\ntitle: T\n---\n## S\n\n" + body)
+        assert page["b"] == ["## S\n\n" + body], "island must survive byte-for-byte"
 
-    def test_hr_is_dropped_not_emitted(self) -> None:
-        """Markdown `---` produced `{"kind": "hr"}` which the schema
-        rejects (no `hr` kind) and the renderer ignores. Drop it."""
-        page = cli.md_to_page("## H\n\nbefore\n\n---\n\nafter\n")
-        section = page["blocks"][0]
-        kinds = [b["kind"] for b in section["blocks"]]
-        assert "hr" not in kinds, "hr block leaked into output"
-        # Surrounding paragraphs still present.
-        assert kinds.count("paragraph") == 2
+    def test_k_in_payload_cannot_spoof_kind(self) -> None:
+        md = '```oku-chart\n{"k":"diagram","type":"bar","rows":[]}\n```'
+        assert cli.md_to_v2_page(md)["b"][0]["k"] == "chart"
 
-    def test_indented_blockquote_does_not_hang(self) -> None:
-        """Regression: a `>` line indented (e.g., inside a list item)
-        used to make the main loop never advance, because the dispatcher
-        stripped whitespace before checking for ">" but ``take_blockquote``
-        compared the raw line. Bisected from a real HANDOFF.md in 2026-05.
-        Cap the parse with a soft time budget so a future regression
-        surfaces as a test timeout, not a hung CI run."""
-        import threading
-
-        md = "## H\n- item:\n  > indented quote line\n"
-        result: dict[str, object] = {}
-
-        def go() -> None:
-            result["page"] = cli.md_to_page(md)
-
-        t = threading.Thread(target=go, daemon=True)
-        t.start()
-        t.join(timeout=2.0)
-        assert not t.is_alive(), "md_to_page hung on indented blockquote"
-        page = result["page"]
-        assert isinstance(page, dict)
-        assert page.get("kind") == "page"
-
-    def test_md_link_in_paragraph_rewritten_to_html(self) -> None:
-        """Live integration — the link rewriter must actually run on
-        paragraph content emitted by md_to_page."""
-        page = cli.md_to_page("# X\n\n## Sec\n\nSee [details](notes/details.md#thing).")
-        # Walk to the link node.
-        found = None
-        def walk(node):
-            nonlocal found
-            if isinstance(node, dict):
-                if node.get("kind") == "link":
-                    found = node
-                    return
-                for v in node.values():
-                    walk(v)
-            elif isinstance(node, list):
-                for it in node:
-                    walk(it)
-        walk(page)
-        assert found is not None, "no link node emitted"
-        assert found["href"] == "notes/details.html#thing"
+    def test_unclosed_typed_fence_does_not_hang(self) -> None:
+        page = cli.md_to_v2_page('```oku-chart\n{"type":"bar"')
+        assert page["b"], "unclosed typed fence must still produce output"
 
 
-# ---------- P4 — Markdown parity additions ----------
+# ---------- markdown string lint ----------
 
 
-class TestMdParityP4:
-    """P4 closed the long-running 'Not in the converter' gaps. These
-    tests lock the new behaviours so a future refactor can't quietly
-    regress them."""
+class TestMdStringLint:
+    """_lint_md_string enforces the strict-GFM subset and audits HTML
+    islands; glossary / ext-ref ids are collected for resolution."""
 
-    @staticmethod
-    def _walk(node):
-        if isinstance(node, dict):
-            yield node
-            for v in node.values():
-                yield from TestMdParityP4._walk(v)
-        elif isinstance(node, list):
-            for it in node:
-                yield from TestMdParityP4._walk(it)
+    def _codes(self, text: str, skip_prose: bool = False) -> list:
+        issues, _, _, _ = cli._lint_md_string(text, skip_prose=skip_prose)
+        return [c for _, c, _, _ in issues]
 
-    def test_yaml_front_matter_hoists_title_and_meta(self) -> None:
-        md = "---\ntitle: Hand-picked\naudience: Author\norder: 7\n---\n\n# Ignored\n\n## S\n\nbody"
-        page = cli.md_to_page(md, default_title="default-x")
-        assert page["title"] == "Hand-picked"
-        meta = page.get("meta") or {}
-        assert meta.get("audience") == "Author"
-        assert meta.get("order") == 7
+    def test_setext_heading_flagged(self) -> None:
+        assert "setext-heading" in self._codes("Title\n=====")
 
-    def test_reference_style_links_resolve(self) -> None:
-        md = "# X\n\n## S\n\nSee [the spec][refspec] for more.\n\n[refspec]: https://example.org/spec\n"
-        page = cli.md_to_page(md)
-        link = next(
-            (n for n in self._walk(page) if isinstance(n, dict) and n.get("kind") == "link"),
-            None,
-        )
-        assert link is not None, "reference-style link not resolved"
-        assert link["href"] == "https://example.org/spec"
-        assert link["text"] == "the spec"
+    def test_ambiguous_hr_flagged(self) -> None:
+        assert "ambiguous-hr" in self._codes("some text\n---")
 
-    def test_footnote_ref_emits_sup_and_section(self) -> None:
-        md = (
-            "# X\n\n## S\n\nA claim with a footnote.[^1]\n\n"
-            "[^1]: The supporting note.\n"
-        )
-        page = cli.md_to_page(md)
-        # Footnote ref renders as a `html` inline node.
-        html_inlines = [
-            n for n in self._walk(page)
-            if isinstance(n, dict) and n.get("kind") == "html" and "fn-1" in (n.get("text") or "")
-        ]
-        assert html_inlines, "inline footnote ref missing"
-        # Footnotes section appears at end.
-        sections = page.get("blocks") or []
-        assert sections[-1].get("title") == "Footnotes", "footnotes section missing"
+    def test_hr_after_blank_ok(self) -> None:
+        assert "ambiguous-hr" not in self._codes("text\n\n---")
 
-    def test_inline_html_passthrough_allowlist(self) -> None:
-        md = "# X\n\n## S\n\nMix <kbd>Ctrl</kbd> + C to copy.\n"
-        page = cli.md_to_page(md)
-        html_inlines = [
-            n for n in self._walk(page)
-            if isinstance(n, dict) and n.get("kind") == "html" and "<kbd>" in (n.get("text") or "")
-        ]
-        assert html_inlines, "inline HTML allowlisted tag (kbd) was dropped"
+    def test_lazy_continuation_flagged(self) -> None:
+        assert "lazy-continuation" in self._codes("> quoted\nlazy line")
 
-    def test_nested_lists_emit_child_html(self) -> None:
-        md = "# X\n\n## S\n\n- top\n  - child a\n  - child b\n- top 2\n"
-        page = cli.md_to_page(md)
-        # The first top-level item carries a nested html node for its children.
-        for node in self._walk(page):
-            if isinstance(node, dict) and node.get("kind") == "list":
-                items = node.get("items", [])
-                # Search for any item whose payload includes an html node.
-                for it in items:
-                    if isinstance(it, list):
-                        for piece in it:
-                            if isinstance(piece, dict) and piece.get("kind") == "html" and "<ul" in piece.get("text", ""):
-                                return
-        raise AssertionError("nested list children did not emit an html-inline payload")
+    def test_marked_blockquote_ok(self) -> None:
+        assert "lazy-continuation" not in self._codes("> quoted\n> second line")
 
-    def test_definition_list_renders_dl(self) -> None:
-        md = "# X\n\n## S\n\nAtom\n:   Indivisible particle of a JSON page.\n\nMolecule\n:   Composition of atoms.\n"
-        page = cli.md_to_page(md)
-        for node in self._walk(page):
-            if isinstance(node, dict) and node.get("kind") == "html" and "<dl" in node.get("text", ""):
-                return
-        raise AssertionError("definition list did not emit a <dl> html-inline payload")
+    def test_indented_code_flagged(self) -> None:
+        assert "indented-code" in self._codes("para\n\n    indented code")
+
+    def test_indented_list_marker_not_flagged(self) -> None:
+        assert "indented-code" not in self._codes("- item\n\n    - nested")
+
+    def test_html_island_audited_once_per_island(self) -> None:
+        codes = self._codes("<div>\nhello\n</div>")
+        assert codes.count("html-island") == 1
+
+    def test_unlifted_fence_flagged(self) -> None:
+        assert "fence-not-lifted" in self._codes("```oku-chart\n{bad\n```")
+
+    def test_bare_fence_is_code_no_language_info(self) -> None:
+        assert "code-no-language" in self._codes("```\nplain\n```")
+
+    def test_glossary_and_extref_collected(self) -> None:
+        _, _, gloss, xrefs = cli._lint_md_string("see [x](#g/iceberg) and [y](#x/spec)", skip_prose=False)
+        assert gloss == ["iceberg"]
+        assert xrefs == ["spec"]
+
+    def test_refs_inside_fences_ignored(self) -> None:
+        _, _, gloss, _ = cli._lint_md_string("```md\n[x](#g/iceberg)\n```", skip_prose=False)
+        assert gloss == []
+
+    def test_heading_ids_explicit_and_slugged(self) -> None:
+        _, ids, _, _ = cli._lint_md_string("## A {#aa}\n\n### B C", skip_prose=False)
+        assert [h for _, h in ids] == ["aa", "b-c"]
+
+    def test_skip_prose_suppresses_breadcrumb(self) -> None:
+        text = "fixed in round 5"
+        assert "process-breadcrumb" in self._codes(text)
+        assert "process-breadcrumb" not in self._codes(text, skip_prose=True)
 
 
 # ---------- find_json_pages / .md walk ----------
