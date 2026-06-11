@@ -291,6 +291,13 @@ class TestMdStringLint:
         codes = self._codes("<div>\nhello\n</div>")
         assert codes.count("html-island") == 1
 
+    def test_inline_tag_at_column_zero_is_not_an_island(self) -> None:
+        """A paragraph starting with an inline-level tag (<code>, <kbd>,
+        …) is prose, not an island — mirrors renderer.js
+        INLINE_HTML_TAGS so lint and runtime agree."""
+        assert "html-island" not in self._codes("<code>bin/oku</code> is a shim.")
+        assert "html-island" not in self._codes("<kbd>Cmd</kbd>+<kbd>R</kbd> reloads.")
+
     def test_unlifted_fence_flagged(self) -> None:
         assert "fence-not-lifted" in self._codes("```oku-chart\n{bad\n```")
 

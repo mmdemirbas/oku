@@ -473,6 +473,22 @@ def test_missing_summary_is_info(tmp_path: Path) -> None:
     assert summary[0]["severity"] == "info"
 
 
+def test_no_summary_skipped_for_materialised_pages(tmp_path: Path) -> None:
+    """Materialised repo markdown (README & friends — no front-matter)
+    can't carry meta.summary; the nudge applies to authored pages only."""
+    materialised = {
+        "k": "page",
+        "t": "README",
+        "m": {"_materialised_by": "oku-init"},
+        "b": ["intro prose"],
+    }
+    authored = {"k": "page", "t": "T", "b": ["intro prose"]}
+    issues = _run(materialised, tmp_path=tmp_path)
+    assert _issues_of(issues, code="no-summary") == []
+    issues = _run(authored, tmp_path=tmp_path)
+    assert len(_issues_of(issues, code="no-summary")) == 1
+
+
 def test_code_block_without_language_is_info(tmp_path: Path) -> None:
     page = {
         "kind": "page",

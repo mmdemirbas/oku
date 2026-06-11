@@ -13,7 +13,7 @@ accent: teal
 
 ### table {#table}
 
-First-class JSON table. Two shapes: flat <code>rows</code> or grouped <code>groups</code>. Renders into a real <code>&lt;table&gt;</code> plus a runtime control bar (filter input, stats counter, Table / List / Cards view toggle, sticky header, full-width auto-fit). Object-form headers and cells declare chip filters with multi-valued cells; groups are collapsible.
+First-class JSON table. Two shapes: flat `rows` or grouped `groups`. Renders into a real `<table>` plus a runtime control bar (filter input, stats counter, Table / List / Cards view toggle, sticky header, full-width auto-fit). Object-form headers and cells declare chip filters with multi-valued cells; groups are collapsible.
 
 ### Flat rows {#tables-flat}
 
@@ -29,7 +29,7 @@ First-class JSON table. Two shapes: flat <code>rows</code> or grouped <code>grou
 
 ### Chip filters + multi-valued cells {#tables-chips}
 
-Headers can declare a fixed chip set with <code>filter: "chips"</code>; cells use the object form <code>{ value, values }</code> to belong to one or more chip values. AND across columns, OR within a column. Combine with the text filter.
+Headers can declare a fixed chip set with `filter: "chips"`; cells use the object form `{ value, values }` to belong to one or more chip values. AND across columns, OR within a column. Combine with the text filter.
 
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"table\",\n  \"headers\": [\n    \"Engine\",\n    { \"label\": \"Tags\", \"filter\": \"chips\",\n      \"values\": [\"lakehouse\", \"streaming\", \"query\"] },\n    { \"label\": \"Maturity\", \"filter\": \"chips\",\n      \"values\": [\"incubating\", \"ga\", \"experimental\"] }\n  ],\n  \"rows\": [\n    [\"Apache Iceberg\",\n      { \"values\": [\"lakehouse\"] },\n      { \"value\": \"GA\", \"values\": [\"ga\"] }],\n    [\"Apache Paimon\",\n      { \"values\": [\"lakehouse\", \"streaming\"] },\n      { \"value\": \"Incubating\", \"values\": [\"incubating\"] }],\n    [\"Trino\",\n      { \"values\": [\"query\"] },\n      { \"value\": \"GA\", \"values\": [\"ga\"] }]\n  ]\n}","lang":"json"},"output":{"k":"table","headers":["Engine",{"label":"Tags","filter":"chips","values":["lakehouse","streaming","query","metadata"]},{"label":"Maturity","filter":"chips","values":["incubating","ga","experimental"]}],"rows":[["Apache Iceberg",{"values":["lakehouse","metadata"]},{"value":"GA","values":["ga"]}],["Apache Hudi",{"values":["lakehouse","streaming"]},{"value":"GA","values":["ga"]}],["Delta Lake",{"values":["lakehouse"]},{"value":"GA","values":["ga"]}],["Apache Paimon",{"values":["lakehouse","streaming"]},{"value":"Incubating","values":["incubating"]}],["Trino",{"values":["query"]},{"value":"GA","values":["ga"]}],["Apache Flink",{"values":["streaming"]},{"value":"GA","values":["ga"]}],["Pulsar Functions",{"values":["streaming","metadata"]},{"value":"Experimental","values":["experimental"]}]]}}
@@ -37,7 +37,7 @@ Headers can declare a fixed chip set with <code>filter: "chips"</code>; cells us
 
 ### Board view: kanban lanes in declared order {#tables-board}
 
-Set <code>view: "board"</code> on the table block to open in kanban lanes by default — rows become cards in one lane per unique value of the group column. Declare <code>boardOrder</code> on the column header to force the lane sequence; without it, lanes appear in first-occurrence order, which rarely matches the kanban flow you want. Values present in row data but missing from <code>boardOrder</code> render at the end so authors can spot the omission. The other views (Table / List / Cards) are still one click away in the view toggle.
+Set `view: "board"` on the table block to open in kanban lanes by default — rows become cards in one lane per unique value of the group column. Declare `boardOrder` on the column header to force the lane sequence; without it, lanes appear in first-occurrence order, which rarely matches the kanban flow you want. Values present in row data but missing from `boardOrder` render at the end so authors can spot the omission. The other views (Table / List / Cards) are still one click away in the view toggle.
 
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"table\",\n  \"view\": \"board\",\n  \"headers\": [\n    \"Item\",\n    { \"label\": \"Status\",\n      \"boardOrder\": [\"queued\", \"in-progress\", \"blocked\", \"done\"] }\n  ],\n  \"rows\": [\n    [\"Cut release tag\",        \"queued\"],\n    [\"Wire CI matrix\",         \"in-progress\"],\n    [\"Vendor security review\", \"blocked\"],\n    [\"Migrate auth layer\",     \"done\"],\n    [\"Draft RFC\",              \"in-progress\"],\n    [\"Update changelog\",       \"queued\"]\n  ]\n}","lang":"json"},"output":{"k":"table","view":"board","headers":["Item",{"label":"Status","boardOrder":["queued","in-progress","blocked","done"]}],"rows":[["Cut release tag","queued"],["Wire CI matrix","in-progress"],["Vendor security review","blocked"],["Migrate auth layer","done"],["Draft RFC","in-progress"],["Update changelog","queued"]]}}
@@ -45,7 +45,7 @@ Set <code>view: "board"</code> on the table block to open in kanban lanes by def
 
 ### Per-column wrap for multi-line cells {#tables-wrap}
 
-Mark a column with <code>wrap: true</code> on the header object and cells in that column honour explicit newlines (<code>\n</code>) from the source. Use for narrative columns — design notes, trade-offs, error-message bodies — where the cell content reads as a short paragraph instead of a single line.
+Mark a column with `wrap: true` on the header object and cells in that column honour explicit newlines (`\n`) from the source. Use for narrative columns — design notes, trade-offs, error-message bodies — where the cell content reads as a short paragraph instead of a single line.
 
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"table\",\n  \"headers\": [\n    \"Option\",\n    { \"label\": \"Trade-off\", \"wrap\": true }\n  ],\n  \"rows\": [\n    [\"Mock the DB\",\n     \"Fast in CI.\\nMisses real SQL errors.\\nLast quarter's migration regression slipped past mocks.\"],\n    [\"Testcontainers\",\n     \"Slower setup (~3s/test).\\nCatches schema + driver behaviour.\\nRequires Docker.\"]\n  ]\n}","lang":"json"},"output":{"k":"table","headers":["Option",{"label":"Trade-off","wrap":true}],"rows":[["Mock the DB","Fast in CI.\nMisses real SQL errors.\nLast quarter's migration regression slipped past mocks."],["Testcontainers","Slower setup (~3s/test).\nCatches schema + driver behaviour.\nRequires Docker."]]}}

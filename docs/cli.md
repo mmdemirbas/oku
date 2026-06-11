@@ -177,4 +177,4 @@ uv run bin/oku serve
 python3 bin/oku serve
 ```
 
-<code>bin/oku</code> is a thin shim that adds <code>src/</code> to sys.path and runs <code>html_doc.cli.main()</code>. PEP 723 inline metadata pulls jsonschema into an ephemeral venv when invoked via uv.
+`bin/oku` is a thin shim that adds `src/` to sys.path and runs `html_doc.cli.main()`. PEP 723 inline metadata pulls jsonschema into an ephemeral venv when invoked via uv.

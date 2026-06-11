@@ -95,10 +95,10 @@ Every Markdown construct maps to a specific kit block or inline node. The table 
 ```
 
 > [!INFO] Relative .md links rewrite to .html
-> <code>[overview](other.md#section)</code> in a Markdown page becomes <code>other.html#section</code> at render time, so links between .md pages work the same as between .json pages. Absolute URLs (http, https, mailto), fragment-only refs (<code>#section</code>), and absolute paths (<code>/x</code>) pass through unchanged.
+> `[overview](other.md#section)` in a Markdown page becomes `other.html#section` at render time, so links between .md pages work the same as between .json pages. Absolute URLs (http, https, mailto), fragment-only refs (`#section`), and absolute paths (`/x`) pass through unchanged.
 
 > [!NEUTRAL] Every Markdown file is a page by default
-> README.md, CHANGELOG.md, CLAUDE.md, AGENTS.md, LICENSE.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md and any other <code>.md</code> the walker reaches all surface as pages. Hide one by moving it under a SKIP_DIRS subdirectory (<code>dist/</code>, <code>_oku/</code>, <code>.git/</code>, <code>.venv/</code>, <code>node_modules/</code>, <code>templates/</code>, <code>_internal/</code>).
+> README.md, CHANGELOG.md, CLAUDE.md, AGENTS.md, LICENSE.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md and any other `.md` the walker reaches all surface as pages. Hide one by moving it under a SKIP_DIRS subdirectory (`dist/`, `_oku/`, `.git/`, `.venv/`, `node_modules/`, `templates/`, `_internal/`).
 
 ## Prose primitives {#prose}
 
@@ -142,7 +142,7 @@ Code blocks. `language` is informational; the renderer puts a `language-*` class
 
 ### annotated-code {#annotated-code}
 
-Numbered code annotations. Markers like <code>(1)</code> / <code>(2)</code> inside the source become circular accent chips, paired with a numbered side panel. Hovering a chip drops a tooltip BELOW the line (never blocking the code) and highlights the line it points at. Click to jump between chip and panel item.
+Numbered code annotations. Markers like `(1)` / `(2)` inside the source become circular accent chips, paired with a numbered side panel. Hovering a chip drops a tooltip BELOW the line (never blocking the code) and highlights the line it points at. Click to jump between chip and panel item.
 
 Each annotation can also declare `lines` (a 1-based line spec — `"3"`, `"1-3"`, `"1,5-7"`) to mark a range or set, and / or `match` (string or array) to highlight specific substrings on hover. When `lines` is set and no inline `(N)` marker is present, the chip auto-places at the start of the first listed line — the source stays clean.
 
@@ -327,13 +327,13 @@ Behaviors that don't introduce a new block kind but change how an existing one r
 
 ### Citation cards via ext-ref {#ext-ref-cards}
 
-Existing <code>ext-ref</code> entries auto-promote to type-themed citation cards (paper / rfc / release / blog / other). Type is read from the extref entry or inferred from the link domain. Inline cite text inherits the type's color on its dotted underline; the hover card carries a type-tinted icon, a mono domain pill, optional author + date row, and a summary.
+Existing `ext-ref` entries auto-promote to type-themed citation cards (paper / rfc / release / blog / other). Type is read from the extref entry or inferred from the link domain. Inline cite text inherits the type's color on its dotted underline; the hover card carries a type-tinted icon, a mono domain pill, optional author + date row, and a summary.
 
 Inline sample — hover any reference to see the card: see [Iceberg paper](#x/Iceberg paper) for the original snapshot-isolation argument, [RFC 9457](#x/RFC 9457) for the HTTP problem-details format, and the [Iceberg 1.4 release](#x/Iceberg 1.4 release) for cross-engine sort orders.
 
 ### Synced hover pairs · [data-bind] {#data-bind}
 
-Add <code>bind: "step-3"</code> to any two blocks and they flash together when either is hovered or focused. Click one — the offscreen partner scrolls into view. One-line opt-in per pair; no kind change required.
+Add `bind: "step-3"` to any two blocks and they flash together when either is hovered or focused. Click one — the offscreen partner scrolls into view. One-line opt-in per pair; no kind change required.
 
 Inline sample — hover or focus this paragraph and the callout below tints in sync. They share the same data-bind key.
 
@@ -342,7 +342,7 @@ Inline sample — hover or focus this paragraph and the callout below tints in s
 
 ### Last-updated line {#meta-updated}
 
-<code>meta.updated</code> renders as a quiet italic line under the cover meta row. Pure trust signal — readers learn at a glance how fresh a page is.
+`meta.updated` renders as a quiet italic line under the cover meta row. Pure trust signal — readers learn at a glance how fresh a page is.
 
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"meta\": {\n    \"date\": \"2026-05-10\",\n    \"updated\": \"2026-05-18\",\n    \"read_time\": \"~3 min\"\n  },\n  \"blocks\": [ ... ]\n}","lang":"json"},"output":"<div style=\"padding:14px 16px; background:var(--surface-2); border:1px solid var(--border-soft); border-radius:10px; line-height:1.5;\"><div style=\"font:600 22px Inter,sans-serif; color:var(--text); margin-bottom:6px;\">My note</div><div style=\"font-size:12.5px; color:var(--text-soft); letter-spacing:0.02em;\">~3 min read · 2026-05-10</div><div style=\"margin-top:4px; font-size:11.5px; color:var(--text-faint); font-style:italic; letter-spacing:0.02em;\">Last updated 2026-05-18</div></div>"}
@@ -350,10 +350,10 @@ Inline sample — hover or focus this paragraph and the callout below tints in s
 
 ### Admonition vocab aliases {#admonition-aliases}
 
-Callout <code>type</code> accepts both the kit's original names (<code>warn / warning / danger / success / neutral</code>) and the industry-standard aliases (<code>note / tip / info / caution</code>). Each row below is the same canonical styling reached from two different vocabularies.
+Callout `type` accepts both the kit's original names (`warn / warning / danger / success / neutral`) and the industry-standard aliases (`note / tip / info / caution`). Each row below is the same canonical styling reached from two different vocabularies.
 
 ```oku-example
-{"code":{"k":"code","src":"{\n  \"kind\": \"callout\",\n  \"type\": \"note\",\n  \"title\": \"note · alias of neutral\",\n  \"content\": \"...\"\n}","lang":"json"},"output":"> [!NOTE] note · alias of neutral\n> <code>type: \"note\"</code> reads the same as <code>type: \"neutral\"</code> — generic informational tint."}
+{"code":{"k":"code","src":"{\n  \"kind\": \"callout\",\n  \"type\": \"note\",\n  \"title\": \"note · alias of neutral\",\n  \"content\": \"...\"\n}","lang":"json"},"output":"> [!NOTE] note · alias of neutral\n> `type: \"note\"` reads the same as `type: \"neutral\"` — generic informational tint."}
 ```
 
 ```oku-example

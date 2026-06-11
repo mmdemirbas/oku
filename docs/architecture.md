@@ -328,16 +328,16 @@ build_standalone embeds the project's kit.json + active domain glossary + extref
 Five behaviors worth knowing about if you're reading the kit code.
 
 > [!NOTE] Kit assets resolver
-> Two valid asset layouts now: development (chrome.{css,js} at repo root) and installed (chrome.{css,js} inside <code>html_doc/assets/</code> in the wheel). <code>cli._kit_assets_dir()</code> picks whichever exists, so <code>oku init</code> works from a clone OR from <code>uv tool install .</code>. Hatchling <code>force-include</code> in pyproject packs the assets into the right place at wheel build time.
+> Two valid asset layouts now: development (chrome.{css,js} at repo root) and installed (chrome.{css,js} inside `html_doc/assets/` in the wheel). `cli._kit_assets_dir()` picks whichever exists, so `oku init` works from a clone OR from `uv tool install .`. Hatchling `force-include` in pyproject packs the assets into the right place at wheel build time.
 
 > [!NOTE] Generated artifacts live under dist/, never source
-> <code>oku build</code> writes site-manifest.json (dist/site/), llms.txt (dist/markdown/), and page.md twins (dist/markdown/) at the closest common parent of JSON pages — picked by <code>_common_docs_dir(root, pages)</code> in cli.py, typically <code>docs/</code>. <code>oku serve</code> doesn't write at all — it synthesizes site-manifest.json and llms.txt in memory on each request so source dirs stay authored-content-only.
+> `oku build` writes site-manifest.json (dist/site/), llms.txt (dist/markdown/), and page.md twins (dist/markdown/) at the closest common parent of JSON pages — picked by `_common_docs_dir(root, pages)` in cli.py, typically `docs/`. `oku serve` doesn't write at all — it synthesizes site-manifest.json and llms.txt in memory on each request so source dirs stay authored-content-only.
 
 > [!NOTE] Serve-time Pagefind
-> <code>cmd_serve</code> spawns a background thread at startup that builds <code>dist/_search/site/</code> (just like <code>cmd_build</code>) and runs pagefind against it. Symlinks <code>&lt;docs-dir&gt;/pagefind</code> → that index so chrome.js's existing search-loader path resolves. Soft-fails if pagefind isn't installed. Opt out with <code>--no-search</code>.
+> `cmd_serve` spawns a background thread at startup that builds `dist/_search/site/` (just like `cmd_build`) and runs pagefind against it. Symlinks `<docs-dir>/pagefind` → that index so chrome.js's existing search-loader path resolves. Soft-fails if pagefind isn't installed. Opt out with `--no-search`.
 
 > [!NOTE] Boot stamp
-> chrome.js console.info()s <code>[oku] kit boot · build=&lt;date&gt; · docsRoot=… · authToken=yes/no</code> at startup. Bump <code>__okuKitBuild</code> whenever a compatibility-affecting change ships so a stale-cache user can confirm from DevTools whether their browser is on the right chrome.js.
+> chrome.js console.info()s `[oku] kit boot · build=<date> · docsRoot=… · authToken=yes/no` at startup. Bump `__okuKitBuild` whenever a compatibility-affecting change ships so a stale-cache user can confirm from DevTools whether their browser is on the right chrome.js.
 
 > [!NOTE] IntelliJ _ijt token propagation
-> chrome-boot.js plucks <code>_ijt</code> from <code>window.location.search</code> and exposes <code>window.__okuWithAuth(url)</code> that appends it to internal asset URLs (same-origin only — CDN URLs stay untouched). chrome.js and renderer.js wrap every fetch and script-src load through it so IntelliJ's built-in server stops 404'ing sub-resource requests.
+> chrome-boot.js plucks `_ijt` from `window.location.search` and exposes `window.__okuWithAuth(url)` that appends it to internal asset URLs (same-origin only — CDN URLs stay untouched). chrome.js and renderer.js wrap every fetch and script-src load through it so IntelliJ's built-in server stops 404'ing sub-resource requests.

@@ -1253,8 +1253,37 @@ _MD_GLOSS_REF_RE = re.compile(r"\]\(#g/([\w-]+)\)")
 _MD_EXTREF_REF_RE = re.compile(r"\]\(#x/([\w-]+)\)")
 _MD_SETEXT_EQ_RE = re.compile(r"^=+\s*$")
 _MD_HR_RE = re.compile(r"^-{3,}\s*$")
-_MD_HTML_ISLAND_RE = re.compile(r"^<(?:[a-zA-Z][\w-]*)(?:[\s/>]|$)")
+_MD_HTML_ISLAND_RE = re.compile(r"^</?([a-zA-Z][\w-]*)(?:[\s/>]|$)")
+# Inline-level tags never open an island — mirrors INLINE_HTML_TAGS in
+# renderer.js: a paragraph that starts with one of these stays prose.
+_INLINE_HTML_TAGS = {
+    "a",
+    "abbr",
+    "br",
+    "code",
+    "del",
+    "em",
+    "ins",
+    "kbd",
+    "mark",
+    "samp",
+    "span",
+    "strong",
+    "sub",
+    "sup",
+}
 _INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+
+
+def _md_island_tag(line: str) -> str | None:
+    """Tag name when the line opens a block-level HTML island, else None."""
+    m = _MD_HTML_ISLAND_RE.match(line)
+    if not m:
+        return None
+    tag = m.group(1).lower()
+    return None if tag in _INLINE_HTML_TAGS else tag
+
+
 _PROSE_SKIP_KEYS = {"src", "source", "code", "k", "language", "lang"}
 
 
@@ -1360,14 +1389,14 @@ def _lint_md_string(
             prev_blank = True
             in_island = False
             continue
-        if not in_island and _MD_HTML_ISLAND_RE.match(line):
-            tag = re.split(r"[\s/>]", line[1:], maxsplit=1)[0]
+        island_tag = None if in_island else _md_island_tag(line)
+        if island_tag:
             issues.append(
                 (
                     "info",
                     "html-island",
                     f"line {lineno}",
-                    f"Raw HTML island <{tag}> — renders fully in the kit, stripped by external markdown viewers.",
+                    f"Raw HTML island <{island_tag}> — renders fully in the kit, stripped by external markdown viewers.",
                 )
             )
             in_island = True
@@ -1766,9 +1795,11 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     f"External reference '{name}' not found in any kit/extrefs/*.json registry.",
                 )
 
-        # 9. Page-level metadata sanity.
+        # 9. Page-level metadata sanity. The no-summary nudge applies
+        # only to hand-authored kit pages — materialised repo markdown
+        # (README, CLAUDE, notes/ …) has no front-matter to carry one.
         meta = _page_meta(page)
-        if not meta.get("summary"):
+        if not meta.get("summary") and not is_materialised:
             add(
                 p,
                 "info",

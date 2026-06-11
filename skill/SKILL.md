@@ -74,7 +74,7 @@ same routing. The visual richness this skill describes elsewhere sits
 
 After ANY edit to a `docs/*.md` page source (or any kit schema), run:
 
-```
+```bash
 oku check
 ```
 

@@ -214,7 +214,7 @@ design — every artifact respects them at both layers.
 
 Glossaries are per-domain, each with multi-language entries:
 
-```
+```text
 _oku/glossary/
   data-platforms.json    # Iceberg, Spark, Flink, ACID, MVCC, ...
   web.json               # Custom Elements, Shadow DOM, FOUC, ...
