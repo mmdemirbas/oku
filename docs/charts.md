@@ -1,0 +1,538 @@
+---
+title: Charts
+eyebrow: Reference · charts
+subtitle: 28 chart variants with payloads + live samples — categorical, distribution, time series, hierarchy, relationship, multivariate, flow, graph, geographic.
+audience: Author
+order: 21
+summary: 28 chart variants with payloads + live samples — categorical, distribution, time series, hierarchy, relationship, multivariate, flow, graph, geographic.
+parent: reference
+accent: teal
+---
+
+## Chart variants {#charts}
+
+28 chart types, one primitive (`chart`). Reach for a type by intent — the families below cluster types that solve the same shape of problem. Each card has a tiny live preview; click through to the variant for its full payload and a live render.
+
+### chart {#chart}
+
+Single primitive, many render modes via the `type` field. The Cartesian family (`scatter`, `line`, `area`, `bubble`, `quadrant`) share an interactive SVG plot with pan / zoom / log axes / PNG export. The bar family (`bar`, `stacked-bar`, `grouped-bar`) renders horizontal CSS bars. `donut` renders a distribution arc. The renderer dispatches by `type` — each mode has its own payload shape; unused fields are ignored.
+
+> [!INFO] Library underneath
+> All modes are kit-native — no third-party chart library. Cartesian + donut modes render as inline SVG drawn by the oku-chart Custom Element. The bar family renders as plain HTML + CSS, no JavaScript after first paint.
+
+### Pick by function {#chart-families}
+
+29 chart variants, grouped by what you're trying to say. Click any card to jump to the variant's full example — the live tiny render previews the shape.
+
+#### Compare {#chart-fn-compare}
+
+Bars, dots-vs-targets, radial spokes — anything that lines values up side by side so the reader can compare magnitudes.
+
+```oku-compare-grid
+{"cards":[{"t":"bar","b":"","href":"#chart-bar"},{"t":"stacked-bar","b":"","href":"#chart-stacked"},{"t":"grouped-bar","b":"","href":"#chart-grouped"},{"t":"bullet","b":"","href":"#chart-bullet"},{"t":"gauge","b":"","href":"#chart-gauge"},{"t":"radar","b":"","href":"#chart-radar"},{"t":"slope","b":"","href":"#chart-slope"},{"t":"parallel-coordinates","b":"","href":"#chart-parallel-coordinates"},{"t":"dot-plot","b":"","href":"#chart-dot-plot"},{"t":"waterfall","b":"","href":"#chart-waterfall"},{"t":"lollipop","b":"","href":"#chart-lollipop"},{"t":"dumbbell","b":"","href":"#chart-dumbbell"}]}
+```
+
+#### Trend {#chart-fn-trend}
+
+Continuous trends or cyclic patterns where the x-axis is time.
+
+```oku-compare-grid
+{"cards":[{"t":"line","b":"","href":"#chart-line"},{"t":"area","b":"","href":"#chart-area"},{"t":"sparkline","b":"","href":"#chart-sparkline"},{"t":"calendar-heatmap","b":"","href":"#chart-calendar-heatmap"},{"t":"candlestick","b":"","href":"#chart-candlestick"},{"t":"stream","b":"","href":"#chart-stream"},{"t":"bump","b":"","href":"#chart-bump"}]}
+```
+
+#### Distribution {#chart-fn-distribution}
+
+Where values cluster, what the spread looks like, how peaks compare across categories.
+
+```oku-compare-grid
+{"cards":[{"t":"histogram","b":"","href":"#chart-histogram"},{"t":"box-plot","b":"","href":"#chart-box-plot"},{"t":"ridgeline","b":"","href":"#chart-ridgeline"},{"t":"density","b":"","href":"#chart-density"},{"t":"violin","b":"","href":"#chart-violin"},{"t":"beeswarm","b":"","href":"#chart-beeswarm"}]}
+```
+
+#### Composition {#chart-fn-composition}
+
+One total, broken into named slices that add up to it. Pick the shape to match how many parts you have and whether the centre matters.
+
+```oku-compare-grid
+{"cards":[{"t":"pie","b":"","href":"#chart-pie"},{"t":"donut","b":"","href":"#chart-donut"},{"t":"waffle","b":"","href":"#chart-waffle"},{"t":"marimekko","b":"","href":"#chart-marimekko"},{"t":"polar-area","b":"","href":"#chart-polar-area"}]}
+```
+
+#### Relationship {#chart-fn-relationship}
+
+How one variable depends on another — pairs, matrices, links between entities.
+
+```oku-compare-grid
+{"cards":[{"t":"scatter","b":"","href":"#chart-scatter"},{"t":"bubble","b":"","href":"#chart-bubble"},{"t":"quadrant","b":"","href":"#chart-quadrant"},{"t":"heatmap","b":"","href":"#chart-heatmap"},{"t":"chord","b":"","href":"#chart-chord"},{"t":"network","b":"","href":"#chart-network"},{"t":"scatter-matrix","b":"","href":"#chart-scatter-matrix"}]}
+```
+
+#### Hierarchy {#chart-fn-hierarchy}
+
+Nested containment — a thing inside a thing inside a thing.
+
+```oku-compare-grid
+{"cards":[{"t":"treemap","b":"","href":"#chart-treemap"},{"t":"sunburst","b":"","href":"#chart-sunburst"}]}
+```
+
+#### Flow {#chart-fn-flow}
+
+Quantity moving from one place to another — funnel stages, weighted source→target links.
+
+```oku-compare-grid
+{"cards":[{"t":"funnel","b":"","href":"#chart-funnel"},{"t":"sankey","b":"","href":"#chart-sankey"},{"t":"gantt","b":"","href":"#chart-gantt"}]}
+```
+
+#### Location {#chart-fn-location}
+
+Values laid out on a coarse tile grid that approximates the world by region. NOT a real choropleth — every region is a fixed-size tile labelled by its ISO code. Use when the reader needs to scan regional differences at a glance without the visual budget (or the topojson dependency) of a real map.
+
+```oku-compare-grid
+{"cards":[{"t":"geo","b":"","href":"#chart-geo"}]}
+```
+
+## Cartesian — x/y points with axes {#family-cartesian}
+
+Use when the x-axis is a continuous quantity (or ordered sequence) and you want to show position, slope, or relationships between two numeric dimensions.
+
+### type: scatter {#chart-scatter}
+
+One or more series of {x, y} points — no connecting line, just dots. Per-point label optional (shown on hover). Per-series colour drawn from the accent / warn / danger / success / muted vocabulary. Axes auto-scale; pass x-scale=log / y-scale=log on the element for log axes.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"scatter\",\n  \"title\": \"Cost vs. impact\",\n  \"x_label\": \"Engineering cost\",\n  \"y_label\": \"User impact\",\n  \"series\": [\n    { \"label\": \"Sample series\", \"color\": \"accent\", \"data\": [\n      { \"x\": 4, \"y\": 9, \"label\": \"H3\" },\n      { \"x\": 6, \"y\": 8, \"label\": \"S2-inline\" }\n    ]}\n  ]\n}","lang":"json"},"output":{"type":"scatter","title":"Chart sample — cost vs. impact","x_label":"Engineering cost","y_label":"User impact","series":[{"label":"Showstoppers + High","color":"accent","data":[{"x":4,"y":9,"label":"H3"},{"x":6,"y":8,"label":"S2-inline"},{"x":2,"y":5,"label":"schema-validate"}]},{"label":"Polish","color":"warn","data":[{"x":1,"y":2,"label":"L1"},{"x":1,"y":3,"label":"L3"},{"x":1,"y":2,"label":"isTouch"}]}],"k":"chart"}}
+```
+
+### type: line {#chart-line}
+
+Same series-of-points contract as scatter — but the renderer connects consecutive points with a polyline. Use when the x-axis is ordered (time, build-number, sequence) and the reader should see slope, not just position. Two or more series stack on the same axes; legend chips at the top-right toggle visibility. Add <code>"curve": "smooth"</code> for a Catmull-Rom spline through the points (default is <code>linear</code>); applies to <code>type: area</code> too.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"line\",\n  \"title\": \"P50 latency over 7 days\",\n  \"x_label\": \"Day\",\n  \"y_label\": \"ms\",\n  \"series\": [\n    { \"label\": \"api-gateway\", \"color\": \"accent\", \"data\": [\n      { \"x\": 1, \"y\": 142 }, { \"x\": 2, \"y\": 155 }, { \"x\": 3, \"y\": 138 },\n      { \"x\": 4, \"y\": 161 }, { \"x\": 5, \"y\": 149 }, { \"x\": 6, \"y\": 144 }, { \"x\": 7, \"y\": 152 }\n    ]},\n    { \"label\": \"auth-svc\", \"color\": \"warn\", \"data\": [\n      { \"x\": 1, \"y\": 88 }, { \"x\": 2, \"y\": 92 }, { \"x\": 3, \"y\": 110 },\n      { \"x\": 4, \"y\": 132 }, { \"x\": 5, \"y\": 121 }, { \"x\": 6, \"y\": 98 }, { \"x\": 7, \"y\": 90 }\n    ]}\n  ]\n}","lang":"json"},"output":{"type":"line","title":"P50 latency over 7 days","x_label":"Day","y_label":"ms","series":[{"label":"api-gateway","color":"accent","data":[{"x":1,"y":142},{"x":2,"y":155},{"x":3,"y":138},{"x":4,"y":161},{"x":5,"y":149},{"x":6,"y":144},{"x":7,"y":152}]},{"label":"auth-svc","color":"warn","data":[{"x":1,"y":88},{"x":2,"y":92},{"x":3,"y":110},{"x":4,"y":132},{"x":5,"y":121},{"x":6,"y":98},{"x":7,"y":90}]},{"label":"search-svc","color":"success","data":[{"x":1,"y":64},{"x":2,"y":71},{"x":3,"y":68},{"x":4,"y":79},{"x":5,"y":73},{"x":6,"y":70},{"x":7,"y":66}]}],"k":"chart"}}
+```
+
+### type: area {#chart-area}
+
+Same shape as line — series of {x, y} points — but the curve is filled down to the baseline. Useful for cumulative metrics over time where magnitude matters as much as direction.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"area\",\n  \"x_label\": \"Day\",\n  \"y_label\": \"Active users\",\n  \"series\": [\n    { \"label\": \"Daily\", \"color\": \"accent\", \"data\": [\n      { \"x\": 1, \"y\": 40 }, { \"x\": 2, \"y\": 65 },\n      { \"x\": 3, \"y\": 55 }, { \"x\": 4, \"y\": 80 },\n      { \"x\": 5, \"y\": 95 }, { \"x\": 6, \"y\": 110 },\n      { \"x\": 7, \"y\": 130 }\n    ]}\n  ]\n}","lang":"json"},"output":{"type":"area","title":"Active users — first week","x_label":"Day","y_label":"Active users","series":[{"label":"Daily","color":"accent","data":[{"x":1,"y":40},{"x":2,"y":65},{"x":3,"y":55},{"x":4,"y":80},{"x":5,"y":95},{"x":6,"y":110},{"x":7,"y":130}]}],"k":"chart"}}
+```
+
+### type: bubble {#chart-bubble}
+
+Scatter plot with a third dimension encoded as dot size. Each point gains an optional `size` field; the renderer takes its square root so the dot's AREA is proportional to size (eye reads area, not radius). Useful for cost vs. impact vs. confidence-style decision matrices.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"bubble\",\n  \"x_label\": \"Cost\",\n  \"y_label\": \"Impact\",\n  \"series\": [\n    { \"label\": \"Initiatives\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"size\": 40,  \"label\": \"Search\" },\n      { \"x\": 6, \"y\": 9, \"size\": 120, \"label\": \"Auth\" },\n      { \"x\": 4, \"y\": 4, \"size\": 80,  \"label\": \"Logging\" },\n      { \"x\": 7, \"y\": 2, \"size\": 25,  \"label\": \"Theme\" }\n    ]}\n  ]\n}","lang":"json"},"output":{"type":"bubble","title":"Initiatives — cost vs. impact vs. team-size","x_label":"Cost","y_label":"Impact","series":[{"label":"Initiatives","color":"accent","data":[{"x":2,"y":8,"size":40,"label":"Search"},{"x":6,"y":9,"size":120,"label":"Auth"},{"x":4,"y":4,"size":80,"label":"Logging"},{"x":7,"y":2,"size":25,"label":"Theme"}]}],"k":"chart"}}
+```
+
+### type: quadrant {#chart-quadrant}
+
+Scatter plot split into four regions by two reference lines. Author supplies a `quadrants` block with `x` (vertical split) + `y` (horizontal split) and optionally four corner labels (`[TL, TR, BL, BR]`). Reads as a 2×2 decision matrix at a glance.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"quadrant\",\n  \"x_label\": \"Effort\",\n  \"y_label\": \"Value\",\n  \"quadrants\": {\n    \"x\": 5, \"y\": 5,\n    \"labels\": [\"Quick wins\", \"Big bets\", \"Skip\", \"Re-evaluate\"]\n  },\n  \"series\": [\n    { \"label\": \"Items\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"label\": \"A\" },\n      { \"x\": 7, \"y\": 8, \"label\": \"B\" },\n      { \"x\": 2, \"y\": 3, \"label\": \"C\" },\n      { \"x\": 8, \"y\": 2, \"label\": \"D\" }\n    ]}\n  ]\n}","lang":"json"},"output":{"type":"quadrant","title":"Effort × value — decision matrix","x_label":"Effort","y_label":"Value","quadrants":{"x":5,"y":5,"labels":["Quick wins","Big bets","Skip","Re-evaluate"]},"series":[{"label":"Items","color":"accent","data":[{"x":2,"y":8,"label":"A"},{"x":7,"y":8,"label":"B"},{"x":2,"y":3,"label":"C"},{"x":8,"y":2,"label":"D"}]}],"k":"chart"}}
+```
+
+### type: connected-scatter {#chart-connected-scatter}
+
+Scatter where consecutive points are joined by a line in series order — a trajectory through 2-D space. Same `series` shape as scatter; sequence is the per-series data order. The start point renders as a hollow ring, the end point as a filled square so direction reads at a glance. Use when two metrics move together over time (life expectancy × income across years, MAU × ARPU across releases).
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"connected-scatter\",\n  \"title\": \"MAU × ARPU across releases\",\n  \"x_label\": \"MAU (k)\",\n  \"y_label\": \"ARPU ($)\",\n  \"series\": [\n    {\n      \"label\": \"product\",\n      \"data\": [\n        {\"x\":  20, \"y\": 1.2, \"label\": \"v1\"},\n        {\"x\":  35, \"y\": 1.6, \"label\": \"v2\"},\n        {\"x\":  68, \"y\": 1.4, \"label\": \"v3\"},\n        {\"x\":  92, \"y\": 2.1, \"label\": \"v4\"},\n        {\"x\": 140, \"y\": 2.8, \"label\": \"v5\"}\n      ]\n    }\n  ]\n}","lang":"json"},"output":{"type":"connected-scatter","title":"MAU × ARPU across releases","x_label":"MAU (k)","y_label":"ARPU ($)","series":[{"label":"product","data":[{"x":20,"y":1.2,"label":"v1"},{"x":35,"y":1.6,"label":"v2"},{"x":68,"y":1.4,"label":"v3"},{"x":92,"y":2.1,"label":"v4"},{"x":140,"y":2.8,"label":"v5"}]}],"k":"chart"}}
+```
+
+## Categorical — value per category {#family-categorical}
+
+One bar per item, optionally split into stacks or sub-groups. Use when each row has a single label and value; reach for stacked/grouped when each row has multiple comparable values.
+
+### type: bar {#chart-bar}
+
+Row-per-item horizontal bars. Each row carries `label`, `value`, optional `display` (right-hand readout override), and optional `color` (accent / warn / danger / success). `max` caps the bar full-width; if omitted, the largest row's value sets the scale. Use when you want a label/value comparison without axis chrome.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"bar\",\n  \"rows\": [\n    { \"label\": \"Spark\",  \"value\": 95, \"display\": \"95 / 100\" },\n    { \"label\": \"Flink\",  \"value\": 80 },\n    { \"label\": \"Trino\",  \"value\": 75 }\n  ]\n}","lang":"json"},"output":{"type":"bar","rows":[{"label":"Spark","value":95,"display":"95 / 100"},{"label":"Flink","value":80,"display":"80 / 100"},{"label":"Trino","value":75,"display":"75 / 100"}],"k":"chart"}}
+```
+
+### type: stacked-bar {#chart-stacked}
+
+Multi-series horizontal bars where each row's series stack into a single bar. Author supplies `categories` (one per row) and `series` of `{label, color, values}`, with `values[i]` aligning to `categories[i]`. The right-hand readout is the row total. Use for breakdown-of-a-total visualisation.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"stacked-bar\",\n  \"title\": \"Build time by phase\",\n  \"categories\": [\"v1.0\", \"v1.1\", \"v1.2\"],\n  \"series\": [\n    { \"label\": \"compile\", \"color\": \"accent\",  \"values\": [12, 14, 11] },\n    { \"label\": \"test\",    \"color\": \"success\", \"values\": [8,  10, 12] },\n    { \"label\": \"package\", \"color\": \"warn\",    \"values\": [3,  4,  3] }\n  ]\n}","lang":"json"},"output":{"type":"stacked-bar","title":"Build time by phase","categories":["v1.0","v1.1","v1.2"],"series":[{"label":"compile","color":"accent","values":[12,14,11]},{"label":"test","color":"success","values":[8,10,12]},{"label":"package","color":"warn","values":[3,4,3]}],"k":"chart"}}
+```
+
+### type: grouped-bar {#chart-grouped}
+
+Same payload as stacked-bar, but each series renders as its own thin sub-bar within the row rather than stacking. Use for direct comparison across series within the same category.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"grouped-bar\",\n  \"title\": \"Latency by region\",\n  \"categories\": [\"p50\", \"p95\", \"p99\"],\n  \"series\": [\n    { \"label\": \"EU\", \"color\": \"accent\",  \"values\": [40, 110, 220] },\n    { \"label\": \"US\", \"color\": \"success\", \"values\": [55, 130, 260] },\n    { \"label\": \"AP\", \"color\": \"warn\",    \"values\": [70, 180, 340] }\n  ]\n}","lang":"json"},"output":{"type":"grouped-bar","title":"Latency by region (ms)","categories":["p50","p95","p99"],"series":[{"label":"EU","color":"accent","values":[40,110,220]},{"label":"US","color":"success","values":[55,130,260]},{"label":"AP","color":"warn","values":[70,180,340]}],"k":"chart"}}
+```
+
+### type: dot-plot {#chart-dot-plot}
+
+One row per category, a single dot at the value. Compact comparison shape — like a horizontal bar stripped to just the endpoint. Use when bar length itself adds visual noise (ratios near each other, ordered lists).
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"dot-plot\",\n  \"title\": \"Adoption by team\",\n  \"rows\": [\n    {\n      \"label\": \"infra\",\n      \"value\": 84,\n      \"color\": \"accent\"\n    },\n    {\n      \"label\": \"platform\",\n      \"value\": 72,\n      \"color\": \"accent\"\n    },\n    {\n      \"label\": \"growth\",\n      \"value\": 58,\n      \"color\": \"warn\"\n    },\n    {\n      \"label\": \"ops\",\n      \"value\": 49,\n      \"color\": \"warn\"\n    },\n    {\n      \"label\": \"billing\",\n      \"value\": 31,\n      \"color\": \"danger\"\n    }\n  ]\n}","lang":"json"},"output":{"type":"dot-plot","title":"Adoption by team","rows":[{"label":"infra","value":84,"color":"accent"},{"label":"platform","value":72,"color":"accent"},{"label":"growth","value":58,"color":"warn"},{"label":"ops","value":49,"color":"warn"},{"label":"billing","value":31,"color":"danger"}],"k":"chart"}}
+```
+
+### type: marimekko {#chart-marimekko}
+
+Variable-width stacked bar — each column's WIDTH is proportional to that column's total, so the chart shows both within-column proportions AND across-column magnitudes in one view.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"marimekko\",\n  \"title\": \"Revenue mix by quarter\",\n  \"categories\": [\n    \"Q1\",\n    \"Q2\",\n    \"Q3\",\n    \"Q4\"\n  ],\n  \"series\": [\n    {\n      \"label\": \"new\",\n      \"values\": [\n        120,\n        180,\n        240,\n        290\n      ]\n    },\n    {\n      \"label\": \"renewal\",\n      \"values\": [\n        260,\n        280,\n        320,\n        360\n      ]\n    },\n    {\n      \"label\": \"upsell\",\n      \"values\": [\n        60,\n        90,\n        140,\n        180\n      ]\n    }\n  ]\n}","lang":"json"},"output":{"type":"marimekko","title":"Revenue mix by quarter","categories":["Q1","Q2","Q3","Q4"],"series":[{"label":"new","values":[120,180,240,290]},{"label":"renewal","values":[260,280,320,360]},{"label":"upsell","values":[60,90,140,180]}],"k":"chart"}}
+```
+
+### type: waterfall {#chart-waterfall}
+
+Incremental gains and losses connecting two totals. Start bar + positive/negative steps + end bar; dashed bridges link cumulative tops. Canonical 'what changed between these two numbers' chart — financial bridge, retention loss-explanation, performance breakdown.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"waterfall\",\n  \"title\": \"Q1 \\u2192 Q2 revenue\",\n  \"steps\": [\n    {\n      \"label\": \"Q1 start\",\n      \"value\": 100,\n      \"kind\": \"start\"\n    },\n    {\n      \"label\": \"+ new\",\n      \"value\": 35,\n      \"kind\": \"plus\"\n    },\n    {\n      \"label\": \"\\u2212 churn\",\n      \"value\": -18,\n      \"kind\": \"minus\"\n    },\n    {\n      \"label\": \"+ upsell\",\n      \"value\": 22,\n      \"kind\": \"plus\"\n    },\n    {\n      \"label\": \"\\u2212 refund\",\n      \"value\": -7,\n      \"kind\": \"minus\"\n    },\n    {\n      \"label\": \"Q2 end\",\n      \"value\": 132,\n      \"kind\": \"end\"\n    }\n  ]\n}","lang":"json"},"output":{"type":"waterfall","title":"Q1 → Q2 revenue","steps":[{"label":"Q1 start","value":100,"kind":"start"},{"label":"+ new","value":35,"kind":"plus"},{"label":"− churn","value":-18,"kind":"minus"},{"label":"+ upsell","value":22,"kind":"plus"},{"label":"− refund","value":-7,"kind":"minus"},{"label":"Q2 end","value":132,"kind":"end"}],"k":"chart"}}
+```
+
+### type: lollipop {#chart-lollipop}
+
+Variant of dot-plot — same data shape, with a thin stem from the axis to the dot. Reads as a less-noisy bar chart when the value comparison is the headline.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"lollipop\",\n  \"title\": \"Endpoints by p95 latency (ms)\",\n  \"rows\": [\n    {\n      \"label\": \"/v1/auth\",\n      \"value\": 24,\n      \"color\": \"success\"\n    },\n    {\n      \"label\": \"/v1/search\",\n      \"value\": 78,\n      \"color\": \"accent\"\n    },\n    {\n      \"label\": \"/v1/recommend\",\n      \"value\": 142,\n      \"color\": \"warn\"\n    },\n    {\n      \"label\": \"/v1/checkout\",\n      \"value\": 240,\n      \"color\": \"danger\"\n    },\n    {\n      \"label\": \"/v1/report\",\n      \"value\": 510,\n      \"color\": \"danger\"\n    }\n  ]\n}","lang":"json"},"output":{"type":"lollipop","title":"Endpoints by p95 latency (ms)","rows":[{"label":"/v1/auth","value":24,"color":"success"},{"label":"/v1/search","value":78,"color":"accent"},{"label":"/v1/recommend","value":142,"color":"warn"},{"label":"/v1/checkout","value":240,"color":"danger"},{"label":"/v1/report","value":510,"color":"danger"}],"k":"chart"}}
+```
+
+### type: dumbbell {#chart-dumbbell}
+
+Two dots per category joined by a line — before/after, men/women, 2010/2020. Compact alternative to the slope chart when many categories don't fit a slope layout. Connector colour signals direction (success up, danger down).
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"dumbbell\",\n  \"title\": \"Q1 \\u2192 Q2 adoption\",\n  \"from_label\": \"Q1\",\n  \"to_label\": \"Q2\",\n  \"from_color\": \"muted\",\n  \"to_color\": \"accent\",\n  \"rows\": [\n    {\n      \"label\": \"infra\",\n      \"from\": 64,\n      \"to\": 88\n    },\n    {\n      \"label\": \"platform\",\n      \"from\": 52,\n      \"to\": 72\n    },\n    {\n      \"label\": \"growth\",\n      \"from\": 58,\n      \"to\": 45\n    },\n    {\n      \"label\": \"ops\",\n      \"from\": 41,\n      \"to\": 60\n    },\n    {\n      \"label\": \"billing\",\n      \"from\": 22,\n      \"to\": 38\n    }\n  ]\n}","lang":"json"},"output":{"type":"dumbbell","title":"Q1 → Q2 adoption","from_label":"Q1","to_label":"Q2","from_color":"muted","to_color":"accent","rows":[{"label":"infra","from":64,"to":88},{"label":"platform","from":52,"to":72},{"label":"growth","from":58,"to":45},{"label":"ops","from":41,"to":60},{"label":"billing","from":22,"to":38}],"k":"chart"}}
+```
+
+### type: population-pyramid {#chart-population-pyramid}
+
+Two diverging horizontal bar groups around a shared centre column of category labels. `left.values[]` grows leftward, `right.values[]` grows rightward, both aligned to `categories`. Use for demographic pyramids (men vs women per age bucket) or any two-sided comparison sharing a row axis (revenue vs cost per region, inbound vs outbound per channel).
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"population-pyramid\",\n  \"title\": \"Active users by age bucket\",\n  \"categories\": [\"55+\", \"45–54\", \"35–44\", \"25–34\", \"18–24\"],\n  \"left\":  { \"label\": \"women\", \"color\": \"accent\",  \"values\": [ 9, 17, 26, 34, 22] },\n  \"right\": { \"label\": \"men\",   \"color\": \"success\", \"values\": [11, 19, 24, 30, 18] }\n}","lang":"json"},"output":{"type":"population-pyramid","title":"Active users by age bucket","categories":["55+","45–54","35–44","25–34","18–24"],"left":{"label":"women","color":"accent","values":[9,17,26,34,22]},"right":{"label":"men","color":"success","values":[11,19,24,30,18]},"k":"chart"}}
+```
+
+### type: range-bar {#chart-range-bar}
+
+One row per item; each row carries a `[low, high]` interval drawn as a horizontal band with optional `mid` tick. Use when the *interval* is the data — confidence intervals, election polls (margin of error), salary ranges, price floors and ceilings, error bars in summary form. The right-hand readout shows the numeric range; hover surfaces low / high / mid in the tooltip.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"range-bar\",\n  \"title\": \"P50 latency, 95% CI (ms)\",\n  \"ranges\": [\n    { \"label\": \"us-east-1\",  \"low\":  42, \"mid\":  48, \"high\":  56 },\n    { \"label\": \"eu-west-1\",  \"low\":  58, \"mid\":  64, \"high\":  72 },\n    { \"label\": \"ap-south-1\", \"low\":  88, \"mid\":  96, \"high\": 110, \"color\": \"warn\" },\n    { \"label\": \"sa-east-1\",  \"low\": 105, \"mid\": 118, \"high\": 132, \"color\": \"danger\" }\n  ]\n}","lang":"json"},"output":{"type":"range-bar","title":"P50 latency, 95% CI (ms)","ranges":[{"label":"us-east-1","low":42,"mid":48,"high":56},{"label":"eu-west-1","low":58,"mid":64,"high":72},{"label":"ap-south-1","low":88,"mid":96,"high":110,"color":"warn"},{"label":"sa-east-1","low":105,"mid":118,"high":132,"color":"danger"}],"k":"chart"}}
+```
+
+### type: pareto {#chart-pareto}
+
+Bars sorted descending by `value` + a cumulative-percentage line on a secondary axis. The classic 80/20 reading shape — surfaces "the top N causes account for 80% of the total" in operations, defect root-cause audits, support-ticket triage. The renderer sorts rows for you; the dashed 80% guide reads against the right-hand percentage axis.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"pareto\",\n  \"title\": \"Support tickets by category (last 30 d)\",\n  \"rows\": [\n    { \"label\": \"auth\",     \"value\": 142 },\n    { \"label\": \"billing\",  \"value\":  88 },\n    { \"label\": \"latency\",  \"value\":  72, \"color\": \"warn\" },\n    { \"label\": \"ui-bug\",   \"value\":  46 },\n    { \"label\": \"data\",     \"value\":  28 },\n    { \"label\": \"feature\",  \"value\":  18 },\n    { \"label\": \"other\",    \"value\":  12, \"color\": \"muted\" }\n  ]\n}","lang":"json"},"output":{"type":"pareto","title":"Support tickets by category (last 30 d)","rows":[{"label":"auth","value":142},{"label":"billing","value":88},{"label":"latency","value":72,"color":"warn"},{"label":"ui-bug","value":46},{"label":"data","value":28},{"label":"feature","value":18},{"label":"other","value":12,"color":"muted"}],"k":"chart"}}
+```
+
+## Part-to-whole {#family-partwhole}
+
+A whole divided into named slices. Donut + pie are the classic choices; waffle reads better when the absolute count matters; treemap when the parts have a hierarchy.
+
+### type: donut {#chart-donut}
+
+Single-ring distribution chart. Each `slice` is a `{label, value, color?}`; the renderer normalises values to percentages of the total, draws an arc per slice, and shows the total + a legend on the side.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"donut\",\n  \"title\": \"Page load breakdown\",\n  \"slices\": [\n    { \"label\": \"HTML\",  \"value\": 12, \"color\": \"accent\" },\n    { \"label\": \"CSS\",   \"value\": 28, \"color\": \"success\" },\n    { \"label\": \"JS\",    \"value\": 44, \"color\": \"warn\" },\n    { \"label\": \"Other\", \"value\": 16, \"color\": \"muted\" }\n  ]\n}","lang":"json"},"output":{"type":"donut","title":"Page load breakdown (KB)","slices":[{"label":"HTML","value":12,"color":"accent"},{"label":"CSS","value":28,"color":"success"},{"label":"JS","value":44,"color":"warn"},{"label":"Other","value":16,"color":"muted"}],"k":"chart"}}
+```
+
+### type: pie {#chart-pie}
+
+Same `slices` payload as donut; the only difference is the absence of the centre hole and the centre-readout. Reach for pie when the part-to-whole relationship is the whole story and the absolute total doesn't need an extra glance. Pie reads better than donut for 2–4 slice distributions; for 5+ slices, prefer donut (clearer per-slice legend strip) or stacked-bar.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"pie\",\n  \"title\": \"Build-time budget\",\n  \"slices\": [\n    { \"label\": \"chrome.js\",   \"value\": 40, \"color\": \"accent\" },\n    { \"label\": \"chrome.css\",  \"value\": 25, \"color\": \"success\" },\n    { \"label\": \"renderer.js\", \"value\": 20, \"color\": \"warn\" },\n    { \"label\": \"cli.py\",      \"value\": 15, \"color\": \"muted\" }\n  ]\n}","lang":"json"},"output":{"type":"pie","title":"Build-time budget","slices":[{"label":"chrome.js","value":40,"color":"accent"},{"label":"chrome.css","value":25,"color":"success"},{"label":"renderer.js","value":20,"color":"warn"},{"label":"cli.py","value":15,"color":"muted"}],"k":"chart"}}
+```
+
+### type: waffle {#chart-waffle}
+
+Dot-matrix breakdown. Default 10×10 grid (= 100 cells). `segments` is a list of `{label, count, color}`; the renderer fills cells in order, one per unit count. The legend lives to the right of the grid with the percentage of each segment.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"waffle\",\n  \"title\": \"User-status breakdown\",\n  \"segments\": [\n    { \"label\": \"Active\",   \"count\": 40, \"color\": \"success\" },\n    { \"label\": \"Trialing\", \"count\": 25, \"color\": \"accent\" },\n    { \"label\": \"Paused\",   \"count\": 10, \"color\": \"warn\" },\n    { \"label\": \"Churned\",  \"count\": 25, \"color\": \"danger\" }\n  ]\n}","lang":"json"},"output":{"type":"waffle","title":"User-status breakdown","segments":[{"label":"Active","count":40,"color":"success"},{"label":"Trialing","count":25,"color":"accent"},{"label":"Paused","count":10,"color":"warn"},{"label":"Churned","count":25,"color":"danger"}],"k":"chart"}}
+```
+
+### type: treemap {#chart-treemap}
+
+Area-proportional nested rectangles via squarified layout. `tree[]` is a flat list of `{label, value, color?}` leaves; the largest values occupy the largest rectangles. Labels render only when the rectangle is large enough to fit them legibly. Use for composition (LoC by language, spend by category, traffic by route).
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"treemap\",\n  \"title\": \"LoC by language\",\n  \"tree\": [\n    {\"label\": \"JavaScript\", \"value\": 6200, \"color\": \"accent\"},\n    {\"label\": \"CSS\",        \"value\": 2400, \"color\": \"success\"},\n    {\"label\": \"Python\",     \"value\": 2800, \"color\": \"warn\"},\n    {\"label\": \"JSON\",       \"value\":  900, \"color\": \"muted\"},\n    {\"label\": \"Markdown\",   \"value\":  400, \"color\": \"danger\"}\n  ]\n}","lang":"json"},"output":{"type":"treemap","title":"LoC by language","tree":[{"label":"JavaScript","value":6200,"color":"accent"},{"label":"CSS","value":2400,"color":"success"},{"label":"Python","value":2800,"color":"warn"},{"label":"JSON","value":900,"color":"muted"},{"label":"Markdown","value":400,"color":"danger"}],"k":"chart"}}
+```
+
+### type: sunburst {#chart-sunburst}
+
+Radial hierarchy. Concentric arcs per depth ring; arc length proportional to node value sum. Like a treemap but radial — reads better for shallow, broad trees with named outer leaves.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"sunburst\",\n  \"title\": \"Compute budget\",\n  \"tree\": {\n    \"label\": \"root\",\n    \"children\": [\n      {\n        \"label\": \"infra\",\n        \"children\": [\n          {\n            \"label\": \"compute\",\n            \"value\": 34\n          },\n          {\n            \"label\": \"storage\",\n            \"value\": 18\n          },\n          {\n            \"label\": \"network\",\n            \"value\": 12\n          }\n        ]\n      },\n      {\n        \"label\": \"product\",\n        \"children\": [\n          {\n            \"label\": \"web\",\n            \"value\": 22\n          },\n          {\n            \"label\": \"api\",\n            \"value\": 28\n          },\n          {\n            \"label\": \"jobs\",\n            \"value\": 14\n          }\n        ]\n      }\n    ]\n  }\n}","lang":"json"},"output":{"type":"sunburst","title":"Compute budget","tree":{"label":"root","children":[{"label":"infra","children":[{"label":"compute","value":34},{"label":"storage","value":18},{"label":"network","value":12}]},{"label":"product","children":[{"label":"web","value":22},{"label":"api","value":28},{"label":"jobs","value":14}]}]},"k":"chart"}}
+```
+
+### type: polar-area {#chart-polar-area}
+
+Bars laid out around a circle. Cyclical categorical data (days of week, months, hours of day, compass directions) where the cyclic shape itself carries meaning. Distinct from radar — radar = filled polygon over multi-vars; polar-area = sector per category.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"polar-area\",\n  \"title\": \"Issues by day of week\",\n  \"sectors\": [\n    {\n      \"label\": \"Mon\",\n      \"value\": 28\n    },\n    {\n      \"label\": \"Tue\",\n      \"value\": 42\n    },\n    {\n      \"label\": \"Wed\",\n      \"value\": 56\n    },\n    {\n      \"label\": \"Thu\",\n      \"value\": 38\n    },\n    {\n      \"label\": \"Fri\",\n      \"value\": 30\n    },\n    {\n      \"label\": \"Sat\",\n      \"value\": 9\n    },\n    {\n      \"label\": \"Sun\",\n      \"value\": 6\n    }\n  ]\n}","lang":"json"},"output":{"type":"polar-area","title":"Issues by day of week","sectors":[{"label":"Mon","value":28},{"label":"Tue","value":42},{"label":"Wed","value":56},{"label":"Thu","value":38},{"label":"Fri","value":30},{"label":"Sat","value":9},{"label":"Sun","value":6}],"k":"chart"}}
+```
+
+## Distribution shape {#family-distribution}
+
+How a value's frequency is spread, not its total. Histogram for binned counts; box-plot for quartile summary; ridgeline to compare multiple distributions vertically.
+
+### type: histogram {#chart-histogram}
+
+Frequency by bin. Author supplies the binning (`bins[]` with `{lo, hi, count}`). Contiguous bins read as a connected distribution; gaps are allowed but render with the visible gap. Use for distribution shape, latency tail, time-to-event.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"histogram\",\n  \"title\": \"Request latency (ms)\",\n  \"bins\": [\n    {\"lo\":   0, \"hi\":  20, \"count\":  4},\n    {\"lo\":  20, \"hi\":  40, \"count\": 14},\n    {\"lo\":  40, \"hi\":  60, \"count\": 22},\n    {\"lo\":  60, \"hi\":  80, \"count\": 18},\n    {\"lo\":  80, \"hi\": 100, \"count\":  9},\n    {\"lo\": 100, \"hi\": 120, \"count\":  3}\n  ]\n}","lang":"json"},"output":{"type":"histogram","title":"Request latency (ms)","bins":[{"lo":0,"hi":20,"count":4},{"lo":20,"hi":40,"count":14},{"lo":40,"hi":60,"count":22},{"lo":60,"hi":80,"count":18},{"lo":80,"hi":100,"count":9},{"lo":100,"hi":120,"count":3}],"k":"chart"}}
+```
+
+### type: box-plot {#chart-box-plot}
+
+Quartiles + whiskers + optional outliers — one row per `boxes[]` entry. Required: `min`, `q1`, `median`, `q3`, `max`. Optional: `outliers: [Number]` rendered as dots beyond the whiskers.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"box-plot\",\n  \"title\": \"Cold-start latency (ms) per region\",\n  \"boxes\": [\n    { \"label\": \"us-east-1\",  \"min\": 18, \"q1\": 32, \"median\": 48, \"q3\": 60, \"max\": 86, \"outliers\": [120] },\n    { \"label\": \"eu-west-1\",  \"min\": 22, \"q1\": 38, \"median\": 52, \"q3\": 66, \"max\": 92 },\n    { \"label\": \"ap-south-1\", \"min\": 38, \"q1\": 62, \"median\": 78, \"q3\": 96, \"max\": 132, \"outliers\": [180, 210] }\n  ]\n}","lang":"json"},"output":{"type":"box-plot","title":"Cold-start latency (ms) per region","boxes":[{"label":"us-east-1","min":18,"q1":32,"median":48,"q3":60,"max":86,"outliers":[120],"color":"accent"},{"label":"eu-west-1","min":22,"q1":38,"median":52,"q3":66,"max":92,"color":"success"},{"label":"ap-south-1","min":38,"q1":62,"median":78,"q3":96,"max":132,"outliers":[180,210],"color":"warn"}],"k":"chart"}}
+```
+
+### type: ridgeline {#chart-ridgeline}
+
+Stacked small-distributions, one per row. `distributions[].values` is a flat sample; the renderer bins each sample into ~30 buckets over the global range. Read for shape comparison across groups (per-region latency, per-cohort engagement).
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"ridgeline\",\n  \"title\": \"Per-region latency (ms)\",\n  \"distributions\": [\n    {\"label\": \"us-east-1\",  \"values\": [..raw samples..]},\n    {\"label\": \"eu-west-1\",  \"values\": [..raw samples..]},\n    {\"label\": \"ap-south-1\", \"values\": [..raw samples..]}\n  ]\n}","lang":"json"},"output":{"type":"ridgeline","title":"Per-region cold-start latency (ms)","distributions":[{"label":"us-east-1","color":"accent","values":[22,28,30,34,36,38,40,42,44,46,48,50,52,54,56,60,62,64,68,72,76,82,90]},{"label":"eu-west-1","color":"success","values":[32,38,42,44,46,48,50,52,54,56,58,60,62,64,66,68,72,76,82,90,96]},{"label":"ap-south-1","color":"warn","values":[48,56,62,66,68,72,76,80,84,88,92,96,100,108,116,124,132,140,148,156,168,180,192,206]}],"k":"chart"}}
+```
+
+### type: density {#chart-density}
+
+Smoothed histogram via Gaussian KDE. Reads like a histogram without the bin-boundary artefacts. Default bandwidth is Silverman's rule; override with bandwidth for tighter or smoother curves.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"density\",\n  \"title\": \"Response time density\",\n  \"values\": [\n    120,\n    130,\n    145,\n    150,\n    155,\n    160,\n    162,\n    168,\n    170,\n    172,\n    175,\n    178,\n    180,\n    180,\n    183,\n    188,\n    190,\n    195,\n    200,\n    210,\n    215,\n    225,\n    240,\n    260,\n    290,\n    340,\n    400,\n    520,\n    150,\n    165,\n    180,\n    195,\n    220\n  ]\n}","lang":"json"},"output":{"type":"density","title":"Response time density","values":[120,130,145,150,155,160,162,168,170,172,175,178,180,180,183,188,190,195,200,210,215,225,240,260,290,340,400,520,150,165,180,195,220],"k":"chart"}}
+```
+
+### type: violin {#chart-violin}
+
+Kernel-density box-plot alternative. Per-distribution mirrored density curve (the violin body) + IQR rectangle + median line. Shows shape AND quartiles where the box-plot only shows quartiles.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"violin\",\n  \"title\": \"Latency by region\",\n  \"distributions\": [\n    {\n      \"label\": \"us-east\",\n      \"color\": \"accent\",\n      \"values\": [\n        120,\n        125,\n        128,\n        130,\n        135,\n        138,\n        140,\n        142,\n        145,\n        148,\n        150,\n        150,\n        155,\n        160,\n        162,\n        168,\n        170,\n        175,\n        180,\n        200\n      ]\n    },\n    {\n      \"label\": \"eu-west\",\n      \"color\": \"success\",\n      \"values\": [\n        80,\n        82,\n        85,\n        90,\n        92,\n        95,\n        98,\n        100,\n        102,\n        105,\n        108,\n        110,\n        110,\n        112,\n        115,\n        118,\n        120,\n        125,\n        130,\n        140\n      ]\n    },\n    {\n      \"label\": \"ap-south\",\n      \"color\": \"warn\",\n      \"values\": [\n        200,\n        210,\n        215,\n        220,\n        225,\n        230,\n        235,\n        240,\n        245,\n        248,\n        250,\n        252,\n        255,\n        260,\n        270,\n        280,\n        290,\n        310,\n        340,\n        400\n      ]\n    }\n  ]\n}","lang":"json"},"output":{"type":"violin","title":"Latency by region","distributions":[{"label":"us-east","color":"accent","values":[120,125,128,130,135,138,140,142,145,148,150,150,155,160,162,168,170,175,180,200]},{"label":"eu-west","color":"success","values":[80,82,85,90,92,95,98,100,102,105,108,110,110,112,115,118,120,125,130,140]},{"label":"ap-south","color":"warn","values":[200,210,215,220,225,230,235,240,245,248,250,252,255,260,270,280,290,310,340,400]}],"k":"chart"}}
+```
+
+### type: beeswarm {#chart-beeswarm}
+
+One-axis distribution rendered as jittered dots, one per data point. Vertical placement is force-balanced so dot density at any x-position visually encodes count. Reads more honestly than a histogram for small samples.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"beeswarm\",\n  \"title\": \"Survey scores\",\n  \"values\": [\n    3,\n    5,\n    4,\n    6,\n    7,\n    8,\n    7,\n    6,\n    7,\n    8,\n    8,\n    9,\n    7,\n    6,\n    5,\n    6,\n    7,\n    8,\n    9,\n    8,\n    7,\n    6,\n    7,\n    8,\n    9,\n    5,\n    4,\n    6,\n    7,\n    8,\n    7,\n    8,\n    9,\n    10,\n    7,\n    8,\n    6,\n    5,\n    7,\n    8\n  ]\n}","lang":"json"},"output":{"type":"beeswarm","title":"Survey scores","values":[3,5,4,6,7,8,7,6,7,8,8,9,7,6,5,6,7,8,9,8,7,6,7,8,9,5,4,6,7,8,7,8,9,10,7,8,6,5,7,8],"k":"chart"}}
+```
+
+### type: hexbin {#chart-hexbin}
+
+Tile the plot region with hexagonal cells; each cell's opacity encodes how many `points[]` fall inside. Use when a scatter would overplot — 10⁴+ samples where individual dots lose meaning and only density matters. `radius` controls cell size in viewBox px; smaller → finer resolution but noisier; bigger → smoother map but loses local detail.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"hexbin\",\n  \"title\": \"Sample density\",\n  \"radius\": 16,\n  \"points\": [\n    {\"x\": 1.1, \"y\": 2.4},\n    {\"x\": 1.5, \"y\": 2.9},\n    {\"x\": 2.2, \"y\": 3.1}\n  ]\n}","lang":"json"},"output":{"type":"hexbin","title":"Sample density (n ≈ 600)","radius":16,"points":[{"x":1.1,"y":2.4},{"x":1.5,"y":2.9},{"x":1.3,"y":2.7},{"x":1.2,"y":2.5},{"x":1.4,"y":2.8},{"x":1.0,"y":2.6},{"x":1.6,"y":2.3},{"x":1.1,"y":2.6},{"x":1.5,"y":2.5},{"x":1.3,"y":2.4},{"x":1.4,"y":2.6},{"x":1.2,"y":2.7},{"x":2.0,"y":3.0},{"x":2.2,"y":3.1},{"x":2.1,"y":3.2},{"x":2.3,"y":3.0},{"x":2.0,"y":3.3},{"x":2.4,"y":3.1},{"x":3.2,"y":3.6},{"x":3.0,"y":3.7},{"x":3.4,"y":3.5},{"x":3.1,"y":3.4},{"x":3.3,"y":3.7},{"x":3.2,"y":3.5},{"x":4.5,"y":4.2},{"x":4.7,"y":4.0},{"x":4.6,"y":4.4},{"x":4.4,"y":4.3},{"x":4.5,"y":4.1},{"x":4.8,"y":4.2},{"x":4.6,"y":4.0},{"x":4.5,"y":4.3},{"x":4.7,"y":4.4},{"x":5.2,"y":4.8},{"x":5.4,"y":4.7},{"x":5.0,"y":4.9},{"x":5.1,"y":4.8},{"x":5.3,"y":4.6},{"x":5.5,"y":4.7},{"x":6.0,"y":5.4},{"x":6.2,"y":5.3},{"x":6.1,"y":5.5},{"x":6.3,"y":5.2},{"x":6.4,"y":5.4},{"x":6.0,"y":5.6},{"x":0.6,"y":1.0},{"x":0.5,"y":1.2},{"x":0.4,"y":1.1},{"x":0.7,"y":0.9},{"x":0.6,"y":1.1},{"x":0.5,"y":1.0}],"k":"chart"}}
+```
+
+## Trend over time {#family-trend}
+
+Sequence on the x-axis, value on the y. Sparkline for in-line micro-trends; slope for before/after pairs; calendar-heatmap for day-of-year × day-of-week activity.
+
+### type: sparkline {#chart-sparkline}
+
+Inline mini line / area / bar. No axes, no chrome — sized for the line height of surrounding prose. `values` is a flat numeric series. `variant` picks line (default), area (filled), or bar (per-value mini-bars). `end_label` renders to the right of the curve as a small caption (`62%`, `↗`, etc.).
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"sparkline\",\n  \"values\": [12,14,18,17,22,25,28,31,30,35],\n  \"variant\": \"area\",\n  \"end_label\": \"35\"\n}","lang":"json"},"output":{"type":"sparkline","values":[12,14,18,17,22,25,28,31,30,35,33,38],"variant":"area","end_label":"↗ 38","k":"chart"}}
+```
+
+Column variant — same flat `values` payload, set <code>"variant": "bar"</code> for per-value mini-bars. Use when each value is a discrete event (a count per day, hits per minute) rather than a continuous trend.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"sparkline\",\n  \"values\": [4, 8, 12, 9, 14, 6, 11, 8],\n  \"variant\": \"bar\",\n  \"end_label\": \"11 events\"\n}","lang":"json"},"output":{"type":"sparkline","values":[4,8,12,9,14,6,11,8],"variant":"bar","end_label":"11 events","k":"chart"}}
+```
+
+### type: slope {#chart-slope}
+
+Two-time-point change — left column is `from`, right column is `to`, one slope line per `items[]` entry. The renderer auto-colours rising as success and falling as danger unless an explicit `color` is set. Use this when ‘who went up, who went down’ is the question.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"slope\",\n  \"title\": \"Page-load p95 (ms) — before / after CDN\",\n  \"from_label\": \"Before\",\n  \"to_label\":   \"After\",\n  \"items\": [\n    { \"label\": \"/home\",      \"from\": 1400, \"to\":  680 },\n    { \"label\": \"/dashboard\", \"from\": 2200, \"to\": 1100 },\n    { \"label\": \"/settings\",  \"from\":  900, \"to\": 1500 }\n  ]\n}","lang":"json"},"output":{"type":"slope","title":"Page-load p95 (ms) — before / after CDN","from_label":"Before","to_label":"After","items":[{"label":"/home","from":1400,"to":680},{"label":"/dashboard","from":2200,"to":1100},{"label":"/settings","from":900,"to":1500}],"k":"chart"}}
+```
+
+### type: calendar-heatmap {#chart-calendar-heatmap}
+
+Year-in-cells activity grid. `date_values` is a map of ISO date → numeric value; days missing from the map render faintly to show the calendar shape. Mon, Wed, Fri labels along the left; month names along the top at the first cell of each month.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"calendar-heatmap\",\n  \"title\": \"Commits in 2026\",\n  \"year\": 2026,\n  \"date_values\": {\n    \"2026-01-04\": 3, \"2026-01-12\": 9,\n    \"2026-03-22\": 14, \"2026-07-01\": 6,\n    \"2026-11-15\": 11, \"2026-12-30\": 4\n  }\n}","lang":"json"},"output":{"type":"calendar-heatmap","title":"Commits in 2026 (sample)","year":2026,"date_values":{"2026-01-04":3,"2026-01-12":9,"2026-01-18":6,"2026-02-03":8,"2026-02-17":12,"2026-02-28":5,"2026-03-08":14,"2026-03-22":17,"2026-03-30":9,"2026-04-11":6,"2026-04-25":10,"2026-05-09":13,"2026-05-22":22,"2026-06-15":8,"2026-07-04":4,"2026-08-19":11,"2026-09-30":7,"2026-10-12":9,"2026-11-15":16,"2026-11-29":4,"2026-12-22":6},"k":"chart"}}
+```
+
+### type: candlestick {#chart-candlestick}
+
+Financial OHLC. Each entry is one trading period; up days (close ≥ open) in success colour, down days in danger. Body from open→close, wick from low→high.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"candlestick\",\n  \"title\": \"Daily price action\",\n  \"entries\": [\n    {\n      \"date\": \"Mon\",\n      \"open\": 100,\n      \"high\": 108,\n      \"low\": 98,\n      \"close\": 105\n    },\n    {\n      \"date\": \"Tue\",\n      \"open\": 105,\n      \"high\": 112,\n      \"low\": 102,\n      \"close\": 110\n    },\n    {\n      \"date\": \"Wed\",\n      \"open\": 110,\n      \"high\": 115,\n      \"low\": 99,\n      \"close\": 101\n    },\n    {\n      \"date\": \"Thu\",\n      \"open\": 101,\n      \"high\": 104,\n      \"low\": 92,\n      \"close\": 94\n    },\n    {\n      \"date\": \"Fri\",\n      \"open\": 94,\n      \"high\": 102,\n      \"low\": 92,\n      \"close\": 100\n    }\n  ]\n}","lang":"json"},"output":{"type":"candlestick","title":"Daily price action","entries":[{"date":"Mon","open":100,"high":108,"low":98,"close":105},{"date":"Tue","open":105,"high":112,"low":102,"close":110},{"date":"Wed","open":110,"high":115,"low":99,"close":101},{"date":"Thu","open":101,"high":104,"low":92,"close":94},{"date":"Fri","open":94,"high":102,"low":92,"close":100}],"k":"chart"}}
+```
+
+### type: stream {#chart-stream}
+
+Centered stacked area. Each layer is centred on the x-axis instead of stacking from the bottom. Useful for showing composition trends where the total varies; the centred shape reads as a flowing stream.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"stream\",\n  \"title\": \"Page views by source\",\n  \"categories\": [\n    \"W1\",\n    \"W2\",\n    \"W3\",\n    \"W4\",\n    \"W5\",\n    \"W6\",\n    \"W7\",\n    \"W8\"\n  ],\n  \"series\": [\n    {\n      \"label\": \"direct\",\n      \"values\": [\n        60,\n        80,\n        75,\n        90,\n        110,\n        120,\n        100,\n        95\n      ]\n    },\n    {\n      \"label\": \"organic\",\n      \"values\": [\n        40,\n        55,\n        70,\n        85,\n        90,\n        95,\n        110,\n        130\n      ]\n    },\n    {\n      \"label\": \"referral\",\n      \"values\": [\n        20,\n        30,\n        28,\n        45,\n        55,\n        60,\n        70,\n        80\n      ]\n    }\n  ]\n}","lang":"json"},"output":{"type":"stream","title":"Page views by source","categories":["W1","W2","W3","W4","W5","W6","W7","W8"],"series":[{"label":"direct","values":[60,80,75,90,110,120,100,95]},{"label":"organic","values":[40,55,70,85,90,95,110,130]},{"label":"referral","values":[20,30,28,45,55,60,70,80]}],"k":"chart"}}
+```
+
+### type: bump {#chart-bump}
+
+Line chart where the Y axis is RANK instead of value. Each series gets ranked across categories; lines cross when the leaderboard reorders. 'Who was #1 each year' — popularity drift, market-share leaders, sports standings.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"bump\",\n  \"title\": \"Top-3 cities by visits\",\n  \"categories\": [\n    \"2020\",\n    \"2021\",\n    \"2022\",\n    \"2023\",\n    \"2024\"\n  ],\n  \"series\": [\n    {\n      \"label\": \"Berlin\",\n      \"values\": [\n        80,\n        75,\n        90,\n        95,\n        92\n      ]\n    },\n    {\n      \"label\": \"Lisbon\",\n      \"values\": [\n        70,\n        85,\n        75,\n        80,\n        88\n      ]\n    },\n    {\n      \"label\": \"Krakow\",\n      \"values\": [\n        60,\n        70,\n        80,\n        65,\n        75\n      ]\n    },\n    {\n      \"label\": \"Tallinn\",\n      \"values\": [\n        40,\n        50,\n        60,\n        70,\n        80\n      ]\n    }\n  ]\n}","lang":"json"},"output":{"type":"bump","title":"Top-3 cities by visits","categories":["2020","2021","2022","2023","2024"],"series":[{"label":"Berlin","values":[80,75,90,95,92]},{"label":"Lisbon","values":[70,85,75,80,88]},{"label":"Krakow","values":[60,70,80,65,75]},{"label":"Tallinn","values":[40,50,60,70,80]}],"k":"chart"}}
+```
+
+### type: horizon {#chart-horizon}
+
+Compressed time series. Each `series` becomes a thin lane; values fold into deeper-colored bands above the baseline so a 36 px lane can carry the same information as a 200 px line chart. Use to compare many time series stacked vertically — server load per region, latency per endpoint — where the per-series shape matters more than absolute pixel height. `bands` (default 3) controls how aggressively the fold compresses range.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"horizon\",\n  \"title\": \"Request rate (req/s) by region\",\n  \"bands\": 3,\n  \"categories\": [\"00:00\", \"04:00\", \"08:00\", \"12:00\", \"16:00\", \"20:00\"],\n  \"series\": [\n    { \"label\": \"us-east-1\", \"color\": \"accent\",  \"values\": [120, 140, 380, 620, 540, 290] },\n    { \"label\": \"eu-west-1\", \"color\": \"success\", \"values\": [ 80, 110, 220, 410, 600, 380] },\n    { \"label\": \"ap-south-1\",\"color\": \"warn\",    \"values\": [340, 480, 510, 360, 240, 180] }\n  ]\n}","lang":"json"},"output":{"type":"horizon","title":"Request rate (req/s) by region","bands":3,"categories":["00:00","04:00","08:00","12:00","16:00","20:00"],"series":[{"label":"us-east-1","color":"accent","values":[120,140,380,620,540,290]},{"label":"eu-west-1","color":"success","values":[80,110,220,410,600,380]},{"label":"ap-south-1","color":"warn","values":[340,480,510,360,240,180]}],"k":"chart"}}
+```
+
+## Flow / conversion {#family-flow}
+
+How a quantity moves between stages or sources. Funnel for ordered drop-off; sankey for arbitrary weighted flows between any pair of nodes.
+
+### type: funnel {#chart-funnel}
+
+Conversion-stage drop-off. `stages[]` is an ordered list of `{label, value, color?}`. The renderer draws a tapered band between adjacent stages; the right-hand readout shows the value + percentage of the first stage.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"funnel\",\n  \"title\": \"Signup conversion\",\n  \"stages\": [\n    {\"label\": \"Visitors\",   \"value\": 1000},\n    {\"label\": \"Signed up\",  \"value\":  680},\n    {\"label\": \"Activated\",  \"value\":  430},\n    {\"label\": \"Upgraded\",   \"value\":  180},\n    {\"label\": \"Retained 30d\",\"value\":  120}\n  ]\n}","lang":"json"},"output":{"type":"funnel","title":"Signup conversion","stages":[{"label":"Visitors","value":1000,"color":"muted"},{"label":"Signed up","value":680,"color":"accent"},{"label":"Activated","value":430,"color":"accent"},{"label":"Upgraded","value":180,"color":"warn"},{"label":"Retained 30d","value":120,"color":"success"}],"k":"chart"}}
+```
+
+### type: sankey {#chart-sankey}
+
+Flow between stages with curved ribbons sized by link value. <code>nodes[]</code> is <code>{id, label?, color?}</code>; <code>links[]</code> is <code>{source, target, value}</code> referencing node ids. The renderer derives the left-to-right column placement from the link graph (BFS depth), stacks nodes within each column by their incoming-or-outgoing total, and routes a cubic-Bezier ribbon between every pair.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"sankey\",\n  \"title\": \"Where time goes\",\n  \"nodes\": [\n    {\"id\": \"source\",  \"label\": \"Working hours\", \"color\": \"muted\"},\n    {\"id\": \"build\",   \"label\": \"Shipping\",   \"color\": \"accent\"},\n    {\"id\": \"plan\",    \"label\": \"Planning\",   \"color\": \"accent\"},\n    {\"id\": \"meet\",    \"label\": \"Meetings\",   \"color\": \"warn\"},\n    {\"id\": \"code\",    \"label\": \"Code\",       \"color\": \"success\"},\n    {\"id\": \"review\",  \"label\": \"Review\",     \"color\": \"success\"},\n    {\"id\": \"docs\",    \"label\": \"Docs\",       \"color\": \"accent\"}\n  ],\n  \"links\": [\n    {\"source\": \"source\", \"target\": \"build\",  \"value\": 24},\n    {\"source\": \"source\", \"target\": \"plan\",   \"value\":  9},\n    {\"source\": \"source\", \"target\": \"meet\",   \"value\":  7},\n    {\"source\": \"build\",  \"target\": \"code\",   \"value\": 14},\n    {\"source\": \"build\",  \"target\": \"review\", \"value\":  6},\n    {\"source\": \"build\",  \"target\": \"docs\",   \"value\":  4},\n    {\"source\": \"plan\",   \"target\": \"docs\",   \"value\":  3}\n  ]\n}","lang":"json"},"output":{"type":"sankey","title":"Where time goes","nodes":[{"id":"source","label":"Working hours","color":"muted"},{"id":"build","label":"Shipping","color":"accent"},{"id":"plan","label":"Planning","color":"accent"},{"id":"meet","label":"Meetings","color":"warn"},{"id":"code","label":"Code","color":"success"},{"id":"review","label":"Review","color":"success"},{"id":"docs","label":"Docs","color":"accent"}],"links":[{"source":"source","target":"build","value":24},{"source":"source","target":"plan","value":9},{"source":"source","target":"meet","value":7},{"source":"build","target":"code","value":14},{"source":"build","target":"review","value":6},{"source":"build","target":"docs","value":4},{"source":"plan","target":"docs","value":3}],"k":"chart"}}
+```
+
+### type: gantt {#chart-gantt}
+
+Horizontal bars on a time axis, one per task. Project schedules, release plans, roadmap windows. start / end are numeric — author picks the unit (days, weeks, hours, or Unix ms with tick_format='date').
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"gantt\",\n  \"title\": \"Release plan (weeks)\",\n  \"tasks\": [\n    {\n      \"label\": \"Discovery\",\n      \"start\": 0,\n      \"end\": 3,\n      \"color\": \"accent\"\n    },\n    {\n      \"label\": \"Design\",\n      \"start\": 2,\n      \"end\": 6,\n      \"color\": \"accent\"\n    },\n    {\n      \"label\": \"Build\",\n      \"start\": 5,\n      \"end\": 14,\n      \"color\": \"success\"\n    },\n    {\n      \"label\": \"Integrate\",\n      \"start\": 12,\n      \"end\": 16,\n      \"color\": \"warn\"\n    },\n    {\n      \"label\": \"QA + launch\",\n      \"start\": 15,\n      \"end\": 20,\n      \"color\": \"danger\"\n    }\n  ]\n}","lang":"json"},"output":{"type":"gantt","title":"Release plan (weeks)","tasks":[{"label":"Discovery","start":0,"end":3,"color":"accent"},{"label":"Design","start":2,"end":6,"color":"accent"},{"label":"Build","start":5,"end":14,"color":"success"},{"label":"Integrate","start":12,"end":16,"color":"warn"},{"label":"QA + launch","start":15,"end":20,"color":"danger"}],"k":"chart"}}
+```
+
+## Network / relationship {#family-network}
+
+Edges between nodes. Network for free-form graphs (force-relaxed layout); chord for fully-connected directional flow matrices.
+
+### type: network {#chart-network}
+
+Node-link diagram with a small Fruchterman-Reingold-ish force relaxation (~60 iterations on each render). Best for graphs up to ~50 nodes — bigger structures need a real graph-viz library. <code>nodes[]</code> + <code>links[]</code> share the same shape as <code>sankey</code>. Node radius scales with degree; hovering a node surfaces its label + degree in the tooltip.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"network\",\n  \"title\": \"Pages link graph\",\n  \"nodes\": [\n    {\"id\": \"index\"},     {\"id\": \"reference\"},  {\"id\": \"glossary\"},\n    {\"id\": \"architecture\"}, {\"id\": \"cli\"},   {\"id\": \"roadmap\"}\n  ],\n  \"links\": [\n    {\"source\": \"index\", \"target\": \"reference\"},\n    {\"source\": \"index\", \"target\": \"glossary\"},\n    {\"source\": \"index\", \"target\": \"architecture\"},\n    {\"source\": \"index\", \"target\": \"cli\"},\n    {\"source\": \"index\", \"target\": \"roadmap\"},\n    {\"source\": \"reference\", \"target\": \"glossary\"},\n    {\"source\": \"reference\", \"target\": \"architecture\"},\n    {\"source\": \"architecture\", \"target\": \"cli\"}\n  ]\n}","lang":"json"},"output":{"type":"network","title":"Pages link graph","nodes":[{"id":"index"},{"id":"reference"},{"id":"glossary"},{"id":"architecture"},{"id":"cli"},{"id":"roadmap"}],"links":[{"source":"index","target":"reference"},{"source":"index","target":"glossary"},{"source":"index","target":"architecture"},{"source":"index","target":"cli"},{"source":"index","target":"roadmap"},{"source":"reference","target":"glossary"},{"source":"reference","target":"architecture"},{"source":"architecture","target":"cli"}],"k":"chart"}}
+```
+
+### type: chord {#chart-chord}
+
+Circular relationship diagram. <code>groups[]</code> defines the perimeter sequence (clockwise from 12 o'clock); <code>matrix</code> is an N×N flow matrix where <code>matrix[i][j]</code> is the flow from <code>groups[i]</code> to <code>groups[j]</code>. Each group occupies an outer arc sized by its total in+out flow; ribbons through the centre carry the pairwise flows.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"chord\",\n  \"title\": \"Cross-team handoffs (this week)\",\n  \"groups\": [\n    {\"id\": \"design\",  \"color\": \"accent\"},\n    {\"id\": \"eng\",     \"color\": \"success\"},\n    {\"id\": \"product\", \"color\": \"warn\"},\n    {\"id\": \"docs\",    \"color\": \"muted\"}\n  ],\n  \"matrix\": [\n    [0, 8, 3, 2],\n    [4, 0, 5, 6],\n    [2, 7, 0, 1],\n    [3, 4, 1, 0]\n  ]\n}","lang":"json"},"output":{"type":"chord","title":"Cross-team handoffs (this week)","groups":[{"id":"design","color":"accent"},{"id":"eng","color":"success"},{"id":"product","color":"warn"},{"id":"docs","color":"muted"}],"matrix":[[0,8,3,2],[4,0,5,6],[2,7,0,1],[3,4,1,0]],"k":"chart"}}
+```
+
+### type: arc-diagram {#chart-arc-diagram}
+
+Nodes positioned evenly on a horizontal baseline; each link draws a semicircular arc above the baseline connecting its source and target. Same `nodes` + `links` payload as <code>network</code>/<code>sankey</code> — what changes is the layout. Use when the *order* of nodes carries meaning (genealogy, chronology, sentence-level word adjacency) and a force-relaxed network would obscure that order. Arc thickness scales with `links[].value`; arc color follows the source node's color token.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"arc-diagram\",\n  \"title\": \"Talk references (in slide order)\",\n  \"nodes\": [\n    {\"id\": \"intro\",       \"label\": \"Intro\"},\n    {\"id\": \"problem\",     \"label\": \"Problem\"},\n    {\"id\": \"prior\",       \"label\": \"Prior work\"},\n    {\"id\": \"method\",      \"label\": \"Method\",   \"color\": \"success\"},\n    {\"id\": \"results\",     \"label\": \"Results\",  \"color\": \"warn\"},\n    {\"id\": \"discussion\",  \"label\": \"Discussion\"},\n    {\"id\": \"conclusion\",  \"label\": \"Conclusion\"}\n  ],\n  \"links\": [\n    {\"source\": \"intro\",       \"target\": \"problem\",    \"value\": 2},\n    {\"source\": \"problem\",     \"target\": \"prior\",      \"value\": 4},\n    {\"source\": \"problem\",     \"target\": \"method\",     \"value\": 6},\n    {\"source\": \"prior\",       \"target\": \"method\",     \"value\": 3},\n    {\"source\": \"method\",      \"target\": \"results\",    \"value\": 8},\n    {\"source\": \"results\",     \"target\": \"discussion\", \"value\": 5},\n    {\"source\": \"discussion\",  \"target\": \"conclusion\", \"value\": 3},\n    {\"source\": \"prior\",       \"target\": \"discussion\", \"value\": 2}\n  ]\n}","lang":"json"},"output":{"type":"arc-diagram","title":"Talk references (in slide order)","nodes":[{"id":"intro","label":"Intro"},{"id":"problem","label":"Problem"},{"id":"prior","label":"Prior work"},{"id":"method","label":"Method","color":"success"},{"id":"results","label":"Results","color":"warn"},{"id":"discussion","label":"Discussion"},{"id":"conclusion","label":"Conclusion"}],"links":[{"source":"intro","target":"problem","value":2},{"source":"problem","target":"prior","value":4},{"source":"problem","target":"method","value":6},{"source":"prior","target":"method","value":3},{"source":"method","target":"results","value":8},{"source":"results","target":"discussion","value":5},{"source":"discussion","target":"conclusion","value":3},{"source":"prior","target":"discussion","value":2}],"k":"chart"}}
+```
+
+## Multivariate / matrix {#family-matrix}
+
+More than two dimensions per record. Heatmap for a 2-D grid coloured by value; scatter-matrix for pair-wise scatters across N variables; parallel-coordinates for per-record polylines crossing N axes.
+
+### type: heatmap {#chart-heatmap}
+
+N×M cell grid coloured by value. `cells` is a 2D array (outer = rows, inner = columns). Optional `row_labels` / `col_labels` annotate the edges. `scale` picks the palette family: sequential (one-sided ramp on accent) or diverging (accent for positives, danger for negatives). Hover any cell for the raw value.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"heatmap\",\n  \"title\": \"Latency by service × hour\",\n  \"row_labels\": [\"svc-a\", \"svc-b\", \"svc-c\"],\n  \"col_labels\": [\"00\", \"06\", \"12\", \"18\"],\n  \"cells\": [[12,18,42,30],[8,22,36,24],[40,50,28,16]]\n}","lang":"json"},"output":{"type":"heatmap","title":"Latency by service × hour","row_labels":["svc-a","svc-b","svc-c","svc-d"],"col_labels":["00","04","08","12","16","20"],"cells":[[12,18,26,42,30,18],[8,22,36,24,16,10],[40,50,28,16,12,8],[6,12,18,24,38,50]],"k":"chart"}}
+```
+
+### type: scatter-matrix {#chart-scatter-matrix}
+
+N×N grid of mini scatter plots for multivariate correlation reading. <code>variables[]</code> defines each axis; <code>records[]</code> is a flat list of objects keyed by variable id. Domains auto-derive from the records unless declared explicitly.
+
+> [!TIP] How to read it
+> Diagonal cells (top-left to bottom-right) label each variable. Off-diagonal cells plot the column-variable on X against the row-variable on Y. Each cell carries an <code>r=</code> chip in its top-left — Pearson correlation between the two variables (-1 to +1). Values where <code>|r| ≥ 0.7</code> show in accent-strong: those are the strong relationships worth investigating. Hover any off-diagonal cell to see the pair, n, and r in a tooltip; click to pin.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"scatter-matrix\",\n  \"title\": \"Page metrics\",\n  \"variables\": [\n    {\"key\": \"lines\",   \"label\": \"Lines\"},\n    {\"key\": \"images\",  \"label\": \"Images\"},\n    {\"key\": \"charts\",  \"label\": \"Charts\"},\n    {\"key\": \"reads\",   \"label\": \"Reads\"}\n  ],\n  \"records\": [\n    {\"lines\":  320, \"images\":  4, \"charts\":  2, \"reads\":  120},\n    {\"lines\":  180, \"images\":  2, \"charts\":  0, \"reads\":   60},\n    ... 20 more rows ...\n  ]\n}","lang":"json"},"output":{"type":"scatter-matrix","title":"Page metrics","variables":[{"key":"lines","label":"Lines"},{"key":"images","label":"Images"},{"key":"charts","label":"Charts"},{"key":"reads","label":"Reads"}],"records":[{"lines":320,"images":4,"charts":2,"reads":120},{"lines":180,"images":2,"charts":0,"reads":60},{"lines":540,"images":7,"charts":5,"reads":210},{"lines":90,"images":1,"charts":0,"reads":40},{"lines":410,"images":5,"charts":3,"reads":160},{"lines":260,"images":3,"charts":2,"reads":90},{"lines":720,"images":9,"charts":8,"reads":310},{"lines":150,"images":1,"charts":1,"reads":55},{"lines":380,"images":4,"charts":3,"reads":140},{"lines":510,"images":6,"charts":4,"reads":180},{"lines":220,"images":2,"charts":1,"reads":80},{"lines":470,"images":5,"charts":4,"reads":190}],"k":"chart"}}
+```
+
+### type: parallel-coordinates {#chart-parallel-coordinates}
+
+One vertical axis per variable; each record draws a polyline crossing all axes at its scaled position. Best for spotting multi-variable clusters (lines that bunch together) or outliers (lines that diverge). Optional <code>_label</code> and <code>_color</code> on each record tag it visually.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"parallel-coordinates\",\n  \"title\": \"Build performance\",\n  \"variables\": [\n    {\"key\": \"pages\",     \"label\": \"Pages\"},\n    {\"key\": \"size_kb\",   \"label\": \"Total KB\"},\n    {\"key\": \"build_ms\",  \"label\": \"Build ms\"},\n    {\"key\": \"lighthouse\",\"label\": \"Lighthouse\"}\n  ],\n  \"records\": [\n    {\"pages\":  10, \"size_kb\":  240, \"build_ms\":  900, \"lighthouse\": 96, \"_color\": \"success\"},\n    {\"pages\":  25, \"size_kb\":  540, \"build_ms\": 1400, \"lighthouse\": 94, \"_color\": \"accent\"},\n    ...\n  ]\n}","lang":"json"},"output":{"type":"parallel-coordinates","title":"Build performance","variables":[{"key":"pages","label":"Pages"},{"key":"size_kb","label":"Total KB"},{"key":"build_ms","label":"Build ms"},{"key":"lighthouse","label":"Lighthouse"}],"records":[{"pages":10,"size_kb":240,"build_ms":900,"lighthouse":96,"_color":"success"},{"pages":25,"size_kb":540,"build_ms":1400,"lighthouse":94,"_color":"accent"},{"pages":40,"size_kb":920,"build_ms":2300,"lighthouse":91,"_color":"accent"},{"pages":60,"size_kb":1500,"build_ms":3800,"lighthouse":88,"_color":"warn"},{"pages":90,"size_kb":2400,"build_ms":6500,"lighthouse":82,"_color":"warn"},{"pages":130,"size_kb":3800,"build_ms":11200,"lighthouse":74,"_color":"danger"}],"k":"chart"}}
+```
+
+## Goal / progress {#family-goal}
+
+Where a value sits inside a known range (often with a target). Gauge for a single arc; bullet for actual-vs-target with zone bands; radar for multi-axis profile comparison.
+
+### type: gauge {#chart-gauge}
+
+Semicircular arc, 0 → max, with a needle / fill at the current value and an optional target tick. Use for single-metric status (SLO budget, runway, uptime) where the gap to target is the point. Optional `zones` paint coloured threshold bands behind the value.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"gauge\",\n  \"title\": \"SLO budget\",\n  \"value\": 92,\n  \"max\": 100,\n  \"target\": 80,\n  \"label\": \"of monthly window remaining\",\n  \"zones\": [\n    { \"from\":  0, \"to\": 50, \"tone\": \"danger\",  \"label\": \"breaching\" },\n    { \"from\": 50, \"to\": 80, \"tone\": \"warn\",    \"label\": \"caution\"   },\n    { \"from\": 80, \"to\": 100,\"tone\": \"success\", \"label\": \"healthy\"   }\n  ]\n}","lang":"json"},"output":{"type":"gauge","title":"SLO budget","value":92,"max":100,"target":80,"label":"of monthly window remaining","zones":[{"from":0,"to":50,"tone":"danger","label":"breaching"},{"from":50,"to":80,"tone":"warn","label":"caution"},{"from":80,"to":100,"tone":"success","label":"healthy"}],"k":"chart"}}
+```
+
+### type: bullet {#chart-bullet}
+
+Actual-vs-target on a banded horizontal track — Stephen Few's bullet chart. One row per `tracks[]` entry: `label`, `value` (current), `target` (optional vertical tick), `max` (right-edge), optional `zones` painted behind the value.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"bullet\",\n  \"title\": \"Quarter at a glance\",\n  \"tracks\": [\n    { \"label\": \"Revenue ($M)\", \"value\": 92, \"target\": 80, \"max\": 120,\n      \"zones\": [{ \"from\":0, \"to\":40, \"tone\":\"danger\" }, { \"from\":40, \"to\":80, \"tone\":\"warn\" }, { \"from\":80, \"to\":120, \"tone\":\"success\" }] },\n    { \"label\": \"NPS\",          \"value\": 58, \"target\": 65, \"max\": 100, \"color\": \"warn\" }\n  ]\n}","lang":"json"},"output":{"type":"bullet","title":"Quarter at a glance","tracks":[{"label":"Revenue ($M)","value":92,"target":80,"max":120,"color":"success","zones":[{"from":0,"to":40,"tone":"danger"},{"from":40,"to":80,"tone":"warn"},{"from":80,"to":120,"tone":"success"}]},{"label":"NPS","value":58,"target":65,"max":100,"color":"warn","zones":[{"from":0,"to":30,"tone":"danger"},{"from":30,"to":60,"tone":"warn"},{"from":60,"to":100,"tone":"success"}]},{"label":"Churn (%)","value":3,"target":5,"max":12,"color":"success"}],"k":"chart"}}
+```
+
+### type: radar {#chart-radar}
+
+N spokes radiating from centre, one filled polygon per series. Best for 3–8 axes and 1–4 series. `axes[].label` names the spoke; optional `axes[].max` overrides per-axis scaling. `series[].values` array must align with `axes` by index.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"radar\",\n  \"title\": \"Database shortlist — seven criteria\",\n  \"axes\": [\n    { \"label\": \"Throughput\" },\n    { \"label\": \"Latency p99\" },\n    { \"label\": \"Cost\"     },\n    { \"label\": \"Docs\"     },\n    { \"label\": \"Operability\" },\n    { \"label\": \"Ecosystem\" },\n    { \"label\": \"Recovery\" }\n  ],\n  \"series\": [\n    { \"label\": \"Postgres\",  \"color\": \"accent\",  \"values\": [8, 7, 9, 9, 8, 9, 8] },\n    { \"label\": \"Cassandra\", \"color\": \"success\", \"values\": [9, 8, 6, 6, 5, 7, 6] },\n    { \"label\": \"DynamoDB\",  \"color\": \"warn\",    \"values\": [9, 9, 4, 8, 9, 6, 9] }\n  ]\n}","lang":"json"},"output":{"type":"radar","title":"Database shortlist — seven criteria","axes":[{"label":"Throughput"},{"label":"Latency p99"},{"label":"Cost"},{"label":"Docs"},{"label":"Operability"},{"label":"Ecosystem"},{"label":"Recovery"}],"series":[{"label":"Postgres","color":"accent","values":[8,7,9,9,8,9,8]},{"label":"Cassandra","color":"success","values":[9,8,6,6,5,7,6]},{"label":"DynamoDB","color":"warn","values":[9,9,4,8,9,6,9]}],"k":"chart"}}
+```
+
+## Tile cartograms {#family-geo}
+
+Value per region laid out on a coarse world tile grid. NOT a real map — country outlines are not drawn — but the visual rhythm is enough for at-a-glance regional comparisons. The honest name is <code>tile-map</code>; <code>geo</code> stays as an alias.
+
+### type: tile-map (alias: geo) {#chart-geo}
+
+Tile cartogram. <code>regions[]</code> is a list of <code>{id, value, label?}</code> where <code>id</code> is an ISO 3166-1 Alpha-2 country code (US, GB, DE, BR, ...) or the synthetic <code>OTH</code> bucket. The kit ships a fixed tile grid (~60 cells) that approximates a flat world; absent regions render as faint placeholder outlines so the layout reads. Cell fill scales with value in a single-hue sequential ramp. This is intentionally NOT a choropleth — no country outlines, no topojson dependency.
+
+```oku-example
+{"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"geo\",\n  \"title\": \"Site traffic by country (k visits)\",\n  \"regions\": [\n    {\"id\": \"US\", \"value\":  82, \"label\": \"United States\"},\n    {\"id\": \"GB\", \"value\":  18, \"label\": \"United Kingdom\"},\n    {\"id\": \"DE\", \"value\":  24, \"label\": \"Germany\"},\n    {\"id\": \"FR\", \"value\":  11, \"label\": \"France\"},\n    {\"id\": \"BR\", \"value\":  14, \"label\": \"Brazil\"},\n    {\"id\": \"IN\", \"value\":  38, \"label\": \"India\"},\n    {\"id\": \"JP\", \"value\":  21, \"label\": \"Japan\"},\n    {\"id\": \"AU\", \"value\":   9, \"label\": \"Australia\"},\n    {\"id\": \"OTH\",\"value\":  47, \"label\": \"Other\"}\n  ]\n}","lang":"json"},"output":{"type":"geo","title":"Site traffic by country (k visits)","regions":[{"id":"US","value":82,"label":"United States"},{"id":"CA","value":6,"label":"Canada"},{"id":"MX","value":4,"label":"Mexico"},{"id":"BR","value":14,"label":"Brazil"},{"id":"AR","value":3,"label":"Argentina"},{"id":"GB","value":18,"label":"United Kingdom"},{"id":"FR","value":11,"label":"France"},{"id":"DE","value":24,"label":"Germany"},{"id":"ES","value":8,"label":"Spain"},{"id":"IT","value":7,"label":"Italy"},{"id":"NL","value":5,"label":"Netherlands"},{"id":"SE","value":4,"label":"Sweden"},{"id":"PL","value":6,"label":"Poland"},{"id":"TR","value":9,"label":"Türkiye"},{"id":"RU","value":4,"label":"Russia"},{"id":"IN","value":38,"label":"India"},{"id":"CN","value":22,"label":"China"},{"id":"JP","value":21,"label":"Japan"},{"id":"KR","value":12,"label":"South Korea"},{"id":"ID","value":7,"label":"Indonesia"},{"id":"AU","value":9,"label":"Australia"},{"id":"ZA","value":3,"label":"South Africa"},{"id":"NG","value":4,"label":"Nigeria"},{"id":"OTH","value":47,"label":"Other / unmapped"}],"k":"chart"}}
+```

@@ -14,10 +14,10 @@ file copies for offline reading.
 
 ## What's in the box
 
-- **Sources:** `*.json` (kit schema) or `*.md`. Markdown drops in
-  unchanged — relative `.md` links retarget to `.html`, code fences
-  highlight, fenced ` ```mermaid ` becomes a live diagram. The
-  converter handles nested lists, footnotes, definition lists,
+- **Sources:** `*.md` — markdown-first. Prose is plain GFM; kit
+  primitives are ` ```oku-<kind> ` fences with a compact JSON body;
+  ` ```mermaid ` becomes a live diagram (and still renders on GitHub).
+  Relative `.md` links retarget to `.html`, definition lists and
   reference-style links, YAML front-matter, and a sanitised inline
   HTML allowlist.
 - **Primitives:** paragraph / heading / list / code / annotated-code,
@@ -73,7 +73,7 @@ python3 bin/oku serve            # plain Python works too (no extras)
 ```bash
 mkdir -p my-project/docs && cd my-project/docs
 oku init                         # _kit symlink + index.html in cwd
-# author *.json or *.md pages anywhere under the docs root
+# author *.md pages anywhere under the docs root
 oku serve                        # http://localhost:9876 with live reload
 ```
 
@@ -86,38 +86,50 @@ tree and they appear in the site tree alongside JSON pages.
 
 ## Authoring model
 
-Each page is a `*.json` file at any depth under your docs root. A thin
-HTML stub next to it (`*.html`, copy of `src/oku/templates/starter.html`)
-bootstraps the renderer. Authors only ever edit the JSON.
+Each page is a `*.md` file at any depth under your docs root: YAML
+front-matter + a GitHub-flavored markdown body. A thin HTML stub next
+to it (`*.html`, copy of `src/oku/templates/starter.html`) bootstraps
+the renderer. Kit primitives (charts, rich tables, KPI grids, step
+flows, …) are fenced blocks whose body is one compact JSON object:
 
-```jsonc
-{
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
-  "kind": "page",
-  "title": "Iceberg storage layer",
-  "meta": {
-    "eyebrow": "Architecture",
-    "summary": "Open table format with ACID guarantees.",
-    "updated": "2026-05-19",
-    "order": 10
-  },
-  "blocks": [
-    { "kind": "tldr", "summary": "...", "bullets": [...] },
-    { "kind": "section", "id": "overview", "title": "Overview", "blocks": [
-      { "kind": "paragraph", "content": [
-        "Iceberg gives ",
-        { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
-        " transactions over object stores."
-      ]},
-      { "kind": "callout", "type": "note", "title": "Heads up", "content": "..." }
-    ]}
-  ]
-}
+````markdown
+---
+title: Iceberg storage layer
+eyebrow: Architecture
+summary: Open table format with ACID guarantees.
+order: 10
+---
+
+> [!TLDR]
+> Open table format with ACID guarantees.
+>
+> - Catalog / metadata / data separation
+> - Snapshot isolation, time travel
+
+## Overview {#overview}
+
+Iceberg gives [ACID](#g/acid) transactions over object stores.
+
+```oku-chart
+{"type":"bar","rows":[{"label":"reads","value":120},{"label":"writes","value":40}]}
 ```
 
-Full schema in `schema/page.schema.json`. Editors that understand JSON
-Schema (VS Code, Cursor, IntelliJ) get autocomplete for every node
-kind.
+```mermaid
+flowchart LR
+  Catalog --> Metadata --> Data
+```
+````
+
+Any external markdown viewer (GitHub, Obsidian, VS Code) renders the
+prose, tables, and mermaid natively; `oku-*` fence payloads show as
+readable JSON. Need full interactivity? A block-level raw-HTML island
+(custom elements, `<script>`, `<style>`) passes through to the kit
+untouched — `oku check` audits each one.
+
+Fence payload shapes live in `kit/schema/page.schema.json`; `oku
+check` validates every payload against it. Legacy JSON pages (v1/v2)
+keep rendering via built-in shims; `oku migrate` converts them to
+`.md` in place.
 
 ## CLI
 
@@ -127,23 +139,22 @@ Five commands, all run from the project root or a subdirectory:
 oku init                         # one-time, runs in cwd: _kit symlink + index.html stub
 oku check                        # lint the doctree (schema + structural + content)
 oku check --strict               # exit 1 on warnings too
-oku build                        # dist/standalone/ + dist/site/ + dist/markdown/ + search index
+oku build                        # dist/standalone/ + dist/site/ + search index
 oku clean                        # remove dist/ from the current project
 oku serve                        # local HTTP, live reload, Pagefind in background
 oku serve --no-watch             # disable filesystem watcher
 oku serve --no-search            # skip background Pagefind index
 ```
 
-`build` writes three single-purpose trees under `dist/`:
+`build` writes two single-purpose trees under `dist/`:
 
 - `dist/standalone/` — every HTML inlines kit + page JSON +
   `window.__okuManifest`. Open via `file://`, attach to email.
-- `dist/site/` — multi-page site with shared `_oku/` assets and a
-  Pagefind index. One `site-manifest.json` sits at the docs root for
-  the runtime page-nav fetch. Drop on any static host.
-- `dist/markdown/` — one `<name>.md` twin per JSON page plus a single
-  `llms.txt` sitemap. Single canonical home for LLM consumers; not
-  duplicated across the human trees.
+- `dist/site/` — multi-page site with shared `_oku/` assets, a
+  Pagefind index, one `site-manifest.json` at the docs root for the
+  runtime page-nav fetch, and `llms.txt` for AI consumers. Drop on
+  any static host. The `.md` sources themselves are the canonical
+  LLM-readable surface — no twin tree.
 
 `serve` synthesizes `site-manifest.json` and `llms.txt` in memory on
 each request so source dirs stay clean.

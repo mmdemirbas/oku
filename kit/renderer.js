@@ -291,6 +291,11 @@
       e.textContent = label;
       return e;
     }
+    // Cross-page markdown link: a relative `foo.md(#frag)` href points
+    // at the rendered page — rewrite to .html. Absolute URLs,
+    // fragment-only and root-absolute hrefs pass through untouched.
+    const mdLink = href.match(/^(?!\w+:|\/\/|#|\/)(.+?)\.md(#[^\s]*)?$/i);
+    if (mdLink) href = mdLink[1] + '.html' + (mdLink[2] || '');
     const a = document.createElement('a');
     a.textContent = label;
     a.setAttribute('href', href);
@@ -316,6 +321,35 @@
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-');
   }
+
+  // Fence tags that lift to typed blocks — mirrors _FENCE_KINDS in
+  // src/oku/cli.py so a fence renders identically whether the page
+  // arrived as .md (lifted at build time) or as a fence inside a v2
+  // markdown string (lifted here).
+  const FENCE_KINDS = ['chart', 'chart-grid', 'table', 'kpi-grid', 'step-flow',
+    'compare-grid', 'insight', 'example', 'live-snippet', 'annotated-code', 'diagram', 'tldr'];
+
+  function liftTypedFence(lang, src) {
+    if (lang === 'mermaid') return { k: 'diagram', src: src };
+    if (!lang.startsWith('oku-')) return null;
+    const kind = lang.slice(4);
+    if (FENCE_KINDS.indexOf(kind) < 0) return null;
+    let payload;
+    try { payload = JSON.parse(src); } catch (e) { return null; }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    payload.k = kind;
+    return payload;
+  }
+
+  // Inline-level tags never open an HTML island — a paragraph that
+  // happens to start with `<kbd>` stays prose.
+  const INLINE_HTML_TAGS = ['a', 'abbr', 'br', 'code', 'del', 'em', 'ins',
+    'kbd', 'mark', 'samp', 'span', 'strong', 'sub', 'sup'];
+
+  // The active renderer's typed-block dispatch; set per render() pass so
+  // emitMarkdown can hand lifted fence nodes to the same renderers that
+  // handle typed b[] objects.
+  let __renderTypedBlock = null;
 
   function parseMarkdown(src) {
     const lines = String(src || '').split('\n');
@@ -344,7 +378,65 @@
           i++;
         }
         i++; // skip closing fence
-        out.push({ k: 'code', lang: lang, src: body.join('\n') });
+        const fsrc = body.join('\n');
+        const typed = liftTypedFence(lang, fsrc);
+        if (typed) {
+          // Italic-caption convention — diagrams only (the one typed
+          // block whose schema carries `caption`).
+          if (typed.k === 'diagram' && typed.caption === undefined) {
+            let j = i;
+            while (j < lines.length && !lines[j].trim()) j++;
+            const cap = j < lines.length && lines[j].match(/^\*([^*].*)\*\s*$/);
+            if (cap && (j + 1 >= lines.length || !lines[j + 1].trim())) {
+              typed.caption = cap[1].trim();
+              i = j + 1;
+            }
+          }
+          out.push({ k: 'typed', block: typed });
+        } else {
+          out.push({ k: 'code', lang: lang, src: fsrc });
+        }
+        continue;
+      }
+      // Raw HTML island — a block-level tag at column 0 passes through
+      // untouched (full capability: custom elements, <script>, <style>).
+      // script/style/pre/textarea consume to their closing tag; anything
+      // else to the next blank line — CommonMark type-1/6 semantics.
+      const island = isIslandStart(line);
+      if (island) {
+        const tag = island;
+        const buf = [];
+        if (tag === 'script' || tag === 'style' || tag === 'pre' || tag === 'textarea') {
+          const closeRe = new RegExp('</' + tag + '\\s*>', 'i');
+          while (i < lines.length) {
+            buf.push(lines[i]);
+            if (closeRe.test(lines[i])) { i++; break; }
+            i++;
+          }
+        } else {
+          while (i < lines.length && lines[i].trim()) {
+            buf.push(lines[i]);
+            i++;
+          }
+        }
+        out.push({ k: 'html', src: buf.join('\n') });
+        continue;
+      }
+      // Definition list — a term line whose next line is `: definition`.
+      if (line.trim() && !isBlockStart(line) && i + 1 < lines.length && /^:\s+\S/.test(lines[i + 1])) {
+        const pairs = [];
+        while (i < lines.length && lines[i].trim() && !/^:\s/.test(lines[i])
+               && i + 1 < lines.length && /^:\s+\S/.test(lines[i + 1])) {
+          const term = lines[i].trim();
+          i++;
+          const defs = [];
+          while (i < lines.length && /^:\s+\S/.test(lines[i])) {
+            defs.push(lines[i].replace(/^:\s+/, ''));
+            i++;
+          }
+          pairs.push({ term: term, defs: defs });
+        }
+        out.push({ k: 'dl', pairs: pairs });
         continue;
       }
       // Heading.
@@ -404,12 +496,23 @@
     return out;
   }
 
+  // A block-level HTML tag at column 0 opens an island; inline-level
+  // tags don't. Returns the lowercase tag name, or null.
+  function isIslandStart(line) {
+    const m = line.match(/^<\/?([a-zA-Z][\w-]*)(?:[\s/>]|$)/);
+    if (!m) return null;
+    const tag = m[1].toLowerCase();
+    return INLINE_HTML_TAGS.indexOf(tag) < 0 ? tag : null;
+  }
+
   function isBlockStart(line) {
     return /^#{1,6}\s/.test(line)
       || /^>\s?/.test(line)
       || /^```/.test(line)
       || /^-{3,}\s*$/.test(line)
-      || /^(\s*)([-*]|\d+[.)])\s+/.test(line);
+      || /^(\s*)([-*]|\d+[.)])\s+/.test(line)
+      || /^:\s+\S/.test(line)
+      || isIslandStart(line) !== null;
   }
 
   function splitTableRow(line) {
@@ -536,6 +639,36 @@
           host.appendChild(renderMarkdownTable(node));
           break;
         }
+        case 'html': {
+          // Raw HTML island. createContextualFragment (unlike
+          // innerHTML) yields <script> elements that execute on
+          // insertion — islands are full-capability by design.
+          host.appendChild(document.createRange().createContextualFragment(node.src));
+          break;
+        }
+        case 'dl': {
+          const dl = document.createElement('dl');
+          dl.className = 'md-dl';
+          for (const pair of node.pairs) {
+            const dt = document.createElement('dt');
+            parseInline(pair.term, dt);
+            dl.appendChild(dt);
+            for (const d of pair.defs) {
+              const dd = document.createElement('dd');
+              parseInline(d, dd);
+              dl.appendChild(dd);
+            }
+          }
+          host.appendChild(dl);
+          break;
+        }
+        case 'typed': {
+          if (__renderTypedBlock) {
+            const el = __renderTypedBlock(node.block);
+            if (el) host.appendChild(el);
+          }
+          break;
+        }
       }
     }
   }
@@ -612,7 +745,20 @@
         if (typeof seg === 'string') text.push(seg);
         else if (seg.__nested) sub.push(seg.__nested.join('\n'));
       }
-      parseInline(text.join(' ').trim(), li);
+      let itemText = text.join(' ').trim();
+      // GFM task-list item: leading [ ] / [x] becomes a checkbox.
+      const task = itemText.match(/^\[([ xX])\]\s+/);
+      if (task) {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.disabled = true;
+        cb.checked = task[1] !== ' ';
+        li.className = 'task-item';
+        li.appendChild(cb);
+        li.appendChild(document.createTextNode(' '));
+        itemText = itemText.slice(task[0].length);
+      }
+      parseInline(itemText, li);
       for (const ns of sub) {
         const parsed = parseMarkdown(ns);
         emitMarkdown(li, parsed, null);
@@ -676,6 +822,7 @@
     render(page, host) {
       this.host = host || this.host || document.querySelector('main#main-content') || document.querySelector('main') || document.body;
       this.warnings = [];
+      __renderTypedBlock = (block) => this._renderTyped(block);
 
       // v1 → v2 shim. Older pages still on disk (or in other projects
       // sharing this kit) keep rendering — no migrate run required.

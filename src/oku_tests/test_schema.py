@@ -7,7 +7,6 @@ ways. Pin the contract here.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -16,23 +15,26 @@ jsonschema = pytest.importorskip("jsonschema")
 
 
 DOC_FILES = [
-    "architecture.json",
-    "cli.json",
-    "glossary.json",
-    "index.json",
-    "reference.json",
+    "architecture.md",
+    "cli.md",
+    "glossary.md",
+    "index.md",
+    "reference.md",
 ]
 
 
 @pytest.mark.parametrize("doc_name", DOC_FILES)
 def test_docs_page_validates(doc_name: str, page_schema: dict, repo_root: Path) -> None:
-    """Each docs/*.json conforms to schema/page.schema.json.
+    """Each docs/*.md source, converted, conforms to page.schema.json.
 
     The repo's CI / build-time validator runs the same check via the
     optional jsonschema dependency; this test makes it explicit and
     fail-fast when running pytest.
     """
-    data = json.loads((repo_root / "docs" / doc_name).read_text(encoding="utf-8"))
+    from oku.cli import md_to_v2_page
+
+    text = (repo_root / "docs" / doc_name).read_text(encoding="utf-8")
+    data = md_to_v2_page(text, default_title=doc_name)
     jsonschema.validate(data, page_schema)
 
 

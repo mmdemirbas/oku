@@ -20,66 +20,92 @@ file is the catalog of the one exception.
 ## What this repo is
 
 A shared HTML chrome kit + a Python CLI (`oku`) that authors
-single-source JSON pages and renders them in the browser via Custom
-Elements. No build step for content; the
-kit is loaded as static assets and `renderer.js` walks the JSON
-tree at page load.
+single-source **markdown pages** and renders them in the browser via
+Custom Elements. No build step for content; the CLI converts each
+`.md` source into a v2 page dict (`md_to_v2_page`) on the fly and
+`renderer.js` walks it at page load.
 
-Authoring shape: `docs/<page>.json` (data) + `docs/<page>.html` (thin
-stub that loads the kit and the page JSON).
+Authoring shape: `docs/<page>.md` (source) + `docs/<page>.html` (thin
+stub that loads the kit; it fetches `<page>.json`, which `oku serve` /
+`oku build` synthesize from the .md).
 
-### Page format (v2)
+### Page format (v3 — markdown-first)
 
-A page is `{k:"page", t, m, b}`. Inside `b[]`, a **string is parsed
-as GitHub-flavored markdown** at render time; an **object is a typed
-primitive** (chart, diagram, table, kpi-grid, step-flow, compare-grid,
-code, annotated-code, live-snippet, example, insight, chart-grid).
+A page is a `.md` file: YAML front-matter + a GFM body. The body is
+**plain markdown**; kit primitives live in typed fences whose body is
+ONE compact JSON object (same payload shapes as the schema `$defs`):
 
-```json
-{"k":"page","t":"Architecture","m":{"accent":"teal","date":"2026-06-01"},"b":[
-"> [!TLDR]\n> Short summary.\n>\n> - bullet 1\n> - bullet 2",
-"## Section title {#anchor-id}\nLead paragraph with *emphasis* and `code`.\n\nMore prose.",
-{"k":"chart","type":"bar","rows":[{"label":"a","value":60},{"label":"b","value":80}]},
-"## Next section\nMore prose."
-]}
+````markdown
+---
+title: Architecture
+accent: teal
+date: 2026-06-11
+order: 40
+summary: Runtime mental model + build pipeline.
+---
+
+> [!TLDR]
+> Short summary.
+>
+> - bullet 1
+> - bullet 2
+
+## Section title {#anchor-id}
+
+Lead paragraph with *emphasis* and `code`.
+
+```oku-chart
+{"type":"bar","rows":[{"label":"a","value":60},{"label":"b","value":80}]}
 ```
 
-Heading levels inside markdown strings drive section nesting — `##`
-opens a `<section>`, `###` is a sub-heading inside it. Anchor IDs
-override the auto-slug via `{#id}`. Glossary terms and ext-refs use
-the link-prefix convention: `[label](#g/term-id)` → `<glossary-term>`,
-`[label](#x/source-id)` → `<ext-ref>`.
-
-Storage: **emit compact JSON** (no pretty-printing). One newline per
-top-level item in `b[]` is fine for readability; nothing more.
-
-Admonitions (callouts) are GFM blockquotes with a type tag. Standard
-GFM types: `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`. The kit
-adds one extension: `TLDR` (gets the special TL;DR layout). A title
-after the type tag is a kit extension:
-
-```
-> [!NOTE] Optional title
-> Body line.
+```mermaid
+flowchart TB
+  A --> B
 ```
 
-### Older pages (v1)
+*An italic line right after a mermaid fence becomes the caption.*
+````
 
-Pages on disk authored against the v1 shape (`kind/title/blocks` with
-`section/paragraph/heading/list/callout/info-tip` nesting) keep
-rendering — `renderer.js` converts them to v2 in memory on load.
-Run `oku migrate [path]` to update the on-disk source to v2 when
-you want the file to match what new pages look like.
+- Fence tags: `oku-chart`, `oku-table`, `oku-kpi-grid`, `oku-step-flow`,
+  `oku-compare-grid`, `oku-example`, `oku-insight`, `oku-live-snippet`,
+  `oku-annotated-code`, `oku-chart-grid`, `oku-tldr`, `oku-diagram` —
+  plus plain `mermaid` (GitHub renders it natively).
+- `##` opens a `<section>`, `###` is a sub-heading inside it. `{#id}`
+  overrides the auto-slug. Glossary / ext-refs: `[label](#g/term-id)`,
+  `[label](#x/source-id)`.
+- Admonitions are GFM blockquotes: `NOTE`, `TIP`, `IMPORTANT`,
+  `WARNING`, `CAUTION` + the kit's `TLDR`. `> [!NOTE] Title` carries
+  an optional title.
+- **Strict-GFM subset** (linted): no indented code blocks, no setext
+  (`===`) headings, no lazy blockquote continuation. The subset is
+  valid GFM, so GitHub/Obsidian render every page.
+- **HTML islands**: a block-level HTML tag at column 0 (custom
+  elements and `<script>`/`<style>` included) passes through to the
+  DOM untouched — full capability, no restrictions. `oku check` lists
+  every island as an info-level audit line; external markdown viewers
+  strip islands. Inline HTML in prose stays literal text.
+- Definition lists (`Term` / `: def`) and task lists (`- [x]`)
+  are supported. Footnotes / reference-style links are NOT yet —
+  roadmap item.
+
+### Older pages (v1/v2 JSON)
+
+JSON pages keep rendering indefinitely: v2 (`k/t/m/b`) natively,
+v1 (`kind/title/blocks`) via the in-memory shim. Run
+`oku migrate [path]` to convert any page-JSON to a v3 `.md` source
+(deterministic, round-trips; the .json is removed).
 
 ### Build outputs
 
-`oku build` produces three single-purpose trees under `dist/`:
+`oku build` produces two single-purpose trees under `dist/`:
 - `dist/standalone/` — self-contained single files (humans, file://).
   Each HTML inlines kit + page JSON + `window.__okuManifest`.
 - `dist/site/` — shared-assets multi-page site with Pagefind search
-  (humans, HTTP). Holds the one `site-manifest.json` chrome.js fetches.
-- `dist/markdown/` — `page.md` twins + `llms.txt` (AI/LLM consumers).
-  Single canonical home; not duplicated across the human trees.
+  (humans, HTTP). Holds the one `site-manifest.json` chrome.js fetches
+  + `llms.txt` at the docs root.
+
+There is no `dist/markdown/` tree: the `.md` sources ARE the canonical
+AI/LLM surface.
 
 ## Top-level files
 
@@ -87,13 +113,13 @@ you want the file to match what new pages look like.
 |---|---|
 | `chrome.js` | Custom Elements (chart with 28 render modes, diagram, live-snippet, annotated-code, glossary-term, ext-ref, page-chrome / page-nav / page-toc), init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring, bar-chart hover/click-pin/legend toggle), Prism + Mermaid lazy loaders, glossary tooltip controller, lightbox with pan/zoom/pinch fullscreen. ~7k LoC. |
 | `chrome.css` | All visual tokens (light/dark, --series-1..--series-10, --prose-width), layout grid (asymmetric bleed, four-mode content width), every primitive's styling. ~3k LoC. |
-| `renderer.js` | JSON → DOM mapping. Walks `b[]`; strings parsed via inline markdown parser (headings → sections, paragraphs, lists, fences, admonitions); objects dispatched to typed renderers (chart/diagram/table/step-flow/compare-grid/example/insight/kpi-grid/annotated-code/live-snippet/chart-grid). v1→v2 shim at the top lets older pages keep rendering. ~1.5k LoC. |
-| `kit/schema/page.schema.json` | JSON-schema for page sources. Every `docs/*.json` validates against it; the optional `jsonschema` dep makes the check active. |
+| `renderer.js` | page JSON → DOM mapping. Walks `b[]`; strings parsed by the GFM block parser (headings → sections, paragraphs, lists, GFM tables, fences — `oku-*`/`mermaid` fences lift to typed blocks, def-lists, task-lists, HTML islands w/ executing scripts, admonitions); typed objects dispatched to typed renderers. v1→v2 shim keeps older pages rendering. ~1.6k LoC. |
+| `kit/schema/page.schema.json` | JSON-schema for page payloads. Every page (converted from .md) validates against it; the optional `jsonschema` dep makes the check active. Chart `type` enum here is the single source of truth for known chart types. |
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
-| `src/oku/cli.py` | `oku init / build / clean / check / migrate / serve` plus the markdown converter (front-matter, nested lists, footnotes, def-lists, ref-links, sanitised inline HTML), the `_md_block` markdown twin emitter, and the v1→v2 page converter (`_v1_to_v2`). |
-| `src/oku/templates/` | `starter.{json,html}` — pair to copy when starting a new page. |
+| `src/oku/cli.py` | `oku init / build / clean / check / migrate / serve` plus the v3 converter pair (`md_to_v2_page` / `page_to_md`), the strict-GFM + island lint (`_lint_md_string`), and the v1→v2 page shim (`_v1_to_v2`). |
+| `src/oku/templates/` | `starter.{md,html}` — pair to copy when starting a new page. |
 | `bin/oku` | PEP 723 shim — run without install via `uv run bin/oku …`. Points at `oku.cli:main`. |
-| `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.json` tracks open phases. |
+| `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.md` tracks open phases. |
 
 ## Develop / verify
 
@@ -101,9 +127,9 @@ you want the file to match what new pages look like.
 uv sync --extra dev           # pulls pytest, ruff, jsonschema
 oku check                     # schema + structural lint (the fast verify gate)
 oku check --strict            # exit 1 on warnings too
-oku build                     # writes dist/{standalone,site,markdown}/
+oku build                     # writes dist/{standalone,site}/
 oku serve --no-watch          # local server (live-reload on by default)
-uv run pytest -q              # 249+ tests; should all pass
+uv run pytest -q              # 300+ tests; should all pass
 uv run ruff check . && uv run ruff format --check .
 ```
 
@@ -153,12 +179,12 @@ English words. The page can flip to TR or EN without touching kit
 code.
 
 **No demo sibling pages.** Every example for a primitive lives
-inside `docs/reference.json` next to the primitive's heading: code
+inside `docs/reference.md` next to the primitive's heading: code
 sample + rendered block. Don't create `docs/<thing>-demo.{html,json}`
 — `src/oku_tests/test_content_regression.py::TestNoStrayDemoPages` enforces.
 
 **No process/round/historical references in docs.** "Round-N",
-"v2 review", "fixed in round 5" etc. are forbidden in `docs/*.json`.
+"v2 review", "fixed in round 5" etc. are forbidden in `docs/*.md`.
 Refer to current behaviour, not how it got here. Past sessions left
 this kind of breadcrumb in many places; `git grep -i round docs/`
 should return nothing relevant.
@@ -267,7 +293,7 @@ computed-style assertion, the rule isn't found yet.
 ## What NOT to do
 
 - Don't introduce a `docs/<thing>-demo.{html,json}` page. Fold demos
-  into `docs/reference.json`.
+  into `docs/reference.md`.
 - Don't reintroduce the dual-pane sidebar / right-side TOC / mid-edge
   collapse tab. They were explicitly removed.
 - Don't add English words to count badges or stats text. Numbers only.

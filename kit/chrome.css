@@ -1333,6 +1333,11 @@ h4 {
 p { margin: 0 0 18px 0; }
 ul, ol { padding-left: 22px; margin: 0 0 18px 0; }
 li { margin: 8px 0; }
+li.task-item { list-style: none; margin-left: -18px; }
+li.task-item input[type="checkbox"] { accent-color: var(--accent); vertical-align: -2px; }
+dl.md-dl { margin: 0 0 18px 0; }
+dl.md-dl dt { font-weight: 700; margin-top: 10px; }
+dl.md-dl dd { margin: 4px 0 4px 22px; color: var(--text-soft); }
 strong { color: var(--text); font-weight: 700; }
 em { color: var(--text-soft); font-style: italic; }
 code:not(pre code) {

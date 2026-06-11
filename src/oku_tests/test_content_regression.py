@@ -21,6 +21,34 @@ from typing import Iterator
 import pytest
 
 
+def _iter_docs_pages(repo_root: Path):
+    """Yield every docs/ page as a parsed dict — v3 .md sources via
+    md_to_v2_page plus any remaining .json (migration windows)."""
+    from oku.cli import md_to_v2_page
+
+    for p in sorted((repo_root / "docs").glob("*.json")):
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(d, dict):
+            yield d
+    for p in sorted((repo_root / "docs").glob("*.md")):
+        yield md_to_v2_page(p.read_text(encoding="utf-8"), default_title=p.stem)
+
+
+def _docs_page(repo_root: Path, name: str) -> dict:
+    """Load a docs page by its legacy .json name, preferring the v3 .md
+    source (converted via md_to_v2_page) when the JSON is gone."""
+    from oku.cli import md_to_v2_page
+
+    stem = name.rsplit(".", 1)[0]
+    md = repo_root / "docs" / f"{stem}.md"
+    if md.exists():
+        return md_to_v2_page(md.read_text(encoding="utf-8"), default_title=stem)
+    return json.loads((repo_root / "docs" / name).read_text(encoding="utf-8"))
+
+
 def _block_kind(b: dict | None) -> str:
     """Return the block discriminator regardless of v1 (`kind`) or v2 (`k`) shape."""
     if not isinstance(b, dict):
@@ -30,10 +58,12 @@ def _block_kind(b: dict | None) -> str:
 
 @pytest.fixture(scope="module")
 def reference(repo_root: Path) -> dict:
-    """Combined view of the kit's own docs — every JSON page under
-    docs/ folded into one virtual page. Merges both legacy v1 `blocks`
-    arrays and v2 `b` arrays so tests written for either shape keep
-    working during the migration window."""
+    """Combined view of the kit's own docs — every page source under
+    docs/ folded into one virtual page. v3 .md sources are converted
+    via md_to_v2_page; any remaining .json (legacy v1 `blocks` or v2
+    `b`) is merged too so tests keep working during migration windows."""
+    from oku.cli import md_to_v2_page
+
     combined: dict = {"kind": "page", "title": "all docs", "blocks": [], "b": []}
     for p in sorted((repo_root / "docs").glob("*.json")):
         try:
@@ -46,6 +76,9 @@ def reference(repo_root: Path) -> dict:
             combined["blocks"].extend(d["blocks"])
         if isinstance(d.get("b"), list):
             combined["b"].extend(d["b"])
+    for p in sorted((repo_root / "docs").glob("*.md")):
+        d = md_to_v2_page(p.read_text(encoding="utf-8"), default_title=p.stem)
+        combined["b"].extend(d.get("b") or [])
     return combined
 
 
@@ -280,11 +313,11 @@ class TestRoadmapAndCleanup:
 
     @pytest.fixture(scope="class")
     def index_json(self, repo_root: Path) -> dict:
-        return json.loads((repo_root / "docs" / "index.json").read_text(encoding="utf-8"))
+        return _docs_page(repo_root, "index.json")
 
     @pytest.fixture(scope="class")
     def roadmap_json(self, repo_root: Path) -> dict:
-        return json.loads((repo_root / "docs" / "roadmap.json").read_text(encoding="utf-8"))
+        return _docs_page(repo_root, "roadmap.json")
 
     def test_plans_directory_retired(self, repo_root: Path) -> None:
         assert not (repo_root / "docs" / "plans").exists(), (
@@ -435,11 +468,7 @@ class TestChromeKitMarkers:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "data-default-view" in js, "chrome.js must read data-default-view to seed the toggle"
         rendered = []
-        for p in sorted((repo_root / "docs").glob("*.json")):
-            try:
-                d = json.loads(p.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
+        for d in _iter_docs_pages(repo_root):
             rendered.extend(
                 b
                 for b in _walk_blocks(d)
@@ -460,11 +489,7 @@ class TestChromeKitMarkers:
         cli = (repo_root / "src" / "oku" / "cli.py").read_text(encoding="utf-8")
         assert '"example"' in cli, "cli._KNOWN_BLOCK_KINDS missing 'example'"
         examples = []
-        for p in sorted((repo_root / "docs").glob("*.json")):
-            try:
-                d = json.loads(p.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
+        for d in _iter_docs_pages(repo_root):
             examples.extend(b for b in _walk_blocks(d) if isinstance(b, dict) and _block_kind(b) == "example")
         assert examples, "kit docs should use at least one `example` block"
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
@@ -523,12 +548,7 @@ class TestChromeKitMarkers:
             ".okc-geo",
         ):
             assert cls in css, f"chart css missing class {cls}"
-        docs = []
-        for p in sorted((repo_root / "docs").glob("*.json")):
-            try:
-                docs.append(json.loads(p.read_text(encoding="utf-8")))
-            except (OSError, json.JSONDecodeError):
-                continue
+        docs = list(_iter_docs_pages(repo_root))
         for hid in (
             "chart-sankey",
             "chart-network",
@@ -546,11 +566,7 @@ class TestChromeKitMarkers:
         sankey-beta."""
         found_section = False
         diagrams_in_compare = 0
-        for p in sorted((repo_root / "docs").glob("*.json")):
-            try:
-                d = json.loads(p.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
+        for d in _iter_docs_pages(repo_root):
             if _has_heading(d, id_="mermaid-supported"):
                 found_section = True
             for b in _walk_blocks(d):
@@ -581,7 +597,7 @@ class TestChromeKitMarkers:
     def test_chart_family_overview_present(self, repo_root: Path) -> None:
         """P3 — chart subsection opens with a compare-grid grouping
         the 28 variants by intent."""
-        charts = json.loads((repo_root / "docs" / "charts.json").read_text(encoding="utf-8"))
+        charts = _docs_page(repo_root, "charts.json")
         assert _has_heading(charts, id_="chart-families"), (
             "chart family overview heading missing in charts.json"
         )
@@ -1282,9 +1298,9 @@ class TestChromeKitMarkers:
         out: "Some examples are different than the rendered content
         below it, some doesn't have a rendered counterpart at all."
         """
-        page_path = repo_root / "docs" / "reference.json"
-        assert page_path.exists(), "docs/reference.json missing"
-        data = json.loads(page_path.read_text(encoding="utf-8"))
+        page_path = repo_root / "docs" / "reference.md"
+        assert page_path.exists(), "docs/reference.md missing"
+        data = _docs_page(repo_root, "reference.json")
 
         def inline_kinds(node, acc=None):
             if acc is None:
@@ -1463,11 +1479,7 @@ class TestChromeKitMarkers:
         )
 
         demo_seen = False
-        for p in sorted((repo_root / "docs").glob("*.json")):
-            try:
-                d = json.loads(p.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
+        for d in _iter_docs_pages(repo_root):
             for block in _walk_blocks(d):
                 if not isinstance(block, dict) or _block_kind(block) != "table":
                     continue
@@ -1625,13 +1637,11 @@ class TestDesignReviewPage:
     bug we want this class to catch."""
 
     def test_design_review_json_parses(self, repo_root: Path) -> None:
-        p = repo_root / "docs" / "design-review.json"
-        assert p.exists(), "docs/design-review.json missing — site nav loses the live decision log"
-        data = json.loads(p.read_text(encoding="utf-8"))
-        assert _block_kind(data) == "page", "design-review.json is not a page (k/kind != 'page')"
-        assert _page_title(data), (
-            "design-review.json missing title — nav entry would render with the filename"
-        )
+        p = repo_root / "docs" / "design-review.md"
+        assert p.exists(), "docs/design-review.md missing — site nav loses the live decision log"
+        data = _docs_page(repo_root, "design-review.json")
+        assert _block_kind(data) == "page", "design-review.md is not a page (k/kind != 'page')"
+        assert _page_title(data), "design-review.md missing title — nav entry would render with the filename"
 
     def test_design_review_in_site_manifest_after_build(self, tmp_path: Path, repo_root: Path) -> None:
         """End-to-end: build the project and verify design-review appears
@@ -2083,9 +2093,8 @@ class TestRadarRichSample:
     decoration."""
 
     def test_radar_example_has_real_data(self, repo_root: Path) -> None:
-        import json as _json
 
-        data = _json.loads((repo_root / "docs" / "charts.json").read_text(encoding="utf-8"))
+        data = _docs_page(repo_root, "charts.json")
 
         # Walk to find the radar example output
         def walk(node):
@@ -2185,9 +2194,8 @@ class TestMermaidUniversalHover:
             )
 
     def test_gantt_sample_is_realistic(self, repo_root: Path) -> None:
-        import json as _json
 
-        diagrams = _json.loads((repo_root / "docs" / "diagrams.json").read_text(encoding="utf-8"))
+        diagrams = _docs_page(repo_root, "diagrams.json")
         src = ""
 
         def walk(node):
@@ -2275,7 +2283,7 @@ class TestGeoHonestNaming:
         )
 
     def test_docs_drop_real_world_map_claim(self, repo_root: Path) -> None:
-        text = (repo_root / "docs" / "charts.json").read_text(encoding="utf-8")
+        text = (repo_root / "docs" / "charts.md").read_text(encoding="utf-8")
         assert "Values placed on a real-world map." not in text, (
             "Docs must NOT claim the geo chart is a 'real-world map' — "
             "it's a tile cartogram; calling it a map overpromises"
@@ -2670,7 +2678,7 @@ class TestArcDiagram:
         """arc-diagram reuses the network/sankey nodes+links shape so
         authors don't have to learn a third payload for a third graph
         layout. The doc example must explicitly use both keys."""
-        charts = json.loads((repo_root / "docs" / "charts.json").read_text(encoding="utf-8"))
+        charts = _docs_page(repo_root, "charts.json")
         # Walk every chart with type=arc-diagram; at least one must
         # declare nodes and links in its payload (typed or as JSON
         # source inside an example block).
@@ -2792,7 +2800,7 @@ class TestEveryChartTypeIsDocumented:
     def test_every_enum_type_has_doc_section(self, repo_root: Path) -> None:
         schema = json.loads((repo_root / "kit" / "schema" / "page.schema.json").read_text(encoding="utf-8"))
         enum = schema["$defs"]["chart"]["properties"]["type"]["enum"]
-        charts = json.loads((repo_root / "docs" / "charts.json").read_text(encoding="utf-8"))
+        charts = _docs_page(repo_root, "charts.json")
         missing: list[str] = []
         for t in enum:
             anchor = self.ALIAS_TO_DOC.get(t, f"chart-{t}")

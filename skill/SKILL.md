@@ -70,9 +70,9 @@ review, a team-facing brief, or a personal learning note. Same vocabulary,
 same routing. The visual richness this skill describes elsewhere sits
 *on top of* this content discipline, not in place of it.
 
-## Verify after every JSON edit — non-negotiable
+## Verify after every page edit — non-negotiable
 
-After ANY edit to a `docs/*.json` page (or any kit schema), run:
+After ANY edit to a `docs/*.md` page source (or any kit schema), run:
 
 ```
 oku check
@@ -88,12 +88,12 @@ output for the offending file + path when non-zero.
 
 This applies to:
 
-- Every individual JSON edit during a multi-edit session — not just
+- Every individual page edit during a multi-edit session — not just
   the last one. Schema errors compound and the path-pointer messages
   get less precise the more invalid blocks coexist.
-- Plan files under `docs/plans/*.json`, page files under `docs/*.json`,
-  and any starter / template JSON. All validate against the same
-  schema.
+- Page sources under `docs/*.md` and any starter / template. Typed
+  fence payloads all validate against the same schema; the strict-GFM
+  subset and HTML-island audit run in the same pass.
 - Skill-file authoring (this file): not subject to the check, but if
   you touch the kit's schema itself, ALSO re-run check across the
   repo's existing pages.
@@ -113,7 +113,7 @@ Failure recovery rules:
 - `engine` is NOT a valid key on `diagram` blocks — Mermaid is the
   only engine; just pass `source: "..."`.
 
-**Never declare a JSON edit done if `oku check` exits non-zero.**
+**Never declare a page edit done if `oku check` exits non-zero.**
 
 For the strict gate before delivery, use `oku check --strict`
 (exits 1 on warnings too). For partial passes during iteration, plain
@@ -546,9 +546,9 @@ These two are the checks most likely to be skipped — don't.
 **Automated (every artifact — run this first):**
 
 Run `oku check --strict` from the project root after you finish
-authoring. The linter validates every page-JSON against the schema and
-flags structural / content issues that the browser-side checks below
-can't see:
+authoring. The linter validates every page (typed fence payloads
+against the schema) and flags structural / content issues that the
+browser-side checks below can't see:
 
 - Schema violations (missing required fields, unknown kinds).
 - Deprecated primitives (`bar-chart`, `scope-grid`) — both fold into
@@ -561,8 +561,13 @@ can't see:
   in any prose. The kit documents current behaviour, not history.
 - Chart shape errors: `type:bar` without `rows`, `type:scatter|line`
   without `series`, unknown chart types.
-- Stray demo pages (`*-demo.html|json`) outside the one historical
-  exception (`markdown-demo.json`).
+- Strict-GFM subset violations (setext headings, indented code
+  blocks, lazy blockquote continuation, ambiguous `---`) and
+  ```oku-* fences that failed to lift (bad JSON / unknown kind).
+- HTML islands (info-level audit — each island is a deliberate,
+  visible decision).
+- Stray demo pages (`*-demo.html|md`) outside the one historical
+  exception (`markdown-demo.md`).
 
 Use `--json` for machine-parseable output, `--verbose` to also see
 info-level nudges (missing `meta.summary`, code blocks without a
