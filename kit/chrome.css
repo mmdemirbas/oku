@@ -815,17 +815,19 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 }
 .okt-lightbox-frame {
   position: relative;
-  /* Explicit size, not a cap — the frame should always fill the viewport
-     so img/svg/table children have a stable box to stretch into. A
-     max-* alone shrinks the frame to its content, which left small
-     diagrams smaller in the "expanded" view than on the page. */
-  width: 92vw; height: 92vh;
+  /* Explicit size, not a cap — the frame fills the FULL viewport so
+     expanded charts / diagrams get every available pixel. A max-*
+     alone shrinks the frame to its content, which left small diagrams
+     smaller in the "expanded" view than on the page. */
+  width: 100vw; height: 100vh;
+  width: 100dvw; height: 100dvh;
   display: flex; flex-direction: column;
   z-index: 1;
 }
 .okt-lightbox-close {
   position: absolute;
-  top: -44px; right: 0;
+  top: 10px; right: 10px;
+  z-index: 3;
   width: 36px; height: 36px;
   background: var(--surface); color: var(--text);
   border: 1px solid var(--border); border-radius: 8px;
@@ -842,9 +844,9 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 .okt-lightbox-content {
   display: flex; align-items: center; justify-content: center;
   background: var(--surface);
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  padding: 12px;
+  border: none;
+  border-radius: 0;
+  padding: 8px;
   flex: 1;
   width: 100%;
   min-width: 0; min-height: 0;

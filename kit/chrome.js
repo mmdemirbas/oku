@@ -10254,14 +10254,25 @@ class OkuDiagram extends HTMLElement {
         title: 'Expand to fullscreen',
         icon: ICON_EXPAND,
         run: function () {
-          var svg = self.querySelector('.okd-render svg');
-          if (!svg || !window.__okuLightbox) return;
-          var copy = svg.cloneNode(true);
-          copy.removeAttribute('width');
-          copy.removeAttribute('height');
-          copy.style.width = '100%';
-          copy.style.height = 'auto';
-          __okuLightbox.open(copy, { title: caption || 'Diagram' });
+          if (!self.querySelector('.okd-render svg') || !window.__okuLightbox) return;
+          // Move the LIVE host into the lightbox (same pattern as
+          // charts) — a cloned svg loses node-hover highlighting and
+          // node tooltips, and okd-* CSS stops matching without the
+          // oku-diagram ancestor. A placeholder keeps the inline slot;
+          // onClose returns the host to its origin.
+          var placeholder = document.createComment('okd-fullscreen-placeholder');
+          self.parentNode.insertBefore(placeholder, self);
+          self.classList.add('okd-fullscreen');
+          __okuLightbox.open(self, {
+            title: caption || 'Diagram',
+            onClose: function () {
+              self.classList.remove('okd-fullscreen');
+              if (placeholder.parentNode) {
+                placeholder.parentNode.insertBefore(self, placeholder);
+                placeholder.parentNode.removeChild(placeholder);
+              }
+            }
+          });
         }
       }
     ]);

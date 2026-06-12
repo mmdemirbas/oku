@@ -185,3 +185,47 @@ def test_inline_html_allowlist_renders(page, site_url):
         }"""
     )
     assert literal == 0, "raw inline tags visible in prose"
+
+
+def test_lightbox_uses_full_viewport_and_keeps_live_content(page, site_url):
+    """Expanded views must (a) fill the whole browser area and (b) move
+    the LIVE element in — clones lose tooltips and hover wiring. Close
+    must return the element to its inline slot."""
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/architecture.html")
+    page.wait_for_selector("oku-diagram .okd-render svg")
+
+    page.evaluate("document.querySelector('oku-diagram').__live = 1")
+    page.hover("oku-diagram")
+    page.click('oku-diagram [title="Expand to fullscreen"]')
+    page.wait_for_selector(".okt-lightbox.open")
+
+    frame = page.locator(".okt-lightbox-frame").bounding_box()
+    vw, vh = page.evaluate("[innerWidth, innerHeight]")
+    assert abs(frame["width"] - vw) <= 1 and abs(frame["height"] - vh) <= 1, (
+        f"lightbox frame {frame['width']}x{frame['height']} must fill viewport {vw}x{vh}"
+    )
+    close = page.locator(".okt-lightbox-close").bounding_box()
+    assert close["y"] >= 0 and close["x"] + close["width"] <= vw, "close button must sit inside the viewport"
+    assert page.evaluate("document.querySelector('.okt-lightbox oku-diagram')?.__live") == 1, (
+        "lightbox must contain the LIVE diagram host, not a clone"
+    )
+
+    page.click(".okt-lightbox-close")
+    page.wait_for_timeout(300)
+    assert page.evaluate("document.querySelector('main oku-diagram')?.__live") == 1, (
+        "close must return the live host to its inline slot"
+    )
+    assert page.evaluate("!document.querySelector('.okt-lightbox oku-diagram')")
+
+
+def test_lightbox_chart_tooltip_still_fires(page, site_url):
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/charts.html")
+    page.wait_for_selector('oku-chart[type="line"] svg')
+    page.hover('oku-chart[type="line"]')
+    page.click('oku-chart[type="line"] [title*="ullscreen"]')
+    page.wait_for_selector(".okt-lightbox.open")
+    page.locator(".okt-lightbox oku-chart svg").first.hover(position={"x": 150, "y": 100})
+    page.wait_for_selector(".okc-tooltip.visible", timeout=3000)
+    page.keyboard.press("Escape")
