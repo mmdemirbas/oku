@@ -4776,7 +4776,7 @@ oku-diagram {
    overflowing box leaks into / past the column edge and reads as a
    "trim". The fullscreen lightbox shows the full diagram for cases
    where the inline view ends up clipping anything important. */
-oku-diagram .okd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; overflow: hidden; }
+oku-diagram .okd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; overflow-x: auto; overflow-y: hidden; }
 
 /* Mermaid diagram interactivity — minimal: hover on a node lifts
    it visually (accent stroke + slight scale via filter). Click

@@ -110,3 +110,78 @@ def test_task_list_and_definition_list_render(page, site_url):
     assert boxes.count() == 3
     assert page.locator("li.task-item input:checked").count() == 2
     assert page.locator("dl.md-dl dt").count() == 2
+
+
+def test_path_router_keeps_url_and_content_in_sync(page, site_url):
+    """The nav bug class: URL path and rendered page must never
+    diverge. Tree-click routes via pushState (no reload), reload keeps
+    the page, Back restores the previous one."""
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/charts.html")
+    assert page.title() == "Charts"
+    assert page.locator("oku-chart").count() >= 40
+
+    page.evaluate("window.__navMarker = 42")
+    page.click('page-nav a[href$="diagrams.html"]')
+    page.wait_for_function("document.title === 'Diagrams'")
+    assert page.evaluate("location.pathname").endswith("/docs/diagrams.html")
+    assert page.evaluate("window.__navMarker === 42"), "tree click must not full-reload"
+    assert page.locator("oku-diagram").count() >= 5
+
+    page.reload()
+    page.wait_for_selector("main section")
+    assert page.title() == "Diagrams", "reload must keep the routed page"
+
+    page.go_back()
+    page.wait_for_function("document.title === 'Charts'")
+    assert page.evaluate("location.pathname").endswith("/docs/charts.html")
+
+
+def test_legacy_hash_urls_normalize_to_real_page(page, site_url):
+    _goto(page, f"{site_url}/docs/charts.html#diagrams.html:mermaid-journey")
+    page.wait_for_function("document.title === 'Diagrams'")
+    assert page.evaluate("location.pathname").endswith("/docs/diagrams.html")
+    assert page.evaluate("location.hash") == "#mermaid-journey"
+
+
+def test_diagram_legibility_floor(page, site_url):
+    """Wide mermaid diagrams render at ≥90% of authored width inside a
+    horizontal scroll context — never shrunk to illegible label sizes."""
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/architecture.html")
+    page.wait_for_selector("oku-diagram .okd-render svg")
+    page.wait_for_timeout(1500)
+    ratios = page.evaluate(
+        """() => [...document.querySelectorAll('oku-diagram .okd-render svg')].map(s => {
+            const vb = s.viewBox.baseVal;
+            return vb.width > 0 ? s.getBoundingClientRect().width / vb.width : 1;
+        })"""
+    )
+    assert ratios, "no rendered diagrams"
+    assert all(r >= 0.89 for r in ratios), f"diagram shrunk below legibility floor: {ratios}"
+
+
+def test_sunburst_has_legend_chips(page, site_url):
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/charts.html")
+    page.wait_for_selector('oku-chart[type="sunburst"] svg')
+    chips = page.locator('oku-chart[type="sunburst"] .okc-legend-chip')
+    assert chips.count() >= 2, "sunburst must identify its top-level ring via legend chips"
+
+
+def test_inline_html_allowlist_renders(page, site_url):
+    """Allow-listed inline tags (<kbd>, <sub>, …) render as elements;
+    nothing in prose shows a raw tag."""
+    _goto(page, f"{site_url}/docs/reference.html")
+    page.wait_for_timeout(1500)
+    assert page.locator("main kbd").count() >= 2
+    literal = page.evaluate(
+        """() => {
+            const w = document.createTreeWalker(document.querySelector('main'), NodeFilter.SHOW_TEXT);
+            let n, hits = 0;
+            while ((n = w.nextNode()))
+                if (/<\\/?(kbd|sub|sup|code)>/.test(n.textContent) && !n.parentElement.closest('code, pre')) hits++;
+            return hits;
+        }"""
+    )
+    assert literal == 0, "raw inline tags visible in prose"

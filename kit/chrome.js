@@ -1036,29 +1036,21 @@ function __okuScrollToAnchor(anchor) {
   });
 }
 
-function __okuRenderHash() {
+function __okuPagePathFromLocation() {
+  var docsRootPath;
+  try { docsRootPath = new URL(__okuDocsRoot, window.location.origin).pathname; } catch (e) { docsRootPath = '/'; }
+  var p = window.location.pathname;
+  var rel = p.indexOf(docsRootPath) === 0 ? p.slice(docsRootPath.length) : (p.split('/').pop() || '');
+  return rel.endsWith('.html') ? rel : 'index.html';
+}
+
+function __okuRenderIfNeeded(pagePath, anchor) {
   if (typeof OkuRenderer === 'undefined') return Promise.reject(new Error('renderer not loaded'));
-  var parsed = __okuParseHash(window.location.hash);
-  var current = window.__okuCurrentPage;
-  // Anchor-only change while parked on a page (e.g., page-toc click on
-  // a non-index page): the user wants to scroll within the current
-  // page, NOT navigate back to index.
-  if (!parsed.page) {
-    if (current) {
-      __okuScrollToAnchor(parsed.anchor);
-      return Promise.resolve();
-    }
-    // No current page (cold boot with anchor-only hash) → render index
-    // and scroll. autoBoot also covers the same case; this branch
-    // mostly catches Back-button into a pre-page state.
-    return __okuFetchAndRender('index.html', parsed.anchor);
-  }
-  // Same page, new anchor → scroll without re-render.
-  if (current === parsed.page) {
-    __okuScrollToAnchor(parsed.anchor);
+  if (window.__okuCurrentPage === pagePath) {
+    __okuScrollToAnchor(anchor);
     return Promise.resolve();
   }
-  return __okuFetchAndRender(parsed.page, parsed.anchor);
+  return __okuFetchAndRender(pagePath, anchor);
 }
 
 function __okuFetchAndRender(pagePath, anchor) {
@@ -1085,8 +1077,19 @@ function __okuRefreshActiveLink(pagePath) {
   });
   document.querySelectorAll('page-nav a[href]').forEach(function (a) {
     var href = a.getAttribute('href') || '';
-    var ref = __okuParseHash(href);
-    var hrefPage = ref.page || '';
+    var hrefPage;
+    if (href.charAt(0) === '#') {
+      // Legacy hash-form entry ("#charts.html[:anchor]").
+      hrefPage = __okuParseHash(href).page || '';
+    } else {
+      // Path-form entry — resolve and strip the docs root so nested
+      // stubs compare correctly.
+      try {
+        var u = new URL(href, window.location.href);
+        var rootPath = new URL(__okuDocsRoot, window.location.origin).pathname;
+        hrefPage = u.pathname.indexOf(rootPath) === 0 ? u.pathname.slice(rootPath.length) : (u.pathname.split('/').pop() || '');
+      } catch (e) { hrefPage = href; }
+    }
     var match = hrefPage === pagePath || (!hrefPage && pagePath === 'index.html');
     if (match) {
       var li = a.closest('.page-nav-item');
@@ -1101,11 +1104,31 @@ function __okuRefreshActiveLink(pagePath) {
 // browser's Back/Forward buttons (which fire hashchange when only
 // the fragment changes).
 window.addEventListener('hashchange', function () {
-  // Tell the scroll-spy to pause its replaceState writes for a tick —
-  // otherwise the scroll-driven hash update fights the click-driven one.
+  // Path-based routing: a plain "#anchor" hash is the browser's own
+  // in-page scroll — nothing to do. Only the LEGACY hash-router form
+  // ("#<page>.html[:anchor]") needs handling: normalise it to the real
+  // page URL and render, so old bookmarks keep resolving.
+  var parsed = __okuParseHash(window.location.hash);
+  if (!parsed.page) return;
   try { window.dispatchEvent(new Event('oku:hash-routing')); } catch (e) { /* ignore */ }
-  __okuRenderHash().catch(function (err) {
-    console.warn('[oku] hash navigation failed', err);
+  var target = __okuDocsRoot + parsed.page + (parsed.anchor ? '#' + parsed.anchor : '');
+  try { history.replaceState(null, '', target); } catch (e2) { window.location.href = target; return; }
+  __okuRenderIfNeeded(parsed.page, parsed.anchor).catch(function (err) {
+    console.warn('[oku] navigation failed', err);
+  });
+  document.body.classList.remove('drawer-open');
+});
+
+// Back/Forward across pushState navigations: the pathname names the
+// page; the hash is a plain section anchor. (History entries from the
+// legacy hash-router era parse via __okuParseHash instead.)
+window.addEventListener('popstate', function () {
+  var parsed = __okuParseHash(window.location.hash);
+  var pagePath = parsed.page || __okuPagePathFromLocation();
+  var anchor = parsed.page ? parsed.anchor : (window.location.hash || '').replace(/^#/, '');
+  try { window.dispatchEvent(new Event('oku:hash-routing')); } catch (e) { /* ignore */ }
+  __okuRenderIfNeeded(pagePath, anchor).catch(function (err) {
+    console.warn('[oku] navigation failed', err);
   });
   document.body.classList.remove('drawer-open');
 });
@@ -1136,13 +1159,21 @@ document.addEventListener('click', function (e) {
     : url.pathname;
   e.preventDefault();
   var anchor = url.hash.replace(/^#/, '');
-  var newHash = '#' + pagePath + (anchor ? ':' + anchor : '');
-  if (window.location.hash === newHash) {
-    // Same target — re-render anyway (scroll to top).
-    __okuRenderHash().catch(function () {});
-  } else {
-    window.location.hash = newHash; // fires hashchange
+  var target = url.pathname + (anchor ? '#' + anchor : '');
+  try {
+    history.pushState({ okuPage: pagePath }, '', target);
+  } catch (err2) {
+    // file:// or a sandboxed host that refuses pushState — fall back
+    // to a normal full navigation; every page has a real stub.
+    window.location.href = target;
+    return;
   }
+  try { window.dispatchEvent(new Event('oku:hash-routing')); } catch (e3) { /* ignore */ }
+  __okuRenderIfNeeded(pagePath, anchor).catch(function (err4) {
+    console.warn('[oku] navigation failed', err4);
+    window.location.href = target;
+  });
+  document.body.classList.remove('drawer-open');
 });
 // Restore persisted state ASAP so the layout doesn't flash open then collapse.
 try {
@@ -1339,13 +1370,9 @@ function buildTOC(tocList) {
   if (sections.length === 0) return;
   tocList.innerHTML = '';
 
-  // Page-aware hash prefix: under hash routing, plain "#sec-id" hrefs
-  // would clobber the current page entry in the URL hash. Anchoring
-  // each TOC entry to "<currentPage>:<sec-id>" keeps the page context
-  // intact and makes copy-link work correctly. For index.html (no
-  // current page or explicit index), the bare "#sec-id" is fine.
-  var current = window.__okuCurrentPage;
-  var hashPrefix = (current && current !== 'index.html') ? '#' + current + ':' : '#';
+  // Path-based routing: the pathname names the page, so TOC entries
+  // are plain section anchors — copy-link gives "<page>.html#sec-id".
+  var hashPrefix = '#';
 
   // Count TOC-eligible sections separately so the numbering doesn't
   // jump when buildable sections precede in DOM order.
@@ -1434,11 +1461,10 @@ function buildTOC(tocList) {
     });
   });
 
-  // Page-aware hash prefix matches buildTOC above — so an in-flight
-  // scroll past a section stamps a URL that fully restores state on
-  // refresh / paste.
+  // Plain-anchor hashes match buildTOC above — the pathname already
+  // names the page, so a scroll-stamped URL fully restores on refresh.
   var pageForHash = window.__okuCurrentPage;
-  var hashPrefix = (pageForHash && pageForHash !== 'index.html') ? '#' + pageForHash + ':' : '#';
+  var hashPrefix = '#';
   var lastHash = null;
   // While the user is interacting with a hash-routed link (click on a
   // TOC entry, programmatic scroll triggered by the router), we let the
@@ -1483,12 +1509,9 @@ function buildTOC(tocList) {
     if (suspendHashUpdate) return;
     var anchorId = current.h3Id || current.sectionId;
     if (!anchorId) return;
-    // The page-prefix part of the hash drives hash-routing (which page
-    // the renderer should fetch). The section part is what the scroll
-    // spy manages. Keep the page-prefix intact across scroll-driven
-    // updates so refreshing on a non-index page brings the reader back
-    // to that page rather than to index.html.
-    var pageBase = (pageForHash && pageForHash !== 'index.html') ? '#' + pageForHash : '';
+    // The pathname names the page; the scroll spy only manages the
+    // plain section anchor. At the very top the anchor drops entirely.
+    var pageBase = '';
     // At the very top of the page (no section in view yet), drop only
     // the section anchor. On non-index pages, the page-prefix stays;
     // on index the hash collapses to empty.
@@ -2940,6 +2963,20 @@ var __okuDocsRoot = (function () {
   // No kit reference found (probably standalone with everything inlined,
   // or an unusual layout). Fall back to page directory.
   return new URL('.', window.location.href).href;
+})();
+
+/* Legacy hash-router URLs ("…/charts.html#diagrams.html:anchor") used
+   to render whatever the HASH named under whatever PATH happened to be
+   in the bar — the two could diverge, and a stale hash made a direct
+   visit to charts.html silently show another page. Routing is
+   path-based now; normalise any legacy hash to the real page URL
+   BEFORE renderer.js autoBoot resolves the page (chrome.js loads
+   first, so this runs first). */
+(function () {
+  var m = /^#([^:#]+\.html)(?::(.*))?$/.exec(window.location.hash || '');
+  if (!m) return;
+  var target = __okuDocsRoot + m[1] + (m[2] ? '#' + m[2] : '');
+  try { history.replaceState(null, '', target); } catch (e) { window.location.href = target; }
 })();
 
 /* Boot stamp — emit once per page so a stale-cached chrome.js is obvious
@@ -7145,15 +7182,38 @@ class OkuChart extends HTMLElement {
     // title (y=20) and the top of the outer arc (cy-rMax) collided
     // for any non-trivial wheel.
     var titleH = this._title ? 28 : 8;
-    var W = 480, H = 480 + titleH;
-    var cx = W / 2, cy = (H + titleH) / 2;
-    var rMax = Math.min(W, H - titleH) / 2 - 12;
+    // Ring-1 colours cascade to every descendant, so a legend over the
+    // top-level children explains the whole wheel's colour story —
+    // without it the only identification is per-arc tooltips.
+    var legendSeries = (Array.isArray(rootNode.children) ? rootNode.children : [])
+      .map(function (c) { return { label: c.label || '' }; })
+      .filter(function (s) { return !!s.label; });
+    var legendH = 0;
+    if (legendSeries.length) {
+      // Same wrap heuristic as _renderSeriesLegend so the reserved
+      // band matches what the helper actually paints.
+      var lx = 0, legendRows = 1, availW = 480 - 32;
+      legendSeries.forEach(function (s) {
+        var labW = Math.max(20, Math.ceil(String(s.label).length * 5.6) + 2);
+        var chipW = 11 + 4 + labW + 6;
+        if (lx + chipW > availW && lx > 0) { lx = 0; legendRows++; }
+        lx += chipW;
+      });
+      legendH = legendRows * 18 + 6;
+    }
+    var topPad = titleH + legendH;
+    var W = 480, H = 480 + topPad;
+    var cx = W / 2, cy = (H + topPad) / 2;
+    var rMax = Math.min(W, H - topPad) / 2 - 12;
     var rMin = 36;
     var ringW = (rMax - rMin) / depth;
     var totalValue = rootNode._value;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Sunburst') + '" class="okc-svg okc-sunburst">');
     if (this._title) parts.push('<text x="' + cx + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
+    if (legendSeries.length) {
+      parts.push(this._renderSeriesLegend(legendSeries, palette, { x: 16, y: titleH + 2, width: W - 32 }));
+    }
     function arcPath(rIn, rOut, a0, a1) {
       var large = (a1 - a0) > Math.PI ? 1 : 0;
       var p0 = [cx + rOut * Math.cos(a0), cy + rOut * Math.sin(a0)];
@@ -10077,6 +10137,25 @@ class OkuDiagram extends HTMLElement {
             svg.style.removeProperty('width');
             svg.style.removeProperty('height');
             svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+            // Legibility floor: never shrink a diagram below 90% of
+            // its authored size — a 1900px flowchart scaled into an
+            // 840px column renders its labels at ~6px. min-width pins
+            // the floor and .okd-render scrolls horizontally past it.
+            // Deliberately NOT conditioned on the host's clientWidth:
+            // lazy renders can measure a host mid-layout (width 0) and
+            // skip the floor. The CSS max-width:100% still lets
+            // diagrams shrink within the 90–100% band to avoid
+            // needless scrollbars. The 70vh height cap is lifted only
+            // when it alone would force the scale below the floor —
+            // with preserveAspectRatio it would letterbox the pinned
+            // width instead of enlarging anything.
+            if (vb.length === 4 && vb[2] > 0) {
+              svg.style.minWidth = (vb[2] * 0.9).toFixed(0) + 'px';
+              var capH = (window.innerHeight || 900) * 0.7;
+              if (vb[3] > 0 && capH / vb[3] < 0.9) {
+                svg.style.maxHeight = 'none';
+              }
+            }
             self._wireNeighborHighlight(svg);
             self._wireNodeTooltips(svg);
           }
@@ -11309,20 +11388,16 @@ class PageNav extends HTMLElement {
       byParent[key].push(p);
     });
 
-    // Hash-based router: the URL pathname always stays at the entry
-    // stub (e.g., index.html). The hash carries the current page —
-    // "#architecture.html" — so refresh / middle-click / copy-link
-    // stay robust under any static host. The "active" page is whatever
-    // the hash points to; falls back to index.html when empty.
-    function currentHashPage() {
-      var raw = (window.location.hash || '').replace(/^#/, '');
-      var sep = raw.indexOf(':');
-      var p = sep >= 0 ? raw.slice(0, sep) : raw;
-      if (p && p.endsWith('.html')) return p;
-      return 'index.html';
+    // Path-based router: the URL pathname names the current page and
+    // serve/build synthesize a real stub for every page, so tree links
+    // carry real hrefs — middle-click / copy-link / refresh all land on
+    // the right URL. The click interceptor upgrades plain left-clicks
+    // to pushState navigation so the SPA feel is kept.
+    function currentPage() {
+      return window.__okuCurrentPage || __okuPagePathFromLocation();
     }
     function isActive(page) {
-      return currentHashPage() === page.path;
+      return currentPage() === page.path;
     }
 
     function renderLevel(parentKey, depth) {
@@ -11333,10 +11408,7 @@ class PageNav extends HTMLElement {
         var li = document.createElement('li');
         li.className = 'page-nav-item';
         var anchor = document.createElement('a');
-        // Hash-only hrefs keep the pathname pinned to index.html so
-        // refresh and middle-click both stay valid even when no
-        // per-page stub exists on disk.
-        anchor.href = '#' + page.path;
+        anchor.href = __okuDocsRoot + page.path;
         anchor.textContent = page.title || page.path;
         if (page.summary) anchor.title = page.summary;
         if (isActive(page)) {

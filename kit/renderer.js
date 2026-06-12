@@ -255,9 +255,10 @@
    * ================================================================ */
 
   function parseInline(text, host) {
-    // Order: code (literal — protect from other rules) → strong → em → link.
-    // We do this in one regex pass over the input so positions are tracked.
-    const re = /`([^`]+?)`|\*\*([^*]+?)\*\*|__([^_]+?)__|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\(([^)\s]+?)\)/g;
+    // Order: code (literal — protect from other rules) → strong → em →
+    // link → allow-listed inline HTML. One regex pass so positions are
+    // tracked. Inline tags OUTSIDE the allow-list stay literal text.
+    const re = /`([^`]+?)`|\*\*([^*]+?)\*\*|__([^_]+?)__|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\(([^)\s]+?)\)|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\8\s*>|<br\s*\/?>/g;
     let pos = 0;
     let m;
     while ((m = re.exec(text)) !== null) {
@@ -270,6 +271,17 @@
         const e = document.createElement('em'); e.textContent = m[4] !== undefined ? m[4] : m[5]; host.appendChild(e);
       } else if (m[6] !== undefined) {
         host.appendChild(renderLink(m[6], m[7]));
+      } else if (m[8] !== undefined) {
+        // Sanitised allow-list pass-through: bare element, recursive
+        // inline body; only `title` survives from the attribute string
+        // (tooltips on <abbr>). Everything else is dropped.
+        const e = document.createElement(m[8].toLowerCase());
+        const title = /\btitle="([^"]*)"/.exec(m[9] || '');
+        if (title) e.title = title[1];
+        parseInline(m[10], e);
+        host.appendChild(e);
+      } else {
+        host.appendChild(document.createElement('br'));
       }
       pos = m.index + m[0].length;
     }

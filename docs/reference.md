@@ -357,7 +357,7 @@ Callout `type` accepts both the kit's original names (`warn / warning / danger /
 ```
 
 ```oku-example
-{"code":{"k":"code","src":"{\n  \"kind\": \"callout\",\n  \"type\": \"tip\",\n  \"title\": \"tip · alias of success\",\n  \"content\": \"...\"\n}","lang":"json"},"output":"> [!TIP] tip · alias of success\n> <code>type: \"tip\"</code> matches <code>type: \"success\"</code> — green guidance accent for positive advice."}
+{"code":{"k":"code","src":"{\n  \"kind\": \"callout\",\n  \"type\": \"tip\",\n  \"title\": \"tip · alias of success\",\n  \"content\": \"...\"\n}","lang":"json"},"output":"> [!TIP] tip · alias of success\n> `type: \"tip\"` matches `type: \"success\"` — green guidance accent for positive advice."}
 ```
 
 ```oku-example
@@ -365,5 +365,5 @@ Callout `type` accepts both the kit's original names (`warn / warning / danger /
 ```
 
 ```oku-example
-{"code":{"k":"code","src":"{\n  \"kind\": \"callout\",\n  \"type\": \"caution\",\n  \"title\": \"caution · alias of warning\",\n  \"content\": \"...\"\n}","lang":"json"},"output":"> [!CAUTION] caution · alias of warning\n> Amber border + icon; same look as <code>type: \"warning\"</code> from earlier rounds."}
+{"code":{"k":"code","src":"{\n  \"kind\": \"callout\",\n  \"type\": \"caution\",\n  \"title\": \"caution · alias of warning\",\n  \"content\": \"...\"\n}","lang":"json"},"output":"> [!CAUTION] caution · alias of warning\n> Amber border + icon; same look as `type: \"warning\"`."}
 ```
