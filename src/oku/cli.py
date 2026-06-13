@@ -611,7 +611,6 @@ def _page_from_source_file(p: Path) -> dict | None:
     return page
 
 
-
 def _front_matter_value(v) -> str:
     """Render one front-matter value the minimal parser reads back."""
     if isinstance(v, bool):
