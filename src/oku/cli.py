@@ -611,10 +611,6 @@ def _page_from_source_file(p: Path) -> dict | None:
     return page
 
 
-# Backwards-compatible alias — tests and older call sites use the
-# markdown-era name.
-_md_page_from_file = _page_from_source_file
-
 
 def _front_matter_value(v) -> str:
     """Render one front-matter value the minimal parser reads back."""

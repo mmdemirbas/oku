@@ -46,7 +46,7 @@
  * Surfaced in the sidebar footer (dimmed) so a reader can see at a
  * glance which build of oku rendered the page. Bump in lockstep
  * with pyproject.toml's [project] version. */
-const KIT_VERSION = '0.2.0';
+const KIT_VERSION = '0.3.0';
 
 /* ============ SVG icon set ============ */
 const ICON_MENU = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>';

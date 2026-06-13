@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --extra dev
+
+      - name: Lint (ruff)
+        run: |
+          uv run ruff check src/
+          uv run ruff format --check src/
+
+      - name: Doctree check (strict)
+        run: uv run oku check --strict
+
+      - name: Build
+        run: uv run oku build
+
+      - name: Install chromium for browser tests
+        run: uv run playwright install --with-deps chromium
+
+      - name: Tests (incl. browser invariants)
+        run: uv run pytest -q
