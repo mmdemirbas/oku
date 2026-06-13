@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sample — capacity dashboard</title>
+<meta name="oku-accent" content="indigo">
+<meta name="oku-order" content="91">
+<meta name="oku-summary" content="Primitive-heavy comparison sample — diagram, charts, KPI grid, step flow.">
+</head>
+<body>
+<section id="topology">
+<h2>Topology</h2>
+<oku-diagram><script type="application/json">{"src":"flowchart LR\n  P[Producers] --> K[Kafka]\n  K --> I[Ingest]\n  I --> S[(Object store)]","caption":"Producers feed Kafka; ingest lands columnar files in the object store."}</script></oku-diagram>
+</section>
+<section id="throughput">
+<h2>Throughput</h2>
+<oku-chart><script type="application/json">{"type":"bar","title":"Peak MB/s per environment","rows":[{"label":"dev","value":40},{"label":"staging","value":220},{"label":"prod","value":910}]}</script></oku-chart>
+<oku-chart><script type="application/json">{"type":"line","title":"p99 commit latency (ms)","series":[{"label":"prod","data":[{"x":1,"y":410},{"x":2,"y":380},{"x":3,"y":460},{"x":4,"y":350}]},{"label":"staging","data":[{"x":1,"y":280},{"x":2,"y":260},{"x":3,"y":300},{"x":4,"y":240}]}]}</script></oku-chart>
+</section>
+<section id="health">
+<h2>Health</h2>
+<oku-kpi-grid><script type="application/json">{"tiles":[{"num":"99.95%","label":"Ingest availability"},{"num":"24","label":"Brokers in prod"},{"num":"3.1s","label":"Median commit interval"}]}</script></oku-kpi-grid>
+<oku-step-flow><script type="application/json">{"steps":[{"t":"Detect","b":"Lag monitor trips at 5x median commit interval."},{"t":"Drain","b":"Producers fail over to the standby cluster."},{"t":"Recover","b":"Backfill job replays the gap from the log."}]}</script></oku-step-flow>
+</section>
+</body>
+</html>

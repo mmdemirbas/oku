@@ -1,0 +1,42 @@
+= Sample — capacity dashboard
+:oku-accent: indigo
+:oku-order: 91
+:oku-summary: Primitive-heavy comparison sample — diagram, charts, KPI grid, step flow.
+
+[#topology]
+== Topology
+
+.Producers feed Kafka; ingest lands columnar files in the object store.
+[mermaid]
+----
+flowchart LR
+  P[Producers] --> K[Kafka]
+  K --> I[Ingest]
+  I --> S[(Object store)]
+----
+
+[#throughput]
+== Throughput
+
+[oku-chart]
+----
+{"type":"bar","title":"Peak MB/s per environment","rows":[{"label":"dev","value":40},{"label":"staging","value":220},{"label":"prod","value":910}]}
+----
+
+[oku-chart]
+----
+{"type":"line","title":"p99 commit latency (ms)","series":[{"label":"prod","data":[{"x":1,"y":410},{"x":2,"y":380},{"x":3,"y":460},{"x":4,"y":350}]},{"label":"staging","data":[{"x":1,"y":280},{"x":2,"y":260},{"x":3,"y":300},{"x":4,"y":240}]}]}
+----
+
+[#health]
+== Health
+
+[oku-kpi-grid]
+----
+{"tiles":[{"num":"99.95%","label":"Ingest availability"},{"num":"24","label":"Brokers in prod"},{"num":"3.1s","label":"Median commit interval"}]}
+----
+
+[oku-step-flow]
+----
+{"steps":[{"t":"Detect","b":"Lag monitor trips at 5x median commit interval."},{"t":"Drain","b":"Producers fail over to the standby cluster."},{"t":"Recover","b":"Backfill job replays the gap from the log."}]}
+----

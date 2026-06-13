@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sample — operations guide</title>
+<meta name="oku-accent" content="teal">
+<meta name="oku-order" content="90">
+<meta name="oku-summary" content="Prose-heavy comparison sample — sections, lists, table, code, callouts.">
+</head>
+<body>
+<oku-callout type="tldr" title="Operations guide">
+<p>How the ingest pipeline is operated day to day.</p>
+<li>Three environments, one promotion path</li>
+<li>Rollback is a config flip, not a deploy</li>
+</oku-callout>
+<section id="environments">
+<h2>Environments</h2>
+<p>Promotion flows <strong>dev</strong> to <em>staging</em> to <code>prod</code>. Every change lands in <a href="#g/iceberg">the runbook</a> before it reaches production traffic.</p>
+<ul>
+<li>dev — synthetic load only</li>
+<li>staging — mirrored sample of production topics</li>
+<li>prod — full traffic, paged on-call</li>
+</ul>
+<table><thead><tr><th>Environment</th><th>Brokers</th><th>Retention</th></tr></thead><tbody>
+<tr><td>dev</td><td>3</td><td>1 day</td></tr>
+<tr><td>staging</td><td>6</td><td>7 days</td></tr>
+<tr><td>prod</td><td>24</td><td>30 days</td></tr>
+</tbody></table>
+</section>
+<section id="rollback">
+<h2>Rollback</h2>
+<p>Rollback never redeploys. The router consults a single flag:</p>
+<pre><code class="language-js">const active = flags.get('ingest-v2') ? v2Pipeline : v1Pipeline;</code></pre>
+<oku-callout type="warning" title="Flag debt">
+<p>A flag older than two releases is an incident waiting to happen.</p>
+<p>Delete flags at the release after their flip.</p>
+</oku-callout>
+</section>
+<section id="escalation">
+<h2>Escalation</h2>
+<p>Page the data-platform rotation first. The broker team owns hardware; everything above the socket is ours.</p>
+</section>
+</body>
+</html>

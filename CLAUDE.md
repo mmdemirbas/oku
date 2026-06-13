@@ -95,6 +95,20 @@ v1 (`kind/title/blocks`) via the in-memory shim. Run
 `oku migrate [path]` to convert any page-JSON to a v3 `.md` source
 (deterministic, round-trips; the .json is removed).
 
+### Alternative source formats (comparison phase)
+
+Markdown is the default, but the pipeline accepts five source
+formats through one registry (`_PAGE_SOURCE_PARSERS` /
+`_PAGE_SOURCE_EMITTERS` in cli.py): `.md`, `.json` (v1/v2),
+`.src.html` (HTML-first — the two-dot suffix keeps sources distinct
+from stubs), `.adoc` (AsciiDoc subset), `.dj` (djot subset). Every
+format converts to/from the v2 dict; lint/build/serve/renderer see
+only v2. The measured comparison lives in `docs/format-comparison.md`
+with its provably-identical corpus under `examples/format-comparison/`
+(round-trip parity enforced by tests). Prune a format = delete its
+emit/parse pair + corpus dir; the decision is recorded in the roadmap
+when made.
+
 ### Build outputs
 
 `oku build` produces two single-purpose trees under `dist/`:

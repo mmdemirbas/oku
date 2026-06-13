@@ -1,0 +1,48 @@
+---
+title: Sample — operations guide
+accent: teal
+order: 90
+summary: Prose-heavy comparison sample — sections, lists, table, code, callouts.
+---
+
+{title="Operations guide"}
+::: tldr
+How the ingest pipeline is operated day to day.
+- Three environments, one promotion path
+- Rollback is a config flip, not a deploy
+:::
+
+{#environments}
+## Environments
+
+Promotion flows *dev* to _staging_ to `prod`. Every change lands in [the runbook](#g/iceberg) before it reaches production traffic.
+
+- dev — synthetic load only
+- staging — mirrored sample of production topics
+- prod — full traffic, paged on-call
+
+| Environment | Brokers | Retention |
+|---|---|---|
+| dev | 3 | 1 day |
+| staging | 6 | 7 days |
+| prod | 24 | 30 days |
+
+{#rollback}
+## Rollback
+
+Rollback never redeploys. The router consults a single flag:
+
+```js
+const active = flags.get('ingest-v2') ? v2Pipeline : v1Pipeline;
+```
+
+{title="Flag debt"}
+::: warning
+A flag older than two releases is an incident waiting to happen.
+Delete flags at the release after their flip.
+:::
+
+{#escalation}
+## Escalation
+
+Page the data-platform rotation first. The broker team owns hardware; everything above the socket is ours.

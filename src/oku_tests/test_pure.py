@@ -7,8 +7,10 @@ before they ship.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import pytest
 
 from oku import cli
 
@@ -363,3 +365,91 @@ class TestFindJsonPagesMd:
         entry = next((e for e in manifest["pages"] if e["path"] == "overview.html"), None)
         assert entry is not None
         assert entry["source"] == "overview.md"
+
+
+# ---------- alternative source formats ----------
+
+
+class TestFormatConverters:
+    """Every alternative format emits from and parses back to the v2
+    dict. Convergence is via the markdown normal form (adjacent string
+    merge), so the corpus content is provably identical per format."""
+
+    MD = (
+        "---\ntitle: Sample\naccent: teal\norder: 5\nsummary: A sample.\n---\n\n"
+        "> [!TLDR] The gist\n> One-line summary.\n> - point one\n\n"
+        "## Overview {#overview}\n\n"
+        "A paragraph with **bold**, *em*, `code` and [a ref](#g/iceberg).\n\n"
+        "- first item\n- second item\n\n"
+        "| Engine | Year |\n|---|---|\n| Iceberg | 2018 |\n\n"
+        "```js\nconsole.log('hi');\n```\n\n"
+        "```mermaid\nflowchart LR\n  A --> B\n```\n\n*The flow.*\n\n"
+        '```oku-chart\n{"type":"bar","rows":[{"label":"a","value":1}]}\n```\n\n'
+        "## Details {#details}\n\nClosing prose.\n"
+    )
+
+    def _norm(self, page):
+        return cli.md_to_v2_page(cli.page_to_md(page))
+
+    def _canon(self):
+        return cli.md_to_v2_page(self.MD, default_title="sample")
+
+    @pytest.mark.parametrize(
+        ("emit", "parse"),
+        [
+            (cli.page_to_html, cli.html_to_v2_page),
+            (cli.page_to_adoc, cli.adoc_to_v2_page),
+            (cli.page_to_djot, cli.djot_to_v2_page),
+        ],
+        ids=["html", "adoc", "djot"],
+    )
+    def test_round_trip_converges(self, emit, parse) -> None:
+        canon = self._canon()
+        back = parse(emit(canon), default_title="sample")
+        assert back.get("t") == canon.get("t")
+        assert back.get("m") == canon.get("m")
+        typed = lambda p: [b for b in p["b"] if isinstance(b, dict)]  # noqa: E731
+        assert typed(back) == typed(canon), "typed blocks must survive byte-for-byte"
+        assert self._norm(back) == self._norm(canon)
+
+    def test_source_registry_dispatch(self, tmp_path: Path) -> None:
+        canon = self._canon()
+        (tmp_path / "p.md").write_text(cli.page_to_md(canon), encoding="utf-8")
+        (tmp_path / "q.adoc").write_text(cli.page_to_adoc(canon), encoding="utf-8")
+        (tmp_path / "r.dj").write_text(cli.page_to_djot(canon), encoding="utf-8")
+        (tmp_path / "s.src.html").write_text(cli.page_to_html(canon), encoding="utf-8")
+        pages = cli.find_json_pages(tmp_path)
+        names = sorted(p.name for p, _ in pages)
+        assert names == ["p.json", "q.json", "r.json", "s.json"]
+        norms = [self._norm(d) for _, d in pages]
+        assert all(n == norms[0] for n in norms), "all formats must converge to one page"
+
+    def test_src_html_never_treated_as_stub(self, tmp_path: Path) -> None:
+        (tmp_path / "x.src.html").write_text(cli.page_to_html(self._canon()), encoding="utf-8")
+        assert cli.find_html_files(tmp_path) == []
+
+
+class TestFormatComparisonCorpus:
+    """The on-disk corpus stays provably identical across formats."""
+
+    def test_corpus_parity(self, repo_root: Path) -> None:
+        base = repo_root / "examples" / "format-comparison"
+        if not base.exists():
+            pytest.skip("corpus missing")
+        for stem in ("sample-guide", "sample-viz"):
+            pages = {}
+            pages["markdown"] = cli.md_to_v2_page(
+                (base / "markdown" / f"{stem}.md").read_text(encoding="utf-8")
+            )
+            pages["json"] = json.loads((base / "json" / f"{stem}.json").read_text(encoding="utf-8"))
+            pages["html"] = cli.html_to_v2_page(
+                (base / "html" / f"{stem}.src.html").read_text(encoding="utf-8")
+            )
+            pages["asciidoc"] = cli.adoc_to_v2_page(
+                (base / "asciidoc" / f"{stem}.adoc").read_text(encoding="utf-8")
+            )
+            pages["djot"] = cli.djot_to_v2_page((base / "djot" / f"{stem}.dj").read_text(encoding="utf-8"))
+            norm = lambda p: cli.md_to_v2_page(cli.page_to_md(p))  # noqa: E731
+            ref = norm(pages["markdown"])
+            for fmt, page in pages.items():
+                assert norm(page) == ref, f"{stem}: {fmt} diverges from markdown"

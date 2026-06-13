@@ -229,3 +229,22 @@ def test_lightbox_chart_tooltip_still_fires(page, site_url):
     page.locator(".okt-lightbox oku-chart svg").first.hover(position={"x": 150, "y": 100})
     page.wait_for_selector(".okc-tooltip.visible", timeout=3000)
     page.keyboard.press("Escape")
+
+
+def test_format_corpus_renders_identically(page, site_url):
+    """The same page through three different source formats must
+    produce the same rendered structure — sections, charts, KPI tiles,
+    step cards all equal."""
+    counts = {}
+    for fmt in ("markdown", "html", "asciidoc"):
+        _goto(page, f"{site_url}/examples/format-comparison/{fmt}/sample-viz.html")
+        page.wait_for_selector("oku-chart svg")
+        counts[fmt] = page.evaluate(
+            """() => ({
+                sections: document.querySelectorAll('main section').length,
+                charts: document.querySelectorAll('oku-chart').length,
+                diagrams: document.querySelectorAll('oku-diagram').length,
+                title: document.title,
+            })"""
+        )
+    assert counts["markdown"] == counts["html"] == counts["asciidoc"], counts

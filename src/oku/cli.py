@@ -340,6 +340,8 @@ def find_html_files(root: Path):
     for p in iter_repo_files(root, (".html",), extra_skip=extra):
         if not p.is_file():
             continue
+        if p.name.endswith(".src.html"):
+            continue  # HTML-first page SOURCE, not a stub
         try:
             head = p.read_text(encoding="utf-8", errors="ignore")[:2048]
         except OSError:
@@ -583,24 +585,35 @@ def md_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
     return page
 
 
-def _md_page_from_file(p: Path) -> dict | None:
-    """Read + convert one markdown source; None when unreadable.
+def _page_from_source_file(p: Path) -> dict | None:
+    """Read + convert one page source (any registered format); None
+    when unreadable or not a recognised source.
 
-    A source whose front-matter carries a `title` is a hand-authored
-    kit page and gets the full lint. Everything else (README,
-    CHANGELOG, CLAUDE, SKILL.md and friends — no front-matter, or
-    front-matter without `title`) gets the `_materialised_by` tag so
-    the linter's prose rules skip author-owned repo prose.
+    Markdown/djot sources whose front-matter carries a `title` are
+    hand-authored kit pages and get the full lint. Markdown WITHOUT a
+    front-matter title (README, CHANGELOG, CLAUDE, SKILL.md and
+    friends) gets the `_materialised_by` tag so the linter's prose
+    rules skip author-owned repo prose. AsciiDoc / HTML sources always
+    carry explicit titles — never materialised.
     """
+    parser = _source_parser_for(p)
+    if parser is None:
+        return None
     try:
         text = p.read_text(encoding="utf-8")
     except OSError:
         return None
-    _, front_meta = _strip_md_front_matter(text)
-    page = md_to_v2_page(text, default_title=p.stem)
-    if not front_meta.get("title"):
-        page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
+    page = parser(text, default_title=_source_stem_path(p).name)
+    if parser is md_to_v2_page:
+        _, front_meta = _strip_md_front_matter(text)
+        if not front_meta.get("title"):
+            page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
     return page
+
+
+# Backwards-compatible alias — tests and older call sites use the
+# markdown-era name.
+_md_page_from_file = _page_from_source_file
 
 
 def _front_matter_value(v) -> str:
@@ -650,6 +663,850 @@ def page_to_md(page: dict) -> str:
     return "\n\n".join(parts) + "\n"
 
 
+# ---------------------------------------------------------------------------
+# Alternative source formats — emit/parse pairs for the side-by-side
+# comparison (docs/format-comparison-spec.md). Every format converts
+# to/from the v2 page dict; lint, build, serve and the renderer only
+# ever see v2. Coverage is the comparison-corpus subset: front-matter,
+# ATX headings with {#id}, paragraphs with inline markdown, flat
+# bullet/ordered lists, GFM tables, plain + typed fences (oku-*,
+# mermaid with italic caption), GFM admonitions. Constructs outside
+# the subset round-trip as verbatim text; the comparison page reports
+# coverage as a datum.
+# ---------------------------------------------------------------------------
+
+_MD_LIST_ITEM_RE = re.compile(r"^([-*]|\d+\.)\s+(.*)$")
+_MD_TABLE_SEP_RE = re.compile(r"^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?\s*$")
+_MD_INLINE_TOKEN_RE = re.compile(
+    r"\*\*([^*]+?)\*\*|\*([^*\s][^*]*?)\*|`([^`]+?)`|\[([^\]]+?)\]\(([^)\s]+?)\)"
+)
+
+
+def _md_segments(text: str):
+    """Yield block segments from a (subset) markdown string:
+    ('heading', level, text, id|None) · ('para', text) ·
+    ('list', ordered, [items]) · ('table', headers, rows) ·
+    ('admonition', type, title, [body lines]) · ('fence', lang, body) ·
+    ('hr',). Driving loop for the non-markdown emitters."""
+    lines = text.split("\n")
+    i, n = 0, len(lines)
+    while i < n:
+        line = lines[i]
+        s = line.strip()
+        if not s:
+            i += 1
+            continue
+        m = _FENCE_OPEN_RE.match(line)
+        if m:
+            close = re.compile(r"^`{" + str(len(m.group(1))) + r",}\s*$")
+            body = []
+            i += 1
+            while i < n and not close.match(lines[i]):
+                body.append(lines[i])
+                i += 1
+            i += 1
+            yield ("fence", (m.group(2) or "").lower(), "\n".join(body))
+            continue
+        hm = _MD_HEADING_LINE_RE.match(line)
+        if hm:
+            yield ("heading", len(hm.group(1)), hm.group(2), hm.group(3))
+            i += 1
+            continue
+        if s.startswith(">"):
+            block = []
+            while i < n and lines[i].lstrip().startswith(">"):
+                block.append(re.sub(r"^\s*>\s?", "", lines[i]))
+                i += 1
+            adm = re.match(r"^\[!([A-Z]+)\](?:\s+(.+))?$", block[0] if block else "")
+            if adm:
+                yield ("admonition", adm.group(1), adm.group(2) or "", block[1:])
+            else:
+                yield ("admonition", "QUOTE", "", block)
+            continue
+        if _MD_HR_RE.match(line):
+            yield ("hr",)
+            i += 1
+            continue
+        if "|" in line and i + 1 < n and _MD_TABLE_SEP_RE.match(lines[i + 1]):
+
+            def cells(row):
+                row = row.strip().strip("|")
+                return [c.strip() for c in row.split("|")]
+
+            headers = cells(line)
+            i += 2
+            rows = []
+            while i < n and "|" in lines[i] and lines[i].strip():
+                rows.append(cells(lines[i]))
+                i += 1
+            yield ("table", headers, rows)
+            continue
+        lm = _MD_LIST_ITEM_RE.match(s)
+        if lm and not line.startswith("    "):
+            ordered = lm.group(1)[0].isdigit()
+            items = []
+            while i < n:
+                im = _MD_LIST_ITEM_RE.match(lines[i].strip())
+                if not im or not lines[i].strip():
+                    break
+                items.append(im.group(2))
+                i += 1
+            yield ("list", ordered, items)
+            continue
+        para = []
+        while i < n and lines[i].strip() and not _is_md_block_start(lines[i]):
+            para.append(lines[i].strip())
+            i += 1
+        if not para:
+            para = [s]
+            i += 1
+        yield ("para", " ".join(para))
+
+
+def _is_md_block_start(line: str) -> bool:
+    s = line.strip()
+    return bool(
+        _MD_HEADING_LINE_RE.match(line)
+        or _FENCE_OPEN_RE.match(line)
+        or s.startswith(">")
+        or _MD_LIST_ITEM_RE.match(s)
+        or _MD_HR_RE.match(line)
+    )
+
+
+def _inline_md_convert(text: str, repl: dict) -> str:
+    """Rewrite inline markdown via per-construct templates. repl keys:
+    strong/em/code/link — format strings with {t} (text) / {u} (url)."""
+
+    def sub(m):
+        if m.group(1) is not None:
+            return repl["strong"].format(t=m.group(1))
+        if m.group(2) is not None:
+            return repl["em"].format(t=m.group(2))
+        if m.group(3) is not None:
+            return repl["code"].format(t=m.group(3))
+        return repl["link"].format(t=m.group(4), u=m.group(5))
+
+    return _MD_INLINE_TOKEN_RE.sub(sub, text)
+
+
+# ---------------- HTML-first (v4) ----------------
+
+_HTML_INLINE = {
+    "strong": "<strong>{t}</strong>",
+    "em": "<em>{t}</em>",
+    "code": "<code>{t}</code>",
+    "link": '<a href="{u}">{t}</a>',
+}
+
+
+def _esc_html(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def page_to_html(page: dict) -> str:
+    """Emit an HTML-first (v4) source: real HTML elements for prose,
+    custom elements with JSON script children for typed blocks."""
+    if page.get("kind") == "page" and "k" not in page:
+        page = _v1_to_v2(page)
+    meta = page.get("m") or {}
+    out = [
+        "<!doctype html>",
+        '<html lang="en">',
+        "<head>",
+        '<meta charset="utf-8">',
+        "<title>" + _esc_html(str(page.get("t", ""))) + "</title>",
+    ]
+    for key, v in meta.items():
+        if key.startswith("_"):
+            continue
+        out.append('<meta name="oku-' + key + '" content="' + _esc_html(str(v)) + '">')
+    out.append("</head>")
+    out.append("<body>")
+    open_section = False
+    for blk in page.get("b") or []:
+        if isinstance(blk, dict):
+            kind = blk.get("k")
+            payload = {kk: v for kk, v in blk.items() if kk != "k"}
+            out.append(
+                "<oku-"
+                + str(kind)
+                + '><script type="application/json">'
+                + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+                + "</script></oku-"
+                + str(kind)
+                + ">"
+            )
+            continue
+        for seg in _md_segments(blk):
+            tag = seg[0]
+            if tag == "heading":
+                level, txt, hid = seg[1], seg[2], seg[3]
+                hid = hid or _md_slug(txt)
+                if level == 2:
+                    if open_section:
+                        out.append("</section>")
+                    out.append('<section id="' + hid + '">')
+                    open_section = True
+                    out.append("<h2>" + _inline_md_convert(txt, _HTML_INLINE) + "</h2>")
+                else:
+                    out.append(
+                        "<h"
+                        + str(level)
+                        + ' id="'
+                        + hid
+                        + '">'
+                        + _inline_md_convert(txt, _HTML_INLINE)
+                        + "</h"
+                        + str(level)
+                        + ">"
+                    )
+            elif tag == "para":
+                out.append("<p>" + _inline_md_convert(seg[1], _HTML_INLINE) + "</p>")
+            elif tag == "list":
+                lt = "ol" if seg[1] else "ul"
+                out.append("<" + lt + ">")
+                out.extend("<li>" + _inline_md_convert(it, _HTML_INLINE) + "</li>" for it in seg[2])
+                out.append("</" + lt + ">")
+            elif tag == "table":
+                out.append(
+                    "<table><thead><tr>"
+                    + "".join("<th>" + _inline_md_convert(h, _HTML_INLINE) + "</th>" for h in seg[1])
+                    + "</tr></thead><tbody>"
+                )
+                for row in seg[2]:
+                    out.append(
+                        "<tr>"
+                        + "".join("<td>" + _inline_md_convert(c, _HTML_INLINE) + "</td>" for c in row)
+                        + "</tr>"
+                    )
+                out.append("</tbody></table>")
+            elif tag == "admonition":
+                attrs = ' type="' + seg[1].lower() + '"'
+                if seg[2]:
+                    attrs += ' title="' + _esc_html(seg[2]) + '"'
+                out.append("<oku-callout" + attrs + ">")
+                for ln in seg[3]:
+                    if ln.strip().startswith("- "):
+                        out.append("<li>" + _inline_md_convert(ln.strip()[2:], _HTML_INLINE) + "</li>")
+                    elif ln.strip():
+                        out.append("<p>" + _inline_md_convert(ln.strip(), _HTML_INLINE) + "</p>")
+                out.append("</oku-callout>")
+            elif tag == "fence":
+                out.append(
+                    '<pre><code class="language-'
+                    + (seg[1] or "text")
+                    + '">'
+                    + _esc_html(seg[2])
+                    + "</code></pre>"
+                )
+            elif tag == "hr":
+                out.append("<hr>")
+    if open_section:
+        out.append("</section>")
+    out.append("</body>")
+    out.append("</html>")
+    return "\n".join(out) + "\n"
+
+
+def html_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
+    """Parse an HTML-first (v4) source back into a v2 page dict."""
+    from html.parser import HTMLParser
+
+    _INLINE_BACK = {"strong": "**{t}**", "em": "*{t}*", "code": "`{t}`"}
+
+    class P(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.title = default_title
+            self.meta: dict = {}
+            self.blocks: list = []
+            self.buf: list = []  # markdown lines accumulating
+            self.stack: list = []  # open tag context
+            self.text: list = []  # inline text run
+            self.json_payload: list = []
+            self.cur_typed: str | None = None
+            self.cur_callout: tuple | None = None
+            self.table: list | None = None
+            self.row: list | None = None
+            self.list_tag: str | None = None
+            self.heading: tuple | None = None
+
+        def flush_md(self):
+            chunk = "\n".join(self.buf).strip("\n")
+            self.buf = []
+            if chunk.strip():
+                self.blocks.append(chunk)
+
+        def handle_starttag(self, tag, attrs):
+            a = dict(attrs)
+            self.stack.append(tag)
+            if tag == "meta" and str(a.get("name", "")).startswith("oku-"):
+                self.meta[a["name"][4:]] = a.get("content", "")
+            elif tag.startswith("oku-") and tag != "oku-callout":
+                self.flush_md()
+                self.cur_typed = tag[4:]
+                self.json_payload = []
+            elif tag == "oku-callout":
+                self.cur_callout = (a.get("type", "note"), a.get("title", ""), [])
+            elif tag == "section":
+                self._section_id = a.get("id")
+            elif tag in ("h2", "h3", "h4"):
+                self.heading = (int(tag[1]), a.get("id") or getattr(self, "_section_id", None))
+                self.text = []
+            elif tag in ("p", "li", "th", "td", "title"):
+                self.text = []
+            elif tag in ("ul", "ol"):
+                self.list_tag = tag
+            elif tag == "table":
+                self.table = []
+            elif tag == "tr":
+                self.row = []
+            elif tag == "pre":
+                self.text = []
+                self._code_lang = None
+            elif tag == "code" and self.stack[-2:-1] == ["pre"]:
+                cls = a.get("class", "")
+                m = re.search(r"language-([\w-]+)", cls)
+                self._code_lang = m.group(1) if m else None
+            elif tag in ("strong", "em", "a"):
+                self.text.append({"strong": "**", "em": "*", "a": "["}[tag])
+                if tag == "a":
+                    self._href = a.get("href", "")
+            elif tag == "code":
+                self.text.append("`")
+            elif tag == "hr":
+                self.buf.append("---")
+                self.buf.append("")
+
+        def handle_endtag(self, tag):
+            while self.stack and self.stack[-1] != tag:
+                self.stack.pop()
+            if self.stack:
+                self.stack.pop()
+            txt = "".join(self.text).strip() if self.text else ""
+            if tag.startswith("oku-") and tag != "oku-callout" and self.cur_typed:
+                try:
+                    payload = json.loads("".join(self.json_payload) or "{}")
+                except json.JSONDecodeError:
+                    payload = {}
+                payload.pop("k", None)
+                self.blocks.append({"k": self.cur_typed, **payload})
+                self.cur_typed = None
+            elif tag == "oku-callout" and self.cur_callout:
+                typ, title, items = self.cur_callout
+                head = "> [!" + typ.upper() + "]" + (" " + title if title else "")
+                body = [head] + ["> " + it for it in items]
+                self.buf.append("\n".join(body))
+                self.buf.append("")
+                self.cur_callout = None
+            elif tag == "title":
+                if txt:
+                    self.title = txt
+                self.text = []
+            elif tag in ("h2", "h3", "h4") and self.heading:
+                level, hid = self.heading
+                line = "#" * level + " " + txt
+                if hid and hid != _md_slug(txt):
+                    line += " {#" + hid + "}"
+                elif hid:
+                    line += " {#" + hid + "}"
+                self.buf.append(line)
+                self.buf.append("")
+                self.heading = None
+            elif tag == "p":
+                target = self.cur_callout[2] if self.cur_callout else None
+                if target is not None:
+                    target.append(txt)
+                else:
+                    self.buf.append(txt)
+                    self.buf.append("")
+            elif tag == "li":
+                if self.cur_callout:
+                    self.cur_callout[2].append("- " + txt)
+                else:
+                    self.buf.append("- " + txt)
+            elif tag in ("ul", "ol"):
+                self.buf.append("")
+                self.list_tag = None
+            elif tag in ("th", "td") and self.row is not None:
+                self.row.append(txt)
+            elif tag == "tr" and self.row is not None:
+                self.table.append(self.row)
+                self.row = None
+            elif tag == "table" and self.table is not None:
+                if self.table:
+                    head, rows = self.table[0], self.table[1:]
+                    self.buf.append("| " + " | ".join(head) + " |")
+                    self.buf.append("|" + "---|" * len(head))
+                    for r in rows:
+                        self.buf.append("| " + " | ".join(r) + " |")
+                    self.buf.append("")
+                self.table = None
+            elif tag == "pre":
+                lang = getattr(self, "_code_lang", None)
+                self.buf.append("```" + (lang or ""))
+                self.buf.append("".join(self.text).strip("\n"))
+                self.buf.append("```")
+                self.buf.append("")
+                self.text = []
+            elif tag in ("strong", "em"):
+                self.text.append({"strong": "**", "em": "*"}[tag])
+            elif tag == "a":
+                self.text.append("](" + getattr(self, "_href", "") + ")")
+            elif tag == "code" and "pre" not in self.stack:
+                self.text.append("`")
+
+        def handle_data(self, data):
+            if self.cur_typed is not None:
+                self.json_payload.append(data)
+            elif (
+                self.text is not None
+                and self.stack
+                and self.stack[-1]
+                in ("p", "li", "th", "td", "title", "h2", "h3", "h4", "strong", "em", "a", "code", "pre")
+            ):
+                self.text.append(data)
+
+    p = P()
+    p.handle_starttag = p.handle_starttag  # noqa: PLW0127 — keep reference
+    p.feed(text)
+    p.flush_md()
+    page: dict = {"k": "page", "t": p.title, "b": p.blocks}
+    meta = {k: (int(v) if isinstance(v, str) and v.isdigit() else v) for k, v in p.meta.items()}
+    if meta:
+        page["m"] = meta
+    return page
+
+
+# ---------------- AsciiDoc ----------------
+
+_ADOC_INLINE = {"strong": "*{t}*", "em": "_{t}_", "code": "`{t}`", "link": "link:{u}[{t}]"}
+
+
+def page_to_adoc(page: dict) -> str:
+    """Emit an AsciiDoc source (comparison subset)."""
+    if page.get("kind") == "page" and "k" not in page:
+        page = _v1_to_v2(page)
+    meta = page.get("m") or {}
+    out = ["= " + str(page.get("t", ""))]
+    for key, v in meta.items():
+        if not key.startswith("_"):
+            out.append(":oku-" + key + ": " + str(v))
+    out.append("")
+    for blk in page.get("b") or []:
+        if isinstance(blk, dict):
+            kind = blk.get("k")
+            payload = {kk: v for kk, v in blk.items() if kk != "k"}
+            if kind == "diagram" and set(blk) <= {"k", "src", "caption"}:
+                if blk.get("caption"):
+                    out.append("." + str(blk["caption"]))
+                out.append("[mermaid]")
+                out.append("----")
+                out.append(str(blk.get("src", "")))
+                out.append("----")
+            else:
+                out.append("[oku-" + str(kind) + "]")
+                out.append("----")
+                out.append(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+                out.append("----")
+            out.append("")
+            continue
+        for seg in _md_segments(blk):
+            tag = seg[0]
+            if tag == "heading":
+                hid = seg[3] or _md_slug(seg[2])
+                out.append("[#" + hid + "]")
+                out.append("=" * seg[1] + " " + _inline_md_convert(seg[2], _ADOC_INLINE))
+            elif tag == "para":
+                out.append(_inline_md_convert(seg[1], _ADOC_INLINE))
+            elif tag == "list":
+                marker = "." if seg[1] else "*"
+                out.extend(marker + " " + _inline_md_convert(it, _ADOC_INLINE) for it in seg[2])
+            elif tag == "table":
+                out.append("|===")
+                out.append("".join("| " + _inline_md_convert(h, _ADOC_INLINE) + " " for h in seg[1]).rstrip())
+                out.append("")
+                for row in seg[2]:
+                    out.append(
+                        "".join("| " + _inline_md_convert(c, _ADOC_INLINE) + " " for c in row).rstrip()
+                    )
+                out.append("|===")
+            elif tag == "admonition":
+                out.append("[" + seg[1] + ("," + seg[2] if seg[2] else "") + "]")
+                out.append("====")
+                out.extend(_inline_md_convert(ln, _ADOC_INLINE) for ln in seg[3])
+                out.append("====")
+            elif tag == "fence":
+                out.append("[source," + (seg[1] or "text") + "]")
+                out.append("----")
+                out.append(seg[2])
+                out.append("----")
+            elif tag == "hr":
+                out.append("'''")
+            out.append("")
+    return "\n".join(out).rstrip("\n") + "\n"
+
+
+_ADOC_INLINE_BACK_RE = re.compile(r"\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|link:([^\[\s]+)\[([^\]]*)\]")
+
+
+def _adoc_inline_to_md(text: str) -> str:
+    def sub(m):
+        if m.group(1) is not None:
+            return "**" + m.group(1) + "**"
+        if m.group(2) is not None:
+            return "*" + m.group(2) + "*"
+        return "[" + m.group(4) + "](" + m.group(3) + ")"
+
+    return _ADOC_INLINE_BACK_RE.sub(sub, text)
+
+
+def adoc_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
+    """Parse an AsciiDoc source (comparison subset) into a v2 page."""
+    lines = text.split("\n")
+    title = default_title
+    meta: dict = {}
+    blocks: list = []
+    buf: list = []
+
+    def flush():
+        chunk = "\n".join(buf).strip("\n")
+        del buf[:]
+        if chunk.strip():
+            blocks.append(chunk)
+
+    i, n = 0, len(lines)
+    pending_caption = None
+    while i < n:
+        line = lines[i]
+        s = line.strip()
+        if i == 0 and s.startswith("= "):
+            title = s[2:].strip()
+            i += 1
+            continue
+        am = re.match(r"^:oku-([\w-]+):\s*(.*)$", s)
+        if am:
+            v = am.group(2).strip()
+            meta[am.group(1)] = int(v) if v.isdigit() else v
+            i += 1
+            continue
+        if s.startswith(".") and not s.startswith(".."):
+            cm = re.match(r"^\.(\S.*)$", s)
+            if cm and i + 1 < n and lines[i + 1].strip().startswith("["):
+                pending_caption = cm.group(1)
+                i += 1
+                continue
+        bm = re.match(r"^\[([A-Za-z][\w-]*)(?:,(.*))?\]$", s)
+        if bm and i + 1 < n and lines[i + 1].strip() in ("----", "===="):
+            tag, arg = bm.group(1), (bm.group(2) or "").strip()
+            delim = lines[i + 1].strip()
+            body = []
+            i += 2
+            while i < n and lines[i].strip() != delim:
+                body.append(lines[i])
+                i += 1
+            i += 1
+            joined = "\n".join(body)
+            if tag == "mermaid":
+                blk = {"k": "diagram", "src": joined}
+                if pending_caption:
+                    blk["caption"] = pending_caption
+                flush()
+                blocks.append(blk)
+            elif tag.startswith("oku-"):
+                try:
+                    payload = json.loads(joined)
+                except json.JSONDecodeError:
+                    payload = None
+                if isinstance(payload, dict):
+                    payload.pop("k", None)
+                    flush()
+                    blocks.append({"k": tag[4:], **payload})
+            elif tag == "source":
+                buf.append("```" + (arg or ""))
+                buf.append(joined)
+                buf.append("```")
+                buf.append("")
+            else:
+                head = "> [!" + tag.upper() + "]" + (" " + arg if arg else "")
+                buf.append("\n".join([head] + ["> " + _adoc_inline_to_md(b) for b in body if b.strip()]))
+                buf.append("")
+            pending_caption = None
+            continue
+        hm = re.match(r"^\[#([\w-]+)\]$", s)
+        if hm and i + 1 < n and re.match(r"^={2,6}\s", lines[i + 1]):
+            lm = re.match(r"^(={2,6})\s+(.*)$", lines[i + 1].strip())
+            buf.append(
+                "#" * len(lm.group(1)) + " " + _adoc_inline_to_md(lm.group(2)) + " {#" + hm.group(1) + "}"
+            )
+            buf.append("")
+            i += 2
+            continue
+        lm = re.match(r"^(={2,6})\s+(.*)$", s)
+        if lm:
+            buf.append("#" * len(lm.group(1)) + " " + _adoc_inline_to_md(lm.group(2)))
+            buf.append("")
+            i += 1
+            continue
+        if s == "|===":
+            rows = []
+            i += 1
+            while i < n and lines[i].strip() != "|===":
+                if lines[i].strip():
+                    rows.append([c.strip() for c in lines[i].strip().lstrip("|").split("|")])
+                i += 1
+            i += 1
+            if rows:
+                head, body_rows = rows[0], rows[1:]
+                buf.append("| " + " | ".join(_adoc_inline_to_md(h) for h in head) + " |")
+                buf.append("|" + "---|" * len(head))
+                for r in body_rows:
+                    buf.append("| " + " | ".join(_adoc_inline_to_md(c) for c in r) + " |")
+                buf.append("")
+            continue
+        im = re.match(r"^([.*])\s+(.*)$", s)
+        if im:
+            marker = "1." if im.group(1) == "." else "-"
+            buf.append(marker + " " + _adoc_inline_to_md(im.group(2)))
+            i += 1
+            if i >= n or not re.match(r"^([.*])\s+", lines[i].strip()):
+                buf.append("")
+            continue
+        if s == "'''":
+            buf.append("---")
+            buf.append("")
+            i += 1
+            continue
+        if s:
+            buf.append(_adoc_inline_to_md(s))
+            if i + 1 >= n or not lines[i + 1].strip():
+                buf.append("")
+        i += 1
+    flush()
+    page: dict = {"k": "page", "t": title, "b": blocks}
+    if meta:
+        page["m"] = meta
+    return page
+
+
+# ---------------- djot ----------------
+
+_DJOT_INLINE = {"strong": "*{t}*", "em": "_{t}_", "code": "`{t}`", "link": "[{t}]({u})"}
+_DJOT_INLINE_BACK_RE = re.compile(r"\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_")
+
+
+def page_to_djot(page: dict) -> str:
+    """Emit a djot source (comparison subset). djot keeps markdown's
+    fences/tables/links; differences: `_em_` / `*strong*`, attribute
+    line `{#id}` BEFORE a heading, `:::` divs for admonitions."""
+    if page.get("kind") == "page" and "k" not in page:
+        page = _v1_to_v2(page)
+    meta = page.get("m") or {}
+    out = ["---", "title: " + _front_matter_value(page.get("t", ""))]
+    out.extend(key + ": " + _front_matter_value(v) for key, v in meta.items() if not key.startswith("_"))
+    out.append("---")
+    out.append("")
+    for blk in page.get("b") or []:
+        if isinstance(blk, dict):
+            kind = blk.get("k")
+            if kind == "diagram" and set(blk) <= {"k", "src", "caption"}:
+                out.append("```mermaid")
+                out.append(str(blk.get("src", "")))
+                out.append("```")
+                if blk.get("caption"):
+                    out.append("")
+                    out.append("_" + str(blk["caption"]) + "_")
+            else:
+                payload = {kk: v for kk, v in blk.items() if kk != "k"}
+                out.append("```oku-" + str(kind))
+                out.append(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+                out.append("```")
+            out.append("")
+            continue
+        for seg in _md_segments(blk):
+            tag = seg[0]
+            if tag == "heading":
+                hid = seg[3] or _md_slug(seg[2])
+                out.append("{#" + hid + "}")
+                out.append("#" * seg[1] + " " + _inline_md_convert(seg[2], _DJOT_INLINE))
+            elif tag == "para":
+                out.append(_inline_md_convert(seg[1], _DJOT_INLINE))
+            elif tag == "list":
+                out.extend(
+                    ("1. " if seg[1] else "- ") + _inline_md_convert(it, _DJOT_INLINE) for it in seg[2]
+                )
+            elif tag == "table":
+                out.append("| " + " | ".join(_inline_md_convert(h, _DJOT_INLINE) for h in seg[1]) + " |")
+                out.append("|" + "---|" * len(seg[1]))
+                for row in seg[2]:
+                    out.append("| " + " | ".join(_inline_md_convert(c, _DJOT_INLINE) for c in row) + " |")
+            elif tag == "admonition":
+                if seg[2]:
+                    out.append('{title="' + seg[2] + '"}')
+                out.append("::: " + seg[1].lower())
+                out.extend(_inline_md_convert(ln, _DJOT_INLINE) for ln in seg[3])
+                out.append(":::")
+            elif tag == "fence":
+                out.append("```" + (seg[1] or ""))
+                out.append(seg[2])
+                out.append("```")
+            elif tag == "hr":
+                out.append("* * *")
+            out.append("")
+    return "\n".join(out).rstrip("\n") + "\n"
+
+
+def _djot_inline_to_md(text: str) -> str:
+    def sub(m):
+        if m.group(1) is not None:
+            return "**" + m.group(1) + "**"
+        return "*" + m.group(2) + "*"
+
+    return _DJOT_INLINE_BACK_RE.sub(sub, text)
+
+
+def djot_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
+    """Parse a djot source (comparison subset) into a v2 page."""
+    text, front_meta = _strip_md_front_matter(text)
+    title = str(front_meta.pop("title", "")).strip() or default_title
+    lines = text.split("\n")
+    blocks: list = []
+    buf: list = []
+
+    def flush():
+        chunk = re.sub(r"\n{3,}", "\n\n", "\n".join(buf)).strip("\n")
+        del buf[:]
+        if chunk.strip():
+            blocks.append(chunk)
+
+    i, n = 0, len(lines)
+    pending_attr: dict = {}
+    while i < n:
+        line = lines[i]
+        s = line.strip()
+        fm = _FENCE_OPEN_RE.match(line)
+        if fm:
+            lang = (fm.group(2) or "").lower()
+            close = re.compile(r"^`{" + str(len(fm.group(1))) + r",}\s*$")
+            body = []
+            i += 1
+            while i < n and not close.match(lines[i]):
+                body.append(lines[i])
+                i += 1
+            i += 1
+            joined = "\n".join(body)
+            if lang == "mermaid":
+                blk = {"k": "diagram", "src": joined}
+                j = i
+                while j < n and not lines[j].strip():
+                    j += 1
+                cap = re.match(r"^_([^_].*)_\s*$", lines[j]) if j < n else None
+                if cap and (j + 1 >= n or not lines[j + 1].strip()):
+                    blk["caption"] = cap.group(1).strip()
+                    i = j + 1
+                flush()
+                blocks.append(blk)
+            elif lang.startswith("oku-"):
+                try:
+                    payload = json.loads(joined)
+                except json.JSONDecodeError:
+                    payload = None
+                if isinstance(payload, dict):
+                    payload.pop("k", None)
+                    flush()
+                    blocks.append({"k": lang[4:], **payload})
+            else:
+                buf.append("```" + lang)
+                buf.append(joined)
+                buf.append("```")
+                buf.append("")
+            continue
+        am = re.match(r'^\{(?:#([\w-]+))?(?:\s*title="([^"]*)")?\}$', s)
+        if am and (am.group(1) or am.group(2)):
+            if am.group(1):
+                pending_attr["id"] = am.group(1)
+            if am.group(2):
+                pending_attr["title"] = am.group(2)
+            i += 1
+            continue
+        hm = re.match(r"^(#{1,6})\s+(.*)$", s)
+        if hm:
+            hid = pending_attr.pop("id", None)
+            line_md = "#" * len(hm.group(1)) + " " + _djot_inline_to_md(hm.group(2))
+            if hid:
+                line_md += " {#" + hid + "}"
+            buf.append(line_md)
+            buf.append("")
+            pending_attr = {}
+            i += 1
+            continue
+        dm = re.match(r"^:{3,}\s+([\w-]+)\s*$", s)
+        if dm:
+            typ = dm.group(1)
+            title_attr = pending_attr.pop("title", "")
+            body = []
+            i += 1
+            while i < n and not re.match(r"^:{3,}\s*$", lines[i].strip()):
+                body.append(lines[i])
+                i += 1
+            i += 1
+            head = "> [!" + typ.upper() + "]" + (" " + title_attr if title_attr else "")
+            buf.append("\n".join([head] + ["> " + _djot_inline_to_md(b) for b in body if b.strip()]))
+            buf.append("")
+            pending_attr = {}
+            continue
+        if s == "* * *":
+            buf.append("---")
+            buf.append("")
+            i += 1
+            continue
+        if s:
+            buf.append(_djot_inline_to_md(line.rstrip()))
+        else:
+            buf.append("")
+        i += 1
+    flush()
+    page: dict = {"k": "page", "t": title, "b": blocks}
+    meta = {k: v for k, v in front_meta.items()}
+    if meta:
+        page["m"] = meta
+    return page
+
+
+# ---------------- source registry ----------------
+
+# Extension → parser. ".src.html" is matched by name suffix (two-dot
+# extension) before the plain-suffix lookup so HTML SOURCES never
+# collide with the per-page HTML stubs.
+_PAGE_SOURCE_PARSERS = {
+    ".md": md_to_v2_page,
+    ".adoc": adoc_to_v2_page,
+    ".dj": djot_to_v2_page,
+}
+_PAGE_SOURCE_EMITTERS = {
+    "md": page_to_md,
+    "html": page_to_html,
+    "adoc": page_to_adoc,
+    "dj": page_to_djot,
+}
+_SOURCE_SUFFIXES = (".md", ".adoc", ".dj", ".src.html")
+
+
+def _source_parser_for(p: Path):
+    """Parser callable for a page-source path, or None."""
+    if p.name.endswith(".src.html"):
+        return html_to_v2_page
+    return _PAGE_SOURCE_PARSERS.get(p.suffix)
+
+
+def _source_stem_path(p: Path) -> Path:
+    """The path minus its SOURCE suffix — 'foo.src.html' → 'foo'."""
+    if p.name.endswith(".src.html"):
+        return p.parent / p.name[: -len(".src.html")]
+    return p.with_suffix("")
+
+
 def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
     """Walk *.md files under root, return (md_path, synthesized_page_dict).
 
@@ -661,8 +1518,10 @@ def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
     """
     out: list[tuple[Path, dict]] = []
     extra = project_skip_dirs(root)
-    for p in iter_repo_files(root, (".md",), extra_skip=extra):
-        page = _md_page_from_file(p)
+    for p in iter_repo_files(root, (".md", ".adoc", ".dj", ".html"), extra_skip=extra):
+        if p.suffix == ".html" and not p.name.endswith(".src.html"):
+            continue  # per-page stubs are not sources
+        page = _page_from_source_file(p)
         if page is not None:
             out.append((p, page))
     return sorted(out, key=lambda x: str(x[0]).lower())
@@ -1074,14 +1933,22 @@ def find_json_pages(root: Path):
     # CLAUDE.md, AGENTS.md and friends included. Authors who don't
     # want a given file in the site tree should put it under a
     # SKIP_DIRS-matching subdirectory.
-    for p in iter_repo_files(root, (".md",), extra_skip=extra):
-        synth_path = p.with_suffix(".json")
-        # Don't shadow a real .json sibling if both exist.
-        if synth_path in real_json:
+    seen_stems: set = set()
+    for p in iter_repo_files(root, (".md", ".adoc", ".dj", ".html"), extra_skip=extra):
+        if p.suffix == ".html" and not p.name.endswith(".src.html"):
+            continue  # per-page stubs are not sources
+        stem = _source_stem_path(p)
+        synth_path = stem.with_suffix(".json")
+        # Don't shadow a real .json sibling. When several source
+        # formats coexist for one stem the first encountered wins —
+        # the format-comparison corpus keeps each format in its own
+        # directory, so this only guards against accidents.
+        if synth_path in real_json or synth_path in seen_stems:
             continue
-        page = _md_page_from_file(p)
+        page = _page_from_source_file(p)
         if page is None:
             continue
+        seen_stems.add(synth_path)
         pages.append((synth_path, page))
     return sorted(pages, key=lambda x: str(x[0]).lower())
 
@@ -1965,9 +2832,16 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
         # field matches what a reader can open in their editor.
         source_rel = rel
         if not p.exists():
-            md_sibling = p.with_suffix(".md")
-            if md_sibling.exists():
-                source_rel = md_sibling.relative_to(root)
+            stem = p.with_suffix("")
+            for sib in (
+                stem.with_suffix(".md"),
+                stem.with_suffix(".adoc"),
+                stem.with_suffix(".dj"),
+                stem.parent / (stem.name + ".src.html"),
+            ):
+                if sib.exists():
+                    source_rel = sib.relative_to(root)
+                    break
         parent = meta.get("parent", path_parent)
         entry = {
             "path": nav_path,
@@ -2626,6 +3500,8 @@ _WATCH_INCLUDE_SUFFIX = {
     ".htm",
     ".md",
     ".markdown",
+    ".adoc",
+    ".dj",
     ".css",
     ".js",
     ".svg",
@@ -2770,20 +3646,45 @@ def _make_serve_handler(root: Path):
             if fs.exists():
                 return False
 
-            md_path = fs.with_suffix(".md")
+            stem = fs.with_suffix("")
+            source_path = None
+            for cand in (
+                stem.with_suffix(".md"),
+                stem.with_suffix(".adoc"),
+                stem.with_suffix(".dj"),
+                stem.parent / (stem.name + ".src.html"),
+            ):
+                if cand.exists():
+                    source_path = cand
+                    break
             json_path = fs.with_suffix(".json")
             body: bytes | None = None
             content_type: str | None = None
 
-            if md_path.exists():
-                page = _md_page_from_file(md_path)
+            if source_path is not None:
+                page = _page_from_source_file(source_path)
                 if page is None:
                     return False
                 if url_path.endswith(".json"):
                     body = json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8")
                     content_type = "application/json; charset=utf-8"
                 else:
-                    body = _stub_for(_page_title(page) or md_path.stem).encode("utf-8")
+                    stub = _stub_for(_page_title(page) or stem.name)
+                    # Nested pages need their _oku/ references walked
+                    # back up — to the NEAREST ancestor that holds the
+                    # _oku kit dir (dev layouts carry the symlink per
+                    # docs root, e.g. docs/_oku and examples/_oku),
+                    # falling back to the serve root.
+                    depth = 0
+                    anc = fs.parent
+                    while anc != root and not (anc / "_oku").exists():
+                        anc = anc.parent
+                        depth += 1
+                    if not (anc / "_oku").exists():
+                        depth = len(fs.relative_to(root).parts) - 1
+                    if depth > 0:
+                        stub = _retarget_kit_urls(stub, depth)
+                    body = stub.encode("utf-8")
                     content_type = "text/html; charset=utf-8"
             elif url_path.endswith(".html") and json_path.exists():
                 # The .json file IS on disk; only the .html shell is missing.
