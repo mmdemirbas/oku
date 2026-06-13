@@ -640,3 +640,27 @@ def test_find_kit_json_falls_back_to_root(tmp_path: Path) -> None:
 
 def test_find_kit_json_returns_none_when_absent(tmp_path: Path) -> None:
     assert cli.find_kit_json(tmp_path) is None
+
+
+def test_shadowed_source_flagged(tmp_path: Path, repo_root: Path) -> None:
+    """A real .json page sitting next to a .md source must be flagged —
+    it silently wins discovery and the rendered page stops following
+    the source (the stale-global-init incident class)."""
+    import subprocess
+    import sys
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "page.md").write_text("---\ntitle: P\n---\n\nbody\n", encoding="utf-8")
+    (docs / "page.json").write_text(
+        '{"k":"page","t":"P","m":{"summary":"s"},"b":["## S {#s}\\n\\nstale shadow"]}',
+        encoding="utf-8",
+    )
+    proc = subprocess.run(
+        [sys.executable, str(repo_root / "bin" / "oku"), "check", "--json"],
+        cwd=docs,
+        capture_output=True,
+        text=True,
+    )
+    assert '"shadowed-source"' in proc.stdout, proc.stdout + proc.stderr
+    assert proc.returncode == 1, "shadowed-source must be an error"

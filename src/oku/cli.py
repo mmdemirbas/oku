@@ -2750,6 +2750,35 @@ def cmd_check(args: argparse.Namespace) -> int:
             }
         )
 
+    # Shadowed sources — a real .json page next to a .md/.adoc/.dj/
+    # .src.html source silently WINS in discovery and serving, so the
+    # rendered page stops following the source the author edits. This
+    # exact failure (a stale global `oku init` materialising v1 .json
+    # shadows over every docs/*.md) once broke a whole review pass —
+    # it must never again be silent.
+    for p, _data in pages:
+        if p.suffix != ".json" or not p.exists():
+            continue
+        stem = p.with_suffix("")
+        for sib in (
+            stem.with_suffix(".md"),
+            stem.with_suffix(".adoc"),
+            stem.with_suffix(".dj"),
+            stem.parent / (stem.name + ".src.html"),
+        ):
+            if sib.exists():
+                issues.append(
+                    {
+                        "path": p,
+                        "severity": "error",
+                        "code": "shadowed-source",
+                        "where": "(file)",
+                        "message": f"Real page-JSON shadows the {sib.name} source — the rendered page "
+                        f"ignores the source file. Delete the .json (it is derived) or the source.",
+                    }
+                )
+                break
+
     if args.json:
         # Emit a machine-parseable stream. Path is serialised relative
         # to root so consumers don't have to strip absolute prefixes.
@@ -3656,6 +3685,25 @@ def _make_serve_handler(root: Path):
             body: bytes | None = None
             content_type: str | None = None
 
+            def _synth_stub(title: str) -> bytes:
+                stub = _stub_for(title)
+                # Nested pages need their _oku/ references walked back
+                # up — to the NEAREST ancestor that holds the _oku kit
+                # dir (dev layouts carry the symlink per docs root,
+                # e.g. docs/_oku and examples/_oku), falling back to
+                # the serve root. Applies to EVERY synthesized stub —
+                # source-derived and json-derived alike.
+                depth = 0
+                anc = fs.parent
+                while anc != root and not (anc / "_oku").exists():
+                    anc = anc.parent
+                    depth += 1
+                if not (anc / "_oku").exists():
+                    depth = len(fs.relative_to(root).parts) - 1
+                if depth > 0:
+                    stub = _retarget_kit_urls(stub, depth)
+                return stub.encode("utf-8")
+
             if source_path is not None:
                 page = _page_from_source_file(source_path)
                 if page is None:
@@ -3664,22 +3712,7 @@ def _make_serve_handler(root: Path):
                     body = json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8")
                     content_type = "application/json; charset=utf-8"
                 else:
-                    stub = _stub_for(_page_title(page) or stem.name)
-                    # Nested pages need their _oku/ references walked
-                    # back up — to the NEAREST ancestor that holds the
-                    # _oku kit dir (dev layouts carry the symlink per
-                    # docs root, e.g. docs/_oku and examples/_oku),
-                    # falling back to the serve root.
-                    depth = 0
-                    anc = fs.parent
-                    while anc != root and not (anc / "_oku").exists():
-                        anc = anc.parent
-                        depth += 1
-                    if not (anc / "_oku").exists():
-                        depth = len(fs.relative_to(root).parts) - 1
-                    if depth > 0:
-                        stub = _retarget_kit_urls(stub, depth)
-                    body = stub.encode("utf-8")
+                    body = _synth_stub(_page_title(page) or stem.name)
                     content_type = "text/html; charset=utf-8"
             elif url_path.endswith(".html") and json_path.exists():
                 # The .json file IS on disk; only the .html shell is missing.
@@ -3690,7 +3723,7 @@ def _make_serve_handler(root: Path):
                     return False
                 if not _is_page(page):
                     return False
-                body = _stub_for(_page_title(page) or json_path.stem).encode("utf-8")
+                body = _synth_stub(_page_title(page) or json_path.stem)
                 content_type = "text/html; charset=utf-8"
             else:
                 return False

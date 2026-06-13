@@ -248,3 +248,21 @@ def test_format_corpus_renders_identically(page, site_url):
             })"""
         )
     assert counts["markdown"] == counts["html"] == counts["asciidoc"], counts
+
+
+def test_comparison_page_rendered_links_all_work(page, site_url):
+    """Every 'See them rendered' link on the comparison page navigates
+    to a rendering page — cross-docs-root links navigate natively (no
+    SPA 404), json-backed stubs retarget kit assets at any depth."""
+    _goto(page, f"{site_url}/docs/format-comparison.html")
+    hrefs = page.evaluate(
+        """() => [...document.querySelectorAll('main a[href*="examples/format-comparison"]')]
+                .map(a => a.getAttribute('href'))"""
+    )
+    assert len(hrefs) == 10, f"expected 10 rendered links, got {len(hrefs)}"
+    for href in hrefs:
+        _goto(page, f"{site_url}/docs/format-comparison.html")
+        page.click(f'main a[href="{href}"]')
+        page.wait_for_selector("main section", timeout=8000)
+        assert page.locator("main section").count() >= 3, f"{href} rendered empty"
+        assert page.title().startswith("Sample"), f"{href} landed on wrong page: {page.title()}"

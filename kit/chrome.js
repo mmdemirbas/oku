@@ -1154,9 +1154,13 @@ document.addEventListener('click', function (e) {
   // Compute pagePath relative to the docs root.
   var docsRootPath;
   try { docsRootPath = new URL(__okuDocsRoot, window.location.origin).pathname; } catch (e2) { docsRootPath = '/'; }
-  var pagePath = url.pathname.indexOf(docsRootPath) === 0
-    ? url.pathname.slice(docsRootPath.length)
-    : url.pathname;
+  if (url.pathname.indexOf(docsRootPath) !== 0) {
+    // Different docs root (e.g. a docs/ page linking into examples/):
+    // SPA-rendering would fetch the JSON from the wrong root and 404.
+    // Let the browser navigate natively — the target has its own stub.
+    return;
+  }
+  var pagePath = url.pathname.slice(docsRootPath.length);
   e.preventDefault();
   var anchor = url.hash.replace(/^#/, '');
   var target = url.pathname + (anchor ? '#' + anchor : '');
@@ -1353,12 +1357,11 @@ function slugify(text) {
 
 function appendPermalink(heading, id, label) {
   if (heading.querySelector('.permalink')) return;
-  // Page-aware so copy-link gives a URL that fully restores state.
-  var current = window.__okuCurrentPage;
-  var prefix = (current && current !== 'index.html') ? '#' + current + ':' : '#';
+  // Path-based routing: the pathname names the page, so the permalink
+  // is a plain section anchor — copy-link gives "<page>.html#id".
   var a = document.createElement('a');
   a.className = 'permalink';
-  a.href = prefix + id;
+  a.href = '#' + id;
   a.textContent = '#';
   a.setAttribute('aria-label', label || 'Permalink');
   heading.appendChild(a);
