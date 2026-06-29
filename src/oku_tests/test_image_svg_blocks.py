@@ -88,3 +88,12 @@ def test_v1_page_with_new_blocks_validates(page_schema: dict) -> None:
     }
     v2 = _v1_to_v2(v1)
     jsonschema.validate(v2, page_schema)
+
+
+def test_known_block_kinds_includes_image_svg() -> None:
+    """The structural `unknown-kind` lint allowlist must accept the new
+    v1 block kinds, otherwise `oku check` errors on legacy JSON pages."""
+    from oku.cli import _KNOWN_BLOCK_KINDS
+
+    assert "image" in _KNOWN_BLOCK_KINDS
+    assert "svg" in _KNOWN_BLOCK_KINDS

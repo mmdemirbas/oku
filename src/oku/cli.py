@@ -2086,6 +2086,8 @@ _KNOWN_BLOCK_KINDS = {
     "compare-grid",
     "chart",
     "diagram",
+    "image",
+    "svg",
     "live-snippet",
     "example",
 }
