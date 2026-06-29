@@ -41,6 +41,8 @@
       "oneOf": [
         { "type": "string" },
         { "$ref": "#/$defs/diagram" },
+        { "$ref": "#/$defs/image" },
+        { "$ref": "#/$defs/svg" },
         { "$ref": "#/$defs/code" },
         { "$ref": "#/$defs/annotated-code" },
         { "$ref": "#/$defs/table" },
@@ -63,6 +65,33 @@
         "k": { "const": "diagram" },
         "src": { "type": "string", "description": "Mermaid source." },
         "caption": { "type": "string" }
+      }
+    },
+
+    "image": {
+      "type": "object",
+      "required": ["k", "src"],
+      "additionalProperties": false,
+      "description": "Raster/vector image as a figure. src is a self-contained data: URI (preferred — keeps the doc offline) or a URL/path. Renders <figure><img><figcaption>.",
+      "properties": {
+        "k": { "const": "image" },
+        "src": { "type": "string", "description": "data: URI (offline-safe) or URL/path." },
+        "alt": { "type": "string", "description": "Accessible alt text." },
+        "caption": { "type": "string", "description": "Visible caption below the image." },
+        "width": { "type": ["integer", "string"], "description": "Max width — number (px) or CSS length." }
+      }
+    },
+
+    "svg": {
+      "type": "object",
+      "required": ["k", "src"],
+      "additionalProperties": false,
+      "description": "Inline, author-authored SVG illustration (theme-aware via currentColor / CSS vars, scales with viewBox). Renders <figure> with the SVG inline. Scripts are stripped.",
+      "properties": {
+        "k": { "const": "svg" },
+        "src": { "type": "string", "description": "Raw <svg>…</svg> markup." },
+        "caption": { "type": "string", "description": "Visible caption below the figure." },
+        "label": { "type": "string", "description": "aria-label for screen readers." }
       }
     },
 

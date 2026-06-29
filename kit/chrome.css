@@ -2504,6 +2504,34 @@ details.info-tip > *:not(summary) { font-size: 13.5px; line-height: 1.6; color: 
 details.info-tip > *:not(summary) p { margin: 0 0 10px 0; }
 details.info-tip > *:not(summary) p:last-child { margin-bottom: 0; }
 
+/* Figure — embedded image (data: URI / URL) or inline author SVG, with
+   optional caption. SVG scales via its own viewBox; raster caps at the
+   content width. Both center and pick up a quiet themed frame. */
+figure.okt-figure {
+  margin: 18px 0;
+  text-align: center;
+}
+figure.okt-figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+figure.okt-figure.okt-svg .okt-svg-holder { width: 100%; }
+figure.okt-figure.okt-svg svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+figure.okt-figure figcaption {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-soft);
+  font-style: italic;
+}
+
 /* Bar-chart — row-per-item horizontal bars. Layout-safe by structure. */
 .bar-chart { display: grid; gap: 6px; margin: 24px 0; }
 .bar-row {
