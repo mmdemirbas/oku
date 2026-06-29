@@ -1161,6 +1161,25 @@
     }
 
     _renderCompareGrid(block) {
+      // Verdict icon makes each card scannable at a glance (traffic-light
+      // read) instead of a uniform pile of text. good/bad get check/cross,
+      // warn/caution an alert triangle; neutral gets a quiet judgment-free
+      // ring (used for informational peer cards like "ISO" / "GNSS" where a
+      // warning glyph would be a false alarm). Coloured by verdict in CSS.
+      const ICONS = {
+        good: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+        bad: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+        warn: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+        accent: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>',
+        neutral: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>'
+      };
+      const iconFor = (k) => {
+        if (k === 'good' || k === 'success' || k === 'in') return ICONS.good;
+        if (k === 'bad' || k === 'danger' || k === 'fail') return ICONS.bad;
+        if (k === 'warn' || k === 'caution' || k === 'warning') return ICONS.warn;
+        if (k === 'accent' || k === 'note' || k === 'info' || k === 'tip') return ICONS.accent;
+        return ICONS.neutral;
+      };
       const grid = document.createElement('div');
       grid.className = 'compare-grid';
       for (const c of (block.cards || [])) {
@@ -1169,9 +1188,16 @@
         card.className = 'compare-card ' + styleKey + (c.href ? ' compare-card-link' : '');
         if (c.href) card.setAttribute('href', c.href);
         if (c.t) {
+          const head = document.createElement('div');
+          head.className = 'compare-card-head';
+          const ico = document.createElement('span');
+          ico.className = 'compare-card-icon';
+          ico.innerHTML = iconFor(styleKey);
           const h = document.createElement('h4');
           h.textContent = c.t;
-          card.appendChild(h);
+          head.appendChild(ico);
+          head.appendChild(h);
+          card.appendChild(head);
         }
         if (c.b) {
           const sub = parseMarkdown(c.b);

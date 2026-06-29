@@ -209,7 +209,7 @@
             "properties": {
               "t":       { "type": "string", "description": "Card title." },
               "b":      { "type": "string", "description": "Card body as markdown." },
-              "verdict": { "enum": ["good", "bad", "neutral", "in", "out"], "default": "neutral" },
+              "verdict": { "enum": ["good", "warn", "bad", "neutral", "in", "out"], "default": "neutral" },
               "accent":  { "enum": ["accent", "warn", "danger", "success", "muted", "neutral"] },
               "href":    { "type": "string" }
             }

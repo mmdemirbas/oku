@@ -3084,6 +3084,22 @@ a.compare-card-link:hover {
 .compare-card.in h4  { color: var(--success); }
 .compare-card.out h4 { color: var(--text-soft); }
 .compare-card h4 { margin: 0 0 12px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--text); }
+/* Verdict-icon header: a check / cross / triangle / ring at the title makes
+   each card readable at a glance instead of a uniform block of text. */
+.compare-card.caution { border-top: 4px solid var(--warning); }
+.compare-card.caution:hover { border-color: var(--warning); }
+.compare-card-head { display: flex; align-items: center; gap: 9px; margin: 0 0 12px 0; }
+.compare-card-head h4 { margin: 0; }
+.compare-card-icon { flex: 0 0 auto; display: inline-flex; color: var(--text-soft); }
+.compare-card-icon svg { display: block; }
+.compare-card.good .compare-card-icon,
+.compare-card.success .compare-card-icon,
+.compare-card.in .compare-card-icon { color: var(--success); }
+.compare-card.bad .compare-card-icon,
+.compare-card.danger .compare-card-icon { color: var(--danger); }
+.compare-card.warn .compare-card-icon,
+.compare-card.caution .compare-card-icon { color: var(--warning); }
+.compare-card.accent .compare-card-icon { color: var(--accent); }
 /* Items list (was scope-col ul) — sits below the optional `content` body. */
 .compare-card ul {
   margin: 0;

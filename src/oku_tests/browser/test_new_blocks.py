@@ -70,6 +70,15 @@ PAGE = {
                     "kind": "diagram",
                     "source": 'flowchart TD\n    A["Uzun bir başlangıç düğümü etiketi"] --> B{"Daha uzun bir karar düğümü metni"}\n    B -->|"Evet"| C["Sonuç bir"]\n    B -->|"Hayır"| D["İkinci sonuç"]',
                 },
+                {
+                    "kind": "compare-grid",
+                    "cards": [
+                        {"verdict": "good", "title": "İyi", "content": "olur"},
+                        {"verdict": "warn", "title": "Dikkat", "content": "dikkatli ol"},
+                        {"verdict": "bad", "title": "Kötü", "content": "olmaz"},
+                        {"verdict": "neutral", "title": "Nötr", "content": "bilgi"},
+                    ],
+                },
             ],
         }
     ],
@@ -129,6 +138,28 @@ def test_bar_chart_shares_origin(page, served):
     )
     assert len(lefts) == 3, lefts
     assert len(set(lefts)) == 1, f"bar tracks must share a left origin, got {lefts}"
+
+
+def test_compare_grid_verdict_icons(page, served):
+    """Each compare-card shows a verdict icon (check / triangle / cross /
+    ring) so the grid reads at a glance instead of as a pile of text.
+    The icon is coloured by verdict — good ≠ bad ≠ warn — and even a
+    judgment-free `neutral` card carries a (quiet) marker."""
+    page.goto(served)
+    page.wait_for_timeout(800)
+    for verdict in ("good", "warn", "bad", "neutral"):
+        sel = f".compare-card.{verdict} .compare-card-icon svg"
+        assert page.locator(sel).count() == 1, sel
+    # the title sits inside the icon header (icon precedes the h4)
+    assert page.locator(".compare-card.good .compare-card-head h4").count() == 1
+    # verdict drives the icon colour — good/bad/warn must differ
+    colors = {
+        v: page.eval_on_selector(
+            f".compare-card.{v} .compare-card-icon", "el => getComputedStyle(el).color"
+        )
+        for v in ("good", "bad", "warn")
+    }
+    assert len(set(colors.values())) == 3, colors
 
 
 def test_mermaid_fits_container(page, served):
