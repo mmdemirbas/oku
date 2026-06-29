@@ -1,0 +1,103 @@
+"""Render-side regression for the new kit features, pinned as Playwright
+assertions (pytest can't see computed colour or <details> semantics):
+
+- `callout` type=danger renders `.callout.danger` with the red --danger
+  border (previously fell back to neutral 'note').
+- `info-tip` renders a collapsible `<details class="info-tip">` — closed
+  by default, with a clickable summary (real "reveal" for self-checks).
+- `image` renders `<figure class="okt-figure"><img>`.
+- `svg` renders `<figure class="okt-figure okt-svg">` with the inline
+  <svg> present (scripts stripped).
+
+Served as a v1 JSON page (the legacy shape convertV1Block handles) from a
+tmp dir with an `_oku` symlink to the live kit/. Uses the pytest-playwright
+`page` fixture; the package auto-skips when chromium isn't installed.
+"""
+
+from __future__ import annotations
+
+import http.server
+import json
+import threading
+from functools import partial
+from pathlib import Path
+
+import pytest
+
+from oku import cli
+
+pytestmark = pytest.mark.browser
+
+KIT = Path(__file__).resolve().parents[3] / "kit"
+
+PAGE = {
+    "kind": "page",
+    "title": "Yeni bloklar",
+    "blocks": [
+        {
+            "kind": "section",
+            "id": "s1",
+            "title": "Test",
+            "blocks": [
+                {"kind": "callout", "type": "danger", "title": "Kritik", "content": "kırmızı olmalı"},
+                {
+                    "kind": "info-tip",
+                    "summary": "Kendini sına — soru?",
+                    "content": [{"kind": "paragraph", "content": "gizli cevap"}],
+                },
+                {
+                    "kind": "image",
+                    "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+                    "alt": "tek piksel",
+                    "caption": "resim",
+                },
+                {
+                    "kind": "svg",
+                    "source": "<svg viewBox='0 0 10 10'><rect width='10' height='10'/></svg>",
+                    "label": "şema",
+                },
+            ],
+        }
+    ],
+}
+
+
+@pytest.fixture(scope="module")
+def served(tmp_path_factory):
+    d = tmp_path_factory.mktemp("newblocks")
+    (d / "_oku").symlink_to(KIT, target_is_directory=True)
+    (d / "page.json").write_text(json.dumps(PAGE, ensure_ascii=False), encoding="utf-8")
+    manifest = {
+        "schema_version": 1,
+        "root": ".",
+        "pages": [{"path": "page.html", "source": "page.json", "title": "Yeni bloklar", "parent": None}],
+    }
+    (d / "page.html").write_text(cli._stub_for("Yeni bloklar", inline_manifest=manifest), encoding="utf-8")
+    handler = partial(http.server.SimpleHTTPRequestHandler, directory=str(d))
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{httpd.server_address[1]}/page.html"
+    httpd.shutdown()
+
+
+def test_new_blocks_render(page, served):
+    page.goto(served)
+    page.wait_for_timeout(1200)
+
+    # danger callout — present and red border (not the neutral fallback)
+    danger = page.locator(".callout.danger")
+    assert danger.count() == 1
+    border = danger.evaluate("el => getComputedStyle(el).borderLeftColor")
+    assert border not in ("rgba(0, 0, 0, 0)", ""), border
+
+    # info-tip — collapsible <details>, closed by default, answer hidden
+    det = page.locator("details.info-tip")
+    assert det.count() == 1
+    assert det.evaluate("el => el.tagName.toLowerCase()") == "details"
+    assert det.evaluate("el => el.open") is False
+    assert det.locator("summary").count() == 1
+
+    # image — figure + img
+    assert page.locator("figure.okt-figure img").count() == 1
+    # svg — figure.okt-svg with inline svg
+    assert page.locator("figure.okt-svg svg").count() == 1

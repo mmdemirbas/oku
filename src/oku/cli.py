@@ -1746,6 +1746,22 @@ def _v1_to_v2_block(blk):
         if blk.get("caption"):
             out_d["caption"] = blk["caption"]
         return out_d
+    if k == "image":
+        out_img = {"k": "image", "src": blk.get("src") or ""}
+        if blk.get("alt"):
+            out_img["alt"] = blk["alt"]
+        if blk.get("caption"):
+            out_img["caption"] = blk["caption"]
+        if blk.get("width") is not None:
+            out_img["width"] = blk["width"]
+        return out_img
+    if k == "svg":
+        out_svg = {"k": "svg", "src": blk.get("source") or ""}
+        if blk.get("caption"):
+            out_svg["caption"] = blk["caption"]
+        if blk.get("label"):
+            out_svg["label"] = blk["label"]
+        return out_svg
     if k == "live-snippet":
         out_l = {"k": "live-snippet", "src": blk.get("source") or ""}
         if blk.get("language"):

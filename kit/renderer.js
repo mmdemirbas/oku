@@ -77,13 +77,17 @@
         return '> [!TLDR]' + tt + body;
       }
       case 'info-tip': {
-        const parts = [];
-        for (const sub of (b.content || [])) {
-          const c = convertV1Block(sub);
-          if (typeof c === 'string') parts.push(c);
-        }
-        const body = parts.length ? '\n' + parts.join('\n\n').split('\n').map(l => '> ' + l).join('\n') : '';
-        return '> [!TIP]' + (b.summary ? ' ' + b.summary : '') + body;
+        // Collapsible disclosure: <details class="info-tip"><summary>.
+        // The summary is the visible cue; the body stays hidden until
+        // the reader expands it (real "think first, then reveal" for
+        // self-check boxes). Content blocks are carried through verbatim
+        // so nested lists / tables render correctly inside the details.
+        return {
+          k: 'info-tip',
+          summary: b.summary || '',
+          content: Array.isArray(b.content) ? b.content : [],
+          open: !!b.open
+        };
       }
       case 'insight':
         return { k: 'insight', b: richToMd(b.content) };
@@ -92,6 +96,19 @@
       case 'diagram': {
         const o = { k: 'diagram', src: b.source || '' };
         if (b.caption) o.caption = b.caption;
+        return o;
+      }
+      case 'image': {
+        const o = { k: 'image', src: b.src || '' };
+        if (b.alt) o.alt = b.alt;
+        if (b.caption) o.caption = b.caption;
+        if (b.width != null) o.width = b.width;
+        return o;
+      }
+      case 'svg': {
+        const o = { k: 'svg', src: b.source || '' };
+        if (b.caption) o.caption = b.caption;
+        if (b.label) o.label = b.label;
         return o;
       }
       case 'live-snippet': {
@@ -687,13 +704,22 @@
 
   // Map admonition types to kit callout classes. Standard GFM types
   // (note, tip, important, warning, caution) map directly; TLDR is the
-  // one kit extension and gets its own special layout.
+  // one kit extension and gets its own special layout. The extra kit
+  // types (danger/info/success/neutral/warn) have their own .callout.*
+  // CSS + icon already; without this map they silently fell back to
+  // 'note' (e.g. a [!DANGER] critical warning rendered neutral-indigo
+  // instead of red).
   const ADM_CLASS = {
     note: 'note',
     tip: 'tip',
     important: 'important',
     warning: 'warning',
     caution: 'caution',
+    danger: 'danger',
+    info: 'info',
+    success: 'success',
+    neutral: 'neutral',
+    warn: 'warn',
     tldr: 'tldr'
   };
 
@@ -965,9 +991,71 @@
         case 'chart-grid':     el = this._renderChartGrid(block); break;
         case 'example':        el = this._renderExample(block); break;
         case 'insight':        el = this._renderInsight(block); break;
+        case 'info-tip':       el = this._renderInfoTip(block); break;
+        case 'image':          el = this._renderImage(block); break;
+        case 'svg':            el = this._renderSvg(block); break;
         default:               el = this._unknown(block); break;
       }
       return el;
+    }
+
+    _renderInfoTip(block) {
+      const det = document.createElement('details');
+      det.className = 'info-tip';
+      if (block.open) det.setAttribute('open', '');
+      const sum = document.createElement('summary');
+      parseInline(block.summary || '', sum);
+      det.appendChild(sum);
+      for (const sub of (block.content || [])) {
+        const conv = convertV1Block(sub);
+        if (conv == null) continue;
+        if (typeof conv === 'string') {
+          emitMarkdown(det, parseMarkdown(conv), null);
+        } else {
+          det.appendChild(this._renderTyped(conv));
+        }
+      }
+      return det;
+    }
+
+    _renderImage(block) {
+      const fig = document.createElement('figure');
+      fig.className = 'okt-figure';
+      const img = document.createElement('img');
+      img.src = block.src || '';
+      img.alt = block.alt || '';
+      img.loading = 'lazy';
+      if (block.width != null) {
+        img.style.maxWidth = typeof block.width === 'number' ? block.width + 'px' : String(block.width);
+      }
+      fig.appendChild(img);
+      if (block.caption) {
+        const cap = document.createElement('figcaption');
+        parseInline(block.caption, cap);
+        fig.appendChild(cap);
+      }
+      return fig;
+    }
+
+    _renderSvg(block) {
+      const fig = document.createElement('figure');
+      fig.className = 'okt-figure okt-svg';
+      const holder = document.createElement('div');
+      holder.className = 'okt-svg-holder';
+      if (block.label) {
+        holder.setAttribute('role', 'img');
+        holder.setAttribute('aria-label', block.label);
+      }
+      // Author-trusted inline SVG (same trust model as diagram / HTML
+      // islands). Scripts stripped defensively — illustrations never need them.
+      holder.innerHTML = String(block.src || '').replace(/<script[\s\S]*?<\/script\s*>/gi, '');
+      fig.appendChild(holder);
+      if (block.caption) {
+        const cap = document.createElement('figcaption');
+        parseInline(block.caption, cap);
+        fig.appendChild(cap);
+      }
+      return fig;
     }
 
     _renderDiagram(block) {
