@@ -56,6 +56,20 @@ PAGE = {
                     "source": "<svg viewBox='0 0 10 10'><rect width='10' height='10'/></svg>",
                     "label": "şema",
                 },
+                {
+                    "kind": "chart",
+                    "type": "bar",
+                    "title": "Karşılaştırma",
+                    "rows": [
+                        {"label": "Kısa", "value": 80},
+                        {"label": "Çok daha uzun bir etiket başlığı", "value": 30},
+                        {"label": "Orta uzunlukta", "value": 55},
+                    ],
+                },
+                {
+                    "kind": "diagram",
+                    "source": 'flowchart TD\n    A["Uzun bir başlangıç düğümü etiketi"] --> B{"Daha uzun bir karar düğümü metni"}\n    B -->|"Evet"| C["Sonuç bir"]\n    B -->|"Hayır"| D["İkinci sonuç"]',
+                },
             ],
         }
     ],
@@ -101,3 +115,35 @@ def test_new_blocks_render(page, served):
     assert page.locator("figure.okt-figure img").count() == 1
     # svg — figure.okt-svg with inline svg
     assert page.locator("figure.okt-svg svg").count() == 1
+
+
+def test_bar_chart_shares_origin(page, served):
+    """All bars in a horizontal bar chart must start at the same x —
+    otherwise lengths are not visually comparable. Labels of very
+    different widths previously pushed each bar to a different origin."""
+    page.goto(served)
+    page.wait_for_timeout(800)
+    lefts = page.eval_on_selector_all(
+        ".bar-chart .bar-row .bar-track",
+        "els => els.map(e => Math.round(e.getBoundingClientRect().left))",
+    )
+    assert len(lefts) == 3, lefts
+    assert len(set(lefts)) == 1, f"bar tracks must share a left origin, got {lefts}"
+
+
+def test_mermaid_fits_container(page, served):
+    """A rendered diagram never overflows its host (it scales down to
+    the column instead of clipping / horizontal-scrolling)."""
+    page.goto(served)
+    page.wait_for_timeout(2500)
+    fit = page.eval_on_selector(
+        "oku-diagram",
+        """el => {
+            const svg = el.querySelector('svg');
+            const host = el.querySelector('.okd-render');
+            if (!svg || !host) return {ok:false, reason:'no svg/host'};
+            return {ok: svg.getBoundingClientRect().width <= host.getBoundingClientRect().width + 1,
+                    svgW: svg.getBoundingClientRect().width, hostW: host.getBoundingClientRect().width};
+        }""",
+    )
+    assert fit["ok"], f"diagram overflows host: {fit}"

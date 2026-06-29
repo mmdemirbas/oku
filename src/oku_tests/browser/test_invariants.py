@@ -144,21 +144,28 @@ def test_legacy_hash_urls_normalize_to_real_page(page, site_url):
     assert page.evaluate("location.hash") == "#mermaid-journey"
 
 
-def test_diagram_legibility_floor(page, site_url):
-    """Wide mermaid diagrams render at ≥90% of authored width inside a
-    horizontal scroll context — never shrunk to illegible label sizes."""
+def test_diagram_fits_container(page, site_url):
+    """Rendered mermaid diagrams FIT their column: never overflow (the
+    old clip / horizontal-scroll regression) and never up-scale beyond
+    their authored size (no cartoonish labels). Detail on a wide diagram
+    is reachable via the fullscreen lightbox, not an inline scrollbar."""
     page.set_viewport_size(DESKTOP)
     _goto(page, f"{site_url}/docs/architecture.html")
     page.wait_for_selector("oku-diagram .okd-render svg")
     page.wait_for_timeout(1500)
-    ratios = page.evaluate(
-        """() => [...document.querySelectorAll('oku-diagram .okd-render svg')].map(s => {
+    data = page.evaluate(
+        """() => [...document.querySelectorAll('oku-diagram')].map(d => {
+            const s = d.querySelector('.okd-render svg');
+            const host = d.querySelector('.okd-render');
             const vb = s.viewBox.baseVal;
-            return vb.width > 0 ? s.getBoundingClientRect().width / vb.width : 1;
+            const w = s.getBoundingClientRect().width;
+            return { fits: w <= host.getBoundingClientRect().width + 1,
+                     notUpscaled: vb.width > 0 ? w <= vb.width + 1 : true };
         })"""
     )
-    assert ratios, "no rendered diagrams"
-    assert all(r >= 0.89 for r in ratios), f"diagram shrunk below legibility floor: {ratios}"
+    assert data, "no rendered diagrams"
+    assert all(d["fits"] for d in data), f"diagram overflows its column (clips): {data}"
+    assert all(d["notUpscaled"] for d in data), f"diagram up-scaled beyond authored size: {data}"
 
 
 def test_sunburst_has_legend_chips(page, site_url):

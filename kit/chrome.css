@@ -2547,6 +2547,29 @@ figure.okt-figure figcaption {
   gap: 12px;
   font-size: 13.5px;
 }
+/* Shared origin (comparison correctness): each row is its own grid, so
+   by default the label column is sized to THAT row's label — and bars
+   start at different x, making lengths impossible to compare. Pull the
+   columns up to the chart and have every row inherit them via subgrid:
+   the label column becomes the widest label across all rows and every
+   bar starts at the same x. Scoped to horizontal charts; vertical bars
+   keep their own layout. */
+.bar-chart:not(.bar-chart-vertical),
+.bar-chart-multi:not(.bar-chart-vertical) {
+  grid-template-columns: minmax(40px, max-content) minmax(0, 1fr) auto;
+  column-gap: 12px;
+}
+.bar-chart:not(.bar-chart-vertical) > .bar-row,
+.bar-chart-multi:not(.bar-chart-vertical) > .bar-row {
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+}
+.bar-chart:not(.bar-chart-vertical) > .bar-chart-title,
+.bar-chart:not(.bar-chart-vertical) > .bar-chart-legend,
+.bar-chart-multi:not(.bar-chart-vertical) > .bar-chart-title,
+.bar-chart-multi:not(.bar-chart-vertical) > .bar-chart-legend {
+  grid-column: 1 / -1;
+}
 .bar-row .bar-label { font-weight: 500; color: var(--text); }
 .bar-row .bar-track {
   height: 20px;

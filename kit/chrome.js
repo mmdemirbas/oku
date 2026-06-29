@@ -9947,6 +9947,9 @@ var __mermaidLoader = (function () {
       // an example-pair render column. 13px is comfortable inline;
       // the lightbox still upscales when the reader opens it.
       fontSize: 13,
+      // Flowchart geometry: curved edges + generous spacing read far
+      // less "boring boxes-and-lines" than the sharp default.
+      flowchart: { curve: 'basis', useMaxWidth: true, padding: 14, nodeSpacing: 46, rankSpacing: 54, diagramPadding: 8 },
       themeVariables: {
         // Flowchart / generic
         background:       bg,
@@ -9963,7 +9966,7 @@ var __mermaidLoader = (function () {
         nodeBorder:       accent,
         clusterBkg:       surface2,
         clusterBorder:    border,
-        lineColor:        textSoft,
+        lineColor:        accent,
         textColor:        text,
         titleColor:       text,
         edgeLabelBackground: bg,
@@ -10129,35 +10132,22 @@ class OkuDiagram extends HTMLElement {
             // diagrams; tall narrow ones now render at their authored
             // size so labels stay readable instead of cartoonish.
             var vb = (svg.getAttribute('viewBox') || '').split(/\s+/).map(parseFloat);
-            if (vb.length === 4 && !isNaN(vb[2]) && !isNaN(vb[3])) {
-              svg.setAttribute('width', String(vb[2]));
-              svg.setAttribute('height', String(vb[3]));
-            } else {
-              svg.removeAttribute('width');
-              svg.removeAttribute('height');
-            }
-            svg.style.removeProperty('max-width');
-            svg.style.removeProperty('width');
-            svg.style.removeProperty('height');
+            // Responsive fit: the diagram ALWAYS fits the column width —
+            // never clipped, never horizontally scrolled. It renders at
+            // most at its authored size (no cartoonish up-scaling) and
+            // scales DOWN to the column when the column is narrower.
+            // Reading detail on a wide diagram is the lightbox's job
+            // (fullscreen zoom/pan), not an inline horizontal scrollbar.
+            // The previous 90%-min-width "legibility floor" is what made
+            // wide flowcharts overflow and read as clipped/trimmed.
+            svg.removeAttribute('width');
+            svg.removeAttribute('height');
             svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-            // Legibility floor: never shrink a diagram below 90% of
-            // its authored size — a 1900px flowchart scaled into an
-            // 840px column renders its labels at ~6px. min-width pins
-            // the floor and .okd-render scrolls horizontally past it.
-            // Deliberately NOT conditioned on the host's clientWidth:
-            // lazy renders can measure a host mid-layout (width 0) and
-            // skip the floor. The CSS max-width:100% still lets
-            // diagrams shrink within the 90–100% band to avoid
-            // needless scrollbars. The 70vh height cap is lifted only
-            // when it alone would force the scale below the floor —
-            // with preserveAspectRatio it would letterbox the pinned
-            // width instead of enlarging anything.
+            svg.style.removeProperty('min-width');
+            svg.style.width = '100%';
+            svg.style.height = 'auto';
             if (vb.length === 4 && vb[2] > 0) {
-              svg.style.minWidth = (vb[2] * 0.9).toFixed(0) + 'px';
-              var capH = (window.innerHeight || 900) * 0.7;
-              if (vb[3] > 0 && capH / vb[3] < 0.9) {
-                svg.style.maxHeight = 'none';
-              }
+              svg.style.maxWidth = Math.round(vb[2]) + 'px';
             }
             self._wireNeighborHighlight(svg);
             self._wireNodeTooltips(svg);

@@ -1776,26 +1776,31 @@ class TestChartConfigMarksAndCompat:
 
 
 class TestMermaidSvgIntrinsicSize:
-    """OkuDiagram must declare width/height from the rendered SVG's
-    viewBox so the SVG renders at 1:1 instead of scaling up to fill
-    its container. The scale-up was the root cause of state + ER
-    diagrams rendering foreignObject labels at ~26-30px (visually
-    twice their authored size)."""
+    """OkuDiagram sizes the rendered SVG to FIT its column: width:100%
+    so a wide diagram scales down to the column (never clips / scrolls),
+    max-width capped at the authored viewBox width so a small diagram
+    never up-scales to cartoonish labels. The earlier 90%-min-width
+    'legibility floor' is what made wide flowcharts overflow and read
+    as clipped, so it must be gone."""
 
-    def test_oku_diagram_sets_explicit_width_height_from_viewbox(self, repo_root: Path) -> None:
+    def test_oku_diagram_fits_column_via_max_width(self, repo_root: Path) -> None:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
-        # Must read the viewBox + assign both width and height attrs
-        # in the post-mermaid-render path.
         assert re.search(
             r"var\s+vb\s*=\s*\(svg\.getAttribute\('viewBox'\)[^;]*split\s*\(",
             js,
-        ), "OkuDiagram must parse the SVG's viewBox to derive intrinsic size"
-        assert "svg.setAttribute('width', String(vb[2]))" in js, (
-            "OkuDiagram must set explicit width from viewBox[2] so the SVG "
-            "renders at 1:1; otherwise foreignObject text scales with the SVG"
+        ), "OkuDiagram must parse the SVG's viewBox to derive its authored size"
+        assert "svg.style.width = '100%'" in js, (
+            "diagram SVG must be width:100% so it scales down to fit the column "
+            "instead of overflowing / clipping"
         )
-        assert "svg.setAttribute('height', String(vb[3]))" in js, (
-            "OkuDiagram must set explicit height from viewBox[3]"
+        assert "svg.style.height = 'auto'" in js, "diagram SVG height must be auto (preserve aspect ratio)"
+        assert "svg.style.maxWidth = Math.round(vb[2]) + 'px'" in js, (
+            "diagram SVG max-width must cap at the authored (viewBox) width so it "
+            "never up-scales beyond 1:1"
+        )
+        assert "svg.style.removeProperty('min-width')" in js, (
+            "the 90% min-width legibility floor must be gone — it forced wide "
+            "diagrams to overflow and read as clipped"
         )
 
 
