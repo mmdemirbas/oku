@@ -163,7 +163,8 @@
             "additionalProperties": false,
             "properties": {
               "num":   { "type": ["string", "number"] },
-              "label": { "type": "string" }
+              "label": { "type": "string" },
+              "icon":  { "type": "string" }
             }
           }
         }

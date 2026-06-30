@@ -79,6 +79,14 @@ PAGE = {
                         {"verdict": "neutral", "title": "Nötr", "content": "bilgi"},
                     ],
                 },
+                {
+                    "kind": "kpi-grid",
+                    "tiles": [
+                        {"icon": "weight", "num": "249 g", "label": "ağırlık"},
+                        {"icon": "wind", "num": "12 m/s", "label": "rüzgâr"},
+                        {"num": "10 km", "label": "ikonsuz tile"},
+                    ],
+                },
             ],
         }
     ],
@@ -160,6 +168,23 @@ def test_compare_grid_verdict_icons(page, served):
         for v in ("good", "bad", "warn")
     }
     assert len(set(colors.values())) == 3, colors
+
+
+def test_kpi_grid_icons(page, served):
+    """A kpi tile with an `icon` renders a semantic glyph above the number
+    (turns a wall of numbers into a scannable spec sheet); a tile without
+    `icon` renders no glyph — back-compatible."""
+    page.goto(served)
+    page.wait_for_timeout(800)
+    tiles = page.locator(".kpi-grid .kpi")
+    assert tiles.count() == 3, tiles.count()
+    # two tiles carry an icon, one (10 km) does not
+    assert page.locator(".kpi-grid .kpi .kpi-icon svg").count() == 2
+    # the icon is non-empty (has path/shape children) and accent-coloured
+    first = page.locator(".kpi-grid .kpi .kpi-icon").first
+    assert first.evaluate("el => el.querySelector('svg').children.length") > 0
+    color = first.evaluate("el => getComputedStyle(el).color")
+    assert color not in ("", "rgba(0, 0, 0, 0)"), color
 
 
 def test_mermaid_fits_container(page, served):

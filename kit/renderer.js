@@ -1105,11 +1105,45 @@
     }
 
     _renderKpiGrid(block) {
+      // Optional per-tile icon turns a wall of numbers into a scannable
+      // spec sheet — the eye jumps straight to the right metric instead of
+      // reading every label. Curated semantic set (24x24, stroke); an
+      // unknown or absent name simply renders no icon (back-compatible).
+      const ICONS = {
+        weight: '<path d="M8 8a4 4 0 0 1 8 0"/><path d="M5 8h14l-1.3 11.1a1 1 0 0 1-1 .9H7.3a1 1 0 0 1-1-.9z"/>',
+        wind: '<path d="M3 8h10a2.5 2.5 0 1 0-2.5-2.5"/><path d="M3 12h15a2.5 2.5 0 1 1-2.5 2.5"/><path d="M3 16h7a2 2 0 1 1-2 2"/>',
+        range: '<path d="M4.5 9a8 8 0 0 1 15 0"/><path d="M7.5 11a4.5 4.5 0 0 1 9 0"/><circle cx="12" cy="13" r="1.6" fill="currentColor" stroke="none"/><path d="M12 14.5V20"/>',
+        globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+        clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3.5 2"/>',
+        light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+        camera: '<circle cx="12" cy="12" r="9"/><path d="M14.3 9.6 21 9"/><path d="M16.3 14.4 19.5 18"/><path d="M9.7 14.4 6.5 21"/><path d="M9.7 9.6 3 9"/><path d="M14.3 9.6 7.7 14.4"/>',
+        resolution: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>',
+        sensor: '<rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
+        film: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>',
+        iso: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4.5-5"/><circle cx="12" cy="18" r="1.6" fill="currentColor" stroke="none"/>',
+        contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>',
+        data: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+        battery: '<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/><path d="M5.5 10.5v3M9 10.5v3M12.5 10.5v3"/>',
+        audio: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a3 3 0 0 1 0 6"/><path d="M18.5 7a6 6 0 0 1 0 10"/>',
+        list: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5.2 5.2 6.4 7.4 4.2M4 11.2l1.2 1.2L7.4 10.2M4 17.2l1.2 1.2L7.4 16.2"/>',
+        chart: '<path d="M3 21h18"/><path d="M6 21V11M11 21V5M16 21v-7"/>',
+        users: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.5a3.2 3.2 0 0 1 0 6M17.5 20a5.5 5.5 0 0 0-3-4.9"/>',
+        percent: '<path d="M19 5 5 19"/><circle cx="7.5" cy="7.5" r="2.3"/><circle cx="16.5" cy="16.5" r="2.3"/>',
+        eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+        file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>'
+      };
       const grid = document.createElement('div');
       grid.className = 'kpi-grid';
       for (const tile of (block.tiles || [])) {
         const k = document.createElement('div');
         k.className = 'kpi';
+        const inner = tile.icon && ICONS[tile.icon];
+        if (inner) {
+          const ico = document.createElement('div');
+          ico.className = 'kpi-icon';
+          ico.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
+          k.appendChild(ico);
+        }
         const num = document.createElement('div');
         num.className = 'num';
         num.textContent = String(tile.num);
