@@ -2849,6 +2849,27 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
+# Repo-meta files still render as pages (reachable by direct URL) but are
+# not documentation, so they're kept OUT of the reader-facing site tree —
+# otherwise README (whose H1 here is "oku") and CLAUDE.md crowd the top of
+# the sidebar next to the real docs. Matched by stem at the repo ROOT only;
+# a CHANGELOG deliberately placed inside docs/ stays in the nav.
+_NAV_EXCLUDE_STEMS = frozenset(
+    {
+        "readme",
+        "changelog",
+        "claude",
+        "agents",
+        "license",
+        "contributing",
+        "code_of_conduct",
+        "security",
+        "notice",
+        "authors",
+    }
+)
+
+
 def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
     """Walk JSON pages under root, return the site manifest dict.
 
@@ -2865,6 +2886,9 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
     entries = []
     for p, data in pages:
         rel = p.relative_to(root)
+        # Repo-meta files at the root are pages but not nav entries.
+        if rel.parent == Path(".") and rel.stem.lower() in _NAV_EXCLUDE_STEMS:
+            continue
         nav_path = rel.with_suffix(".html").as_posix()
         path_parent = rel.parent.as_posix() if rel.parent != Path(".") else None
         meta = _page_meta(data)

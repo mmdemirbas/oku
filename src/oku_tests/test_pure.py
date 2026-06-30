@@ -366,6 +366,26 @@ class TestFindJsonPagesMd:
         assert entry is not None
         assert entry["source"] == "overview.md"
 
+    def test_manifest_excludes_root_repo_meta_from_nav(self, tmp_path: Path) -> None:
+        """README / CLAUDE & friends still BUILD as pages but must not show
+        in the site-nav manifest — otherwise they crowd the top of the
+        sidebar next to the real docs (README's H1 here is even 'oku', a
+        duplicate of the index title)."""
+        (tmp_path / "README.md").write_text("# oku", encoding="utf-8")
+        (tmp_path / "CLAUDE.md").write_text("# CLAUDE", encoding="utf-8")
+        (tmp_path / "overview.md").write_text("# Overview\n\nx", encoding="utf-8")
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "changelog.md").write_text("# Changelog\n\nx", encoding="utf-8")
+        nav_paths = {e["path"] for e in cli.compute_manifest(tmp_path)["pages"]}
+        assert "README.html" not in nav_paths, "README must not be a nav entry"
+        assert "CLAUDE.html" not in nav_paths, "CLAUDE must not be a nav entry"
+        assert "overview.html" in nav_paths, "a real root doc must stay in nav"
+        # A changelog deliberately placed inside docs/ is a real doc — kept.
+        assert "docs/changelog.html" in nav_paths
+        # …but they still build as reachable pages.
+        page_paths = {str(p.relative_to(tmp_path)) for p, _ in cli.find_json_pages(tmp_path)}
+        assert {"README.json", "CLAUDE.json"} <= page_paths
+
 
 # ---------- alternative source formats ----------
 
