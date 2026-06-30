@@ -1274,6 +1274,11 @@ header.cover {
   padding: 44px 42px 48px 42px;
   border-radius: 20px;
   background:
+    /* Diagonal wash present at every width — the two corner glows alone
+       wash out on a wide desktop cover and the hero reads as flat white.
+       The linear layer keeps the accent visible across the whole block
+       (the way the corner radials already do on a narrow mobile card). */
+    linear-gradient(118deg, var(--accent-soft) 0%, transparent 50%),
     radial-gradient(820px 460px at 108% -18%, var(--accent-soft) 0%, transparent 62%),
     radial-gradient(560px 320px at -12% 118%, var(--accent-soft) 0%, transparent 70%),
     var(--surface);

@@ -142,6 +142,21 @@ def test_nav_cards_are_unordered_two_column_grid(page, site_url):
     assert info["columns"] == 2, f"nav cards must tile two-up at desktop, got {info['columns']}"
 
 
+def test_hero_keeps_gradient_wash_at_desktop(page, site_url):
+    """The hero cover must read as a branded block on a wide desktop, not
+    flat white: it carries a diagonal accent wash (visible at any width)
+    on top of the two corner glows. Gradient legibility itself needs the
+    eye (see commit screenshots); this guards the layers from silently
+    being dropped."""
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/index.html")
+    bg = page.evaluate(
+        "() => getComputedStyle(document.querySelector('header.cover')).backgroundImage"
+    )
+    assert bg.count("linear-gradient") >= 1, f"hero lost its diagonal wash: {bg}"
+    assert bg.count("radial-gradient") >= 2, f"hero lost its corner glows: {bg}"
+
+
 def test_drawer_geometry_at_narrow_viewport(page, site_url):
     page.set_viewport_size(NARROW)
     _goto(page, f"{site_url}/docs/architecture.html")
