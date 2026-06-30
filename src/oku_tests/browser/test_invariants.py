@@ -120,6 +120,28 @@ def test_example_output_outweighs_code(page, site_url):
     )
 
 
+def test_nav_cards_are_unordered_two_column_grid(page, site_url):
+    """The index Documentation menu is a set of parallel destinations, not
+    a numbered sequence: render it as an unordered 2-up card grid with no
+    step numerals (numerals imply an order the menu doesn't have)."""
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/index.html")
+    page.wait_for_selector(".step-cards-grid .step-card")
+    info = page.evaluate(
+        """() => {
+            const cards = [...document.querySelectorAll('.step-cards-grid .step-card')];
+            return {
+                count: cards.length,
+                numerals: document.querySelectorAll('.step-cards-grid .step-num').length,
+                columns: new Set(cards.map(c => Math.round(c.getBoundingClientRect().x))).size,
+            };
+        }"""
+    )
+    assert info["count"] >= 6, f"nav menu lost its cards: {info}"
+    assert info["numerals"] == 0, "nav cards must not carry sequence numerals"
+    assert info["columns"] == 2, f"nav cards must tile two-up at desktop, got {info['columns']}"
+
+
 def test_drawer_geometry_at_narrow_viewport(page, site_url):
     page.set_viewport_size(NARROW)
     _goto(page, f"{site_url}/docs/architecture.html")

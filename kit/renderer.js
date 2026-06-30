@@ -1159,7 +1159,12 @@
 
     _renderStepFlow(block) {
       const wrap = document.createElement('div');
-      wrap.className = 'step-cards';
+      // ordered (default): numbered single-column flow. ordered:false: an
+      // unordered 2-up grid of link cards (navigation / parallel options)
+      // with no step numerals — a numeral here reads as a sequence the
+      // items don't have.
+      const ordered = block.ordered !== false;
+      wrap.className = 'step-cards' + (ordered ? '' : ' step-cards-grid');
       (block.steps || []).forEach((s, i) => {
         const card = document.createElement(s.href ? 'a' : 'div');
         card.className = 'step-card' + (s.href ? ' step-card-link' : '');
@@ -1170,10 +1175,12 @@
             card.setAttribute('rel', 'noopener');
           }
         }
-        const num = document.createElement('span');
-        num.className = 'step-num';
-        num.textContent = String(i + 1);
-        card.appendChild(num);
+        if (ordered) {
+          const num = document.createElement('span');
+          num.className = 'step-num';
+          num.textContent = String(i + 1);
+          card.appendChild(num);
+        }
         const body = document.createElement('div');
         const h = document.createElement('h4');
         h.textContent = s.t || '';

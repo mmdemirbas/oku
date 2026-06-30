@@ -177,6 +177,7 @@
       "additionalProperties": false,
       "properties": {
         "k": { "const": "step-flow" },
+        "ordered": { "type": "boolean", "default": true, "description": "true (default): numbered single-column flow. false: an unordered 2-up grid of link cards (navigation / parallel options) — no numerals, which would imply a sequence that isn't there." },
         "steps": {
           "type": "array",
           "items": {

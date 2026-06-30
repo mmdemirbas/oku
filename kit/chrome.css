@@ -2700,6 +2700,13 @@ figure.okt-figure figcaption {
 
 /* Step-flow — numbered horizontal flow that wraps to a stack. */
 .step-cards { display: grid; gap: 12px; margin: 24px 0; }
+/* Unordered variant (ordered:false) — a 2-up grid of parallel link
+   cards (navigation, option lists) instead of a numbered single-column
+   sequence. No step-num column, so the card body spans the full width.
+   Collapses to one column on narrow viewports like the other grids. */
+.step-cards-grid { grid-template-columns: repeat(2, 1fr); }
+.step-cards-grid .step-card { grid-template-columns: 1fr; }
+@media (max-width: 768px) { .step-cards-grid { grid-template-columns: 1fr; } }
 .step-card {
   display: grid;
   grid-template-columns: auto 1fr;
