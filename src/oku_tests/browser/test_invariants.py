@@ -8,6 +8,8 @@ kit-native SVG, so chart assertions DO require rendered <svg>.
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 pytestmark = pytest.mark.browser
@@ -64,6 +66,32 @@ def test_charts_render_kit_native_svg(page, site_url):
     assert page.locator("oku-chart").count() >= 40, "charts page lost its fence-lifted charts"
     assert page.locator("oku-chart svg").count() >= 40, "charts must render kit-native SVG"
     assert _literal_tag_text_nodes(page) == 0
+
+
+def test_chart_axis_ticks_are_nice_numbers(page, site_url):
+    """Linear axes label human-friendly values, not the raw even-split.
+    Before the nice-tick pass the 7-day latency line read its X axis as
+    0.78 · 2.3 · 3.9 · 5.6 · 7.3; it must now read whole days on a nice,
+    uniform step."""
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/charts.html")
+    page.wait_for_selector('oku-chart[title="P50 latency over 7 days"] svg')
+    xticks = page.evaluate(
+        """() => {
+            const c = document.querySelector('oku-chart[title="P50 latency over 7 days"]');
+            return [...c.querySelectorAll('text.okc-tick[text-anchor="middle"]')]
+                .map(t => parseFloat(t.textContent))
+                .filter(v => !Number.isNaN(v));
+        }"""
+    )
+    assert len(xticks) >= 3, f"expected x-axis ticks, got {xticks}"
+    # Whole-day labels: no 0.78 / 2.3 fractional noise.
+    assert all(abs(v - round(v)) < 1e-9 for v in xticks), f"x ticks not whole numbers: {xticks}"
+    # Uniform spacing on a nice step (1 / 2 / 2.5 / 5 / 10 × 10ᵏ).
+    steps = [round(xticks[i + 1] - xticks[i], 6) for i in range(len(xticks) - 1)]
+    assert len(set(steps)) == 1, f"non-uniform tick spacing: {steps}"
+    mant = steps[0] / 10 ** math.floor(math.log10(steps[0]))
+    assert round(mant, 6) in (1.0, 2.0, 2.5, 5.0), f"tick step not nice: {steps[0]}"
 
 
 def test_drawer_geometry_at_narrow_viewport(page, site_url):

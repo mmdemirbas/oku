@@ -4380,10 +4380,29 @@ class OkuChart extends HTMLElement {
       }
       return ticks;
     }
-    var xTicks = xLog ? logTicks(v.xMin, v.xMax) :
-      (function () { var r = []; for (var i = 0; i <= 4; i++) r.push(v.xMin + (i / 4) * (v.xMax - v.xMin)); return r; })();
-    var yTicks = yLog ? logTicks(v.yMin, v.yMax) :
-      (function () { var r = []; for (var i = 0; i <= 4; i++) r.push(v.yMin + (i / 4) * (v.yMax - v.yMin)); return r; })();
+    // Linear ticks land on human-friendly values (1 / 2 / 2.5 / 5 × 10ᵏ)
+    // INSIDE the domain, so a "Day" axis reads 1,2,3… instead of the raw
+    // even-split 0.78,2.3,3.9,5.6,7.3. The domain itself is left alone
+    // (it tracks data / pan-zoom view), so the outermost ticks sit just
+    // inside the axis ends — which is the conventional look. A degenerate
+    // (zero-width) range falls back to the bare endpoint.
+    function niceTicks(min, max, count) {
+      if (!(max > min)) return [min];
+      var raw = (max - min) / Math.max(1, count);
+      var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+      var f = raw / mag;
+      var step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag;
+      var start = Math.ceil(min / step) * step;
+      var n = Math.floor((max - start) / step + 1e-9);
+      var ticks = [];
+      for (var i = 0; i <= n; i++) {
+        // toPrecision then back to Number strips float drift (0.30000000004).
+        ticks.push(Number((start + i * step).toPrecision(12)));
+      }
+      return ticks.length ? ticks : [min, max];
+    }
+    var xTicks = xLog ? logTicks(v.xMin, v.xMax) : niceTicks(v.xMin, v.xMax, 5);
+    var yTicks = yLog ? logTicks(v.yMin, v.yMax) : niceTicks(v.yMin, v.yMax, 5);
     xTicks.forEach(function (val) {
       var pos = sx(val);
       parts.push('<line x1="' + pos + '" y1="' + (pad.top + plotH) + '" x2="' + pos + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
