@@ -5281,7 +5281,11 @@ body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
  * --------------------------------------------------------------- */
 .example-pair {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /* Output-dominant 2:3. The rendered block is the thing the reader
+     came to see; the JSON beside it is reference. A 50/50 split let the
+     source out-shout its own result (worst on the charts page, where a
+     chart should lead and its payload should footnote). */
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   gap: 12px;
   /* Each column lays out from the top — the rendered block keeps
      its natural height instead of stretching to match the source

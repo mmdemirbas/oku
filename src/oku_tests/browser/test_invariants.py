@@ -94,6 +94,32 @@ def test_chart_axis_ticks_are_nice_numbers(page, site_url):
     assert round(mant, 6) in (1.0, 2.0, 2.5, 5.0), f"tick step not nice: {steps[0]}"
 
 
+def test_example_output_outweighs_code(page, site_url):
+    """In a CODE/OUTPUT demo pair the rendered output is the point; it
+    must be the wider column (was a 50/50 split that let source out-shout
+    its own result)."""
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/reference.html")
+    page.wait_for_selector(".example-pair .example-output")
+    boxes = page.evaluate(
+        """() => {
+            for (const p of document.querySelectorAll('.example-pair')) {
+                const c = p.querySelector('.example-code');
+                const o = p.querySelector('.example-output');
+                if (!c || !o) continue;
+                const cb = c.getBoundingClientRect(), ob = o.getBoundingClientRect();
+                if (cb.width > 0 && ob.width > 0) return {code: cb.width, output: ob.width};
+            }
+            return null;
+        }"""
+    )
+    assert boxes is not None, "no two-column example-pair found at desktop width"
+    # 2fr:3fr → output ≈ 1.5× code. Pin the dominance with margin.
+    assert boxes["output"] >= boxes["code"] * 1.3, (
+        f"output column must dominate code: {boxes}"
+    )
+
+
 def test_drawer_geometry_at_narrow_viewport(page, site_url):
     page.set_viewport_size(NARROW)
     _goto(page, f"{site_url}/docs/architecture.html")
