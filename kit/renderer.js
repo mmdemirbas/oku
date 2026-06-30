@@ -1304,6 +1304,20 @@
       const wrapColumn = headers.map(h =>
         h && typeof h === 'object' && !Array.isArray(h) && h.wrap === true
       );
+      // Per-column value→verdict map. A matching cell renders as a coloured
+      // status pill; its td.textContent stays the bare value so sort /
+      // filter / group / board all read it unchanged.
+      const statusColumn = headers.map(h =>
+        (h && typeof h === 'object' && !Array.isArray(h) && h.status && typeof h.status === 'object')
+          ? h.status : null
+      );
+      const STATUS_VERDICT = {
+        good: 'good', success: 'good', ok: 'good', pass: 'good',
+        warn: 'warn', warning: 'warn', caution: 'warn',
+        bad: 'bad', danger: 'bad', fail: 'bad', error: 'bad',
+        info: 'info', accent: 'info', tip: 'info',
+        neutral: 'neutral',
+      };
       if (headers.length) {
         const thead = document.createElement('thead');
         const tr = document.createElement('tr');
@@ -1333,9 +1347,17 @@
       const renderCell = (cell, colIdx) => {
         const td = document.createElement('td');
         if (wrapColumn[colIdx]) td.setAttribute('data-wrap', '1');
+        const statusMap = statusColumn[colIdx];
         if (cell && typeof cell === 'object' && !Array.isArray(cell) && Array.isArray(cell.values)) {
           td.setAttribute('data-values', cell.values.join('|'));
           parseInline(cell.value != null ? cell.value : cell.values.join(', '), td);
+        } else if (statusMap && typeof cell === 'string' &&
+                   Object.prototype.hasOwnProperty.call(statusMap, cell.trim())) {
+          const verdict = STATUS_VERDICT[String(statusMap[cell.trim()]).toLowerCase()] || 'neutral';
+          const chip = document.createElement('span');
+          chip.className = 'okt-status okt-status-' + verdict;
+          chip.textContent = cell;          // textContent === value: sort/filter unaffected
+          td.appendChild(chip);
         } else {
           parseInline(typeof cell === 'string' ? cell : '', td);
         }

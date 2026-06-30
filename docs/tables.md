@@ -13,12 +13,12 @@ accent: teal
 
 ### table {#table}
 
-First-class JSON table. Two shapes: flat `rows` or grouped `groups`. Renders into a real `<table>` plus a runtime control bar (filter input, stats counter, Table / List / Cards view toggle, sticky header, full-width auto-fit). Object-form headers and cells declare chip filters with multi-valued cells; groups are collapsible.
+First-class JSON table. Two shapes: flat `rows` or grouped `groups`. Renders into a real `<table>` plus a runtime control bar (filter input, stats counter, Table / List / Cards view toggle, sticky header, full-width auto-fit). Object-form headers and cells declare chip filters with multi-valued cells; groups are collapsible. A header's `status` map turns a column's values into colour-coded status pills (`good` / `warn` / `bad` / `info` / `neutral`) — the author maps their own values, so the colour language stays locale-neutral.
 
 ### Flat rows {#tables-flat}
 
 ```oku-example
-{"code":{"k":"code","src":"{\n  \"kind\": \"table\",\n  \"headers\": [\"Stage\", \"Status\", \"Duration\"],\n  \"rows\": [\n    [\"Plan\",  \"done\",         \"1d\"],\n    [\"Build\", \"done\",         \"3d\"],\n    [\"Test\",  \"in-progress\",  \"2d\"],\n    [\"Ship\",  \"queued\",       \"—\"]\n  ]\n}","lang":"json"},"output":{"k":"table","headers":["Stage","Status","Duration"],"rows":[["Plan","done","1d"],["Build","done","3d"],["Test","in-progress","2d"],["Ship","queued","—"]]}}
+{"code":{"k":"code","src":"{\n  \"kind\": \"table\",\n  \"headers\": [\n    \"Stage\",\n    { \"label\": \"Status\",\n      \"status\": { \"done\": \"good\", \"in-progress\": \"warn\", \"queued\": \"neutral\" } },\n    \"Duration\"\n  ],\n  \"rows\": [\n    [\"Plan\",  \"done\",         \"1d\"],\n    [\"Build\", \"done\",         \"3d\"],\n    [\"Test\",  \"in-progress\",  \"2d\"],\n    [\"Ship\",  \"queued\",       \"—\"]\n  ]\n}","lang":"json"},"output":{"k":"table","headers":["Stage",{"label":"Status","status":{"done":"good","in-progress":"warn","queued":"neutral"}},"Duration"],"rows":[["Plan","done","1d"],["Build","done","3d"],["Test","in-progress","2d"],["Ship","queued","—"]]}}
 ```
 
 ### Grouped rows with per-group counts {#tables-grouped}

@@ -289,13 +289,15 @@
             "filter":     { "const": "chips" },
             "values":     { "type": "array", "items": { "type": "string" }, "minItems": 1 },
             "boardOrder": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-            "wrap":       { "type": "boolean" }
+            "wrap":       { "type": "boolean" },
+            "status":     { "type": "object", "minProperties": 1, "additionalProperties": { "enum": ["good", "success", "ok", "pass", "warn", "warning", "caution", "bad", "danger", "fail", "error", "info", "accent", "tip", "neutral"] }, "description": "Map a cell value → verdict; matching cells in this column render as a coloured status pill. Locale-neutral: the author maps their own values, so the kit bakes in no English status words." }
           },
           "dependentRequired": { "filter": ["values"] },
           "anyOf": [
             { "required": ["filter"] },
             { "required": ["boardOrder"] },
-            { "required": ["wrap"] }
+            { "required": ["wrap"] },
+            { "required": ["status"] }
           ]
         }
       ]

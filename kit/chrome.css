@@ -2839,6 +2839,24 @@ table th {
 }
 table tr.okt-nowrap td,
 table.okt-nowrap td { white-space: nowrap; overflow-wrap: normal; }
+/* Semantic status pill (header `status` value→verdict map). Same colour
+   language as compare-grid verdicts so state reads at a glance instead of
+   as bare text. Soft fill + strong text; tokens carry their own light/dark
+   pairs. The pill is purely visual — the cell's text value is unchanged. */
+.okt-status {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.okt-status-good    { background: var(--success-soft); color: var(--success); }
+.okt-status-warn    { background: var(--warning-soft); color: var(--warning); }
+.okt-status-bad     { background: var(--danger-soft);  color: var(--danger); }
+.okt-status-info    { background: var(--accent-soft);  color: var(--accent-strong); }
+.okt-status-neutral { background: var(--surface-2);    color: var(--text-soft); border: 1px solid var(--border); }
 /* Per-column wrap: true (header object). Cells in a wrap-flagged
    column honour explicit newlines from the source so authors can
    author multi-paragraph cell content with `\n` instead of inlining

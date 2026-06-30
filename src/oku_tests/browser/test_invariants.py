@@ -157,6 +157,32 @@ def test_hero_keeps_gradient_wash_at_desktop(page, site_url):
     assert bg.count("radial-gradient") >= 2, f"hero lost its corner glows: {bg}"
 
 
+def test_table_status_cells_render_semantic_pills(page, site_url):
+    """A table column with a `status` value→verdict map renders coloured
+    status pills (not bare text), and the pill is purely visual — the cell
+    text stays the raw value so sort / filter / group still read it."""
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/tables.html")
+    page.wait_for_selector(".okt-status")
+    info = page.evaluate(
+        """() => {
+            const out = {};
+            for (const c of document.querySelectorAll('td .okt-status')) {
+                out[c.textContent.trim()] = {
+                    cls: c.className,
+                    tdText: c.closest('td').textContent.trim(),
+                };
+            }
+            return out;
+        }"""
+    )
+    assert "okt-status-good" in info.get("done", {}).get("cls", ""), info
+    assert "okt-status-warn" in info.get("in-progress", {}).get("cls", ""), info
+    assert "okt-status-neutral" in info.get("queued", {}).get("cls", ""), info
+    # Pill is visual only — underlying cell value preserved for sort/filter.
+    assert info["done"]["tdText"] == "done", "status pill must not alter the cell value"
+
+
 def test_drawer_geometry_at_narrow_viewport(page, site_url):
     page.set_viewport_size(NARROW)
     _goto(page, f"{site_url}/docs/architecture.html")
