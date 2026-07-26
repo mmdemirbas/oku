@@ -115,9 +115,7 @@ def test_example_output_outweighs_code(page, site_url):
     )
     assert boxes is not None, "no two-column example-pair found at desktop width"
     # 2fr:3fr → output ≈ 1.5× code. Pin the dominance with margin.
-    assert boxes["output"] >= boxes["code"] * 1.3, (
-        f"output column must dominate code: {boxes}"
-    )
+    assert boxes["output"] >= boxes["code"] * 1.3, f"output column must dominate code: {boxes}"
 
 
 def test_nav_cards_are_unordered_two_column_grid(page, site_url):
@@ -150,9 +148,7 @@ def test_hero_keeps_gradient_wash_at_desktop(page, site_url):
     being dropped."""
     page.set_viewport_size(DESKTOP)
     _goto(page, f"{site_url}/docs/index.html")
-    bg = page.evaluate(
-        "() => getComputedStyle(document.querySelector('header.cover')).backgroundImage"
-    )
+    bg = page.evaluate("() => getComputedStyle(document.querySelector('header.cover')).backgroundImage")
     assert bg.count("linear-gradient") >= 1, f"hero lost its diagonal wash: {bg}"
     assert bg.count("radial-gradient") >= 2, f"hero lost its corner glows: {bg}"
 

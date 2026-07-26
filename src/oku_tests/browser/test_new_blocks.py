@@ -162,9 +162,7 @@ def test_compare_grid_verdict_icons(page, served):
     assert page.locator(".compare-card.good .compare-card-head h4").count() == 1
     # verdict drives the icon colour — good/bad/warn must differ
     colors = {
-        v: page.eval_on_selector(
-            f".compare-card.{v} .compare-card-icon", "el => getComputedStyle(el).color"
-        )
+        v: page.eval_on_selector(f".compare-card.{v} .compare-card-icon", "el => getComputedStyle(el).color")
         for v in ("good", "bad", "warn")
     }
     assert len(set(colors.values())) == 3, colors

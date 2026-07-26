@@ -1795,8 +1795,7 @@ class TestMermaidSvgIntrinsicSize:
         )
         assert "svg.style.height = 'auto'" in js, "diagram SVG height must be auto (preserve aspect ratio)"
         assert "svg.style.maxWidth = Math.round(vb[2]) + 'px'" in js, (
-            "diagram SVG max-width must cap at the authored (viewBox) width so it "
-            "never up-scales beyond 1:1"
+            "diagram SVG max-width must cap at the authored (viewBox) width so it never up-scales beyond 1:1"
         )
         assert "svg.style.removeProperty('min-width')" in js, (
             "the 90% min-width legibility floor must be gone — it forced wide "
