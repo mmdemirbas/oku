@@ -82,6 +82,21 @@ def test_kit_source_does_not_leak_into_the_page(page, standalone_url):
     assert page.locator("main > section").count() == 3
 
 
+def test_no_stray_page_json_fetch(page, standalone_url):
+    """The inline page data is the only source; nothing is fetched.
+
+    render() returns nothing, so autoBoot used to read its undefined
+    return as "inline path didn't run" and fetch <page>.json on top —
+    a guaranteed 404 in a single file, and a hard failure over file://.
+    """
+    requested: list[str] = []
+    page.on("request", lambda r: requested.append(r.url))
+    _goto(page, standalone_url)
+    page.wait_for_timeout(400)
+    strays = [u for u in requested if u.endswith(".json") or u.endswith("/__reload")]
+    assert strays == [], f"standalone must not reach the network: {strays}"
+
+
 def test_main_owns_the_wide_grid_track(page, standalone_url):
     """main must not be squeezed into the sidebar's column.
 

@@ -2942,7 +2942,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-05-18-r11';
+var __okuKitBuild = '2026-05-18-r12';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -3466,17 +3466,30 @@ function escapeHTML(s) {
   if (typeof window === 'undefined') return;
   var h = window.location && window.location.hostname;
   if (h !== 'localhost' && h !== '127.0.0.1' && h !== '::1') return;
-  if (window.__okuReloadAttached) return;
-  window.__okuReloadAttached = true;
-  try {
-    var es = new EventSource('/__reload');
-    es.addEventListener('message', function () {
-      try { es.close(); } catch (e) {}
-      window.location.reload();
-    });
-    // Silently let the browser auto-reconnect on transient errors.
-    es.addEventListener('error', function () { /* swallow */ });
-  } catch (e) { /* SSE unsupported or blocked — no live reload */ }
+  function attach() {
+    // A standalone build carries its page inline and is never the thing
+    // `oku serve` is watching — previewing one from a plain local server
+    // would otherwise poll an endpoint that isn't there. The check has to
+    // wait for the parsed body: the kit runs from <head>, the page-data
+    // script sits at the end of <body>.
+    if (document.getElementById('__oku_page__')) return;
+    if (window.__okuReloadAttached) return;
+    window.__okuReloadAttached = true;
+    try {
+      var es = new EventSource('/__reload');
+      es.addEventListener('message', function () {
+        try { es.close(); } catch (e) {}
+        window.location.reload();
+      });
+      // Silently let the browser auto-reconnect on transient errors.
+      es.addEventListener('error', function () { /* swallow */ });
+    } catch (e) { /* SSE unsupported or blocked — no live reload */ }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attach);
+  } else {
+    attach();
+  }
 })();
 
 /* ============ Tooltip controller (used by <glossary-term> + <ext-ref>) ============ */

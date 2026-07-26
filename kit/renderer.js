@@ -1795,15 +1795,20 @@
     if (OkuRenderer._autoBootRan) return OkuRenderer._autoBootRan;
     const inline = document.getElementById('__oku_page__');
     let result;
+    // render() returns nothing, so its return value can't tell us whether
+    // the inline path ran — a standalone build would fall through and also
+    // fetch <page>.json, which isn't there. Track the outcome explicitly.
+    let renderedInline = false;
     if (inline) {
       try {
         const data = JSON.parse(inline.textContent);
         result = new OkuRenderer(opts || {}).render(data);
+        renderedInline = true;
       } catch (e) {
         console.error('[oku] inline page parse failed', e);
       }
     }
-    if (result === undefined) {
+    if (!renderedInline) {
       const rawHash = (window.location.hash || '').replace(/^#/, '');
       const sep = rawHash.indexOf(':');
       const hashPage = sep >= 0 ? rawHash.slice(0, sep) : rawHash;
@@ -1829,7 +1834,9 @@
         });
       }
     }
-    OkuRenderer._autoBootRan = result;
+    // The inline path has no promise to hand back; store a truthy marker so
+    // the once-only guard at the top still holds on a second call.
+    OkuRenderer._autoBootRan = result === undefined ? true : result;
     return result;
   };
 
