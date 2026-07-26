@@ -9,6 +9,7 @@ pagefind body injected) rather than the content of the kit itself.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,29 @@ SAMPLE_STUB = """<!DOCTYPE html>
 </body>
 </html>
 """
+
+
+_SCRIPT_OPEN_RE = re.compile(r"<script\b[^>]*>", re.I)
+
+
+def _script_bodies(html: str) -> list[str]:
+    """Split html into script bodies the way an HTML parser would.
+
+    A parser ends a script element at the first `</script` in the raw text,
+    regardless of JS syntax — which is exactly the failure mode this file
+    guards against. Mirroring that rule here (rather than counting tags)
+    keeps the assertions honest.
+    """
+    bodies: list[str] = []
+    pos = 0
+    while (m := _SCRIPT_OPEN_RE.search(html, pos)) is not None:
+        end = html.lower().find("</script", m.end())
+        if end == -1:
+            bodies.append(html[m.end() :])
+            break
+        bodies.append(html[m.end() : end])
+        pos = end + len("</script")
+    return bodies
 
 
 def _scaffold_project(root: Path, *, with_kit_json: bool = True) -> list[tuple[Path, str, dict | None]]:
@@ -247,6 +271,38 @@ class TestBuildStandalone:
         # autoBoot looks for this id; missing → standalone is dead on arrival.
         assert 'id="__oku_page__"' in body
         assert "Body of Index" in body
+
+    def test_inlined_kit_scripts_are_not_split_by_the_page_data(self, tmp_path: Path) -> None:
+        """The page-data tag must not land inside an inlined kit script.
+
+        chrome.js documents the layout skeleton with a comment containing the
+        literal text "<body></body>". Injecting the page data after the kit
+        was inlined matched that comment first, so the JSON landed mid-script
+        and its </script> terminated chrome.js early — the remaining ~11k
+        lines rendered as visible page text.
+        """
+        src_root = tmp_path / "src"
+        out_dir = tmp_path / "out"
+        src_root.mkdir()
+        pages = _scaffold_project(src_root)
+        cli.build_standalone(pages, out_dir, src_root)
+        body = (out_dir / "index.html").read_text(encoding="utf-8")
+
+        bodies = _script_bodies(body)
+        # Exactly one script body is the page data, and it parses as JSON —
+        # a truncated one would not.
+        page_blobs = [b for b in bodies if '"k"' in b or '"kind"' in b]
+        assert len(page_blobs) == 1
+        json.loads(page_blobs[0])
+
+        # chrome.js arrives whole: the body that opens it also carries its
+        # tail. A split leaves the tail outside every script body.
+        chrome_src = (cli.KIT_DIR / "chrome.js").read_text(encoding="utf-8")
+        head_marker = chrome_src[:200].strip().splitlines()[1].strip()
+        tail_marker = chrome_src.strip().splitlines()[-1].strip()
+        hosting = [b for b in bodies if head_marker in b]
+        assert len(hosting) == 1, "chrome.js should occupy exactly one script element"
+        assert tail_marker in hosting[0], "chrome.js was cut off mid-script"
 
     def test_escapes_closing_script_tag_in_json(self, tmp_path: Path) -> None:
         # JSON content that literally contains "</script" would close the

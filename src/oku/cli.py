@@ -3289,11 +3289,13 @@ def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
     kit_bundle = build_kit_bundle(src_root)  # may be None
 
     for src, html, page_data in srcs:
-        html = LINK_TO_KIT_CSS.sub(lambda m: f"<style>\n{css}\n</style>", html, count=1)
-        html = SCRIPT_TO_KIT_BOOT.sub(lambda m: f"<script>\n{boot}\n</script>", html, count=1)
-        html = SCRIPT_TO_KIT_MAIN.sub(lambda m: f"<script>\n{main}\n</script>", html, count=1)
-        html = SCRIPT_TO_KIT_RENDERER.sub(lambda m: f"<script>\n{renderer}\n</script>", html, count=1)
-
+        # Page data goes in FIRST, while `html` is still the thin stub with
+        # exactly one </body>. Inlining the kit first would drag chrome.js's
+        # own source into the document — and its layout-skeleton comment
+        # contains the literal text "<body></body>", which _BODY_CLOSE_RE
+        # matches before the real one. The page JSON then lands mid-script
+        # and its closing tag terminates the inlined chrome.js early, so the
+        # rest of the kit renders as visible text.
         # Inline the JSON page content so autoBoot finds it offline.
         json_sibling = src.with_suffix(".json")
         data_text = None
@@ -3313,6 +3315,11 @@ def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
             # Lambda replacement avoids re.sub interpreting \n in the JSON
             # content as a backslash escape and turning it into a newline.
             html = _BODY_CLOSE_RE.sub(lambda m: inline + "\n</body>", html, count=1)
+
+        html = LINK_TO_KIT_CSS.sub(lambda m: f"<style>\n{css}\n</style>", html, count=1)
+        html = SCRIPT_TO_KIT_BOOT.sub(lambda m: f"<script>\n{boot}\n</script>", html, count=1)
+        html = SCRIPT_TO_KIT_MAIN.sub(lambda m: f"<script>\n{main}\n</script>", html, count=1)
+        html = SCRIPT_TO_KIT_RENDERER.sub(lambda m: f"<script>\n{renderer}\n</script>", html, count=1)
 
         # Preserve directory structure relative to src_root.
         rel = src.relative_to(src_root)

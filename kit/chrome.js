@@ -2942,7 +2942,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-05-18-r10';
+var __okuKitBuild = '2026-05-18-r11';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -11169,7 +11169,14 @@ class PageNav extends HTMLElement {
     // end of body, after <page-nav>).
     function start() {
       if (document.getElementById('__oku_page__')) {
-        self.style.display = 'none';
+        // Standalone single-file build: there is no site to navigate, so the
+        // site-tree panel goes away. The ELEMENT stays — it owns the
+        // sidebar's grid column and it has adopted page-toc, so hiding it
+        // strands main in the 280px sidebar track and takes the on-page TOC
+        // down with it.
+        var panel = self.querySelector(':scope > .page-nav-scroll > .page-nav-panel');
+        if (panel) panel.remove();
+        self.classList.add('page-nav-standalone');
         return;
       }
       loadManifest()
