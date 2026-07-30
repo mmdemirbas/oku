@@ -5252,7 +5252,12 @@ class OkuChart extends HTMLElement {
     // segment" — the legend ignores them when toggling.
     while (fills.length < totalCells) fills.push({ color: palette.muted, label: 'empty', empty: true, segIdx: -1 });
     var cell = 22, gap = 3;
-    var W = gCols * (cell + gap) + 12 + 160; // grid + legend
+    // The legend column was a fixed 160 units, so any segment label
+    // longer than that ran off the SVG's right edge. Size it to the
+    // labels (+18 for the swatch, +6 for the "· NN%" suffix).
+    var wafFit = okuFitLabelGutter(segments.map(function (s) { return (s.label || '') + ' · 100%'; }),
+                                   { width: 900, fontPx: 11, minW: 140, maxFrac: 0.55, pad: 24 });
+    var W = gCols * (cell + gap) + 12 + wafFit.gutter; // grid + legend
     var H = (this._title ? 28 : 4) + gRows * (cell + gap) + 12;
     var titleTop = this._title ? 28 : 0;
     var parts = [];
@@ -5280,7 +5285,7 @@ class OkuChart extends HTMLElement {
     segments.forEach(function (seg, idx) {
       var ly = titleTop + 16 + idx * 22;
       var color = palette[seg.color] || palette.accent;
-      parts.push('<g class="okc-waffle-legend" data-segment-idx="' + idx + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml('Toggle ' + (seg.label || 'segment')) + '"><rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/><text x="' + (lx + 18) + '" y="' + ly + '" class="okc-waffle-legend-label">' + escapeXml(seg.label || '') + ' · ' + (Math.round((Math.max(0, +seg.count || 0) / total) * 100)) + '%</text></g>');
+      parts.push('<g class="okc-waffle-legend" data-segment-idx="' + idx + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml('Toggle ' + (seg.label || 'segment')) + '"><rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/><text x="' + (lx + 18) + '" y="' + ly + '" class="okc-waffle-legend-label">' + escapeXml(wafFit.fit((seg.label || '') + ' · ' + (Math.round((Math.max(0, +seg.count || 0) / total) * 100)) + '%')) + '<title>' + escapeXml(seg.label || '') + '</title></text></g>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -6241,13 +6246,19 @@ class OkuChart extends HTMLElement {
     //   right-anchored             right-aligned   right-aligned
     //
     // Numbers right-align so the digits stack visually.
-    var labelColRight = 168;          // x where label text ends
-    var bandLeft       = 184;          // x of band's leftmost extent
-    var bandRight      = 184 + 200;    // x of band's rightmost extent
+    // The label column sizes itself to the labels; a fixed width
+    // clipped anything longer at the SVG's left edge. Everything
+    // downstream shifts by the same delta so the grid stays aligned.
+    var funnelFit = okuFitLabelGutter(stages.map(function (s) { return s.label || ''; }),
+                                      { width: 540, fontPx: 11, minW: 120, maxFrac: 0.42 });
+    var shift          = funnelFit.gutter - 168;
+    var labelColRight = funnelFit.gutter; // x where label text ends
+    var bandLeft       = 184 + shift;  // x of band's leftmost extent
+    var bandRight      = bandLeft + 200; // x of band's rightmost extent
     var bandMaxW       = bandRight - bandLeft;
-    var valueColRight  = 470;          // value text right-aligned to here
-    var pctColRight    = 528;          // percentage text right-aligned to here
-    var W              = 540;
+    var valueColRight  = 470 + shift;  // value text right-aligned to here
+    var pctColRight    = 528 + shift;  // percentage text right-aligned to here
+    var W              = 540 + shift;
     var stageH         = 56;
     var titleTop       = this._title ? 36 : 12;
     var H              = titleTop + stages.length * stageH + 12;
@@ -6291,7 +6302,7 @@ class OkuChart extends HTMLElement {
       // Three fixed columns — labels, values, percentages — all
       // right-anchored to their column edge so digits stack and
       // labels line up regardless of band width.
-      parts.push('<text x="' + labelColRight + '" y="' + textY + '" text-anchor="end" class="okc-funnel-label">' + escapeXml(st.label || '') + '</text>');
+      parts.push('<text x="' + labelColRight + '" y="' + textY + '" text-anchor="end" class="okc-funnel-label">' + escapeXml(funnelFit.fit(st.label || '')) + '<title>' + escapeXml(st.label || '') + '</title></text>');
       parts.push('<text x="' + valueColRight + '" y="' + textY + '" text-anchor="end" class="okc-funnel-value">' + escapeXml(fmtNum(v)) + '</text>');
       parts.push('<text x="' + pctColRight + '" y="' + textY + '" text-anchor="end" class="okc-funnel-pct">' + pct + '%</text>');
     });

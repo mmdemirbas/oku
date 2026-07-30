@@ -466,3 +466,73 @@ def test_gantt_labels_never_clip_at_svg_edge(page, site_url):
             if row["text"] != original:
                 assert row["text"].endswith("…"), f"silent truncation: {row!r}"
                 assert row["title"] == original, f"tooltip lost the full label: {row!r}"
+
+
+def test_gutter_charts_keep_long_labels_inside_the_svg(page, site_url):
+    """Charts that park labels in a side gutter (gantt row labels,
+    funnel stage labels, waffle legend) sized that gutter with a
+    constant, so a long label overflowed the SVG box and got clipped.
+    Same defect, three renderers — assert the class, not one instance.
+
+    Labels here are deliberately longer than every fixed gutter the kit
+    used to hardcode (160 / 168 / 160 units).
+    """
+    long_label = "Ankara rehberi: Telegram verisi yapısal listeye dönüştürülür"
+    specs = [
+        ("gantt", "gantt", ".okc-gantt-label",
+         {"tasks": [{"label": long_label, "start": 0, "end": 3},
+                    {"label": "QA", "start": 2, "end": 4}]}),
+        ("funnel", "funnel", ".okc-funnel-label",
+         {"stages": [{"label": long_label, "value": 200},
+                     {"label": "Kısa", "value": 30}]}),
+        ("waffle", "waffle", ".okc-waffle-legend-label",
+         {"segments": [{"label": long_label, "count": 60},
+                       {"label": "Kısa", "count": 40}], "total": 100}),
+    ]
+    for viewport in (DESKTOP, NARROW):
+        page.set_viewport_size(viewport)
+        _goto(page, f"{site_url}/docs/charts.html")
+        page.wait_for_selector("oku-chart svg")
+        for chart_type, extras_key, selector, payload in specs:
+            data = page.evaluate(
+                """([type, extrasKey, selector, payload]) => {
+                    const host = document.createElement('oku-chart');
+                    host.setAttribute('type', type);
+                    const s = document.createElement('script');
+                    s.type = 'application/json'; s.textContent = '[]';
+                    host.appendChild(s);
+                    const ex = document.createElement('script');
+                    ex.type = 'application/json';
+                    ex.setAttribute('data-extras', extrasKey);
+                    ex.textContent = JSON.stringify(payload);
+                    host.appendChild(ex);
+                    document.querySelector('main section').appendChild(host);
+                    const svg = host.querySelector('svg');
+                    if (!svg) { host.remove(); return {rendered: false}; }
+                    const sr = svg.getBoundingClientRect();
+                    const rows = [...svg.querySelectorAll(selector)].map(t => {
+                        const r = t.getBoundingClientRect();
+                        const visible = [...t.childNodes]
+                            .filter(n => n.nodeType === Node.TEXT_NODE)
+                            .map(n => n.nodeValue).join('').trim();
+                        return {text: visible,
+                                left: +(sr.left - r.left).toFixed(2),
+                                right: +(r.right - sr.right).toFixed(2)};
+                    });
+                    host.remove();
+                    return {rendered: true, rows};
+                }""",
+                [chart_type, extras_key, selector, payload],
+            )
+            assert data["rendered"], f"{chart_type} did not render"
+            assert data["rows"], f"{chart_type} rendered no labels"
+            for row in data["rows"]:
+                assert row["text"], f"{chart_type}: empty label at {viewport}"
+                assert row["left"] <= 1, (
+                    f"{chart_type} label clipped left at {viewport['width']}px: "
+                    f"{row['left']}px over — {row!r}"
+                )
+                assert row["right"] <= 1, (
+                    f"{chart_type} label clipped right at {viewport['width']}px: "
+                    f"{row['right']}px over — {row!r}"
+                )
