@@ -3996,6 +3996,14 @@ oku-chart .okc-axis-label {
   font: 500 11px 'Inter', sans-serif;
   letter-spacing: 0.02em;
 }
+/* Gantt row labels sit in a gutter whose width okuFitLabelGutter()
+   estimates from this font size. Leaving the font unset let it
+   inherit the SVG default (16px), so the gutter and the glyphs
+   disagreed and long labels ran off the left edge. */
+oku-chart .okc-gantt-label {
+  fill: var(--text-soft);
+  font: 500 11px 'Inter', sans-serif;
+}
 oku-chart .okc-tick {
   fill: var(--text-soft);
   font: 400 10.5px 'JetBrains Mono', monospace;

@@ -386,3 +386,83 @@ def test_comparison_page_rendered_links_all_work(page, site_url):
         page.wait_for_selector("main section", timeout=8000)
         assert page.locator("main section").count() >= 3, f"{href} rendered empty"
         assert page.title().startswith("Sample"), f"{href} landed on wrong page: {page.title()}"
+
+
+def test_gantt_labels_never_clip_at_svg_edge(page, site_url):
+    """Gantt row labels stay INSIDE the chart's own box at every
+    viewport. The left gutter used to be a fixed 160 units, so any
+    label wider than that ran off the SVG's left edge and was clipped
+    mid-word — silently, and worse as the viewport narrowed.
+
+    Long, real-world labels are injected here because the docs' gantt
+    sample uses short ones ("Design", "Build") that cannot expose the
+    bug. Assertion is numeric: every label's bounding box must sit at
+    or inside the SVG's left edge, and each label's text must be
+    non-empty (a zero-width gutter would "pass" a bounds check while
+    rendering nothing).
+    """
+    labels = [
+        "Ankara rehberi: Telegram verisi → yapısal liste",
+        "Hukuki hazırlık (belgeler, avukat, yazılı cevap)",
+        "Mülakat hazırlığı (Spark boşluğu + anlatılar)",
+        "QA",
+    ]
+    for viewport in (DESKTOP, NARROW):
+        page.set_viewport_size(viewport)
+        _goto(page, f"{site_url}/docs/charts.html")
+        page.wait_for_selector("oku-chart svg")
+        data = page.evaluate(
+            """(labels) => {
+                const host = document.createElement('oku-chart');
+                host.setAttribute('type', 'gantt');
+                host.setAttribute('title', 'clip probe');
+                const s = document.createElement('script');
+                s.type = 'application/json';
+                s.textContent = '[]';
+                host.appendChild(s);
+                const ex = document.createElement('script');
+                ex.type = 'application/json';
+                ex.setAttribute('data-extras', 'gantt');
+                ex.textContent = JSON.stringify({
+                    tasks: labels.map((l, i) => ({label: l, start: i, end: i + 2}))
+                });
+                host.appendChild(ex);
+                document.querySelector('main section').appendChild(host);
+                const svg = host.querySelector('svg');
+                if (!svg) return {rendered: false};
+                const sr = svg.getBoundingClientRect();
+                const rows = [...svg.querySelectorAll('.okc-gantt-label')].map(t => {
+                    const r = t.getBoundingClientRect();
+                    // Direct text nodes only — textContent would also
+                    // splice in the nested <title> tooltip string.
+                    const visible = [...t.childNodes]
+                        .filter(n => n.nodeType === Node.TEXT_NODE)
+                        .map(n => n.nodeValue).join('');
+                    return {
+                        text: visible.trim(),
+                        title: (t.querySelector('title') || {}).textContent || '',
+                        overflowLeft: +(sr.left - r.left).toFixed(2),
+                        overflowRight: +(r.right - sr.right).toFixed(2),
+                    };
+                });
+                host.remove();
+                return {rendered: true, rows, count: rows.length};
+            }""",
+            labels,
+        )
+        assert data["rendered"], "gantt did not render"
+        assert data["count"] == len(labels), f"expected {len(labels)} labels, got {data['count']}"
+        for row in data["rows"]:
+            assert row["text"], f"empty gantt label at {viewport}: {row}"
+            assert row["overflowLeft"] <= 1, (
+                f"gantt label clipped at left edge ({viewport['width']}px): "
+                f"{row['overflowLeft']}px over — {row!r}"
+            )
+            assert row["overflowRight"] <= 1, (
+                f"gantt label overruns the plot ({viewport['width']}px): {row!r}"
+            )
+        # Truncated labels must keep the full string reachable in <title>.
+        for row, original in zip(data["rows"], labels):
+            if row["text"] != original:
+                assert row["text"].endswith("…"), f"silent truncation: {row!r}"
+                assert row["title"] == original, f"tooltip lost the full label: {row!r}"

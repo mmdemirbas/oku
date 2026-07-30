@@ -7928,9 +7928,11 @@ class OkuChart extends HTMLElement {
     var vMin = Math.min.apply(null, tasks.map(function (t) { return +t.start || 0; }));
     var vMax = Math.max.apply(null, tasks.map(function (t) { return +t.end   || 0; }));
     if (vMin === vMax) { vMax += 1; }
-    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 160, right: 16 };
+    var W = 720;
+    var labelFit = okuFitLabelGutter(tasks.map(function (t) { return t.label || ''; }), { width: W, fontPx: 11 });
+    var pad = { top: this._title ? 36 : 16, bottom: 36, left: labelFit.gutter, right: 16 };
     var rowH = 26;
-    var W = 720, H = pad.top + tasks.length * rowH + pad.bottom;
+    var H = pad.top + tasks.length * rowH + pad.bottom;
     var plotW = W - pad.left - pad.right;
     function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
     var parts = [];
@@ -7948,7 +7950,7 @@ class OkuChart extends HTMLElement {
       var bx = xOf(+task.start || 0);
       var bw = Math.max(2, xOf(+task.end || 0) - bx);
       var color = palette[task.color] || palette.accent;
-      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 14) + '" text-anchor="end" class="okc-gantt-label">' + escapeXml(task.label || '') + '</text>');
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 14) + '" text-anchor="end" class="okc-gantt-label">' + escapeXml(labelFit.fit(task.label || '')) + '<title>' + escapeXml(task.label || '') + '</title></text>');
       var payload = JSON.stringify({
         label: task.label || '',
         kv: [
@@ -9677,6 +9679,43 @@ window.addEventListener('oku:rendered', function () {
 
 function escapeXml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+/* Size a left label gutter to the labels it must hold.
+   Renderers that put row labels in a left gutter used a FIXED pad
+   (gantt: 160). Any label wider than that was clipped at the SVG's
+   left edge — silently, and worse on narrow viewports. Callers pass
+   their label set and the chart width; they get back a gutter width
+   plus a `fit()` that ellipsises anything still too long, so text is
+   never cut mid-glyph.
+
+   Width is estimated, not measured: the SVG string is built before it
+   is in the DOM, so getComputedTextLength() is unavailable. 0.62em per
+   character is the observed mean for Inter at mixed-case Latin +
+   Turkish; capitals and CJK run wider, which the maxFrac clamp and
+   fit() absorb. */
+function okuFitLabelGutter(labels, opts) {
+  var o = opts || {};
+  var fontPx = o.fontPx || 11;
+  var chW = fontPx * (o.emPerChar || 0.62);
+  var pad = o.pad === undefined ? 10 : o.pad;
+  var maxW = Math.max(40, (o.width || 720) * (o.maxFrac || 0.42));
+  var minW = o.minW || 60;
+  var widest = 0;
+  (labels || []).forEach(function (l) {
+    widest = Math.max(widest, String(l == null ? '' : l).length * chW);
+  });
+  var gutter = Math.min(maxW, Math.max(minW, widest + pad));
+  var maxChars = Math.max(3, Math.floor((gutter - pad) / chW));
+  return {
+    gutter: Math.round(gutter),
+    /* Returns the label unchanged when it fits, else clipped to
+       maxChars-1 plus an ellipsis. Callers keep the full string in a
+       <title> so the hidden tail stays reachable. */
+    fit: function (l) {
+      var s = String(l == null ? '' : l);
+      return s.length <= maxChars ? s : s.slice(0, maxChars - 1).trimEnd() + '…';
+    }
+  };
 }
 function fmtNum(n) {
   if (n === undefined || n === null) return '';
