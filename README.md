@@ -47,11 +47,12 @@ file copies for offline reading.
   to `--content-width`. On screens >1600px the content width
   widens further so charts and tables breathe.
 - **CLI:** `init` symlinks the kit + writes an index stub; `build`
-  emits `dist/site/` (multi-page + Pagefind), `dist/standalone/`
-  (single file with inline page JSON), and `dist/markdown/`
-  (`page.md` twins + `llms.txt` for LLM consumers); `clean` drops
-  `dist/`; `check` lints the doctree (schema + structural +
-  content); `serve` runs a local HTTP server with live reload.
+  emits `dist/site/` (multi-page + manifest + `llms.txt` + Pagefind)
+  and `dist/standalone/` (single file with inline page JSON); the
+  `.md` sources are the AI/LLM surface, so there is no twin tree.
+  `clean` drops `dist/`; `check` lints the doctree (schema +
+  structural + content); `serve` runs a local HTTP server with live
+  reload.
 
 ## Install
 
@@ -270,8 +271,8 @@ oku check --strict              # schema + structural + content lint
 Covers the pure converter (Markdown front-matter, nested lists,
 footnotes, definition lists, reference-style links, sanitised inline
 HTML), schema validation on every published page, the build helpers
-(`build_manifest`, `build_llms_txt`, `build_markdown_twins`,
-`extract_page_text`, `inject_pagefind_body`) via `tmp_path`
+(`build_manifest`, `build_llms_txt`, `extract_page_text`,
+`inject_pagefind_body`) via `tmp_path`
 fixtures, and content-regression tests that lock the chrome.js /
 chrome.css markers the user has called out as load-bearing.
 

@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -20,10 +23,12 @@ jobs:
       - name: Sync dependencies
         run: uv sync --extra dev
 
+      # Whole repo, not just src/ — a future script or tool at the root
+      # is still Python this project owns.
       - name: Lint (ruff)
         run: |
-          uv run ruff check src/
-          uv run ruff format --check src/
+          uv run ruff check .
+          uv run ruff format --check .
 
       - name: Doctree check (strict)
         run: uv run oku check --strict
@@ -34,5 +39,10 @@ jobs:
       - name: Install chromium for browser tests
         run: uv run playwright install --with-deps chromium
 
+      # OKU_REQUIRE_BROWSER makes the browser package FAIL instead of
+      # skip when chromium is missing. Without it a broken install turns
+      # the whole UI suite into silent skips and CI still reports green.
       - name: Tests (incl. browser invariants)
+        env:
+          OKU_REQUIRE_BROWSER: "1"
         run: uv run pytest -q

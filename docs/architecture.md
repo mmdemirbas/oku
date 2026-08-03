@@ -17,7 +17,7 @@ accent: teal
 > - Format: JSON tree → renderer.js walks it → Custom Element DOM → chrome.js attaches behavior.
 > - kit.json + per-domain glossary/extref JSON files are the registry; loaded once at page start, resolved per element.
 > - Visual Viewport API keeps fixed-position chrome buttons anchored during pinch-zoom on Safari.
-> - Build pipeline (oku CLI) emits three single-purpose trees under dist/: standalone/ (self-contained HTMLs), site/ (multi-page + Pagefind + manifest), markdown/ (page.md twins + llms.txt).
+> - Build pipeline (oku CLI) emits two single-purpose trees under dist/: standalone/ (self-contained HTMLs) and site/ (multi-page + Pagefind + manifest + llms.txt). The .md sources are the AI/LLM surface, so no twin tree is emitted.
 
 ## Layered overview {#overview}
 
@@ -38,11 +38,10 @@ flowchart TB
       CSS["chrome.css — tokens + every primitive"]:::rt
       REG["glossary / extrefs — per-domain JSON"]:::reg
     end
-    subgraph O[Build outputs — three trees]
+    subgraph O[Build outputs — two trees]
       direction LR
       STA["dist/standalone/ — self-contained"]:::out
-      SIT["dist/site/ — multi-page + Pagefind"]:::out
-      MDT["dist/markdown/ — page.md + llms.txt"]:::out
+      SIT["dist/site/ — multi-page + Pagefind + llms.txt"]:::out
     end
     JSON --> RND
     MD --> RND
@@ -287,7 +286,6 @@ flowchart LR
     KIT --> BUILD
     BUILD --> S["📦 dist/standalone/<br/>self-contained HTML"]:::output
     BUILD --> SI["🌍 dist/site/<br/>multi-page + manifest"]:::output
-    BUILD --> MD["📝 dist/markdown/<br/>page.md + llms.txt"]:::output
     BUILD -.-> PF["🔍 dist/site/pagefind/"]:::optional
     classDef content fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a
     classDef kit fill:#ccfbf1,stroke:#0f766e,color:#115e59
@@ -302,8 +300,8 @@ flowchart LR
 2. if jsonschema is installed, validate every page against schema/page.schema.json; print errors with field paths. Structural lint runs regardless of jsonschema.
 3. build_standalone: for each page, inline chrome.css + chrome.js + renderer.js + page JSON + kit bundle + window.__okuManifest seed into a single self-contained HTML. No external dependencies beyond Google Fonts and Mermaid CDN (when used).
 4. build_site: copy every HTML stub + sibling JSON into dist/site/<rel-path>; copy _oku/ as dist/site/_oku/ once; embed extracted text via hidden data-pagefind-body div for indexing.
-5. write a single site-manifest.json under dist/site/<docs-root>/. chrome.js fetches it at runtime to populate the page-nav sidebar.
-6. build_markdown_twins + build_llms_txt: emit per-page page.md plus a single llms.txt sitemap under dist/markdown/. LLM-readable, never duplicated across the human trees.
+5. write a single site-manifest.json at the site root (dist/site/). chrome.js resolves the docs root by stripping back to whichever directory holds _oku/, and build_site copies the kit to dist/site/_oku/ once — so the manifest belongs beside it, with page paths relative to the project root.
+6. build_llms_txt: emit one llms.txt sitemap at the site root, next to the manifest. The .md page sources are the canonical AI/LLM surface, so nothing is duplicated into a twin tree.
 7. if pagefind is on PATH, index dist/site/ to dist/site/pagefind/.
 
 ## Standalone kit bundle {#standalone-bundle}
@@ -331,7 +329,7 @@ Five behaviors worth knowing about if you're reading the kit code.
 > Two valid asset layouts now: development (chrome.{css,js} at repo root) and installed (chrome.{css,js} inside `html_doc/assets/` in the wheel). `cli._kit_assets_dir()` picks whichever exists, so `oku init` works from a clone OR from `uv tool install .`. Hatchling `force-include` in pyproject packs the assets into the right place at wheel build time.
 
 > [!NOTE] Generated artifacts live under dist/, never source
-> `oku build` writes site-manifest.json (dist/site/), llms.txt (dist/markdown/), and page.md twins (dist/markdown/) at the closest common parent of JSON pages — picked by `_common_docs_dir(root, pages)` in cli.py, typically `docs/`. `oku serve` doesn't write at all — it synthesizes site-manifest.json and llms.txt in memory on each request so source dirs stay authored-content-only.
+> `oku build` writes site-manifest.json and llms.txt at the site root (dist/site/), where build_site puts the shared _oku/ kit — that is the docs root chrome.js resolves at runtime, so page paths inside the manifest are relative to the project root. `oku serve` doesn't write at all — it synthesizes site-manifest.json, llms.txt and kit.json in memory on each request so source dirs stay authored-content-only.
 
 > [!NOTE] Serve-time Pagefind
 > `cmd_serve` spawns a background thread at startup that builds `dist/_search/site/` (just like `cmd_build`) and runs pagefind against it. Symlinks `<docs-dir>/pagefind` → that index so chrome.js's existing search-loader path resolves. Soft-fails if pagefind isn't installed. Opt out with `--no-search`.

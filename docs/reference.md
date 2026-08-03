@@ -21,7 +21,7 @@ accent: teal
 > - Emphasis · callout, insight, info-tip
 > - Layout · tldr, kpi-grid, table, compare-grid, step-flow
 > - Visual · chart (scatter / line / area / bubble / quadrant / bar / stacked-bar / grouped-bar / donut), diagram, live-snippet
-> - Build · oku build → dist/standalone/, dist/site/ (+ Pagefind), dist/markdown/ (page.md twins + llms.txt)
+> - Build · oku build → dist/standalone/ (single files) and dist/site/ (+ manifest, llms.txt, Pagefind)
 
 ## Project setup {#setup}
 
@@ -227,7 +227,7 @@ Scope variant — set `verdict` to `in` (green border) or `out` (muted), and use
 Numbered cards for ordered actions, build steps, or migration paths.
 
 ```oku-example
-{"code":{"k":"code","src":"{\n  \"kind\": \"step-flow\",\n  \"steps\": [\n    { \"num\": \"1\", \"title\": \"Init\",  \"meta\": \"~1 min\", \"content\": \"oku init\" },\n    { \"num\": \"2\", \"title\": \"Author\", \"content\": \"Write the JSON page.\" }\n  ]\n}","lang":"json"},"output":{"k":"step-flow","steps":[{"t":"Init","b":"cd into your docs root, then oku init scaffolds the _oku symlink and an index.html stub there.","meta":"~1 min · one-time per project"},{"t":"Author","b":"Write a JSON page and an HTML stub side by side; the renderer fetches the JSON at load time.","meta":"iterative"},{"t":"Build","b":"oku build → dist/standalone/ (single-file HTMLs), dist/site/ (shared-asset multi-page + manifest + Pagefind), dist/markdown/ (page.md twins + llms.txt for LLM consumers).","meta":"before deploy or before sharing standalone"}]}}
+{"code":{"k":"code","src":"{\n  \"kind\": \"step-flow\",\n  \"steps\": [\n    { \"num\": \"1\", \"title\": \"Init\",  \"meta\": \"~1 min\", \"content\": \"oku init\" },\n    { \"num\": \"2\", \"title\": \"Author\", \"content\": \"Write the JSON page.\" }\n  ]\n}","lang":"json"},"output":{"k":"step-flow","steps":[{"t":"Init","b":"cd into your docs root, then oku init scaffolds the _oku symlink and an index.html stub there.","meta":"~1 min · one-time per project"},{"t":"Author","b":"Write a JSON page and an HTML stub side by side; the renderer fetches the JSON at load time.","meta":"iterative"},{"t":"Build","b":"oku build → dist/standalone/ (single-file HTMLs) and dist/site/ (shared-asset multi-page + manifest + llms.txt + Pagefind).","meta":"before deploy or before sharing standalone"}]}}
 ```
 
 ## live-snippet {#visual}
@@ -303,7 +303,7 @@ meta drives nav placement, the cover header, the llms.txt sitemap, and search ex
 oku build produces three trees under dist/, one per audience. Authors don't need to run it during dev — the runtime renderer fetches JSON directly — but build is required for search, the standalone single-file mode, and the llms.txt sitemap.
 
 ```oku-step-flow
-{"steps":[{"t":"dist/site/","b":"Deployable multi-page site. Every HTML + JSON copied with directory structure preserved. Kit assets bundled at dist/site/_oku/. site-manifest.json sits at the docs root for the runtime page-nav fetch. Drop on any static host.","meta":"humans, HTTP"},{"t":"dist/standalone/","b":"Single-file artifacts. Every HTML inlines kit JS, CSS, page JSON, glossary bundle, and the manifest as window.__okuManifest. One self-contained file per page that opens offline — email-as-attachment ready. No sidecar manifest or llms.txt needed.","meta":"humans, file://"},{"t":"dist/markdown/","b":"page.md twin for every JSON page + a single llms.txt sitemap (one line per page: URL + title + summary, convention from llmstxt.org). Single canonical home — no duplication across the human trees.","meta":"AI / LLM consumers"}]}
+{"steps":[{"t":"dist/site/","b":"Deployable multi-page site. Every HTML + JSON copied with directory structure preserved. Kit assets bundled at dist/site/_oku/. site-manifest.json sits at the site root, beside the copied kit — chrome.js resolves the docs root from wherever _oku/ sits and fetches it there. Drop on any static host.","meta":"humans, HTTP"},{"t":"dist/standalone/","b":"Single-file artifacts. Every HTML inlines kit JS, CSS, page JSON, glossary bundle, and the manifest as window.__okuManifest. One self-contained file per page that opens offline — email-as-attachment ready. No sidecar manifest or llms.txt needed.","meta":"humans, file://"},{"t":".md sources + dist/site/llms.txt","b":"No twin tree: the .md page sources ARE the canonical AI/LLM surface. The build drops one llms.txt sitemap (one line per page: URL + title + summary, convention from llmstxt.org) at the site root, beside the manifest.","meta":"AI / LLM consumers"}]}
 ```
 
 > [!SUCCESS] Pagefind search — optional dependency

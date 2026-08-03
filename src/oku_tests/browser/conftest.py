@@ -13,6 +13,7 @@ installed (`uv run playwright install chromium` to enable).
 from __future__ import annotations
 
 import http.server
+import os
 import threading
 from pathlib import Path
 
@@ -29,8 +30,16 @@ def _require_chromium():
 
     with sync_playwright() as p:
         exe = Path(p.chromium.executable_path)
-    if not exe.exists():
-        pytest.skip("chromium not installed — run `playwright install chromium`")
+    if exe.exists():
+        return
+    # Locally, a missing browser is a setup detail and skipping is right.
+    # In CI it is the difference between "the UI suite passed" and "the
+    # UI suite never ran", which reads identically in a green summary —
+    # so CI sets OKU_REQUIRE_BROWSER=1 and this fails loudly instead.
+    message = "chromium not installed — run `playwright install chromium`"
+    if os.environ.get("OKU_REQUIRE_BROWSER"):
+        pytest.fail(f"OKU_REQUIRE_BROWSER is set but {message}")
+    pytest.skip(message)
 
 
 @pytest.fixture(scope="session")

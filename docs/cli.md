@@ -12,7 +12,7 @@ accent: teal
 ---
 
 > [!TLDR]
-> init scaffolds the cwd as a docs root: _oku symlink + index.html entry stub. build emits three single-purpose trees — dist/standalone/, dist/site/ (with manifest + Pagefind), dist/markdown/ (page.md twins + llms.txt). clean wipes dist/. check lints every page. serve runs a local HTTP server and synthesizes the manifest + llms.txt in memory — source dirs stay clean apart from the one entry stub.
+> init scaffolds the cwd as a docs root: _oku symlink + index.html entry stub. build emits two single-purpose trees — dist/standalone/ and dist/site/ (with manifest + llms.txt + Pagefind). clean wipes dist/. check lints every page. serve runs a local HTTP server and synthesizes the manifest, llms.txt and kit.json in memory — source dirs stay clean apart from the one entry stub.
 >
 > - init treats cwd as the docs root. Run it from wherever you want pages to live (typically cd into your docs/ subdir first).
 > - Source dirs hold JSON (or MD) plus a single index.html entry stub so IDE-served workflows work without the dev server running.
@@ -49,8 +49,8 @@ cd ~/path/to/your-project
 oku build
 
 # ✓ Doctree check: 6 page(s) clean
-# ✓ Wrote dist/site/docs/site-manifest.json (6 JSON page(s))
-# ✓ Wrote 6 page.md twin(s) + llms.txt under dist/markdown/docs/
+# ✓ Wrote dist/site/site-manifest.json (6 JSON page(s))
+# ✓ Wrote dist/site/llms.txt
 # ✓ Synthesized 6 stub(s) for pages without on-disk .html
 # ✓ Pagefind index built: dist/site/pagefind/
 # ✓ Built 6 HTML file(s):
@@ -62,17 +62,14 @@ oku build
 #   site (shared assets, multi-page):
 #   site root:   file:///.../dist/site
 #                ...
-#
-#   markdown (LLM twins + llms.txt):
-#   markdown root: file:///.../dist/markdown
 ```
 
 ```oku-step-flow
-{"steps":[{"t":"Walk *.json and *.md pages recursively","b":"Skips dist/, _oku/, node_modules/, .git/, venv/, __pycache__/. Treats files with kind:\"page\" (and any .md) as pages."},{"t":"Schema validation (optional)","b":"If jsonschema is installed (pip install jsonschema), every page is checked against kit/schema/page.schema.json. Errors print with field paths. Without jsonschema, prints a one-line hint and skips."},{"t":"build_standalone — single-file per page (humans, file://)","b":"For each page, synthesize the HTML stub in memory, inline chrome.css/.js, chrome-boot.js, renderer.js, the page JSON, the kit bundle, and the site-manifest seed (window.__okuManifest). One self-contained file per page; no sidecars. Output to dist/standalone/ with directory structure preserved."},{"t":"build_site — multi-page deployable (humans, HTTP)","b":"Write a per-page stub + copy the source JSON to dist/site/ with directory structure preserved. Copy the kit once into dist/site/_oku/. Write a single site-manifest.json at the docs root (chrome.js fetches it at runtime). Inject extracted text into hidden data-pagefind-body for indexing."},{"t":"build_markdown_twins + llms.txt (LLM consumers)","b":"For each JSON page, emit a sibling page.md under dist/markdown/. Relative .html links rewrite to .md so internal navigation stays consistent inside the tree. Drop one llms.txt sitemap (llmstxt.org convention) at the markdown docs root."},{"t":"Pagefind index (optional)","b":"If pagefind is on PATH (brew install pagefind, or npx pagefind), run it over dist/site/. Output to dist/site/pagefind/. Soft-fails with install hint if absent."}]}
+{"steps":[{"t":"Walk *.json and *.md pages recursively","b":"Skips dist/, _oku/, node_modules/, .git/, venv/, __pycache__/. Treats files with kind:\"page\" (and any .md) as pages."},{"t":"Schema validation (optional)","b":"If jsonschema is installed (pip install jsonschema), every page is checked against kit/schema/page.schema.json. Errors print with field paths. Without jsonschema, prints a one-line hint and skips."},{"t":"build_standalone — single-file per page (humans, file://)","b":"For each page, synthesize the HTML stub in memory, inline chrome.css/.js, chrome-boot.js, renderer.js, the page JSON, the kit bundle, and the site-manifest seed (window.__okuManifest). One self-contained file per page; no sidecars. Output to dist/standalone/ with directory structure preserved."},{"t":"build_site — multi-page deployable (humans, HTTP)","b":"Write a per-page stub + copy the source JSON to dist/site/ with directory structure preserved. Copy the kit once into dist/site/_oku/. Write a single site-manifest.json at the site root, beside the copied kit (chrome.js resolves the docs root from wherever _oku/ sits and fetches it there at runtime). Inject extracted text into hidden data-pagefind-body for indexing."},{"t":"build_llms_txt (LLM consumers)","b":"Drop one llms.txt sitemap (llmstxt.org convention) at the site root, beside the manifest. The .md page sources are the canonical AI/LLM surface, so no twin tree is emitted."},{"t":"Pagefind index (optional)","b":"If pagefind is on PATH (brew install pagefind, or npx pagefind), run it over dist/site/. Output to dist/site/pagefind/. Soft-fails with install hint if absent."}]}
 ```
 
-> [!WARN] build wipes its three dist trees
-> build removes dist/standalone/, dist/site/, and dist/markdown/ before rebuilding so stale files don't accumulate. Anything else you've parked under dist/ is left alone — use oku clean to wipe the entire dist/ tree.
+> [!WARN] build wipes its dist trees
+> build removes dist/standalone/ and dist/site/ before rebuilding (plus dist/markdown/ if an older build left one) so stale files don't accumulate. Anything else you've parked under dist/ is left alone — use oku clean to wipe the entire dist/ tree.
 
 ## oku clean {#clean}
 
