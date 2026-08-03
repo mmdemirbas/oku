@@ -445,6 +445,26 @@ def test_known_glossary_term_passes(tmp_path: Path) -> None:
     assert _issues_of(issues, code="unresolved-glossary") == []
 
 
+def test_multi_word_markdown_refs_are_collected(tmp_path: Path) -> None:
+    """Registry ids carry spaces ("Iceberg paper", "Time travel"). The
+    reference scanner used to match `[\\w-]+` only, so a multi-word
+    reference was never collected — an unresolved one passed check in
+    silence, and that is most of the registry."""
+    fixture = tmp_path / "kit_empty"
+    (fixture / "glossary").mkdir(parents=True)
+    (fixture / "extrefs").mkdir(parents=True)
+    page = {
+        "k": "page",
+        "t": "T",
+        "b": ["## S {#s}\n\nSee [the paper](#x/Iceberg paper) and [travel](#g/Time travel).\n"],
+    }
+    issues = cli.check_pages([(tmp_path / "page.json", page)], tmp_path, kit_dir=fixture)
+    x = _issues_of(issues, code="unresolved-extref")
+    assert len(x) == 1 and "Iceberg paper" in x[0]["where"], x
+    g = _issues_of(issues, code="unresolved-glossary")
+    assert len(g) == 1 and "Time travel" in g[0]["where"], g
+
+
 # ---------- stray demo pages ----------
 
 

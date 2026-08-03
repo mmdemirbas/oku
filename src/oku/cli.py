@@ -673,7 +673,7 @@ def page_to_md(page: dict) -> str:
 _MD_LIST_ITEM_RE = re.compile(r"^([-*]|\d+\.)\s+(.*)$")
 _MD_TABLE_SEP_RE = re.compile(r"^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?\s*$")
 _MD_INLINE_TOKEN_RE = re.compile(
-    r"\*\*([\s\S]+?)\*\*|\*([^*\s][^*]*?)\*|`([^`]+?)`|\[([^\]]+?)\]\(([^)\s]+?)\)"
+    r"\*\*([\s\S]+?)\*\*|\*([^*\s][^*]*?)\*|`([^`]+?)`|\[([^\]]+?)\]\((#[gx]/[^)\n]+?|[^)\s]+?)\)"
 )
 
 
@@ -2138,8 +2138,11 @@ def _load_registry(kit_dir: Path, kind: str) -> dict:
 
 
 _MD_HEADING_LINE_RE = re.compile(r"^(#{1,6})\s+(.*?)(?:\s*\{#([A-Za-z][\w-]*)\})?\s*$")
-_MD_GLOSS_REF_RE = re.compile(r"\]\(#g/([\w-]+)\)")
-_MD_EXTREF_REF_RE = re.compile(r"\]\(#x/([\w-]+)\)")
+# Registry ids are human-readable keys, spaces included ("Iceberg paper",
+# "Time travel") — a \w-only id silently skipped most real references,
+# so unresolved ones were never reported.
+_MD_GLOSS_REF_RE = re.compile(r"\]\(#g/([^)\n]+?)\)")
+_MD_EXTREF_REF_RE = re.compile(r"\]\(#x/([^)\n]+?)\)")
 _MD_SETEXT_EQ_RE = re.compile(r"^=+\s*$")
 _MD_HR_RE = re.compile(r"^-{3,}\s*$")
 _MD_HTML_ISLAND_RE = re.compile(r"^</?([a-zA-Z][\w-]*)(?:[\s/>]|$)")

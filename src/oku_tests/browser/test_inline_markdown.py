@@ -41,6 +41,8 @@ PAGE = {
         f"Ters yön: [**kalın** bir bağlantı içinde]({Y}).\n\n"
         "Kod: **`kalın kod`** ve vurgu: **kalın içinde *vurgu* var**.\n\n"
         "Sözlük: **[terim](#g/iceberg)**.\n\n"
+        "Boşluklu kimlik: [makale](#x/Iceberg paper) ve [zaman](#g/Time travel).\n\n"
+        "Normal bağlantı boşluk kabul etmez: [kırık](http://a b) düz metin kalır.\n\n"
         "Literal kod: `**[a](b)**` aynen kalmalı.\n"
     ],
 }
@@ -94,6 +96,27 @@ def test_glossary_link_inside_bold_stays_a_glossary_term(page, served):
     assert gt.get_attribute("term") == "iceberg"
 
 
+def test_multi_word_registry_ids_resolve(page, served):
+    """`#g/` and `#x/` ids are human-readable registry keys and most of
+    them contain spaces ("Iceberg paper", "Time travel"). GFM forbids
+    whitespace in a link destination, so those references rendered as
+    literal text — the kit prefixes are the documented exception."""
+    page.goto(served)
+    page.wait_for_timeout(800)
+    assert page.locator('ext-ref[name="Iceberg paper"]').count() == 1
+    assert page.locator('glossary-term[term="Time travel"]').count() == 1
+
+
+def test_plain_link_still_rejects_whitespace(page, served):
+    """The exception is scoped to the kit prefixes — an ordinary
+    destination with a space stays literal, as GFM specifies."""
+    page.goto(served)
+    page.wait_for_timeout(800)
+    assert page.locator('a[href="http://a b"]').count() == 0
+    body = page.eval_on_selector("main", "el => el.innerText")
+    assert "[kırık](http://a b)" in body
+
+
 def test_code_span_body_stays_literal(page, served):
     """Recursion must not reach inside a code span — the one construct
     whose body is by definition literal."""
@@ -105,11 +128,14 @@ def test_code_span_body_stays_literal(page, served):
 
 
 def test_no_literal_markdown_leaks_into_prose(page, served):
-    """Nothing in the rendered prose still reads as markdown source."""
+    """Nothing in the rendered prose still reads as markdown source —
+    except the one paragraph that deliberately carries an invalid
+    destination (see test_plain_link_still_rejects_whitespace)."""
     page.goto(served)
     page.wait_for_timeout(800)
-    text = page.eval_on_selector_all(
-        "main p", "els => els.filter(e => !e.querySelector('code')).map(e => e.innerText).join('\\n')"
+    leaks = page.eval_on_selector_all(
+        "main p",
+        "els => els.filter(e => !e.querySelector('code'))"
+        ".map(e => e.innerText).filter(t => t.includes('](') || t.includes('**'))",
     )
-    assert "](" not in text, text
-    assert "**" not in text, text
+    assert leaks == ["Normal bağlantı boşluk kabul etmez: [kırık](http://a b) düz metin kalır."], leaks

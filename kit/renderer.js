@@ -281,7 +281,12 @@
     // compose. Only `code` keeps a literal body — that is the rule that
     // protects it. Strong therefore admits `*`/`_` in its body; em still
     // refuses them, which is what stops `*a **b** c*` from crossing.
-    const re = /`([^`]+?)`|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\(([^)\s]+?)\)|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\8\s*>|<br\s*\/?>/g;
+    //
+    // Link destinations forbid whitespace, as GFM does — EXCEPT the kit's
+    // own `#g/` / `#x/` prefixes, whose ids are human-readable registry
+    // keys with spaces in them ("Iceberg paper", "Time travel"). That
+    // branch is tried first; everything else keeps the strict form.
+    const re = /`([^`]+?)`|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\8\s*>|<br\s*\/?>/g;
     let pos = 0;
     let m;
     while ((m = re.exec(text)) !== null) {
