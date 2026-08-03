@@ -673,7 +673,7 @@ def page_to_md(page: dict) -> str:
 _MD_LIST_ITEM_RE = re.compile(r"^([-*]|\d+\.)\s+(.*)$")
 _MD_TABLE_SEP_RE = re.compile(r"^\s*\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?\s*$")
 _MD_INLINE_TOKEN_RE = re.compile(
-    r"\*\*([^*]+?)\*\*|\*([^*\s][^*]*?)\*|`([^`]+?)`|\[([^\]]+?)\]\(([^)\s]+?)\)"
+    r"\*\*([\s\S]+?)\*\*|\*([^*\s][^*]*?)\*|`([^`]+?)`|\[([^\]]+?)\]\(([^)\s]+?)\)"
 )
 
 
@@ -771,16 +771,20 @@ def _is_md_block_start(line: str) -> bool:
 
 def _inline_md_convert(text: str, repl: dict) -> str:
     """Rewrite inline markdown via per-construct templates. repl keys:
-    strong/em/code/link — format strings with {t} (text) / {u} (url)."""
+    strong/em/code/link — format strings with {t} (text) / {u} (url).
+
+    Emphasis and link bodies recurse, so `**[a](b)**` and `[**a**](b)`
+    keep their inner construct instead of emitting it as literal text.
+    Only `code` keeps a literal body."""
 
     def sub(m):
         if m.group(1) is not None:
-            return repl["strong"].format(t=m.group(1))
+            return repl["strong"].format(t=_inline_md_convert(m.group(1), repl))
         if m.group(2) is not None:
-            return repl["em"].format(t=m.group(2))
+            return repl["em"].format(t=_inline_md_convert(m.group(2), repl))
         if m.group(3) is not None:
             return repl["code"].format(t=m.group(3))
-        return repl["link"].format(t=m.group(4), u=m.group(5))
+        return repl["link"].format(t=_inline_md_convert(m.group(4), repl), u=m.group(5))
 
     return _MD_INLINE_TOKEN_RE.sub(sub, text)
 
@@ -1148,11 +1152,13 @@ _ADOC_INLINE_BACK_RE = re.compile(r"\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|link:([^
 
 def _adoc_inline_to_md(text: str) -> str:
     def sub(m):
+        # Bodies recurse — an emphasis run wrapping a link (or the other
+        # way round) has to keep the inner construct.
         if m.group(1) is not None:
-            return "**" + m.group(1) + "**"
+            return "**" + _adoc_inline_to_md(m.group(1)) + "**"
         if m.group(2) is not None:
-            return "*" + m.group(2) + "*"
-        return "[" + m.group(4) + "](" + m.group(3) + ")"
+            return "*" + _adoc_inline_to_md(m.group(2)) + "*"
+        return "[" + _adoc_inline_to_md(m.group(4)) + "](" + m.group(3) + ")"
 
     return _ADOC_INLINE_BACK_RE.sub(sub, text)
 
@@ -1354,9 +1360,11 @@ def page_to_djot(page: dict) -> str:
 
 def _djot_inline_to_md(text: str) -> str:
     def sub(m):
+        # Bodies recurse — djot links share markdown's syntax, but a
+        # nested emphasis run still has to be rewritten.
         if m.group(1) is not None:
-            return "**" + m.group(1) + "**"
-        return "*" + m.group(2) + "*"
+            return "**" + _djot_inline_to_md(m.group(1)) + "**"
+        return "*" + _djot_inline_to_md(m.group(2)) + "*"
 
     return _DJOT_INLINE_BACK_RE.sub(sub, text)
 

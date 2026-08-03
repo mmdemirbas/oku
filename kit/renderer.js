@@ -275,7 +275,13 @@
     // Order: code (literal — protect from other rules) → strong → em →
     // link → allow-listed inline HTML. One regex pass so positions are
     // tracked. Inline tags OUTSIDE the allow-list stay literal text.
-    const re = /`([^`]+?)`|\*\*([^*]+?)\*\*|__([^_]+?)__|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\(([^)\s]+?)\)|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\8\s*>|<br\s*\/?>/g;
+    //
+    // Emphasis and link bodies are parsed RECURSIVELY, so `**[a](b)**`,
+    // `[**a**](b)`, `**`code`**` and `**bold with *em* inside**` all
+    // compose. Only `code` keeps a literal body — that is the rule that
+    // protects it. Strong therefore admits `*`/`_` in its body; em still
+    // refuses them, which is what stops `*a **b** c*` from crossing.
+    const re = /`([^`]+?)`|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\(([^)\s]+?)\)|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\8\s*>|<br\s*\/?>/g;
     let pos = 0;
     let m;
     while ((m = re.exec(text)) !== null) {
@@ -283,9 +289,9 @@
       if (m[1] !== undefined) {
         const e = document.createElement('code'); e.textContent = m[1]; host.appendChild(e);
       } else if (m[2] !== undefined || m[3] !== undefined) {
-        const e = document.createElement('strong'); e.textContent = m[2] !== undefined ? m[2] : m[3]; host.appendChild(e);
+        const e = document.createElement('strong'); parseInline(m[2] !== undefined ? m[2] : m[3], e); host.appendChild(e);
       } else if (m[4] !== undefined || m[5] !== undefined) {
-        const e = document.createElement('em'); e.textContent = m[4] !== undefined ? m[4] : m[5]; host.appendChild(e);
+        const e = document.createElement('em'); parseInline(m[4] !== undefined ? m[4] : m[5], e); host.appendChild(e);
       } else if (m[6] !== undefined) {
         host.appendChild(renderLink(m[6], m[7]));
       } else if (m[8] !== undefined) {
@@ -308,16 +314,18 @@
   function renderLink(label, href) {
     // Kit-extension prefixes: #g/term-id  → <glossary-term>
     //                        #x/source-id → <ext-ref>
+    // Labels go through parseInline so `[**a**](b)` keeps its markup;
+    // the term / name attribute carries the id either way.
     if (href.startsWith('#g/')) {
       const e = document.createElement('glossary-term');
       e.setAttribute('term', href.slice(3));
-      e.textContent = label;
+      parseInline(label, e);
       return e;
     }
     if (href.startsWith('#x/')) {
       const e = document.createElement('ext-ref');
       e.setAttribute('name', href.slice(3));
-      e.textContent = label;
+      parseInline(label, e);
       return e;
     }
     // Cross-page markdown link: a relative `foo.md(#frag)` href points
@@ -326,7 +334,7 @@
     const mdLink = href.match(/^(?!\w+:|\/\/|#|\/)(.+?)\.md(#[^\s]*)?$/i);
     if (mdLink) href = mdLink[1] + '.html' + (mdLink[2] || '');
     const a = document.createElement('a');
-    a.textContent = label;
+    parseInline(label, a);
     a.setAttribute('href', href);
     if (/^https?:/i.test(href)) {
       a.setAttribute('target', '_blank');

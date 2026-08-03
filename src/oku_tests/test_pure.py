@@ -400,6 +400,8 @@ class TestFormatConverters:
         "> [!TLDR] The gist\n> One-line summary.\n> - point one\n\n"
         "## Overview {#overview}\n\n"
         "A paragraph with **bold**, *em*, `code` and [a ref](#g/iceberg).\n\n"
+        "Nested: **[a link](https://example.com/x) inside bold** and "
+        "[**bold** inside a link](https://example.com/y).\n\n"
         "- first item\n- second item\n\n"
         "| Engine | Year |\n|---|---|\n| Iceberg | 2018 |\n\n"
         "```js\nconsole.log('hi');\n```\n\n"
@@ -431,6 +433,22 @@ class TestFormatConverters:
         typed = lambda p: [b for b in p["b"] if isinstance(b, dict)]  # noqa: E731
         assert typed(back) == typed(canon), "typed blocks must survive byte-for-byte"
         assert self._norm(back) == self._norm(canon)
+
+    def test_nested_inline_constructs_survive_conversion(self) -> None:
+        """A link inside emphasis (and emphasis inside a link) must stay a
+        link. The inline rewriter used to substitute one construct per
+        match and emit the inner one as literal text, so `**[a](b)**`
+        rendered as the characters `[a](b)` in bold."""
+        md = "**[a](https://e.x/1) in bold** and [**b**](https://e.x/2) and *[c](https://e.x/3)*"
+        html = cli._inline_md_convert(md, cli._HTML_INLINE)
+        assert '<strong><a href="https://e.x/1">a</a> in bold</strong>' in html
+        assert '<a href="https://e.x/2"><strong>b</strong></a>' in html
+        assert '<em><a href="https://e.x/3">c</a></em>' in html
+        # …and back again, for the formats that re-parse their own syntax
+        adoc = cli._inline_md_convert(md, cli._ADOC_INLINE)
+        assert cli._adoc_inline_to_md(adoc) == md
+        djot = cli._inline_md_convert(md, cli._DJOT_INLINE)
+        assert cli._djot_inline_to_md(djot) == md
 
     def test_source_registry_dispatch(self, tmp_path: Path) -> None:
         canon = self._canon()

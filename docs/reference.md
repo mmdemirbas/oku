@@ -268,6 +268,12 @@ Like glossary-term but for external entities (tools, papers, people). Same hover
 {"code":{"k":"code","src":"{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Inline \",\n    { \"kind\": \"code\",   \"text\": \"build_manifest()\" },\n    \", \",\n    { \"kind\": \"em\",     \"text\": \"italic\" },\n    \", \",\n    { \"kind\": \"strong\", \"text\": \"bold\" },\n    \", and a \",\n    { \"kind\": \"link\",   \"text\": \"jsDelivr\", \"href\": \"https://cdn.jsdelivr.net\" },\n    \" link (opens in a new tab).\"\n  ]\n}","lang":"json"},"output":"Inline `build_manifest()`, *italic*, **bold**, and a [jsDelivr](https://cdn.jsdelivr.net) link (opens in a new tab)."}
 ```
 
+Inline constructs nest in either order — a link inside emphasis, emphasis inside a link, a code span inside bold. Only a code span keeps a literal body, so markdown written inside backticks stays visible as source.
+
+```oku-example
+{"code":{"k":"code","src":"Nesting composes: **[a bold link](https://example.com)**, [**bold** inside a link](https://example.com), **`code` in bold**, and **bold with *italic* inside**. Inside backticks nothing is parsed: `**[a](b)**`.","lang":"markdown"},"output":"Nesting composes: **[a bold link](https://example.com)**, [**bold** inside a link](https://example.com), **`code` in bold**, and **bold with *italic* inside**. Inside backticks nothing is parsed: `**[a](b)**`."}
+```
+
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Sanitised inline HTML pass-through: \",\n    { \"kind\": \"html\", \"text\": \"<kbd>Ctrl</kbd>\" },\n    \" + \",\n    { \"kind\": \"html\", \"text\": \"<kbd>C</kbd>\" },\n    \" copies a selection, with H<sub>2</sub>O as a chemistry footnote.\"\n  ]\n}","lang":"json"},"output":"Sanitised inline HTML pass-through: <kbd>Ctrl</kbd> + <kbd>C</kbd> copies a selection, with H<sub>2</sub>O as a chemistry footnote."}
 ```
