@@ -479,15 +479,24 @@ def test_gutter_charts_keep_long_labels_inside_the_svg(page, site_url):
     """
     long_label = "Ankara rehberi: Telegram verisi yapısal listeye dönüştürülür"
     specs = [
-        ("gantt", "gantt", ".okc-gantt-label",
-         {"tasks": [{"label": long_label, "start": 0, "end": 3},
-                    {"label": "QA", "start": 2, "end": 4}]}),
-        ("funnel", "funnel", ".okc-funnel-label",
-         {"stages": [{"label": long_label, "value": 200},
-                     {"label": "Kısa", "value": 30}]}),
-        ("waffle", "waffle", ".okc-waffle-legend-label",
-         {"segments": [{"label": long_label, "count": 60},
-                       {"label": "Kısa", "count": 40}], "total": 100}),
+        (
+            "gantt",
+            "gantt",
+            ".okc-gantt-label",
+            {"tasks": [{"label": long_label, "start": 0, "end": 3}, {"label": "QA", "start": 2, "end": 4}]},
+        ),
+        (
+            "funnel",
+            "funnel",
+            ".okc-funnel-label",
+            {"stages": [{"label": long_label, "value": 200}, {"label": "Kısa", "value": 30}]},
+        ),
+        (
+            "waffle",
+            "waffle",
+            ".okc-waffle-legend-label",
+            {"segments": [{"label": long_label, "count": 60}, {"label": "Kısa", "count": 40}], "total": 100},
+        ),
     ]
     for viewport in (DESKTOP, NARROW):
         page.set_viewport_size(viewport)
