@@ -3765,9 +3765,51 @@ def _make_serve_handler(root: Path):
             # Runtime expects .html (the kit-loading shell) + .json (the
             # renderer fetches this sibling). Authoring only the .json (or
             # .md) keeps source dirs free of boilerplate stubs (D5).
+            if self._serve_kit_asset():
+                return
             if self._serve_synthesized():
                 return
             super().do_GET()
+
+        def _serve_kit_asset(self) -> bool:
+            """Serve any `…/_oku/<asset>` request from the kit directory
+            when no such file exists on disk.
+
+            `oku init` drops the _oku symlink in one directory — usually
+            docs/. A page ANYWHERE else (a root README.md, a nested
+            examples/ tree, a sibling notes/ folder) references _oku/
+            relative to itself and gets a 404, which means no chrome.css,
+            no chrome.js, no renderer: the page renders blank. Six of this
+            repo's own 32 pages did exactly that. A real symlink still
+            wins; this is the fallback.
+            """
+            url_path = unquote(self.path.split("?", 1)[0])
+            marker = "/_oku/"
+            idx = url_path.find(marker)
+            if idx < 0:
+                return False
+            tail = url_path[idx + len(marker) :]
+            if not tail or ".." in tail.split("/"):
+                return False
+            on_disk = (root / url_path.lstrip("/")).resolve()
+            if on_disk.exists():
+                return False  # a real _oku/ here — let the static handler serve it
+            assets = _kit_assets_dir()
+            try:
+                target = (assets / tail).resolve()
+                target.relative_to(assets.resolve())
+            except (OSError, ValueError):
+                return False
+            if not target.is_file():
+                return False
+            body = target.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", self.guess_type(str(target)))
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(body)
+            return True
 
         def _serve_synthesized(self) -> bool:
             """Synthesize generated artifacts in memory so source dirs
@@ -3887,8 +3929,28 @@ def _make_serve_handler(root: Path):
             if artifact_name not in (
                 "site-manifest.json",
                 "llms.txt",
+                "kit.json",
             ):
                 return False
+            if artifact_name == "kit.json":
+                # The project has ONE kit.json (glossary domains, language),
+                # usually in docs/. chrome.js asks for it at whatever docs
+                # root the page resolved to, so a page outside that folder
+                # would lose its glossary entirely. Serve the project's copy
+                # wherever it is asked for; a real file on disk still wins.
+                if (root / url_path.lstrip("/")).exists():
+                    return False
+                found = find_kit_json(root)
+                if found is None:
+                    return False
+                body = found.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(body)
+                return True
             try:
                 rel_dir = url_path.lstrip("/").rsplit("/", 1)[0] if "/" in url_path.lstrip("/") else ""
                 docs_root = (root / rel_dir).resolve() if rel_dir else root

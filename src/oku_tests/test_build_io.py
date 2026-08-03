@@ -11,6 +11,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 
 from oku import cli
 
@@ -235,5 +237,36 @@ def test_serve_synthesizes_pages_with_non_ascii_filenames(tmp_path: Path) -> Non
         assert "Ölçüm raporu" in html.read().decode("utf-8")
         page = json.loads(urllib.request.urlopen(f"{base}/{quoted}.json").read().decode("utf-8"))
         assert page["t"] == "Ölçüm raporu"
+    finally:
+        httpd.shutdown()
+
+
+def test_serve_falls_back_to_the_kit_for_pages_outside_the_init_directory(tmp_path: Path) -> None:
+    """`oku init` drops the _oku symlink in one directory. A page anywhere
+    else references _oku/ relative to itself, so without a fallback it
+    gets a 404 for chrome.css / chrome.js / renderer.js and renders
+    blank — which is what a root-level README.md did."""
+    import urllib.error
+    import urllib.request
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "_oku").symlink_to(cli._kit_assets_dir(), target_is_directory=True)
+    (docs / "kit.json").write_text(json.dumps({"domains": ["web"]}), encoding="utf-8")
+    (tmp_path / "README.md").write_text("---\ntitle: R\n---\n\n## S\n\nx\n", encoding="utf-8")
+
+    httpd, base = _serve(tmp_path)
+    try:
+        # The root README's stub asks for /_oku/... — no symlink there.
+        for asset in ("chrome.css", "chrome.js", "renderer.js", "chrome-boot.js"):
+            resp = urllib.request.urlopen(f"{base}/_oku/{asset}")
+            assert resp.status == 200 and len(resp.read()) > 0, asset
+        # kit.json is a single per-project file; it resolves from anywhere.
+        assert json.loads(urllib.request.urlopen(f"{base}/kit.json").read()) == {"domains": ["web"]}
+        # …and the real symlink still serves the docs/ copy.
+        assert urllib.request.urlopen(f"{base}/docs/_oku/chrome.css").status == 200
+        # Path traversal through the fallback is refused.
+        with pytest.raises(urllib.error.HTTPError):
+            urllib.request.urlopen(f"{base}/_oku/../../etc/hosts")
     finally:
         httpd.shutdown()
