@@ -2381,6 +2381,66 @@ def _lint_md_string(
     return issues, heading_ids, gloss, x_refs
 
 
+_MD_FOOTNOTE_DEF_RE = re.compile(r"^ {0,3}\[\^([^\]]+)\]:")
+_MD_FOOTNOTE_REF_RE = re.compile(r"\[\^([^\]]+?)\]")
+_MD_LINK_DEF_RE = re.compile(r"^ {0,3}\[([^\]^][^\]]*)\]:\s*(\S+)")
+_MD_LINK_REF_RE = re.compile(r"\[([^\]]+?)\]\[([^\]]*?)\]")
+
+
+def _md_reference_definitions(strings: list[str]) -> tuple[set[str], set[str]]:
+    """Collect footnote and link-reference definitions across every
+    markdown string of one page — the scope the renderer resolves in."""
+    fn_defs: set[str] = set()
+    link_defs: set[str] = set()
+    for text in strings:
+        prose, _ = _split_md_fences(text)
+        for _, line in prose:
+            m = _MD_FOOTNOTE_DEF_RE.match(line)
+            if m:
+                fn_defs.add(m.group(1))
+                continue
+            m = _MD_LINK_DEF_RE.match(line)
+            if m:
+                link_defs.add(m.group(1).lower())
+    return fn_defs, link_defs
+
+
+def _lint_md_reference_forms(
+    text: str, fn_defs: set[str], link_defs: set[str]
+) -> list[tuple[str, str, str, str]]:
+    """Report a footnote or reference link with no definition anywhere on
+    the page. The renderer leaves it as literal source text, so nothing
+    else in the pipeline tells the author it did not resolve."""
+    issues: list[tuple[str, str, str, str]] = []
+    prose, _ = _split_md_fences(text)
+    for lineno, raw in prose:
+        if _MD_FOOTNOTE_DEF_RE.match(raw) or _MD_LINK_DEF_RE.match(raw):
+            continue
+        line = _INLINE_CODE_RE.sub("", raw)
+        for fid in _MD_FOOTNOTE_REF_RE.findall(line):
+            if fid not in fn_defs:
+                issues.append(
+                    (
+                        "warning",
+                        "undefined-footnote",
+                        f"line {lineno}",
+                        f"Footnote reference [^{fid}] has no [^{fid}]: definition on this page; it renders as literal text.",
+                    )
+                )
+        for text, label in _MD_LINK_REF_RE.findall(line):
+            key = (label or text).lower()
+            if key not in link_defs:
+                issues.append(
+                    (
+                        "warning",
+                        "undefined-link-reference",
+                        f"line {lineno}",
+                        f"Reference link [{text}][{label}] has no [{key}]: definition on this page; it renders as literal text.",
+                    )
+                )
+    return issues
+
+
 def _known_chart_types() -> list[str]:
     """Chart `type` values, read from the schema enum — the single
     source of truth. Empty when the schema is unavailable; callers must
@@ -2593,6 +2653,9 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         seen_ids: dict[str, int] = {}
         gloss_refs: list[tuple[str, str]] = []
         extref_refs: list[tuple[str, str]] = []
+        # Footnote / link-reference definitions resolve page-wide, so they
+        # are collected before any string is linted.
+        fn_defs, link_defs = _md_reference_definitions([b for b in body if isinstance(b, str)])
 
         for idx, blk in enumerate(body):
             where = f"b[{idx}]"
@@ -2600,6 +2663,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 # 3. Markdown-string passes: strict-GFM subset, HTML
                 # island audit, unlifted fences, process prose.
                 str_issues, heading_ids, gloss, x_refs = _lint_md_string(blk, skip_prose=is_materialised)
+                str_issues = str_issues + _lint_md_reference_forms(blk, fn_defs, link_defs)
                 for severity, code, loc, message in str_issues:
                     add(p, severity, code, f"{where} {loc}", message)
                 for lineno, hid in heading_ids:

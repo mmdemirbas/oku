@@ -268,6 +268,15 @@ Like glossary-term but for external entities (tools, papers, people). Same hover
 {"code":{"k":"code","src":"{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Inline \",\n    { \"kind\": \"code\",   \"text\": \"build_manifest()\" },\n    \", \",\n    { \"kind\": \"em\",     \"text\": \"italic\" },\n    \", \",\n    { \"kind\": \"strong\", \"text\": \"bold\" },\n    \", and a \",\n    { \"kind\": \"link\",   \"text\": \"jsDelivr\", \"href\": \"https://cdn.jsdelivr.net\" },\n    \" link (opens in a new tab).\"\n  ]\n}","lang":"json"},"output":"Inline `build_manifest()`, *italic*, **bold**, and a [jsDelivr](https://cdn.jsdelivr.net) link (opens in a new tab)."}
 ```
 
+Footnotes and reference-style links resolve across the whole page, so a definition can sit far from its use — at the end of the source, or in another block entirely. The paragraph below is live: a footnote[^ref-demo] and a [reference link][pagefind-site] rendered from the definitions at the bottom of this page.
+
+```markdown
+A claim that needs a source[^ref-demo] and a [reference link][pagefind-site].
+
+[^ref-demo]: Definitions may appear anywhere on the page.
+[pagefind-site]: https://pagefind.app "Pagefind"
+```
+
 Inline constructs nest in either order — a link inside emphasis, emphasis inside a link, a code span inside bold. Only a code span keeps a literal body, so markdown written inside backticks stays visible as source.
 
 ```oku-example
@@ -373,3 +382,7 @@ Callout `type` accepts both the kit's original names (`warn / warning / danger /
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"callout\",\n  \"type\": \"caution\",\n  \"title\": \"caution · alias of warning\",\n  \"content\": \"...\"\n}","lang":"json"},"output":"> [!CAUTION] caution · alias of warning\n> Amber border + icon; same look as `type: \"warning\"`."}
 ```
+
+[^ref-demo]: Definitions may appear anywhere on the page — the renderer collects them before it emits anything, then lists the referenced ones here.
+
+[pagefind-site]: https://pagefind.app "Pagefind"

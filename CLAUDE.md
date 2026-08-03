@@ -84,9 +84,15 @@ flowchart TB
   DOM untouched — full capability, no restrictions. `oku check` lists
   every island as an info-level audit line; external markdown viewers
   strip islands. Inline HTML in prose stays literal text.
-- Definition lists (`Term` / `: def`) and task lists (`- [x]`)
-  are supported. Footnotes / reference-style links are NOT yet —
-  roadmap item.
+- Definition lists (`Term` / `: def`), task lists (`- [x]`), footnotes
+  (`[^id]` + `[^id]: …`) and reference-style links (`[text][label]`,
+  `[label][]`, `[label]` + `[label]: url "title"`) are supported.
+  Both reference forms resolve **page-wide**, not per b[] string —
+  `md_to_v2_page` splits a page at every typed fence, so a definition
+  routinely lands in a different string than its reference. Footnotes
+  render as numbered superscripts plus one "Footnotes" section at the
+  end of the page. `oku check` warns on a reference with no definition
+  (it would otherwise render as literal text with no other signal).
 
 ### Older pages (v1/v2 JSON)
 

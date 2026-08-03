@@ -80,6 +80,18 @@ x = 1
 ### Same title
 
 ### Same title
+
+### References {#refs}
+
+A footnote here[^n] and a second one[^long id]. A [reference link][site],
+a [collapsed][] one, a [shortcut] one, and an [unknown][nope] one.
+
+[^n]: The first note.
+[^long id]: The second note,
+  continued on the next line.
+[site]: https://example.com/ref "Ref title"
+[collapsed]: https://example.com/collapsed
+[shortcut]: https://example.com/shortcut
 """
 
 PAGE = {"k": "page", "t": "Markdown pipeline", "b": [MD]}
@@ -270,3 +282,43 @@ def test_page_has_no_duplicate_element_ids(rendered):
         }"""
     )
     assert dups == [], dups
+
+
+# ---------- page-scoped reference forms ----------
+
+
+def test_footnotes_render_as_numbered_references(rendered):
+    """`docs/reference.md` documented footnotes long before the renderer
+    had them; the syntax used to ship to readers as literal text."""
+    refs = rendered.eval_on_selector_all("main sup.okt-fn-ref a", "els => els.map(e => e.textContent)")
+    assert refs == ["1", "2"]
+    section = rendered.locator("section.okt-footnotes")
+    assert section.count() == 1
+    items = section.locator("li")
+    assert items.count() == 2
+    assert "The first note." in items.first.inner_text()
+    # a definition continued on an indented line keeps its tail
+    assert "continued on the next line." in items.nth(1).inner_text()
+
+
+def test_footnote_reference_and_definition_link_to_each_other(rendered):
+    assert rendered.locator('main sup.okt-fn-ref a[href="#fn-1"]').count() == 1
+    assert rendered.locator('section.okt-footnotes li#fn-1 a[href="#fnref-1"]').count() == 1
+
+
+def test_reference_links_resolve_in_all_three_forms(rendered):
+    full = rendered.locator('main a[href="https://example.com/ref"]')
+    assert full.count() == 1
+    assert full.get_attribute("title") == "Ref title"
+    assert rendered.locator('main a[href="https://example.com/collapsed"]').count() == 1
+    assert rendered.locator('main a[href="https://example.com/shortcut"]').count() == 1
+
+
+def test_undefined_reference_stays_literal_text(rendered):
+    assert "[unknown][nope]" in _text(rendered)
+
+
+def test_definition_lines_are_not_rendered(rendered):
+    body = _text(rendered)
+    assert "https://example.com/ref" not in body
+    assert "[^n]:" not in body

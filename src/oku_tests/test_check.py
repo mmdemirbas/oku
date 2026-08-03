@@ -684,3 +684,26 @@ def test_shadowed_source_flagged(tmp_path: Path, repo_root: Path) -> None:
     )
     assert '"shadowed-source"' in proc.stdout, proc.stdout + proc.stderr
     assert proc.returncode == 1, "shadowed-source must be an error"
+
+
+# ---------- reference forms (footnotes, reference links) ----------
+
+
+def test_undefined_footnote_and_link_reference_are_flagged(tmp_path: Path) -> None:
+    """Both forms resolve page-wide at render time; an undefined one is
+    invisible in the output (it renders as its own source text), so the
+    linter is where the author has to hear about it."""
+    page = {
+        "k": "page",
+        "t": "T",
+        "b": [
+            "## S {#s}\n\nA note[^ok] and a bad one[^missing].\n\n"
+            "A [good][site] and a [bad][nope] link.\n\n"
+            "[^ok]: defined\n[site]: https://example.com\n"
+        ],
+    }
+    issues = cli.check_pages([(tmp_path / "page.json", page)], tmp_path)
+    fn = _issues_of(issues, code="undefined-footnote")
+    ln = _issues_of(issues, code="undefined-link-reference")
+    assert len(fn) == 1 and "missing" in fn[0]["message"], fn
+    assert len(ln) == 1 and "nope" in ln[0]["message"], ln

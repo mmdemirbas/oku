@@ -1347,6 +1347,30 @@ dl.md-dl dt { font-weight: 700; margin-top: 10px; }
 dl.md-dl dd { margin: 4px 0 4px 22px; color: var(--text-soft); }
 strong { color: var(--text); font-weight: 700; }
 em { color: var(--text-soft); font-style: italic; }
+del { color: var(--text-soft); text-decoration-color: var(--border); }
+
+/* Inline image from `![alt](src)`. Never wider than its column, and it
+   keeps the baseline of the line it sits on. */
+img.okt-inline-img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+/* Footnotes: the reference is a quiet superscript, the section at the
+   end of the page is one step down in weight from body prose. */
+sup.okt-fn-ref { line-height: 0; font-size: 0.75em; }
+sup.okt-fn-ref a {
+  text-decoration: none;
+  padding: 0 2px;
+  color: var(--accent-strong);
+}
+section.okt-footnotes { font-size: 0.94em; color: var(--text-soft); }
+section.okt-footnotes ol { padding-left: 20px; }
+section.okt-footnotes li { margin: 6px 0; }
+section.okt-footnotes li:target { background: var(--surface-2); }
+a.okt-fn-back { text-decoration: none; color: var(--text-faint); }
 code:not(pre code) {
   background: var(--surface-2);
   border: 1px solid var(--border-soft);

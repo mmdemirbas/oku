@@ -325,6 +325,113 @@
     return document.createTextNode(decodeEntities(s));
   }
 
+  /* ================================================================ *
+   * Link-reference definitions and footnotes
+   * Both are page-scoped, not string-scoped: md_to_v2_page splits a
+   * page into several b[] strings at every typed fence, so a definition
+   * can easily land in a different string than its reference. render()
+   * collects them across the whole page before emitting anything.
+   * ================================================================ */
+
+  const LINK_DEF_RE = /^ {0,3}\[([^\]^][^\]]*)\]:\s*(\S+)(?:\s+"([^"]*)")?\s*$/;
+  const FOOTNOTE_DEF_RE = /^ {0,3}\[\^([^\]]+)\]:\s*(.*)$/;
+
+  let __linkDefs = new Map();
+  let __footnoteDefs = new Map();
+  let __footnoteUses = [];
+
+  function resetDefinitions() {
+    __linkDefs = new Map();
+    __footnoteDefs = new Map();
+    __footnoteUses = [];
+  }
+
+  // Pull definition lines out of one markdown string and return what is
+  // left. A footnote body continues onto following indented lines.
+  function extractDefinitions(src) {
+    const lines = String(src || '').split('\n');
+    const kept = [];
+    let inFence = null;
+    for (let i = 0; i < lines.length; i++) {
+      const fence = lines[i].match(/^(`{3,}|~{3,})/);
+      if (fence) {
+        if (inFence && lines[i].charAt(0) === inFence.charAt(0) && fence[1].length >= inFence.length) inFence = null;
+        else if (!inFence) inFence = fence[1];
+        kept.push(lines[i]);
+        continue;
+      }
+      if (inFence) { kept.push(lines[i]); continue; }
+      const fn = lines[i].match(FOOTNOTE_DEF_RE);
+      if (fn) {
+        const body = [fn[2]];
+        while (i + 1 < lines.length && /^\s{2,}\S/.test(lines[i + 1])) {
+          body.push(lines[i + 1].trim());
+          i++;
+        }
+        __footnoteDefs.set(fn[1], body.join('\n').trim());
+        continue;
+      }
+      const ld = lines[i].match(LINK_DEF_RE);
+      if (ld) {
+        __linkDefs.set(ld[1].toLowerCase(), { href: ld[2], title: ld[3] || '' });
+        continue;
+      }
+      kept.push(lines[i]);
+    }
+    return kept.join('\n');
+  }
+
+  // Reference number for a footnote id, assigned in order of first use.
+  function footnoteNumber(id) {
+    const at = __footnoteUses.indexOf(id);
+    if (at >= 0) return at + 1;
+    __footnoteUses.push(id);
+    return __footnoteUses.length;
+  }
+
+  function renderFootnoteRef(id) {
+    if (!__footnoteDefs.has(id)) return null;
+    const n = footnoteNumber(id);
+    const sup = document.createElement('sup');
+    sup.className = 'okt-fn-ref';
+    sup.id = uniqueAnchorId('fnref-' + n);
+    const a = document.createElement('a');
+    a.setAttribute('href', '#fn-' + n);
+    a.textContent = String(n);
+    sup.appendChild(a);
+    return sup;
+  }
+
+  // The "Footnotes" block, emitted once at the end of a page that used
+  // at least one. Only referenced notes appear, in reference order.
+  function renderFootnoteSection() {
+    if (!__footnoteUses.length) return null;
+    const section = document.createElement('section');
+    section.id = uniqueAnchorId('footnotes');
+    section.className = 'okt-footnotes';
+    const h2 = document.createElement('h2');
+    h2.textContent = 'Footnotes';
+    section.appendChild(h2);
+    const ol = document.createElement('ol');
+    __footnoteUses.forEach(function (id, idx) {
+      const li = document.createElement('li');
+      li.id = 'fn-' + (idx + 1);
+      const blocks = parseMarkdown(__footnoteDefs.get(id) || '', { noIslands: true });
+      if (blocks.length === 1 && blocks[0].k === 'paragraph') parseInline(blocks[0].text, li);
+      else emitMarkdown(li, blocks, null);
+      const back = document.createElement('a');
+      back.className = 'okt-fn-back';
+      back.setAttribute('href', '#fnref-' + (idx + 1));
+      back.setAttribute('aria-label', 'Back to reference');
+      back.textContent = '↩';
+      li.appendChild(document.createTextNode(' '));
+      li.appendChild(back);
+      ol.appendChild(li);
+    });
+    section.appendChild(ol);
+    return section;
+  }
+
   function parseInline(text, host) {
     // One regex pass so positions are tracked; alternation order IS the
     // precedence. Escape first (it must win over every construct it
@@ -344,8 +451,11 @@
     // branch is tried first; everything else keeps the strict form.
     //
     // Groups: 1 escape · 2 code · 3,4 image · 5,6 strong · 7 strike ·
-    // 8,9 em · 10,11,12 link · 13 autolink · 14,15,16 inline HTML.
-    const re = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|`([^`]+?)`|!\[([^\]]*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+)>|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\14\s*>|<br\s*\/?>/g;
+    // 8,9 em · 10,11,12 link · 13 autolink · 14,15,16 inline HTML ·
+    // 17 footnote ref · 18,19 reference link · 20 shortcut reference.
+    // The three reference forms sit last: they are the loosest patterns
+    // and only fire when the page actually defines that label.
+    const re = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|`([^`]+?)`|!\[([^\]]*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+)>|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\14\s*>|<br\s*\/?>|\[\^([^\]]+?)\]|\[([^\]]+?)\]\[([^\]]*?)\]|\[([^\]^][^\]]*?)\]/g;
     let pos = 0;
     let m;
     while ((m = re.exec(text)) !== null) {
@@ -354,6 +464,18 @@
       // Rejecting has to leave the run unconsumed: keep `pos` where it is
       // and restart one character in, so the text still lands verbatim.
       if ((m[6] !== undefined || m[9] !== undefined) && !underscoreRunIsFree(text, m.index, m[0].length)) {
+        re.lastIndex = m.index + 1;
+        continue;
+      }
+      // A reference form declines the match when the page never defined
+      // that label — GFM leaves it as literal text. Declining has to
+      // happen here, before any text is emitted, for the same reason.
+      if (m[17] !== undefined && !__footnoteDefs.has(m[17])) {
+        re.lastIndex = m.index + 1;
+        continue;
+      }
+      if ((m[18] !== undefined || m[20] !== undefined)
+          && !__linkDefs.has((m[18] !== undefined ? (m[19] || m[18]) : m[20]).toLowerCase())) {
         re.lastIndex = m.index + 1;
         continue;
       }
@@ -383,6 +505,13 @@
         if (title) e.title = title[1];
         parseInline(m[16], e);
         host.appendChild(e);
+      } else if (m[17] !== undefined) {
+        host.appendChild(renderFootnoteRef(m[17]));
+      } else if (m[18] !== undefined || m[20] !== undefined) {
+        // [text][label] · [label][] · [label] — all resolve against the
+        // page's link-reference definitions.
+        const def = __linkDefs.get((m[18] !== undefined ? (m[19] || m[18]) : m[20]).toLowerCase());
+        host.appendChild(renderLink(m[18] !== undefined ? m[18] : m[20], def.href, def.title));
       } else {
         host.appendChild(document.createElement('br'));
       }
@@ -1068,6 +1197,7 @@
       this.warnings = [];
       __renderTypedBlock = (block) => this._renderTyped(block);
       resetAnchorIds();
+      resetDefinitions();
 
       // v1 → v2 shim. Older pages still on disk (or in other projects
       // sharing this kit) keep rendering — no migrate run required.
@@ -1104,7 +1234,14 @@
       };
       const target = () => currentSection || main;
 
-      for (const block of (page.b || [])) {
+      // Definitions are page-scoped: collect (and strip) them from every
+      // string first, so a reference resolves against a definition that
+      // lives in a later block.
+      const blocks = (page.b || []).map(function (b) {
+        return typeof b === 'string' ? extractDefinitions(b) : b;
+      });
+
+      for (const block of blocks) {
         if (typeof block === 'string') {
           const parsed = parseMarkdown(block);
           // Walk node-by-node so h2 can open a section mid-string.
@@ -1129,6 +1266,9 @@
           if (el) target().appendChild(el);
         }
       }
+
+      const notes = renderFootnoteSection();
+      if (notes) main.appendChild(notes);
 
       if (this.warnings.length) {
         window.dispatchEvent(new CustomEvent('oku:warnings', { detail: this.warnings }));
