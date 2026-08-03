@@ -587,3 +587,26 @@ def test_no_duplicate_element_ids_on_a_chart_heavy_page(page, site_url):
         }"""
     )
     assert dups == [], dups
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        "docs/index.html",
+        "docs/reference.html",
+        "docs/charts.html",
+        "docs/tables.html",
+        "notes/audit-2026-08-03.html",
+    ],
+)
+def test_no_horizontal_page_scroll_at_360(page, site_url, rel):
+    """Wide content scrolls inside its own container; the page body never
+    does. A grid item defaults to min-width:auto, so one long path or
+    URL inside a card refuses to shrink and drags the whole document
+    wider than the viewport — which is what an audit page full of file
+    paths did at 360px."""
+    page.set_viewport_size(NARROW)
+    _goto(page, f"{site_url}/{rel}")
+    page.wait_for_timeout(600)
+    doc_w, win_w = page.evaluate("() => [document.documentElement.scrollWidth, window.innerWidth]")
+    assert doc_w <= win_w, f"{rel}: document {doc_w}px wider than viewport {win_w}px"

@@ -2958,6 +2958,12 @@ table tr:hover td { background: var(--surface-2); }
 .kpi:hover .kpi-icon { opacity: 1; }
 
 .compare-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin: 24px 0; }
+/* A grid item defaults to min-width: auto, so it refuses to shrink below
+   the widest unbreakable token it contains — one long path, URL or
+   percent-encoded string in a card and the whole PAGE scrolls sideways
+   at 360px. min-width: 0 lets the item track the column; the global
+   overflow-wrap then breaks the token inside it. */
+.compare-grid > *, .kpi-grid > *, .step-cards > * { min-width: 0; }
 .compare-card {
   padding: 22px; border-radius: 10px;
   border: 1px solid var(--border); background: var(--surface);
