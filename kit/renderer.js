@@ -271,52 +271,147 @@
    * so glossary / ext-ref tooltips keep working from markdown.
    * ================================================================ */
 
+  // Named character references worth decoding. GFM decodes the full HTML5
+  // set; a fixed map covers what documentation actually uses and cannot be
+  // tricked into parsing markup the way an innerHTML round-trip can.
+  const ENTITIES = {
+    amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+    ndash: '–', mdash: '—', hellip: '…', laquo: '«',
+    raquo: '»', ldquo: '“', rdquo: '”', lsquo: '‘',
+    rsquo: '’', bull: '•', middot: '·', deg: '°',
+    plusmn: '±', times: '×', divide: '÷', minus: '−',
+    copy: '©', reg: '®', trade: '™', para: '¶',
+    sect: '§', dagger: '†', permil: '‰', euro: '€',
+    pound: '£', yen: '¥', cent: '¢', larr: '←',
+    rarr: '→', uarr: '↑', darr: '↓', harr: '↔',
+    lArr: '⇐', rArr: '⇒', hArr: '⇔', ne: '≠',
+    le: '≤', ge: '≥', asymp: '≈', infin: '∞',
+    sum: '∑', prod: '∏', radic: '√', check: '✓',
+    cross: '✗', star: '★', hearts: '♥', ensp: ' ',
+    emsp: ' ', thinsp: ' ', shy: '­', alpha: 'α',
+    beta: 'β', gamma: 'γ', delta: 'δ', lambda: 'λ',
+    mu: 'μ', pi: 'π', sigma: 'σ', tau: 'τ',
+    phi: 'φ', omega: 'ω', Delta: 'Δ', Omega: 'Ω',
+    Sigma: 'Σ'
+  };
+  const ENTITY_RE = /&(#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z][a-zA-Z0-9]{1,31});/g;
+
+  function decodeEntities(s) {
+    if (s.indexOf('&') < 0) return s;
+    return s.replace(ENTITY_RE, function (whole, body) {
+      if (body.charAt(0) === '#') {
+        const cp = body.charAt(1) === 'x' || body.charAt(1) === 'X'
+          ? parseInt(body.slice(2), 16)
+          : parseInt(body.slice(1), 10);
+        if (!isFinite(cp) || cp <= 0 || cp > 0x10ffff) return whole;
+        try { return String.fromCodePoint(cp); } catch (e) { return whole; }
+      }
+      return Object.prototype.hasOwnProperty.call(ENTITIES, body) ? ENTITIES[body] : whole;
+    });
+  }
+
+  // A destination is safe when it cannot execute script on activation.
+  // Returns the original href, or null when the URL must not be used —
+  // callers then fall back to plain text (links) or to the alt text
+  // (images). data: is allowed for images only, and only image/*.
+  function safeUrl(href, forImage) {
+    const probe = String(href).replace(/[\u0000-\u0020]/g, '').toLowerCase();
+    if (/^(javascript|vbscript|file):/.test(probe)) return null;
+    if (probe.indexOf('data:') === 0 && !(forImage && probe.indexOf('data:image/') === 0)) return null;
+    return href;
+  }
+
+  function textNode(s) {
+    return document.createTextNode(decodeEntities(s));
+  }
+
   function parseInline(text, host) {
-    // Order: code (literal — protect from other rules) → strong → em →
-    // link → allow-listed inline HTML. One regex pass so positions are
-    // tracked. Inline tags OUTSIDE the allow-list stay literal text.
+    // One regex pass so positions are tracked; alternation order IS the
+    // precedence. Escape first (it must win over every construct it
+    // protects), then code (literal body — the rule that protects it),
+    // then image / emphasis / strike / link / autolink, and finally the
+    // allow-listed inline HTML tags. Inline tags outside the allow-list
+    // stay literal text.
     //
     // Emphasis and link bodies are parsed RECURSIVELY, so `**[a](b)**`,
     // `[**a**](b)`, `**`code`**` and `**bold with *em* inside**` all
-    // compose. Only `code` keeps a literal body — that is the rule that
-    // protects it. Strong therefore admits `*`/`_` in its body; em still
+    // compose. Strong therefore admits `*`/`_` in its body; em still
     // refuses them, which is what stops `*a **b** c*` from crossing.
     //
     // Link destinations forbid whitespace, as GFM does — EXCEPT the kit's
     // own `#g/` / `#x/` prefixes, whose ids are human-readable registry
     // keys with spaces in them ("Iceberg paper", "Time travel"). That
     // branch is tried first; everything else keeps the strict form.
-    const re = /`([^`]+?)`|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\8\s*>|<br\s*\/?>/g;
+    //
+    // Groups: 1 escape · 2 code · 3,4 image · 5,6 strong · 7 strike ·
+    // 8,9 em · 10,11,12 link · 13 autolink · 14,15,16 inline HTML.
+    const re = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|`([^`]+?)`|!\[([^\]]*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+)>|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\14\s*>|<br\s*\/?>/g;
     let pos = 0;
     let m;
     while ((m = re.exec(text)) !== null) {
-      if (m.index > pos) host.appendChild(document.createTextNode(text.slice(pos, m.index)));
+      // `_` never opens or closes emphasis inside a word — snake_case_name
+      // and a__b are identifiers, not markup (CommonMark's intraword rule).
+      // Rejecting has to leave the run unconsumed: keep `pos` where it is
+      // and restart one character in, so the text still lands verbatim.
+      if ((m[6] !== undefined || m[9] !== undefined) && !underscoreRunIsFree(text, m.index, m[0].length)) {
+        re.lastIndex = m.index + 1;
+        continue;
+      }
+      if (m.index > pos) host.appendChild(textNode(text.slice(pos, m.index)));
       if (m[1] !== undefined) {
-        const e = document.createElement('code'); e.textContent = m[1]; host.appendChild(e);
-      } else if (m[2] !== undefined || m[3] !== undefined) {
-        const e = document.createElement('strong'); parseInline(m[2] !== undefined ? m[2] : m[3], e); host.appendChild(e);
-      } else if (m[4] !== undefined || m[5] !== undefined) {
-        const e = document.createElement('em'); parseInline(m[4] !== undefined ? m[4] : m[5], e); host.appendChild(e);
-      } else if (m[6] !== undefined) {
-        host.appendChild(renderLink(m[6], m[7]));
-      } else if (m[8] !== undefined) {
+        host.appendChild(document.createTextNode(m[1]));
+      } else if (m[2] !== undefined) {
+        const e = document.createElement('code'); e.textContent = m[2]; host.appendChild(e);
+      } else if (m[3] !== undefined) {
+        host.appendChild(renderImage(m[3], m[4]));
+      } else if (m[5] !== undefined || m[6] !== undefined) {
+        const e = document.createElement('strong'); parseInline(m[5] !== undefined ? m[5] : m[6], e); host.appendChild(e);
+      } else if (m[7] !== undefined) {
+        const e = document.createElement('del'); parseInline(m[7], e); host.appendChild(e);
+      } else if (m[8] !== undefined || m[9] !== undefined) {
+        const e = document.createElement('em'); parseInline(m[8] !== undefined ? m[8] : m[9], e); host.appendChild(e);
+      } else if (m[10] !== undefined) {
+        host.appendChild(renderLink(m[10], m[11], m[12]));
+      } else if (m[13] !== undefined) {
+        host.appendChild(renderLink(m[13], m[13]));
+      } else if (m[14] !== undefined) {
         // Sanitised allow-list pass-through: bare element, recursive
         // inline body; only `title` survives from the attribute string
         // (tooltips on <abbr>). Everything else is dropped.
-        const e = document.createElement(m[8].toLowerCase());
-        const title = /\btitle="([^"]*)"/.exec(m[9] || '');
+        const e = document.createElement(m[14].toLowerCase());
+        const title = /\btitle="([^"]*)"/.exec(m[15] || '');
         if (title) e.title = title[1];
-        parseInline(m[10], e);
+        parseInline(m[16], e);
         host.appendChild(e);
       } else {
         host.appendChild(document.createElement('br'));
       }
       pos = m.index + m[0].length;
     }
-    if (pos < text.length) host.appendChild(document.createTextNode(text.slice(pos)));
+    if (pos < text.length) host.appendChild(textNode(text.slice(pos)));
   }
 
-  function renderLink(label, href) {
+  // True when neither end of an underscore run touches a word character.
+  // `snake_case`, `a__b` and `__init__`'s inner underscores all fail this;
+  // a run that stands between spaces or punctuation passes.
+  function underscoreRunIsFree(text, index, length) {
+    const before = index > 0 ? text.charAt(index - 1) : '';
+    const after = index + length < text.length ? text.charAt(index + length) : '';
+    return !/[\w]/.test(before) && !/[\w]/.test(after);
+  }
+
+  function renderImage(alt, src) {
+    const url = safeUrl(src, true);
+    if (url === null) return textNode(alt);
+    const img = document.createElement('img');
+    img.setAttribute('src', url);
+    img.setAttribute('alt', alt);
+    img.className = 'okt-inline-img';
+    img.loading = 'lazy';
+    return img;
+  }
+
+  function renderLink(label, href, title) {
     // Kit-extension prefixes: #g/term-id  → <glossary-term>
     //                        #x/source-id → <ext-ref>
     // Labels go through parseInline so `[**a**](b)` keeps its markup;
@@ -338,10 +433,19 @@
     // fragment-only and root-absolute hrefs pass through untouched.
     const mdLink = href.match(/^(?!\w+:|\/\/|#|\/)(.+?)\.md(#[^\s]*)?$/i);
     if (mdLink) href = mdLink[1] + '.html' + (mdLink[2] || '');
+    // A destination that would execute script on click is not a link.
+    // Dropping the href (rather than the text) keeps the label readable.
+    const url = safeUrl(href, false);
+    if (url === null) {
+      const span = document.createElement('span');
+      parseInline(label, span);
+      return span;
+    }
     const a = document.createElement('a');
     parseInline(label, a);
-    a.setAttribute('href', href);
-    if (/^https?:/i.test(href)) {
+    a.setAttribute('href', url);
+    if (title) a.setAttribute('title', title);
+    if (/^https?:/i.test(url)) {
       a.setAttribute('target', '_blank');
       a.setAttribute('rel', 'noopener');
     }
@@ -354,6 +458,10 @@
    * payload; the caller walks them and emits DOM. Headings are returned
    * as their own nodes so the outer walker can use h2 to open sections.
    * ================================================================ */
+
+  // Thematic break: three or more of the same marker, spaces allowed
+  // between them, nothing else on the line.
+  const HR_RE = /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/;
 
   // Slugify a heading title for a default anchor id.
   function slugify(text) {
@@ -393,7 +501,30 @@
   // handle typed b[] objects.
   let __renderTypedBlock = null;
 
-  function parseMarkdown(src) {
+  // Anchor ids handed out during the current render pass. Two headings
+  // with the same title slugify identically; a duplicate id makes
+  // getElementById (deep links, the TOC, scroll-spy) reach the first one
+  // forever, so later collisions get a numeric suffix — the convention
+  // GitHub and every other renderer uses.
+  let __anchorIds = new Set();
+
+  function resetAnchorIds() { __anchorIds = new Set(); }
+
+  function uniqueAnchorId(id) {
+    if (!__anchorIds.has(id)) { __anchorIds.add(id); return id; }
+    let n = 2;
+    while (__anchorIds.has(id + '-' + n)) n++;
+    const out = id + '-' + n;
+    __anchorIds.add(out);
+    return out;
+  }
+
+  // opts.noIslands — do not treat a block-level HTML tag as an island.
+  // List-item content is dedented before it is re-parsed, so a line that
+  // reads `<chart> renders …` is NOT at column 0 in the source and must
+  // stay prose; only a page-level string can open an island.
+  function parseMarkdown(src, opts) {
+    const noIslands = !!(opts && opts.noIslands);
     const lines = String(src || '').split('\n');
     const out = [];
     let i = 0;
@@ -401,20 +532,23 @@
       const line = lines[i];
       // Blank line — skip.
       if (!line.trim()) { i++; continue; }
-      // Horizontal rule.
-      if (/^-{3,}\s*$/.test(line)) { out.push({ k: 'hr' }); i++; continue; }
-      // Fenced code block. Variable-length: a fence of N backticks
-      // closes only at a line of N (or more) backticks. Lets authors
-      // nest a 3-tick fenced sample inside a 4-tick outer fence — the
-      // CommonMark-compliant way to show markdown code samples that
-      // contain code fences.
-      const fence = line.match(/^(`{3,})\s*([\w-]*)\s*$/);
+      // Thematic break — any of `---`, `***`, `___`, with optional inner
+      // spaces (`- - -`). Only `---` used to qualify, so a `***` rule
+      // rendered as a paragraph of asterisks.
+      if (HR_RE.test(line)) { out.push({ k: 'hr' }); i++; continue; }
+      // Fenced code block. Variable-length: a fence of N backticks (or
+      // tildes) closes only at a line of N or more of the SAME character.
+      // Lets authors nest a 3-tick fenced sample inside a 4-tick outer
+      // fence — the CommonMark-compliant way to show markdown code
+      // samples that contain code fences.
+      const fence = line.match(/^(`{3,}|~{3,})\s*([\w-]*)[^\n]*$/);
       if (fence) {
         const openLen = fence[1].length;
+        const fenceChar = fence[1].charAt(0);
         const lang = fence[2] || '';
         const body = [];
         i++;
-        const closeRe = new RegExp('^`{' + openLen + ',}\\s*$');
+        const closeRe = new RegExp('^' + (fenceChar === '~' ? '~' : '`') + '{' + openLen + ',}\\s*$');
         while (i < lines.length && !closeRe.test(lines[i])) {
           body.push(lines[i]);
           i++;
@@ -444,7 +578,7 @@
       // untouched (full capability: custom elements, <script>, <style>).
       // script/style/pre/textarea consume to their closing tag; anything
       // else to the next blank line — CommonMark type-1/6 semantics.
-      const island = isIslandStart(line);
+      const island = noIslands ? null : isIslandStart(line);
       if (island) {
         const tag = island;
         const buf = [];
@@ -465,7 +599,7 @@
         continue;
       }
       // Definition list — a term line whose next line is `: definition`.
-      if (line.trim() && !isBlockStart(line) && i + 1 < lines.length && /^:\s+\S/.test(lines[i + 1])) {
+      if (line.trim() && !isBlockStart(line, noIslands) && i + 1 < lines.length && /^:\s+\S/.test(lines[i + 1])) {
         const pairs = [];
         while (i < lines.length && lines[i].trim() && !/^:\s/.test(lines[i])
                && i + 1 < lines.length && /^:\s+\S/.test(lines[i + 1])) {
@@ -481,11 +615,11 @@
         out.push({ k: 'dl', pairs: pairs });
         continue;
       }
-      // Heading.
+      // Heading. A closing sequence of #s is decoration, not title text.
       const head = line.match(/^(#{1,6})\s+(.+?)(?:\s+\{#([\w-]+)\})?\s*$/);
       if (head) {
         const level = head[1].length;
-        const title = head[2];
+        const title = head[2].replace(/\s+#+\s*$/, '');
         const id = head[3] || slugify(title);
         out.push({ k: 'heading', level: level, title: title, id: id });
         i++;
@@ -510,13 +644,22 @@
       // Pipe table — header row, separator row, data rows.
       if (line.indexOf('|') >= 0 && i + 1 < lines.length && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1])) {
         const hdr = splitTableRow(line);
+        const align = splitTableRow(lines[i + 1]).map(function (spec) {
+          const left = spec.charAt(0) === ':';
+          const right = spec.charAt(spec.length - 1) === ':';
+          return left && right ? 'center' : right ? 'right' : left ? 'left' : '';
+        });
         i += 2; // skip header + separator
         const rows = [];
         while (i < lines.length && lines[i].indexOf('|') >= 0 && lines[i].trim()) {
-          rows.push(splitTableRow(lines[i]));
+          // GFM: a row is padded with empty cells / truncated to the
+          // header width, so the body can never out-column the head.
+          const cells = splitTableRow(lines[i]);
+          while (cells.length < hdr.length) cells.push('');
+          rows.push(cells.slice(0, hdr.length));
           i++;
         }
-        out.push({ k: 'table', headers: hdr, rows: rows });
+        out.push({ k: 'table', headers: hdr, rows: rows, align: align });
         continue;
       }
       // List — bullet (- / *) or numbered (1. / 1)).
@@ -529,13 +672,30 @@
       // Paragraph — gather until blank line or block-start.
       const para = [line];
       i++;
-      while (i < lines.length && lines[i].trim() && !isBlockStart(lines[i]) && !(i + 1 < lines.length && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1]))) {
+      while (i < lines.length && lines[i].trim() && !isBlockStart(lines[i], noIslands) && !(i + 1 < lines.length && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1]))) {
         para.push(lines[i]);
         i++;
       }
-      out.push({ k: 'paragraph', text: para.join(' ').replace(/\s+/g, ' ').trim() });
+      out.push({ k: 'paragraph', text: joinParagraph(para) });
     }
     return out;
+  }
+
+  // Collapse a paragraph's lines into one inline string. A line ending in
+  // two or more spaces, or in a single backslash, is GFM's hard break and
+  // survives as <br>; every other newline is a soft break, i.e. a space.
+  function joinParagraph(lines) {
+    let out = '';
+    for (let k = 0; k < lines.length; k++) {
+      const last = k === lines.length - 1;
+      let line = lines[k];
+      let hard = false;
+      if (!last && /\s{2,}$/.test(line)) { hard = true; }
+      else if (!last && /(^|[^\\])\\$/.test(line)) { hard = true; line = line.slice(0, -1); }
+      out += line.replace(/\s+$/, '');
+      if (!last) out += hard ? '<br>' : ' ';
+    }
+    return out.replace(/[^\S\n]+/g, ' ').trim();
   }
 
   // A block-level HTML tag at column 0 opens an island; inline-level
@@ -547,27 +707,30 @@
     return INLINE_HTML_TAGS.indexOf(tag) < 0 ? tag : null;
   }
 
-  function isBlockStart(line) {
+  function isBlockStart(line, noIslands) {
     return /^#{1,6}\s/.test(line)
       || /^>\s?/.test(line)
-      || /^```/.test(line)
-      || /^-{3,}\s*$/.test(line)
+      || /^(```|~~~)/.test(line)
+      || HR_RE.test(line)
       || /^(\s*)([-*]|\d+[.)])\s+/.test(line)
       || /^:\s+\S/.test(line)
-      || isIslandStart(line) !== null;
+      || (!noIslands && isIslandStart(line) !== null);
   }
 
   function splitTableRow(line) {
-    // Trim leading/trailing pipes, then split on |. Backtick-protected
-    // pipes (inside `code`) escape from the split.
+    // Trim leading/trailing pipes, then split on |. Two things escape the
+    // split: a backslash-escaped pipe (`\|`, GFM's documented way to put
+    // a pipe in a cell) and a pipe inside a `code` span.
     let s = line.trim();
     if (s.startsWith('|')) s = s.slice(1);
     if (s.endsWith('|')) s = s.slice(0, -1);
     const cells = [];
     let cur = '';
     let inCode = false;
-    for (const c of s) {
-      if (c === '`') { inCode = !inCode; cur += c; }
+    for (let k = 0; k < s.length; k++) {
+      const c = s.charAt(k);
+      if (c === '\\' && k + 1 < s.length && s.charAt(k + 1) === '|') { cur += '|'; k++; }
+      else if (c === '`') { inCode = !inCode; cur += c; }
       else if (c === '|' && !inCode) { cells.push(cur.trim()); cur = ''; }
       else cur += c;
     }
@@ -575,52 +738,77 @@
     return cells;
   }
 
+  const LIST_ITEM_RE = /^(\s*)([-*]|\d+[.)])(\s+)(.*)$/;
+
   function parseList(lines, start) {
     // Walks lines starting at `start`. Returns { node, next }.
     // Supports bullet (- / *) and ordered (1. / 1)) at any indent depth.
+    //
+    // An item owns every following line that is indented past the marker,
+    // blank lines included — that is what makes a second paragraph, a
+    // fenced code block or a nested list part of the item instead of
+    // ending the list. Each item is kept as raw (dedented) lines and
+    // parsed as its own little markdown document at render time.
     const items = [];
     let i = start;
-    const first = lines[start].match(/^(\s*)([-*]|\d+[.)])\s+/);
+    const first = lines[start].match(LIST_ITEM_RE);
     const baseIndent = first[1].length;
     const ordered = /\d/.test(first[2]);
+    const startNum = ordered ? parseInt(first[2], 10) : 1;
+    // Switching marker family ends the list, as GFM specifies — an `-`
+    // item after a `1.` item starts a new <ul> instead of joining the
+    // <ol> (which silently renumbered it).
+    const sameFamily = (marker) => /\d/.test(marker) === ordered;
     while (i < lines.length) {
-      const m = lines[i].match(/^(\s*)([-*]|\d+[.)])\s+(.*)$/);
+      const m = lines[i].match(LIST_ITEM_RE);
+      if (m && m[1].length === baseIndent && !sameFamily(m[2])) break;
       if (m && m[1].length === baseIndent) {
-        const itemLines = [m[3]];
+        const contentIndent = m[1].length + m[2].length + m[3].length;
+        const itemLines = [m[4]];
         i++;
         while (i < lines.length) {
-          const continuation = lines[i].match(/^(\s+)(.*)$/);
-          if (continuation && continuation[1].length > baseIndent && !/^(\s*)([-*]|\d+[.)])\s+/.test(lines[i])) {
-            itemLines.push(lines[i].trim());
-            i++;
-          } else if (continuation && /^(\s*)([-*]|\d+[.)])\s+/.test(lines[i]) && continuation[1].length > baseIndent) {
-            // Nested list start — collect lines while still indented past base.
-            const subStart = i;
-            while (i < lines.length) {
-              const sub = lines[i].match(/^(\s+)/);
-              if (!sub || sub[1].length <= baseIndent) break;
-              i++;
+          if (!lines[i].trim()) {
+            // A blank line continues the item only if indented content
+            // follows it; otherwise it ends the item (and maybe the list).
+            let j = i;
+            while (j < lines.length && !lines[j].trim()) j++;
+            const indent = j < lines.length ? lines[j].match(/^(\s*)/)[1].length : 0;
+            if (j < lines.length && indent >= contentIndent) {
+              for (let k = i; k < j; k++) itemLines.push('');
+              i = j;
+              continue;
             }
-            // Capture the nested-list source for recursive parse.
-            const nested = lines.slice(subStart, i).map(l => l.slice(baseIndent + 2));
-            itemLines.push({ __nested: nested });
-          } else {
             break;
           }
+          const indent = lines[i].match(/^(\s*)/)[1].length;
+          if (indent >= contentIndent) {
+            itemLines.push(lines[i].slice(contentIndent));
+            i++;
+            continue;
+          }
+          // A less-indented list marker belongs to this list (or an outer
+          // one); anything else at column <= base ends the item.
+          if (LIST_ITEM_RE.test(lines[i]) && indent > baseIndent) {
+            itemLines.push(lines[i].slice(Math.min(indent, contentIndent)));
+            i++;
+            continue;
+          }
+          break;
         }
+        while (itemLines.length && !itemLines[itemLines.length - 1].trim()) itemLines.pop();
         items.push(itemLines);
-      } else if (lines[i].trim() === '') {
-        // Blank inside list — peek; if next is still a list item, continue.
-        if (i + 1 < lines.length && /^(\s*)([-*]|\d+[.)])\s+/.test(lines[i + 1])) {
-          i++;
-          continue;
-        }
+      } else if (!lines[i].trim()) {
+        // Blank between items — the list continues if another item follows.
+        let j = i;
+        while (j < lines.length && !lines[j].trim()) j++;
+        const next = j < lines.length ? lines[j].match(LIST_ITEM_RE) : null;
+        if (next && next[1].length === baseIndent && sameFamily(next[2])) { i = j; continue; }
         break;
       } else {
         break;
       }
     }
-    return { node: { k: 'list', ordered: ordered, items: items }, next: i };
+    return { node: { k: 'list', ordered: ordered, start: startNum, items: items }, next: i };
   }
 
   /* ================================================================ *
@@ -638,7 +826,7 @@
             break;
           }
           const h = document.createElement('h' + Math.min(6, Math.max(1, node.level)));
-          if (node.id) h.id = node.id;
+          if (node.id) h.id = uniqueAnchorId(node.id);
           parseInline(node.title, h);
           host.appendChild(h);
           break;
@@ -741,7 +929,7 @@
     if (type === 'tldr') {
       // TLDR keeps the legacy .tldr layout — h2 + summary + bullets.
       const section = document.createElement('section');
-      section.id = 'tldr';
+      section.id = uniqueAnchorId('tldr');
       const tldr = document.createElement('div');
       tldr.className = 'tldr';
       const lab = document.createElement('span');
@@ -787,18 +975,12 @@
   function renderList(node) {
     const tag = node.ordered ? 'ol' : 'ul';
     const list = document.createElement(tag);
+    if (node.ordered && node.start && node.start !== 1) list.start = node.start;
     for (const item of node.items) {
       const li = document.createElement('li');
-      // Item is an array of strings and {__nested: lines} objects.
-      const text = [];
-      const sub = [];
-      for (const seg of item) {
-        if (typeof seg === 'string') text.push(seg);
-        else if (seg.__nested) sub.push(seg.__nested.join('\n'));
-      }
-      let itemText = text.join(' ').trim();
+      const lines = item.slice();
       // GFM task-list item: leading [ ] / [x] becomes a checkbox.
-      const task = itemText.match(/^\[([ xX])\]\s+/);
+      const task = (lines[0] || '').match(/^\[([ xX])\]\s+/);
       if (task) {
         const cb = document.createElement('input');
         cb.type = 'checkbox';
@@ -807,12 +989,20 @@
         li.className = 'task-item';
         li.appendChild(cb);
         li.appendChild(document.createTextNode(' '));
-        itemText = itemText.slice(task[0].length);
+        lines[0] = lines[0].slice(task[0].length);
       }
-      parseInline(itemText, li);
-      for (const ns of sub) {
-        const parsed = parseMarkdown(ns);
-        emitMarkdown(li, parsed, null);
+      // Tight item (no blank line inside it): the leading prose goes
+      // straight into the <li>, so `- a` stays `<li>a</li>` and a nested
+      // list hangs off the same item without a <p> wrapper. A loose item
+      // — second paragraph, fence, table — renders as its own markdown
+      // sub-document, paragraphs included.
+      const blocks = parseMarkdown(lines.join('\n'), { noIslands: true });
+      const tight = lines.every(function (l) { return l.trim() !== ''; });
+      if (tight && blocks.length && blocks[0].k === 'paragraph') {
+        parseInline(blocks[0].text, li);
+        emitMarkdown(li, blocks.slice(1), null);
+      } else {
+        emitMarkdown(li, blocks, null);
       }
       list.appendChild(li);
     }
@@ -821,23 +1011,26 @@
 
   function renderMarkdownTable(node) {
     const table = document.createElement('table');
+    const align = node.align || [];
     const thead = document.createElement('thead');
     const htr = document.createElement('tr');
-    for (const h of node.headers) {
+    node.headers.forEach(function (h, col) {
       const th = document.createElement('th');
       parseInline(h, th);
+      if (align[col]) th.style.textAlign = align[col];
       htr.appendChild(th);
-    }
+    });
     thead.appendChild(htr);
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
     for (const row of node.rows) {
       const tr = document.createElement('tr');
-      for (const cell of row) {
+      row.forEach(function (cell, col) {
         const td = document.createElement('td');
         parseInline(cell, td);
+        if (align[col]) td.style.textAlign = align[col];
         tr.appendChild(td);
-      }
+      });
       tbody.appendChild(tr);
     }
     table.appendChild(tbody);
@@ -874,6 +1067,7 @@
       this.host = host || this.host || document.querySelector('main#main-content') || document.querySelector('main') || document.body;
       this.warnings = [];
       __renderTypedBlock = (block) => this._renderTyped(block);
+      resetAnchorIds();
 
       // v1 → v2 shim. Older pages still on disk (or in other projects
       // sharing this kit) keep rendering — no migrate run required.
@@ -901,7 +1095,7 @@
       let currentSection = null;
       const openSection = (heading) => {
         const section = document.createElement('section');
-        if (heading.id) section.id = heading.id;
+        if (heading.id) section.id = uniqueAnchorId(heading.id);
         const h2 = document.createElement('h2');
         h2.textContent = heading.title;
         section.appendChild(h2);

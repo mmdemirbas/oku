@@ -448,7 +448,17 @@ def _strip_md_front_matter(text: str) -> tuple[str, dict]:
     return "\n".join(lines[j + 1 :]), meta
 
 
-_FENCE_OPEN_RE = re.compile(r"^(`{3,})(\S*)\s*$")
+# A fence opens with three or more backticks OR tildes; the closing run
+# must be the same character and at least as long. Tilde fences are the
+# GFM way to show a backtick-fenced sample verbatim, so the CLI has to
+# agree with the renderer on them.
+_FENCE_OPEN_RE = re.compile(r"^([`~]{3,})\s*([\w-]*)[^\n]*$")
+
+
+def _fence_close_re(opener: str) -> re.Pattern[str]:
+    return re.compile(r"^" + re.escape(opener[0]) + r"{" + str(len(opener)) + r",}\s*$")
+
+
 _MD_FENCE_CAPTION_RE = re.compile(r"^\*([^*].*)\*\s*$")
 
 # Fence tags that lift into typed v2 blocks: ```oku-<kind> with a JSON
@@ -545,7 +555,7 @@ def md_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
         if m:
             ticks, lang = m.group(1), (m.group(2) or "").lower()
             if lang == "mermaid" or lang.startswith("oku-"):
-                close_re = re.compile(r"^`{" + str(len(ticks)) + r",}\s*$")
+                close_re = _fence_close_re(ticks)
                 body_lines: list[str] = []
                 j = i + 1
                 while j < n and not close_re.match(lines[j]):
@@ -573,7 +583,7 @@ def md_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
                 blocks.append(block)
                 i = j + 1
                 continue
-            plain_fence_close = re.compile(r"^`{" + str(len(ticks)) + r",}\s*$")
+            plain_fence_close = _fence_close_re(ticks)
         buf.append(line)
         i += 1
     flush()
@@ -693,7 +703,7 @@ def _md_segments(text: str):
             continue
         m = _FENCE_OPEN_RE.match(line)
         if m:
-            close = re.compile(r"^`{" + str(len(m.group(1))) + r",}\s*$")
+            close = _fence_close_re(m.group(1))
             body = []
             i += 1
             while i < n and not close.match(lines[i]):
@@ -1391,7 +1401,7 @@ def djot_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
         fm = _FENCE_OPEN_RE.match(line)
         if fm:
             lang = (fm.group(2) or "").lower()
-            close = re.compile(r"^`{" + str(len(fm.group(1))) + r",}\s*$")
+            close = _fence_close_re(fm.group(1))
             body = []
             i += 1
             while i < n and not close.match(lines[i]):
@@ -2218,7 +2228,7 @@ def _split_md_fences(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, 
             continue
         m = _FENCE_OPEN_RE.match(line)
         if m:
-            close_re = re.compile(r"^`{" + str(len(m.group(1))) + r",}\s*$")
+            close_re = _fence_close_re(m.group(1))
             fence_start = i
             fence_lang = (m.group(2) or "").lower()
             continue
