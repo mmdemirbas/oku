@@ -46,6 +46,8 @@ line two ends it.
 
 Unsafe: [click](javascript:alert(1)) stays text.
 
+Code spans: `` `code` and [a](b) `` and ``a ` b`` stay literal.
+
 ## Block {#block}
 
 Rule below is three asterisks.
@@ -322,3 +324,25 @@ def test_definition_lines_are_not_rendered(rendered):
     body = _text(rendered)
     assert "https://example.com/ref" not in body
     assert "[^n]:" not in body
+
+
+# ---------- code spans ----------
+
+
+def test_multi_backtick_code_spans(rendered):
+    """A code span opens with N backticks and closes on the next run of
+    exactly N. Only the single-backtick form used to parse, so the
+    CommonMark ``…`` form — the one you need when the code itself holds
+    a backtick — mis-paired and let markdown inside the span render:
+    this repo's own reference table leaked a live link and four broken
+    images out of a code cell that way."""
+    spans = rendered.eval_on_selector_all("main code", "els => els.map(e => e.textContent)")
+    assert "`code` and [a](b)" in spans
+    assert "a ` b" in spans
+    # …and nothing inside those spans became an element.
+    assert rendered.locator("main code a, main code img").count() == 0
+
+
+def test_code_span_strips_one_padding_space_each_side(rendered):
+    spans = rendered.eval_on_selector_all("main code", "els => els.map(e => e.textContent)")
+    assert not any(s.startswith(" ") and s.endswith(" ") for s in spans), spans

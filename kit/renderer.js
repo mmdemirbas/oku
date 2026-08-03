@@ -450,12 +450,15 @@
     // keys with spaces in them ("Iceberg paper", "Time travel"). That
     // branch is tried first; everything else keeps the strict form.
     //
-    // Groups: 1 escape · 2 code · 3,4 image · 5,6 strong · 7 strike ·
-    // 8,9 em · 10,11,12 link · 13 autolink · 14,15,16 inline HTML ·
-    // 17 footnote ref · 18,19 reference link · 20 shortcut reference.
+    // Groups: 1 escape · 2,3 code (fence run + body) · 4,5 image ·
+    // 6,7 strong · 8 strike · 9,10 em · 11,12,13 link · 14 autolink ·
+    // 15,16,17 inline HTML · 18 footnote ref · 19,20 reference link ·
+    // 21 shortcut reference. A code span opens with N backticks and
+    // closes on the next run of exactly N — the CommonMark rule that
+    // lets ``a `b` c`` hold a backtick.
     // The three reference forms sit last: they are the loosest patterns
     // and only fire when the page actually defines that label.
-    const re = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|`([^`]+?)`|!\[([^\]]*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+)>|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\14\s*>|<br\s*\/?>|\[\^([^\]]+?)\]|\[([^\]]+?)\]\[([^\]]*?)\]|\[([^\]^][^\]]*?)\]/g;
+    const re = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|(`+)([\s\S]+?)\2(?!`)|!\[([^\]]*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+)>|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\15\s*>|<br\s*\/?>|\[\^([^\]]+?)\]|\[([^\]]+?)\]\[([^\]]*?)\]|\[([^\]^][^\]]*?)\]/g;
     let pos = 0;
     let m;
     while ((m = re.exec(text)) !== null) {
@@ -463,55 +466,59 @@
       // and a__b are identifiers, not markup (CommonMark's intraword rule).
       // Rejecting has to leave the run unconsumed: keep `pos` where it is
       // and restart one character in, so the text still lands verbatim.
-      if ((m[6] !== undefined || m[9] !== undefined) && !underscoreRunIsFree(text, m.index, m[0].length)) {
+      if ((m[7] !== undefined || m[10] !== undefined) && !underscoreRunIsFree(text, m.index, m[0].length)) {
         re.lastIndex = m.index + 1;
         continue;
       }
       // A reference form declines the match when the page never defined
       // that label — GFM leaves it as literal text. Declining has to
       // happen here, before any text is emitted, for the same reason.
-      if (m[17] !== undefined && !__footnoteDefs.has(m[17])) {
+      if (m[18] !== undefined && !__footnoteDefs.has(m[18])) {
         re.lastIndex = m.index + 1;
         continue;
       }
-      if ((m[18] !== undefined || m[20] !== undefined)
-          && !__linkDefs.has((m[18] !== undefined ? (m[19] || m[18]) : m[20]).toLowerCase())) {
+      if ((m[19] !== undefined || m[21] !== undefined)
+          && !__linkDefs.has((m[19] !== undefined ? (m[20] || m[19]) : m[21]).toLowerCase())) {
         re.lastIndex = m.index + 1;
         continue;
       }
       if (m.index > pos) host.appendChild(textNode(text.slice(pos, m.index)));
       if (m[1] !== undefined) {
         host.appendChild(document.createTextNode(m[1]));
-      } else if (m[2] !== undefined) {
-        const e = document.createElement('code'); e.textContent = m[2]; host.appendChild(e);
       } else if (m[3] !== undefined) {
-        host.appendChild(renderImage(m[3], m[4]));
-      } else if (m[5] !== undefined || m[6] !== undefined) {
-        const e = document.createElement('strong'); parseInline(m[5] !== undefined ? m[5] : m[6], e); host.appendChild(e);
-      } else if (m[7] !== undefined) {
-        const e = document.createElement('del'); parseInline(m[7], e); host.appendChild(e);
-      } else if (m[8] !== undefined || m[9] !== undefined) {
-        const e = document.createElement('em'); parseInline(m[8] !== undefined ? m[8] : m[9], e); host.appendChild(e);
-      } else if (m[10] !== undefined) {
-        host.appendChild(renderLink(m[10], m[11], m[12]));
-      } else if (m[13] !== undefined) {
-        host.appendChild(renderLink(m[13], m[13]));
+        const e = document.createElement('code');
+        // CommonMark strips one space at each end when both are there —
+        // that is what lets `` `x` `` carry a leading backtick.
+        e.textContent = /^ [\s\S]* $/.test(m[3]) && /[^ ]/.test(m[3]) ? m[3].slice(1, -1) : m[3];
+        host.appendChild(e);
+      } else if (m[4] !== undefined) {
+        host.appendChild(renderImage(m[4], m[5]));
+      } else if (m[6] !== undefined || m[7] !== undefined) {
+        const e = document.createElement('strong'); parseInline(m[6] !== undefined ? m[6] : m[7], e); host.appendChild(e);
+      } else if (m[8] !== undefined) {
+        const e = document.createElement('del'); parseInline(m[8], e); host.appendChild(e);
+      } else if (m[9] !== undefined || m[10] !== undefined) {
+        const e = document.createElement('em'); parseInline(m[9] !== undefined ? m[9] : m[10], e); host.appendChild(e);
+      } else if (m[11] !== undefined) {
+        host.appendChild(renderLink(m[11], m[12], m[13]));
       } else if (m[14] !== undefined) {
+        host.appendChild(renderLink(m[14], m[14]));
+      } else if (m[15] !== undefined) {
         // Sanitised allow-list pass-through: bare element, recursive
         // inline body; only `title` survives from the attribute string
         // (tooltips on <abbr>). Everything else is dropped.
-        const e = document.createElement(m[14].toLowerCase());
-        const title = /\btitle="([^"]*)"/.exec(m[15] || '');
+        const e = document.createElement(m[15].toLowerCase());
+        const title = /\btitle="([^"]*)"/.exec(m[16] || '');
         if (title) e.title = title[1];
-        parseInline(m[16], e);
+        parseInline(m[17], e);
         host.appendChild(e);
-      } else if (m[17] !== undefined) {
-        host.appendChild(renderFootnoteRef(m[17]));
-      } else if (m[18] !== undefined || m[20] !== undefined) {
+      } else if (m[18] !== undefined) {
+        host.appendChild(renderFootnoteRef(m[18]));
+      } else if (m[19] !== undefined || m[21] !== undefined) {
         // [text][label] · [label][] · [label] — all resolve against the
         // page's link-reference definitions.
-        const def = __linkDefs.get((m[18] !== undefined ? (m[19] || m[18]) : m[20]).toLowerCase());
-        host.appendChild(renderLink(m[18] !== undefined ? m[18] : m[20], def.href, def.title));
+        const def = __linkDefs.get((m[19] !== undefined ? (m[20] || m[19]) : m[21]).toLowerCase());
+        host.appendChild(renderLink(m[19] !== undefined ? m[19] : m[21], def.href, def.title));
       } else {
         host.appendChild(document.createElement('br'));
       }
