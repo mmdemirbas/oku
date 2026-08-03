@@ -201,3 +201,39 @@ class TestInjectPagefindBody:
         assert "data-pagefind-body" in out
         # Original content is preserved and the indexable block lands after it.
         assert out.startswith(original)
+
+
+# ---------- serve handler ----------
+
+
+def _serve(root: Path):
+    """Start the real serve handler on an ephemeral port; yields the base URL."""
+    import http.server
+    import threading
+
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), cli._make_serve_handler(root))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd, f"http://127.0.0.1:{httpd.server_address[1]}"
+
+
+def test_serve_synthesizes_pages_with_non_ascii_filenames(tmp_path: Path) -> None:
+    """A browser percent-encodes every non-ASCII byte and every space, so
+    the handler has to decode before it looks for the source. Without it,
+    `oku serve` 404s on any page whose filename is not plain ASCII —
+    which is most of a Turkish doc tree."""
+    import urllib.request
+
+    (tmp_path / "_oku").mkdir()
+    (tmp_path / "ölçüm raporu.md").write_text(
+        "---\ntitle: Ölçüm raporu\n---\n\n## Bölüm\n\nmetin\n", encoding="utf-8"
+    )
+    httpd, base = _serve(tmp_path)
+    try:
+        quoted = urllib.request.quote("ölçüm raporu")
+        html = urllib.request.urlopen(f"{base}/{quoted}.html")
+        assert html.status == 200
+        assert "Ölçüm raporu" in html.read().decode("utf-8")
+        page = json.loads(urllib.request.urlopen(f"{base}/{quoted}.json").read().decode("utf-8"))
+        assert page["t"] == "Ölçüm raporu"
+    finally:
+        httpd.shutdown()

@@ -34,6 +34,7 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
+from urllib.parse import unquote
 
 
 def _kit_assets_dir() -> Path:
@@ -3424,12 +3425,6 @@ def cmd_build(args: argparse.Namespace) -> int:
         print(f"✗ No .html or page-JSON files found in {root}", file=sys.stderr)
         return 1
 
-    # site-manifest.json + llms.txt are derived from the JSON pages.
-    # The build writes them under dist/ (site-manifest.json under
-    # dist/site/, llms.txt under dist/markdown/); the dev server
-    # synthesizes both in memory. Source stays authored-content-only.
-    docs_dir = _common_docs_dir(root, json_pages)
-
     # Schema validation + structural lint — runs the same checks as
     # `oku check` so the build never produces a doctree that the
     # standalone linter would have rejected. Soft-fails without
@@ -3478,14 +3473,19 @@ def cmd_build(args: argparse.Namespace) -> int:
     #                from the docs root; llms.txt at the docs root
     #                serves AI/LLM consumers (the .md SOURCES are the
     #                canonical AI surface — no twin tree needed).
-    rel_docs = docs_dir.relative_to(root)
-    rel_display = "" if rel_docs == Path(".") else rel_docs.as_posix() + "/"
+    # In the SITE tree the docs root is the site root: build_site copies
+    # the kit to dist/site/_oku/ once, and chrome.js derives the docs root
+    # by stripping back to whichever directory holds _oku/. Writing the
+    # manifest anywhere else — e.g. under dist/site/docs/ for a project
+    # whose pages all live in docs/ — leaves every built page fetching a
+    # manifest that isn't there, and the site tree renders with an empty
+    # site-tree nav. Page paths are therefore relative to the project
+    # root, which is exactly the layout inside dist/site/.
+    build_manifest(root, out_dir=site, pages=json_pages)
+    print(f"✓ Wrote dist/site/site-manifest.json ({len(json_pages)} JSON page(s))")
 
-    build_manifest(docs_dir, out_dir=site / rel_docs, pages=json_pages)
-    print(f"✓ Wrote dist/site/{rel_display}site-manifest.json ({len(json_pages)} JSON page(s))")
-
-    build_llms_txt(docs_dir, out_dir=site / rel_docs, pages=json_pages)
-    print(f"✓ Wrote dist/site/{rel_display}llms.txt")
+    build_llms_txt(root, out_dir=site, pages=json_pages)
+    print("✓ Wrote dist/site/llms.txt")
 
     # Synthesized stubs (from .json or .md sources with no on-disk
     # .html sibling) are emitted inline by build_site / build_standalone
@@ -3783,7 +3783,11 @@ def _make_serve_handler(root: Path):
             Real-file-on-disk always wins (returns False, letting the
             static handler serve it).
             """
-            url_path = self.path.split("?", 1)[0]
+            # Percent-DECODE before the path touches the filesystem: a
+            # browser encodes every non-ASCII byte and every space, so
+            # "ölçüm raporu.md" arrives as %C3%B6l%C3%A7%C3%BCm%20raporu
+            # and no synthesis site would ever find its source.
+            url_path = unquote(self.path.split("?", 1)[0])
             # Generated docs-root artifacts: synthesize from the docs dir
             # without writing anything to source.
             if self._serve_generated_artifact(url_path):
@@ -4102,6 +4106,18 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _page_content_fingerprint(page: dict) -> tuple[str, str, str]:
+    """Title, typed blocks and prose of a page, in a form that survives
+    markdown emission. Two pages with the same fingerprint render the
+    same content — used to prove a migration is lossless before the
+    source JSON is deleted."""
+    v2 = _v1_to_v2(page) if (page.get("kind") == "page" and not page.get("k")) else page
+    body = v2.get("b") or []
+    typed = json.dumps([b for b in body if isinstance(b, dict)], sort_keys=True, ensure_ascii=False)
+    prose = re.sub(r"\s+", " ", " ".join(b for b in body if isinstance(b, str))).strip()
+    return (str(v2.get("t") or ""), typed, prose)
+
+
 # ---------- main ----------
 def cmd_migrate(args: argparse.Namespace) -> int:
     """`oku migrate [path]` — convert page-JSON sources (v1 or v2) to
@@ -4159,10 +4175,23 @@ def cmd_migrate(args: argparse.Namespace) -> int:
         if md_path.exists():
             print(f"  skip {rel}: {md_path.name} already exists")
             continue
+        # Deleting the JSON is irreversible, so prove the round-trip first:
+        # emit the markdown, parse it back, and compare content. A page
+        # holding something the emitter cannot express keeps its JSON.
+        md_text = page_to_md(data)
+        back = md_to_v2_page(md_text, default_title=_page_title(data) or md_path.stem)
+        lossless = _page_content_fingerprint(back) == _page_content_fingerprint(data)
+        if not lossless:
+            print(
+                f"  skip {rel}: markdown round-trip is not lossless — source kept. "
+                f"Report this page; the JSON still renders.",
+                file=sys.stderr,
+            )
+            continue
         if args.dry_run:
             print(f"  would migrate {rel} → {md_path.name}")
         else:
-            md_path.write_text(page_to_md(data), encoding="utf-8")
+            md_path.write_text(md_text, encoding="utf-8")
             if not args.keep_json:
                 p.unlink()
             print(f"  migrated {rel} → {md_path.name}")

@@ -10231,6 +10231,34 @@ class OkuDiagram extends HTMLElement {
             if (vb.length === 4 && vb[2] > 0) {
               svg.style.maxWidth = Math.round(vb[2]) + 'px';
             }
+            // Mermaid sometimes lays content OUTSIDE the viewBox it
+            // computes (edge labels, wide nodes, the last rank of a
+            // tall flowchart). The container clips that overspill, so
+            // the diagram reads as trimmed — the symptom the
+            // `overflow: hidden` comment in chrome.css describes.
+            // Refit the viewBox to the union of mermaid's box and the
+            // real content bbox so nothing can fall outside it; the
+            // SVG then scales to fit instead of being cut.
+            try {
+              var contentBox = svg.getBBox();
+              if (contentBox && isFinite(contentBox.width) && contentBox.width > 0 &&
+                  isFinite(contentBox.height) && contentBox.height > 0) {
+                var pad = 8;
+                var x0 = contentBox.x - pad, y0 = contentBox.y - pad;
+                var x1 = contentBox.x + contentBox.width + pad;
+                var y1 = contentBox.y + contentBox.height + pad;
+                if (vb.length === 4 && isFinite(vb[0]) && isFinite(vb[1]) &&
+                    vb[2] > 0 && vb[3] > 0) {
+                  x0 = Math.min(x0, vb[0]); y0 = Math.min(y0, vb[1]);
+                  x1 = Math.max(x1, vb[0] + vb[2]); y1 = Math.max(y1, vb[1] + vb[3]);
+                }
+                svg.setAttribute('viewBox', x0 + ' ' + y0 + ' ' + (x1 - x0) + ' ' + (y1 - y0));
+                svg.style.maxWidth = Math.round(x1 - x0) + 'px';
+              }
+            } catch (err) {
+              /* getBBox throws when the host is display:none — keep
+                 mermaid's own viewBox in that case. */
+            }
             self._wireNeighborHighlight(svg);
             self._wireNodeTooltips(svg);
           }
@@ -11523,8 +11551,14 @@ class PageNav extends HTMLElement {
         // Direct child folder of parentKey
         var rest = parentKey === '' ? folder : folder.slice(parentKey.length + 1);
         if (rest.indexOf('/') !== -1) return; // not a direct child
-        // Skip if already rendered as a page above
-        if (byParent[parentKey].some(function (p) { return p.path.replace(/\.[^/]+$/, '') === folder; })) return;
+        // Skip if already rendered as a page above. A level with no pages
+        // of its own is normal — the standard layout puts every page under
+        // docs/, so the ROOT level holds folders only. Indexing that
+        // missing bucket used to throw, the throw was swallowed by
+        // loadManifest's .catch, and the sidebar claimed there was no
+        // manifest at all ("Run oku serve for full site navigation") on a
+        // site whose manifest had loaded fine.
+        if ((byParent[parentKey] || []).some(function (p) { return p.path.replace(/\.[^/]+$/, '') === folder; })) return;
         var li = document.createElement('li');
         li.className = 'page-nav-item folder';
         var label = document.createElement('div');

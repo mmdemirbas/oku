@@ -103,6 +103,29 @@ class TestCLIBuild:
         assert not (docs / "dist" / "markdown").exists()
         assert not (docs / "dist" / "standalone" / "llms.txt").exists()
 
+    def test_manifest_sits_where_the_kit_does_when_building_from_the_root(
+        self, sample_project: Path, repo_root: Path
+    ) -> None:
+        """Built from the PROJECT root with every page under docs/ — the
+        standard layout. build_site copies the kit to dist/site/_oku/ and
+        chrome.js derives the docs root from wherever _oku/ sits, so the
+        manifest has to be at the site root with root-relative page paths.
+        Writing it under dist/site/docs/ left every built page fetching a
+        manifest that was not there, and the site tree came up empty."""
+        proc = _run_cli(sample_project, "build", repo_root=repo_root)
+        assert proc.returncode == 0, proc.stderr
+        site = sample_project / "dist" / "site"
+        assert (site / "site-manifest.json").exists()
+        assert not (site / "docs" / "site-manifest.json").exists()
+        assert (site / "llms.txt").exists()
+        assert (site / "_oku" / "chrome.js").exists()
+        manifest = json.loads((site / "site-manifest.json").read_text(encoding="utf-8"))
+        paths = sorted(entry["path"] for entry in manifest["pages"])
+        assert paths == ["docs/about.html", "docs/index.html"], paths
+        # …and each of those paths resolves against the site root.
+        for rel in paths:
+            assert (site / rel).exists(), rel
+
     def test_manifest_lists_both_pages(self, sample_project: Path, repo_root: Path) -> None:
         docs = sample_project / "docs"
         _run_cli(docs, "build", repo_root=repo_root)
@@ -338,3 +361,44 @@ class TestCLIHelp:
         out = proc.stdout
         assert "--no-watch" in out
         assert "--no-search" in out
+
+
+# ---------- migrate ----------
+
+
+def test_migrate_converts_and_removes_the_json(tmp_path: Path, repo_root: Path) -> None:
+    page = {"k": "page", "t": "Sayfa", "b": ["## Bölüm {#b}\n\nMetin.\n"]}
+    (tmp_path / "p.json").write_text(json.dumps(page, ensure_ascii=False), encoding="utf-8")
+    proc = _run_cli(tmp_path, "migrate", repo_root=repo_root)
+    assert proc.returncode == 0, proc.stderr
+    assert not (tmp_path / "p.json").exists()
+    assert "## Bölüm {#b}" in (tmp_path / "p.md").read_text(encoding="utf-8")
+
+
+def test_migrate_keeps_json_when_asked(tmp_path: Path, repo_root: Path) -> None:
+    page = {"k": "page", "t": "T", "b": ["## S {#s}\n\nx\n"]}
+    (tmp_path / "p.json").write_text(json.dumps(page), encoding="utf-8")
+    assert _run_cli(tmp_path, "migrate", "--keep-json", repo_root=repo_root).returncode == 0
+    assert (tmp_path / "p.json").exists()
+    assert (tmp_path / "p.md").exists()
+
+
+def test_migrate_dry_run_writes_nothing(tmp_path: Path, repo_root: Path) -> None:
+    page = {"k": "page", "t": "T", "b": ["## S {#s}\n\nx\n"]}
+    (tmp_path / "p.json").write_text(json.dumps(page), encoding="utf-8")
+    assert _run_cli(tmp_path, "migrate", "--dry-run", repo_root=repo_root).returncode == 0
+    assert (tmp_path / "p.json").exists()
+    assert not (tmp_path / "p.md").exists()
+
+
+def test_migrate_refuses_to_delete_a_page_it_cannot_reproduce(tmp_path: Path, repo_root: Path) -> None:
+    """The JSON is deleted after conversion, so a page carrying something
+    the markdown emitter cannot express must keep its source instead of
+    losing it silently."""
+    page = {"k": "page", "t": "T", "b": ["## S {#s}\n\nx\n", {"k": "weird-kind", "x": 1}]}
+    (tmp_path / "p.json").write_text(json.dumps(page), encoding="utf-8")
+    proc = _run_cli(tmp_path, "migrate", repo_root=repo_root)
+    assert proc.returncode == 0
+    assert (tmp_path / "p.json").exists(), "source must survive a lossy conversion"
+    assert not (tmp_path / "p.md").exists()
+    assert "not lossless" in proc.stderr
