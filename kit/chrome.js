@@ -1559,6 +1559,11 @@ function buildTOC(tocList) {
 // closure that can't be removed.
 var __okuAidsInited = false;
 
+// Monotonic counter behind every per-instance SVG id the kit mints.
+// SVG url(#…) references are document-scoped, so two charts sharing an
+// id silently point at the same element.
+var __okuClipSeq = 0;
+
 function initReadingAids() {
   if (!__okuAidsInited) {
     __okuAidsInited = true;
@@ -4365,7 +4370,12 @@ class OkuChart extends HTMLElement {
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + (this._title || (this._type + ' chart')) + '" class="okc-svg">');
     // Clip rect so the plot doesn't bleed into the chrome when zoomed.
-    parts.push('<defs><clipPath id="okc-clip"><rect x="' + pad.left + '" y="' + pad.top + '" width="' + plotW + '" height="' + plotH + '"/></clipPath></defs>');
+    // The id must be unique per chart: url(#…) resolves to the FIRST
+    // element with that id in the DOCUMENT, so a shared id made every
+    // chart on a page clip to the first chart's plot rect — points cut
+    // off or spilling over, depending on which chart came first.
+    var clipId = 'okc-clip-' + (++__okuClipSeq);
+    parts.push('<defs><clipPath id="' + clipId + '"><rect x="' + pad.left + '" y="' + pad.top + '" width="' + plotW + '" height="' + plotH + '"/></clipPath></defs>');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Axes
     parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
@@ -4469,7 +4479,7 @@ class OkuChart extends HTMLElement {
 
     // Plot region (clipped). All series + their dots / labels live here so
     // points that scroll past the axes don't leak.
-    parts.push('<g clip-path="url(#okc-clip)">');
+    parts.push('<g clip-path="url(#' + clipId + ')">');
     var plotMidX = pad.left + plotW / 2;
     var drawsConnector = (self._type === 'line' || self._type === 'area');
     var drawsFill = (self._type === 'area');

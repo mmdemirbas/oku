@@ -545,3 +545,45 @@ def test_gutter_charts_keep_long_labels_inside_the_svg(page, site_url):
                     f"{chart_type} label clipped right at {viewport['width']}px: "
                     f"{row['right']}px over — {row!r}"
                 )
+
+
+def test_every_chart_clips_to_its_own_plot_rect(page, site_url):
+    """SVG url(#id) references resolve against the DOCUMENT, so a
+    clipPath id shared by every chart made all of them clip to the FIRST
+    chart's plot rectangle — series cut off or spilling over depending on
+    page order. Ids must be unique, and each chart's clip must point at a
+    rect inside that same chart."""
+    _goto(page, f"{site_url}/docs/charts.html")
+    page.wait_for_timeout(1500)
+    result = page.evaluate(
+        """() => {
+            const ids = [...document.querySelectorAll('clipPath[id]')].map(c => c.id);
+            const refs = [...document.querySelectorAll('[clip-path^="url(#"]')].map(g => {
+                const id = g.getAttribute('clip-path').slice(5, -1);  // strip url(# and )
+                const target = document.getElementById(id);
+                return { id, sameChart: !!target && target.closest('oku-chart') === g.closest('oku-chart') };
+            });
+            return { ids, refs };
+        }"""
+    )
+    assert len(result["ids"]) > 1, "expected several charts on this page"
+    assert len(set(result["ids"])) == len(result["ids"]), result["ids"]
+    assert result["refs"], "expected clipped plot groups"
+    assert all(r["sameChart"] for r in result["refs"]), result["refs"]
+
+
+def test_no_duplicate_element_ids_on_a_chart_heavy_page(page, site_url):
+    """Duplicate ids break getElementById for everything after the first
+    one — deep links, the TOC and SVG references alike."""
+    _goto(page, f"{site_url}/docs/charts.html")
+    page.wait_for_timeout(1500)
+    dups = page.evaluate(
+        """() => {
+            const seen = new Set(), dup = [];
+            document.querySelectorAll('[id]').forEach(e => {
+                if (seen.has(e.id)) dup.push(e.id); else seen.add(e.id);
+            });
+            return dup;
+        }"""
+    )
+    assert dups == [], dups
