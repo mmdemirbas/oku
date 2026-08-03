@@ -3009,6 +3009,13 @@ function _hdtAfterPrismHighlight(env) {
   var code = env.element;
   var pre = code.parentElement;
   if (!pre || pre.tagName !== 'PRE') return;
+  // Prism makes every <pre> it highlights keyboard-scrollable by
+  // stamping tabindex="0" — right for a code block, wrong for one that
+  // is aria-hidden (the live-snippet underlay behind its textarea).
+  // Focusable + aria-hidden is a tab stop a keyboard user lands on and
+  // a screen reader cannot describe. The autoloader re-highlights when
+  // a language module arrives, so this has to run on every pass.
+  if (pre.getAttribute('aria-hidden') === 'true') pre.removeAttribute('tabindex');
   if (!pre.classList.contains('okt-line-numbered')) return;
   if (code.querySelector(':scope > .okt-code-line')) return; // already wrapped, intact
   _hdtWrapCodeLines(code);
@@ -3028,8 +3035,11 @@ function _hdtAfterPrismHighlight(env) {
     marker.removeAttribute('role');
     marker.removeAttribute('tabindex');
     marker.removeAttribute('aria-expanded');
+    marker.removeAttribute('aria-label');
     marker.removeAttribute('data-fold-start');
     marker.removeAttribute('data-fold-end');
+    // Back to decoration until a fold pass claims it again.
+    marker.setAttribute('aria-hidden', 'true');
   });
   var lang = (code.className.match(/language-([\w-]+)/) || [0, ''])[1].toLowerCase();
   // Stamp a small language pill on the pre so the reader sees what
@@ -3261,6 +3271,12 @@ function _hdtApplyFolds(pre, code, folds) {
     marker.setAttribute('role', 'button');
     marker.setAttribute('tabindex', '0');
     marker.setAttribute('aria-expanded', 'true');
+    // A marker is decoration until it becomes foldable. Once it is a
+    // focusable button it must be exposed AND named: focusable +
+    // aria-hidden is a control a keyboard user can reach and a screen
+    // reader cannot see.
+    marker.removeAttribute('aria-hidden');
+    marker.setAttribute('aria-label', 'Fold block starting at line ' + (f.start + 1));
     marker.dataset.foldStart = String(f.start);
     marker.dataset.foldEnd = String(f.end);
   });

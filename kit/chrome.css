@@ -1741,6 +1741,9 @@ code:not(pre code) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  /* 24px is the pointer-target minimum; the chip rack is one of the
+     most-clicked surfaces in a table, and 3px padding left it at 23. */
+  min-height: 24px;
   padding: 3px 10px;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -2097,8 +2100,10 @@ a.okt-card:focus-visible,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  /* Box sized to the pointer-target minimum; the glyph inside stays
+     12px so the header rhythm is unchanged. */
+  width: 24px;
+  height: 24px;
   margin-right: 4px;
   border-radius: 4px;
   color: var(--text-soft);
@@ -5124,6 +5129,7 @@ oku-snippet .hds-reset {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 4px;
+  min-height: 24px;
   padding: 3px 10px;
   font-size: 11px;
   color: var(--text-soft);

@@ -610,3 +610,156 @@ def test_no_horizontal_page_scroll_at_360(page, site_url, rel):
     page.wait_for_timeout(600)
     doc_w, win_w = page.evaluate("() => [document.documentElement.scrollWidth, window.innerWidth]")
     assert doc_w <= win_w, f"{rel}: document {doc_w}px wider than viewport {win_w}px"
+
+
+CONTAINMENT_PROBE = """() => {
+  const main = document.querySelector('main');
+  const mb = main.getBoundingClientRect();
+  const out = [];
+  main.querySelectorAll('*').forEach(e => {
+    const r = e.getBoundingClientRect();
+    const cs = getComputedStyle(e);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.position === 'fixed') return;
+    if (r.width === 0 && r.height === 0) return;
+    if (r.right <= mb.right + 1.5 && r.left >= mb.left - 1.5) return;
+    // Wide content MAY overflow inside a scroll container — that is the
+    // documented pattern for tables, boards and code. What it may not do
+    // is overflow with nowhere to scroll.
+    let a = e.parentElement;
+    while (a && a !== main.parentElement) {
+      const ov = getComputedStyle(a).overflowX;
+      if ((ov === 'auto' || ov === 'scroll') && a.scrollWidth > a.clientWidth + 1) return;
+      a = a.parentElement;
+    }
+    const cls = (e.className && e.className.baseVal !== undefined ? e.className.baseVal : e.className) || '';
+    out.push(e.tagName + '.' + cls + ' +' + Math.round(Math.max(r.right - mb.right, mb.left - r.left)) + 'px');
+  });
+  return [...new Set(out)].slice(0, 8);
+}"""
+
+
+@pytest.mark.parametrize("width", [1440, 768, 360])
+@pytest.mark.parametrize("rel", ["docs/charts.html", "docs/tables.html", "docs/reference.html"])
+def test_nothing_escapes_its_container(page, site_url, rel, width):
+    """Every rendered element stays inside <main>, unless it sits in a
+    container that actually scrolls. This is the one assertion that
+    covers the whole primitive set at once — 48 charts, boards, wide
+    tables, code blocks — at every breakpoint."""
+    page.set_viewport_size({"width": width, "height": 900})
+    _goto(page, f"{site_url}/{rel}")
+    page.wait_for_timeout(1500)
+    escapes = page.evaluate(CONTAINMENT_PROBE)
+    assert escapes == [], f"{rel} @{width}px: {escapes}"
+
+
+def test_containment_holds_in_dark_theme(page, site_url):
+    """Dark theme swaps tokens, and a token change can change a border
+    or padding — so containment is asserted in both themes, not one."""
+    page.add_init_script("try{localStorage.setItem('theme-pref','dark')}catch(e){}")
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/charts.html")
+    page.wait_for_timeout(1500)
+    assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
+    assert page.evaluate(CONTAINMENT_PROBE) == []
+
+
+def test_every_chart_on_the_charts_page_renders_a_visual(page, site_url):
+    """A chart that fails to render leaves an empty host — visible as a
+    gap, invisible to a schema check. Every <oku-chart> must carry a
+    non-trivial rendered surface (SVG or the DIV-based bar family)."""
+    _goto(page, f"{site_url}/docs/charts.html")
+    page.wait_for_timeout(1800)
+    empty = page.evaluate(
+        """() => [...document.querySelectorAll('oku-chart')]
+             .filter(c => {
+               const v = c.querySelector('svg, .bar-chart, .bar-chart-multi, .waffle, .kpi-grid');
+               if (!v) return true;
+               const r = v.getBoundingClientRect();
+               return r.width < 8 || r.height < 8;
+             })
+             .map(c => c.getAttribute('type') || c.textContent.slice(0, 30))"""
+    )
+    assert empty == [], empty
+
+
+# ---------- accessibility baseline ----------
+
+
+A11Y_PROBE = """() => {
+  const vis = e => {
+    const r = e.getBoundingClientRect();
+    const cs = getComputedStyle(e);
+    return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none';
+  };
+  const name = e =>
+    (e.getAttribute('aria-label') || '').trim() ||
+    (e.getAttribute('title') || '').trim() ||
+    (e.textContent || '').trim() ||
+    (e.labels && e.labels.length ? [...e.labels].map(l => l.textContent.trim()).join(' ') : '');
+  const controls = [...document.querySelectorAll(
+    'button, [role="button"], input, select, a[href]')].filter(vis);
+  return {
+    unnamed: [...new Set(controls.filter(e => !name(e))
+      .map(e => e.tagName + '.' + (e.className || '')))],
+    focusableButHidden: [...new Set([...document.querySelectorAll(
+      '[aria-hidden="true"]')].filter(e => e.tabIndex >= 0 && vis(e))
+      .map(e => e.tagName + '.' + (e.className || '')))],
+    unnamedCharts: [...document.querySelectorAll('oku-chart svg.okc-svg')]
+      .filter(vis).filter(s => !s.getAttribute('aria-label') && !s.querySelector('title')).length,
+    landmarks: {
+      main: document.querySelectorAll('main').length,
+      h1: document.querySelectorAll('main h1').length,
+      lang: document.documentElement.lang || '',
+    },
+  };
+}"""
+
+
+@pytest.mark.parametrize("rel", ["docs/charts.html", "docs/tables.html", "docs/reference.html"])
+def test_accessibility_baseline(page, site_url, rel):
+    """Every visible control has an accessible name, nothing is both
+    focusable and aria-hidden (a control a keyboard reaches and a screen
+    reader cannot see), every chart SVG is named, and the page has one
+    main, one h1 and a language."""
+    _goto(page, f"{site_url}/{rel}")
+    page.wait_for_timeout(1500)
+    r = page.evaluate(A11Y_PROBE)
+    assert r["unnamed"] == [], f"{rel}: unnamed controls {r['unnamed']}"
+    assert r["focusableButHidden"] == [], f"{rel}: {r['focusableButHidden']}"
+    assert r["unnamedCharts"] == 0, f"{rel}: {r['unnamedCharts']} chart SVGs without a name"
+    assert r["landmarks"] == {"main": 1, "h1": 1, "lang": "en"}, r["landmarks"]
+
+
+def test_pointer_targets_meet_the_minimum(page, site_url):
+    """Chip rack, group chevrons and toolbar buttons are the surfaces a
+    reader actually clicks; they must be at least 24px in both axes.
+    Inline affordances inside prose or a code gutter are exempt — that
+    is the documented exception, not an oversight."""
+    _goto(page, f"{site_url}/docs/tables.html")
+    page.wait_for_timeout(1500)
+    small = page.evaluate(
+        """() => [...document.querySelectorAll(
+             '.okt-chip, .okt-group-chevron, .okt-table-controls button, .copy-btn, .okt-wrap-btn')]
+           .map(e => ({ n: e.className, r: e.getBoundingClientRect() }))
+           .filter(o => o.r.width > 0 && (o.r.width < 24 || o.r.height < 24))
+           .map(o => o.n + ' ' + Math.round(o.r.width) + 'x' + Math.round(o.r.height))"""
+    )
+    assert small == [], small
+
+
+def test_code_fold_marker_is_a_named_button_when_active(page, site_url):
+    """The marker starts as decoration (aria-hidden) and becomes a real
+    button once a fold is attached. It used to keep aria-hidden while
+    gaining tabindex — reachable by keyboard, invisible to a reader."""
+    _goto(page, f"{site_url}/docs/reference.html")
+    page.wait_for_timeout(1500)
+    state = page.evaluate(
+        """() => [...document.querySelectorAll('.okt-fold-marker.okt-foldable')].slice(0, 3)
+             .map(m => ({ hidden: m.getAttribute('aria-hidden'), label: m.getAttribute('aria-label'),
+                          role: m.getAttribute('role'), expanded: m.getAttribute('aria-expanded') }))"""
+    )
+    assert state, "expected at least one foldable marker on the reference page"
+    for m in state:
+        assert m["hidden"] is None, m
+        assert m["label"], m
+        assert m["role"] == "button" and m["expanded"] in ("true", "false"), m

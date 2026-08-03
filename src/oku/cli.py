@@ -2442,6 +2442,32 @@ def _lint_md_reference_forms(
     return issues
 
 
+def _md_heading_level_skips(body: list) -> list[tuple[str, int, str]]:
+    """Find headings that jump more than one level down (## → ####).
+
+    The outline is what a screen reader announces and what the on-page
+    TOC nests by, so a skipped level is a structural defect, not a
+    styling preference. Levels are tracked across the whole page: a
+    typed fence opens a new b[] string mid-section, and the heading
+    before it still counts.
+    """
+    out: list[tuple[str, int, str]] = []
+    prev = 0
+    for idx, blk in enumerate(body):
+        if not isinstance(blk, str):
+            continue
+        prose, _ = _split_md_fences(blk)
+        for lineno, line in prose:
+            m = _MD_HEADING_LINE_RE.match(line)
+            if not m:
+                continue
+            level = len(m.group(1))
+            if prev and level > prev + 1:
+                out.append((f"b[{idx}]", lineno, f"h{prev} → h{level}"))
+            prev = level
+    return out
+
+
 def _known_chart_types() -> list[str]:
     """Chart `type` values, read from the schema enum — the single
     source of truth. Empty when the schema is unavailable; callers must
@@ -2657,6 +2683,15 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         # Footnote / link-reference definitions resolve page-wide, so they
         # are collected before any string is linted.
         fn_defs, link_defs = _md_reference_definitions([b for b in body if isinstance(b, str)])
+        for where, lineno, jump in _md_heading_level_skips(body):
+            add(
+                p,
+                "warning",
+                "heading-level-skip",
+                f"{where} line {lineno}",
+                f"Heading jumps {jump} — a level was skipped, which breaks the document outline for "
+                "screen readers and for the on-page TOC.",
+            )
 
         for idx, blk in enumerate(body):
             where = f"b[{idx}]"
@@ -2720,6 +2755,33 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             if kind == "chart":
                 for code, message in _chart_shape_issues(blk):
                     add(p, "error", code, where, message)
+
+            # 6b. Layout primitives with an empty collection render to
+            # nothing at all — zero height, no message, no console
+            # warning. The author sees a gap and has to guess. Charts
+            # are already covered by the shape checks above.
+            for empty_kind, field in (
+                ("kpi-grid", "tiles"),
+                ("step-flow", "steps"),
+                ("compare-grid", "cards"),
+                ("chart-grid", "charts"),
+            ):
+                if kind == empty_kind and not blk.get(field):
+                    add(
+                        p,
+                        "error",
+                        f"empty-{empty_kind}",
+                        where,
+                        f"{empty_kind} has no `{field}`; it renders as a zero-height gap.",
+                    )
+            if kind == "table" and not blk.get("rows"):
+                add(
+                    p,
+                    "info",
+                    "empty-table",
+                    where,
+                    "Table has headers but no rows — intentional as an empty state, a mistake otherwise.",
+                )
 
             # Prose nested inside typed payloads (step bodies, card
             # bodies, table cells, …) is markdown too — same glossary /

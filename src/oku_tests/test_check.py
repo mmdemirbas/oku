@@ -707,3 +707,54 @@ def test_undefined_footnote_and_link_reference_are_flagged(tmp_path: Path) -> No
     ln = _issues_of(issues, code="undefined-link-reference")
     assert len(fn) == 1 and "missing" in fn[0]["message"], fn
     assert len(ln) == 1 and "nope" in ln[0]["message"], ln
+
+
+# ---------- empty layout payloads ----------
+
+
+@pytest.mark.parametrize(
+    ("kind", "field"),
+    [("kpi-grid", "tiles"), ("step-flow", "steps"), ("compare-grid", "cards"), ("chart-grid", "charts")],
+)
+def test_empty_layout_primitive_is_an_error(tmp_path: Path, kind: str, field: str) -> None:
+    """These render to literally nothing — zero height, no message, no
+    console warning — so the author sees a gap and has to guess. The
+    linter is the only place the mistake can surface."""
+    page = {"k": "page", "t": "T", "b": ["## S {#s}\n", {"k": kind, field: []}]}
+    issues = cli.check_pages([(tmp_path / "p.json", page)], tmp_path)
+    flagged = _issues_of(issues, code=f"empty-{kind}")
+    assert len(flagged) == 1 and flagged[0]["severity"] == "error", issues
+
+
+def test_table_without_rows_is_only_an_info(tmp_path: Path) -> None:
+    """A header-only table is a legitimate empty state, so it is a nudge
+    rather than an error."""
+    page = {"k": "page", "t": "T", "b": ["## S {#s}\n", {"k": "table", "headers": ["a"], "rows": []}]}
+    issues = cli.check_pages([(tmp_path / "p.json", page)], tmp_path)
+    empty = _issues_of(issues, code="empty-table")
+    assert len(empty) == 1 and empty[0]["severity"] == "info"
+
+
+def test_heading_level_skip_is_flagged(tmp_path: Path) -> None:
+    """The outline is what a screen reader announces and what the TOC
+    nests by, so h2 → h4 is a structural defect. Levels are tracked
+    across the whole page: a typed fence starts a new b[] string, and
+    the heading before it still counts."""
+    page = {
+        "k": "page",
+        "t": "T",
+        "b": [
+            "## A {#a}\n\nprose\n",
+            {"k": "kpi-grid", "tiles": [{"num": "1", "label": "x"}]},
+            "#### D {#d}\n\nprose\n",
+        ],
+    }
+    issues = cli.check_pages([(tmp_path / "p.json", page)], tmp_path)
+    skips = _issues_of(issues, code="heading-level-skip")
+    assert len(skips) == 1 and "h2 → h4" in skips[0]["message"], issues
+
+
+def test_heading_levels_in_order_pass(tmp_path: Path) -> None:
+    page = {"k": "page", "t": "T", "b": ["## A {#a}\n\nx\n\n### B {#b}\n\ny\n\n#### C {#c}\n\nz\n"]}
+    issues = cli.check_pages([(tmp_path / "p.json", page)], tmp_path)
+    assert _issues_of(issues, code="heading-level-skip") == []
