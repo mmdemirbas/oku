@@ -402,3 +402,34 @@ def test_migrate_refuses_to_delete_a_page_it_cannot_reproduce(tmp_path: Path, re
     assert (tmp_path / "p.json").exists(), "source must survive a lossy conversion"
     assert not (tmp_path / "p.md").exists()
     assert "not lossless" in proc.stderr
+
+
+# ---------- init starter page ----------
+
+
+def test_init_seeds_a_starter_page_in_an_empty_docs_root(tmp_path: Path, repo_root: Path) -> None:
+    """An empty docs root that renders nothing is a bad first minute.
+    init drops a front-matter skeleton the author can type into."""
+    proc = _run_cli(tmp_path, "init", repo_root=repo_root)
+    assert proc.returncode == 0, proc.stderr
+    md = tmp_path / "index.md"
+    assert md.exists()
+    body = md.read_text(encoding="utf-8")
+    assert body.startswith("---\ntitle:")
+    assert "[!TLDR]" in body
+    assert (tmp_path / "index.html").exists()
+    assert (tmp_path / "_oku").is_symlink()
+
+
+def test_init_does_not_add_a_starter_next_to_existing_pages(tmp_path: Path, repo_root: Path) -> None:
+    """init is idempotent and gets re-run constantly; it must never drop
+    a stray index.md into a docs tree that already has pages."""
+    (tmp_path / "guide.md").write_text("---\ntitle: G\n---\n\n## S\n\nx\n", encoding="utf-8")
+    assert _run_cli(tmp_path, "init", repo_root=repo_root).returncode == 0
+    assert not (tmp_path / "index.md").exists()
+
+
+def test_init_keeps_an_existing_starter(tmp_path: Path, repo_root: Path) -> None:
+    (tmp_path / "index.md").write_text("---\ntitle: Mine\n---\n\n## S\n\nmine\n", encoding="utf-8")
+    assert _run_cli(tmp_path, "init", repo_root=repo_root).returncode == 0
+    assert "mine" in (tmp_path / "index.md").read_text(encoding="utf-8")

@@ -45,6 +45,14 @@ This skill is governed by the four design principles in
 grouping). They apply at three layers — visual, content, code — and
 the **content layer** is the load-bearing one for this skill.
 
+**Before structuring the page, decide catalog or teaching** — see
+`~/.claude/rules/teaching-order.md`. A reference the user returns to
+for lookup is organised by topic; anything meant to be read start to
+finish is organised by the reader's next question, with one spine
+visual that grows through the document. Getting this backwards
+produces a page that is complete and unusable. When both are needed,
+build two pages and link them.
+
 When generating any artifact via this skill, route the content design
 through the four:
 
@@ -112,8 +120,20 @@ Failure recovery rules:
   pipe-separated-string shape is invalid.
 - `engine` is NOT a valid key on `diagram` blocks — Mermaid is the
   only engine; just pass `source: "..."`.
+- `info-tip.content` must be a **block array**, never a bare string.
+  A string passes `oku check` and then renders as a `<details>` with
+  ONLY the `<summary>` — the body silently disappears. Same silent-drop
+  risk for any `content` field documented as a block list. After adding
+  an `info-tip`, open the page and assert the `<details>` has more than
+  one child element; the linter will not catch this.
 
 **Never declare a page edit done if `oku check` exits non-zero.**
+
+**`oku check` passing is not proof the content rendered.** Blocks with
+a wrong-but-valid payload shape (see `info-tip` above) validate clean and
+vanish in the browser. For any block kind you have not used before,
+verify in a real browser that its body is present, not just that the
+build succeeded.
 
 For the strict gate before delivery, use `oku check --strict`
 (exits 1 on warnings too). For partial passes during iteration, plain
@@ -140,73 +160,96 @@ For the strict gate before delivery, use `oku check --strict`
 3. **Run `oku init` from the docs root.** Do this silently — don't
    tell the user "run init"; just run it yourself from the directory
    that contains (or will contain) the new page. Init is idempotent:
-   it confirms or refreshes the `_kit` symlink and refreshes
+   it confirms or refreshes the `_oku` symlink and refreshes
    `index.html` so the inline `window.__okuManifest` includes every
    page currently in the tree (including the one you just added). Run
    it once before authoring AND once after adding or updating a page
    — the second run is what makes the new entry visible in the site-
    tree sidebar when the user opens the file directly from their IDE.
 
+   In an otherwise empty directory init also drops a starter
+   `index.md`: front-matter skeleton plus a TL;DR block, ready to type
+   into. It never adds one next to pages that already exist.
+
    Important: run `oku init` in the same directory the page lives
    under (typically `docs/`). Running from the project root when
-   pages live under `docs/` creates a stray `_kit` symlink and
+   pages live under `docs/` creates a stray `_oku` symlink and
    `index.html` at the project root — neither is wanted.
 
-4. **Use the kit-style skeleton.** Don't inline 500 lines of chrome CSS
-   anymore. The minimal HTML head is:
+4. **Author the page as markdown.** A page is ONE `.md` file:
+   YAML front-matter + a GFM body. There is no HTML to write and no
+   JSON to hand-assemble — `oku serve` and `oku build` convert the
+   source on the fly.
 
-   ```html
-   <script src="_oku/chrome-boot.js"></script>
-   <link rel="stylesheet" href="_oku/chrome.css">
-   <script src="_oku/chrome.js" defer></script>
+   ```markdown
+   ---
+   title: Storage engines
+   eyebrow: Reference
+   subtitle: One line under the H1.
+   accent: teal
+   order: 20
+   summary: One line for nav tooltips, search and llms.txt.
+   ---
+
+   > [!TLDR]
+   > The one sentence a reader keeps.
+   >
+   > - point one
+   > - point two
+
+   ## Section title {#anchor-id}
+
+   Lead paragraph. Full GFM: **bold**, *italic*, ~~strike~~, `code`,
+   [links](https://example.com), ![images](path.png), footnotes[^1],
+   tables with alignment, task lists, definition lists.
+
+   ```oku-chart
+   {"type":"bar","rows":[{"label":"a","value":60}]}
    ```
 
-   And the minimal body shape is:
-
-   ```html
-   <page-chrome></page-chrome>
-   <div class="layout">
-     <page-toc title="Contents"></page-toc>
-     <main id="main-content">
-       <header class="cover">…</header>
-       <section id="…"><h2>…</h2>…</section>
-     </main>
-   </div>
+   [^1]: Definitions resolve page-wide — put them wherever you like.
    ```
 
-   The kit gives you: three-mode theme (system / light / dark, system
-   default with live OS sync), sticky TOC with scroll-spy, frosted-glass
-   chrome buttons, progress bar, back-to-top, section permalinks,
-   copy-to-clipboard on `<pre>`, glossary tooltips, callouts, pills,
-   KPI tiles, comparison cards, TL;DR box, cover header with radial
-   accent glow, print/PDF stylesheet. Don't re-implement any of this.
+   - `##` opens a section (the TOC is built from these); `###` is a
+     sub-heading inside it. `{#id}` overrides the auto-slug.
+   - Every kit primitive is a typed fence whose body is ONE compact
+     JSON object: `oku-chart`, `oku-table`, `oku-kpi-grid`,
+     `oku-step-flow`, `oku-compare-grid`, `oku-example`, `oku-insight`,
+     `oku-live-snippet`, `oku-annotated-code`, `oku-chart-grid`,
+     `oku-tldr`, `oku-diagram` — plus plain `mermaid`.
+   - Admonitions are GFM alerts: `NOTE`, `TIP`, `IMPORTANT`, `WARNING`,
+     `CAUTION` and the kit's `TLDR`.
+   - Glossary and external references are links:
+     `[label](#g/term-id)` and `[label](#x/source-id)`. Registry ids
+     may contain spaces.
+   - A block-level HTML tag at column 0 is an escape hatch (custom
+     elements and `<script>` included) when a primitive genuinely does
+     not exist for what you need. `oku check` lists each one.
+   - `docs/reference.md` in the kit repo is the canonical example of
+     every primitive with its payload shape beside the rendered output.
 
-   For a per-page accent color, add a small `<style>` block in `<head>`
-   overriding `--accent` / `--accent-soft` / `--accent-strong` for both
-   `:root` and `:root[data-theme="dark"]`. Nothing else.
+   Hand-authored `.json` pages (v1 and v2) still render, and
+   `oku migrate` converts one to markdown, but new pages are markdown.
 
-   `oku init` lays down a starter `index.{html,json}` pair when run
-   in an empty docs directory — that's the canonical minimal page.
-   The starter templates live under `src/oku/templates/` in the repo
-   if you need to inspect them directly.
-
-5. **Write content following the chosen narrative arc.** Use
-   `<section id="...">` for each top-level chunk with at least one
-   `<h2>` — TOC is built from this structure.
+5. **Keep the chrome out of it.** Do not write `<page-chrome>`,
+   `<page-toc>`, `<main>`, a cover header or a `<style>` block — the
+   renderer emits all of it from the front-matter. Per-page accent is
+   the `accent:` key (named token or CSS colour), not a stylesheet.
+   The kit gives you three-mode theming, the sticky TOC with
+   scroll-spy, the progress bar, back-to-top, section permalinks,
+   copy-to-clipboard and line folding on code, glossary tooltips, the
+   lightbox, search and the print stylesheet. Don't re-implement any
+   of it.
 
 6. **Run sanity checks** (see below).
 
-7. **Report the artifact with a project-relative path** (e.g.
-   `_internal/foo.html` or `docs/team-brief/bar.html`). Do **not** emit
-   `file://` URLs — the user's setup serves these files via an HTTP
-   server, so a bare `file://` link cannot be opened by clicking. The
-   user already knows how to open the path; don't add prefix noise.
+7. **Run `oku build`, then report the standalone file by absolute path** —
+   e.g. `/Users/md/dev/proj/docs/reports/dist/standalone/foo.html`. No
+   `file://` prefix; the bare absolute path is clickable.
 
-   Do **not** suggest `oku serve`, "open the file in a browser",
-   "run a local server", or any other preview step. The user's flow
-   is IDE-direct: they click the file in their IDE to render it. The
-   kit boots from `_oku/` and the inline manifest you just refreshed
-   in step 3; nothing else is needed. Just name the file and stop.
+   `dist/standalone/` inlines its assets, so it opens in a browser tab
+   with no server. `dist/site/` and the source directory both depend on
+   sibling assets — never hand those over.
 
 ## Visual-first communication — the load-bearing principle
 
@@ -245,8 +288,18 @@ not, you've decorated text, not built a visual.
   or `<task-dir>/notes/<topic>.html`. Place alongside the source artifact
   so the user can read both side-by-side.
 - Multiple replies in one day: suffix `-01`, `-02`.
-- Never commit by default — these are study/review aids, not project
-  history. The user opts in if they want.
+- Commit policy depends on what the artifact IS — don't assume:
+  - **One-off / throwaway** (a single-reply review HTML, a postmortem
+    or audit doc generated alongside one answer): don't commit by
+    default; it's a personal aid, not project history. User opts in.
+  - **An ongoing project or knowledge base** the user is actively
+    building with the kit (a multi-session study guide, a docs site,
+    a living reference): this IS real project work. Version-control it
+    like any code — follow the repo's commit conventions and the
+    user's `commit.md` cadence. Do NOT label it a "study aid" and skip
+    committing; that mislabels real work. If unsure which kind it is,
+    ask — the difference is "wrote it once to answer a question" vs.
+    "we keep coming back to grow it."
 
 ## Page chrome — never moves
 
@@ -561,6 +614,14 @@ browser-side checks below can't see:
   in any prose. The kit documents current behaviour, not history.
 - Chart shape errors: `type:bar` without `rows`, `type:scatter|line`
   without `series`, unknown chart types.
+- Layout primitives with an empty collection (`kpi-grid` with no
+  tiles, `step-flow` with no steps, `compare-grid` with no cards,
+  `chart-grid` with no charts) — these render as a zero-height gap
+  with no other signal.
+- Footnote and reference-link labels with no definition anywhere on
+  the page; both render as literal source text otherwise.
+- Headings that skip a level (`##` → `####`), which breaks the
+  outline a screen reader announces and the TOC nests by.
 - Strict-GFM subset violations (setext headings, indented code
   blocks, lazy blockquote continuation, ambiguous `---`) and
   ```oku-* fences that failed to lift (bad JSON / unknown kind).

@@ -237,19 +237,36 @@ def report(label: str, path: Path) -> None:
     print(f"  {label:<14} {file_url(path)}")
 
 
+def _kit_starter_md() -> str | None:
+    """The starter markdown shipped with the package, with the
+    placeholder tokens left in place — they read as a form to fill in."""
+    for base in (Path(__file__).parent / "templates", _kit_assets_dir() / "templates"):
+        candidate = base / "starter.md"
+        if candidate.exists():
+            try:
+                return candidate.read_text(encoding="utf-8")
+            except OSError:
+                return None
+    return None
+
+
 # ---------- init ----------
 def cmd_init(args: argparse.Namespace) -> int:
     """Idempotently scaffold the CURRENT directory as a docs root.
 
     Creates two things in cwd if missing:
 
-    - ``_kit`` → KIT_DIR symlink (kit JS/CSS + schema/glossary/extrefs).
+    - ``_oku`` → KIT_DIR symlink (kit JS/CSS + schema/glossary/extrefs).
       If a stale symlink already points somewhere else, it is replaced;
       a non-symlink path of the same name is left alone with an error.
     - ``index.html`` — entry stub. A single on-disk stub at the docs
       root is what makes IDE-served workflows work (IntelliJ's built-in
-      HTTP server, Live Server, etc.); deeper pages stay JSON-only and
+      HTTP server, Live Server, etc.); deeper pages stay source-only and
       rely on the dev server's in-memory synthesis.
+    - ``index.md`` — starter page, ONLY in a directory that holds no
+      page source yet. An empty docs root that renders nothing is a bad
+      first minute; a filled-in front-matter block and a TL;DR is a page
+      an author can start typing into.
 
     Run this in whichever directory you treat as your docs root —
     typically ``cd docs && oku init``. The command never creates
@@ -293,6 +310,21 @@ def cmd_init(args: argparse.Namespace) -> int:
                 title = data["title"]
         except (json.JSONDecodeError, OSError):
             pass
+    # Starter page — only when the directory holds no page source at
+    # all, so re-running init in a real docs tree never adds a stray
+    # index.md next to the pages that are already there.
+    index_md = root / "index.md"
+    has_source = any(
+        p.suffix in (".md", ".json") and p.name not in ("kit.json", "site-manifest.json")
+        for p in root.iterdir()
+        if p.is_file()
+    )
+    if not has_source:
+        template = _kit_starter_md()
+        if template is not None:
+            index_md.write_text(template, encoding="utf-8")
+            print(f"✓ Created {index_md} (starter page — fill in the front-matter)")
+
     fresh = _stub_for(title, inline_manifest=_init_time_manifest(root))
     if index_html.exists():
         existing = index_html.read_text(encoding="utf-8")
@@ -311,7 +343,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         index_html.write_text(fresh, encoding="utf-8")
         print(f"✓ Created {index_html}")
     print()
-    print("  Author pages as <name>.json (or .md) next to index.html.")
+    print("  Author pages as <name>.md next to index.html (JSON still works).")
     print("  Open index.html in your IDE, or run `oku serve` from the")
     print("  project root for a live-reloading dev server.")
     return 0
