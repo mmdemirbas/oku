@@ -763,3 +763,27 @@ def test_code_fold_marker_is_a_named_button_when_active(page, site_url):
         assert m["hidden"] is None, m
         assert m["label"], m
         assert m["role"] == "button" and m["expanded"] in ("true", "false"), m
+
+
+def test_theme_toggle_leaves_the_dom_where_it_started(page, site_url):
+    """Charts, code blocks and tables all re-render on a theme change.
+    If any of them appends instead of replacing, a page grows every time
+    the reader flips the theme — invisible until a long document turns
+    sluggish. Six round trips must land on the counts it started with."""
+    snapshot = """() => ({
+      elements: document.querySelectorAll('main *').length,
+      chartSvgs: document.querySelectorAll('oku-chart svg').length,
+      copyBtns: document.querySelectorAll('main .copy-btn').length,
+      wrapBtns: document.querySelectorAll('main .okt-wrap-btn').length,
+      tableWraps: document.querySelectorAll('main .okt-table-wrap').length,
+      theme: document.documentElement.dataset.theme,
+    })"""
+    _goto(page, f"{site_url}/docs/charts.html")
+    page.wait_for_timeout(1800)
+    before = page.evaluate(snapshot)
+    for _ in range(6):
+        page.click(".theme-toggle, [data-theme-toggle], .ctrl-btn[title*='theme' i]")
+        page.wait_for_timeout(320)
+    page.wait_for_timeout(900)
+    after = page.evaluate(snapshot)
+    assert after == before, {k: (before[k], after[k]) for k in before if before[k] != after[k]}

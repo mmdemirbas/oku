@@ -138,3 +138,97 @@ def test_narrow_viewport_gives_main_the_full_width(page, standalone_url):
     assert main["width"] >= NARROW["width"] * 0.8, (
         f"main width {main['width']} too narrow at {NARROW['width']}px"
     )
+
+
+# ---------- parity with the served page ----------
+
+_RICH_PAGE = {
+    "k": "page",
+    "t": "Zengin sayfa",
+    "m": {"summary": "Parity probe"},
+    "b": [
+        "## Metin {#metin}\n\nParagraf, **kalın**, `kod`, [bağlantı](https://example.com) ve bir liste:\n\n- bir\n- iki\n",
+        {"k": "chart", "type": "bar", "rows": [{"label": "a", "value": 60}, {"label": "b", "value": 80}]},
+        {"k": "table", "headers": ["Ad", "Değer"], "rows": [["x", "1"], ["y", "2"]]},
+        {"k": "kpi-grid", "tiles": [{"num": "12", "label": "ölçüm"}]},
+        "## İkinci {#ikinci}\n\n> [!NOTE] Not\n> Gövde.\n\n```js\nconst a = 1;\n```\n",
+    ],
+}
+
+_SHAPE = """() => ({
+  sections: document.querySelectorAll('main section').length,
+  paragraphs: document.querySelectorAll('main p').length,
+  listItems: document.querySelectorAll('main li').length,
+  tables: document.querySelectorAll('main .okt-table-wrap').length,
+  rows: document.querySelectorAll('main .okt-table-wrap tbody tr').length,
+  charts: document.querySelectorAll('oku-chart').length,
+  barRows: document.querySelectorAll('main .bar-row').length,
+  kpis: document.querySelectorAll('main .kpi').length,
+  callouts: document.querySelectorAll('main .callout').length,
+  codeBlocks: document.querySelectorAll('main pre code').length,
+  links: document.querySelectorAll('main a[href^="https://"]').length,
+  text: document.querySelector('main').innerText.replace(/\\s+/g, ' ').trim(),
+})"""
+
+
+@pytest.fixture(scope="session")
+def parity_urls(tmp_path_factory):
+    """The same page two ways: served (stub + sibling JSON) and built
+    standalone (everything inlined). Also hands back the file:// URL of
+    the standalone artifact, which is how it actually gets shared."""
+    from oku import cli
+
+    src = tmp_path_factory.mktemp("parity-src")
+    out = tmp_path_factory.mktemp("parity-out")
+    (src / "_oku").symlink_to(Path(__file__).resolve().parents[3] / "kit", target_is_directory=True)
+    stub = cli._stub_for("Zengin sayfa")
+    (src / "rich.html").write_text(stub, encoding="utf-8")
+    (src / "rich.json").write_text(json.dumps(_RICH_PAGE, ensure_ascii=False), encoding="utf-8")
+    cli.build_standalone([(src / "rich.html", stub, _RICH_PAGE)], out, src)
+
+    servers = []
+    for directory in (src, out):
+        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(directory))
+        httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        servers.append(httpd)
+    yield {
+        "served": f"http://127.0.0.1:{servers[0].server_address[1]}/rich.html",
+        "standalone": f"http://127.0.0.1:{servers[1].server_address[1]}/rich.html",
+        "file": (out / "rich.html").as_uri(),
+    }
+    for httpd in servers:
+        httpd.shutdown()
+
+
+def test_standalone_matches_the_served_page(page, parity_urls):
+    """A standalone file is what gets emailed. Its DOM must match the
+    served page block for block — same sections, same chart, same table
+    rows, same text — or "send the HTML" quietly ships something else
+    than what the author reviewed."""
+    _goto(page, parity_urls["served"])
+    page.wait_for_timeout(1200)
+    served = page.evaluate(_SHAPE)
+
+    _goto(page, parity_urls["standalone"])
+    page.wait_for_timeout(1200)
+    standalone = page.evaluate(_SHAPE)
+
+    assert standalone == served, {k: (served[k], standalone[k]) for k in served if served[k] != standalone[k]}
+    # The bar family renders as DIV rows rather than an <oku-chart> host,
+    # so barRows is what proves the chart made it across.
+    assert served["barRows"] == 2 and served["tables"] == 1, served
+
+
+def test_standalone_renders_the_same_from_file_protocol(page, parity_urls):
+    """No server at all — the file:// case the artifact exists for."""
+    page.goto(parity_urls["file"])
+    page.wait_for_selector("main section")
+    page.wait_for_timeout(1200)
+    shape = page.evaluate(_SHAPE)
+    assert shape["sections"] == 2
+    assert shape["barRows"] == 2
+    assert shape["tables"] == 1 and shape["rows"] >= 2
+    assert shape["kpis"] == 1 and shape["callouts"] == 1
+    assert shape["codeBlocks"] == 1 and shape["links"] == 1
+    assert "kalın" in shape["text"]
