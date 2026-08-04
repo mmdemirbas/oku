@@ -157,158 +157,62 @@ table { font-variant-numeric: tabular-nums; }
   font-variant-numeric: tabular-nums;
 }
 
-/* Layout — single left sidebar + main. page-nav adopts page-toc as a
-   child at boot (see PageNav.connectedCallback), so the sidebar is a
-   single grid cell. A two-column grid is all the layout needs. The
-   layout spans the full viewport — the sidebar anchors at left:0 so
-   it never looks "floating in the middle" on wide windows. Content
-   width is governed by `main { max-width: ... }`, which respects the
-   reader's width-mode preference (see --content-width). */
-.layout {
-  display: grid;
-  grid-template-columns: var(--sidebar-width, 280px) minmax(0, 1fr);
-  transition: grid-template-columns 0.25s ease;
-}
-/* Suppress the grid transition while the reader is dragging the
-   resizer — otherwise the column lags behind the cursor. */
-body.sidebar-resizing .layout { transition: none; }
-body.sidebar-resizing { cursor: col-resize; user-select: none; }
+/* Layout — one centred content column. The sidebar (page-nav, which
+   adopts page-toc at boot) is an OVERLAY drawer at every width, opened
+   by the "Contents" button in the top-left chrome strip. Content never
+   shifts: a reader who opens the contents to jump somewhere gets the
+   same measure back when it closes, and on a wide window the drawer
+   sits in the empty gutter beside the centred column. The previous
+   model — a permanent grid column with a full-height edge handle that
+   both resized and collapsed it — drew a line down the page and moved
+   the text every time it was used. */
+.layout { display: block; }
 
-/* Collapsed state — keep a 24px rail with a vertical chevron so the
-   reader has an obvious "click here to expand" target. The panel
-   content is hidden, the border-right thickens slightly for the
-   affordance, and a centered chevron sits inside the rail. The whole
-   page-nav still works as the click target so the user doesn't have
-   to aim at a small icon. */
-body.sidebar-collapsed .layout {
-  grid-template-columns: 24px minmax(0, 1fr);
-}
-body.sidebar-collapsed page-nav {
-  overflow: hidden;
-  cursor: e-resize;
-  background: var(--surface-2);
-}
-body.sidebar-collapsed page-nav > * { visibility: hidden; pointer-events: none; }
-body.sidebar-collapsed page-nav::after {
-  /* Vertical chevron centered in the rail, pointing right to invite
-     expansion. The text-symbol approach keeps the size predictable
-     without loading an extra SVG; transform centers vertically. */
-  content: '›';
-  visibility: visible;
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  font: 700 16px 'Inter', sans-serif;
-  color: var(--text-soft);
-  transition: color 0.15s ease, transform 0.2s ease;
-}
-body.sidebar-collapsed page-nav:hover { background: var(--accent-soft); }
-body.sidebar-collapsed page-nav:hover::after {
-  color: var(--accent-strong);
-  transform: scale(1.15);
-}
-body.sidebar-collapsed page-toc,
-body.sidebar-collapsed nav.toc { display: none; }
-
-/* ============ Right-edge resize + collapse handle ============
-   On the expanded sidebar a vertical full-height strip on the right
-   edge doubles as resize handle (drag) and collapse button (click).
-   It mirrors the collapsed 24px rail's full-edge expand affordance.
-   The chevron points LEFT — same metaphor as the rail's right-pointing
-   chevron, just inverted. page-nav is `position: sticky` already (set
-   in the base rule far below), which is enough containing-block for
-   the absolute-positioned handle. */
-.page-nav-edge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  /* Resting hit area: 8px. Easy to miss intentionally, hard to grab
-     by accident. Hover/focus widen the area to 20px so the reader
-     can land on it without micro-aiming — see :hover / :focus-visible
-     below. width animates smoothly so the user feels the affordance
-     grow under the cursor. */
-  width: 8px;
-  cursor: col-resize;
-  background: transparent;
-  transition: width 0.15s ease, background 0.15s ease;
-  z-index: 5;
-}
-.page-nav-edge::before {
-  /* Subtle vertical bar that brightens on hover so the reader sees
-     the affordance without it feeling busy. */
+/* Scrim behind the open drawer. One pseudo-element, no extra node. */
+body.drawer-open::before {
   content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 2px;
-  background: var(--border-soft);
-  transition: background 0.15s ease, width 0.15s ease;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 90;
+  animation: htmldoc-fade-in 0.2s ease;
 }
-.page-nav-edge::after {
-  content: '‹';
-  position: absolute;
-  top: 50%;
-  right: 4px;
-  transform: translateY(-50%);
-  font: 700 14px 'Inter', sans-serif;
-  color: var(--text-soft);
-  opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s ease;
-  pointer-events: none;
-}
-.page-nav-edge:hover,
-.page-nav-edge:focus-visible {
-  width: 20px;
-  background: var(--accent-soft);
-}
-.page-nav-edge:hover::before,
-.page-nav-edge:focus-visible::before {
-  width: 3px;
-  background: var(--accent-strong);
-}
-.page-nav-edge:hover::after,
-.page-nav-edge:focus-visible::after {
-  opacity: 1;
-  color: var(--accent-strong);
-}
-.page-nav-edge:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-/* Hidden in collapsed mode (the rail itself is the affordance). */
-body.sidebar-collapsed .page-nav-edge { display: none; }
+@keyframes htmldoc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+body.drawer-open { overflow: hidden; }
 
-/* The drawer-toggle is the off-canvas opener at narrow widths. On wide
-   viewports the right-edge handle is the affordance, so hide the button. */
-.ctrl-btn.drawer-toggle { display: none; }
+/* The Contents button opens the drawer at every width — the sidebar's
+   only affordance. It carries a visible label, so it sizes to content
+   instead of the square icon box the other chrome buttons use. */
+.ctrl-btn.drawer-toggle {
+  display: inline-flex;
+  width: auto;
+  min-width: 44px;
+  gap: 8px;
+  padding: 0 14px;
+  font: 600 13px 'Inter', sans-serif;
+}
+.ctrl-btn.drawer-toggle .drawer-toggle-label { line-height: 1; white-space: nowrap; }
 
 main {
   padding: 56px 64px 120px 64px;
   max-width: var(--content-width, var(--max-width));
-  /* Content left-aligns in its grid cell (no auto margins) so it sits
-     immediately next to the edge-anchored sidebar. The reader-controlled
-     width modes (narrow/wide/max) live on body via --content-width;
-     --max-width is the unmodified default. */
+  /* Centred, always. The sidebar overlays rather than occupying a
+     column, so nothing competes for the horizontal space and the
+     measure never moves when the contents open. The reader-controlled
+     width modes (narrow/comfortable/wide/max) live on body via
+     --content-width; --max-width is the unmodified default. */
+  margin-inline: auto;
 }
 
 /* ============ TOC sidebar section ============ *
  * Stacks under page-nav inside the single left column. On wide
- * viewports the right-edge handle (.page-nav-edge) collapses the
- * sidebar via body.sidebar-collapsed; on narrow (≤768px) the
- * .drawer-toggle button opens it as an off-canvas drawer. Top padding
- * only on the FIRST sidebar element so the chrome-button strip clears
- * without doubling up.
+ * Stacks under the site tree inside the Contents drawer, which owns
+ * the panel edge and the scroll context.
  * --------------------------------------------------------------- */
 nav.toc, page-toc {
   align-self: start;
   z-index: 60;
   padding: 12px 24px 36px 24px;
-  border-right: 1px solid var(--border-soft);
+  /* No border-right: the drawer owns the panel edge. */
   background: var(--surface);
   font-size: 13.5px; line-height: 1.5;
   display: block;
@@ -3227,53 +3131,13 @@ footer {
 }
 
 /* ============ Responsive ============ */
-/* ≤768px: off-canvas drawer. page-nav (which has page-toc adopted as a
-   child) becomes a fixed slide-over panel anchored to the left edge.
-   The .drawer-toggle button in the chrome strip opens it; clicking the
-   backdrop or pressing Escape closes. The right-edge resize handle and
-   the collapse rail are both irrelevant at this width — hidden. */
+/* ≤768px — phone tuning only. The Contents drawer behaves the same at
+   every width; see the layout note at the top of this file. */
 @media (max-width: 768px) {
-  .layout { display: block; }
-  /* body-prefixed so this beats the base `page-nav { position: sticky }`
-     rule defined further down in source order. */
-  body page-nav {
-    position: fixed;
-    top: 0;
-    left: -100%;
-    width: min(320px, 88vw);
-    max-width: none;
-    height: 100vh;
-    height: 100dvh;
-    max-height: 100dvh;
-    z-index: 99;
-    transition: left 0.25s ease;
-    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
-    padding-top: 64px;
-  }
-  body.drawer-open page-nav { left: 0; }
-  /* Drawer backdrop — single rule, no extra element needed. */
-  body.drawer-open::before {
-    content: '';
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.35);
-    z-index: 90;
-    animation: htmldoc-fade-in 0.2s ease;
-  }
-  @keyframes htmldoc-fade-in {
-    from { opacity: 0; } to { opacity: 1; }
-  }
-  body.drawer-open { overflow: hidden; }
-  .page-nav-edge { display: none; }
-  /* Hamburger surfaces as the drawer opener at this width. */
-  .ctrl-btn.drawer-toggle { display: inline-flex; }
-  /* The collapsed-rail design doesn't apply: drop the styles so the
-     drawer reads normally even if the user previously persisted
-     sidebar-collapsed = '1'. */
-  body.sidebar-collapsed .layout { grid-template-columns: none; }
-  body.sidebar-collapsed page-nav::after { display: none; }
-  body.sidebar-collapsed page-nav { background: var(--surface); cursor: default; }
-  body.sidebar-collapsed page-nav > * { visibility: visible; pointer-events: auto; }
-  main { padding: 28px 22px 96px 22px; }
+  /* The drawer, its scrim and the Contents button are base layout now;
+     this width only tightens the reading surface. Top padding clears
+     the Contents button (16px inset + 44px tall) before the cover. */
+  main { padding: 76px 22px 96px 22px; }
   header.cover h1 { font-size: 30px; }
   header.cover .subtitle { font-size: 16px; }
   h2 { font-size: 24px; }
@@ -3505,30 +3369,30 @@ a.okt-cite-domain:focus-visible {
    <page-nav> — site-tree sidebar
    ============================================================ */
 page-nav {
-  align-self: start;
-  z-index: 60;
-  /* Three-row column: scroll region grows, edge handle is absolute,
-     footer pins itself at the bottom edge with flex-shrink:0.
-     overflow is set to visible on the host so the absolute edge
-     handle can extend its hover hit area beyond the rightmost
-     border without being clipped. The .page-nav-scroll child
-     owns the actual scrollbar. */
+  /* Overlay drawer at every width: parked off-canvas, slid in by
+     body.drawer-open. `left` rather than a transform so position:sticky
+     inside it (the panel headers) keeps a containing block. Two rows:
+     the scroll region grows, the footer pins to the bottom edge. */
   display: flex;
   flex-direction: column;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: -100%;
+  width: min(320px, 88vw);
   height: 100vh;
   height: 100dvh;
-  max-height: 100vh;
-  max-height: 100dvh;
-  overflow: visible;
+  z-index: 99;
+  overflow: hidden;
   overscroll-behavior: contain;
   background: var(--surface);
   border-right: 1px solid var(--border-soft);
+  box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+  padding-top: 56px;
   font-size: 13.5px;
   line-height: 1.5;
-  transition: background 0.25s, border-color 0.25s;
+  transition: left 0.25s ease, background 0.25s, border-color 0.25s;
 }
+body.drawer-open page-nav { left: 0; }
 /* The scroll region: takes ALL space between the top of the sidebar
    and the footer at the bottom. Holds the boxed site tree AND the
    adopted TOC. Footer never scrolls with this content. */
@@ -3542,7 +3406,7 @@ page-nav .page-nav-scroll {
    group from the TOC stacked below. Sits below the chrome strip via
    its own 76px top margin. */
 page-nav .page-nav-panel {
-  margin: 76px 14px 18px 14px;
+  margin: 14px 14px 18px 14px;
   padding: 14px 14px;
   background: var(--surface-2, var(--surface));
   border: 1px solid var(--border-soft);
@@ -3550,14 +3414,6 @@ page-nav .page-nav-panel {
   min-width: 0;
   transition: opacity 0.2s ease, margin 0.25s, padding 0.25s,
               background 0.25s, border-color 0.25s;
-}
-.layout.nav-collapsed page-nav .page-nav-panel {
-  opacity: 0;
-  margin-left: 0;
-  margin-right: 0;
-  padding-left: 0;
-  padding-right: 0;
-  pointer-events: none;
 }
 /* The TOC sits below the boxed site tree inside the scroll region —
    shares the same sidebar padding so the heading aligns with the
@@ -3583,11 +3439,6 @@ page-nav .page-nav-footer {
 }
 page-nav .page-nav-footer .page-nav-version {
   font-variant-numeric: tabular-nums;
-}
-body.sidebar-collapsed page-nav .page-nav-footer,
-.layout.nav-collapsed page-nav .page-nav-footer {
-  opacity: 0;
-  pointer-events: none;
 }
 page-nav .page-nav-tree { list-style: none; margin: 0; padding: 0; }
 page-nav .page-nav-tree ol { list-style: none; margin: 0; padding-left: 12px; }
@@ -3705,7 +3556,6 @@ page-nav .page-nav-tab:active .page-nav-tab-thumb {
   transition-duration: 0.08s;
 }
 .page-nav-tab-thumb svg { width: 14px; height: 14px; transition: transform 0.2s; }
-.layout.nav-collapsed .page-nav-tab-thumb svg { transform: rotate(180deg); }
 /* The pane edge tabs are no longer rendered by page-nav / page-toc in
    the single-sidebar layout. If older HTML still contains them, hide. */
 page-nav .page-nav-tab,

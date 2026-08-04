@@ -191,28 +191,25 @@ like "my change didn't take effect" — it did; the runtime is stale.
 
 ## Rules the user has set down
 
-**Single LEFT sidebar.** `page-nav` adopts `page-toc` as a child at
-boot so site-tree + on-page TOC stack in one column. NO dual-pane,
-NO right-side TOC. The sidebar is `position: sticky` with its own
-scroll — main scrolls under it.
+**Contents drawer, centred content.** `page-nav` adopts `page-toc` as
+a child at boot so site-tree + on-page TOC stack in one panel. NO
+dual-pane, NO right-side TOC.
 
-Two affordances toggle / size it, both edge-anchored (no top-left
-button on wide viewports):
-- **Right-edge handle** (`.page-nav-edge`, full-height): click without
-  drag → collapse to a 24px rail; drag → resize the sidebar width
-  (persisted as `--sidebar-width` + `localStorage.sidebarWidth`).
-- **Collapsed rail** (24px column, chevron pointing right): click
-  anywhere on it → re-expand.
+The panel is an **overlay drawer at every width** — parked off-canvas
+at `left: -100%`, slid in by `body.drawer-open`, with a scrim, Escape
+and outside-click to close. `main` is `margin-inline: auto`, so the
+measure is centred and **never moves when the drawer opens**. On a wide
+window the drawer lands in the empty gutter beside the column.
 
-The two affordances are symmetric: full-edge expand AND full-edge
-collapse. The old top-left `.ctrl-btn.toc-toggle` was removed.
+One affordance: the **`.ctrl-btn.drawer-toggle` in the top-left chrome
+strip**, labelled "Contents" (icon + visible text, `aria-expanded`,
+`aria-controls`). It is visible at every width.
 
-On narrow viewports (`≤768px`) the column becomes an off-canvas
-drawer (`body.drawer-open` slides it in, backdrop dims the page,
-Escape or backdrop click closes). The `.ctrl-btn.drawer-toggle`
-hamburger appears in the chrome strip only at this width — it's the
-only top-left button on mobile. The right-edge handle is hidden in
-drawer mode (the drawer IS the affordance).
+Removed, do not bring back: the permanent sidebar grid column, the
+full-height right-edge handle (`.page-nav-edge`) that doubled as
+resize + collapse, the 24px collapsed rail, and the persisted
+`sidebarCollapsed` / `sidebarWidth` state. A line down the page that
+reflows the text every time it is used is what this replaced.
 
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never

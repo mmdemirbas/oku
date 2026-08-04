@@ -404,9 +404,14 @@ class TestChromeKitMarkers:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "_hdtDetectBraceFolds" in src, "code-block brace-fold detector missing from chrome.js"
 
-    def test_chrome_has_sidebar_toggle(self, repo_root: Path) -> None:
+    def test_chrome_has_a_labelled_contents_toggle(self, repo_root: Path) -> None:
+        """One affordance for the sidebar, at every width, and it says
+        what it opens — an icon-only hamburger reads as "site menu"."""
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
-        assert "sidebar-collapsed" in src, "sidebar collapse class wiring missing"
+        assert "drawer-toggle" in src, "Contents toggle wiring missing"
+        assert "drawer-toggle-label" in src, "the toggle must carry a visible label"
+        assert "aria-expanded" in src and "aria-controls" in src, "toggle aria wiring missing"
+        assert "function setDrawer(" in src, "open/close must go through one state setter"
 
     def test_chrome_extref_link_in_tooltip(self, repo_root: Path) -> None:
         """ext-ref hosts are NOT navigation links — clicking them only
@@ -844,11 +849,14 @@ class TestChromeKitMarkers:
                 "hides the only sidebar collapse toggle on every doc page"
             )
 
-    def test_chrome_css_has_sticky_sidebar(self, repo_root: Path) -> None:
+    def test_chrome_css_parks_the_drawer_off_canvas(self, repo_root: Path) -> None:
+        """The sidebar is an overlay drawer, not a column: parked
+        off-canvas, slid in by body.drawer-open, with a scrim."""
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        assert "position: sticky" in css, "sticky position missing in chrome.css"
-        # Sidebar should be sticky + scrollable independently.
-        assert "max-height: 100vh" in css, "sidebar must cap at viewport height so it can scroll on its own"
+        assert "left: -100%" in css, "drawer must park off-canvas"
+        assert "body.drawer-open page-nav { left: 0; }" in css, "no open state for the drawer"
+        assert "body.drawer-open::before" in css, "scrim missing"
+        assert "margin-inline: auto" in css, "main must stay centred"
 
     def test_page_nav_spans_full_viewport_height(self, repo_root: Path) -> None:
         """page-nav must declare an explicit height, not just max-height.
@@ -1151,31 +1159,18 @@ class TestChromeKitMarkers:
         assert "_inPageSearch" in js, "in-page fallback function missing"
         assert "site index unavailable" in js or "On this page" in js, "fallback status message missing"
 
-    def test_sidebar_default_expanded_on_first_visit(self, repo_root: Path) -> None:
-        """First-time visitor must see the sidebar expanded.
-
-        Rule: absent `sidebarCollapsed` localStorage key &rArr; sidebar
-        renders expanded so the user discovers the site tree. The
-        collapsed class is only applied when the key is explicitly '1'.
-        Two conditions enforce this:
-
-        - chrome.js boot guards `sidebar-collapsed` behind a strict
-          `=== '1'` check (not a looser `!== null` or truthy check).
-        - chrome-boot.js does NOT add the `sidebar-collapsed` class
-          (its responsibility is theme + auth; nav state belongs to
-          chrome.js to keep the restore path single-source).
-        """
+    def test_drawer_starts_closed_and_leaves_no_stale_state(self, repo_root: Path) -> None:
+        """The drawer overlays the page, so a remembered "open" would
+        cover the text the reader came for: it always starts closed.
+        The pre-drawer layout persisted collapse + width keys; those are
+        cleared on sight so an old browser profile doesn't resurrect a
+        layout that no longer exists."""
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+        assert "localStorage.removeItem('sidebarCollapsed')" in js
+        assert "localStorage.removeItem('sidebarWidth')" in js
+        assert "sidebar-collapsed" not in js, "collapsed-column state must be gone"
         boot = (repo_root / "kit" / "chrome-boot.js").read_text(encoding="utf-8")
-        assert "localStorage.getItem('sidebarCollapsed') === '1'" in js, (
-            "chrome.js must restore `sidebar-collapsed` only when the key "
-            "equals '1' — a looser check would surface the collapsed state "
-            "on first visit"
-        )
-        assert "sidebar-collapsed" not in boot, (
-            "chrome-boot.js must not touch the sidebar-collapsed class; "
-            "single-source restore lives in chrome.js"
-        )
+        assert "drawer-open" not in boot, "drawer state belongs to chrome.js, not the boot script"
 
     def test_no_unresolved_references_in_docs(self, repo_root: Path) -> None:
         """Every glossary-term / ext-ref / anchor link in docs must resolve.

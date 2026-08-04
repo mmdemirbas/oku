@@ -46,7 +46,7 @@
  * Surfaced in the sidebar footer (dimmed) so a reader can see at a
  * glance which build of oku rendered the page. Bump in lockstep
  * with pyproject.toml's [project] version. */
-const KIT_VERSION = '0.3.0';
+const KIT_VERSION = '0.4.0';
 
 /* ============ SVG icon set ============ */
 const ICON_MENU = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>';
@@ -957,39 +957,33 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', fun
   }
 });
 
-/* ============ Sidebar toggle (one button, one collapse class) ============ *
- * Toggles the unified left sidebar (page-nav + page-toc, stacked in the
- * same column). The class lives on <body> so layout CSS can collapse
- * the whole grid column with one rule. Mobile uses a drawer mode that
- * sits on the page-nav element.
+/* ============ Contents drawer (one button, one class) ============ *
+ * The sidebar — page-nav with page-toc adopted into it — is an overlay
+ * drawer at EVERY width, opened by the "Contents" button in the
+ * top-left chrome strip. Content stays centred and never reflows when
+ * it opens: the reader gets the same measure back when it closes.
  * ---------------------------------------------------------------- */
-function toggleTOC() {
-  if (window.innerWidth <= 768) {
-    // Narrow viewport: drawer mode. body.drawer-open powers both the
-    // slide-in animation on page-nav and the backdrop pseudo-element.
-    document.body.classList.toggle('drawer-open');
-    return;
-  }
-  // Wide viewport: column collapse via the persistent body class.
-  document.body.classList.toggle('sidebar-collapsed');
-  try {
-    localStorage.setItem('sidebarCollapsed',
-      document.body.classList.contains('sidebar-collapsed') ? '1' : '0');
-  } catch (e) {}
+function setDrawer(open) {
+  document.body.classList.toggle('drawer-open', open);
+  var btn = document.querySelector('.ctrl-btn.drawer-toggle');
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
-// Close the mobile drawer on outside click or Escape.
+function toggleTOC() {
+  setDrawer(!document.body.classList.contains('drawer-open'));
+}
+
+// Close on outside click or Escape, at every width.
 document.addEventListener('click', function (e) {
   if (!document.body.classList.contains('drawer-open')) return;
-  if (window.innerWidth > 768) return;
   var nav = document.querySelector('page-nav');
-  var hamburger = document.querySelector('.ctrl-btn.drawer-toggle');
+  var button = document.querySelector('.ctrl-btn.drawer-toggle');
   if (nav && nav.contains(e.target)) return;
-  if (hamburger && hamburger.contains(e.target)) return;
-  document.body.classList.remove('drawer-open');
+  if (button && button.contains(e.target)) return;
+  setDrawer(false);
 });
 document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape') document.body.classList.remove('drawer-open');
+  if (e.key === 'Escape') setDrawer(false);
 });
 
 /* ============ Hash-based SPA navigation ========================== *
@@ -1116,7 +1110,7 @@ window.addEventListener('hashchange', function () {
   __okuRenderIfNeeded(parsed.page, parsed.anchor).catch(function (err) {
     console.warn('[oku] navigation failed', err);
   });
-  document.body.classList.remove('drawer-open');
+  setDrawer(false);
 });
 
 // Back/Forward across pushState navigations: the pathname names the
@@ -1130,7 +1124,7 @@ window.addEventListener('popstate', function () {
   __okuRenderIfNeeded(pagePath, anchor).catch(function (err) {
     console.warn('[oku] navigation failed', err);
   });
-  document.body.classList.remove('drawer-open');
+  setDrawer(false);
 });
 
 // Intercept clicks on internal .html links that DON'T already use
@@ -1177,18 +1171,12 @@ document.addEventListener('click', function (e) {
     console.warn('[oku] navigation failed', err4);
     window.location.href = target;
   });
-  document.body.classList.remove('drawer-open');
+  setDrawer(false);
 });
-// Restore persisted state ASAP so the layout doesn't flash open then collapse.
-try {
-  if (localStorage.getItem('sidebarCollapsed') === '1') {
-    document.documentElement.classList.add('sidebar-preload-collapsed');
-    document.addEventListener('DOMContentLoaded', function () {
-      document.body.classList.add('sidebar-collapsed');
-      document.documentElement.classList.remove('sidebar-preload-collapsed');
-    });
-  }
-} catch (e) {}
+// The drawer always starts closed — it overlays the page, so a
+// remembered "open" would cover the text the reader came for. The
+// pre-drawer layout persisted a collapse flag; drop it on sight.
+try { localStorage.removeItem('sidebarCollapsed'); localStorage.removeItem('sidebarWidth'); } catch (e) {}
 
 /* Content-width mode (D3) — reader picks narrow / wide / max, persists.
  * narrow = 860px (optimal line length); wide = 1100px (more cards per
@@ -1265,19 +1253,21 @@ if (document.readyState === 'loading') {
 class PageChrome extends HTMLElement {
   connectedCallback() {
     var skipLabel = this.getAttribute('skip-label') || 'Skip to content';
-    var drawerLabel = this.getAttribute('drawer-label') || 'Open navigation';
+    var drawerLabel = this.getAttribute('drawer-label') || 'Contents';
     var themeLabel = this.getAttribute('theme-label') || 'Cycle theme (system / light / dark)';
     var widthLabel = this.getAttribute('width-label') || 'Cycle content width (narrow / comfortable / wide / max)';
     var topLabel = this.getAttribute('top-label') || 'Back to top';
 
-    // .drawer-toggle is hidden via CSS on wide viewports — the right-
-    // edge handle on page-nav is the collapse affordance there. On
-    // narrow (≤768px) the sidebar becomes an off-canvas drawer and
-    // this is its only toggle.
+    // The Contents button is the sidebar's only affordance, at every
+    // width. It carries a visible label, not just a glyph: this is the
+    // control a reader looks for by name, and an icon-only hamburger
+    // reads as "site menu" rather than "contents of this page".
     this.innerHTML =
       '<a class="skip-link" href="#main-content">' + skipLabel + '</a>' +
       '<div class="progress-bar" id="progress-bar"></div>' +
-      '<button class="ctrl-btn drawer-toggle" type="button" aria-label="' + drawerLabel + '" title="' + drawerLabel + '">' + ICON_MENU + '</button>' +
+      '<button class="ctrl-btn drawer-toggle" type="button" aria-expanded="false" aria-controls="oku-page-nav"' +
+        ' aria-label="' + drawerLabel + '" title="' + drawerLabel + '">' + ICON_MENU +
+        '<span class="drawer-toggle-label">' + drawerLabel + '</span></button>' +
       '<button class="ctrl-btn width-toggle" type="button" aria-label="' + widthLabel + '" title="' + widthLabel + '">' + ICON_WIDTH + '</button>' +
       '<button class="ctrl-btn theme-toggle" type="button" aria-label="' + themeLabel + '" title="' + themeLabel + '">' +
         '<span class="icon-system">' + ICON_SYSTEM + '</span>' +
@@ -11137,22 +11127,24 @@ if (!customElements.get('oku-snippet')) customElements.define('oku-snippet', Oku
 /* ============ <page-nav> Custom Element ============ *
  * Loads site-manifest.json from the docs root and renders a collapsible
  * tree of pages. Active page highlighted from location.pathname. The
- * panel sits in the single left sidebar; the top-left ctrl-btn handles
- * sidebar collapse via the body.sidebar-collapsed class.
+ * panel lives in the Contents drawer, which the top-left button opens
+ * via body.drawer-open.
  *
  * If a <page-toc> sibling exists in the same .layout, page-nav adopts
  * it as its own child so both panels become one stacked flex column.
- * That keeps the layout grid simple (2 columns, single row), avoids
- * the row-span ordering gymnastics, and lets the whole sidebar share
+ * That keeps the drawer a single scroll context, avoids the row-span
+ * ordering gymnastics, and lets the whole sidebar share
  * one scroll context.
  * ----------------------------------------------------------------- */
 class PageNav extends HTMLElement {
   connectedCallback() {
+    // aria-controls on the Contents button points here.
+    if (!this.id) this.id = 'oku-page-nav';
+    this.setAttribute('aria-label', this.getAttribute('aria-label') || 'Contents');
     // DOM shape:
     //   .page-nav-scroll   ← flex-1, scrolls; holds the site-tree panel
     //                        AND the adopted page-toc (appended by
     //                        adopt() below).
-    //   .page-nav-edge     ← absolute-positioned right-edge handle.
     //   .page-nav-footer   ← flex-shrink:0, pinned at the literal
     //                        bottom edge of the sidebar; never scrolls
     //                        and never sits between tree and TOC.
@@ -11164,10 +11156,6 @@ class PageNav extends HTMLElement {
           '<ol class="page-nav-tree"><li class="page-nav-loading">Loading…</li></ol>' +
         '</div>' +
       '</div>' +
-      // Right-edge handle: drag to resize, click (no drag) to collapse.
-      // Symmetric to the collapsed 24px rail's full-edge expand affordance.
-      '<div class="page-nav-edge" role="separator" aria-orientation="vertical" ' +
-        'aria-label="Resize or collapse sidebar" tabindex="0"></div>' +
       '<div class="page-nav-footer">' +
         'oku <span class="page-nav-version">v' + KIT_VERSION + '</span>' +
       '</div>';
@@ -11204,93 +11192,15 @@ class PageNav extends HTMLElement {
     } else {
       Promise.resolve().then(adopt);
     }
-    // Click-anywhere-on-the-rail to expand when collapsed. The whole
-    // page-nav becomes the click target. The base CSS already sets
-    // position: sticky on page-nav, which is enough containing-block
-    // for the absolute-positioned children; setting it inline here
-    // used to break the narrow-viewport `position: fixed` drawer rule.
-    this.addEventListener('click', function (e) {
-      if (!document.body.classList.contains('sidebar-collapsed')) return;
-      if (e.target && e.target.closest('a, button, input, select')) return;
-      if (e.target && e.target.classList.contains('page-nav-edge')) return;
-      if (typeof toggleTOC === 'function') toggleTOC();
-    });
-
-    // Right-edge handle: click (no drag) toggles collapse; drag resizes.
-    // Heuristic: mouseup with movement <= EDGE_DRAG_THRESHOLD is a click;
-    // anything beyond is a resize. Width persists per host across reloads.
-    var edge = this.querySelector('.page-nav-edge');
-    if (edge) {
-      var EDGE_DRAG_THRESHOLD = 4;
-      var MIN_WIDTH = 200;
-      var MAX_WIDTH_FRAC = 0.6;
-      // Restore persisted width (only when not collapsed).
-      try {
-        var stored = parseInt(localStorage.getItem('sidebarWidth') || '', 10);
-        if (stored && stored >= MIN_WIDTH) {
-          document.body.style.setProperty('--sidebar-width', stored + 'px');
-        }
-      } catch (eRestore) {}
-      edge.addEventListener('mousedown', function (e) {
-        // Ignore right/middle clicks.
-        if (e.button !== 0) return;
-        if (document.body.classList.contains('sidebar-collapsed')) {
-          // In collapsed mode the rail handles expansion; bail.
-          return;
-        }
-        e.preventDefault();
-        var startX = e.clientX;
-        var startWidth = self.getBoundingClientRect().width;
-        var moved = false;
-        document.body.classList.add('sidebar-resizing');
-        function onMove(ev) {
-          var dx = ev.clientX - startX;
-          if (!moved && Math.abs(dx) <= EDGE_DRAG_THRESHOLD) return;
-          moved = true;
-          var w = startWidth + dx;
-          var max = Math.floor(window.innerWidth * MAX_WIDTH_FRAC);
-          if (w < MIN_WIDTH) w = MIN_WIDTH;
-          if (w > max) w = max;
-          document.body.style.setProperty('--sidebar-width', w + 'px');
-        }
-        function onUp() {
-          document.removeEventListener('mousemove', onMove);
-          document.removeEventListener('mouseup', onUp);
-          document.body.classList.remove('sidebar-resizing');
-          if (moved) {
-            try {
-              var w = parseInt((document.body.style.getPropertyValue('--sidebar-width') || '').replace('px', ''), 10);
-              if (w) localStorage.setItem('sidebarWidth', String(w));
-            } catch (eStore) {}
-          } else {
-            if (typeof toggleTOC === 'function') toggleTOC();
-          }
-        }
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-      });
-      // Keyboard alternative for collapse — focus the handle, press Enter/Space.
-      edge.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          if (typeof toggleTOC === 'function') toggleTOC();
-        }
-      });
-    }
-    // Drawer Escape handling now lives next to toggleTOC; this block
-    // used to remove a stale `.open` class on page-nav that the new
-    // drawer model doesn't use.
-
     // Defer until the document is fully parsed so we can reliably detect
     // the standalone-build inline page-data script (which sits at the
     // end of body, after <page-nav>).
     function start() {
       if (document.getElementById('__oku_page__')) {
-        // Standalone single-file build: there is no site to navigate, so the
-        // site-tree panel goes away. The ELEMENT stays — it owns the
-        // sidebar's grid column and it has adopted page-toc, so hiding it
-        // strands main in the 280px sidebar track and takes the on-page TOC
-        // down with it.
+        // Standalone single-file build: there is no site to navigate, so
+        // the site-tree panel goes away. The ELEMENT stays — it has
+        // adopted page-toc, and removing it would take the on-page
+        // contents down with it.
         var panel = self.querySelector(':scope > .page-nav-scroll > .page-nav-panel');
         if (panel) panel.remove();
         self.classList.add('page-nav-standalone');

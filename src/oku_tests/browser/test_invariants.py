@@ -39,15 +39,57 @@ def _literal_tag_text_nodes(page) -> int:
     )
 
 
-def test_sidebar_spans_viewport(page, site_url):
-    page.set_viewport_size(DESKTOP)
+@pytest.mark.parametrize("size", [DESKTOP, NARROW], ids=["desktop", "narrow"])
+def test_contents_drawer_is_off_canvas_until_asked_for(page, site_url, size):
+    """The sidebar is an overlay at every width: parked off-canvas,
+    opened by the Contents button, spanning the viewport when open.
+    It used to be a permanent grid column on desktop with a full-height
+    edge handle that both resized and collapsed it."""
+    page.set_viewport_size(size)
     _goto(page, f"{site_url}/docs/architecture.html")
-    box = page.locator("page-nav").bounding_box()
-    assert box is not None, "page-nav missing"
-    assert abs(box["y"]) <= 1, f"sidebar must start at y=0, got {box['y']}"
-    assert abs(box["height"] - DESKTOP["height"]) <= 1, (
-        f"sidebar surface must span the viewport: height {box['height']} != {DESKTOP['height']}"
+    nav = page.locator("page-nav").bounding_box()
+    assert nav is not None, "page-nav missing"
+    assert nav["x"] + nav["width"] <= 1, f"drawer must start off-canvas, got x={nav['x']}"
+
+    button = page.locator(".ctrl-btn.drawer-toggle")
+    box = button.bounding_box()
+    assert box["width"] >= 24 and box["height"] >= 24, "touch target below 24px minimum"
+    assert button.get_attribute("aria-expanded") == "false"
+    assert "Contents" in button.inner_text(), "the opener carries a visible label"
+
+    button.click()
+    page.wait_for_function("document.querySelector('page-nav').getBoundingClientRect().left > -1")
+    nav = page.locator("page-nav").bounding_box()
+    assert abs(nav["x"]) <= 1, f"open drawer must sit at x=0, got {nav['x']}"
+    assert abs(nav["height"] - size["height"]) <= 1, "open drawer must span the viewport"
+    assert button.get_attribute("aria-expanded") == "true"
+
+    page.keyboard.press("Escape")
+    page.wait_for_function("!document.body.classList.contains('drawer-open')")
+    assert button.get_attribute("aria-expanded") == "false"
+
+
+@pytest.mark.parametrize("width", [1600, 1280, 900])
+def test_content_stays_centred_whether_the_drawer_is_open_or_not(page, site_url, width):
+    """The measure must not move when the contents open — that is the
+    whole reason the sidebar overlays instead of taking a column."""
+    page.set_viewport_size({"width": width, "height": 900})
+    _goto(page, f"{site_url}/docs/architecture.html")
+    page.wait_for_timeout(400)
+    before = page.evaluate(
+        """() => { const r = document.querySelector('main').getBoundingClientRect();
+                   return [Math.round(r.x), Math.round(r.width),
+                           Math.round(window.innerWidth - r.right)]; }"""
     )
+    assert abs(before[0] - before[2]) <= 1, f"main not centred: left {before[0]} vs right {before[2]}"
+    page.click(".ctrl-btn.drawer-toggle")
+    page.wait_for_function("document.querySelector('page-nav').getBoundingClientRect().left > -1")
+    after = page.evaluate(
+        """() => { const r = document.querySelector('main').getBoundingClientRect();
+                   return [Math.round(r.x), Math.round(r.width),
+                           Math.round(window.innerWidth - r.right)]; }"""
+    )
+    assert after == before, f"content moved when the drawer opened: {before} -> {after}"
 
 
 def test_architecture_renders_fence_lifted_blocks(page, site_url):
@@ -179,31 +221,18 @@ def test_table_status_cells_render_semantic_pills(page, site_url):
     assert info["done"]["tdText"] == "done", "status pill must not alter the cell value"
 
 
-def test_drawer_geometry_at_narrow_viewport(page, site_url):
+def test_narrow_viewport_has_no_horizontal_scroll_and_a_reachable_opener(page, site_url):
     page.set_viewport_size(NARROW)
     _goto(page, f"{site_url}/docs/architecture.html")
-
-    toggle = page.locator(".ctrl-btn.drawer-toggle").bounding_box()
-    assert toggle is not None, "drawer toggle missing at 360px"
-    assert toggle["width"] >= 24 and toggle["height"] >= 24, "touch target below 24px minimum"
-
-    nav = page.locator("page-nav").bounding_box()
-    assert nav["x"] + nav["width"] <= 0 or nav["x"] >= NARROW["width"], (
-        f"sidebar must be off-canvas at 360px, got x={nav['x']}"
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), "horizontal scroll at 360px"
+    button = page.locator(".ctrl-btn.drawer-toggle").bounding_box()
+    assert button is not None and button["x"] >= 0 and button["y"] >= 0
+    assert button["x"] + button["width"] <= NARROW["width"], "opener off-screen at 360px"
+    # The cover must clear the opener rather than start underneath it.
+    cover = page.locator("main header.cover").bounding_box()
+    assert cover["y"] >= button["y"] + button["height"], (
+        f"cover starts at {cover['y']}, opener ends at {button['y'] + button['height']}"
     )
-    no_hscroll = page.evaluate("document.documentElement.scrollWidth <= innerWidth")
-    assert no_hscroll, "horizontal scroll at 360px"
-
-    page.click(".ctrl-btn.drawer-toggle")
-    # The slide-in is a CSS transition — wait on the geometry, not the
-    # class, so the assertion never reads a mid-animation frame.
-    page.wait_for_function("document.querySelector('page-nav').getBoundingClientRect().left > -1")
-    nav = page.locator("page-nav").bounding_box()
-    assert abs(nav["x"]) <= 1, f"open drawer must sit at x=0, got {nav['x']}"
-    assert abs(nav["height"] - NARROW["height"]) <= 1, "open drawer must span the viewport"
-
-    page.keyboard.press("Escape")
-    page.wait_for_function("!document.body.classList.contains('drawer-open')")
 
 
 def test_html_island_script_executes(page, site_url):
@@ -235,11 +264,18 @@ def test_path_router_keeps_url_and_content_in_sync(page, site_url):
     assert page.locator("oku-chart").count() >= 40
 
     page.evaluate("window.__navMarker = 42")
+    # The site tree lives in the Contents drawer now, so a reader opens
+    # it before navigating — and the drawer must close behind the click.
+    page.click(".ctrl-btn.drawer-toggle")
+    page.wait_for_function("document.querySelector('page-nav').getBoundingClientRect().left > -1")
     page.click('page-nav a[href$="diagrams.html"]')
     page.wait_for_function("document.title === 'Diagrams'")
     assert page.evaluate("location.pathname").endswith("/docs/diagrams.html")
     assert page.evaluate("window.__navMarker === 42"), "tree click must not full-reload"
     assert page.locator("oku-diagram").count() >= 5
+    assert not page.evaluate("document.body.classList.contains('drawer-open')"), (
+        "the drawer must close once it has been used to navigate"
+    )
 
     page.reload()
     page.wait_for_selector("main section")
