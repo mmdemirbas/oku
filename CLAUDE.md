@@ -315,6 +315,22 @@ computed-style assertion, the rule isn't found yet.
   sidebar shape during init you'll see them as separate elements
   until the microtask runs.
 
+- **`connectedCallback` fires on every reparent.** "Expand to
+  fullscreen" moves the LIVE host into the lightbox and back on
+  close. Every custom element that consumes its own source
+  (`<script type="text/x-mermaid">`, `text/x-code`, `text/plain`)
+  and then overwrites `innerHTML` MUST carry the
+  `if (this._initialized) return;` guard, or the second pass reads
+  an empty source and blanks the block. Chart, diagram, snippet and
+  annotated-code all have it; a new element of that shape needs it
+  too. `test_reparent_safety.py` pins it.
+
+- **Inline styles beat the lightbox stylesheet.** The diagram render
+  pass pins the authored width as an inline `max-width`, so the
+  `max-width: none` rule for `.okt-lightbox-*` loses. Anything that
+  should change inside the lightbox and was set inline must be
+  stashed and restored by the expand handler, not fought in CSS.
+
 - **`tldr` is allowed inside contentBlock** (recent schema change).
   Don't refactor the schema to remove this — the primitives reference
   embeds a live tldr sample alongside its code example.
