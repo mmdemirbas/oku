@@ -1074,6 +1074,16 @@
       tldr.appendChild(lab);
       const h2 = document.createElement('h2');
       h2.textContent = node.title || 'TL;DR';
+      // An untitled `> [!TLDR]` used to print the words twice — once in
+      // the pill, once here — and that is exactly what the starter
+      // template emits, so it was the default state of the block that
+      // opens most pages. The heading still has to EXIST: buildTOC()
+      // skips any section without an h2, and the search index reads the
+      // section heading. So when it would only repeat the pill, keep it
+      // for the outline and take it out of the visual flow.
+      if (!node.title || node.title.trim().toLowerCase() === 'tl;dr') {
+        h2.className = 'okt-sr-only';
+      }
       tldr.appendChild(h2);
       // Body is a markdown sub-document — first paragraph becomes the
       // summary line; any list becomes the bullet block.
@@ -1347,10 +1357,17 @@
       const h1 = document.createElement('h1');
       h1.textContent = page.t || '';
       cover.appendChild(h1);
-      if (meta.subtitle) {
+      // `summary` is the one line the author always writes — it feeds the
+      // nav, the page list and the search result. Authors were also
+      // copying it verbatim into `subtitle` to fill the cover (three of
+      // this repo's own pages carried the identical sentence in both
+      // fields). Falling back removes the duplicate field without
+      // removing the cover line it was there to produce.
+      const subtitle = meta.subtitle || meta.summary;
+      if (subtitle) {
         const sub = document.createElement('p');
         sub.className = 'subtitle';
-        sub.textContent = meta.subtitle;
+        sub.textContent = subtitle;
         cover.appendChild(sub);
       }
       const metaParts = [];
@@ -1363,12 +1380,17 @@
         m.textContent = metaParts.join(' · ');
         cover.appendChild(m);
       }
-      if (meta.updated) {
+      // Two hand-maintained dates that are usually the same one. When
+      // they agree, `date` has already said it — printing "Last updated"
+      // underneath in a second style says nothing and looks like drift.
+      if (meta.updated && meta.updated !== meta.date) {
         const u = document.createElement('div');
         u.className = 'meta meta-updated';
         u.textContent = 'Last updated ' + meta.updated;
         cover.appendChild(u);
       }
+      // A title on its own does not need a 156px tinted panel to sit in.
+      if (cover.children.length === 1) cover.classList.add('cover-bare');
       return cover;
     }
 

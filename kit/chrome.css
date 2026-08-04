@@ -38,12 +38,15 @@
      full-token zoom. Narrow / wide / max are picked via the top-right
      chrome button and persist to localStorage. */
   --content-width: 960px;
-  /* Asymmetric bleed (wide-screen support). Prose primitives clamp
-     to --prose-width for readable line length; visual primitives
-     (table, chart, kpi-grid, compare-grid, step-flow, diagram, code,
-     annotated-code) bleed to --content-width. Reader picks the
-     content width via the chrome button; prose stays put. */
-  --prose-width: 720px;
+  /* Line-length cap for running prose. Visual primitives (table, chart,
+     kpi-grid, compare-grid, step-flow, diagram, code, annotated-code)
+     always fill --content-width; only paragraphs and lists clamp here.
+     Expressed in `ch` and re-declared per content-width mode below, so
+     the width toggle still moves prose in the same direction as
+     everything else — just on a curve suited to reading rather than to
+     a chart. The per-mode values are the source of truth; this is the
+     fallback for a page with no body attribute yet. */
+  --prose-width: 62ch;
   --shadow-strong: rgba(30, 27, 41, 0.18);
   --shadow-soft:   rgba(30, 27, 41, 0.06);
   --ctrl-bg:        rgba(255, 255, 255, 0.85);
@@ -290,10 +293,15 @@ nav.toc, page-toc {
 
 /* Content-width modes (D3). The CSS variable wins because <main> reads
    it via max-width; the body attribute is the persisted source of truth. */
-body[data-content-width="narrow"]      { --content-width: 860px;  }
-body[data-content-width="comfortable"] { --content-width: 1100px; }
-body[data-content-width="wide"]        { --content-width: 1400px; }
-body[data-content-width="max"]         { --content-width: 100vw;  }
+/* The `ch` values are calibrated, not chosen: `ch` is the width of "0",
+   which in Inter is wider than the average character in running prose,
+   so the rendered line runs ~1.1x the nominal figure. Measured medians
+   at these settings are 63 / 67 / 78 characters, against a readable
+   range of 45-75. Re-measure if the body font changes. */
+body[data-content-width="narrow"]      { --content-width: 860px;  --prose-width: 54ch; }
+body[data-content-width="comfortable"] { --content-width: 1100px; --prose-width: 62ch; }
+body[data-content-width="wide"]        { --content-width: 1400px; --prose-width: 72ch; }
+body[data-content-width="max"]         { --content-width: 100vw;  --prose-width: none; }
 /* Wide-screen bumps. Comfortable + wide both scale up so the page
    actually USES the available room on 1600px+ monitors. */
 @media (min-width: 1500px) {
@@ -1190,6 +1198,11 @@ header.cover {
   box-shadow: 0 1px 2px var(--shadow-soft);
 }
 header.cover > * { position: relative; z-index: 1; }
+/* Title only — no eyebrow, no subtitle, no meta line. The full panel
+   padding leaves the heading stranded in the top third of a mostly
+   empty tinted rectangle, so the block shrinks to fit what it holds. */
+header.cover.cover-bare { padding: 30px 42px 32px 42px; margin-bottom: 36px; }
+header.cover.cover-bare h1 { margin-bottom: 0; }
 header.cover .eyebrow {
   font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.18em;
   color: var(--accent-strong); font-weight: 700; margin-bottom: 16px;
@@ -1364,6 +1377,45 @@ code:not(pre code) {
 .okt-table-controls .okt-groupby { margin-right: auto; }
 .okt-table-wrap:hover .okt-table-controls,
 .okt-table-wrap:focus-within .okt-table-controls { opacity: 1; }
+/* Small table (see SMALL_TABLE_ROWS in chrome.js): the reader can see
+   every row already, so filtering, counting, grouping and view-switching
+   have nothing to act on. Copy and expand stay — those are useful at any
+   size. The nodes remain in the DOM with their listeners bound; only the
+   affordance goes. */
+.okt-table-wrap[data-scale="small"] .okt-filter,
+.okt-table-wrap[data-scale="small"] .okt-stats,
+.okt-table-wrap[data-scale="small"] .okt-ctrl-sep-after,
+.okt-table-wrap[data-scale="small"] .okt-view-group,
+.okt-table-wrap[data-scale="small"] .okt-ctrl-sep,
+.okt-table-wrap[data-scale="small"] .okt-table-controls [data-cfg] {
+  display: none;
+}
+/* Sorting three rows the reader can already see is the same non-answer
+   as filtering them, so the column affordance goes with the rest. The
+   class stays on the <th> — only the arrow and the hover target go. */
+.okt-table-wrap[data-scale="small"] .okt-sortable {
+  cursor: default;
+}
+.okt-table-wrap[data-scale="small"] .okt-sortable::after { content: none; }
+.okt-table-wrap[data-scale="small"] .okt-sortable:hover {
+  background: transparent !important;
+  color: inherit !important;
+}
+/* Size to content rather than stretching three short cells across the
+   full content width — "Plan | manifest list | rewrite groups" spread
+   over 970px reads as a layout accident. Still capped at 100%, so a
+   small table with long cells behaves exactly as before. */
+.okt-table-wrap[data-scale="small"] .okt-table-scroll > table {
+  width: auto;
+  max-width: 100%;
+}
+/* The card has to shrink with it. Left at full width, the header band
+   and the row rules stop mid-card and the empty remainder reads as a
+   rendering fault. */
+.okt-table-wrap[data-scale="small"] {
+  width: fit-content;
+  max-width: 100%;
+}
 /* Force-show whenever the table is in a non-default state — an
    active filter (input has text), an active chip, or a view other
    than the default table view. The user must always be able to see
@@ -2320,10 +2372,24 @@ pre[class*="language-"] {
 .token.entity      { cursor: help; }
 
 /* ============ TL;DR block ============ */
+/* The far stop is --surface, not --surface-2. --surface-2 is a
+   violet-leaning neutral (#f5f3ff), which reads as intentional under
+   the default indigo accent and as an unrelated lavender wash under
+   any other one — the card fades teal-to-lavender on a teal page.
+   Fading to the plain card surface is accent-agnostic. */
 .tldr {
   margin: 0 0 40px 0; padding: 28px 32px;
-  background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface-2) 100%);
+  background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%);
   border: 1px solid var(--border); border-radius: 12px;
+}
+/* Kept in the accessibility tree and in the TOC, out of the visual
+   flow. Not `display: none` — that would drop it from both. */
+.okt-sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%);
+  overflow: hidden; white-space: nowrap;
 }
 .tldr .tldr-label {
   font-size: 11px; font-weight: 800; letter-spacing: 0.15em;
@@ -5427,17 +5493,22 @@ oku-chart .okc-parcoord .okc-parcoord-line.hovered {
 }
 
 
-/* ============ Symmetric content width ============
- * Every component — prose AND visuals — fills the reader's
- * selected content width. Set per the body[data-content-width]
- * value and the wide-screen @media bumps near the top of this
- * file. The earlier asymmetric-bleed model (prose clamped to
- * --prose-width, visuals to --content-width) was retired
- * because authors expect the width-toggle button to act
- * uniformly across every block kind. If line-length is a
- * concern at very wide settings, switch back to 'narrow' mode.
- * --prose-width remains as a CSS variable for callers who
- * want to opt back into a line-length cap on their own block.
+/* ============ Content width ============
+ * Visual components fill the reader's selected content width, set
+ * per the body[data-content-width] value and the wide-screen
+ * @media bumps near the top of this file.
+ *
+ * Running prose does not. A fully symmetric model was tried first —
+ * every block kind, prose included, filling --content-width — on the
+ * grounds that the width toggle should act uniformly. It does act
+ * uniformly, and the cost lands on the default: at 'comfortable' on
+ * a 1440px window, body paragraphs ran 77-83 characters per line
+ * against a readable range of 45-75.
+ *
+ * The cap is expressed in `ch` and re-declared per mode, so the
+ * toggle still moves prose in the same direction — narrow 58ch,
+ * comfortable 66ch, wide 78ch, max uncapped. A reader who wants
+ * full-bleed prose still has 'max'.
  * ---------------------------------------------------------------- */
 main .okt-table-wrap,
 main .compare-grid,
@@ -5452,6 +5523,18 @@ main oku-annotated-code,
 main pre,
 main .example-pair {
   max-width: 100%;
+}
+
+/* Running prose only — direct children of a section, which is where
+   the markdown emitter puts paragraphs, lists and blockquotes. Text
+   inside a card, a table cell or a callout is already constrained by
+   its container and must not be clamped twice. */
+main > section > p,
+main > section > ul,
+main > section > ol,
+main > section > dl,
+main > section > blockquote {
+  max-width: var(--prose-width);
 }
 
 

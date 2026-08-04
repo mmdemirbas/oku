@@ -1894,6 +1894,10 @@ function initReadingAids() {
       return { type: 'row', cells: cellHtml, cellValues: cellValues, iv: iv, el: tr };
     }
 
+    // Row count at or below which a table is "small" — every row is on
+    // screen at once, so filtering and grouping have nothing to do.
+    var SMALL_TABLE_ROWS = 6;
+
     var allClassified = rowEls.map(classify).filter(Boolean);
     var flatRows = allClassified.filter(function (e) { return e.type === 'row'; });
     var authorGroupTitles = allClassified.filter(function (e) { return e.type === 'group'; })
@@ -1912,6 +1916,16 @@ function initReadingAids() {
     // on the expand button pins state and stops auto-toggling.
     wrap.className = 'okt-table-wrap';
     wrap.dataset.view = 'table';
+    // A table the reader can take in at a glance does not need a filter
+    // box, a row counter, a view switcher or a configuration popover —
+    // they cost a control strip above every three-row table and answer
+    // a question nobody has at that size. Marked as an attribute rather
+    // than skipped at build time: every control below stays in the DOM
+    // with its listener attached, so the wiring has one shape and a
+    // table that grows past the threshold needs no re-init. CSS does
+    // the hiding, with display:none, so the affordance is genuinely
+    // gone rather than merely faint.
+    if (rowCount <= SMALL_TABLE_ROWS && !hasAuthorGroups) wrap.dataset.scale = 'small';
 
     var ctrl = document.createElement('div');
     ctrl.className = 'okt-table-controls';
@@ -2937,7 +2951,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-04-r18';
+var __okuKitBuild = '2026-08-04-r19';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
