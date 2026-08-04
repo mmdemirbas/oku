@@ -2937,7 +2937,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-04-r16';
+var __okuKitBuild = '2026-08-04-r17';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -3484,6 +3484,10 @@ function escapeHTML(s) {
     // wait for the parsed body: the kit runs from <head>, the page-data
     // script sits at the end of <body>.
     if (document.getElementById('__oku_page__')) return;
+    // Same for a site build previewed from a plain local server: the
+    // build stamps window.__okuBuilt, because a built stub and a
+    // dev-server stub are otherwise indistinguishable from in here.
+    if (window.__okuBuilt) return;
     if (window.__okuReloadAttached) return;
     window.__okuReloadAttached = true;
     try {
@@ -11819,6 +11823,19 @@ var __okuSearch = (function () {
 
   function loadPagefind() {
     if (pagefindPromise) return pagefindPromise;
+    // A standalone build is ONE self-contained file; a Pagefind index is
+    // a directory of sidecar shards, so it can never be there. Probing
+    // for it anyway costs two failed module imports on every page —
+    // logged as console errors, and as scary-looking CORS failures when
+    // the file is opened over file:// — before the in-page fallback
+    // takes over and searches the page correctly. Skip straight to the
+    // fallback instead.
+    if (__okuStandalone()) {
+      pagefindPromise = Promise.reject(new Error('standalone build — no site index'));
+      // Nothing awaits this rejection before runSearch() catches it.
+      pagefindPromise.catch(function () {});
+      return pagefindPromise;
+    }
     // Resolve pagefind relative to the kit. _oku/../pagefind covers both
     // the standalone-build layout (where pagefind sits next to the HTML)
     // and a custom override.
@@ -12024,16 +12041,24 @@ var __okuSearch = (function () {
         // Pagefind index missing (IDE-served, no build yet). Don't
         // dead-end the user — fall back to in-page search so they can
         // at least navigate the current document.
+        // A standalone build is one self-contained file, so page-scoped
+        // search is the CORRECT behaviour there, not a degraded mode —
+        // saying "site index unavailable" reads as a fault the reader
+        // should go fix.
+        var solo = __okuStandalone();
         var localHits = _inPageSearch(query);
         if (localHits.length) {
           status.innerHTML = 'On this page: <strong>' + localHits.length +
             '</strong> match' + (localHits.length === 1 ? '' : 'es') +
-            ' &middot; <em>site index unavailable</em>';
+            ' &middot; <em>' + (solo ? 'this file only' : 'site index unavailable') + '</em>';
           _renderHits(localHits, resultsEl);
           return;
         }
         var msg = String((err && err.message) || err);
-        if (/pagefind|404|Not Found|fetch/i.test(msg)) {
+        if (solo) {
+          status.innerHTML = 'No matches in this file. ' +
+            'Open the <code>dist/site/</code> build for full-site search.';
+        } else if (/pagefind|404|Not Found|fetch|standalone/i.test(msg)) {
           status.innerHTML = 'Site index unavailable and no matches on this page. ' +
             'Run <code>oku build</code> + view from <code>dist/site/</code> for full-site search.';
         } else {

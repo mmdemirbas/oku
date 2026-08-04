@@ -407,3 +407,79 @@ class TestValidatePages:
         path, msg = errors[0]
         assert path == bad
         assert isinstance(msg, str) and msg
+
+
+# ---------- authored stubs must keep their page data ----------
+
+
+class TestAuthoredStubKeepsItsPage:
+    """`docs/<page>.md` + a thin `docs/<page>.html` is the documented
+    authoring shape. When the stub exists on disk the build must use the
+    author's HTML *and* the parsed page — dropping the page left the
+    standalone build with nothing to inline, so the artifact fetched
+    `<page>.json` at runtime and rendered blank from a file:// origin.
+    """
+
+    MD = "---\ntitle: Authored\n---\n\n## Body {#body}\n\nText.\n"
+
+    def _tree(self, tmp_path: Path) -> Path:
+        (tmp_path / "page.md").write_text(self.MD, encoding="utf-8")
+        (tmp_path / "page.html").write_text(cli._stub_for("Authored"), encoding="utf-8")
+        return tmp_path
+
+    def test_iter_page_stubs_attaches_the_page(self, tmp_path: Path) -> None:
+        root = self._tree(tmp_path)
+        srcs = cli.iter_page_stubs(root)
+        entry = [s for s in srcs if s[0].name == "page.html"]
+        assert len(entry) == 1, srcs
+        path, html, page = entry[0]
+        assert page is not None, "authored stub lost its page data"
+        assert "_oku/chrome.js" in html, "the author's own stub was replaced"
+
+    def test_standalone_inlines_the_page(self, tmp_path: Path) -> None:
+        root = self._tree(tmp_path)
+        out = tmp_path / "out"
+        cli.build_standalone(cli.iter_page_stubs(root), out, root)
+        built = (out / "page.html").read_text(encoding="utf-8")
+        assert 'id="__oku_page__"' in built, "standalone build inlined no page data"
+        assert '"Body"' in built or "Body" in built
+
+    def test_site_build_indexes_the_page(self, tmp_path: Path) -> None:
+        """Same omission kept authored-stub pages out of Pagefind."""
+        root = self._tree(tmp_path)
+        out = tmp_path / "site"
+        cli.build_site(cli.iter_page_stubs(root), out, root)
+        built = (out / "page.html").read_text(encoding="utf-8")
+        assert "data-pagefind-body" in built, "page missing from the search index"
+
+
+class TestKitSniffWindow:
+    def test_stub_with_a_large_inline_manifest_is_recognised(self, tmp_path: Path) -> None:
+        """`oku init` writes the entry stub with an inline manifest. On a
+        site of any size that pushes the kit <script> well past the first
+        couple of KB; a short sniff window made the build treat the stub
+        as foreign HTML and ignore it."""
+        manifest = {"pages": [{"path": f"p{i}.html", "title": f"Page {i}"} for i in range(200)]}
+        stub = cli._stub_for("Big", inline_manifest=manifest)
+        assert stub.index("_oku/chrome-boot.js") > 4096, "fixture is not exercising the window"
+        (tmp_path / "big.html").write_text(stub, encoding="utf-8")
+        found = [p.name for p in cli.find_html_files(tmp_path)]
+        assert "big.html" in found, found
+
+
+class TestBuiltMarker:
+    def test_site_pages_are_stamped_as_build_output(self, tmp_path: Path) -> None:
+        """A built stub and a dev-server stub are otherwise identical, so
+        a site previewed from a local static server opened an EventSource
+        against the dev server's /__reload and logged a 404 per page."""
+        (tmp_path / "page.md").write_text("---\ntitle: T\n---\n\n## S {#s}\n\nx.\n", encoding="utf-8")
+        out = tmp_path / "site"
+        cli.build_site(cli.iter_page_stubs(tmp_path), out, tmp_path)
+        built = (out / "page.html").read_text(encoding="utf-8")
+        assert "window.__okuBuilt=1" in built
+        assert built.index("window.__okuBuilt=1") < built.index("_oku/chrome-boot.js")
+
+    def test_marker_is_not_doubled(self) -> None:
+        once = cli._mark_built("<html><head><title>t</title></head><body></body></html>")
+        assert once.count("window.__okuBuilt=1") == 1
+        assert cli._mark_built(once) == once

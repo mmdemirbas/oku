@@ -43,9 +43,9 @@ try:  # installed distribution
     try:
         _PKG_VERSION = _dist_version("oku")
     except PackageNotFoundError:  # running from a checkout
-        _PKG_VERSION = "0.4.2+source"
+        _PKG_VERSION = "0.4.3+source"
 except ImportError:  # pragma: no cover — Python < 3.8
-    _PKG_VERSION = "0.4.2+source"
+    _PKG_VERSION = "0.4.3+source"
 
 
 def _kit_assets_dir() -> Path:
@@ -404,7 +404,12 @@ def find_html_files(root: Path):
         if p.name.endswith(".src.html"):
             continue  # HTML-first page SOURCE, not a stub
         try:
-            head = p.read_text(encoding="utf-8", errors="ignore")[:2048]
+            # 64K, not 2K: `oku init` writes the entry stub with an inline
+            # window.__okuManifest, which on a site of any size pushes the
+            # kit <script> past a small sniff window. The stub then reads
+            # as foreign HTML and the build silently ignores whatever the
+            # author customised in it.
+            head = p.read_text(encoding="utf-8", errors="ignore")[:65536]
         except OSError:
             continue
         if "_oku/chrome.js" not in head and "_oku/chrome-boot.js" not in head:
@@ -439,6 +444,17 @@ def iter_page_stubs(root: Path, json_pages: list | None = None):
     for json_path, page in pages_iter:
         stub_path = json_path.with_suffix(".html").resolve()
         if stub_path in stubs:
+            # An authored stub keeps its own HTML — but it must still
+            # carry its page data. Dropping it here left the standalone
+            # build with nothing to inline, so the artifact fell back to
+            # fetching `<page>.json`, which a file:// origin blocks: the
+            # documented authoring shape (`page.md` + a thin `page.html`)
+            # produced a standalone file that renders BLANK when opened
+            # off disk. It also kept the page out of the Pagefind index,
+            # since build_site only injects a body when it has the page.
+            existing_html, existing_page = stubs[stub_path]
+            if existing_page is None:
+                stubs[stub_path] = (existing_html, page)
             continue
         title = page.get("title") or json_path.stem
         stubs[stub_path] = (_stub_for(title), page)
@@ -3428,7 +3444,29 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
                 text = extract_page_text(page)
                 title = _page_title(page) or src.stem
                 html = inject_pagefind_body(html, text, title)
-        dest_html.write_text(html, encoding="utf-8")
+        dest_html.write_text(_mark_built(html), encoding="utf-8")
+
+
+_BUILT_MARKER = "<script>window.__okuBuilt=1;</script>"
+_HEAD_OPEN_RE = re.compile(r"<head\b[^>]*>", re.IGNORECASE)
+
+
+def _mark_built(html: str) -> str:
+    """Stamp a page as build output rather than dev-server output.
+
+    A site stub and a dev-server stub are otherwise byte-identical, and
+    chrome.js can only see that it is on localhost — so previewing
+    ``dist/site/`` with any static server made every page open an
+    EventSource against ``/__reload``, which that server does not have.
+    One 404 per page load, in the console of a shipped artifact, on the
+    exact path the build's own output line invites the reader to take.
+    """
+    if _BUILT_MARKER in html:
+        return html
+    m = _HEAD_OPEN_RE.search(html)
+    if m:
+        return html[: m.end()] + "\n" + _BUILT_MARKER + html[m.end() :]
+    return _BUILT_MARKER + "\n" + html
 
 
 def build_kit_bundle(src_root: Path) -> str | None:
