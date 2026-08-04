@@ -2937,7 +2937,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-04-r14';
+var __okuKitBuild = '2026-08-04-r15';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -10166,6 +10166,18 @@ var __mermaidLoader = (function () {
 
 class OkuDiagram extends HTMLElement {
   connectedCallback() {
+    // Guard against re-init when the host is moved (same reason as
+    // OkuChart). "Expand to fullscreen" moves the LIVE element into the
+    // lightbox and back on close, and every reparent fires
+    // connectedCallback again. The first init CONSUMES the
+    // <script type="text/x-mermaid"> source node — the innerHTML write
+    // below replaces it — so a second pass reads an empty string,
+    // mermaid.parse('') rejects with "No diagram type detected matching
+    // given configuration for text:", and the rendered diagram is
+    // replaced by the parse-error card in the lightbox AND back in the
+    // page, with one bogus mermaid-render-failed warning per move.
+    if (this._initialized) return;
+    this._initialized = true;
     var srcNode = this.querySelector('script[type="text/x-mermaid"]');
     var src = srcNode ? srcNode.textContent.trim() : '';
     var caption = this.getAttribute('caption') || '';
@@ -10382,10 +10394,19 @@ class OkuDiagram extends HTMLElement {
           var placeholder = document.createComment('okd-fullscreen-placeholder');
           self.parentNode.insertBefore(placeholder, self);
           self.classList.add('okd-fullscreen');
+          // The inline max-width the render pass pins (the diagram's
+          // authored width, so it never up-scales in the column) is an
+          // INLINE style — it beats the stylesheet's `max-width: none`
+          // for the lightbox and would cap fullscreen at the inline
+          // size. Lift it for the duration and restore on close.
+          var fsSvg = self.querySelector('.okd-render svg');
+          var savedMaxWidth = fsSvg ? fsSvg.style.maxWidth : '';
+          if (fsSvg) fsSvg.style.maxWidth = 'none';
           __okuLightbox.open(self, {
             title: caption || 'Diagram',
             onClose: function () {
               self.classList.remove('okd-fullscreen');
+              if (fsSvg) fsSvg.style.maxWidth = savedMaxWidth;
               if (placeholder.parentNode) {
                 placeholder.parentNode.insertBefore(self, placeholder);
                 placeholder.parentNode.removeChild(placeholder);
@@ -10564,6 +10585,11 @@ window.addEventListener('oku:theme-changed', function () {
  * --------------------------------------------------------------------- */
 class OkuAnnotatedCode extends HTMLElement {
   connectedCallback() {
+    // Same re-init guard as OkuChart / OkuDiagram: the init below wipes
+    // innerHTML, which consumes the <script> source. A reparent would
+    // otherwise re-run it against an empty host and blank the block.
+    if (this._initialized) return;
+    this._initialized = true;
     var srcNode = this.querySelector('script[type="text/x-code"]');
     var jsonNode = this.querySelector('script[type="application/json"]');
     var code = srcNode ? srcNode.textContent.replace(/^\n/, '') : (this.textContent || '');
@@ -11048,6 +11074,11 @@ if (!customElements.get('oku-annotated-code')) customElements.define('oku-annota
 /* ============ <oku-snippet> — editable HTML/CSS/JS playground ============ */
 class OkuSnippet extends HTMLElement {
   connectedCallback() {
+    // Same re-init guard as OkuChart / OkuDiagram: the innerHTML write
+    // below consumes the <script> source, so a reparent would re-run
+    // init against an empty host and blank the playground.
+    if (this._initialized) return;
+    this._initialized = true;
     var srcNode = this.querySelector('script[type="text/plain"]');
     var source = srcNode ? srcNode.textContent : '';
     // Trim a single leading newline if present (common in JSON-encoded multi-line strings)

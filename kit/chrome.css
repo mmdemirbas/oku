@@ -4915,7 +4915,14 @@ oku-diagram .okd-render svg foreignObject span {
   font-size: 13px !important;
 }
 /* Fullscreen lightbox: let the diagram grow to fill the pan/zoom
-   stage. The SVG keeps aspect ratio via viewBox. */
+   stage. `.okt-lightbox-pz-inner > *` sets width:auto so images shrink
+   to their natural size; a diagram host has no natural size (its SVG
+   is width:100% of the host), so auto collapses it to a few hundred
+   px in the middle of a 1700px stage. Pin the host to the stage. */
+.okt-lightbox-pz-inner > oku-diagram.okd-fullscreen {
+  width: 100%;
+  max-height: 100%;
+}
 .okt-lightbox-pz oku-diagram .okd-render svg,
 .okt-lightbox-content oku-diagram .okd-render svg {
   width: 100%;
