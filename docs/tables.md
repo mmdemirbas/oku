@@ -1,12 +1,9 @@
 ---
 title: Tables
 eyebrow: Reference · tables
-subtitle: table primitive — flat rows, grouped rows, chip filters, board / kanban view, sticky headers, column resize.
-audience: Author
 order: 22
 summary: table primitive — flat rows, grouped rows, chip filters, board / kanban view, sticky headers, column resize.
 parent: reference
-accent: teal
 ---
 
 ## Table primitive {#tables}

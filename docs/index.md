@@ -2,10 +2,8 @@
 title: oku
 eyebrow: Documentation kit · oku
 subtitle: Renders JSON or Markdown pages in the browser. Single-source content, no build step for authoring, multi-page site with full-text search when you want one.
-audience: Author
 order: 1
 summary: What the kit is, how it's organised, where the documentation lives.
-accent: teal
 ---
 
 > [!TLDR]

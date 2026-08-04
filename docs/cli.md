@@ -2,13 +2,10 @@
 title: CLI reference
 eyebrow: Reference
 subtitle: Three commands: oku init, oku build, oku serve. Zero flags. Designed so you mostly forget the CLI exists.
-audience: Author
 date: 2026-05-18
-read_time: ~4 min read
 order: 50
 summary: oku init / build / clean / check / serve — what each does.
 updated: 2026-05-21
-accent: teal
 ---
 
 > [!TLDR]

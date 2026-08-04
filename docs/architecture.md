@@ -4,11 +4,8 @@ eyebrow: Internals
 subtitle: How the kit fits together at runtime. Useful when something doesn't behave as expected, or when you want to extend a primitive.
 audience: Maintainer
 date: 2026-05-18
-read_time: ~7 min read
 order: 40
 summary: Runtime mental model + build pipeline.
-updated: 2026-05-18
-accent: teal
 ---
 
 > [!TLDR]

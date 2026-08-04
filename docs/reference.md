@@ -2,13 +2,10 @@
 title: Reference
 eyebrow: Reference
 subtitle: Everything an author needs in one page — project setup, page anatomy, every primitive with its JSON shape and a live example, per-page metadata, build outputs.
-audience: Author
 date: 2026-05-18
-read_time: ~15 min read
 order: 20
 summary: Project setup, page shape, every primitive with JSON shape + live example, metadata, build outputs.
 updated: 2026-05-21
-accent: teal
 ---
 
 > [!TLDR]
@@ -75,12 +72,12 @@ Every JSON page is rooted at kind:"page" and has three pieces: title, meta, bloc
 
 - `kind` — must be `"page"`. The renderer rejects anything else.
 - `title` — required. Becomes the `<title>` and the H1 in the cover.
-- `accent` — optional. Either a named token (`teal`, `amber`, `indigo`) or a CSS color value. Overrides the kit default per page.
-- `meta` — optional object. eyebrow, subtitle, audience, date, read_time, order, summary, lang. Each is optional individually.
+- `accent` — optional. Either a named token (`teal`, `amber`, `indigo`) or a CSS color value. Overrides the tree default from `kit.json` for this page only.
+- `meta` — optional object. See Per-page metadata below; in a markdown source these are the front-matter keys. Only `summary` is worth writing on most pages.
 - `blocks` — the content tree. Array of top-level blocks (tldr, kpi-grid, section).
 
 > [!TIP] Why summary matters
-> meta.summary is surfaced in three places: the page-nav tooltip on hover, the llms.txt sitemap line for AI consumers, and (when present) the Pagefind search excerpt. Keep it one tight sentence focused on what the page contains — not a teaser.
+> meta.summary is surfaced in four places: the page-nav tooltip on hover, the llms.txt sitemap line for AI consumers, the Pagefind search excerpt, and the cover subtitle. Keep it one tight sentence focused on what the page contains — not a teaser.
 
 ### Markdown sources {#markdown-sources}
 
@@ -289,14 +286,24 @@ Inline constructs nest in either order — a link inside emphasis, emphasis insi
 
 ## Per-page metadata {#metadata}
 
-meta drives nav placement, the cover header, the llms.txt sitemap, and search excerpts.
+Two fields are yours to write: `title` and `summary`. Everything else
+is either derived or inherited from the tree, and every one of them can
+still be overridden per page when the default is wrong.
+
+`summary` earns its place twice — it is the nav tooltip, the llms.txt
+entry and the search excerpt, and it fills the cover subtitle when no
+`subtitle` is set.
 
 ```oku-table
-{"headers":["Field",{"label":"Group","filter":"chips","values":["Display","Behavior","Top-level"]},"Meaning"],"rows":[["`eyebrow`",{"value":"Display","values":["Display"]},"Small label above the H1 — \"Architecture\", \"Notes\", \"Reference · charts\". One short noun phrase."],["`subtitle`",{"value":"Display","values":["Display"]},"One-paragraph description sitting under the H1 in the cover header. Sets reader expectations for the page."],["`audience`",{"value":"Display","values":["Display"]},"Free-form audience label — \"Spark+Iceberg team\", \"Personal\", \"Maintainer\". Appears in the cover meta row."],["`date`",{"value":"Display","values":["Display"]},"ISO date or human string. Shown in the cover meta row. Authors pick the convention — the kit never parses the value."],["`read_time`",{"value":"Display","values":["Display"]},"Like \"~5 min read\". Appears in the cover meta row. Author-supplied — no autocomputation."],["`updated`",{"value":"Display","values":["Display"]},"Last-updated date. Renders as a quiet italic line under the cover meta row — pure trust signal for freshness."],["`order`",{"value":"Behavior","values":["Behavior"]},"Sort key in the site-tree nav. Lower numbers sort earlier; ties fall back to title."],["`summary`",{"value":"Behavior","values":["Behavior"]},"Single line. Used in nav tooltips, llms.txt entries, and search excerpts."],["`lang`",{"value":"Behavior","values":["Behavior"]},"Locale code — \"en\", \"tr\", or anything the kit knows. Overrides the project default on this page only."],["`parent`",{"value":"Behavior","values":["Behavior"]},"Page id of the parent. Nests this page under it in the site tree (charts / tables / diagrams under Reference, etc.)."],["`accent`",{"value":"Top-level","values":["Top-level"]},"Sits on the page root, not under meta. Named token (teal, amber, indigo, rose…) or any valid CSS color."]]}
+{"headers":["Field",{"label":"Who supplies it","filter":"chips","values":["Author writes","From kit.json","Derived","Optional"]},"Meaning"],"rows":[["`title`",{"value":"Author writes","values":["Author writes"]},"The page title. The only field with no sensible default."],["`summary`",{"value":"Author writes","values":["Author writes"]},"One line. Nav tooltip, llms.txt entry, search excerpt — and the cover subtitle when `subtitle` is absent."],["`order`",{"value":"Author writes","values":["Author writes"]},"Sort key in the site-tree nav. Lower sorts earlier; ties fall back to title."],["`parent`",{"value":"Author writes","values":["Author writes"]},"Page id of the parent — nests this page under it in the site tree."],["`accent`",{"value":"From kit.json","values":["From kit.json"]},"Named token (teal, amber, indigo, rose…) or any CSS colour. Set it once for the tree in `kit.json`; a page overrides only when it genuinely differs."],["`audience`",{"value":"From kit.json","values":["From kit.json"]},"Free-form reader label shown in the cover meta row. Tree-wide in `kit.json`; per-page override for the odd maintainer-facing page."],["`read_time`",{"value":"Derived","values":["Derived"]},"Estimated from the body at 220 words per minute, and omitted below two minutes. Set it to override; a hand-counted figure goes stale on the next edit."],["`updated`",{"value":"Derived","values":["Derived"]},"The file's last commit date. Deliberately not the filesystem mtime — a fresh clone would stamp the whole tree as updated today. Renders as a quiet italic line, and is suppressed when it equals `date`."],["`eyebrow`",{"value":"Optional","values":["Optional"]},"Small label above the H1. Leave it out unless it says something the nav does not already show."],["`subtitle`",{"value":"Optional","values":["Optional"]},"One paragraph under the H1. Only needed when the cover should say something other than `summary`."],["`date`",{"value":"Optional","values":["Optional"]},"Publication date, displayed verbatim — the kit never parses it."],["`lang`",{"value":"Optional","values":["Optional"]},"Locale code. Overrides the project default on this page only."]]}
 ```
 
-> [!TIP] Date conventions
-> The kit doesn't parse the date — it's a display string. Use whatever convention you've adopted (ISO 8601, locale date). For consistency across a project, pick one and stick. Sort order in the nav uses meta.order, not the date.
+> [!TIP] Where a default belongs
+> A value that is the same on every page of a tree belongs in
+> `kit.json`, not repeated in eleven front-matter blocks. A value the
+> body already implies — how long the page takes to read, when it last
+> changed — belongs to the build. `oku check` warns when a page sets a
+> field it did not need to.
 
 ## Build outputs {#build}
 

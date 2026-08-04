@@ -6,7 +6,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string", "description": "Optional schema URL for editor autocomplete." },
+    "$schema": {
+      "type": "string",
+      "description": "Optional schema URL for editor autocomplete."
+    },
     "name": {
       "type": "string",
       "description": "Display name of the project. Surfaced in the page chrome and llms.txt."
@@ -15,9 +18,19 @@
       "type": "string",
       "description": "One-paragraph project description."
     },
+    "accent": {
+      "type": "string",
+      "description": "Default accent for every page in this tree. A page may still override with its own `accent`, but a tree whose pages each pick a different colour is an inconsistency, not a design — `oku check` warns about it."
+    },
+    "audience": {
+      "type": "string",
+      "description": "Default reader for every page in this tree (Author, Maintainer, …). Surfaced in the cover meta line. A page may override."
+    },
     "domains": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Glossary / ext-ref domains active for this project, in priority order. When a term resolves against multiple domains, the first listed wins (unless the inline carries `in:` to qualify)."
     },
     "lang": {
@@ -26,7 +39,9 @@
     },
     "lang_fallback": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Ordered fallback languages, tried when the preferred lang has no entry for a term. Typical value: ['en']."
     },
     "glossary": {
@@ -38,11 +53,17 @@
           "type": "object",
           "additionalProperties": {
             "type": "object",
-            "required": ["def"],
+            "required": [
+              "def"
+            ],
             "additionalProperties": false,
             "properties": {
-              "def": { "type": "string" },
-              "link": { "type": "string" }
+              "def": {
+                "type": "string"
+              },
+              "link": {
+                "type": "string"
+              }
             }
           }
         }
@@ -57,12 +78,22 @@
           "type": "object",
           "additionalProperties": {
             "type": "object",
-            "required": ["name", "summary", "link"],
+            "required": [
+              "name",
+              "summary",
+              "link"
+            ],
             "additionalProperties": false,
             "properties": {
-              "name": { "type": "string" },
-              "summary": { "type": "string" },
-              "link": { "type": "string" }
+              "name": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "link": {
+                "type": "string"
+              }
             }
           }
         }
@@ -73,13 +104,28 @@
       "description": "Reader-side variables substituted into code blocks at runtime. Each entry declares one key the reader can fill in via the chrome gear icon; matching {{key}} markers in code blocks swap in the reader's value. Values persist in localStorage.",
       "items": {
         "type": "object",
-        "required": ["key", "label"],
+        "required": [
+          "key",
+          "label"
+        ],
         "additionalProperties": false,
         "properties": {
-          "key": { "type": "string", "description": "Variable name; appears as {{key}} in code blocks." },
-          "label": { "type": "string", "description": "Human-readable label shown in the personalization panel." },
-          "default": { "type": "string", "description": "Initial value before the reader sets one." },
-          "type": { "type": "string", "description": "Optional input type hint (e.g. 'password' to mask)." }
+          "key": {
+            "type": "string",
+            "description": "Variable name; appears as {{key}} in code blocks."
+          },
+          "label": {
+            "type": "string",
+            "description": "Human-readable label shown in the personalization panel."
+          },
+          "default": {
+            "type": "string",
+            "description": "Initial value before the reader sets one."
+          },
+          "type": {
+            "type": "string",
+            "description": "Optional input type hint (e.g. 'password' to mask)."
+          }
         }
       }
     }

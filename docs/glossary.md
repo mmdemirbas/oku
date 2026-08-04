@@ -2,12 +2,9 @@
 title: Glossary & external refs
 eyebrow: Reference
 subtitle: How the multi-domain, multi-language glossary registry works. File layout, project-level overrides, disambiguation, the resolution algorithm.
-audience: Author
 date: 2026-05-18
-read_time: ~6 min read
 order: 30
 summary: Multi-domain glossary architecture and how to extend it.
-accent: teal
 ---
 
 > [!TLDR]

@@ -695,7 +695,138 @@ def _page_from_source_file(p: Path) -> dict | None:
         _, front_meta = _strip_md_front_matter(text)
         if not front_meta.get("title"):
             page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
+    _apply_meta_defaults(page, p)
     return page
+
+
+# ---------- metadata the author should not have to write ----------
+#
+# Every field an author fills in before writing a sentence is formatting
+# work, and the eleven pages in this repo's own docs tree showed most of
+# it being answered the same way every time: `accent` teal on 8 of 11,
+# `audience` "Author" on 7, `read_time` hand-counted prose that goes
+# stale on the next edit, `updated` a second hand-maintained date that
+# already matched `date` on one page and had drifted on two others.
+#
+# What is derivable is derived, what is constant across a tree comes
+# from kit.json, and either can still be overridden per page — an
+# authored value always wins. Derived keys are listed in `m._derived`
+# so `oku check` can tell "the author wrote this" from "we worked it
+# out", and the leading underscore keeps them out of `page_to_md`, so a
+# migrate round-trip never writes them back into the source.
+
+_WORDS_PER_MINUTE = 220
+# Below this a reading estimate is not information — it takes longer to
+# read the estimate than to skim the page.
+_MIN_READ_MINUTES = 2
+
+_tree_defaults_cache: dict[Path, dict] = {}
+_git_date_cache: dict[tuple[str, int], str | None] = {}
+
+
+def _tree_defaults(source: Path) -> dict:
+    """Tree-wide meta defaults from the nearest kit.json.
+
+    kit.json already carries what is true of a docs tree rather than of
+    one page (name, description, domains, lang). A colour and a reader
+    are the same kind of fact: a tree with a different accent on every
+    page is not a design, and `oku check` warns about exactly that.
+    """
+    start = source.parent if source.is_file() else source
+    for d in (start, *start.parents):
+        cached = _tree_defaults_cache.get(d)
+        if cached is not None:
+            return cached
+        kit_json = d / "kit.json"
+        if not kit_json.is_file():
+            continue
+        try:
+            data = json.loads(kit_json.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            data = {}
+        defaults = {k: data[k] for k in ("accent", "audience") if isinstance(data.get(k), str)}
+        _tree_defaults_cache[d] = defaults
+        return defaults
+    return {}
+
+
+def _read_time_for(page: dict) -> str | None:
+    """A reading estimate from the body, or None when the page is short
+    enough that the estimate says nothing."""
+    words = 0
+    for blk in page.get("b") or []:
+        if isinstance(blk, str):
+            words += len(blk.split())
+        elif isinstance(blk, dict):
+            # Typed blocks are read by looking, not by reading. Count
+            # their prose at a discount rather than not at all.
+            words += len(json.dumps(blk, ensure_ascii=False).split()) // 2
+    minutes = round(words / _WORDS_PER_MINUTE)
+    return f"~{minutes} min read" if minutes >= _MIN_READ_MINUTES else None
+
+
+def _git_last_modified(p: Path) -> str | None:
+    """The file's last commit date as YYYY-MM-DD, or None.
+
+    Deliberately NOT the filesystem mtime: a fresh clone stamps every
+    file with the checkout time, which would render the whole tree as
+    "updated today" — worse than showing nothing, because it looks like
+    information.
+    """
+    try:
+        key = (str(p.resolve()), int(p.stat().st_mtime))
+    except OSError:
+        return None
+    if key in _git_date_cache:
+        return _git_date_cache[key]
+    out: str | None = None
+    try:
+        r = subprocess.run(
+            ["git", "log", "-1", "--format=%cs", "--", p.name],
+            cwd=p.parent,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if r.returncode == 0 and re.fullmatch(r"\d{4}-\d{2}-\d{2}", r.stdout.strip()):
+            out = r.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        out = None
+    _git_date_cache[key] = out
+    return out
+
+
+def _apply_meta_defaults(page: dict, source: Path) -> None:
+    """Fill the meta an author should not have to write. Authored values
+    always win; every filled key is recorded in `m._derived`."""
+    if not isinstance(page, dict) or page.get("k") != "page":
+        return
+    meta = page.get("m")
+    if meta is None:
+        meta = {}
+    derived: list[str] = []
+
+    for key, value in _tree_defaults(source).items():
+        if not meta.get(key):
+            meta[key] = value
+            derived.append(key)
+
+    if not meta.get("read_time"):
+        rt = _read_time_for(page)
+        if rt:
+            meta["read_time"] = rt
+            derived.append("read_time")
+
+    if not meta.get("updated"):
+        when = _git_last_modified(source)
+        if when:
+            meta["updated"] = when
+            derived.append("updated")
+
+    if derived:
+        meta["_derived"] = derived
+    if meta:
+        page["m"] = meta
 
 
 def _front_matter_value(v) -> str:
@@ -719,9 +850,14 @@ def page_to_md(page: dict) -> str:
     if page.get("kind") == "page" and "k" not in page:
         page = _v1_to_v2(page)
     meta = page.get("m") or {}
+    # Values the build worked out (tree accent, reading estimate, commit
+    # date) must never be written back into a source — one migrate would
+    # re-introduce every field the derivation exists to remove, and the
+    # next edit would leave the frozen copy silently stale.
+    derived = set(meta.get("_derived") or ())
     fm: list[str] = ["---", f"title: {_front_matter_value(page.get('t', ''))}"]
     for key, v in meta.items():
-        if key.startswith("_") or "\n" in str(v):
+        if key.startswith("_") or key in derived or "\n" in str(v):
             continue
         fm.append(f"{key}: {_front_matter_value(v)}")
     fm.append("---")

@@ -1,12 +1,9 @@
 ---
 title: Diagrams
 eyebrow: Reference · Mermaid
-subtitle: diagram primitive + the Mermaid v10 type catalog the kit ships with.
-audience: Author
 order: 23
 summary: diagram primitive + the Mermaid v10 type catalog the kit ships with.
 parent: reference
-accent: teal
 ---
 
 ## Diagram + Mermaid {#diagrams}

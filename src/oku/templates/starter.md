@@ -1,12 +1,5 @@
 ---
 title: {{ TITLE }}
-accent: teal
-eyebrow: {{ EYEBROW }}
-subtitle: {{ SUBTITLE }}
-audience: {{ AUDIENCE }}
-date: {{ DATE }}
-read_time: {{ READ_TIME }}
-order: 10
 summary: {{ ONE_LINE_SUMMARY }}
 ---
 

@@ -1,12 +1,9 @@
 ---
 title: Charts
 eyebrow: Reference · charts
-subtitle: 28 chart variants with payloads + live samples — categorical, distribution, time series, hierarchy, relationship, multivariate, flow, graph, geographic.
-audience: Author
 order: 21
 summary: 28 chart variants with payloads + live samples — categorical, distribution, time series, hierarchy, relationship, multivariate, flow, graph, geographic.
 parent: reference
-accent: teal
 ---
 
 ## Chart variants {#charts}
