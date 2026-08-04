@@ -5,13 +5,14 @@ description: >
   replies — reviews, feedback rounds, study guides, briefs, design docs.
   Use when the user has 5+ distinct points/questions, asks for "visually
   rich" or "well-designed" output, needs ~1500+ words, or wants a
-  document to read alongside another file. Diagrams (SVG topology,
-  HTML/CSS bar charts, timelines, scatter matrices, step-flow chevrons,
-  comparison cards, status icons) are the primary communication
-  medium; prose is caption. The output is a single self-contained HTML
-  file with consistent chrome (top-left TOC toggle, top-right theme
-  toggle), light/dark theme that respects prefers-color-scheme,
-  auto-built scroll-spy TOC, and a reusable kit of visual components.
+  document to read alongside another file. Figures are the primary
+  communication medium and prose is the caption. A page is one markdown
+  file — front-matter plus a GFM body — where charts, tables, diagrams,
+  comparison grids and step flows are typed fences. The kit renders the
+  chrome: Contents drawer, three-mode theming, scroll-spy TOC, search,
+  lightbox and print stylesheet. There is no CSS to write; HTML islands
+  are the escape hatch and build on the kit's own classes and CSS
+  variables.
   Companion repo: https://github.com/mmdemirbas/html-doc (remote URL
   still on the legacy name).
 ---
@@ -184,11 +185,7 @@ For the strict gate before delivery, use `oku check --strict`
    ```markdown
    ---
    title: Storage engines
-   eyebrow: Reference
-   subtitle: One line under the H1.
-   accent: teal
-   order: 20
-   summary: One line for nav tooltips, search and llms.txt.
+   summary: One line for the nav tooltip, search, llms.txt and the cover.
    ---
 
    > [!TLDR]
@@ -210,6 +207,11 @@ For the strict gate before delivery, use `oku check --strict`
    [^1]: Definitions resolve page-wide — put them wherever you like.
    ```
 
+   - **`title` and `summary` are the whole front-matter** on most
+     pages. `order` and `parent` place the page in the tree when it
+     has siblings. Everything else — accent, audience, reading time,
+     last-updated — comes from `kit.json` or from the build, and
+     `oku check` tells you when a page sets a field it did not need.
    - `##` opens a section (the TOC is built from these); `###` is a
      sub-heading inside it. `{#id}` overrides the auto-slug.
    - Every kit primitive is a typed fence whose body is ONE compact
@@ -233,13 +235,11 @@ For the strict gate before delivery, use `oku check --strict`
 
 5. **Keep the chrome out of it.** Do not write `<page-chrome>`,
    `<page-toc>`, `<main>`, a cover header or a `<style>` block — the
-   renderer emits all of it from the front-matter. Per-page accent is
-   the `accent:` key (named token or CSS colour), not a stylesheet.
-   The kit gives you three-mode theming, the sticky TOC with
-   scroll-spy, the progress bar, back-to-top, section permalinks,
-   copy-to-clipboard and line folding on code, glossary tooltips, the
-   lightbox, search and the print stylesheet. Don't re-implement any
-   of it.
+   renderer emits all of it. The tree's accent lives in `kit.json`,
+   once, not in each page's front-matter and never in a stylesheet.
+   See "What the kit owns" below for the full list of what you get for
+   free; re-implementing any of it is the most common way an artifact
+   ends up worse than the default.
 
 6. **Run sanity checks** (see below).
 
@@ -301,225 +301,109 @@ not, you've decorated text, not built a visual.
     ask — the difference is "wrote it once to answer a question" vs.
     "we keep coming back to grow it."
 
-## Page chrome — never moves
+## What the kit owns — don't rebuild any of it
 
-Two fixed-position icon-only buttons, persistent across the document:
+None of the chrome is yours to write, style or position. The renderer
+emits it from the source: the cover, the Contents drawer carrying the
+site tree and the on-page TOC, three-mode theming that follows the OS
+until the reader overrides it, the content-width toggle, search,
+scroll-spy, section permalinks, the progress bar, back-to-top, code
+line numbers with a language pill and brace folds, glossary tooltips,
+the lightbox with pan and zoom, and the print stylesheet.
 
-- **Top-left:** TOC toggle (☰)
-- **Top-right:** Theme toggle (🌙 / ☀️)
+There is no stylesheet to write and no `:root` block to define. Two
+complete CSS variable sets ship in the kit, light and dark, and every
+component reads them. The accent comes from `kit.json` for the whole
+tree.
 
-**Same corners at every viewport.** Resist the urge to drop a
-"☰ Contents" pill at bottom-right on mobile. The single TOC button
-branches its behaviour by viewport width:
+**If you are writing CSS, stop and check the vocabulary below.** You
+are almost certainly rebuilding something that already exists, and the
+hand-rolled copy will not follow the accent or the theme.
 
-- Desktop (> 920px): collapses the sticky sidebar to zero width
-  (`body.toc-collapsed`), persisted via `localStorage`.
-- Mobile (≤ 920px): toggles an off-canvas drawer (`nav.toc.open`).
+## The primitive vocabulary — pick by the relationship
 
-Same icon for both states; the meaning is the action, not the glyph.
+This is the part worth knowing. Each primitive is a typed fence whose
+body is ONE compact JSON object. Pick by what the content *is*, not by
+what looks good:
 
-### Fixed-positioning pitfalls
-
-Make sure no ancestor breaks `position: fixed`:
-
-- Ancestor with `transform`, `filter`, `perspective`,
-  `will-change: transform`, or `contain: paint` establishes a new
-  containing block. Buttons must be direct children of `<body>`.
-- `overflow: hidden` on a near-ancestor sometimes clips the button.
-- Stacking contexts from `opacity < 1`, `mix-blend-mode`, or
-  `isolation: isolate` on ancestors can hide the button behind
-  otherwise-lower-z elements. Use z-index ≥ 100.
-
-## Theme switcher — three modes
-
-The kit ships a **three-mode** cycler: `system → light → dark → system`.
-System is the default and follows `prefers-color-scheme` live; if the
-user changes their OS theme while in system mode, the page updates
-without a click.
-
-- Stored in `localStorage` under key `theme-pref`. Values: `light`,
-  `dark`, or absent (= system).
-- `chrome-boot.js` (synchronous, in `<head>`) reads the pref and sets
-  `data-theme` (the rendered theme) and `data-theme-mode` (which of
-  the three modes is active) on `<html>` before paint. No FOUC.
-- Cycler button icon shows the *current mode* (monitor, sun, moon),
-  not the rendered theme. So if the user is in system mode and OS is
-  dark, the button still shows the monitor icon.
-- Two complete CSS variable sets in `chrome.css`: `:root` (light) and
-  `:root[data-theme="dark"]` (dark). Every rule reads `var(--bg)`,
-  `var(--text)`, etc. No hardcoded hex outside these two blocks.
-- Concept colours (engine palette, status pills) need both light- and
-  dark-mode values. Saturated dark colours often look garish on white;
-  desaturate and darken for light.
-
-## TOC behaviour
-
-- Sidebar default open on desktop.
-- Top-left toggle collapses to zero width and reopens.
-- Off-canvas drawer on mobile: backdrop click, toggle click, `Escape`,
-  and clicking any TOC link all close it.
-- Scroll-spy highlights the active section in the TOC; sub-items expand
-  for the active section, collapse for others.
-- Auto-generated from `<main> <section>` `<h2>` and `<h3>` elements —
-  add `id` attributes if you want stable anchors, otherwise the script
-  slugifies titles.
-
-## CSS token system
-
-The kit's `chrome.css` provides two complete sets. Don't introduce
-hardcoded colours outside `:root` and `:root[data-theme="dark"]`. If
-the topic has parallel concepts (engines, states, tracks), add one
-variable per concept in **both** blocks. Same colour = same concept
-everywhere.
-
-Don't reuse a colour for two distinct concepts.
-
-### Accent — pick per artifact
-
-The accent colour is **not fixed**. Each artifact picks its own (matching
-the project's product palette, the topic, or the contrast of the team).
-Examples in the repo: amber (`#f0b429` dark / `#b45309` light) for the
-Flink studies; indigo for a strategy brief; teal for an infrastructure
-review. Define the accent and `--accent-soft` in both `:root` and
-`[data-theme="dark"]` (or `[data-theme="light"]`) blocks. Everything
-else — chrome buttons, focus halos, scroll-spy active TOC, anchor
-flash, progress bar, hero glow — derives from those two tokens.
-
-## Visual language — modern, layered, frosted
-
-The kit ships a modern, ai-2025-era look. Don't strip it down to
-"plain HTML"; that feels mechanical and dated. The defining touches:
-
-- **Typography:** Inter (body, 400/500/600/700/800) and JetBrains Mono
-  (code, 400/500/600). Both via Google Fonts with `display=swap`.
-  Body at 16px, line-height 1.65, letter-spacing 0.005em. H1 ≈ 44px
-  with -0.025em letter-spacing. Eyebrow letter-spacing 0.2em.
-- **Chrome buttons** (`.ctrl-btn`): 44×44, border-radius 12px. Layered
-  shadow `0 6px 18px var(--shadow-strong), 0 0 0 1px var(--shadow-soft)`,
-  frosted via `backdrop-filter: blur(12px) saturate(140%)`, isolation
-  `isolation: isolate`, and a subtle `:active { transform: scale(0.96) }`
-  press feedback. Hover lifts to `--ctrl-bg-hover` with `--line-strong`
-  border.
-- **SVG icons** (Feather-style stroke): menu `☰`, sun, moon, up-arrow.
-  Use inline `<svg viewBox="0 0 24 24" stroke="currentColor" ...>` at
-  20×20 inside `.ctrl-btn` rather than emoji glyphs. Theme switcher
-  shows sun XOR moon via `display: none/flex` based on
-  `[data-theme="..."]`.
-- **Hero radial glow:** `header.cover::before` is a radial gradient
-  using `--accent-soft` positioned at `60% 80% at 20% 0%`, behind the
-  hero content via `z-index: -1` and parent `isolation: isolate`. Gives
-  the page a focal point without a hard banner.
-- **Content centering:** `main { max-width: var(--max-width); margin:
-  0 auto; }` keeps body width stable when the sticky sidebar collapses,
-  so the eye doesn't jump.
-
-These are **defaults**, not laws. A project with a different visual
-identity can override — but if you find yourself reaching for plainer
-chrome, default back to this kit before shipping. "Mechanical" is the
-failure mode.
-
-## Diagram patterns — the primary vocabulary
-
-These are the actual visuals. Reach for one of these before writing
-the third paragraph in a section. All implementable in inline SVG or
-HTML+CSS — no external libraries needed.
-
-| Pattern | When to reach for it |
-|---|---|
-| **Topology / architecture diagram** (inline SVG: nodes + edges, color-coded paths, arrowheads) | "Where does X sit relative to Y" — any system with 3+ components and at least one path between them. The single highest-leverage diagram for orientation. |
-| **Horizontal bar chart** (HTML/CSS, log-scaled if range is wide) | Comparing magnitudes across categories — recovery times, costs, byte counts, latencies, sizes. Add overlay rows in a different color for before/after comparisons. |
-| **Timeline** (HTML/CSS, axis + event dots + colored bands) | "What happens when X event fires" — sequence of events with relative timing. Colored bands show state regions (working / degraded / broken). Use side-by-side timelines for before/after. |
-| **2-D scatter / ROI matrix** (HTML positioned dots in a 2×2 grid) | Multi-attribute comparison of a small set (3–6 items). Cost vs impact, risk vs payoff, effort vs value. The position carries the message. |
-| **Step-flow chevrons** (boxes + arrows in a horizontal row) | Pipeline order, dependency chain, ship sequence. ≤6 steps. Highlight the current/recommended step. |
-| **Verdict tile** (icon + headline + status pills, framed) | Top-of-doc summary instead of a prose TL;DR. The icon does most of the work; the headline is one sentence; the pills are the conclusions. |
-| **Numbered card list** (badge + title + meta row + body) | Proposals, action items, ranked recommendations. Each card scannable as a unit — cost / risk / files line as meta, ≤2 short paragraphs in the body. |
-| **Comparison cards** (side-by-side bad/good with status colors) | Today-vs-proposed, A/B alternatives, before/after of a single decision. |
-| **Inline status icons** (single-color SVG, currentColor-aware) | Replace pill text where the meaning is binary. Checkmark, cross, warning triangle, arrow. |
-
-## Static text-shaped components — supporting cast
-
-Use these to dress and frame the diagrams above, not as standalone
-"visuals". A section made entirely of these is a markdown document
-in HTML clothing.
-
-| Component | Use for |
-|---|---|
-| `.callout` (+ `.warning` / `.danger` / `.success` / `.neutral`) | A piece of prose that needs scannable attention — pitfall, key takeaway, optional reading. |
-| `.pill` (+ `.ok` / `.warn` / `.fail` / `.info` / `.muted`) | Status badges. Best paired with an inline SVG icon. |
-| `.kpi-grid` + `.kpi` | Headline numbers at the start of a section. Useful but easy to overuse — replace with a bar chart whenever you have 4+ values that share a unit. |
-| `<table>` | Matrices (engine × column, rule × trigger). Use any time prose lists more than three parallel things — but ask first if a chart or grid would carry it better. |
-| `details.card` (or `details.defer`) | Optional depth that doesn't disrupt linear reading. Default-collapsed for skim-readers; expand for the full account. |
-| `.g-wrap` + `.g` + `.g-tip` | Inline glossary tooltip; dotted underline indicator. |
-
-## SVG conventions
-
-- **Inline only.** No external CDNs, no `<img src="…">`. The artifact
-  must be a self-contained file the user can open offline.
-- **Reference CSS variables for colors.** `fill="var(--surface)"`,
-  `stroke="var(--text-soft)"`. Theme toggle then works automatically
-  with no JS re-render needed.
-- **Use `viewBox` + `width="100%"`.** Diagrams scale on mobile without
-  per-viewport code. Set `class="full"` (or equivalent) on the SVG
-  element so it fills its container.
-- **Cap diagram complexity.** One SVG should be ≤ ~150 lines. If it's
-  growing past that, the diagram is doing too much — split into
-  two diagrams or simplify the system being shown.
-- **Define markers (arrowheads) once in `<defs>`.** Color them via
-  class so theme variables propagate.
-- **Accessibility.** Add `role="img"` + `aria-label="..."` on the
-  outer SVG, or a `<title>` first child. Screen-reader users should
-  get the gist without seeing the geometry.
-- **Honour reduced-motion.** No CSS animations on SVG that aren't
-  decorative; if any are present, gate them behind
-  `@media (prefers-reduced-motion: no-preference)`.
-
-## Layout discipline — overlap is structural, not stylistic
-
-The single most common way a "visual" turns unreadable is hand-positioned
-text that overlaps when content is dense or the viewport is narrow.
-The fix is never "make the font smaller" or "shorten the labels" —
-it's **pick a layout pattern where overlaps are structurally impossible**.
-
-**The hand-positioned-text trap:** any time a label, dot, or annotation
-gets an `style="left:X%"` / `top:Y%` / SVG `x="..." y="..."` that you
-chose by eye, the layout will collide for SOME content density or
-viewport width. CSS doesn't compute label-collision; you do, and you
-will get it wrong.
-
-### Safe patterns — use these
-
-| Pattern | Why overlap is impossible |
-|---|---|
-| **Bar chart row-per-item** (each row is its own track) | Labels and bars share a row; a row is only one thing tall. Adding more items adds more rows; never collides. |
-| **Table-driven legend below the visual** (numbered marker on visual, numbered row in table below) | The visual carries position/shape; the table carries text. Tables can't overlap themselves. |
-| **Step-flow chevrons in a flexbox row with `flex-wrap: wrap`** | Each step is a self-contained box; wrap kicks in when narrow. No fixed-position math. |
-| **Comparison cards in a CSS grid** (`grid-template-columns: 1fr 1fr`) | Each card is its own cell; collapses to 1fr on narrow viewports. |
-| **Mermaid diagrams** (sequence, gantt, flow, state) | Mermaid computes positions and avoids label overlap automatically. Worth the runtime dependency for any diagram that would otherwise need ≥4 hand-positioned labels. |
-
-### Risky patterns — use only with strong constraints
-
-| Pattern | Risk | Constraint that makes it safe |
+| Fence | The relationship it carries | Reach for it when |
 |---|---|---|
-| **Timeline with event labels on the bar** | Labels collide when events are <10% apart on the time axis | Cap to 3 events on the bar; put detail in a numbered table BELOW the bar (the visual is bands + axis ticks only). |
-| **Scatter / 2-D matrix with labels next to dots** | Labels collide when dots are close OR viewport is narrow | Number the dots only; put the legend in a keyed table below. |
-| **Topology with edge labels** | Labels overlap when edges cross or are close | Place labels on the edge midpoint with `text-anchor="middle"` and a `<rect>` background; if you have ≥3 edges through a region, split into two diagrams. |
-| **Hand-positioned annotations on any SVG** | Will fail at SOME viewport. | Use `viewBox` so geometry scales together; never mix `viewBox` (relative) with `style="left:X%"` (absolute) on the same diagram. |
+| `oku-chart` | magnitude, distribution, change over time, part-to-whole, correlation | Any set of numbers that share a unit. ~50 types; `bar` and `plot` cover most cases. |
+| `oku-chart-grid` | the same shape repeated across N groups | Small multiples — one chart per region, per engine, per week. |
+| `oku-table` | a matrix — N things × M attributes | More than three parallel things with the same fields. Gains filter, sort, group-by and card/board views past a size threshold. |
+| `oku-compare-grid` | two or more options weighed side by side | A decision with alternatives. `verdict` marks the winner; `accent` colours the card. |
+| `oku-step-flow` | ordered stages, or unordered parallel options | A pipeline, a procedure, a migration. `ordered: false` for a 2-up grid of links with no implied sequence. |
+| `oku-kpi-grid` | headline numbers, no shared axis | Two to four figures that open a section. Four or more values sharing a unit belong in a chart instead. |
+| `mermaid` | topology, sequence, state, containment, timing | Any diagram. Mermaid computes positions and avoids label collision; prefer it over hand-drawn SVG. |
+| `oku-diagram` | the same, with a caption | When the figure needs a caption line. A plain `mermaid` fence with an italic line under it produces the same thing. |
+| `oku-annotated-code` | a line of code and the reason for it | Walking through an implementation. Numbered markers in the source pair with a side panel. |
+| `oku-example` | input beside its rendered output | Documenting a format. This is how `docs/reference.md` shows every primitive. |
+| `oku-live-snippet` | code the reader can edit and re-run | Teaching a syntax where trying it beats reading about it. |
+| `oku-insight` | one sentence that must not be skipped | Sparingly. It is text-shaped, and three of them in a row is a bullet list. |
+| `oku-tldr` | the page in one line plus three points | The opener. Usually written as a `> [!TLDR]` admonition instead. |
 
-### The two-pass test (run on every diagram)
+Admonitions (`NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`, `TLDR`)
+are GFM blockquotes. **They are not visuals.** A coloured box around a
+paragraph is decorated text — `oku check`'s density rule does not count
+one, and neither should you.
 
-After laying out a diagram:
+`docs/reference.md` in the kit repo carries every primitive's payload
+shape beside its rendered output. Read it there rather than guessing.
 
-1. **Density pass:** add 50% more items mentally — would labels overlap? If yes, the pattern can't survive a content change. Switch to a row-per-item or table-below pattern.
-2. **Viewport pass:** view at the narrowest planned viewport (typically 360px). Are any two text elements within 4px of each other? If yes, the pattern can't survive a viewport change.
+## When a primitive does not fit: HTML islands
 
-A diagram that passes both is robust. A diagram that fails either will produce the bug "labels are unreadable" the moment content shifts or someone opens it on a phone.
+A block-level HTML tag at column 0 passes through to the DOM untouched
+— custom elements, `<script>` and `<style>` included. Full capability,
+no restrictions. This is the intended escape hatch, and reaching for it
+is not a failure.
 
-### When in doubt, use Mermaid
+**Build on the kit, not beside it.** An island that carries its own
+colours ignores the page accent and breaks in the theme the author
+wasn't looking at:
 
-Reach for Mermaid (sequence, gantt, flowchart, state) any time a custom
-diagram would need ≥4 hand-positioned labels. The runtime dependency
-(~80 KB inlined) is worth more than any custom design — Mermaid solves
-label collision automatically and the diagrams age well.
+```html
+<!-- yes: follows the accent, follows light/dark -->
+<div class="okt-card" style="background: var(--surface); color: var(--text);
+     border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
+  <strong style="color: var(--accent-strong)">Heading</strong>
+</div>
+
+<!-- no: hardcoded, breaks in dark mode, ignores the accent -->
+<div style="background: #f5f3ff; color: #1e1b29;">…</div>
+```
+
+`oku check` reports `island-hand-styled` for the second shape. The
+variables to build on: `--bg`, `--surface`, `--surface-2`, `--text`,
+`--text-soft`, `--text-faint`, `--border`, `--accent`, `--accent-soft`,
+`--accent-strong`, `--warning`, `--danger`, `--success`, and
+`--series-1` … `--series-10` for categorical data.
+
+### Hand-drawn SVG inside an island
+
+Sometimes the figure genuinely has no primitive — a topology, an
+annotated screenshot, a custom geometry. Then:
+
+- **Inline only**, no external URLs. The artifact has to open offline.
+- **Colours from variables:** `fill="var(--surface)"`,
+  `stroke="var(--text-soft)"`. The theme toggle then needs no JS.
+- **`viewBox` + `width="100%"`** so it scales instead of clipping.
+- `role="img"` + `aria-label`, or a `<title>` first child.
+- Keep it under ~150 lines. Past that the diagram is doing two jobs.
+
+**The hand-positioned-text trap.** Any label placed at a coordinate you
+picked by eye will collide at some content density or viewport width.
+CSS does not compute label collision; you do, and you will get it
+wrong. Two passes before shipping any hand-drawn figure:
+
+1. **Density:** add 50% more items mentally. Do labels overlap?
+2. **Viewport:** open it at 360px. Are any two text elements within 4px?
+
+If either fails, the pattern cannot survive a content or viewport
+change. Switch to a shape where overlap is structurally impossible — a
+row per item, a numbered marker with the text in a table below, a
+flex-wrap row of self-contained boxes — or use Mermaid, which solves
+collision for you. **Reach for Mermaid whenever a custom diagram would
+need four or more hand-positioned labels.**
 
 ## Tone
 
@@ -550,11 +434,11 @@ disguised markdown):
 - Don't ship a "diagram" that's just a fancier list. If your diagram
   looks like the bullet list it replaced but with boxes, it isn't
   pulling its weight. Cut it or replace with a real chart.
-- Don't dump deep-dive content inline. Use `<details>` accordions so
-  the skim-reader sees the structure and the depth-reader can expand.
+- Don't dump deep-dive content inline. A `<details>` island keeps the
+  structure visible to a skim-reader and the depth available on click.
 - Don't ship a section with three or more paragraphs of prose without
-  at least one visual. Either find the diagram, or rewrite as a table,
-  card grid, or comparison block.
+  at least one visual. Either find the figure, or rewrite as a table,
+  card grid, or comparison block. `oku check` names the section.
 
 **Mechanical / structural don'ts:**
 
@@ -568,33 +452,34 @@ disguised markdown):
   degrades cleanly without them.
 - Don't write a "design decisions" section that's just rationalising
   what you did. List the rejected alternatives.
-- Don't ship a second mobile-only button (no bottom-right "Contents"
-  pill). One button, top-left, every viewport.
+- Don't hand-write chrome, a stylesheet, a `:root` block or a per-page
+  accent. The kit owns all four, and a hand-rolled copy stops following
+  the theme the moment the reader toggles it.
+- Don't fill front-matter fields the build supplies. A hand-counted
+  reading time is wrong after the next edit and nothing says so.
 
 ## Sanity checks before delivery
 
-**Density gate (run BEFORE the mechanical checks):**
+**The density gate is now the linter's job, not yours.**
 
-0a. **Visual presence.** Walk through every section. For each one, ask:
-   - Does it have at least one visual element that isn't a callout / pill / table?
-   - Could I cover the prose and still get the point from the visual?
-   - If I removed the visual, would the section still "feel like HTML" or read as a markdown paragraph in disguise?
+`oku check` reports `prose-only-section` for any section with three or
+more paragraphs and nothing for the eye — a callout does not count. It
+also reports `redundant-meta` for a field that repeats another,
+`island-hand-styled` for an island carrying hardcoded colour, and
+`accent-divergence` for a tree with no colour convention. Run it and
+fix what it names; that removes the whole class of judgement calls that
+used to sit here as a checklist.
 
-   If a section fails any of these, find the diagram (topology, bar
-   chart, timeline, scatter, flow, comparison cards) before shipping.
+What the linter cannot decide, and you still have to:
 
-0b. **Layout robustness.** For every diagram in the document, run the
-   two-pass test from the Layout discipline section:
-   - **Density pass:** would labels overlap if I added 50% more items?
-   - **Viewport pass:** at 360px width, are any two text elements within 4px of each other?
-
-   Open the file in a browser and resize to ~360px (devtools "Responsive"
-   mode is fastest). If anything overlaps, the diagram uses a hand-
-   positioned pattern that needs to be replaced with a row-per-item bar,
-   a table-below-visual legend, or a Mermaid diagram. **Never ship a
-   diagram you haven't actually viewed at narrow width.**
-
-These two are the checks most likely to be skipped — don't.
+- **Does the figure carry the point?** Cover the prose. Can you still
+  get the section from the visual alone? A chart that restates the
+  sentence above it passes every automated check and earns nothing.
+- **Is the visual vocabulary varied?** A page that is nine tables is
+  not visually richer than a page that is nine paragraphs.
+- **Layout robustness of any hand-drawn figure.** Run the two-pass test
+  from the islands section — density, then 360px — in a real browser.
+  Never ship a hand-positioned diagram you have not viewed narrow.
 
 **Automated (every artifact — run this first):**
 
@@ -639,11 +524,11 @@ doctree is clean.
 
 1. Page opens in a browser; no console errors.
 2. Every TOC link resolves to a section.
-3. Toggle the theme; nothing strobes, all callouts/pills/tooltips/SVGs
-   remain legible (especially confirm SVG fills/strokes use CSS
-   variables, not hardcoded hex).
-4. Resize to a narrow viewport; chrome stays in corners, drawer
-   behaves correctly, SVGs scale via `viewBox`.
+3. Toggle the theme; nothing strobes, and any island or hand-drawn SVG
+   stays legible — confirm its fills and strokes read CSS variables
+   rather than hardcoded hex.
+4. Resize to a narrow viewport; the Contents drawer behaves, and any
+   SVG scales via `viewBox` instead of clipping.
 5. Word-search for placeholders (`{{ }}`, `TODO`, `TBD`, `XXX`) —
    none should remain.
 
@@ -657,17 +542,12 @@ doctree is clean.
 After the checks, announce the file with a 1-3 sentence pointer plus
 the top 1-3 takeaways.
 
-## Optional: Mermaid and Prism
+## Mermaid and Prism are already handled
 
-The kit doesn't ship with Mermaid or Prism. If the artifact needs
-them:
-
-- **Mermaid** bakes theme into rendered SVG at init. On theme toggle,
-  re-initialise with new variables and re-render every `.mermaid`
-  block. Cache original source in `data-mermaid-src`.
-- **Prism** themes are CSS. Ship `prism-tomorrow` (dark) and `prism`
-  (light), toggle `disabled` on the `<link>` tags. Or write Prism token
-  rules using the page's own CSS variables.
+The kit lazy-loads both and re-renders Mermaid on a theme toggle,
+caching the source so a re-render never reads an emptied node. Write a
+```mermaid fence and a fenced code block with a language; there is
+nothing to wire.
 
 ## After the round
 
