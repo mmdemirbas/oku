@@ -4858,9 +4858,14 @@ oku-diagram .okd-render svg .note:hover rect {
 oku-diagram .okd-render svg[data-okd-has-active] .node:not([data-okd-active]),
 oku-diagram .okd-render svg[data-okd-has-active] .flowchart-link:not([data-okd-active]),
 oku-diagram .okd-render svg[data-okd-has-active] .edge-thickness-normal:not([data-okd-active]),
-oku-diagram .okd-render svg[data-okd-has-active] .edgeLabel,
-oku-diagram .okd-render svg[data-okd-has-active] .edgeLabels > g {
-  opacity: 0.25;
+oku-diagram .okd-render svg[data-okd-has-active] .edgeLabel:not([data-okd-active]),
+oku-diagram .okd-render svg[data-okd-has-active] .edgeLabels > g:not([data-okd-active]) {
+  /* Recede, don't disappear. 0.25 put dimmed labels below the
+     readability floor on the dark theme — the reader could no longer
+     see the rest of the graph they were navigating. The active subgraph
+     is carried by the accent stroke and the 2–2.5px stroke-width above;
+     the dim only has to push the rest back one layer. */
+  opacity: 0.55;
   transition: opacity 0.18s ease;
 }
 oku-diagram .okd-render svg .node[data-okd-active] > rect,

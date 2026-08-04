@@ -2937,7 +2937,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-04-r15';
+var __okuKitBuild = '2026-08-04-r16';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -10287,6 +10287,7 @@ class OkuDiagram extends HTMLElement {
               /* getBBox throws when the host is display:none — keep
                  mermaid's own viewBox in that case. */
             }
+            self._snapEdgeEndpoints(svg);
             self._wireNeighborHighlight(svg);
             self._wireNodeTooltips(svg);
           }
@@ -10417,6 +10418,103 @@ class OkuDiagram extends HTMLElement {
       }
     ]);
   }
+  /* Guarantee that every edge touches what it connects.
+   *
+   * Mermaid routes an edge, then trims it at the boundary of its source
+   * and target. When the endpoint is a SUBGRAPH rather than a node, the
+   * trim has been observed to stop short — the reader sees a line
+   * floating in space beside the cluster it is supposed to leave. It is
+   * environment-dependent: the same source, kit build, mermaid version
+   * and page render with the edge attached in headless chromium at
+   * several widths, fonts and font sizes, over both http and file://,
+   * and detached in the reporter's Chrome. The upstream cause is not
+   * characterised, so this is a REPAIR of the symptom, not a fix of the
+   * cause — if the cause is found, delete this and its test.
+   *
+   * It is a no-op on a correctly routed diagram: an attached endpoint
+   * is already inside (or within SNAP_MIN of) its shape, so nothing is
+   * rewritten and `data-okd-snapped` never appears. Only a gap in
+   * (SNAP_MIN, SNAP_MAX] is bridged, by extending the path backwards
+   * along its own start tangent (forwards along its end tangent) until
+   * it reaches the shape it was leaving. A larger gap is left alone —
+   * it is not a trim artefact, and a long invented segment would be
+   * worse than the gap.
+   */
+  _snapEdgeEndpoints(svg) {
+    var SNAP_MIN = 3;     // px on screen — below this it already touches
+    var SNAP_MAX = 200;   // px on screen — beyond this, don't invent geometry
+    var STEP = 2;
+    var paths = svg.querySelectorAll('.edgePaths path');
+    if (!paths.length) return;
+    var shapes = [];
+    svg.querySelectorAll('g.node, g.cluster').forEach(function (g) {
+      var r = g.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) shapes.push(r);
+    });
+    if (!shapes.length) return;
+    function inAnyShape(x, y, pad) {
+      pad = pad || 0;
+      for (var i = 0; i < shapes.length; i++) {
+        var r = shapes[i];
+        if (x >= r.left - pad && x <= r.right + pad &&
+            y >= r.top - pad && y <= r.bottom + pad) return true;
+      }
+      return false;
+    }
+    var repaired = 0;
+    paths.forEach(function (path) {
+      var len;
+      try { len = path.getTotalLength(); } catch (e) { return; }
+      if (!isFinite(len) || len < 4) return;
+      var ctm = path.getScreenCTM();
+      if (!ctm) return;
+      var inv = ctm.inverse();
+      var probe = Math.min(6, len / 4);
+      function toScreen(pt) {
+        var q = svg.createSVGPoint(); q.x = pt.x; q.y = pt.y;
+        return q.matrixTransform(ctm);
+      }
+      function toLocal(sx, sy) {
+        var q = svg.createSVGPoint(); q.x = sx; q.y = sy;
+        return q.matrixTransform(inv);
+      }
+      // Walk outward from `tip` along the outward tangent; return the
+      // first screen point that lands inside a shape, or null.
+      function reach(tip, inward) {
+        var dx = tip.x - inward.x, dy = tip.y - inward.y;
+        var mag = Math.hypot(dx, dy);
+        if (!mag) return null;
+        dx /= mag; dy /= mag;
+        // Already touching? Test the tip against the boxes INFLATED by
+        // SNAP_MIN — a correctly trimmed tip sits exactly on a boundary,
+        // so probing outward from it always lands outside and would read
+        // as detached.
+        if (inAnyShape(tip.x, tip.y, SNAP_MIN)) return null;
+        for (var t = SNAP_MIN; t <= SNAP_MAX; t += STEP) {
+          var x = tip.x + dx * t, y = tip.y + dy * t;
+          if (inAnyShape(x, y)) return { x: x, y: y };
+        }
+        return null;
+      }
+      var d = path.getAttribute('d');
+      if (!d) return;
+      var changed = false;
+      var head = reach(toScreen(path.getPointAtLength(0)),
+                       toScreen(path.getPointAtLength(probe)));
+      if (head) {
+        var h = toLocal(head.x, head.y);
+        var start = path.getPointAtLength(0);
+        d = 'M' + h.x + ',' + h.y + 'L' + start.x + ',' + start.y + d;
+        changed = true;
+      }
+      // Only the START. The far end is deliberately short of its target
+      // by the length of the arrowhead — mermaid trims it so the
+      // marker-end, not the stroke, lands on the boundary. Extending it
+      // would push every arrowhead inside its node.
+      if (changed) { path.setAttribute('d', d); repaired++; }
+    });
+    if (repaired) svg.setAttribute('data-okd-snapped', String(repaired));
+  }
   _wireNeighborHighlight(svg) {
     // Mermaid flowcharts encode adjacency in two predictable shapes:
     //   - Nodes carry data-id="<NodeId>" (the user's source id).
@@ -10435,6 +10533,16 @@ class OkuDiagram extends HTMLElement {
       var id = n.getAttribute('data-id');
       nodeById[id] = n;
     });
+    // Mermaid emits one <g class="edgeLabel"> per edge, in the same
+    // order as the edge paths, empty for unlabelled edges. There is no
+    // id to join on, so pair them by index — and only when the counts
+    // agree, so a diagram type that breaks the correspondence just
+    // keeps its labels unmarked instead of highlighting the wrong one.
+    var pathList  = Array.prototype.slice.call(svg.querySelectorAll('.edgePaths path'));
+    var labelList = Array.prototype.slice.call(svg.querySelectorAll('.edgeLabels > g'));
+    if (pathList.length === labelList.length) {
+      pathList.forEach(function (p, i) { p.__okdLabel = labelList[i]; });
+    }
     var edges = svg.querySelectorAll('.flowchart-link, path.edge-thickness-normal');
     edges.forEach(function (e) {
       var cls = e.getAttribute('class') || '';
@@ -10458,6 +10566,9 @@ class OkuDiagram extends HTMLElement {
       if (node) node.setAttribute('data-okd-active', '1');
       (edgesByEndpoint[id] || []).forEach(function (pair) {
         pair[0].setAttribute('data-okd-active', '1');
+        // The active edge's own label stays lit — dimming it with the
+        // rest hid the one word explaining the relation being hovered.
+        if (pair[0].__okdLabel) pair[0].__okdLabel.setAttribute('data-okd-active', '1');
         if (nodeById[pair[1]]) nodeById[pair[1]].setAttribute('data-okd-active', '1');
       });
     }
@@ -10552,6 +10663,7 @@ class OkuDiagram extends HTMLElement {
         renderHost.innerHTML = out.svg;
         var svg = renderHost.querySelector('svg');
         if (svg) {
+          self._snapEdgeEndpoints(svg);
           self._wireNeighborHighlight(svg);
           self._wireNodeTooltips(svg);
         }
