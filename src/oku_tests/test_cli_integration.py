@@ -433,3 +433,19 @@ def test_init_keeps_an_existing_starter(tmp_path: Path, repo_root: Path) -> None
     (tmp_path / "index.md").write_text("---\ntitle: Mine\n---\n\n## S\n\nmine\n", encoding="utf-8")
     assert _run_cli(tmp_path, "init", repo_root=repo_root).returncode == 0
     assert "mine" in (tmp_path / "index.md").read_text(encoding="utf-8")
+
+
+def test_version_reports_the_kit_build_stamp(tmp_path: Path, repo_root: Path) -> None:
+    """An installed tool carries its own COPY of the kit, and
+    `uv tool install --force` reuses the cached wheel when the version
+    string has not changed — so a stale tool looks freshly installed.
+    `oku --version` is the one-command answer to "which kit is this
+    tool actually building with?"."""
+    proc = _run_cli(tmp_path, "--version", repo_root=repo_root)
+    assert proc.returncode == 0, proc.stderr
+    out = proc.stdout.strip()
+    assert out.startswith("oku ")
+    assert " · kit " in out and " · assets " in out
+    stamp = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
+    expected = re.search(r"__okuKitBuild\s*=\s*'([^']+)'", stamp).group(1)
+    assert expected in out, out

@@ -2,7 +2,7 @@
 # Project name is `oku` (Turkish imperative "read!"). Package lives
 # at src/oku/.
 name = "oku"
-version = "0.3.0"
+version = "0.4.0"
 description = "oku — shared HTML chrome kit + CLI. Standalone, theme-aware visual docs without a build step."
 readme = "README.md"
 requires-python = ">=3.10"

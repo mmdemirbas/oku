@@ -141,6 +141,27 @@ AI/LLM surface.
 | `bin/oku` | PEP 723 shim — run without install via `uv run bin/oku …`. Points at `oku.cli:main`. |
 | `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.md` tracks open phases. |
 
+## Installing the tool globally
+
+Other projects reach the kit through a globally installed `oku`, which
+carries its OWN COPY of `kit/` inside the wheel. Editing this repo does
+not change what those projects build with until the tool is reinstalled:
+
+```bash
+uv tool install --force --no-cache --from . oku   # --no-cache is load-bearing
+oku --version    # oku 0.4.0 · kit 2026-08-03-r13 · assets /…/site-packages/oku/assets
+```
+
+`--force` alone is NOT enough: uv reuses the cached wheel when the
+version string in `pyproject.toml` has not changed, so the tool silently
+stays on the old kit while reporting a successful install. Either bump
+the version on a kit change, or pass `--no-cache`. `oku --version`
+prints the kit build stamp (`__okuKitBuild` in chrome.js) — compare it
+against the repo's to see whether a project is building with the current
+kit. A page rendered by a stale tool is the usual cause of a "the kit
+regressed" report; check the stamp inlined in the artifact first
+(standalone HTML files carry it).
+
 ## Develop / verify
 
 ```bash

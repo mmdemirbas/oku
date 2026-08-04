@@ -37,6 +37,17 @@ from pathlib import Path
 from urllib.parse import unquote
 
 
+try:  # installed distribution
+    from importlib.metadata import PackageNotFoundError, version as _dist_version
+
+    try:
+        _PKG_VERSION = _dist_version("oku")
+    except PackageNotFoundError:  # running from a checkout
+        _PKG_VERSION = "0.4.0+source"
+except ImportError:  # pragma: no cover — Python < 3.8
+    _PKG_VERSION = "0.4.0+source"
+
+
 def _kit_assets_dir() -> Path:
     """Locate the kit's asset directory.
 
@@ -127,6 +138,23 @@ SKIP_DIRS = {
 
 
 _project_skip_cache: dict[str, frozenset[str]] = {}
+
+
+def _kit_build_stamp() -> str:
+    """The kit's own build stamp (__okuKitBuild in chrome.js).
+
+    A globally installed `oku` carries a COPY of the kit, so the stamp is
+    the only way to tell whether the tool a project builds with is the
+    kit you just edited. `uv tool install --force` reuses the cached
+    wheel when the version string has not changed, which makes a stale
+    tool look freshly installed — this is how that shows up.
+    """
+    try:
+        text = (_kit_assets_dir() / "chrome.js").read_text(encoding="utf-8")
+    except OSError:
+        return "unknown"
+    m = re.search(r"__okuKitBuild\s*=\s*'([^']+)'", text)
+    return m.group(1) if m else "unknown"
 
 
 def find_kit_json(root: Path) -> Path | None:
@@ -4361,6 +4389,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         prog="oku",
         description="Shared HTML chrome kit. Init projects, build artifacts, serve locally.",
+    )
+    # Version prints the kit build stamp and the assets path too: an
+    # installed tool carries its own copy of the kit, and "did my kit
+    # change reach the tool?" is otherwise a filesystem hunt.
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"oku {_PKG_VERSION} · kit {_kit_build_stamp()} · assets {_kit_assets_dir()}",
     )
     sub = parser.add_subparsers(dest="cmd")
     sub.add_parser("init", help="create docs/_kit symlink in the current project")
