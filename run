@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# One entry point for everything this repo does day to day.
+#
+#   ./run            list the subcommands
+#   ./run <cmd> ...  run one; extra args pass through
+#
+# Everything runs through `uv`, so no venv activation is needed.
+set -euo pipefail
+
+cd "$(dirname "$0")"
+REPO="$PWD"
+
+blue() { printf '\033[34m%s\033[0m\n' "$*"; }
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+red() { printf '\033[31m%s\033[0m\n' "$*" >&2; }
+step() { blue "▸ $*"; }
+
+usage() {
+  cat <<'EOF'
+oku — ./run <command>
+
+  Author
+    serve [args]      dev server with live reload (default port 9876)
+    check [args]      lint the doctree; --strict fails on warnings too
+    build             write dist/{standalone,site}/
+    clean             remove dist/
+    new <path>        scaffold a docs root at <path> (init + starter page)
+
+  Ship the kit to other projects
+    install           reinstall the global `oku` from this repo (--no-cache)
+    version           which kit is the global tool building with?
+    rebuild <dir>...  install, then `oku build` in each project directory
+
+  Develop
+    verify            everything CI runs: lint, doctree, build, tests
+    test [args]       pytest (add -k, paths, -x …)
+    test:fast         pytest without the browser suite
+    test:browser      only the headless-chromium suite
+    lint              ruff check + format --check
+    fmt               ruff format, then ruff check --fix
+    deps              uv sync --extra dev
+    browser           install the chromium Playwright needs
+
+Anything not listed is forwarded to the CLI, so `./run migrate --dry-run`
+works too.
+EOF
+}
+
+# --- author -----------------------------------------------------------------
+
+cmd_serve() { uv run bin/oku serve "$@"; }
+cmd_check() { uv run bin/oku check "$@"; }
+cmd_build() { uv run bin/oku build "$@"; }
+cmd_clean() { uv run bin/oku clean "$@"; }
+
+cmd_new() {
+  [ $# -ge 1 ] || { red "usage: ./run new <path>"; exit 2; }
+  mkdir -p "$1"
+  (cd "$1" && uv run --project "$REPO" "$REPO/bin/oku" init)
+  green "✓ docs root ready at $1"
+}
+
+# --- ship -------------------------------------------------------------------
+
+# --no-cache is load-bearing: uv reuses the cached wheel when the version
+# string has not changed, so a plain --force install silently leaves the
+# old kit in place while reporting success.
+cmd_install() {
+  step "installing the global oku from $REPO"
+  uv tool install --force --no-cache --from "$REPO" oku
+  cmd_version
+}
+
+cmd_version() {
+  printf '  repo   kit %s\n' "$(sed -n "s/.*__okuKitBuild = '\([^']*\)'.*/\1/p" kit/chrome.js | head -1)"
+  if command -v oku >/dev/null 2>&1; then
+    printf '  global %s\n' "$(oku --version 2>/dev/null | tr '\n' ' ')"
+  else
+    printf '  global not installed — ./run install\n'
+  fi
+}
+
+cmd_rebuild() {
+  [ $# -ge 1 ] || { red "usage: ./run rebuild <project-dir>..."; exit 2; }
+  cmd_install
+  for dir in "$@"; do
+    step "building $dir"
+    (cd "$dir" && oku build)
+  done
+}
+
+# --- develop ----------------------------------------------------------------
+
+cmd_deps() { uv sync --extra dev; }
+cmd_browser() { uv run playwright install chromium; }
+cmd_test() { uv run pytest "$@"; }
+cmd_test_fast() { uv run pytest -q --ignore=src/oku_tests/browser "$@"; }
+cmd_test_browser() { uv run pytest -q src/oku_tests/browser "$@"; }
+
+cmd_lint() {
+  uv run ruff check .
+  uv run ruff format --check .
+}
+
+cmd_fmt() {
+  uv run ruff format .
+  uv run ruff check --fix .
+}
+
+cmd_verify() {
+  step "lint"; cmd_lint
+  step "doctree"; uv run bin/oku check --strict
+  step "build"; uv run bin/oku build >/dev/null
+  step "tests"; uv run pytest -q
+  green "✓ all gates pass"
+}
+
+# --- dispatch ---------------------------------------------------------------
+
+[ $# -ge 1 ] || { usage; exit 0; }
+cmd="$1"; shift
+case "$cmd" in
+  -h|--help|help) usage ;;
+  serve|check|build|clean|new|install|version|rebuild|deps|browser|lint|fmt|verify) "cmd_$cmd" "$@" ;;
+  test) cmd_test "$@" ;;
+  test:fast|fast) cmd_test_fast "$@" ;;
+  test:browser|browser-tests) cmd_test_browser "$@" ;;
+  *) uv run bin/oku "$cmd" "$@" ;;
+esac
