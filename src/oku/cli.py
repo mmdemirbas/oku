@@ -3057,7 +3057,223 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 "Page has no title; the document <title> and cover <h1> will be empty.",
             )
 
+        # 10. Presentation. Style advice written as prose in a briefing
+        # decays, because nothing fails when it is ignored. The half of
+        # it that a tool can decide without judgement lives here, so the
+        # briefing can be about content.
+        if not is_materialised:
+            for issue in _presentation_issues(page, _tree_defaults(p)):
+                add(p, *issue)
+
+    # 11. Accent consistency, per tree. Cross-page, so it runs after the
+    # per-page loop. A tree with a different accent on every page is not
+    # a design; the fix is one line in kit.json.
+    by_tree: dict[Path, dict[str, list[Path]]] = {}
+    tree_size: dict[Path, int] = {}
+    for p, page in pages:
+        tree_size[p.parent] = tree_size.get(p.parent, 0) + 1
+        if _tree_defaults(p).get("accent"):
+            continue  # the tree HAS an answer; a page override is a choice
+        meta = _page_meta(page)
+        accent = meta.get("accent")
+        if accent and "accent" not in (meta.get("_derived") or ()):
+            by_tree.setdefault(p.parent, {}).setdefault(str(accent), []).append(p)
+    for where, accents in by_tree.items():
+        # Two pages disagreeing is a coincidence; it takes a third page
+        # before "no convention" is distinguishable from "two pages".
+        if len(accents) < 2 or tree_size.get(where, 0) < 3:
+            continue
+        names = ", ".join(sorted(accents))
+        for paths in accents.values():
+            for p in paths:
+                add(
+                    p,
+                    "info",
+                    "accent-divergence",
+                    "meta.accent",
+                    f"{len(accents)} different accents in this directory ({names}) and no default "
+                    "in kit.json. Set the tree's accent once there and override only where a page "
+                    "genuinely differs.",
+                )
+
     return issues
+
+
+# Fields whose value the build can supply, and where from. Setting one
+# by hand is allowed — the authored value always wins — but it is worth
+# a note, because a hand-counted reading time is wrong after the next
+# edit and nothing tells the author.
+_DERIVABLE_META = {
+    "read_time": "the body at 220 words per minute",
+    "updated": "the file's last commit date",
+}
+
+_ISLAND_STYLE_RE = re.compile(r"<style[\s>]|style\s*=\s*[\"'][^\"']*(?:#[0-9a-fA-F]{3,8}|rgb\()")
+_HTML_ISLAND_RE = re.compile(r"^<[a-zA-Z][^\s>]*", re.MULTILINE)
+
+
+def _presentation_issues(page: dict, tree_defaults: dict) -> list[tuple[str, str, str, str]]:
+    """(severity, code, where, message) for the presentation rules.
+
+    Each rule is decidable without judgement. Anything needing a reader
+    — whether the diagram carries the point — stays out of here on
+    purpose; a check that guesses trains authors to ignore checks.
+    """
+    out: list[tuple[str, str, str, str]] = []
+    meta = _page_meta(page)
+    derived = set(meta.get("_derived") or ())
+
+    def authored(key: str):
+        return meta.get(key) if key not in derived else None
+
+    subtitle, summary = authored("subtitle"), meta.get("summary")
+    if subtitle and summary and str(subtitle).strip() == str(summary).strip():
+        out.append(
+            (
+                "warning",
+                "redundant-meta",
+                "meta.subtitle",
+                "`subtitle` repeats `summary` verbatim. Drop it — the cover falls back to "
+                "`summary` when no subtitle is set.",
+            )
+        )
+
+    date, updated = authored("date"), authored("updated")
+    if date and updated and str(date).strip() == str(updated).strip():
+        out.append(
+            (
+                "warning",
+                "redundant-meta",
+                "meta.updated",
+                "`updated` repeats `date`. Two hand-maintained dates drift; drop `updated` and "
+                "the build supplies the last commit date.",
+            )
+        )
+
+    for key, value in tree_defaults.items():
+        if authored(key) is not None and str(meta.get(key)).strip() == str(value).strip():
+            out.append(
+                (
+                    "info",
+                    "redundant-meta",
+                    f"meta.{key}",
+                    f"`{key}` repeats the tree default in kit.json. Drop it.",
+                )
+            )
+
+    for key, whence in _DERIVABLE_META.items():
+        if authored(key) is not None:
+            out.append(
+                (
+                    "info",
+                    "hand-set-derivable",
+                    f"meta.{key}",
+                    f"`{key}` is set by hand where the build derives it from {whence}. "
+                    "Keep it only when the derived value is wrong — a hand-set one goes stale silently.",
+                )
+            )
+
+    for title, paragraphs, visuals in _section_shapes(page):
+        if paragraphs >= 3 and visuals == 0:
+            out.append(
+                (
+                    "warning",
+                    "prose-only-section",
+                    f"section '{title}'",
+                    f"{paragraphs} paragraphs and nothing for the eye — no table, chart, diagram, "
+                    "card grid or code block. Either the figure is missing or the section is doing "
+                    "two jobs.",
+                )
+            )
+
+    for i, blk in enumerate(page.get("b") or []):
+        if not isinstance(blk, str):
+            continue
+        for chunk in _md_chunks(blk):
+            if not _HTML_ISLAND_RE.match(chunk) or not _ISLAND_STYLE_RE.search(chunk):
+                continue
+            out.append(
+                (
+                    "warning",
+                    "island-hand-styled",
+                    f"b[{i}]",
+                    "HTML island carries its own colours or a <style> block. Build on the kit's "
+                    "classes and CSS variables (var(--accent), var(--surface), .okt-* ) so the "
+                    "island follows the page accent and the light/dark theme.",
+                )
+            )
+            break
+
+    return out
+
+
+def _md_chunks(text: str) -> list[str]:
+    """Blank-line-separated blocks, with fenced regions kept whole."""
+    chunks: list[str] = []
+    buf: list[str] = []
+    fence: re.Pattern | None = None
+    for line in text.split("\n"):
+        if fence is not None:
+            buf.append(line)
+            if fence.match(line):
+                fence = None
+            continue
+        m = _FENCE_OPEN_RE.match(line)
+        if m:
+            if buf and not "".join(buf).strip():
+                buf = []
+            fence = _fence_close_re(m.group(1))
+            buf.append(line)
+            continue
+        if not line.strip():
+            if any(x.strip() for x in buf):
+                chunks.append("\n".join(buf).strip("\n"))
+            buf = []
+            continue
+        buf.append(line)
+    if any(x.strip() for x in buf):
+        chunks.append("\n".join(buf).strip("\n"))
+    return chunks
+
+
+def _section_shapes(page: dict) -> list[tuple[str, int, int]]:
+    """(section title, paragraph count, visual count) per `##` section.
+
+    A callout is not a visual. That is the whole point of the rule: a
+    coloured box around a paragraph reads as decorated text, and
+    counting it would let a page pass by adding one.
+    """
+    sections: list[list] = []
+
+    def current() -> list:
+        if not sections:
+            sections.append(["(before the first heading)", 0, 0])
+        return sections[-1]
+
+    for blk in page.get("b") or []:
+        if isinstance(blk, dict):
+            # Every typed block is a visual except the text-shaped ones.
+            if blk.get("k") not in ("insight", "tldr"):
+                current()[2] += 1
+            continue
+        if not isinstance(blk, str):
+            continue
+        for chunk in _md_chunks(blk):
+            head = chunk.lstrip()
+            if head.startswith("## ") and not head.startswith("###"):
+                title = re.sub(r"\s*\{#[\w-]+\}\s*$", "", head.split("\n", 1)[0][3:]).strip()
+                sections.append([title, 0, 0])
+                continue
+            if head.startswith("#"):
+                continue
+            sec = current()
+            if head.startswith(("|", "```", "~~~")) or _HTML_ISLAND_RE.match(chunk):
+                sec[2] += 1
+            elif head.startswith((">", "-", "*", "+", ":")) or re.match(r"\d+[.)]\s", head):
+                continue
+            else:
+                sec[1] += 1
+    return [(str(t), int(p), int(v)) for t, p, v in sections]
 
 
 def _format_issue(issue: dict, root: Path) -> str:

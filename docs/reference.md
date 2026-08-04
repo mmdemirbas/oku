@@ -5,7 +5,6 @@ subtitle: Everything an author needs in one page — project setup, page anatomy
 date: 2026-05-18
 order: 20
 summary: Project setup, page shape, every primitive with JSON shape + live example, metadata, build outputs.
-updated: 2026-05-21
 ---
 
 > [!TLDR]

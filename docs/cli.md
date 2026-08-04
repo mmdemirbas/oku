@@ -5,7 +5,6 @@ subtitle: Three commands: oku init, oku build, oku serve. Zero flags. Designed s
 date: 2026-05-18
 order: 50
 summary: oku init / build / clean / check / serve — what each does.
-updated: 2026-05-21
 ---
 
 > [!TLDR]
@@ -105,11 +104,13 @@ oku check
 Issues land at three severities. Exit code is 1 if any error is present (or any warning under --strict); 0 otherwise.
 
 ```oku-table
-{"headers":["Severity","Codes","What it catches"],"rows":[["**error**","`schema`, `deprecated-kind`, `unknown-kind`, `duplicate-anchor`, `chart-*`, `stray-demo`, `no-title`","JSON shape problems, removed primitives still in use, duplicate section / heading IDs, malformed chart payloads, demo pages outside docs/reference.json, page without a title."],["**warning**","`process-breadcrumb`, `unresolved-glossary`, `unresolved-extref`, `unknown-inline`","Prose containing process/history references (round-N, vN-review, fixed-in-round; kit documents current behaviour only). Glossary terms / ext-refs that don't resolve against kit/glossary/ / kit/extrefs/."],["**info**","`code-no-language`, `no-summary`","Code blocks without a declared language (Prism + the language pill skipped). Pages without meta.summary (manifest tooltips and llms.txt lose the one-liner)."]]}
+{"headers":["Severity","Codes","What it catches"],"rows":[["**error**","`schema`, `deprecated-kind`, `unknown-kind`, `duplicate-anchor`, `chart-*`, `stray-demo`, `no-title`, `shadowed-source`, `json-parse-failed`","JSON shape problems, removed primitives still in use, duplicate section / heading IDs, malformed chart payloads, demo pages outside docs/reference.md, a page without a title, a .json shadowing the source you edit."],["**warning**","`process-breadcrumb`, `unresolved-glossary`, `unresolved-extref`, `unknown-inline`","Prose containing process/history references (round-N, vN-review, fixed-in-round; the kit documents current behaviour only). Glossary terms and ext-refs that do not resolve against kit/glossary/ and kit/extrefs/."],["**warning** · presentation","`redundant-meta`, `prose-only-section`, `island-hand-styled`","A field that repeats another (`subtitle` verbatim from `summary`, `updated` from `date`). A section of three or more paragraphs with nothing for the eye — no table, chart, diagram, card grid or code block; a callout does not count. An HTML island carrying hardcoded colours or its own `<style>` instead of building on the kit's classes and CSS variables."],["**info**","`code-no-language`, `no-summary`, `html-island`, `hand-set-derivable`, `accent-divergence`","Code blocks with no declared language. Pages with no meta.summary. HTML islands (they render in the kit, external markdown viewers strip them). A field set by hand where the build derives it. Three or more pages in one directory picking different accents with no default in kit.json."]]}
 ```
 
 > [!TIP] Adding to the oku skill flow
-> Run oku check --strict before declaring an HTML artifact done. Use the --json mode if you want to surface findings programmatically. The linter is designed to be the fastest verification step in the auto-verify loop — no browser required.
+> Run oku check --strict before declaring an HTML artifact done. Use --json to surface findings programmatically. The linter is the fastest verification step in the auto-verify loop — no browser required.
+>
+> The presentation rules exist so the briefing does not have to carry them as prose. A style rule written in a guide decays, because nothing fails when it is ignored; a rule the linter applies does not. Only the decidable half lives here — whether the diagram carries the point is still a question for a reader.
 
 ## oku serve {#serve}
 

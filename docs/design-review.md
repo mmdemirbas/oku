@@ -2,7 +2,6 @@
 title: Design review
 eyebrow: Strategy — live decision log
 subtitle: What was proposed, what the user decided, what shipped, and what's still open
-updated: 2026-05-30
 summary: Decision log + current state of the kit. Original five decisions all shipped; round-by-round breadcrumbs collapsed (see git log --grep=Q for the full trail). Open-questions table is essentially closed.
 accent: indigo
 ---
@@ -38,14 +37,27 @@ What the kit does today, grouped by surface. Round-by-round breadcrumbs live in 
 
 ## The north star {#north-star}
 
-Restate the contract so every later decision is measured against it. (Unchanged from the original review.)
+The contract every later decision is measured against.
 
-> [!INFO] Contract (from the user, paraphrased)
-> JSON is the substrate so AI can read / write / modify content without fighting style or glue markup. The presentation should be capable yet simple — simplicity is the ultimate sophistication. Pre-defined structures should be enough for the 90% case, but raw HTML/JS escape hatches should remain available for the 10%.
+> [!INFO] Contract
+> A markdown source is the substrate, so AI can read, write and modify
+> content without fighting style or glue markup. The presentation should
+> be capable yet simple. Pre-defined structures cover the 90% case; raw
+> HTML islands stay available for the other 10%, built on the kit's own
+> classes and CSS variables.
 
-Two failure modes to guard against. **Drift toward complexity:** every new feature adds schema surface, runtime branches, and visual-language vocabulary the reader has to learn. Each addition is locally justifiable; collectively they erode the contract. **Drift toward purity:** rejecting every addition leaves the reader with bullet-points and tables for everything a chart could illustrate. Equally a failure.
+The kit can fail this contract in two opposite directions, and guarding
+against one is what walks you into the other.
 
-The discipline: every new primitive must answer two questions. **(1) Can AI emit this in one obvious shape, with no per-page judgement calls?** (2) Does the rendered result earn the schema cost — i.e., does the reader recognise the shape faster than they'd parse a paragraph + bullets?
+```oku-compare-grid
+{"cards":[{"t":"Drift toward complexity","b":"Every new feature adds schema surface, runtime branches, and visual vocabulary the reader has to learn. Each addition is locally justifiable; together they erode the contract.","accent":"danger"},{"t":"Drift toward purity","b":"Rejecting every addition leaves the reader with bullet points and tables for everything a chart could have shown. Equally a failure.","accent":"warn"}]}
+```
+
+Two questions decide it, and a new primitive has to answer both.
+
+```oku-step-flow
+{"steps":[{"t":"Can AI emit this in one obvious shape?","b":"With no per-page judgement calls. A primitive that needs the author to choose between three ways of expressing the same thing has moved work back onto the author.","meta":"the authoring test"},{"t":"Does the rendered result earn its schema cost?","b":"Does the reader recognise the shape faster than they would parse a paragraph and a bullet list? If not, the paragraph was already the right answer.","meta":"the reader test"}]}
+```
 
 ## What's still open {#open-questions}
 
