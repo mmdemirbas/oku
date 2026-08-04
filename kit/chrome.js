@@ -2937,7 +2937,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-04-r17';
+var __okuKitBuild = '2026-08-04-r18';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -3671,8 +3671,13 @@ var __okuKit = (function () {
       waiters = [];
       return Promise.resolve(kit);
     }
-    // Standalone without a kit bundle: degrade silently.
-    if (document.getElementById('__oku_page__')) {
+    // Standalone without a kit bundle, or ANY page opened over file://
+    // (an opaque origin, so every fetch below is blocked before it can
+    // return a 404 we'd handle): degrade silently. Glossary tooltips
+    // need the registries; without them the term still renders as text,
+    // which beats a console full of scheme errors on the path readers
+    // actually use — opening the file off disk.
+    if (document.getElementById('__oku_page__') || window.location.protocol === 'file:') {
       loaded = true;
       waiters.forEach(function (w) { w(kit); });
       waiters = [];

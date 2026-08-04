@@ -1188,15 +1188,62 @@
     async renderFromUrl(url, host) {
       let page;
       const wa = window.__okuWithAuth || ((u) => u);
+      // A file:// origin is opaque, so fetch() is blocked cross-origin
+      // no matter what sits next to the file. Calling it anyway only
+      // buys a browser-level console error before the same fallback
+      // runs, so decide up front.
+      if (window.location.protocol === 'file:') {
+        if (this._renderManifestIndex(url, host)) return;
+        this._fail(
+          'page-source-unreachable',
+          'Opened over file:// with no inlined page. A browser cannot read ' + url +
+          ' from a file:// origin — use the dist/standalone/ build, which carries its page inside the HTML.'
+        );
+        return;
+      }
       try {
         const res = await fetch(wa(url), { cache: 'no-cache' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         page = await res.json();
       } catch (e) {
+        if (this._renderManifestIndex(url, host)) return;
         this._fail('page-fetch-failed', 'Could not load ' + url + ': ' + e.message);
         return;
       }
       this.render(page, host);
+    }
+
+    /* The entry stub `oku init` writes has no page source of its own —
+     * it exists to be the door into the tree, and carries the site
+     * manifest inline for the drawer. Rendering nothing there left the
+     * front door of every docs tree blank (plus a fetch error in the
+     * console), and the reader had to guess that the Contents button
+     * held the actual site. Render the manifest as the page instead.
+     *
+     * Scoped to the index: on any other page a missing JSON is a real
+     * failure and must keep reporting as one. Returns true if it
+     * rendered. */
+    _renderManifestIndex(url, host) {
+      if (!/(^|\/)index\.json$/.test(String(url || ''))) return false;
+      const m = window.__okuManifest;
+      const pages = (m && Array.isArray(m.pages)) ? m.pages : [];
+      const rows = pages.filter((p) => p && p.path && !/(^|\/)index\.html$/.test(p.path));
+      if (!rows.length) return false;
+      // Summaries are author prose — keep them out of block position so
+      // a stray character can't start a markdown construct.
+      const esc = (s) => String(s).replace(/[\[\]]/g, '').replace(/\s+/g, ' ').trim();
+      const body = rows.map((p) => {
+        const title = esc(p.title || p.path);
+        const summary = p.summary ? ' — ' + esc(p.summary) : '';
+        return '- [' + title + '](' + p.path + ')' + summary;
+      }).join('\n');
+      const title = (document.title || 'Documentation').trim();
+      this.render({
+        k: 'page',
+        t: title,
+        b: ['## Pages {#pages}\n\n' + body + '\n'],
+      }, host);
+      return true;
     }
 
     render(page, host) {

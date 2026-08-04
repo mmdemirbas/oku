@@ -132,3 +132,81 @@ def test_standalone_search_falls_back_to_this_file(page, standalone_file):
     assert got["results"] >= 1, got
     assert "this file only" in got["status"], got
     assert "unavailable" not in got["status"].lower(), got
+
+
+# ---------- the entry stub ----------
+#
+# `oku init` writes `index.html` on every run but `index.md` only when
+# the tree has no page source yet — so a docs tree whose pages already
+# existed gets an entry stub with nothing behind it. It carries the site
+# manifest inline for the drawer; rendering nothing else left the front
+# door of the tree blank, with a fetch error in the console, and the
+# reader had to guess the Contents button held the site.
+
+ENTRY_MANIFEST = {
+    "schema_version": 1,
+    "root": ".",
+    "pages": [
+        {
+            "path": "one.html",
+            "source": "one.md",
+            "title": "First page",
+            "parent": None,
+            "summary": "What the first page covers.",
+        },
+        {"path": "two.html", "source": "two.md", "title": "Second page", "parent": None},
+        {"path": "index.html", "source": None, "title": "Documentation", "parent": None},
+    ],
+}
+
+
+@pytest.fixture(scope="module")
+def entry_tree(tmp_path_factory):
+    docs = tmp_path_factory.mktemp("entry") / "docs"
+    docs.mkdir()
+    (docs / "_oku").symlink_to(Path(__file__).resolve().parents[3] / "kit", target_is_directory=True)
+    for name in ("one", "two"):
+        (docs / f"{name}.md").write_text(
+            f"---\ntitle: {name}\n---\n\n## Body {{#body}}\n\nText.\n", encoding="utf-8"
+        )
+    (docs / "index.html").write_text(
+        cli._stub_for("Documentation", inline_manifest=ENTRY_MANIFEST), encoding="utf-8"
+    )
+    return docs
+
+
+def test_entry_stub_renders_the_page_list_off_disk(page, entry_tree):
+    console = []
+    page.on("console", lambda m: console.append(m.text) if m.type == "error" else None)
+    page.goto((entry_tree / "index.html").as_uri(), wait_until="load")
+    page.wait_for_timeout(2000)
+
+    got = page.evaluate(
+        """() => ({
+        heading: (document.querySelector('#pages h2, h2') || {}).textContent || null,
+        links: [...document.querySelectorAll('main a[href$=".html"]')].map(a => a.getAttribute('href')),
+        text: (document.querySelector('main') || {}).textContent || '',
+    })"""
+    )
+    assert got["links"] == ["one.html", "two.html"], got
+    assert "What the first page covers." in got["text"], got
+    # The index links to the pages, not to itself.
+    assert "index.html" not in got["links"], got
+    assert [c for c in console if not CDN.search(c)] == [], console
+
+
+def test_missing_page_source_still_reports_on_a_content_page(page, entry_tree):
+    """The page-list fallback is scoped to the index. Anywhere else a
+    missing page source is a real failure and has to say so, rather than
+    quietly showing a table of contents in its place."""
+    stray = entry_tree / "one.html"
+    stray.write_text(cli._stub_for("First page", inline_manifest=ENTRY_MANIFEST), encoding="utf-8")
+    console = []
+    page.on("console", lambda m: console.append(m.text) if m.type == "error" else None)
+    page.goto(stray.as_uri(), wait_until="load")
+    page.wait_for_timeout(1500)
+
+    reported = [c for c in console if "page-source-unreachable" in c]
+    assert reported, f"a missing page source was not reported: {console}"
+    listed = page.evaluate("""[...document.querySelectorAll('main a[href$=".html"]')].length""")
+    assert listed == 0, "the index fallback rendered on a content page"
