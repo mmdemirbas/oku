@@ -211,6 +211,49 @@ resize + collapse, the 24px collapsed rail, and the persisted
 `sidebarCollapsed` / `sidebarWidth` state. A line down the page that
 reflows the text every time it is used is what this replaced.
 
+**The default has to render finished.** A page whose author wrote
+`title`, `summary` and content — nothing else — is the case the kit is
+judged on. Concretely, and each pinned by a test in
+`src/oku_tests/browser/test_presentation_defaults.py`:
+
+- An untitled `> [!TLDR]` shows the words TL;DR **once**. The `<h2>`
+  still exists (`buildTOC` skips a section without one, and search
+  reads it) carrying `.okt-sr-only`.
+- Body prose caps at `--prose-width`, declared in `ch` per
+  content-width mode. Measured medians 63 / 67 / 78 characters for
+  narrow / comfortable / wide. Visual primitives are never capped.
+- A table at or below `SMALL_TABLE_ROWS` (chrome.js) sizes to its
+  content and keeps only copy + expand. The controls stay in the DOM
+  with their listeners bound; CSS hides them, so a table that grows
+  past the threshold needs no re-init.
+- The cover subtitle falls back to `summary`; a cover holding only an
+  h1 gets `.cover-bare`; `updated` is suppressed when it equals `date`.
+
+**Front-matter is `title` + `summary`.** Plus `order` / `parent` for
+tree placement. `accent` and `audience` are tree-wide in `docs/kit.json`;
+`read_time` and `updated` are derived at build time (220 wpm; the git
+commit date, never the mtime — a fresh clone would stamp the whole tree
+as updated today). An authored value always wins and every derived key
+is listed in `m._derived`. **`page_to_md` must skip that set** — without
+it, one `oku migrate` writes every derived value back into the source
+and freezes it stale.
+
+**Presentation rules live in `oku check`, not in prose.** A style rule
+written in the skill briefing decays because nothing fails when it is
+ignored. `redundant-meta`, `hand-set-derivable`, `prose-only-section`,
+`island-hand-styled` and `accent-divergence` are the decidable half.
+Anything needing a reader's judgement stays out — a check that guesses
+trains authors to ignore checks. The repo's own tree must stay clean
+under `oku check --strict`; `test_check.py::test_project_docs_pass_check_strict`
+enforces it.
+
+**HTML islands build on the kit.** An island is the escape hatch and
+keeps full capability, but its colours come from the kit's CSS
+variables (`var(--accent)`, `var(--surface)`, `--series-1..10`) and its
+structure from the `.okt-*` classes. Hardcoded hex or an inline
+`<style>` earns `island-hand-styled`, because the hand-rolled copy stops
+following the accent and breaks in the theme nobody was looking at.
+
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never
 English words. The page can flip to TR or EN without touching kit
