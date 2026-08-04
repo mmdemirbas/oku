@@ -369,3 +369,22 @@ def test_a_table_past_the_threshold_keeps_its_controls(rendered):
     )
     assert got["scale"] is None, got
     assert got["filter"] is True and got["gear"] is True, got
+
+
+def test_the_quiet_surface_has_no_hue_of_its_own(rendered):
+    """--surface-2 backs 38 rules — table header band, chart tracks, code
+    background, TOC hover. At #f5f3ff it carried 12 points of blue over
+    red, which reads as intentional beside the default indigo accent and
+    as an unrelated lavender everywhere else."""
+    rgb = rendered.evaluate(
+        """() => {
+        const v = getComputedStyle(document.documentElement)
+                    .getPropertyValue('--surface-2').trim();
+        const d = document.createElement('div');
+        d.style.color = v; document.body.appendChild(d);
+        const c = getComputedStyle(d).color; d.remove();
+        return c.match(/\\d+/g).slice(0, 3).map(Number);
+    }"""
+    )
+    spread = max(rgb) - min(rgb)
+    assert spread <= 5, f"--surface-2 is {rgb}, a spread of {spread} — it reads as a hue, not a neutral"

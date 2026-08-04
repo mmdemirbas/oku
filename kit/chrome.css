@@ -14,7 +14,13 @@
 :root {
   --bg: #fafaf9;
   --surface: #ffffff;
-  --surface-2: #f5f3ff;
+  /* Quiet raised/recessed surface — table header band, chart tracks,
+     code background, TOC hover. It was #f5f3ff, which carries 12 points
+     of blue over red and reads as lavender. That looks intentional
+     beside the default indigo accent and looks like an unrelated hue
+     beside any other one, on 38 surfaces at once. Same family, a
+     quarter of the saturation. */
+  --surface-2: #f5f4f8;
   --text: #1e1b29;
   --text-soft: #4c4760;
   --text-faint: #8b85a3;
@@ -2372,11 +2378,9 @@ pre[class*="language-"] {
 .token.entity      { cursor: help; }
 
 /* ============ TL;DR block ============ */
-/* The far stop is --surface, not --surface-2. --surface-2 is a
-   violet-leaning neutral (#f5f3ff), which reads as intentional under
-   the default indigo accent and as an unrelated lavender wash under
-   any other one — the card fades teal-to-lavender on a teal page.
-   Fading to the plain card surface is accent-agnostic. */
+/* The far stop is --surface, not --surface-2: a gradient wants to end
+   on a colour with no hue of its own, and --surface-2 is a tinted
+   surface even after the de-saturation above. */
 .tldr {
   margin: 0 0 40px 0; padding: 28px 32px;
   background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%);

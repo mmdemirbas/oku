@@ -43,9 +43,9 @@ try:  # installed distribution
     try:
         _PKG_VERSION = _dist_version("oku")
     except PackageNotFoundError:  # running from a checkout
-        _PKG_VERSION = "0.4.5+source"
+        _PKG_VERSION = "0.4.6+source"
 except ImportError:  # pragma: no cover — Python < 3.8
-    _PKG_VERSION = "0.4.5+source"
+    _PKG_VERSION = "0.4.6+source"
 
 
 def _kit_assets_dir() -> Path:
