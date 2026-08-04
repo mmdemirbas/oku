@@ -53,7 +53,7 @@ Kanban board — filter by area or priority to scope. Each chip filters; the boa
 - Source format v3 (markdown-first) shipped end to end; structural lint resurrected for v2 pages.
 - Five simultaneous source formats (md / json / html-first / asciidoc / djot) behind one converter registry; measured comparison published in format-comparison with a provably-identical corpus.
 - Path-based navigation router — URL pathname and rendered page can no longer diverge; legacy hash links normalise.
-- Mermaid legibility floor (never below 90% of authored size, horizontal scroll past it) — closes the wide-diagram trim investigation.
+- Wide diagrams always fit their column: the SVG renders at most at its authored size and scales down to the column, and its viewBox is refitted to the union of mermaid's box and the real content bbox so nothing mermaid lays outside that box can be cut. Reading detail on a wide diagram is the lightbox's job. This replaced an earlier 90%-of-authored-size floor, which is what made wide flowcharts overflow and read as trimmed.
 - Lightbox: full-viewport frame; diagrams move the live host (full interactivity) like charts.
 - Inline sanitised HTML allow-list restored in the renderer; sunburst gained ring-1 legend chips.
 - Browser regression suite (headless chromium against the real serve handler) wired into the default pytest run.

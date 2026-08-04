@@ -201,3 +201,67 @@ def test_mermaid_fits_container(page, served):
         }""",
     )
     assert fit["ok"], f"diagram overflows host: {fit}"
+
+
+# ---------- wide diagrams ----------
+
+_WIDE_FLOWCHART = (
+    "flowchart LR\n"
+    '  A["Full subtitle file\\n(all cues)"] --> G{{"Spoiler gate\\ncurrentTime + tier"}}\n'
+    '  P["video.currentTime"] --> G\n'
+    '  T["Tier setting\\nT0..T4"] --> G\n'
+    '  G -->|"cues where end <= now"| S["Safe context"]\n'
+    '  G -.->|"blocked at T0/T1/T2"| F["Future cues"]\n'
+    '  S --> R["Recap"]\n'
+    '  S --> V["Vocabulary"]\n'
+    '  S --> C["Character roster"]\n'
+    '  F -.->|"unlocked at T3/T4"| R'
+)
+
+_WIDE_PAGE = {
+    "k": "page",
+    "t": "Wide diagram",
+    "b": ["## Gate {#gate}\n", {"k": "diagram", "caption": "Gate.", "src": _WIDE_FLOWCHART}],
+}
+
+
+@pytest.fixture(scope="module")
+def wide_diagram(tmp_path_factory):
+    d = tmp_path_factory.mktemp("widediag")
+    (d / "_oku").symlink_to(KIT, target_is_directory=True)
+    (d / "page.json").write_text(json.dumps(_WIDE_PAGE, ensure_ascii=False), encoding="utf-8")
+    (d / "page.html").write_text(cli._stub_for("Wide diagram"), encoding="utf-8")
+    handler = partial(http.server.SimpleHTTPRequestHandler, directory=str(d))
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{httpd.server_address[1]}/page.html"
+    httpd.shutdown()
+
+
+@pytest.mark.parametrize("width", [1440, 900, 360])
+def test_wide_flowchart_is_never_cut_off(page, wide_diagram, width):
+    """A flowchart wider than its column must scale down to fit, not get
+    clipped at the container edge. Mermaid also lays some content
+    OUTSIDE the viewBox it computes (edge labels, the last rank), so the
+    viewBox is refitted to the union with the real content bbox —
+    without that, the right-hand nodes are painted past the clip."""
+    page.set_viewport_size({"width": width, "height": 900})
+    page.goto(wide_diagram)
+    page.wait_for_timeout(3200)
+    r = page.evaluate(
+        """() => {
+            const el = document.querySelector('oku-diagram');
+            const host = el.querySelector('.okd-render');
+            const svg = el.querySelector('svg');
+            if (!svg || !host) return null;
+            const hb = host.getBoundingClientRect(), sb = svg.getBoundingClientRect();
+            const outside = [...svg.querySelectorAll('.node, .edgeLabel, foreignObject')]
+              .map(n => n.getBoundingClientRect())
+              .filter(x => x.width > 0 && (x.right > hb.right + 0.5 || x.left < hb.left - 0.5)).length;
+            return { overflowRight: sb.right - hb.right, clipped: outside, svgWidth: sb.width };
+        }"""
+    )
+    assert r is not None, "diagram did not render"
+    assert r["svgWidth"] > 8, r
+    assert r["overflowRight"] <= 1, r
+    assert r["clipped"] == 0, r
