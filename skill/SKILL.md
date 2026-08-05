@@ -349,9 +349,18 @@ None of the chrome is yours to write, style or position. The renderer
 emits it from the source: the cover, the Contents drawer carrying the
 site tree and the on-page TOC, three-mode theming that follows the OS
 until the reader overrides it, the content-width toggle, search,
-scroll-spy, section permalinks, the progress bar, back-to-top, code
+scroll-spy, section permalinks, the top rail, back-to-top, code
 line numbers with a language pill and brace folds, glossary tooltips,
 the lightbox with pan and zoom, and the print stylesheet.
+
+The rail is worth knowing about because it changes what a heading
+costs you. It is the 9px strip across the top: read progress, plus a
+tick for every `##` and a dot for every figure — table, chart, diagram,
+comparison, step flow, annotated code — each one a button that jumps
+there. So a page with clear section titles and real figures gets a
+usable map for free, and a page that is one long undivided section
+gets a rail with nothing on it. That is a reason to break a page into
+sections, not a reason to write anything extra.
 
 There is no stylesheet to write and no `:root` block to define. Two
 complete CSS variable sets ship in the kit, light and dark, and every

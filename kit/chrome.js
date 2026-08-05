@@ -1264,7 +1264,11 @@ class PageChrome extends HTMLElement {
     // reads as "site menu" rather than "contents of this page".
     this.innerHTML =
       '<a class="skip-link" href="#main-content">' + skipLabel + '</a>' +
-      '<div class="progress-bar" id="progress-bar"></div>' +
+      '<div class="okt-rail" id="oku-rail">' +
+        '<div class="progress-bar" id="progress-bar"></div>' +
+        '<div class="okt-rail-marks" role="navigation" aria-label="Page landmarks"></div>' +
+        '<div class="okt-rail-tip" role="status" aria-live="off"></div>' +
+      '</div>' +
       '<button class="ctrl-btn drawer-toggle" type="button" aria-expanded="false" aria-controls="oku-page-nav"' +
         ' aria-label="' + drawerLabel + '" title="' + drawerLabel + '">' + ICON_MENU +
         '<span class="drawer-toggle-label">' + drawerLabel + '</span></button>' +
@@ -1541,6 +1545,242 @@ function buildTOC(tocList) {
   });
 }
 
+/* ============ Page rail — landmarks on the progress strip ============ *
+ * The progress bar knew how far down the page you were and nothing
+ * else. The rail adds the two things a reader of a long document keeps
+ * asking for: the shape of the page, and a way back to the figure they
+ * remember seeing.
+ *
+ * Coordinates. A mark sits at `elementTop / maxScroll`, the same scale
+ * the fill uses, so the fill edge reaches a mark at exactly the moment
+ * that landmark arrives at the top of the viewport. Anything inside the
+ * final viewport-height maps past 1 and clamps — unavoidable with this
+ * mapping, and the alternative (measuring against scrollHeight) makes
+ * the fill start at a non-zero width, which reads as broken.
+ */
+
+// What earns a dot. Plain <pre> deliberately does not: code is dense in
+// a technical page and marking every block turns the rail into a dotted
+// line, which is the "annoying" failure this is trying to avoid.
+// `oku-annotated-code` IS here — that one is a figure, not an aside.
+var RAIL_FIGURES = [
+  ['.okt-table-wrap', 'Table'],
+  ['oku-chart', 'Chart'],
+  ['.bar-chart', 'Chart'],
+  ['.okt-chart-grid', 'Charts'],
+  ['oku-diagram', 'Diagram'],
+  ['oku-annotated-code', 'Annotated code'],
+  ['oku-live-snippet', 'Snippet'],
+  ['.kpi-grid', 'Figures'],
+  ['.compare-grid', 'Comparison'],
+  ['.step-cards', 'Steps'],
+  ['.example-pair', 'Example'],
+];
+
+// Set by buildRail so the existing rAF-throttled scroll handler can
+// light the current mark without registering a second listener.
+var __okuRailOnScroll = null;
+
+function buildRail() {
+  var rail = document.getElementById('oku-rail');
+  if (!rail) return;
+  var host = rail.querySelector('.okt-rail-marks');
+  var tip = rail.querySelector('.okt-rail-tip');
+  if (!host || !tip) return;
+
+  var doc = document.documentElement;
+  var maxScroll = doc.scrollHeight - doc.clientHeight;
+  rail.setAttribute('data-scrollable', maxScroll > 40 ? '1' : '0');
+  host.innerHTML = '';
+  __okuRailOnScroll = null;
+  if (maxScroll <= 40) return;
+
+  // Landmarks in document order. A figure is labelled by its kind plus
+  // the section holding it — "Table · C5" is what the reader is
+  // actually looking for, and a caption is not always there.
+  var marks = [];
+  var seen = [];
+  document.querySelectorAll('main > section').forEach(function (sec) {
+    var h2 = sec.querySelector('h2');
+    var title = '';
+    if (h2) {
+      var clone = h2.cloneNode(true);
+      var n = clone.querySelector('.num'); if (n) n.remove();
+      var p = clone.querySelector('.permalink'); if (p) p.remove();
+      title = clone.textContent.trim();
+    }
+    // A section whose h2 is .okt-sr-only (an untitled TL;DR) has no
+    // name to show and no shape to contribute.
+    if (title && !(h2 && h2.classList.contains('okt-sr-only'))) {
+      marks.push({ el: sec, kind: 'section', label: title, tipKind: '' });
+    }
+    RAIL_FIGURES.forEach(function (pair) {
+      sec.querySelectorAll(pair[0]).forEach(function (el) {
+        // A chart inside a chart-grid, a table inside a lightbox clone:
+        // only the outermost match of a nested pair earns a dot.
+        for (var i = 0; i < seen.length; i++) {
+          if (seen[i] === el || seen[i].contains(el)) return;
+        }
+        seen.push(el);
+        marks.push({ el: el, kind: 'figure', label: title || 'Figure', tipKind: pair[1] });
+      });
+    });
+  });
+  if (!marks.length) return;
+
+  marks.forEach(function (m) {
+    m.top = m.el.getBoundingClientRect().top + window.scrollY;
+    m.pct = Math.max(0, Math.min(100, (m.top / maxScroll) * 100));
+  });
+  marks.sort(function (a, b) { return a.top - b.top; });
+
+  // Thinning. 49 landmarks across a 390px rail put marks 0px apart —
+  // a smear, not a map. Sections are always placed: they ARE the shape
+  // of the page, and there are few of them. Figures are placed only
+  // where they clear their neighbours, and not at all on a rail too
+  // narrow to separate them, where there is no pointer to hover with
+  // anyway. A dropped figure always has a kept mark within a few
+  // pixels of it, so nothing on the page becomes more than one screen
+  // away from something the rail can reach.
+  var railW = rail.getBoundingClientRect().width || 1;
+  var MIN_GAP_PX = 6;
+  var FIGURES_NEED_PX = 560;
+  // Two passes, not one: sections go down first and IN FULL, so a
+  // figure is measured against every section rather than only the ones
+  // that happen to precede it in document order. A single pass left a
+  // figure sitting 1px from the next section heading.
+  var placed = marks.filter(function (m) { return m.kind === 'section'; });
+  if (railW >= FIGURES_NEED_PX) {
+    marks.forEach(function (m) {
+      if (m.kind !== 'figure') return;
+      var x = (m.pct / 100) * railW;
+      for (var i = 0; i < placed.length; i++) {
+        if (Math.abs((placed[i].pct / 100) * railW - x) < MIN_GAP_PX) return;
+      }
+      placed.push(m);
+    });
+  }
+  placed.sort(function (a, b) { return a.top - b.top; });
+  rail.setAttribute('data-marks', placed.length);
+  rail.setAttribute('data-dropped', marks.length - placed.length);
+  marks = placed;
+
+  marks.forEach(function (m, i) {
+    var pct = m.pct;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'okt-rail-mark';
+    btn.dataset.kind = m.kind;
+    btn.style.left = pct + '%';
+    btn.tabIndex = i === 0 ? 0 : -1;
+    btn.setAttribute('aria-label',
+      'Jump to ' + (m.tipKind ? m.tipKind + ' in ' + m.label : m.label));
+    btn._okuMark = m;
+    btn._okuPct = pct;
+    host.appendChild(btn);
+  });
+
+  var buttons = Array.prototype.slice.call(host.children);
+
+  function showTip(btn) {
+    var m = btn._okuMark;
+    tip.innerHTML = (m.tipKind
+      ? '<span class="okt-rail-tip-kind">' + escapeXml(m.tipKind) + '</span>' : '') +
+      escapeXml(m.label);
+    // Place, then pull back inside the viewport. Reading offsetWidth
+    // after the text is set is a forced layout, but it happens once per
+    // hover and the alternative is a label that runs off the edge.
+    tip.style.left = btn._okuPct + '%';
+    tip.classList.add('visible');
+    var r = tip.getBoundingClientRect();
+    var overshootRight = r.right - (window.innerWidth - 8);
+    var overshootLeft = 8 - r.left;
+    if (overshootRight > 0) tip.style.left = 'calc(' + btn._okuPct + '% - ' + overshootRight + 'px)';
+    else if (overshootLeft > 0) tip.style.left = 'calc(' + btn._okuPct + '% + ' + overshootLeft + 'px)';
+  }
+  function hideTip() { tip.classList.remove('visible'); }
+
+  function goTo(btn) {
+    var top = btn._okuMark.el.getBoundingClientRect().top + window.scrollY;
+    // 80px matches the `:target` scroll-margin, so a rail jump and an
+    // anchor jump land the heading in the same place.
+    window.scrollTo({ top: Math.max(0, top - 80), behavior: 'smooth' });
+  }
+
+  host.addEventListener('mouseover', function (e) {
+    var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;
+    if (btn) showTip(btn);
+  });
+  host.addEventListener('mouseout', function (e) {
+    var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;
+    if (btn) hideTip();
+  });
+  host.addEventListener('focusin', function (e) {
+    if (e.target.classList.contains('okt-rail-mark')) showTip(e.target);
+  });
+  host.addEventListener('focusout', hideTip);
+  host.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;
+    if (btn) goTo(btn);
+  });
+
+  // Roving tabindex: the rail is one tab stop, not one per landmark.
+  // Fifty extra stops at the top of every page would make the keyboard
+  // path through the document worse, and the drawer already lists the
+  // sections — but the figures are reachable ONLY here, so the marks
+  // cannot simply be hidden from the keyboard either.
+  host.addEventListener('keydown', function (e) {
+    var i = buttons.indexOf(document.activeElement);
+    if (i < 0) return;
+    var next = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = buttons[i + 1];
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = buttons[i - 1];
+    else if (e.key === 'Home') next = buttons[0];
+    else if (e.key === 'End') next = buttons[buttons.length - 1];
+    else return;
+    e.preventDefault();
+    if (!next) return;
+    buttons.forEach(function (b) { b.tabIndex = -1; });
+    next.tabIndex = 0;
+    next.focus();
+  });
+
+  // Current landmark = the last one the fill edge has reached. Same
+  // comparison the fill itself makes, so the highlight can never
+  // disagree with the bar next to it.
+  var currentBtn = null;
+  __okuRailOnScroll = function (pct) {
+    var found = null;
+    for (var i = 0; i < buttons.length; i++) {
+      if (buttons[i]._okuPct <= pct + 0.01) found = buttons[i]; else break;
+    }
+    if (found === currentBtn) return;
+    if (currentBtn) currentBtn.classList.remove('is-current');
+    if (found) found.classList.add('is-current');
+    currentBtn = found;
+  };
+}
+
+// Document height moves after the rail is built — mermaid renders
+// async, fonts settle, the reader flips the width toggle, a table
+// switches view. Every one of those invalidates every mark position.
+(function () {
+  var pending = false;
+  function rebuild() {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () { pending = false; buildRail(); });
+  }
+  window.__okuRebuildRail = rebuild;
+  window.addEventListener('resize', rebuild, { passive: true });
+  window.addEventListener('oku:rendered', rebuild);
+  if (typeof ResizeObserver === 'function') {
+    document.addEventListener('DOMContentLoaded', function () {
+      new ResizeObserver(rebuild).observe(document.body);
+    });
+  }
+})();
+
 /* ============ Reading aids: progress, back-to-top, copy-btn, glossary ============ */
 // The once-only globals (scroll + keydown listeners) are registered the
 // first time initReadingAids runs; subsequent calls only re-scan the DOM
@@ -1566,8 +1806,12 @@ function initReadingAids() {
       function update() {
         var h = document.documentElement;
         var max = h.scrollHeight - h.clientHeight;
-        if (bar) bar.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+        var pct = max > 0 ? (h.scrollTop / max) * 100 : 0;
+        if (bar) bar.style.width = pct + '%';
         if (btt) btt.classList.toggle('visible', h.scrollTop > 600);
+        // Same number drives the rail's current mark, so the highlight
+        // and the fill edge can never disagree.
+        if (__okuRailOnScroll) __okuRailOnScroll(pct);
         ticking = false;
       }
       window.addEventListener('scroll', function () {
@@ -2947,7 +3191,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-05-r24';
+var __okuKitBuild = '2026-08-05-r25';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

@@ -131,7 +131,7 @@ AI/LLM surface.
 
 | File | Owns |
 |---|---|
-| `chrome.js` | Custom Elements (chart with 28 render modes, diagram, live-snippet, annotated-code, glossary-term, ext-ref, page-chrome / page-nav / page-toc), init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring, bar-chart hover/click-pin/legend toggle), Prism + Mermaid lazy loaders, glossary tooltip controller, lightbox with pan/zoom/pinch fullscreen. ~7k LoC. |
+| `chrome.js` | Custom Elements (chart with 28 render modes, diagram, live-snippet, annotated-code, glossary-term, ext-ref, page-chrome / page-nav / page-toc), init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring, bar-chart hover/click-pin/legend toggle), Prism + Mermaid lazy loaders, glossary tooltip controller, lightbox with pan/zoom/pinch fullscreen, the top rail (progress + landmark minimap). ~7k LoC. |
 | `chrome.css` | All visual tokens (light/dark, --series-1..--series-10, --prose-width), layout grid (asymmetric bleed, four-mode content width), every primitive's styling. ~3k LoC. |
 | `renderer.js` | page JSON → DOM mapping. Walks `b[]`; strings parsed by the GFM block parser (headings → sections, paragraphs, lists, GFM tables, fences — `oku-*`/`mermaid` fences lift to typed blocks, def-lists, task-lists, HTML islands w/ executing scripts, admonitions); typed objects dispatched to typed renderers. v1→v2 shim keeps older pages rendering. ~1.6k LoC. |
 | `kit/schema/page.schema.json` | JSON-schema for page payloads. Every page (converted from .md) validates against it; the optional `jsonschema` dep makes the check active. Chart `type` enum here is the single source of truth for known chart types. |
@@ -245,6 +245,24 @@ fault. `--prose-width` stays declared and unapplied for a caller that
 wants a per-block cap. `test_presentation_measure.py` pins the rule at
 every width, including the computed `max-width: none`, so re-applying
 the cap fails rather than merely looking different.
+
+**The rail does not move.** The 9px strip at the top carries read
+progress plus a tick per `##` and a dot per figure, each a button that
+jumps there. It sits where a mis-click costs a scroll position, so
+hover, focus and the current-position highlight change **colour and
+opacity only** — every bounding box is identical in every state, and
+`test_page_rail.py` compares them. The label is absolutely positioned
+and `pointer-events: none`, so revealing it cannot push anything.
+
+Two decisions inside it are load-bearing. Marks and the fill share one
+scale (`elementTop / maxScroll`), so the fill edge reaches a mark
+exactly when that landmark hits the top of the viewport — a second
+scale would let the highlight contradict the bar beside it. And marks
+are **thinned**: sections are always placed because they are the shape
+of the page, figures only where they clear their neighbours by 6px,
+and not at all below a 560px rail. Unthinned, `docs/reference.md` put
+49 marks 0px apart at phone width. Plain `<pre>` is not a landmark
+kind — marking every code block turns the rail into a dotted line.
 
 **Front-matter is `title` + `summary`.** Plus `order` / `parent` for
 tree placement. `accent` and `audience` are tree-wide in `docs/kit.json`;
