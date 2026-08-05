@@ -1,13 +1,23 @@
-"""Where the line breaks, in one column.
+"""One column, one right edge.
 
-**One column, two measures.** `--prose-width` was applied to
-section-level paragraphs only, so a callout wrapped at 1037px directly
-under a paragraph wrapping at 626px. The reader does not read the
-selector; they see the line break move, and a wrap point that moves
-mid-column is the first thing the eye catches.
+Every block in a section — paragraph, list, blockquote, callout, the
+TL;DR panel, a code block, a diagram — ends at the same x. That is the
+whole rule, and it is the one a reader can see without being told.
 
-Reported by a reader, not found by a test, which is why the cap now
-has one.
+It was broken by trying to make paragraphs easier to read. Body prose
+runs long at the comfortable width — a 77-83 character median when the
+cap was proposed — so `--prose-width` was applied to running prose. It
+worked on the paragraph and failed on the page: the text stopped
+~200px short of the cover, the code blocks and the diagrams above and
+below it. Reported twice, the second time with arrows drawn on the
+screenshot — "the text is still narrower than the other elements."
+
+So the measure belongs to `--content-width`, and the reader shortens it
+with the width toggle, which moves every block together.
+`--prose-width` stays declared and unapplied for a caller that wants a
+per-block cap; the kit does not use it.
+
+The tests below are the guard against reopening this a third time.
 """
 
 from __future__ import annotations
@@ -31,8 +41,8 @@ PARA = (
 )
 
 PAGE_MD = f"""---
-title: One measure
-summary: Running prose wraps at one width, whatever frame it sits in.
+title: One column
+summary: Every block in a section ends at the same x.
 ---
 
 > [!TLDR]
@@ -40,26 +50,26 @@ summary: Running prose wraps at one width, whatever frame it sits in.
 
 ## Prose and its frames {{#prose}}
 
-{PARA}
+{PARA} {PARA} {PARA}
 
 > [!IMPORTANT]
 > {PARA}
 
+- {PARA}
+
+> {PARA}
+
+```python
+value = "a line of code that is not especially long"
+```
+
+```mermaid
+flowchart LR
+  A[write] --> B[compact]
+  B --> C[read]
+```
+
 {PARA}
-
-## A table worth filtering {{#big}}
-
-| Stage | Input | Output |
-|---|---|---|
-| a | 1 | x |
-| b | 2 | x |
-| c | 3 | x |
-| d | 4 | x |
-| e | 5 | x |
-| f | 6 | x |
-| g | 7 | x |
-| h | 8 | x |
-
 """
 
 
@@ -70,10 +80,10 @@ def measure_url(tmp_path_factory):
     manifest = {
         "schema_version": 1,
         "root": ".",
-        "pages": [{"path": "page.html", "source": "page.md", "title": "One measure", "parent": None}],
+        "pages": [{"path": "page.html", "source": "page.md", "title": "One column", "parent": None}],
     }
     (d / "page.md").write_text(PAGE_MD, encoding="utf-8")
-    (d / "page.html").write_text(cli._stub_for("One measure", inline_manifest=manifest), encoding="utf-8")
+    (d / "page.html").write_text(cli._stub_for("One column", inline_manifest=manifest), encoding="utf-8")
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), cli._make_serve_handler(d))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{httpd.server_address[1]}"
@@ -89,86 +99,103 @@ def rendered(measure_url, browser):
     page.close()
 
 
-def _width(page, selector):
-    return page.evaluate(
-        """(sel) => {
-        const e = document.querySelector(sel);
-        return e ? Math.round(e.getBoundingClientRect().width) : null;
-    }""",
-        selector,
+# Every direct child of a section, labelled by what it is, with its
+# right edge. A blockquote carries a left rule and its own inset, so it
+# is measured on the outer box like everything else.
+EDGES = """() => {
+  const out = [];
+  for (const el of document.querySelector('#prose').children) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 1) continue;
+    out.push({ tag: el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).split(' ')[0] : ''),
+               right: Math.round(r.right), width: Math.round(r.width) });
+  }
+  return out;
+}"""
+
+
+def test_every_block_in_a_section_ends_at_the_same_x(rendered):
+    """The reported defect, stated as a number. Before: paragraphs at
+    870, callout at 951, code and diagram at 1356."""
+    blocks = rendered.evaluate(EDGES)
+    assert len(blocks) >= 6, f"the fixture did not render enough block kinds: {blocks}"
+    edges = {b["right"] for b in blocks}
+    assert max(edges) - min(edges) <= 1, "blocks in one section end at different x: " + ", ".join(
+        f"{b['tag']}@{b['right']}" for b in blocks
     )
 
 
-# ---------- one column, one measure ----------
-
-# The frames add their own padding back, and the compensation is in `ch`
-# against a padding written in px, so it lands within a character or two
-# rather than exactly. A reader notices a wrap point moving by a word,
-# not by a character.
-MEASURE_SLACK_PX = 14
-
-
-def test_a_callout_wraps_where_the_paragraph_above_it_wraps(rendered):
-    """Measured before the fix: 626px for the paragraph, 1037px for the
-    callout body directly below it — a 66% jump inside one column."""
-    para = _width(rendered, "main > section > p")
-    body = _width(rendered, ".callout > p")
-    assert para and body, (para, body)
-    assert abs(body - para) <= MEASURE_SLACK_PX, (
-        f"a callout wraps at {body}px where the prose around it wraps at {para}px"
-    )
-
-
-def test_the_tldr_wraps_where_prose_wraps(rendered):
-    """Same divergence, on the block that opens most pages: 1046px."""
-    para = _width(rendered, "main > section > p")
-    body = _width(rendered, ".tldr > p")
-    assert para and body, (para, body)
-    assert abs(body - para) <= MEASURE_SLACK_PX, (
-        f"the TL;DR wraps at {body}px where the prose around it wraps at {para}px"
-    )
-
-
-@pytest.mark.parametrize("mode", ["narrow", "comfortable", "wide"])
-def test_framed_prose_tracks_the_width_toggle(rendered, mode):
-    """The cap is one number per mode, so the frames have to move with
-    it — a callout pinned to the comfortable measure would diverge
-    again the moment the reader widened the page."""
-    rendered.evaluate("(m) => document.body.setAttribute('data-content-width', m)", mode)
-    rendered.wait_for_timeout(120)
-    para = _width(rendered, "main > section > p")
-    body = _width(rendered, ".callout > p")
-    rendered.evaluate("() => document.body.setAttribute('data-content-width', 'comfortable')")
-    assert abs(body - para) <= MEASURE_SLACK_PX, f"{mode}: callout {body}px vs prose {para}px"
-
-
-def test_the_two_framed_blocks_share_a_right_edge(rendered):
-    """A callout and the TL;DR panel are both tinted frames in the same
-    column. At prose + 8ch and prose + 7ch they landed 11px apart, and
-    a right edge that is almost-but-not-quite shared reads as a
-    misalignment rather than a decision."""
+def test_the_tldr_panel_ends_where_the_section_does(rendered):
+    """It is the block the report pointed at, and it sits outside the
+    section, so the rule above does not cover it."""
     got = rendered.evaluate(
         """() => {
         const r = s => { const e = document.querySelector(s);
                          return e ? Math.round(e.getBoundingClientRect().right) : null; };
-        return { callout: r('.callout'), tldr: r('.tldr') };
+        return { tldr: r('.tldr'), cover: r('header.cover'), para: r('main > section > p') };
     }"""
     )
-    assert got["callout"] and got["tldr"], got
-    assert abs(got["callout"] - got["tldr"]) <= 1, got
+    assert got["tldr"] and got["cover"] and got["para"], got
+    assert abs(got["tldr"] - got["para"]) <= 1, got
+    assert abs(got["tldr"] - got["cover"]) <= 1, got
 
 
-def test_max_mode_drops_the_cap_on_framed_prose_too(rendered):
-    """`max` means "use the window". Leaving a callout capped there
-    would make it the only narrow thing on the page."""
-    rendered.evaluate("() => document.body.setAttribute('data-content-width', 'max')")
-    rendered.wait_for_timeout(120)
-    got = rendered.evaluate(
-        """() => ({
-        callout: getComputedStyle(document.querySelector('.callout')).maxWidth,
-        tldr: getComputedStyle(document.querySelector('.tldr')).maxWidth,
-    })"""
-    )
+@pytest.mark.parametrize("mode", ["narrow", "comfortable", "wide", "max"])
+def test_one_edge_holds_at_every_width(rendered, mode):
+    """The width toggle moves the column. It must not open a gap
+    between the block kinds inside it."""
+    rendered.evaluate("(m) => document.body.setAttribute('data-content-width', m)", mode)
+    rendered.wait_for_timeout(200)
+    blocks = rendered.evaluate(EDGES)
     rendered.evaluate("() => document.body.setAttribute('data-content-width', 'comfortable')")
-    assert got["callout"] == "none", got
-    assert got["tldr"] == "none", got
+    edges = {b["right"] for b in blocks}
+    assert max(edges) - min(edges) <= 1, f"{mode}: " + ", ".join(f"{b['tag']}@{b['right']}" for b in blocks)
+
+
+def test_nothing_applies_the_prose_cap(rendered):
+    """`--prose-width` stays declared for a caller that wants it. The
+    moment the kit applies it to a block, the edges diverge again — so
+    assert the computed max-width rather than trusting the stylesheet
+    to have stayed the way it reads."""
+    got = rendered.evaluate(
+        """() => {
+        const m = s => { const e = document.querySelector(s);
+                         return e ? getComputedStyle(e).maxWidth : null; };
+        return { declared: getComputedStyle(document.body).getPropertyValue('--prose-width').trim(),
+                 para: m('main > section > p'), callout: m('.callout'), tldr: m('.tldr'),
+                 list: m('main > section > ul'), quote: m('main > section > blockquote') };
+    }"""
+    )
+    assert got["declared"], "--prose-width was deleted; it is kept for callers that want a cap"
+    for key in ("para", "callout", "tldr", "list", "quote"):
+        assert got[key] == "none", f"{key} is capped at {got[key]} — the edges will diverge"
+
+
+def test_the_width_toggle_still_moves_the_measure(rendered):
+    """Removing the cap does not remove the reader's control over line
+    length; it moves it to the toggle, which acts on the whole column,
+    so the edges stay aligned at every setting.
+
+    Width is the assertion, not characters-per-line. Both estimators
+    available in headless are unreliable here: `text.length / lines` is
+    inflated by the partial last line, and canvas `measureText` falls
+    back to a different font than the one the paragraph renders in —
+    they disagreed by 20% on the same paragraph. Width is exact and
+    proves the same thing."""
+    seen = {}
+    for mode in ("narrow", "comfortable", "wide"):
+        rendered.evaluate("(m) => document.body.setAttribute('data-content-width', m)", mode)
+        rendered.wait_for_timeout(200)
+        seen[mode] = rendered.evaluate(
+            """() => {
+            const p = document.querySelector('main > section > p');
+            const lh = parseFloat(getComputedStyle(p).lineHeight);
+            return { width: Math.round(p.getBoundingClientRect().width),
+                     lines: Math.round(p.getBoundingClientRect().height / lh) };
+        }"""
+        )
+    rendered.evaluate("() => document.body.setAttribute('data-content-width', 'comfortable')")
+    assert seen["narrow"]["width"] < seen["comfortable"]["width"] < seen["wide"]["width"], seen
+    # More lines for the same text is the same statement, arrived at
+    # independently of the width: narrow really does wrap sooner.
+    assert seen["narrow"]["lines"] > seen["wide"]["lines"], seen

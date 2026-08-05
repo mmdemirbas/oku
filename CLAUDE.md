@@ -219,15 +219,32 @@ judged on. Concretely, and each pinned by a test in
 - An untitled `> [!TLDR]` shows the words TL;DR **once**. The `<h2>`
   still exists (`buildTOC` skips a section without one, and search
   reads it) carrying `.okt-sr-only`.
-- Body prose caps at `--prose-width`, declared in `ch` per
-  content-width mode. Measured medians 63 / 67 / 78 characters for
-  narrow / comfortable / wide. Visual primitives are never capped.
+- Every block in a section ends at the same x — paragraph, list,
+  blockquote, callout, TL;DR, code, diagram, table. See "One column,
+  one right edge" below; nothing caps a block below `--content-width`.
 - A table at or below `SMALL_TABLE_ROWS` (chrome.js) sizes to its
   content and keeps only copy + expand. The controls stay in the DOM
   with their listeners bound; CSS hides them, so a table that grows
   past the threshold needs no re-init.
 - The cover subtitle falls back to `summary`; a cover holding only an
   h1 gets `.cover-bare`; `updated` is suppressed when it equals `date`.
+
+**One column, one right edge.** Every block in a section ends at the
+same x. Nothing caps a block below `--content-width` — not prose, not
+a callout, not the TL;DR panel. The reader shortens the measure with
+the width toggle, which moves the whole column together.
+
+This has been reopened once and must not be a third time. Body prose
+runs long at the comfortable width (a 77–83 character median when it
+was measured), so `--prose-width` was applied to running prose. Better
+for the paragraph, wrong for the page: the text stopped ~200px short
+of the cover, the code blocks and the diagrams around it, and the
+verdict was "the text is still narrower than the other elements". A
+right edge that steps in and out down the page reads as a rendering
+fault. `--prose-width` stays declared and unapplied for a caller that
+wants a per-block cap. `test_presentation_measure.py` pins the rule at
+every width, including the computed `max-width: none`, so re-applying
+the cap fails rather than merely looking different.
 
 **Front-matter is `title` + `summary`.** Plus `order` / `parent` for
 tree placement. `accent` and `audience` are tree-wide in `docs/kit.json`;

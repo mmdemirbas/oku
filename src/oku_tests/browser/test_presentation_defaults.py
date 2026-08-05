@@ -8,8 +8,7 @@ rather than eyeballed:
   * the TL;DR gradient faded to a violet-leaning neutral, so it read
     teal-to-lavender under any accent that was not the default indigo
   * a cover with nothing but a title sat in a 156px tinted panel
-  * body prose ran 77-83 characters per line at the default width
-  * a three-row table shipped a filter box, a row counter and a gear
+  * a small table shipped a filter box, a row counter and a gear
 
 The page below sets exactly two front-matter fields. That is the
 point — anything an author has to add to get a decent result is the
@@ -254,55 +253,28 @@ def test_a_title_only_cover_shrinks_to_fit(defaults_url, browser):
 # ---------- prose measure ----------
 
 
-CPL = """() => {
-  const out = [];
-  for (const p of document.querySelectorAll('main > section > p')) {
-    const lh = parseFloat(getComputedStyle(p).lineHeight);
-    const lines = Math.round(p.getBoundingClientRect().height / lh);
-    if (lines >= 3) out.push(Math.round(p.textContent.trim().length / lines));
-  }
-  out.sort((a, b) => a - b);
-  return { n: out.length, median: out[Math.floor(out.length / 2)], max: out[out.length - 1] };
-}"""
+# This group used to assert the opposite: that running prose was
+# clamped to a 45-75 character measure while visuals filled the column.
+# That shipped, and the reader's verdict on it was "the text is still
+# narrower than the other elements" — a right edge that steps in and
+# out down the page costs more than the shorter line buys. The rule and
+# its history live in test_presentation_measure.py; what survives here
+# is the one line that belongs with the other defaults.
 
 
-def test_default_prose_measure_is_inside_the_readable_range(rendered):
-    """At the default content width, body paragraphs ran 77-83
-    characters per line. The readable range is 45-75."""
-    got = rendered.evaluate(CPL)
-    assert got["n"] >= 2, f"not enough wrapped paragraphs to measure: {got}"
-    assert 45 <= got["median"] <= 75, f"default measure outside the readable range: {got}"
-
-
-def test_the_width_toggle_still_moves_prose(rendered):
-    """The symmetric model was adopted because authors expect the
-    toggle to act on every block kind. It still does — on a curve
-    suited to reading."""
-    seen = {}
-    for mode in ("narrow", "comfortable", "wide", "max"):
-        rendered.evaluate(f"document.body.setAttribute('data-content-width','{mode}')")
-        rendered.wait_for_timeout(200)
-        seen[mode] = rendered.evaluate(CPL)["median"]
-    rendered.evaluate("document.body.setAttribute('data-content-width','comfortable')")
-    rendered.wait_for_timeout(200)
-    assert seen["narrow"] < seen["comfortable"] < seen["wide"] < seen["max"], seen
-    assert seen["narrow"] >= 45, f"narrow is too tight to read: {seen}"
-
-
-def test_visual_primitives_are_not_clamped_to_the_prose_measure(rendered):
-    """Only running prose is capped. A table still fills the content
-    width — that was the whole objection to the asymmetric model. (A
-    SMALL table is the stated exception: it sizes to its content, so
+def test_prose_fills_the_column_like_everything_else(rendered):
+    """A paragraph and a table on the same page end at the same x. (A
+    SMALL table is the stated exception — it sizes to its content — so
     this measures one past the threshold.)"""
     got = rendered.evaluate(
         """() => {
         const t = document.querySelector('#big .okt-table-wrap');
         const p = document.querySelector('main > section > p');
-        return { table: Math.round(t.getBoundingClientRect().width),
-                 para: Math.round(p.getBoundingClientRect().width) };
+        return { table: Math.round(t.getBoundingClientRect().right),
+                 para: Math.round(p.getBoundingClientRect().right) };
     }"""
     )
-    assert got["table"] > got["para"] + 100, got
+    assert abs(got["table"] - got["para"]) <= 1, got
 
 
 # ---------- small tables ----------

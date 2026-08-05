@@ -2401,10 +2401,7 @@ pre[class*="language-"] {
    on a colour with no hue of its own, and --surface-2 is a tinted
    surface even after the de-saturation above. */
 .tldr {
-  /* 36px horizontal — 72px inset, matching the callout's 48+22 closely
-     enough that the two frames share a right edge and an inner measure.
-     See the prose-measure rule above. */
-  margin: 0 0 40px 0; padding: 28px 36px;
+  margin: 0 0 40px 0; padding: 28px 32px;
   background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%);
   border: 1px solid var(--border); border-radius: 12px;
 }
@@ -5557,35 +5554,33 @@ main .example-pair {
   max-width: 100%;
 }
 
-/* The measure is a property of running prose, not of the selector it
-   happens to sit under. A callout and the TL;DR panel hold the same
-   kind of text as a section paragraph, and both are full-width boxes —
-   nothing about the container constrains the line. Left out of this
-   rule they wrapped at 1037px directly below a 626px paragraph, and
-   two wrap points in one column is what a reader notices first.
-   The framed blocks add their own horizontal padding back (border-box
-   means max-width bounds the border box, so a 70px-inset callout would
-   otherwise run ~8 characters short of the paragraph above it). */
-main > section > p,
-main > section > ul,
-main > section > ol,
-main > section > dl,
-main > section > blockquote {
-  max-width: var(--prose-width);
-}
-/* One number for both frames, not one each: at prose + 8ch and
-   prose + 7ch they landed 11px apart, and two tinted panels in one
-   column with almost-but-not-quite the same right edge reads as a
-   misalignment rather than a decision. The TL;DR's padding is tuned
-   to 36px below so its inset matches the callout's 70px. */
-.callout,
-.tldr { max-width: calc(var(--prose-width) + 8ch); }   /* callout inset: 48px + 22px */
-/* `max` mode drops the cap entirely; calc() on the `none` keyword is
-   invalid, and relying on invalid-at-computed-value-time to fall back
-   to `none` is a coincidence, not a rule. Say it. */
-body[data-content-width="max"] .callout,
-body[data-content-width="max"] .tldr {
-  max-width: none;
+/* NOTHING here caps a block below --content-width, and that is the
+   rule: one column, one right edge, for prose, callouts, the TL;DR
+   panel, code, tables and diagrams alike.
+   `--prose-width` is declared in :root and per mode, and the kit does
+   not apply it. That looks like dead weight and is not — it is there
+   for a caller that wants a per-block line-length cap.
+   The history is worth keeping, because it is easy to reopen: body
+   prose runs long at the comfortable width (a 77-83 character median
+   when the cap was proposed), and shortening it IS better for the
+   paragraph in isolation. It was tried. What the reader sees is not
+   one paragraph though, it is a column where the text stops ~200px
+   short of the cover, the code block and the diagram — and a right
+   edge that moves from block to block reads as a rendering fault,
+   which costs more than the long line saves.
+   The measure belongs to --content-width, and the reader shortens it
+   with the width toggle, which moves every block together.
+   Pinned by test_presentation_measure.py — every block in a section
+   shares one right edge, at every width. */
+
+/* The one block that broke that rule without anyone writing a line of
+   CSS: the kit never styled <blockquote>, so it took the UA default
+   `margin: 1em 40px` and ended 40px short of every sibling. The left
+   indent is the convention and stays; the right inset is what put a
+   step in the column edge. Geometry only — the kit still declares no
+   colour, border or type for a quote, which is a separate gap. */
+main blockquote {
+  margin: 1em 0 1em 40px;
 }
 
 

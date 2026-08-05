@@ -49,7 +49,7 @@ Two of them were decided deliberately and are recorded as such in the
 source. The rest are unowned.
 
 ```oku-table
-{"headers":["#","Finding","Kind","What shipped"],"rows":[["1","`> [!TLDR]` with no title rendered the words TL;DR twice — once as the pill, once as the heading. The shipped starter template produced exactly that shape, so it was the default state of the block that opens nearly every page.","Defect","The heading carries `.okt-sr-only` when it would only repeat the pill. It has to stay in the DOM: `buildTOC` skips a section without an `h2`, and the search index reads it."],["2","The TL;DR gradient faded to `--surface-2`, a violet-leaning neutral. Under the default indigo accent that reads as intentional; on a teal page the card faded teal → lavender. Fixing only the gradient left the same lavender on the table header band and the chart tracks — the token backs 38 rules.","Defect, twice","The gradient ends on `--surface`, which has no hue of its own. Then `--surface-2` itself went from `#f5f3ff` to `#f5f4f8` — same family, a quarter of the saturation — so the whole quiet-surface layer stops reading as a colour. A test pins its channel spread at 5."],["3","Body prose ran 77–83 characters per line. `--prose-width` was declared and applied to nothing.","Recorded trade-off, reopened","`--prose-width` is now a `ch` value re-declared per content-width mode. Measured medians 63 / 67 / 78. Visual primitives are untouched."],["4","With no `eyebrow` and no `subtitle` the cover was a 972×156 tinted panel holding one line of text in its top third.","Defect","The subtitle falls back to `summary`; a cover holding only an `h1` gets `.cover-bare` and shrinks to fit."],["5","A three-row table shipped a filter input, a count badge, a gear popover and an expand button, then stretched three short cells across the full content width.","Defect","At or below `SMALL_TABLE_ROWS` the table sizes to its content and keeps copy + expand. The controls stay in the DOM with their listeners bound; CSS hides them."],["6","`date` and `updated` were separate hand-maintained fields and the cover printed both. On `architecture.md` they were the same date in two styles.","Design","`updated` is derived from the file's last commit date, and suppressed when it equals `date`."],["7","`read_time` was hand-written prose on four pages — and `architecture.md`'s was already a minute off the body it described.","Design","Derived at 220 wpm, omitted below two minutes. Setting it by hand still wins and earns an info note."]]}
+{"headers":["#","Finding","Kind","What shipped"],"rows":[["1","`> [!TLDR]` with no title rendered the words TL;DR twice — once as the pill, once as the heading. The shipped starter template produced exactly that shape, so it was the default state of the block that opens nearly every page.","Defect","The heading carries `.okt-sr-only` when it would only repeat the pill. It has to stay in the DOM: `buildTOC` skips a section without an `h2`, and the search index reads it."],["2","The TL;DR gradient faded to `--surface-2`, a violet-leaning neutral. Under the default indigo accent that reads as intentional; on a teal page the card faded teal → lavender. Fixing only the gradient left the same lavender on the table header band and the chart tracks — the token backs 38 rules.","Defect, twice","The gradient ends on `--surface`, which has no hue of its own. Then `--surface-2` itself went from `#f5f3ff` to `#f5f4f8` — same family, a quarter of the saturation — so the whole quiet-surface layer stops reading as a colour. A test pins its channel spread at 5."],["3","Body prose ran 77–83 characters per line. `--prose-width` was declared and applied to nothing.","Recorded trade-off, reopened — then re-closed","A `ch`-based cap shipped and was reverted after two reading rounds: it left the text ending ~200px short of the cover, the code and the diagrams around it. One column, one right edge. `--prose-width` stays declared and unapplied."],["4","With no `eyebrow` and no `subtitle` the cover was a 972×156 tinted panel holding one line of text in its top third.","Defect","The subtitle falls back to `summary`; a cover holding only an `h1` gets `.cover-bare` and shrinks to fit."],["5","A three-row table shipped a filter input, a count badge, a gear popover and an expand button, then stretched three short cells across the full content width.","Defect","At or below `SMALL_TABLE_ROWS` the table sizes to its content and keeps copy + expand. The controls stay in the DOM with their listeners bound; CSS hides them."],["6","`date` and `updated` were separate hand-maintained fields and the cover printed both. On `architecture.md` they were the same date in two styles.","Design","`updated` is derived from the file's last commit date, and suppressed when it equals `date`."],["7","`read_time` was hand-written prose on four pages — and `architecture.md`'s was already a minute off the body it described.","Design","Derived at 220 wpm, omitted below two minutes. Setting it by hand still wins and earns an info note."]]}
 ```
 
 Finding 3 is the one worth arguing about, because it was decided on
@@ -59,21 +59,31 @@ retired because authors expect the width toggle to act uniformly across
 every block kind. That is a real objection and the note is right that the
 asymmetric model surprised people.
 
-The cost of the resolution landed on the default reading experience,
-which is the surface this page is about. What shipped is a middle
-position that keeps the toggle uniform: prose has a `ch`-based cap that
-scales with the same toggle rather than ignoring it.
+A middle position shipped first: prose kept a `ch`-based cap that
+scaled with the same toggle, so the control still acted in one
+direction on every block. Measured medians were 63 / 67 / 78 characters
+for narrow / comfortable / wide.
+
+**It was reverted.** The cap is gone and the recorded decision stands.
+Two rounds of reading a real document found the same thing each time,
+the second with arrows drawn on the screenshot:
 
 ```oku-table
-{"headers":["Toggle setting","Content width","Prose cap","Measured median"],"rows":[["narrow","860px","54ch","63 characters"],["comfortable (default)","1100px","62ch","67 characters"],["wide","1400px","72ch","78 characters"],["max","100vw","none","uncapped (142)"]]}
+{"headers":["What the reader sees","With the cap","Without"],"rows":[["Paragraph right edge","870px","1356px"],["Callout right edge","951px","1356px"],["Cover / code / diagram right edge","1356px","1356px"],["Verdict","\"the text is still narrower than the other elements\"","one column, one edge"]]}
 ```
 
-Prose still responds to the toggle in the same direction, so the control
-keeps its meaning; it responds on a curve suited to reading rather than
-to a chart. The `ch` values are calibrated rather than chosen — `ch` is
-the width of "0", wider than the average character in running prose, so
-the rendered line runs about 1.1× the nominal figure. A reader who wants
-full-bleed prose still has `max`.
+The paragraph in isolation was better capped. The column was not: text
+that stops ~200px short of the cover above it and the diagram below it
+reads as a rendering fault, and that costs more than the shorter line
+buys. The measure belongs to `--content-width`, and the reader shortens
+it with the toggle, which moves every block together.
+
+`--prose-width` stays declared and unapplied, for a caller that wants a
+per-block cap. `test_presentation_measure.py` pins the rule — every
+block in a section shares one right edge at every width, and the
+computed `max-width` on prose, callouts and the TL;DR panel must be
+`none` — so re-applying the cap fails a test rather than merely looking
+different.
 
 ## Why does the author fill in ten metadata fields? {#front-matter}
 
