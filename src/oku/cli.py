@@ -2259,13 +2259,24 @@ def validate_pages(pages) -> list:
         # converting in-memory first. Migration to disk via `oku migrate`
         # is optional — this keeps `oku check` accurate for either shape.
         v2 = _v1_to_v2(data) if isinstance(data, dict) and data.get("k") != "page" else data
+        # Every failing block, not the first. Stopping at one was called
+        # "keeping the report focused"; in practice it meant a page with
+        # three malformed blocks reported one, and an author who fixed
+        # it and re-ran got the next — three rounds to learn what one
+        # run could have said. One real page had a table, a KPI grid and
+        # a step flow all wrong, and only the table was ever named.
+        #
+        # One error PER BLOCK, though: a block that fails `anyOf` emits a
+        # sub-error for every branch it didn't match, and printing forty
+        # of those for one bad table buries the page.
+        seen_paths: set[str] = set()
         for err in validator.iter_errors(v2):
             field = ".".join(str(x) for x in err.absolute_path) or "(root)"
+            block_path = ".".join(str(x) for x in list(err.absolute_path)[:2]) or "(root)"
+            if block_path in seen_paths:
+                continue
+            seen_paths.add(block_path)
             errors.append((p, f"{field}: {err.message}"))
-            # Match the single-error-per-page behaviour the old
-            # `validate()` wrapper had — it raised on the first failure
-            # and never reported the rest. Keeps the report focused.
-            break
     return errors
 
 
@@ -3501,6 +3512,21 @@ def cmd_check(args: argparse.Namespace) -> int:
             for it in infos:
                 print(_format_issue(it, root))
 
+        if not _HAS_JSONSCHEMA:
+            # Never print a tick for a pass that did not run. This exact
+            # line once read "✓ 2 page(s) clean" for a page whose table
+            # and step-flow payloads the renderer could not read at all,
+            # because the installed tool had no jsonschema and the
+            # schema pass silently returned []. jsonschema is a hard
+            # dependency now, so reaching here means a broken install —
+            # say so, and fail.
+            print(
+                "✗ schema validation did not run — jsonschema is missing from this install.\n"
+                "  Only the structural checks ran, and they cannot see a malformed block\n"
+                "  payload. Reinstall with `uv tool install --force --no-cache --from . oku`.",
+                file=sys.stderr,
+            )
+            return 1
         if not errors and not warnings:
             print(f"✓ {len(pages)} page(s) clean (schema + structural + content)")
         elif not errors:

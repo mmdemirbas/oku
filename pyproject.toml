@@ -2,7 +2,7 @@
 # Project name is `oku` (Turkish imperative "read!"). Package lives
 # at src/oku/.
 name = "oku"
-version = "0.5.0"
+version = "0.6.0"
 description = "oku — shared HTML chrome kit + CLI. Standalone, theme-aware visual docs without a build step."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,9 +14,16 @@ keywords = ["oku", "html", "docs", "static-site", "documentation"]
 # (validation is skipped, build still succeeds). uv-driven invocations
 # pull it in automatically via the PEP 723 inline metadata in
 # `bin/oku`; install-time users can opt in via the `schema` extra.
-dependencies = []
+# jsonschema is NOT optional. It was, and the consequence was a page
+# that `oku check` called clean while three of its blocks rendered as
+# blank space — the installed tool had no jsonschema, so the schema
+# pass silently no-opped and only the structural checks ran. A check
+# that reports success when it did not run is worse than no check.
+dependencies = ["jsonschema>=4.0"]
 
 [project.optional-dependencies]
+# Kept so an existing `oku[schema]` install keeps resolving; the
+# dependency itself moved to the base set above.
 schema = ["jsonschema>=4.0"]
 # Pagefind ships its own Rust binary inside the `pagefind[bin]` PyPI
 # extra — no brew / npm / npx needed. cli.py prefers `python -m

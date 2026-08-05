@@ -4006,6 +4006,17 @@ body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
   color: var(--text-soft);
   line-height: 1.5;
 }
+/* Same card, used by the renderer when a typed block draws nothing.
+   It needs its own frame because it is not sitting inside an
+   .okd-render the way the diagram error is. */
+.okt-block-error {
+  display: block;
+  margin: 24px 0;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1px dashed var(--warning);
+  border-radius: 8px;
+}
 .okd-error-card .okd-error-head {
   display: flex;
   align-items: baseline;

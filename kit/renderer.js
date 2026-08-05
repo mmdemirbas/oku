@@ -1457,6 +1457,19 @@
 
     _renderTyped(block) {
       if (!block || !block.k) return this._unknown(block);
+      // Contract check BEFORE rendering. Without it a payload the
+      // renderer cannot read degrades instead of failing: a step flow
+      // written with `title`/`detail` drew four cards containing the
+      // numerals 1-4 and nothing else, and a KPI grid written with
+      // `value`/`note` printed the literal string "undefined" into a
+      // delivered document. Both passed a "did it draw anything" test.
+      // The contract mirrors the schema's `required` lists, and
+      // test_renderer_contract.py fails if the two drift.
+      const missing = this._contractViolation(block);
+      if (missing) {
+        this._warn('block-contract', 'Block "' + block.k + '" is missing ' + missing, block);
+        return this._blockError(block, missing);
+      }
       let el;
       switch (block.k) {
         case 'diagram':        el = this._renderDiagram(block); break;
@@ -1476,7 +1489,81 @@
         case 'svg':            el = this._renderSvg(block); break;
         default:               el = this._unknown(block); break;
       }
+      // A KNOWN kind carrying a payload the renderer cannot read used
+      // to produce an element with nothing in it — a band of white
+      // space in a published document, with no console warning and no
+      // clue in the page about which block it was. Three blocks on one
+      // real page failed this way (a table written with `columns` +
+      // keyed rows, a step flow written with `title`/`detail`) and the
+      // page shipped. An empty typed block is always a defect: every
+      // primitive here exists to draw something.
+      if (el && !this._hasVisibleContent(el)) {
+        this._warn('empty-block', 'Block "' + block.k + '" rendered nothing — check its payload against the schema.', block);
+        return this._blockError(block);
+      }
       return el;
+    }
+
+    /* Which fields a typed block must carry for its renderer to have
+       anything to read. Mirrors the `required` arrays in
+       kit/schema/page.schema.json — kept as a literal here because the
+       renderer must not depend on fetching the schema at runtime, and
+       kept honest by a test that compares the two files.
+       `items` names an array property and what each element needs. */
+    _contractViolation(block) {
+      const C = OkuRenderer.BLOCK_CONTRACT[block.k];
+      if (!C) return null;
+      for (const key of (C.required || [])) {
+        if (block[key] === undefined || block[key] === null) return '`' + key + '`';
+      }
+      for (const [field, keys] of Object.entries(C.items || {})) {
+        const arr = block[field];
+        if (!Array.isArray(arr)) continue;
+        for (const item of arr) {
+          if (!item || typeof item !== 'object') continue;
+          for (const key of keys) {
+            if (item[key] === undefined || item[key] === null) {
+              return '`' + key + '` on an entry of `' + field + '`';
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    /* Cheap "did this draw anything" test: any text, or any element
+       that paints on its own (svg / img / canvas / a custom element
+       that fills itself in later). Deliberately generous — the point is
+       to catch a block that produced NOTHING, not to police sparse
+       ones. */
+    _hasVisibleContent(el) {
+      if (!el) return false;
+      if ((el.textContent || '').trim()) return true;
+      return !!el.querySelector('svg, img, canvas, oku-chart, oku-diagram, oku-snippet, oku-annotated-code, input, td, th, li');
+    }
+
+    /* The same in-page error card a broken diagram gets. An author sees
+       the problem where the block should have been, which is the only
+       place they are looking. */
+    _blockError(block, missing) {
+      const card = document.createElement('div');
+      card.className = 'okd-error-card okt-block-error';
+      const head = document.createElement('div');
+      head.className = 'okd-error-head';
+      const kind = document.createElement('strong');
+      kind.textContent = String(block.k);   // textContent, not innerHTML: `k` is authored input
+      head.appendChild(kind);
+      head.appendChild(document.createTextNode(missing ? ' is missing a required field' : ' rendered nothing'));
+      card.appendChild(head);
+      const msg = document.createElement('div');
+      msg.className = 'okd-error-msg';
+      const keys = Object.keys(block).filter(k => k !== 'k');
+      msg.textContent =
+        (missing ? 'Needs ' + missing + '. ' : '') +
+        'The payload carries ' + (keys.length ? keys.map(k => '`' + k + '`').join(', ') : 'no fields') +
+        '. Run `oku check` — the schema names the fields this block needs.';
+      card.appendChild(msg);
+      return card;
     }
 
     _renderInfoTip(block) {
@@ -2292,6 +2379,28 @@
   /* ================================================================ *
    * Auto-boot
    * ================================================================ */
+
+  /* Generated from the `required` arrays in kit/schema/page.schema.json.
+     The renderer cannot fetch the schema at runtime (standalone builds
+     have no network), so this is a copy — and a copy drifts, which is
+     why test_renderer_contract.py regenerates it from the schema and
+     fails on any difference. Regenerate rather than hand-edit. */
+  OkuRenderer.BLOCK_CONTRACT = {
+    'annotated-code': { required: ['src'], items: { annotations: ['id', 'content'] } },
+    'chart': { required: ['type'], items: { rows: ['label'], slices: ['label', 'value'], segments: ['label', 'count'], zones: ['from', 'to'], axes: ['label'], boxes: ['label', 'q1', 'median', 'q3', 'min', 'max'], tracks: ['label', 'value', 'max'], items: ['label', 'from', 'to'], bins: ['lo', 'hi', 'count'], distributions: ['label', 'values'], stages: ['label', 'value'], nodes: ['id'], links: ['source', 'target'], variables: ['key'], groups: ['id'], regions: ['id', 'value'], steps: ['label', 'value'], points: ['x', 'y'], ranges: ['label', 'low', 'high'] } },
+    'chart-grid': { required: ['panels'] },
+    'code': { required: ['src'] },
+    'compare-grid': { required: ['cards'], items: { cards: ['t'] } },
+    'diagram': { required: ['src'] },
+    'example': { required: ['code', 'output'] },
+    'image': { required: ['src'] },
+    'insight': { required: ['b'] },
+    'kpi-grid': { required: ['tiles'], items: { tiles: ['num', 'label'] } },
+    'live-snippet': { required: ['src'] },
+    'step-flow': { required: ['steps'], items: { steps: ['t'] } },
+    'svg': { required: ['src'] },
+    'table': { items: { groups: ['rows'] } },
+  };
 
   OkuRenderer.autoBoot = function (opts) {
     if (OkuRenderer._autoBootRan) return OkuRenderer._autoBootRan;
