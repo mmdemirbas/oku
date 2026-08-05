@@ -1642,31 +1642,39 @@ class TestChromeKitMarkers:
         )
 
 
-class TestDesignReviewPage:
-    """The design-review page is the live decision log the user keeps
-    flipping back to. A silent drop from the site nav (because of a
-    JSON parse error, a missing meta field, or a build skip) is the
-    bug we want this class to catch."""
+class TestEveryDocsPageReachesTheNav:
+    """A page silently dropped from the site nav — by a JSON parse
+    error, a missing title, or a build skip — is the bug this class
+    catches. It used to name one page (`design-review`, the decision
+    log the user kept flipping back to). That page has since been
+    deleted as retired, and naming a single page was the weaker test
+    anyway: the failure is a class, so the assertion is now every page
+    in the tree.
+    """
 
-    def test_design_review_json_parses(self, repo_root: Path) -> None:
-        p = repo_root / "docs" / "design-review.md"
-        assert p.exists(), "docs/design-review.md missing — site nav loses the live decision log"
-        data = _docs_page(repo_root, "design-review.json")
-        assert _block_kind(data) == "page", "design-review.md is not a page (k/kind != 'page')"
-        assert _page_title(data), "design-review.md missing title — nav entry would render with the filename"
-
-    def test_design_review_in_site_manifest_after_build(self, tmp_path: Path, repo_root: Path) -> None:
-        """End-to-end: build the project and verify design-review appears
-        in dist/site/site-manifest.json. Earlier regression: a stray
-        comma in design-review.json silently dropped the page from the
-        manifest while every other check still reported 'clean'."""
+    def test_every_docs_page_parses_and_carries_a_title(self, repo_root: Path) -> None:
         from oku import cli
 
-        # Stage a minimal project that includes a design-review-shaped
-        # page so we don't depend on real docs/.
+        pages = [p for p in (repo_root / "docs").glob("*.md")]
+        assert len(pages) >= 5, f"docs/ has almost nothing in it: {pages}"
+        for src in pages:
+            data = cli._page_from_source_file(src)
+            assert data is not None, f"{src.name} did not convert to a page"
+            assert _block_kind(data) == "page", f"{src.name} is not a page (k/kind != 'page')"
+            assert _page_title(data), (
+                f"{src.name} has no title — its nav entry would render with the filename"
+            )
+
+    def test_a_page_reaches_the_site_manifest_after_build(self, tmp_path: Path) -> None:
+        """End-to-end: build a project and verify its page appears in
+        dist/site/site-manifest.json. Earlier regression: a stray comma
+        in a page's JSON silently dropped it from the manifest while
+        every other check still reported 'clean'."""
+        from oku import cli
+
         (tmp_path / "docs").mkdir()
-        (tmp_path / "docs" / "design-review.json").write_text(
-            json.dumps({"kind": "page", "title": "Design review", "blocks": []}),
+        (tmp_path / "docs" / "notes.json").write_text(
+            json.dumps({"kind": "page", "title": "Notes", "blocks": []}),
             encoding="utf-8",
         )
         (tmp_path / "docs" / "index.html").write_text(
@@ -1682,9 +1690,7 @@ class TestDesignReviewPage:
         cli.build_manifest(tmp_path, out_dir=out_dir, pages=pages)
         m = json.loads((out_dir / "site-manifest.json").read_text(encoding="utf-8"))
         page_paths = [p["path"] for p in m.get("pages", [])]
-        assert any("design-review" in p for p in page_paths), (
-            f"design-review.html missing from manifest. Pages: {page_paths}"
-        )
+        assert any("notes" in p for p in page_paths), f"notes.html missing from manifest. Pages: {page_paths}"
 
 
 class TestMultiSeriesChartsHaveLegendExtras:
