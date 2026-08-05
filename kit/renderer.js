@@ -1183,6 +1183,63 @@
     return table;
   }
 
+  /* Derive a whole accent family — soft and strong surfaces, light and
+     dark — from one authored colour. Used by `_applyAccent` for any
+     accent that is not one of the three hand-tuned named palettes.
+
+     Same hue throughout, by construction: `ui-aesthetics` calls a
+     surface and its accent from different hue families "two unrelated
+     light sources on one object", and that is exactly what a page got
+     when only --accent moved.
+
+     The lightness targets are read off the named palettes rather than
+     invented — indigo's strong sits ~9 points below its accent, its
+     soft near L 94, and its dark-theme accent up near L 79. */
+  function deriveAccent(color) {
+    const hex = String(color).trim().replace(/^#/, '');
+    const full = hex.length === 3 ? hex.split('').map(function (c) { return c + c; }).join('') : hex;
+    if (!/^[0-9a-fA-F]{6}$/.test(full)) return null;
+    const r = parseInt(full.slice(0, 2), 16) / 255;
+    const g = parseInt(full.slice(2, 4), 16) / 255;
+    const b = parseInt(full.slice(4, 6), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    const d = max - min;
+    let h = 0;
+    let s = 0;
+    if (d !== 0) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      if (max === r) h = 60 * (((g - b) / d) % 6);
+      else if (max === g) h = 60 * ((b - r) / d + 2);
+      else h = 60 * ((r - g) / d + 4);
+      if (h < 0) h += 360;
+    }
+    const H = Math.round(h);
+    const S = Math.round(s * 100);
+    const L = Math.round(l * 100);
+    const hsl = function (sat, lig) {
+      return 'hsl(' + H + ' ' + Math.max(0, Math.min(100, Math.round(sat))) + '% ' +
+        Math.max(0, Math.min(100, Math.round(lig))) + '%)';
+    };
+    return {
+      light: {
+        // The authored colour is used verbatim — an author who wrote a
+        // hex expects to see that hex.
+        accent: '#' + full,
+        soft: hsl(Math.min(S, 90), 93),
+        strong: hsl(S, Math.max(22, Math.min(45, L - 10))),
+      },
+      dark: {
+        // A dark theme inverts the roles: the accent has to be light
+        // enough to read on a near-black surface, and "soft" becomes a
+        // deep tint rather than a pale one.
+        accent: hsl(Math.min(S, 80), 72),
+        soft: hsl(Math.min(S, 60), 14),
+        strong: hsl(Math.min(S, 85), 82),
+      },
+    };
+  }
+
   /* ================================================================ *
    * Public API
    * ================================================================ */
@@ -2189,9 +2246,31 @@
         style.textContent =
           ':root { --accent: ' + p.light + '; --accent-soft: ' + p.soft + '; --accent-strong: ' + p.strong + '; }' +
           ':root[data-theme="dark"] { --accent: ' + p.dark + '; --accent-soft: ' + p.darkSoft + '; --accent-strong: ' + p.darkStrong + '; }';
-      } else {
-        style.textContent = ':root { --accent: ' + accent + '; }';
+        return;
       }
+      // A custom colour used to set --accent and stop there, which left
+      // --accent-soft and --accent-strong on the indigo defaults. The
+      // page then rendered one hue on the borders and another on every
+      // tinted surface behind them — an orange callout rule around an
+      // indigo body, an indigo icon inside it. It reads as two unrelated
+      // light sources on one object, and it went unnoticed because the
+      // default accent IS indigo, so the bug is invisible until someone
+      // picks a colour. Dark mode was not derived at all.
+      const derived = deriveAccent(accent);
+      if (!derived) {
+        // Not a hex we can read (a named CSS colour, a gradient). Set
+        // what was asked for and leave the rest alone rather than
+        // guessing a family from something we cannot decompose.
+        style.textContent = ':root { --accent: ' + accent + '; }';
+        return;
+      }
+      style.textContent =
+        ':root { --accent: ' + derived.light.accent +
+          '; --accent-soft: ' + derived.light.soft +
+          '; --accent-strong: ' + derived.light.strong + '; }' +
+        ':root[data-theme="dark"] { --accent: ' + derived.dark.accent +
+          '; --accent-soft: ' + derived.dark.soft +
+          '; --accent-strong: ' + derived.dark.strong + '; }';
     }
 
     _unknown(block) {

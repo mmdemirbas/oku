@@ -2462,6 +2462,13 @@ pre[class*="language-"] {
 .callout.danger { --callout-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='4.93' y1='4.93' x2='19.07' y2='19.07'/></svg>"); }
 .callout.success { --callout-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M22 11.08V12a10 10 0 1 1-5.93-9.14'/><polyline points='22 4 12 14.01 9 11.01'/></svg>"); }
 .callout.neutral { --callout-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 11 12 14 22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/></svg>"); }
+/* IMPORTANT is one of the five standard GFM types and had no entry
+   here. With no --callout-icon the ::before falls back to `mask-image:
+   none`, and a 20x20 box painted --accent-strong with no mask renders
+   as a solid square — a filled block where the glyph should be. Speech
+   bubble with an exclamation, matching GitHub's own reading of the
+   type: this is a remark you must not miss. */
+.callout.important { --callout-icon: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/><line x1='12' y1='7.5' x2='12' y2='11'/><line x1='12' y1='13.6' x2='12.01' y2='13.6'/></svg>"); }
 /* Per-type tint on the icon — picks up the same colour family as
    the heading text below it. */
 .callout.warn::before,
