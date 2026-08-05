@@ -2401,7 +2401,10 @@ pre[class*="language-"] {
    on a colour with no hue of its own, and --surface-2 is a tinted
    surface even after the de-saturation above. */
 .tldr {
-  margin: 0 0 40px 0; padding: 28px 32px;
+  /* 36px horizontal — 72px inset, matching the callout's 48+22 closely
+     enough that the two frames share a right edge and an inner measure.
+     See the prose-measure rule above. */
+  margin: 0 0 40px 0; padding: 28px 36px;
   background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%);
   border: 1px solid var(--border); border-radius: 12px;
 }
@@ -5570,8 +5573,13 @@ main > section > dl,
 main > section > blockquote {
   max-width: var(--prose-width);
 }
-.callout { max-width: calc(var(--prose-width) + 8ch); }   /* 48px + 22px inset */
-.tldr    { max-width: calc(var(--prose-width) + 7ch); }   /* 32px + 32px inset */
+/* One number for both frames, not one each: at prose + 8ch and
+   prose + 7ch they landed 11px apart, and two tinted panels in one
+   column with almost-but-not-quite the same right edge reads as a
+   misalignment rather than a decision. The TL;DR's padding is tuned
+   to 36px below so its inset matches the callout's 70px. */
+.callout,
+.tldr { max-width: calc(var(--prose-width) + 8ch); }   /* callout inset: 48px + 22px */
 /* `max` mode drops the cap entirely; calc() on the `none` keyword is
    invalid, and relying on invalid-at-computed-value-time to fall back
    to `none` is a coincidence, not a rule. Say it. */

@@ -321,3 +321,29 @@ def test_list_cards_carry_the_same_edge(rendered):
     rendered.evaluate("() => document.querySelector('#big [data-view=table]').click()")
     assert _rgb(got["field"]) != _rgb(got["card"]), got
     assert got["shadow"] != "none", got
+
+
+def test_touch_keeps_the_controls_reachable(afford_url, browser):
+    """Hover-to-reveal has no meaning without a pointer. On a device
+    reporting `hover: none` the bar must stay visible, or filtering and
+    expanding a table become unreachable — the failure the desktop
+    measurement above cannot see."""
+    ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    page = ctx.new_page()
+    try:
+        page.goto(f"{afford_url}/page.html")
+        page.wait_for_timeout(1500)
+        got = page.evaluate(
+            """() => {
+            const c = document.querySelector('#big .okt-table-controls');
+            const s = getComputedStyle(c);
+            return { hoverNone: matchMedia('(hover: none)').matches,
+                     opacity: s.opacity, pointer: s.pointerEvents };
+        }"""
+        )
+        assert got["hoverNone"], f"the context did not emulate a touch device: {got}"
+        assert got["opacity"] == "1", got
+        assert got["pointer"] == "auto", got
+    finally:
+        page.close()
+        ctx.close()

@@ -142,6 +142,22 @@ def test_framed_prose_tracks_the_width_toggle(rendered, mode):
     assert abs(body - para) <= MEASURE_SLACK_PX, f"{mode}: callout {body}px vs prose {para}px"
 
 
+def test_the_two_framed_blocks_share_a_right_edge(rendered):
+    """A callout and the TL;DR panel are both tinted frames in the same
+    column. At prose + 8ch and prose + 7ch they landed 11px apart, and
+    a right edge that is almost-but-not-quite shared reads as a
+    misalignment rather than a decision."""
+    got = rendered.evaluate(
+        """() => {
+        const r = s => { const e = document.querySelector(s);
+                         return e ? Math.round(e.getBoundingClientRect().right) : null; };
+        return { callout: r('.callout'), tldr: r('.tldr') };
+    }"""
+    )
+    assert got["callout"] and got["tldr"], got
+    assert abs(got["callout"] - got["tldr"]) <= 1, got
+
+
 def test_max_mode_drops_the_cap_on_framed_prose_too(rendered):
     """`max` means "use the window". Leaving a callout capped there
     would make it the only narrow thing on the page."""

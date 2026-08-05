@@ -2209,7 +2209,11 @@ class TestMermaidUniversalHover:
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         # The selector list that ends in `cursor: default` — the block
         # declaring "these shapes are not buttons".
-        quiet = re.search(r"((?:oku-diagram \.okd-render svg [^,{]+,\s*(?:/\*.*?\*/\s*)?)+[^,{]+\{[^}]*cursor:\s*default[^}]*\})", css, re.S)
+        quiet = re.search(
+            r"((?:oku-diagram \.okd-render svg [^,{]+,\s*(?:/\*.*?\*/\s*)?)+[^,{]+\{[^}]*cursor:\s*default[^}]*\})",
+            css,
+            re.S,
+        )
         assert quiet, "the mermaid shape rule no longer sets cursor: default"
         block = quiet.group(1)
         for sel in (
@@ -2382,8 +2386,7 @@ class TestSelfReviewMisses:
         TestMermaidUniversalHover for why the glow went away."""
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "oku-diagram .okd-render svg .slice" in css, (
-            "the mermaid shape rule must include .slice — the wedge class "
-            "is where pie's shapes actually live"
+            "the mermaid shape rule must include .slice — the wedge class is where pie's shapes actually live"
         )
         assert "oku-diagram .okd-render svg .slice:hover" not in css, (
             "a pie wedge with no click handler must not react like a button"
