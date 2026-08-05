@@ -334,6 +334,26 @@ cloned from the rendered SVG. The clone's ids are rewritten;
 `page-chrome` precedes `<main>`, so a duplicate id would make
 `getElementById` return the thumbnail instead of the real figure.
 
+**The top-right corner is one flex row, not five offsets.** Every button
+that belongs there — personalize, search, warning, width, theme — is a
+child of `.okt-chrome-cluster` and is positioned by it. Visual order is
+`order:`, so it does not depend on which subsystem initialised first.
+The cluster lives on `<body>`, deliberately **not** inside `page-chrome`:
+that element rewrites its own `innerHTML` in `connectedCallback`, which
+fires again on reparent, and would take a late-arriving search button
+with it. Use `okuChromeCluster()` to get it; never `document.body.
+appendChild` a chrome button and never give one a `right:` of its own.
+
+The version this replaced had each button computing `right:` by hand
+plus `:has()` rules to close the gap when a neighbour was absent, and
+`.width-toggle` and `.search-toggle` both landed on right: 76px — same
+44px square, width toggle unreachable, on every page with search and no
+warning. Neither declaration was wrong alone; the offset table was
+never re-derived when search was added, which is what offset tables do.
+A `display: none` child now takes no space and the row closes up on its
+own. `test_invariants.py::test_the_top_right_chrome_never_overlaps`
+asserts no two visible `.ctrl-btn` rects intersect, at four widths.
+
 **The chrome buttons quiet down when nothing is reaching for them.**
 Four fixed 44px boxes float over the top of the reading column at every
 scroll position. They sit at a 0.32 floor and rise to full on a cosine

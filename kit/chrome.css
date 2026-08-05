@@ -313,9 +313,52 @@ body[data-ctrl-proximity="1"] .ctrl-btn[aria-expanded="true"] {
 body[data-ctrl-proximity="1"] .back-to-top:not(.visible) { opacity: 0; }
 
 .drawer-toggle { top: 16px; left: 16px; }
-.theme-toggle { top: 16px; right: 16px; }
-.width-toggle { top: 16px; right: 76px; /* 16 + 44 + 16 gap, left of theme */ }
-.personalize-toggle { top: 16px; right: 136px; /* shifted left of .width-toggle */ }
+
+/* ---- the top-right cluster ---- *
+ * One flex row, not five buttons each computing its own `right:`.
+ *
+ * The arithmetic version did not survive its own growth. Five buttons
+ * want this corner (personalize, search, warning, width, theme), three
+ * of them appear conditionally and at different times, and each carried
+ * a hand-computed offset plus a `:has()` rule to compact when a
+ * neighbour was absent. `.width-toggle` and `.search-toggle` both
+ * resolved to right: 76px on any page with search and no warning — two
+ * 44px boxes at exactly [1320, 16, 44, 44], the width toggle
+ * unreachable underneath. Nothing was wrong with either declaration on
+ * its own; the offset table was simply never re-derived when search
+ * was added, which is what an offset table always does.
+ *
+ * A flex row has no table to re-derive. A button that is absent, or
+ * `display: none` (the warning indicator's default), takes no space and
+ * the rest close up on their own. Adding a sixth costs an `order`.
+ * Pinned by test_invariants.py::test_the_top_right_chrome_never_overlaps. */
+.okt-chrome-cluster {
+  position: fixed;
+  top: 16px; right: 16px;
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  /* Pinch-zoom stability moves here, once, instead of onto each child —
+     see the .ctrl-btn note above. */
+  transform: translate(var(--vv-left, 0), var(--vv-top, 0));
+}
+.okt-chrome-cluster .ctrl-btn {
+  position: static;
+  transform: none;
+}
+.okt-chrome-cluster .ctrl-btn:active {
+  transform: scale(0.96);
+}
+/* Visual order is fixed by `order`, so it does not depend on which
+   button was created first — search and the warning indicator arrive
+   whenever their subsystem initialises. Theme stays hard right: it is
+   the one a reader reaches for by position. */
+.okt-chrome-cluster .personalize-toggle { order: 10; }
+.okt-chrome-cluster .search-toggle      { order: 20; }
+.okt-chrome-cluster .warning-indicator  { order: 30; }
+.okt-chrome-cluster .width-toggle       { order: 40; }
+.okt-chrome-cluster .theme-toggle       { order: 50; }
 
 /* Content-width modes (D3). The CSS variable wins because <main> reads
    it via max-width; the body attribute is the persisted source of truth. */
@@ -3501,7 +3544,8 @@ footer {
 
 /* ============ Print / PDF ============ */
 @media print {
-  .ctrl-btn, .okt-rail, .progress-bar, .skip-link, .copy-btn, .permalink { display: none !important; }
+  .ctrl-btn, .okt-chrome-cluster, .okt-rail, .progress-bar, .skip-link,
+  .copy-btn, .permalink { display: none !important; }
   nav.toc, page-toc { display: none !important; }
   .layout { display: block; }
   body { background: white; color: black; font-size: 11pt; }
@@ -4007,12 +4051,10 @@ body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
 /* ============================================================
    Forward-compat warning indicator
    ============================================================ */
+/* Position comes from .okt-chrome-cluster; only the alarm colours are
+   this button's own. It ships `display: none` and the cluster closes up
+   around it, which is why there is no compaction rule here any more. */
 .ctrl-btn.warning-indicator {
-  /* Sits in the top-right system cluster, immediately left of theme. */
-  position: fixed;
-  top: 16px;
-  right: 76px; /* 16 (theme right offset) + 44 (theme width) + 16 (gap) */
-  z-index: 210;
   color: var(--warning);
   background: var(--warning-soft);
   border-color: var(--warning);
@@ -5436,19 +5478,10 @@ oku-snippet .hds-preview {
 /* ============================================================
    Pagefind search — button + modal
    ============================================================ */
-.ctrl-btn.search-toggle {
-  /* Top-right system cluster, sits between the (optional) warning
-     indicator and the theme cycler. */
-  position: fixed;
-  top: 16px;
-  right: 136px; /* 16 (theme right) + 44 (theme width) + 16 (gap) + 44 (warn width) + 16 (gap) */
-  z-index: 210;
-}
-/* When the warning indicator is hidden, search slots in at the warning's spot. */
-body:has(.warning-indicator[style*="display: none"]) .ctrl-btn.search-toggle,
-body:not(:has(.warning-indicator)) .ctrl-btn.search-toggle {
-  right: 76px;
-}
+/* The search button is positioned by .okt-chrome-cluster and needs no
+   rule of its own. It used to carry right: 136px plus a pair of
+   `:has()` rules that pulled it to 76px when the warning indicator was
+   absent — where .width-toggle already was. */
 
 .search-modal {
   position: fixed;

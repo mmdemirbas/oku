@@ -767,10 +767,13 @@ class TestChromeKitMarkers:
           attribute overrides
         - chrome.js exposes `cycleContentWidth` and a boot-time restore
           path reading `localStorage['htmldoc-content-width']`
-        - PageChrome injects a `.width-toggle` button alongside the
-          other top-right chrome controls
-        - `.personalize-toggle` shifts to right: 136px so it doesn't
-          collide with `.width-toggle` at right: 76px
+        - PageChrome injects a `.width-toggle` button into the top-right
+          cluster, which lays the corner out as a flex row. The buttons
+          used to carry hand-computed `right:` offsets and a `:has()`
+          compaction rule; two of them ended up on the same 44px square.
+          Geometry is asserted in the browser now, not by grepping
+          offsets out of the stylesheet — see
+          test_invariants.py::test_the_top_right_chrome_never_overlaps.
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "--content-width" in css, "missing --content-width CSS variable"
@@ -778,11 +781,14 @@ class TestChromeKitMarkers:
         # boot default and sits between narrow and wide.
         for mode in ("narrow", "comfortable", "wide", "max"):
             assert f'body[data-content-width="{mode}"]' in css, f"missing CSS rule for width mode '{mode}'"
-        assert ".width-toggle { top: 16px; right: 76px;" in css, (
-            "width-toggle button must sit at right:76px (left of theme)"
-        )
-        assert ".personalize-toggle { top: 16px; right: 136px;" in css, (
-            "personalize-toggle must shift to right:136px to make room for the new width-toggle button"
+        assert ".okt-chrome-cluster {" in css, "the top-right cluster must own the corner's layout"
+        # Declarations only — the comments explaining the old offsets
+        # quote them, and matching those would make this pass or fail on
+        # prose.
+        declarations = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        assert "right: 76px" not in declarations, (
+            "a hand-computed right: offset is back in the top-right corner — "
+            "that arithmetic is what put .width-toggle and .search-toggle on the same square"
         )
 
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")

@@ -1249,6 +1249,29 @@ if (document.readyState === 'loading') {
   ensureLayoutSkeleton();
 }
 
+/* ============ The top-right chrome cluster ============ *
+ * Every button that belongs in the top-right corner goes in here rather
+ * than positioning itself. Five subsystems want that corner and three of
+ * them initialise at different times (search when Pagefind loads, the
+ * warning indicator when a forward-compat kind is hit, personalize when
+ * a snippet declares placeholders), so no creator can know what else is
+ * present. A flex row means none of them has to.
+ *
+ * It lives on <body>, deliberately NOT inside <page-chrome>: that
+ * element rewrites its own innerHTML in connectedCallback, which fires
+ * again on reparent, and would take a late-arriving search button with
+ * it. Position is `fixed`, so the parent makes no visual difference.
+ * ------------------------------------------------------------------ */
+function okuChromeCluster() {
+  var el = document.getElementById('oku-chrome-cluster');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'oku-chrome-cluster';
+  el.className = 'okt-chrome-cluster';
+  document.body.appendChild(el);
+  return el;
+}
+
 /* ============ <page-chrome> Web Component ============ */
 class PageChrome extends HTMLElement {
   connectedCallback() {
@@ -1273,20 +1296,29 @@ class PageChrome extends HTMLElement {
       '</div>' +
       '<button class="ctrl-btn drawer-toggle" type="button" aria-expanded="false" aria-controls="oku-page-nav"' +
         ' aria-label="' + drawerLabel + '" title="' + drawerLabel + '">' + ICON_MENU + '</button>' +
-      '<button class="ctrl-btn width-toggle" type="button" aria-label="' + widthLabel + '" title="' + widthLabel + '">' + ICON_WIDTH + '</button>' +
-      '<button class="ctrl-btn theme-toggle" type="button" aria-label="' + themeLabel + '" title="' + themeLabel + '">' +
-        '<span class="icon-system">' + ICON_SYSTEM + '</span>' +
-        '<span class="icon-sun">' + ICON_SUN + '</span>' +
-        '<span class="icon-moon">' + ICON_MOON + '</span>' +
-      '</button>' +
       '<button class="ctrl-btn back-to-top" type="button" aria-label="' + topLabel + '" title="' + topLabel + '">' + ICON_UP + '</button>';
 
     this.querySelector('.drawer-toggle').addEventListener('click', toggleTOC);
-    this.querySelector('.width-toggle').addEventListener('click', cycleContentWidth);
-    this.querySelector('.theme-toggle').addEventListener('click', cycleTheme);
     this.querySelector('.back-to-top').addEventListener('click', function () {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+
+    // Width and theme belong to the top-right cluster, which lives on
+    // <body> and survives this element's innerHTML rewrite. Guarded
+    // because connectedCallback fires again on reparent, and appending
+    // to a node outside `this` is not undone by that rewrite.
+    var cluster = okuChromeCluster();
+    if (!cluster.querySelector('.width-toggle')) {
+      cluster.insertAdjacentHTML('beforeend',
+        '<button class="ctrl-btn width-toggle" type="button" aria-label="' + widthLabel + '" title="' + widthLabel + '">' + ICON_WIDTH + '</button>' +
+        '<button class="ctrl-btn theme-toggle" type="button" aria-label="' + themeLabel + '" title="' + themeLabel + '">' +
+          '<span class="icon-system">' + ICON_SYSTEM + '</span>' +
+          '<span class="icon-sun">' + ICON_SUN + '</span>' +
+          '<span class="icon-moon">' + ICON_MOON + '</span>' +
+        '</button>');
+      cluster.querySelector('.width-toggle').addEventListener('click', cycleContentWidth);
+      cluster.querySelector('.theme-toggle').addEventListener('click', cycleTheme);
+    }
 
     initReadingAids();
   }
@@ -2060,6 +2092,22 @@ function buildRail() {
 
   window.addEventListener('resize', function () { rects = null; schedule(); }, { passive: true });
   window.addEventListener('oku:rendered', function () { rects = null; });
+  // The cluster's contents move without the button COUNT changing: the
+  // warning indicator ships `display: none` and flips to visible, which
+  // slides every button left of it by 60px. Watching the cluster's own
+  // width catches that; the count check in apply() only catches a
+  // button arriving or leaving the DOM.
+  if (typeof ResizeObserver === 'function') {
+    var startObserving = function () {
+      var cluster = document.getElementById('oku-chrome-cluster');
+      if (cluster) new ResizeObserver(function () { rects = null; }).observe(cluster);
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startObserving);
+    } else {
+      startObserving();
+    }
+  }
 })();
 
 /* ============ Reading aids: progress, back-to-top, copy-btn, glossary ============ */
@@ -4448,7 +4496,7 @@ var __okuPersonalization = (function () {
   }
 
   function buildButton() {
-    var cluster = document.querySelector('page-chrome') || document.body;
+    var cluster = okuChromeCluster();
     btn = document.createElement('button');
     btn.className = 'ctrl-btn personalize-toggle';
     btn.type = 'button';
@@ -12244,7 +12292,7 @@ var __okuWarnings = (function () {
     btn.title = 'View warnings';
     btn.style.display = 'none';
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-    document.body.appendChild(btn);
+    okuChromeCluster().appendChild(btn);
     btn.addEventListener('click', function () {
       if (panel && panel.parentNode) {
         panel.parentNode.removeChild(panel);
@@ -12631,7 +12679,7 @@ var __okuSearch = (function () {
     btn.setAttribute('aria-label', 'Search (Cmd/Ctrl+K)');
     btn.title = 'Search (⌘K)';
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>';
-    document.body.appendChild(btn);
+    okuChromeCluster().appendChild(btn);
     btn.addEventListener('click', show);
   }
 

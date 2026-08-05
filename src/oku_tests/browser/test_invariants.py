@@ -73,6 +73,56 @@ def test_contents_drawer_is_off_canvas_until_asked_for(page, site_url, size):
     assert button.get_attribute("aria-expanded") == "false"
 
 
+@pytest.mark.parametrize("width", [1600, 1280, 900, 390])
+def test_the_top_right_chrome_never_overlaps(page, site_url, width):
+    """No two chrome buttons may occupy the same pixels.
+
+    They used to position themselves individually, each with a
+    hand-computed `right:` and a `:has()` rule to close the gap when a
+    neighbour was absent. `.width-toggle` and `.search-toggle` both
+    resolved to right: 76px on any page carrying search and no warning
+    indicator, so they sat on exactly the same 44px square and the width
+    toggle could not be clicked at all. Neither declaration was wrong on
+    its own — the offset table was never re-derived when search landed.
+
+    Asserted as geometry rather than as offsets, because the offsets are
+    what lied. A flex row is what makes it hold: an absent or
+    `display: none` button takes no space and the rest close up.
+    """
+    page.set_viewport_size({"width": width, "height": 900})
+    _goto(page, f"{site_url}/docs/architecture.html")
+    page.wait_for_timeout(600)
+    got = page.evaluate(
+        """() => {
+        const vis = [...document.querySelectorAll('.ctrl-btn')].filter(b => {
+            const r = b.getBoundingClientRect();
+            return r.width > 0 && r.height > 0 && getComputedStyle(b).opacity !== '0';
+        });
+        const overlaps = [];
+        for (let i = 0; i < vis.length; i++) {
+            for (let j = i + 1; j < vis.length; j++) {
+                const a = vis[i].getBoundingClientRect(), b = vis[j].getBoundingClientRect();
+                if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) {
+                    overlaps.push(vis[i].className + ' / ' + vis[j].className);
+                }
+            }
+        }
+        const inView = vis.filter(b => {
+            const r = b.getBoundingClientRect();
+            return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight;
+        }).length;
+        return { names: vis.map(b => b.className.replace('ctrl-btn ', '')),
+                 overlaps, count: vis.length, inView };
+    }"""
+    )
+    # The fixture page carries search + width + theme + contents, so the
+    # exact pair that collided is present and measured.
+    assert any("search-toggle" in n for n in got["names"]), f"no search button to collide with: {got}"
+    assert any("width-toggle" in n for n in got["names"]), got["names"]
+    assert got["overlaps"] == [], f"chrome buttons overlap at {width}px: {got}"
+    assert got["inView"] == got["count"], f"a chrome button sits outside the viewport at {width}px: {got}"
+
+
 @pytest.mark.parametrize("width", [1600, 1280, 900])
 def test_content_stays_centred_whether_the_drawer_is_open_or_not(page, site_url, width):
     """The measure must not move when the contents open — that is the
