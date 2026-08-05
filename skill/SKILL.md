@@ -265,6 +265,40 @@ fractions of the time it takes to read prose.
 glancing at one visual. Prose is the caption underneath, not the
 delivery mechanism.
 
+### Visuals are not equal — rank them before you pick one
+
+Three properties separate a figure that does the work from one that
+merely occupies the space. Aim for all three; accept two.
+
+1. **It shows the whole at a glance.** The reader sees the shape of
+   the answer before reading a single label — which bar is tallest,
+   where the line turns, which box everything flows into. A figure
+   that has to be read left-to-right like a sentence has not bought
+   anything over the sentence.
+2. **It packs information into a small space, meaningfully.** Density
+   is only a virtue when every mark is carrying a value: position,
+   length, angle, colour scale, containment. Twelve numbers in one
+   sparkline beats twelve tiles. Twelve *labels* in one diagram is
+   just a list drawn sideways.
+3. **It tells the story without stopping the reader.** No legend to
+   decode before the point lands, no mental arithmetic, no "compare
+   the third row against the seventh". If the reader has to *work* the
+   figure out, the figure is the work, not the answer.
+
+Ranked by what they typically achieve:
+
+| Tier | Shapes | Why |
+|---|---|---|
+| **Reach for first** | charts with a real axis, small multiples, mermaid flow / state / sequence / ER, annotated code, before-and-after pairs on one scale | Position and length encode magnitude; arrows encode direction; containment encodes scope. Measurable with a ruler. |
+| **Legitimate, lower ceiling** | tables with a filter, step flows, compare grids | Structure the reader can *scan*, but every cell still has to be read. Worth it when the content genuinely is N things × M attributes. |
+| **Almost never a visual** | KPI tiles, status pills, coloured callouts, icon rows, "key concepts" cards, a flowchart whose boxes are the section headings | Nothing is encoded. Colour is decoration, adjacency is not comparison, and the box restates prose already on the page. |
+
+**The rule that follows:** when a section's content is numeric, it
+gets a chart, not tiles. When it is a process, it gets a diagram, not
+a step-flow of paragraph summaries. Drop to the lower tiers only when
+the content really has no encodable dimension — and then say so in
+one sentence rather than dressing the prose.
+
 **The covering test:** put your hand over a section's prose. Can you
 still get the point from the diagram alone? If not, the diagram is
 either missing or too small to carry the point. Add it; don't paste
@@ -281,6 +315,14 @@ They feel visual to the writer (because adding them was an extra
 step) and read as decorated text to the reader. Test by removing
 the prose around them — is the surviving thing self-explanatory? If
 not, you've decorated text, not built a visual.
+
+**Two of these are decidable, so `oku check` enforces them:**
+`figure-restates-headings` fires when a diagram's boxes are the page's
+own section titles, and `group-of-one` fires on a compare-grid, step
+flow, KPI grid or chart grid carrying a single member — a primitive
+whose entire job is the relationship between members, used where there
+is no second member. The rest of this section needs your judgement and
+no linter will do it for you.
 
 ## File conventions
 
@@ -324,7 +366,9 @@ hand-rolled copy will not follow the accent or the theme.
 
 This is the part worth knowing. Each primitive is a typed fence whose
 body is ONE compact JSON object. Pick by what the content *is*, not by
-what looks good:
+what looks good — and within that, by what the primitive **encodes**
+(see the tier table above; the first three rows here are the ones to
+reach for first):
 
 | Fence | The relationship it carries | Reach for it when |
 |---|---|---|
@@ -333,7 +377,7 @@ what looks good:
 | `oku-table` | a matrix — N things × M attributes | More than three parallel things with the same fields. Gains filter, sort, group-by and card/board views past a size threshold. |
 | `oku-compare-grid` | two or more options weighed side by side | A decision with alternatives. `verdict` marks the winner; `accent` colours the card. |
 | `oku-step-flow` | ordered stages, or unordered parallel options | A pipeline, a procedure, a migration. `ordered: false` for a 2-up grid of links with no implied sequence. |
-| `oku-kpi-grid` | headline numbers, no shared axis | Two to four figures that open a section. Four or more values sharing a unit belong in a chart instead. |
+| `oku-kpi-grid` | headline numbers, no shared axis | Two to four figures that open a section — and know that this is a tier-three shape: nothing is encoded, adjacency is not comparison. Values that share a unit belong in a chart. |
 | `mermaid` | topology, sequence, state, containment, timing | Any diagram. Mermaid computes positions and avoids label collision; prefer it over hand-drawn SVG. |
 | `oku-diagram` | the same, with a caption | When the figure needs a caption line. A plain `mermaid` fence with an italic line under it produces the same thing. |
 | `oku-annotated-code` | a line of code and the reason for it | Walking through an implementation. Numbered markers in the source pair with a side panel. |
@@ -465,10 +509,13 @@ disguised markdown):
 `oku check` reports `prose-only-section` for any section with three or
 more paragraphs and nothing for the eye — a callout does not count. It
 also reports `redundant-meta` for a field that repeats another,
-`island-hand-styled` for an island carrying hardcoded colour, and
-`accent-divergence` for a tree with no colour convention. Run it and
-fix what it names; that removes the whole class of judgement calls that
-used to sit here as a checklist.
+`island-hand-styled` for an island carrying hardcoded colour,
+`accent-divergence` for a tree with no colour convention,
+`group-of-one` for a compare-grid / step flow / KPI grid / chart grid
+holding a single member, and `figure-restates-headings` for a diagram
+whose boxes are the page's own section titles. Run it and fix what it
+names; that removes the whole class of judgement calls that used to sit
+here as a checklist.
 
 What the linter cannot decide, and you still have to:
 

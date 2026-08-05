@@ -241,11 +241,26 @@ and freezes it stale.
 **Presentation rules live in `oku check`, not in prose.** A style rule
 written in the skill briefing decays because nothing fails when it is
 ignored. `redundant-meta`, `hand-set-derivable`, `prose-only-section`,
-`island-hand-styled` and `accent-divergence` are the decidable half.
-Anything needing a reader's judgement stays out — a check that guesses
-trains authors to ignore checks. The repo's own tree must stay clean
-under `oku check --strict`; `test_check.py::test_project_docs_pass_check_strict`
+`island-hand-styled`, `accent-divergence`, `group-of-one` and
+`figure-restates-headings` are the decidable half. Anything needing a
+reader's judgement stays out — a check that guesses trains authors to
+ignore checks. The repo's own tree must stay clean under
+`oku check --strict`; `test_check.py::test_project_docs_pass_check_strict`
 enforces it.
+
+**Visuals are ranked, and the ranking is in the briefing.** Prefer the
+figure that shows the whole at a glance, encodes values into a small
+space, and lands without the reader stopping to work it out: charts
+with a real axis, small multiples, mermaid topology, before/after on
+one scale. Tables, step flows and compare grids are legitimate with a
+lower ceiling — the reader still has to read every cell. KPI tiles,
+status pills, coloured callouts and icon rows encode nothing; they are
+decoration wearing a chart's clothes. Only two parts of this are
+decidable, and those two are checks: `group-of-one` (a primitive whose
+job is the relationship between members, used with one member) and
+`figure-restates-headings` (a diagram whose boxes are the page's own
+section titles). The rest is the author's judgement, and belongs in
+`skill/SKILL.md`.
 
 **HTML islands build on the kit.** An island is the escape hatch and
 keeps full capability, but its colours come from the kit's CSS

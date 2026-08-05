@@ -245,3 +245,97 @@ class TestTheReposOwnTree:
         assert pages
         errors = [i for i in cli.check_pages(pages, root) if i["severity"] == "error"]
         assert errors == [], errors
+
+
+# ---------- visualizations that encode nothing ----------
+
+
+class TestGroupOfOne:
+    """A compare-grid, step flow, KPI grid or chart grid draws the
+    relationship BETWEEN its members. With one member there is no
+    relationship left — what remains is a titled box with an accent on
+    it, which is the shape that reads as a visualization without being
+    one."""
+
+    @pytest.mark.parametrize(
+        ("fence", "payload", "word"),
+        [
+            ("oku-compare-grid", '{"cards":[{"t":"Only","b":"One card."}]}', "cards"),
+            ("oku-step-flow", '{"steps":[{"t":"Only","b":"One step."}]}', "steps"),
+            ("oku-kpi-grid", '{"tiles":[{"label":"Rows","value":"12"}]}', "tiles"),
+        ],
+    )
+    def test_a_single_member_is_flagged(self, tmp_path, fence, payload, word):
+        issues = _issues(
+            tmp_path,
+            f"---\ntitle: T\nsummary: S.\n---\n\n## S {{#s}}\n\n```{fence}\n{payload}\n```\n",
+        )
+        hit = [i for i in issues if i["code"] == "group-of-one"]
+        assert hit, _codes(issues)
+        assert hit[0]["severity"] == "warning"
+        assert word in hit[0]["message"], hit[0]["message"]
+
+    def test_two_members_are_fine(self, tmp_path):
+        issues = _issues(
+            tmp_path,
+            "---\ntitle: T\nsummary: S.\n---\n\n## S {#s}\n\n"
+            '```oku-compare-grid\n{"cards":[{"t":"A","b":"x"},{"t":"B","b":"y"}]}\n```\n',
+        )
+        assert "group-of-one" not in _codes(issues)
+
+    def test_a_repeated_index_is_exempt(self, tmp_path):
+        """docs/charts.md indexes nine chart families as nine grids, and
+        one family has a single member. There the relationship the
+        reader is reading lives between the grids, so a lone card in one
+        of them is not the defect this rule is about. Three or more
+        instances of the same primitive on a page means a series."""
+        cards = '{"cards":[{"t":"only","b":"","href":"#x"}]}'
+        body = "\n\n".join(f"```oku-compare-grid\n{cards}\n```" for _ in range(3))
+        issues = _issues(tmp_path, f"---\ntitle: T\nsummary: S.\n---\n\n## S {{#s}}\n\n{body}\n")
+        assert "group-of-one" not in _codes(issues)
+
+
+class TestFigureRestatesHeadings:
+    """A flowchart whose boxes are the page's own section titles is the
+    table of contents, drawn. It adds no relationship the headings do
+    not already carry."""
+
+    def test_a_diagram_of_the_headings_is_flagged(self, tmp_path):
+        md = (
+            "---\ntitle: T\nsummary: S.\n---\n\n"
+            "## Plan {#plan}\n\nText.\n\n"
+            "## Execute {#execute}\n\nText.\n\n"
+            "## Commit {#commit}\n\nText.\n\n"
+            "```mermaid\nflowchart LR\n  A[Plan] --> B[Execute]\n  B --> C[Commit]\n```\n"
+        )
+        issues = _issues(tmp_path, md)
+        hit = [i for i in issues if i["code"] == "figure-restates-headings"]
+        assert hit, _codes(issues)
+        assert hit[0]["severity"] == "warning"
+        assert "3 of 3" in hit[0]["message"], hit[0]["message"]
+
+    def test_a_diagram_that_adds_structure_is_not(self, tmp_path):
+        """Same three headings, but the figure names the artifacts that
+        move between them — which is the relationship the headings do
+        not show."""
+        md = (
+            "---\ntitle: T\nsummary: S.\n---\n\n"
+            "## Plan {#plan}\n\nText.\n\n"
+            "## Execute {#execute}\n\nText.\n\n"
+            "## Commit {#commit}\n\nText.\n\n"
+            "```mermaid\nflowchart LR\n"
+            "  A[manifest list] --> B[rewrite groups]\n"
+            "  B --> C[merged files]\n  C --> D[new snapshot]\n```\n"
+        )
+        assert "figure-restates-headings" not in _codes(_issues(tmp_path, md))
+
+    def test_a_two_node_diagram_is_left_alone(self, tmp_path):
+        """Two boxes is below the floor where the overlap means
+        anything — the rule would be guessing."""
+        md = (
+            "---\ntitle: T\nsummary: S.\n---\n\n"
+            "## Plan {#plan}\n\nText.\n\n"
+            "## Execute {#execute}\n\nText.\n\n"
+            "```mermaid\nflowchart LR\n  A[Plan] --> B[Execute]\n```\n"
+        )
+        assert "figure-restates-headings" not in _codes(_issues(tmp_path, md))

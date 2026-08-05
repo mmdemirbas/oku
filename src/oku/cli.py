@@ -21,6 +21,7 @@ prefix for click-to-open.
 """
 
 import argparse
+import collections
 import datetime
 import http.server
 import json
@@ -3111,6 +3112,50 @@ _DERIVABLE_META = {
 _ISLAND_STYLE_RE = re.compile(r"<style[\s>]|style\s*=\s*[\"'][^\"']*(?:#[0-9a-fA-F]{3,8}|rgb\()")
 _HTML_ISLAND_RE = re.compile(r"^<[a-zA-Z][^\s>]*", re.MULTILINE)
 
+# Primitives whose whole job is the relationship BETWEEN their members.
+# With one member there is no relationship left — what remains is a
+# titled box with an accent on it, which is the "looks like a
+# visualization" shape rather than a visualization.
+_GROUP_PRIMITIVES = {
+    "compare-grid": ("cards", "a second option to weigh it against"),
+    "step-flow": ("steps", "a second stage to lead to"),
+    "kpi-grid": ("tiles", "a second figure to sit beside"),
+    "chart-grid": ("panels", "a second panel to compare against"),
+}
+
+# Mermaid node labels: the text inside [], (), {}, or their doubled
+# forms, with optional quotes. Deliberately loose — it is only used to
+# compare against headings, and a label this misses simply does not
+# count toward the ratio.
+_MERMAID_LABEL_RE = re.compile(r"[\[\(\{]{1,2}\s*\"?([^\"\[\]\(\)\{\}|]+?)\"?\s*[\]\)\}]{1,2}")
+
+
+def _normalise_label(text: str) -> str:
+    """Lowercased, punctuation-free, markup-free comparison key."""
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"[`*_#]", "", text)
+    text = re.sub(r"[^\w\s]", " ", text)
+    return " ".join(text.lower().split())
+
+
+def _page_headings(page: dict) -> set[str]:
+    """Every `##` / `###` heading on the page, normalised."""
+    out: set[str] = set()
+    for blk in page.get("b") or []:
+        if isinstance(blk, dict):
+            if blk.get("k") == "heading" and blk.get("t"):
+                out.add(_normalise_label(str(blk["t"])))
+            continue
+        if not isinstance(blk, str):
+            continue
+        for line in blk.split("\n"):
+            m = re.match(r"\s{0,3}(#{2,4})\s+(.+?)\s*$", line)
+            if m:
+                title = re.sub(r"\s*\{#[\w-]+\}\s*$", "", m.group(2))
+                out.add(_normalise_label(title))
+    out.discard("")
+    return out
+
 
 def _presentation_issues(page: dict, tree_defaults: dict) -> list[tuple[str, str, str, str]]:
     """(severity, code, where, message) for the presentation rules.
@@ -3185,6 +3230,51 @@ def _presentation_issues(page: dict, tree_defaults: dict) -> list[tuple[str, str
                     "two jobs.",
                 )
             )
+
+    headings = _page_headings(page)
+    # A primitive used three or more times on one page is an index
+    # element, and the relationship the reader is reading lives between
+    # the instances rather than inside any one of them — docs/charts.md
+    # indexes nine chart families that way, and one family happens to
+    # have a single member. Exempt the series; keep the rule sharp on
+    # the lone grid, which is the shape the rule is actually about.
+    kinds = collections.Counter(
+        str(b.get("k")) for b in (page.get("b") or []) if isinstance(b, dict) and b.get("k")
+    )
+    for i, blk in enumerate(page.get("b") or []):
+        if not isinstance(blk, dict):
+            continue
+        kind = str(blk.get("k") or "")
+        field, need = _GROUP_PRIMITIVES.get(kind, (None, None))
+        if field is not None and kinds[kind] < 3:
+            members = blk.get(field)
+            if isinstance(members, list) and len(members) == 1:
+                out.append(
+                    (
+                        "warning",
+                        "group-of-one",
+                        f"b[{i}] {kind}",
+                        f"one entry in `{field}`. This primitive draws the relationship between "
+                        f"its members, and there is no relationship without {need}. Add the "
+                        "second member, or write the single point as prose.",
+                    )
+                )
+        if kind == "diagram" and headings:
+            labels = {_normalise_label(x) for x in _MERMAID_LABEL_RE.findall(str(blk.get("src") or ""))}
+            labels.discard("")
+            hit = labels & headings
+            if len(labels) >= 3 and len(hit) * 3 >= len(labels) * 2:
+                out.append(
+                    (
+                        "warning",
+                        "figure-restates-headings",
+                        f"b[{i}] diagram",
+                        f"{len(hit)} of {len(labels)} node labels are this page's own section "
+                        f"titles ({', '.join(sorted(hit)[:3])}…). A figure has to add a relationship "
+                        "the headings do not already show — otherwise it is the table of contents, "
+                        "drawn.",
+                    )
+                )
 
     for i, blk in enumerate(page.get("b") or []):
         if not isinstance(blk, str):
