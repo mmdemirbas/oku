@@ -47,7 +47,10 @@ CODE = "```python\nvalue = 'a plain code block, which earns no mark'\n```"
 
 
 def _section(n: int, body: str) -> str:
-    return f"## Section {n} {{#s{n}}}\n\n{PARA * 6}\n\n{body}\n\n{PARA * 6}\n"
+    return (
+        f"## Section {n} {{#s{n}}}\n\n{PARA * 6}\n\n{body}\n\n"
+        f"### Detail {n}\n\n{PARA * 6}\n"
+    )
 
 
 LONG_MD = (
@@ -378,3 +381,200 @@ def test_marks_never_collide_at_any_width(rail_url, browser, width, expect_figur
         assert got["minGap"] >= 6, f"marks {got['minGap']}px apart at {width}px: {got}"
     finally:
         page.close()
+
+
+# ---------- what kind of thing is at this position ----------
+
+
+def test_marks_are_shaped_by_what_they_point_at(rendered):
+    """A 3px mark can carry a silhouette; it cannot carry an alphabet.
+    Four shapes: a bar for headings, a square for grids of values, a
+    round for something plotted on an axis, an angle for a topology."""
+    got = rendered.evaluate(
+        """() => {
+        const out = {};
+        for (const m of document.querySelectorAll('.okt-rail-mark')) {
+            const key = m.dataset.kind + '/' + m.dataset.shape;
+            out[key] = (out[key] || 0) + 1;
+        }
+        return out;
+    }"""
+    )
+    assert got.get("section/bar") == 6, got
+    assert got.get("figure/square", 0) >= 2, got  # tables
+    assert got.get("figure/round", 0) >= 1, got  # the chart
+    assert got.get("figure/angle", 0) >= 1, got  # the mermaid diagram
+
+
+def test_heading_depth_is_visible_in_the_rail(rendered):
+    """A page of six sections and a page of six sections with thirty
+    sub-headings must not draw the same picture. Depth is carried by
+    the bar's height, so it stays one glance rather than one legend."""
+    got = rendered.evaluate(
+        """() => {
+        const h = sel => {
+            const m = document.querySelector(sel);
+            return m ? parseFloat(getComputedStyle(m, '::before').height) : null;
+        };
+        return { section: h('.okt-rail-mark[data-kind="section"]'),
+                 sub: h('.okt-rail-mark[data-kind="sub"]'),
+                 subCount: document.querySelectorAll('.okt-rail-mark[data-kind="sub"]').length };
+    }"""
+    )
+    assert got["subCount"] >= 2, f"the fixture grew no sub-headings: {got}"
+    assert got["sub"] < got["section"], got
+
+
+# ---------- the swell ----------
+
+
+def test_the_pointer_swells_its_neighbourhood(rendered):
+    """The dock behaviour: marks near the pointer scale up on a cosine
+    falloff, marks beyond the radius do not move at all."""
+    got = rendered.evaluate(
+        """async () => {
+        const rail = document.getElementById('oku-rail');
+        const marks = [...document.querySelectorAll('.okt-rail-mark')];
+        const target = marks[Math.floor(marks.length / 2)];
+        const x = target.getBoundingClientRect().x + 7;
+        rail.dispatchEvent(new PointerEvent('pointermove',
+            { clientX: x, clientY: 5, bubbles: true, pointerType: 'mouse' }));
+        await new Promise(r => setTimeout(r, 250));
+        const mags = marks.map(m => parseFloat(m.style.getPropertyValue('--okt-mag') || '1'));
+        const dists = marks.map(m => Math.abs(m.getBoundingClientRect().x + 7 - x));
+        return { at: mags[marks.indexOf(target)],
+                 far: mags.filter((_, i) => dists[i] > 60),
+                 swollen: mags.filter(v => v > 1.02).length };
+    }"""
+    )
+    assert got["at"] > 1.4, f"the mark under the pointer barely moved: {got}"
+    assert got["swollen"] >= 1, got
+    assert all(abs(v - 1) < 0.001 for v in got["far"]), f"marks beyond the radius were magnified: {got}"
+
+
+def test_the_swell_moves_nothing(rendered):
+    """The whole reason this is safe where a real dock is not: the scale
+    is a transform on the ::before, so no button box moves and the mark
+    you were aiming at is still where you decided to aim."""
+    got = rendered.evaluate(
+        """async () => {
+        const box = e => { const b = e.getBoundingClientRect();
+                           return [Math.round(b.x), Math.round(b.y),
+                                   Math.round(b.width), Math.round(b.height)]; };
+        const rail = document.getElementById('oku-rail');
+        const marks = [...document.querySelectorAll('.okt-rail-mark')];
+        const before = marks.map(box);
+        const mainTop = Math.round(document.querySelector('main').getBoundingClientRect().top);
+        for (const x of [200, 400, 600, 800]) {
+            rail.dispatchEvent(new PointerEvent('pointermove',
+                { clientX: x, clientY: 5, bubbles: true, pointerType: 'mouse' }));
+            await new Promise(r => setTimeout(r, 90));
+        }
+        return { same: JSON.stringify(before) === JSON.stringify(marks.map(box)),
+                 mainMoved: Math.round(document.querySelector('main').getBoundingClientRect().top) !== mainTop,
+                 railH: Math.round(rail.getBoundingClientRect().height) };
+    }"""
+    )
+    assert got["same"], "a mark box moved while the pointer swept the rail"
+    assert not got["mainMoved"], "the page content moved while the rail was hovered"
+    assert got["railH"] == 12, got
+
+
+def test_a_swollen_mark_stays_inside_the_strip(rendered):
+    """The strip is opaque and the marks have to stay in it — a mark
+    that grows past the bottom edge is drawn over whatever prose is
+    scrolling underneath, which is the illegibility the strip's height
+    exists to prevent."""
+    got = rendered.evaluate(
+        """() => {
+        const railH = document.getElementById('oku-rail').getBoundingClientRect().height;
+        let worst = 0, worstMag = 0;
+        for (const m of document.querySelectorAll('.okt-rail-mark')) {
+            const s = getComputedStyle(m, '::before');
+            const reach = parseFloat(s.top || 0) + parseFloat(s.height || 0);
+            // The scale is anchored at the ::before's own top, so the
+            // magnified reach is top + height*mag, not (top+height)*mag.
+            worst = Math.max(worst, reach);
+            worstMag = Math.max(worstMag, parseFloat(s.top || 0) + parseFloat(s.height || 0) * 1.6);
+        }
+        return { railH, worstAtRest: worst, worstMagnified: worstMag };
+    }"""
+    )
+    assert got["worstMagnified"] <= got["railH"] + 1, got
+
+
+def test_touch_does_not_trigger_the_swell(rendered):
+    """There is no pointer to follow on a touch screen, and a swell
+    that fires on tap would move the target out from under the finger
+    between touchstart and touchend."""
+    got = rendered.evaluate(
+        """async () => {
+        const rail = document.getElementById('oku-rail');
+        const marks = [...document.querySelectorAll('.okt-rail-mark')];
+        rail.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 120));
+        const x = marks[3].getBoundingClientRect().x + 7;
+        rail.dispatchEvent(new PointerEvent('pointermove',
+            { clientX: x, clientY: 5, bubbles: true, pointerType: 'touch' }));
+        await new Promise(r => setTimeout(r, 200));
+        return marks.map(m => parseFloat(m.style.getPropertyValue('--okt-mag') || '1'));
+    }"""
+    )
+    assert all(abs(v - 1) < 0.001 for v in got), f"touch magnified the rail: {got}"
+
+
+# ---------- the preview ----------
+
+
+def test_a_diagram_mark_previews_the_diagram(rendered):
+    """A rendered SVG clones inertly — no scripts, no custom-element
+    lifecycle — so the tooltip can show the figure's real silhouette
+    rather than a description of one."""
+    got = rendered.evaluate(
+        """async () => {
+        const m = document.querySelector('.okt-rail-mark[data-kind="figure"][data-shape="angle"]');
+        if (!m) return { skipped: true };
+        const origId = (m._okuMark.el.querySelector('svg') || {}).id || null;
+        m.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 300));
+        const tip = document.querySelector('.okt-rail-tip');
+        const thumb = tip.querySelector('.okt-rail-tip-thumb svg');
+        const b = tip.getBoundingClientRect();
+        return {
+            hasThumb: !!thumb,
+            origId,
+            cloneId: thumb ? thumb.id : null,
+            duplicates: origId ? document.querySelectorAll('[id="' + origId + '"]').length : 0,
+            insideViewport: b.left >= 0 && b.right <= window.innerWidth,
+        };
+    }"""
+    )
+    if got.get("skipped"):
+        pytest.skip("no diagram on the fixture page")
+    assert got["hasThumb"], got
+    assert got["insideViewport"], got
+    # The clone must be renamed. page-chrome precedes <main>, so a
+    # duplicate id would make document.getElementById return the
+    # THUMBNAIL instead of the real diagram.
+    if got["origId"]:
+        assert got["duplicates"] == 1, got
+        assert got["cloneId"] != got["origId"], got
+
+
+def test_a_table_mark_previews_its_size(rendered):
+    """No SVG to clone, so the preview is the next most useful thing
+    about a table you are trying to find again: how big it is."""
+    got = rendered.evaluate(
+        """async () => {
+        const m = [...document.querySelectorAll('.okt-rail-mark[data-kind="figure"]')]
+                    .find(x => (x.getAttribute('aria-label') || '').includes('Table'));
+        if (!m) return { skipped: true };
+        m.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 300));
+        const p = document.querySelector('.okt-rail-tip .okt-rail-tip-preview');
+        return { text: p ? p.textContent.trim() : null };
+    }"""
+    )
+    if got.get("skipped"):
+        pytest.skip("no table on the fixture page")
+    assert got["text"] and "×" in got["text"], got

@@ -435,29 +435,37 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
 :root:not([data-theme-mode]) .theme-toggle .icon-system { display: inline-flex; }
 
 /* ============ Reading aids ============ *
- * The rail: a 3px strip across the top that answers three questions
+ * The rail: a 12px strip across the top that answers three questions
  * without the reader asking any of them — how far in am I, what shape
- * is this page, and can I get to that table again.
+ * is this page, and can I get back to that table.
  *
- * The governing constraint is that NOTHING here changes size. Hover,
- * focus and the current-position highlight move colour and opacity
- * only; the hit targets, the ticks and the strip keep their geometry
- * at every state. A control that grows under the pointer makes the
- * reader chase it, and this one sits where a mis-click costs a scroll
- * position. Pinned by test_page_rail.py. */
+ * Two rules govern every declaration below.
+ *
+ * 1. NO BUTTON BOX EVER MOVES. The hover swell, the current-position
+ *    highlight and focus all act on the mark's ::before via `transform`
+ *    and colour. The <button> hit boxes are fixed at 14x13 and the
+ *    strip is fixed at 12px, at every state. A dock that reflows makes
+ *    you chase the thing you were aiming at; this one cannot.
+ * 2. NOTHING ON THE PAGE MOVES EITHER. The strip is `position: fixed`
+ *    and the label is absolutely positioned inside it with
+ *    `pointer-events: none`, so revealing either cannot displace a
+ *    single element of the document.
+ * Pinned by test_page_rail.py. */
 .okt-rail {
   position: fixed; top: 0; left: 0; right: 0;
-  /* Tall enough to CONTAIN the marks. At 3px they had to hang below
-     the strip onto whatever text was scrolling under it, where a 2px
-     tick over a line of prose is a speck, not a landmark. The band is
-     painted --bg, so the effect is that page content ends 9px early —
-     the same thing any fixed header does, at a ninth of the height. */
-  height: 9px;
+  /* Tall enough to CONTAIN the marks, including magnified. At 3px they
+     had to hang below the strip onto whatever text was scrolling under
+     it, where a 2px tick is a speck. Painted --bg, so the effect is
+     that page content ends 12px early — what any fixed header does, at
+     a fraction of the height. */
+  height: 12px;
   z-index: 250;
   background: var(--bg);
-  /* The strip is scenery; only the marks inside it take the pointer,
-     so the top of the page stays clickable-through. */
-  pointer-events: none;
+  /* The strip takes the pointer so the swell can start BEFORE the
+     pointer reaches a mark — a dock that only responds once you are
+     already on target is backwards. Nothing interactive lives in the
+     top 12px (the chrome buttons start at y=16), and the strip is
+     opaque, so nothing is being covered. */
 }
 /* The track. It has to be visible or the ticks read as a row of
    floating marks with nothing joining them — and the line joining them
@@ -476,7 +484,7 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
   background: var(--accent);
   transition: width 0.1s linear; pointer-events: none;
 }
-.okt-rail-marks { position: absolute; inset: 0; }
+.okt-rail-marks { position: absolute; inset: 0; pointer-events: none; }
 /* A landmark is a button with a constant 14x13 box and no visuals of
    its own. Everything visible is the ::before, so the target can be
    comfortably large while the mark stays a hairline. */
@@ -489,28 +497,42 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
 }
 .okt-rail-mark::before {
   content: '';
-  position: absolute; left: 50%;
-  margin-left: -1px;
-  transition: background-color 0.18s ease, opacity 0.18s ease;
+  position: absolute; left: 50%; top: 0;
+  /* The swell. `transform` only — it never triggers layout, so the
+     pointermove handler is cheap and the boxes above stay put.
+     transform-origin at the top centre grows the mark downward from
+     the track, the way a tick lengthens rather than floats. */
+  transform: translateX(-50%) scale(var(--okt-mag, 1));
+  transform-origin: 50% 0;
+  transition: background-color 0.18s ease, opacity 0.18s ease, transform 0.12s ease;
 }
-/* Section: a 2px tick crossing the strip and hanging below it, in the
-   darkest neutral. Two weights have to be told apart in 3px of height,
-   so the difference is carried by BOTH length and colour — --text-soft
-   against --text-faint, 9px against 3px. */
+/* ---- shapes: what kind of thing is at this position ---- */
+/* Heading — a bar crossing the track. Two depths, so a page of six
+   sections and a page of six sections with thirty sub-headings do not
+   draw the same picture. */
 .okt-rail-mark[data-kind="section"]::before {
-  top: 0; width: 2px; height: 9px;
-  border-radius: 0 0 1px 1px;
-  background: var(--text-soft); opacity: 0.85;
+  width: 2px; height: 7px; border-radius: 0 0 1px 1px;
+  background: var(--text-soft); opacity: 0.9;
 }
-/* Figure: a small dot below the track. Quieter than a section on
-   purpose — the shape of the page is its headings; the figures are the
-   things you go back for. */
+.okt-rail-mark[data-kind="sub"]::before {
+  width: 2px; height: 4px; border-radius: 0 0 1px 1px;
+  background: var(--text-soft); opacity: 0.5;
+}
+/* Figures sit below the track, quieter than any heading — the shape of
+   the page is its headings; figures are the things you go back for. */
 .okt-rail-mark[data-kind="figure"]::before {
-  top: 5px; width: 3px; height: 3px; margin-left: -1.5px;
-  border-radius: 50%;
-  background: var(--text-faint); opacity: 0.6;
+  top: 5px;
+  background: var(--text-faint); opacity: 0.62;
 }
-.okt-rail-marks:hover .okt-rail-mark[data-kind="figure"]::before { opacity: 0.8; }
+.okt-rail-mark[data-shape="square"]::before { width: 4px; height: 4px; border-radius: 1px; }
+.okt-rail-mark[data-shape="round"]::before  { width: 4px; height: 4px; border-radius: 50%; }
+/* Diamond — a square on its corner. The rotation composes with the
+   swell rather than replacing it, so a magnified diamond stays a
+   diamond. */
+.okt-rail-mark[data-shape="angle"]::before {
+  width: 4px; height: 4px; border-radius: 1px;
+  transform: translateX(-50%) scale(var(--okt-mag, 1)) rotate(45deg);
+}
 .okt-rail-mark:hover::before,
 .okt-rail-mark:focus-visible::before,
 .okt-rail-mark.is-current::before {
@@ -521,13 +543,17 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
   outline-offset: 0;
   border-radius: 3px;
 }
-/* Label. Absolutely positioned and pointer-transparent, so revealing
-   it cannot move the rail, the marks, or anything on the page. */
+@media (prefers-reduced-motion: reduce) {
+  .okt-rail-mark::before { transition: background-color 0.18s ease, opacity 0.18s ease; }
+}
+/* ---- the label ---- */
+/* Absolutely positioned and pointer-transparent, so revealing it cannot
+   move the rail, the marks, or anything on the page. */
 .okt-rail-tip {
-  position: absolute; top: 15px;
+  position: absolute; top: 16px;
   transform: translateX(-50%);
-  max-width: min(280px, 60vw);
-  padding: 5px 10px;
+  max-width: min(300px, 66vw);
+  padding: 7px 10px;
   border-radius: 8px;
   background: var(--ctrl-bg, var(--surface));
   border: 1px solid var(--border);
@@ -536,9 +562,11 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
   backdrop-filter: blur(12px) saturate(140%);
   font: 500 11.5px/1.35 'Inter', -apple-system, sans-serif;
   color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   opacity: 0; pointer-events: none;
   transition: opacity 0.14s ease;
+}
+.okt-rail-tip .okt-rail-tip-line {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .okt-rail-tip .okt-rail-tip-kind {
   color: var(--text-soft);
@@ -546,9 +574,26 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
   text-transform: uppercase; letter-spacing: 0.07em;
   margin-right: 6px;
 }
+/* Preview. A rendered SVG clones inertly — no scripts, no
+   custom-element lifecycle — so a chart or a diagram can show its real
+   silhouette rather than a description of one. */
+.okt-rail-tip-preview {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.okt-rail-tip-thumb {
+  width: 100%; height: 88px;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+}
+.okt-rail-tip-thumb svg { max-width: 100%; max-height: 84px; display: block; }
 .okt-rail-tip.visible { opacity: 1; }
-/* A page that fits on one screen has no position to report and nothing
-   to navigate to. The whole strip goes. */
+
 .okt-rail[data-scrollable="0"] { display: none; }
 .skip-link {
   position: absolute; left: -9999px; top: auto;

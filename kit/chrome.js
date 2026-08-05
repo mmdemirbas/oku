@@ -1563,19 +1563,40 @@ function buildTOC(tocList) {
 // a technical page and marking every block turns the rail into a dotted
 // line, which is the "annoying" failure this is trying to avoid.
 // `oku-annotated-code` IS here — that one is a figure, not an aside.
+// selector · label · shape. The shape is what the reader sees; the
+// label is what the tooltip says. Four shapes, not eleven, because a
+// 3px mark can carry a silhouette and cannot carry an alphabet:
+//   bar     headings — the page's own divisions
+//   square  a grid of values you read cell by cell
+//   round   something plotted on an axis
+//   angle   a topology or a walkthrough — boxes and arrows
+// Shapes this small are only half-legible at rest, which is what the
+// hover swell is for: the neighbourhood around the pointer grows and
+// the silhouettes resolve.
 var RAIL_FIGURES = [
-  ['.okt-table-wrap', 'Table'],
-  ['oku-chart', 'Chart'],
-  ['.bar-chart', 'Chart'],
-  ['.okt-chart-grid', 'Charts'],
-  ['oku-diagram', 'Diagram'],
-  ['oku-annotated-code', 'Annotated code'],
-  ['oku-live-snippet', 'Snippet'],
-  ['.kpi-grid', 'Figures'],
-  ['.compare-grid', 'Comparison'],
-  ['.step-cards', 'Steps'],
-  ['.example-pair', 'Example'],
+  ['.okt-table-wrap', 'Table', 'square'],
+  ['.kpi-grid', 'Figures', 'square'],
+  ['.compare-grid', 'Comparison', 'square'],
+  ['oku-chart', 'Chart', 'round'],
+  ['.bar-chart', 'Chart', 'round'],
+  ['.okt-chart-grid', 'Charts', 'round'],
+  ['oku-diagram', 'Diagram', 'angle'],
+  ['.step-cards', 'Steps', 'angle'],
+  ['oku-annotated-code', 'Annotated code', 'square'],
+  ['oku-live-snippet', 'Snippet', 'square'],
+  ['.example-pair', 'Example', 'square'],
 ];
+
+// How far from the pointer the swell reaches, and how much it swells.
+// A dock magnifies its icons; this magnifies marks that are 3px tall,
+// so the numbers are small and the falloff is a cosine — abrupt
+// falloff reads as a jump when the pointer moves one pixel.
+var RAIL_MAG_RADIUS_PX = 46;
+// 1.6, not more: a section bar is 7px and grows downward from the top
+// of the track, so anything past 1.7 pushes it out of the 12px strip
+// and onto the page content — the exact illegibility the strip was
+// made tall enough to prevent.
+var RAIL_MAG_MAX = 1.6;
 
 // Set by buildRail so the existing rAF-throttled scroll handler can
 // light the current mark without registering a second listener.
@@ -1612,17 +1633,30 @@ function buildRail() {
     // A section whose h2 is .okt-sr-only (an untitled TL;DR) has no
     // name to show and no shape to contribute.
     if (title && !(h2 && h2.classList.contains('okt-sr-only'))) {
-      marks.push({ el: sec, kind: 'section', label: title, tipKind: '' });
+      marks.push({ el: sec, kind: 'section', shape: 'bar', label: title, tipKind: 'Section' });
     }
-    RAIL_FIGURES.forEach(function (pair) {
-      sec.querySelectorAll(pair[0]).forEach(function (el) {
+    // Sub-headings get the same bar at two thirds the height. The page
+    // outline is a hierarchy and the rail should show it as one —
+    // otherwise a page of six sections and a page of six sections with
+    // thirty sub-headings draw the same picture.
+    sec.querySelectorAll(':scope > h3').forEach(function (h3) {
+      var c = h3.cloneNode(true);
+      var pl = c.querySelector('.permalink'); if (pl) pl.remove();
+      var t = c.textContent.trim();
+      if (t) marks.push({ el: h3, kind: 'sub', shape: 'bar', label: t, tipKind: 'Sub-section' });
+    });
+    RAIL_FIGURES.forEach(function (spec) {
+      sec.querySelectorAll(spec[0]).forEach(function (el) {
         // A chart inside a chart-grid, a table inside a lightbox clone:
         // only the outermost match of a nested pair earns a dot.
         for (var i = 0; i < seen.length; i++) {
           if (seen[i] === el || seen[i].contains(el)) return;
         }
         seen.push(el);
-        marks.push({ el: el, kind: 'figure', label: title || 'Figure', tipKind: pair[1] });
+        marks.push({
+          el: el, kind: 'figure', shape: spec[2],
+          label: title || 'Figure', tipKind: spec[1],
+        });
       });
     });
   });
@@ -1650,16 +1684,20 @@ function buildRail() {
   // that happen to precede it in document order. A single pass left a
   // figure sitting 1px from the next section heading.
   var placed = marks.filter(function (m) { return m.kind === 'section'; });
-  if (railW >= FIGURES_NEED_PX) {
+  // Sub-headings then figures, each measured against everything already
+  // down. Priority is the order of the page's own hierarchy: a section
+  // outranks a sub-section outranks a figure.
+  ['sub', 'figure'].forEach(function (kind) {
+    if (kind === 'figure' && railW < FIGURES_NEED_PX) return;
     marks.forEach(function (m) {
-      if (m.kind !== 'figure') return;
+      if (m.kind !== kind) return;
       var x = (m.pct / 100) * railW;
       for (var i = 0; i < placed.length; i++) {
         if (Math.abs((placed[i].pct / 100) * railW - x) < MIN_GAP_PX) return;
       }
       placed.push(m);
     });
-  }
+  });
   placed.sort(function (a, b) { return a.top - b.top; });
   rail.setAttribute('data-marks', placed.length);
   rail.setAttribute('data-dropped', marks.length - placed.length);
@@ -1671,6 +1709,7 @@ function buildRail() {
     btn.type = 'button';
     btn.className = 'okt-rail-mark';
     btn.dataset.kind = m.kind;
+    btn.dataset.shape = m.shape;
     btn.style.left = pct + '%';
     btn.tabIndex = i === 0 ? 0 : -1;
     btn.setAttribute('aria-label',
@@ -1682,13 +1721,80 @@ function buildRail() {
 
   var buttons = Array.prototype.slice.call(host.children);
 
+  /* What the figure IS, in the few words that help you decide whether
+     it is the one you were looking for. A rendered SVG clones inertly —
+     no scripts, no custom-element lifecycle — so a chart or a diagram
+     can show its actual silhouette. Everything else gets its shape as
+     a number, which is the next most useful thing about a table you
+     are trying to find again. */
+  function tipPreview(m) {
+    if (m.kind !== 'figure') return null;
+    // Only the shapes that ARE an SVG get the thumbnail. A blind
+    // `querySelector('svg')` found the magnifier icon inside a table's
+    // own filter box and previewed that — the kit's chrome is full of
+    // inline icons, and any of them will match first.
+    var svg = (m.shape === 'round' || m.shape === 'angle')
+      ? (m.el.tagName === 'svg' ? m.el : m.el.querySelector('svg'))
+      : null;
+    if (svg) {
+      var box = document.createElement('div');
+      box.className = 'okt-rail-tip-thumb';
+      // The id has to be rewritten, not just copied. Mermaid names its
+      // root and then targets that name from a <style> inside the SVG
+      // and from url(#…) fills; a straight clone puts a SECOND element
+      // with that id in the document, and page-chrome sits before
+      // <main>, so document.getElementById would start returning the
+      // thumbnail instead of the real diagram. Renaming every
+      // occurrence in one pass keeps the clone self-consistent and
+      // leaves the original alone.
+      var markup = svg.outerHTML;
+      if (svg.id) {
+        var uid = 'okrail-' + (++__okuClipSeq);
+        markup = markup.split(svg.id).join(uid);
+      }
+      var holder = document.createElement('div');
+      holder.innerHTML = markup;
+      var copy = holder.firstElementChild;
+      if (!copy) return null;
+      copy.removeAttribute('width');
+      copy.removeAttribute('height');
+      copy.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      copy.setAttribute('aria-hidden', 'true');
+      box.appendChild(copy);
+      return box;
+    }
+    var table = m.el.matches('table') ? m.el : m.el.querySelector('table');
+    if (table) {
+      var rows = table.querySelectorAll('tbody tr').length;
+      var cols = (table.querySelector('tr') || { children: [] }).children.length;
+      return document.createTextNode(rows + ' × ' + cols);
+    }
+    var n = m.el.querySelectorAll('.kpi-tile, .compare-card, .step-card').length;
+    return n ? document.createTextNode(n + ' items') : null;
+  }
+
   function showTip(btn) {
     var m = btn._okuMark;
-    tip.innerHTML = (m.tipKind
-      ? '<span class="okt-rail-tip-kind">' + escapeXml(m.tipKind) + '</span>' : '') +
-      escapeXml(m.label);
-    // Place, then pull back inside the viewport. Reading offsetWidth
-    // after the text is set is a forced layout, but it happens once per
+    tip.textContent = '';
+    var line = document.createElement('div');
+    line.className = 'okt-rail-tip-line';
+    if (m.tipKind) {
+      var kindEl = document.createElement('span');
+      kindEl.className = 'okt-rail-tip-kind';
+      kindEl.textContent = m.tipKind;
+      line.appendChild(kindEl);
+    }
+    line.appendChild(document.createTextNode(m.label));
+    tip.appendChild(line);
+    var preview = tipPreview(m);
+    if (preview) {
+      var wrap = document.createElement('div');
+      wrap.className = 'okt-rail-tip-preview';
+      wrap.appendChild(preview);
+      tip.appendChild(wrap);
+    }
+    // Place, then pull back inside the viewport. Reading the box after
+    // the content is set is a forced layout, but it happens once per
     // hover and the alternative is a label that runs off the edge.
     tip.style.left = btn._okuPct + '%';
     tip.classList.add('visible');
@@ -1700,12 +1806,64 @@ function buildRail() {
   }
   function hideTip() { tip.classList.remove('visible'); }
 
+  /* Dock swell. Every mark within RAIL_MAG_RADIUS_PX of the pointer
+     scales by a cosine falloff — 1.0 at the edge of the radius, full at
+     the pointer. Two properties make this safe where a real dock is
+     not: the scale is a `transform` on the mark's ::before, so no
+     layout is recomputed and no BUTTON BOX MOVES. The thing you are
+     aiming at stays exactly where it was when you decided to aim at
+     it — which is the failure mode of a dock that reflows, and the
+     reason the brief said "without making it hard to use". */
+  function magnify(clientX) {
+    for (var i = 0; i < buttons.length; i++) {
+      var b = buttons[i];
+      var d = Math.abs(b._okuX - clientX);
+      var m = d >= RAIL_MAG_RADIUS_PX
+        ? 1
+        : 1 + (RAIL_MAG_MAX - 1) * Math.cos((d / RAIL_MAG_RADIUS_PX) * Math.PI / 2);
+      if (m === b._okuMag) continue;
+      b._okuMag = m;
+      b.style.setProperty('--okt-mag', m.toFixed(3));
+    }
+  }
+  function unmagnify() {
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i]._okuMag = 1;
+      buttons[i].style.removeProperty('--okt-mag');
+    }
+  }
+
   function goTo(btn) {
     var top = btn._okuMark.el.getBoundingClientRect().top + window.scrollY;
     // 80px matches the `:target` scroll-margin, so a rail jump and an
     // anchor jump land the heading in the same place.
     window.scrollTo({ top: Math.max(0, top - 80), behavior: 'smooth' });
   }
+
+  // Each mark's centre in viewport coordinates, cached so the
+  // pointermove handler never touches the layout. Rebuilt with the
+  // rail, which already happens on resize.
+  buttons.forEach(function (b) {
+    var r = b.getBoundingClientRect();
+    b._okuX = r.x + r.width / 2;
+    b._okuMag = 1;
+  });
+
+  var magPending = false;
+  var lastX = 0;
+  // The swell is a hover affordance and the rail is 12px tall, so the
+  // listener goes on the RAIL rather than the marks — otherwise the
+  // swell only starts once you are already on a target, which is
+  // backwards. `pointermove` on a fixed 12px strip is cheap, and it is
+  // rAF-throttled anyway.
+  rail.addEventListener('pointermove', function (e) {
+    if (e.pointerType === 'touch') return;   // no hover to respond to
+    lastX = e.clientX;
+    if (magPending) return;
+    magPending = true;
+    requestAnimationFrame(function () { magPending = false; magnify(lastX); });
+  }, { passive: true });
+  rail.addEventListener('pointerleave', unmagnify, { passive: true });
 
   host.addEventListener('mouseover', function (e) {
     var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;
@@ -3191,7 +3349,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-05-r25';
+var __okuKitBuild = '2026-08-05-r26';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

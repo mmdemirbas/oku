@@ -27,8 +27,17 @@ __pycache__/
 # fetch resolves; never tracked.
 /pagefind
 
-# Personal / session working files
+# Personal / session working files. These are the artifacts a session
+# leaves behind — a review write-up, a scratch plan. `commit.md` forbids
+# staging them, so ignoring them is the only way `git status` can be
+# empty at the end of a session.
 SPEC.md
+REVIEW.md
+TASK.md
+SESSION.md
+HANDOFF.md
+code-review.md
+notes/
 _internal/
 .scratch/
 

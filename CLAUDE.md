@@ -264,11 +264,32 @@ Two decisions inside it are load-bearing. Marks and the fill share one
 scale (`elementTop / maxScroll`), so the fill edge reaches a mark
 exactly when that landmark hits the top of the viewport — a second
 scale would let the highlight contradict the bar beside it. And marks
-are **thinned**: sections are always placed because they are the shape
-of the page, figures only where they clear their neighbours by 6px,
-and not at all below a 560px rail. Unthinned, `docs/reference.md` put
-49 marks 0px apart at phone width. Plain `<pre>` is not a landmark
-kind — marking every code block turns the rail into a dotted line.
+are **thinned** in hierarchy order: sections first because they are the
+shape of the page, then sub-headings, then figures, each placed only
+where it clears everything already down by 6px, and figures not at all
+below a 560px rail. Unthinned, `docs/reference.md` put 49 marks 0px
+apart at phone width. Plain `<pre>` is not a landmark kind — marking
+every code block turns the rail into a dotted line.
+
+**The swell is a transform, and that is the whole safety argument.**
+Marks within 46px of the pointer scale on a cosine falloff, like a
+dock. A dock that reflows makes you chase the thing you were aiming
+at; this one scales the mark's `::before`, so no layout is computed
+and no button box moves. `RAIL_MAG_MAX` is 1.6 because a 7px section
+bar grows downward from the track and anything past ~1.7 pushes it out
+of the 12px strip onto the page content. Touch pointers are ignored —
+there is no hover to respond to, and a swell on tap moves the target
+out from under the finger.
+
+**Shape says what kind of thing it is**: a bar for headings (two
+heights, `##` and `###`), a square for grids of values, a circle for
+something on an axis, a diamond for a topology. Four shapes, not
+eleven — 3px carries a silhouette, not an alphabet, which is also why
+the swell exists: it resolves them. The tooltip carries the name, and
+for a chart or a diagram a thumbnail cloned from the rendered SVG. The
+clone's ids are rewritten; `page-chrome` precedes `<main>`, so a
+duplicate id would make `getElementById` return the thumbnail instead
+of the real figure.
 
 **Front-matter is `title` + `summary`.** Plus `order` / `parent` for
 tree placement. `accent` and `audience` are tree-wide in `docs/kit.json`;
