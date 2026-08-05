@@ -60,6 +60,7 @@ PAGE = {
                     "kind": "chart",
                     "type": "bar",
                     "title": "Karşılaştırma",
+                    "x_label": "saat",
                     "rows": [
                         {"label": "Kısa", "value": 80},
                         {"label": "Çok daha uzun bir etiket başlığı", "value": 30},
@@ -132,6 +133,25 @@ def test_new_blocks_render(page, served):
     assert page.locator("figure.okt-figure img").count() == 1
     # svg — figure.okt-svg with inline svg
     assert page.locator("figure.okt-svg svg").count() == 1
+
+
+def test_a_bar_chart_prints_the_unit_it_was_given(page, served):
+    """`x_label` is declared on `chart` in the schema, so the validator
+    accepts it on a bar chart and says nothing. `_renderBars` used to
+    drop it: the author wrote the unit their numbers are in, `oku check`
+    passed, and the page shipped a column of bare numerals.
+
+    Accepted-and-silently-discarded is the same defect as a block that
+    renders nothing — the author has no signal either way. A declared
+    property either draws or fails the check. Found on a real document
+    (katip, 2026-08-05), where three bar charts carried their unit."""
+    page.goto(served)
+    page.wait_for_timeout(800)
+    unit = page.locator(".bar-chart .bar-chart-unit")
+    assert unit.count() == 1, "the bar chart dropped its x_label"
+    assert unit.inner_text().strip() == "saat", unit.inner_text()
+    box = unit.bounding_box()
+    assert box["height"] > 0 and box["width"] > 0, box
 
 
 def test_bar_chart_shares_origin(page, served):

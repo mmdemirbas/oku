@@ -2929,6 +2929,16 @@ figure.okt-figure figcaption {
   color: var(--text-soft);
 }
 
+/* The unit line under a bar chart, from `x_label`. Sits under the bars
+   in the value column's own grid track so it reads as a note about the
+   numbers rather than a caption for the whole figure. */
+.bar-chart > .bar-chart-unit {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  font: 500 11.5px 'Inter', sans-serif;
+  color: var(--text-faint);
+}
+
 /* Multi-series bars — stacked or grouped variants of the horizontal
    bar chart. The track is a flex container so each series's bar can
    sit either next to (stacked) or above/below (grouped) its siblings. */

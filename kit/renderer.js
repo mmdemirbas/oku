@@ -2277,6 +2277,19 @@
         row.appendChild(val);
         wrap.appendChild(row);
       }
+      // The unit the numbers are in. `x_label` is declared on `chart` in
+      // the schema, which means the validator accepts it on a bar chart
+      // and says nothing — and this renderer used to drop it, so the
+      // author wrote a unit, `oku check` passed, and the page shipped a
+      // column of bare numerals. Accepted-and-silently-discarded is the
+      // same defect class as a block that renders nothing; a declared
+      // property either draws or fails the check.
+      if (block.x_label) {
+        const cap = document.createElement('div');
+        cap.className = 'bar-chart-unit';
+        cap.textContent = block.x_label;
+        wrap.appendChild(cap);
+      }
       return wrap;
     }
 
