@@ -5529,16 +5529,30 @@ main .example-pair {
   max-width: 100%;
 }
 
-/* Running prose only — direct children of a section, which is where
-   the markdown emitter puts paragraphs, lists and blockquotes. Text
-   inside a card, a table cell or a callout is already constrained by
-   its container and must not be clamped twice. */
+/* The measure is a property of running prose, not of the selector it
+   happens to sit under. A callout and the TL;DR panel hold the same
+   kind of text as a section paragraph, and both are full-width boxes —
+   nothing about the container constrains the line. Left out of this
+   rule they wrapped at 1037px directly below a 626px paragraph, and
+   two wrap points in one column is what a reader notices first.
+   The framed blocks add their own horizontal padding back (border-box
+   means max-width bounds the border box, so a 70px-inset callout would
+   otherwise run ~8 characters short of the paragraph above it). */
 main > section > p,
 main > section > ul,
 main > section > ol,
 main > section > dl,
 main > section > blockquote {
   max-width: var(--prose-width);
+}
+.callout { max-width: calc(var(--prose-width) + 8ch); }   /* 48px + 22px inset */
+.tldr    { max-width: calc(var(--prose-width) + 7ch); }   /* 32px + 32px inset */
+/* `max` mode drops the cap entirely; calc() on the `none` keyword is
+   invalid, and relying on invalid-at-computed-value-time to fall back
+   to `none` is a coincidence, not a rule. Say it. */
+body[data-content-width="max"] .callout,
+body[data-content-width="max"] .tldr {
+  max-width: none;
 }
 
 
