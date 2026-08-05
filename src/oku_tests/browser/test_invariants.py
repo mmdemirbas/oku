@@ -388,11 +388,13 @@ def test_lightbox_chart_tooltip_still_fires(page, site_url):
 
 
 def test_format_corpus_renders_identically(page, site_url):
-    """The same page through three different source formats must
-    produce the same rendered structure — sections, charts, KPI tiles,
-    step cards all equal."""
+    """The markdown source and the v2 JSON it converts to must render
+    the same structure. This used to span five formats; the three
+    comparison-only ones (.src.html / .adoc / .dj) were deleted once
+    the decision was made, and the two that remain are the two that
+    ship: what an author writes, and what legacy pages still are."""
     counts = {}
-    for fmt in ("markdown", "html", "asciidoc"):
+    for fmt in ("markdown", "json"):
         _goto(page, f"{site_url}/examples/format-comparison/{fmt}/sample-viz.html")
         page.wait_for_selector("oku-chart svg")
         counts[fmt] = page.evaluate(
@@ -400,10 +402,9 @@ def test_format_corpus_renders_identically(page, site_url):
                 sections: document.querySelectorAll('main section').length,
                 charts: document.querySelectorAll('oku-chart').length,
                 diagrams: document.querySelectorAll('oku-diagram').length,
-                title: document.title,
             })"""
         )
-    assert counts["markdown"] == counts["html"] == counts["asciidoc"], counts
+    assert counts["markdown"] == counts["json"], counts
 
 
 def test_comparison_page_rendered_links_all_work(page, site_url):
@@ -415,7 +416,9 @@ def test_comparison_page_rendered_links_all_work(page, site_url):
         """() => [...document.querySelectorAll('main a[href*="examples/format-comparison"]')]
                 .map(a => a.getAttribute('href'))"""
     )
-    assert len(hrefs) == 10, f"expected 10 rendered links, got {len(hrefs)}"
+    # Two formats x two samples. Was ten, when three comparison-only
+    # formats were still carried.
+    assert len(hrefs) == 4, f"expected 4 rendered links, got {len(hrefs)}"
     for href in hrefs:
         _goto(page, f"{site_url}/docs/format-comparison.html")
         page.click(f'main a[href="{href}"]')

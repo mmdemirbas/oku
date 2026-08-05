@@ -51,7 +51,7 @@ Kanban board — filter by area or priority to scope. Each chip filters; the boa
 - Site navigation for the standard docs/ layout: the manifest is written where the kit lands, and a level with no pages of its own no longer breaks the tree.
 - `oku serve` falls back to the kit for pages outside the init directory, and percent-decodes request paths (non-ASCII filenames).
 - Source format v3 (markdown-first) shipped end to end; structural lint resurrected for v2 pages.
-- Five simultaneous source formats (md / json / html-first / asciidoc / djot) behind one converter registry; measured comparison published in format-comparison with a provably-identical corpus.
+- Source formats pruned to the two that ship: `.md` (what an author writes) and `.json` (pages written before the markdown format existed). The three carried for the measured comparison — html-first, asciidoc, djot — are deleted, along with their corpus and round-trip tests. HTML was never one of the candidates in the sense the name suggests: it is the OUTPUT of every build.
 - Path-based navigation router — URL pathname and rendered page can no longer diverge; legacy hash links normalise.
 - Wide diagrams always fit their column: the SVG renders at most at its authored size and scales down to the column, and its viewBox is refitted to the union of mermaid's box and the real content bbox so nothing mermaid lays outside that box can be cut. Reading detail on a wide diagram is the lightbox's job. This replaced an earlier 90%-of-authored-size floor, which is what made wide flowcharts overflow and read as trimmed.
 - Lightbox: full-viewport frame; diagrams move the live host (full interactivity) like charts.

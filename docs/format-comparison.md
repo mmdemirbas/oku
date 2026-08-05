@@ -1,77 +1,83 @@
 ---
-title: Format comparison — measured
+title: Why the source format is markdown
 accent: amber
 eyebrow: Reference
 date: 2026-06-13
 order: 95
-summary: The same two pages authored in five formats, measured on tokens,
-  bytes, converter weight and ecosystem fit. The decision surface for
-  pruning formats.
+summary: Five source formats were measured on tokens, converter weight and
+  ecosystem fit. Markdown won and the other three were deleted. What the
+  measurement said, kept so the decision is not re-argued from memory.
 ---
 
 > [!TLDR]
-> Two identical pages (one prose-heavy, one primitive-heavy) live in
-> all five formats under `examples/format-comparison/`. Markdown,
-> AsciiDoc and djot are within 1.2% of each other on tokens; JSON
-> costs +6%; HTML-first costs +52%. Every format renders through the
-> same pipeline — pruning one deletes a converter, nothing else.
+> **HTML is the output.** Every page ships as HTML whatever its source —
+> that was never the question. The question was what an author *types*,
+> and five answers were measured on two identical pages. Markdown,
+> AsciiDoc and djot came within 1.2% of each other on tokens; JSON cost
+> +6%; authoring in HTML cost +52%. Markdown won on the axes that were
+> not close: it is the register an AI writes in natively, and it renders
+> in GitHub, Obsidian and every editor without the kit.
 
-## Method {#method}
+## What shipped {#shipped}
 
-The corpus is GENERATED, not hand-written: each sample's canonical
-form is the v2 page dict, emitted into every format by its
-`page_to_<fmt>` emitter and parsed back by its `<fmt>_to_v2_page`
-parser. Round-trip equality is enforced by tests, so the content is
-provably identical — the only thing the numbers compare is the
-format itself. Tokens use `cl100k_base`, the tokenizer behind real
-AI billing.
+Two source formats, and the second exists only for pages that predate
+the first.
 
-## Tokens and bytes {#tokens}
+| Format | What it is | Status |
+|---|---|---|
+| `.md` | Front-matter + strict-GFM body. What an author writes. | The format |
+| `.json` | v1 / v2 page dicts written before `.md` existed | Renders forever; `oku migrate` converts one on demand |
+| `.src.html` | Authoring the *source* in HTML | Deleted |
+| `.adoc` | AsciiDoc subset | Deleted |
+| `.dj` | djot subset | Deleted |
+
+Deleting the three removed ~820 lines of converter, three corpus
+directories and their round-trip tests. Nothing else changed: every
+format always converted to the same v2 dict, and lint, build, serve and
+the renderer only ever saw v2.
+
+**Wanting raw HTML inside a page is a different want**, and it is
+already served — a block-level HTML tag at column 0 passes through
+untouched, with no restrictions. That is the escape hatch, and it is
+what authors reach for, rather than writing a whole page in HTML.
+
+## What the measurement said {#measured}
+
+The corpus was generated rather than hand-written: one canonical v2
+page dict emitted into each format and parsed back, with round-trip
+equality enforced by tests, so the only variable was the format itself.
+Tokens are `cl100k_base`.
 
 ```oku-chart
 {"type":"bar","title":"Source tokens — two-page corpus (cl100k)","rows":[{"label":"markdown","value":679},{"label":"asciidoc","value":682},{"label":"djot","value":688},{"label":"json (v2)","value":720},{"label":"html-first","value":1034}]}
 ```
 
-| Format | guide | viz | Total tokens | vs markdown | Bytes |
-|---|---|---|---|---|---|
-| markdown (v3) | 303 | 376 | 679 | 100.0% | 2396 |
-| asciidoc | 303 | 379 | 682 | 100.4% | 2429 |
-| djot | 309 | 379 | 688 | 101.3% | 2410 |
-| json (v2) | 337 | 383 | 720 | 106.0% | 2475 |
-| html-first (v4) | 523 | 511 | 1034 | 152.3% | 3539 |
+| Format | Total tokens | vs markdown | Bytes |
+|---|---|---|---|
+| markdown (v3) | 679 | 100.0% | 2396 |
+| asciidoc | 682 | 100.4% | 2429 |
+| djot | 688 | 101.3% | 2410 |
+| json (v2) | 720 | 106.0% | 2475 |
+| html-first | 1034 | 152.3% | 3539 |
 
-JSON's penalty is small only because v2 keeps markdown strings inside
-the JSON; the price shows up in editing (escaping), not reading.
-HTML's +52% is pure markup overhead — every paragraph pays open/close
-tags.
+Tokens did not decide it — three formats tied inside 1.2%. The deciding
+axes were the ones with a wide spread.
 
-## Beyond tokens {#qualitative}
+| Axis | markdown | asciidoc / djot | html-first |
+|---|---|---|---|
+| AI edit accuracy | native output register | low training-data presence | tag discipline, verbose diffs |
+| External rendering | GitHub, Obsidian, editors; mermaid native | GitHub partial / none | browser only |
+| Python parser | shipped | none exists — subset only | stdlib |
 
-| Axis | markdown | json | html-first | asciidoc | djot |
-|---|---|---|---|---|---|
-| AI edit accuracy | native output register | newline/quote escaping in strings | tag discipline, verbose diffs | low training-data presence | very low training-data presence |
-| External rendering | GitHub/Obsidian/editors, mermaid native | none | browser only | GitHub partial | none mainstream |
-| Grammar ambiguity | linted strict subset | none | none | low | lowest |
-| Converter weight | shipped (default) | none needed | ~340 LoC stdlib | ~190 LoC subset | ~150 LoC subset |
-| Ecosystem libs | everywhere | everywhere | stdlib | no good Python lib (subset only) | no Python lib (subset only) |
-| Typed primitives | fenced JSON | inline objects | JSON script child | delimited JSON block | fenced JSON |
-
-> [!NOTE] Subset caveat
-> The AsciiDoc and djot converters cover the comparison corpus
-> constructs only (headings, paragraphs, lists, tables, fences,
-> admonitions). Full-spec support would require parsers that don't
-> exist in Python — that tooling gap is itself a comparison datum.
+> [!NOTE] What the subsets meant
+> The AsciiDoc and djot converters only ever covered the corpus
+> constructs — headings, paragraphs, lists, tables, fences,
+> admonitions. Full-spec support needed parsers that do not exist in
+> Python, and that tooling gap was itself the datum.
 
 ## See them rendered {#rendered}
 
-Each page below is the SAME content through a different source
-format — open side by side:
+The two surviving formats, same content, same pipeline:
 
-- Guide: [markdown](../examples/format-comparison/markdown/sample-guide.html) · [json](../examples/format-comparison/json/sample-guide.html) · [html-first](../examples/format-comparison/html/sample-guide.html) · [asciidoc](../examples/format-comparison/asciidoc/sample-guide.html) · [djot](../examples/format-comparison/djot/sample-guide.html)
-- Dashboard: [markdown](../examples/format-comparison/markdown/sample-viz.html) · [json](../examples/format-comparison/json/sample-viz.html) · [html-first](../examples/format-comparison/html/sample-viz.html) · [asciidoc](../examples/format-comparison/asciidoc/sample-viz.html) · [djot](../examples/format-comparison/djot/sample-viz.html)
-
-## Pruning {#pruning}
-
-All five stay supported until the user records a pruning decision in
-the roadmap. Removing a format deletes its emit/parse pair and its
-corpus directory; the registry, pipeline and renderer are untouched.
+- Guide: [markdown](../examples/format-comparison/markdown/sample-guide.html) · [json](../examples/format-comparison/json/sample-guide.html)
+- Dashboard: [markdown](../examples/format-comparison/markdown/sample-viz.html) · [json](../examples/format-comparison/json/sample-viz.html)

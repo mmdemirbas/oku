@@ -1101,8 +1101,6 @@ class TestChromeKitMarkers:
             for p in d.rglob("*.html"):
                 if "dist" in p.parts:
                     continue
-                if p.name.endswith(".src.html"):
-                    continue  # HTML-first page SOURCE, not a generated stub
                 if p == repo_root / "docs" / "index.html":
                     continue
                 offenders.append(str(p.relative_to(repo_root)))

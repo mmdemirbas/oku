@@ -101,19 +101,25 @@ v1 (`kind/title/blocks`) via the in-memory shim. Run
 `oku migrate [path]` to convert any page-JSON to a v3 `.md` source
 (deterministic, round-trips; the .json is removed).
 
-### Alternative source formats (comparison phase)
+### Two source formats. HTML is the output, not a source.
 
-Markdown is the default, but the pipeline accepts five source
-formats through one registry (`_PAGE_SOURCE_PARSERS` /
-`_PAGE_SOURCE_EMITTERS` in cli.py): `.md`, `.json` (v1/v2),
-`.src.html` (HTML-first — the two-dot suffix keeps sources distinct
-from stubs), `.adoc` (AsciiDoc subset), `.dj` (djot subset). Every
-format converts to/from the v2 dict; lint/build/serve/renderer see
-only v2. The measured comparison lives in `docs/format-comparison.md`
-with its provably-identical corpus under `examples/format-comparison/`
-(round-trip parity enforced by tests). Prune a format = delete its
-emit/parse pair + corpus dir; the decision is recorded in the roadmap
-when made.
+Worth stating plainly, because the phrase "markdown-first" reads like
+a claim about the deliverable and is not one. **Every page ships as
+HTML** — that is what `oku build` writes and what a reader opens.
+The source format is a separate question: what the author types.
+
+- **`.md`** — what an author writes. Front-matter + strict-GFM body.
+- **`.json`** — v1/v2 pages written before the markdown format
+  existed. They keep rendering forever; `oku migrate` converts one to
+  `.md` when you want it converted.
+
+Three more once existed for a measured comparison — `.src.html`
+(authoring the *source* in HTML), `.adoc`, `.dj` — and were deleted
+once markdown won. An author who wants raw HTML inside a page uses an
+HTML island, which has no restrictions; that is a different thing from
+writing the whole page in HTML, and it is the thing people actually
+want. `_PAGE_SOURCE_PARSERS` / `_PAGE_SOURCE_EMITTERS` in cli.py stay
+as a registry because `.json` is still a second entry.
 
 ### Build outputs
 
