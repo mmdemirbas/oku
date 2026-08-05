@@ -404,12 +404,18 @@ class TestChromeKitMarkers:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "_hdtDetectBraceFolds" in src, "code-block brace-fold detector missing from chrome.js"
 
-    def test_chrome_has_a_labelled_contents_toggle(self, repo_root: Path) -> None:
-        """One affordance for the sidebar, at every width, and it says
-        what it opens — an icon-only hamburger reads as "site menu"."""
+    def test_chrome_has_a_contents_toggle(self, repo_root: Path) -> None:
+        """One affordance for the sidebar, at every width. Icon only —
+        the visible word was removed, so the name has to survive in the
+        accessible name and the hover title instead."""
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "drawer-toggle" in src, "Contents toggle wiring missing"
-        assert "drawer-toggle-label" in src, "the toggle must carry a visible label"
+        assert "drawer-toggle-label" not in src, (
+            "the toggle is icon-only — the visible label must stay removed"
+        )
+        assert 'aria-label="' in src and 'title="' in src, (
+            "an icon-only toggle must carry its name as aria-label and title"
+        )
         assert "aria-expanded" in src and "aria-controls" in src, "toggle aria wiring missing"
         assert "function setDrawer(" in src, "open/close must go through one state setter"
 

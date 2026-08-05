@@ -354,13 +354,15 @@ line numbers with a language pill and brace folds, glossary tooltips,
 the lightbox with pan and zoom, and the print stylesheet.
 
 The rail is worth knowing about because it changes what a heading
-costs you. It is the 9px strip across the top: read progress, plus a
-tick for every `##` and a dot for every figure — table, chart, diagram,
-comparison, step flow, annotated code — each one a button that jumps
-there. So a page with clear section titles and real figures gets a
-usable map for free, and a page that is one long undivided section
-gets a rail with nothing on it. That is a reason to break a page into
-sections, not a reason to write anything extra.
+costs you. It is the hairline strip across the top: read progress, plus
+a tick for every heading — thicker the higher its level — and a mark for
+every figure, shaped by kind: a square is a table, a circle is a chart,
+a diamond is a diagram, a hollow square is any other figure. Each one
+is a button that jumps there, and hovering the strip opens it so the
+shapes resolve. So a page with clear section titles and real figures
+gets a usable map for free, and a page that is one long undivided
+section gets a rail with nothing on it. That is a reason to break a
+page into sections, not a reason to write anything extra.
 
 There is no stylesheet to write and no `:root` block to define. Two
 complete CSS variable sets ship in the kit, light and dark, and every

@@ -189,17 +189,9 @@ body.drawer-open::before {
 body.drawer-open { overflow: hidden; }
 
 /* The Contents button opens the drawer at every width — the sidebar's
-   only affordance. It carries a visible label, so it sizes to content
-   instead of the square icon box the other chrome buttons use. */
-.ctrl-btn.drawer-toggle {
-  display: inline-flex;
-  width: auto;
-  min-width: 44px;
-  gap: 8px;
-  padding: 0 14px;
-  font: 600 13px 'Inter', sans-serif;
-}
-.ctrl-btn.drawer-toggle .drawer-toggle-label { line-height: 1; white-space: nowrap; }
+   only affordance. It takes the same 44px icon box as every other chrome
+   button; the name lives in `aria-label` and `title`, not in ink above
+   the cover. */
 
 main {
   padding: 56px 64px 120px 64px;
@@ -292,6 +284,34 @@ nav.toc, page-toc {
 .ctrl-btn { transform: translate(var(--vv-left, 0), var(--vv-top, 0)); }
 .ctrl-btn:active { transform: translate(var(--vv-left, 0), var(--vv-top, 0)) scale(0.96); }
 .ctrl-btn svg { width: 20px; height: 20px; display: block; }
+/* Proximity dimming. The chrome buttons are permanent, fixed, and sit
+   over the top of the reading column at every scroll position — four
+   opaque 44px boxes competing with the cover for the first thing the eye
+   lands on. They fade back to a hint until the pointer approaches, then
+   come up to full strength; the falloff is per-button distance
+   (chrome.js), so walking toward the theme cycler brings the theme
+   cycler up and leaves the Contents button where it was.
+   Three things keep this from becoming a hidden control:
+   - the floor is 0.32, not 0 — the button is always visible, always
+     click-targetable, and its box never moves (invariant 2);
+   - hover and focus-visible pin it to full regardless of the computed
+     distance, so the keyboard path is unaffected;
+   - the whole mechanism only arms when a fine pointer has actually
+     moved (body[data-ctrl-proximity]) — a touch device, a screen
+     reader, or a browser where the script never ran sees full opacity.
+   The warning indicator is out: an alert that dims itself is a bug. */
+body[data-ctrl-proximity="1"] .ctrl-btn:not(.warning-indicator) {
+  opacity: var(--okt-ctrl-near, 1);
+}
+body[data-ctrl-proximity="1"] .ctrl-btn:hover,
+body[data-ctrl-proximity="1"] .ctrl-btn:focus-visible,
+body[data-ctrl-proximity="1"] .ctrl-btn[aria-expanded="true"] {
+  opacity: 1;
+}
+/* back-to-top carries its own visibility (scroll position decides
+   whether it exists at all). Proximity must not resurrect it. */
+body[data-ctrl-proximity="1"] .back-to-top:not(.visible) { opacity: 0; }
+
 .drawer-toggle { top: 16px; left: 16px; }
 .theme-toggle { top: 16px; right: 16px; }
 .width-toggle { top: 16px; right: 76px; /* 16 + 44 + 16 gap, left of theme */ }
@@ -458,7 +478,15 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
      it, where a 2px tick is a speck. Painted --bg, so the effect is
      that page content ends 12px early — what any fixed header does, at
      a fraction of the height. */
-  height: 12px;
+  --okt-rail-h: 12px;
+  /* One multiplier drives every mark's size, so at rest the strip is a
+     hairline and under the pointer it is a legible map. It composes with
+     the per-mark dock swell (`--okt-mag`) rather than replacing it: the
+     neighbourhood you are pointing at is the biggest thing on the rail,
+     inside a rail that has already grown. */
+  --okt-rail-scale: 1;
+  height: var(--okt-rail-h);
+  transition: height 0.16s ease;
   z-index: 250;
   background: var(--bg);
   /* The strip takes the pointer so the swell can start BEFORE the
@@ -466,6 +494,29 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
      already on target is backwards. Nothing interactive lives in the
      top 12px (the chrome buttons start at y=16), and the strip is
      opaque, so nothing is being covered. */
+}
+/* Hover opens the map. The strip grows DOWNWARD from a fixed top edge
+   and it is `position: fixed`, so nothing in the document moves and no
+   mark changes its x or its top — the growth is the one direction that
+   cannot displace anything, including the mark you are aiming at.
+   32px, because the tallest thing on the rail is the title bar at
+   9px x 2 (open scale) x 1.6 (swell at the pointer) = 28.8px, and it
+   has to stay inside the strip rather than hang onto the text scrolling
+   under it. Those three numbers are one constraint — change any and
+   re-check the other two against the 9px bar.
+   `focus-within` is not decoration: the keyboard path through the marks
+   is a roving tabindex, and a 3px mark you cannot see is not a target. */
+.okt-rail:hover,
+.okt-rail:focus-within {
+  --okt-rail-h: 32px;
+  --okt-rail-scale: 2;
+  background: var(--surface);
+  box-shadow: 0 4px 14px var(--shadow-soft);
+}
+/* A touch pointer has no hover. Expanding on tap would grow the strip
+   under the finger that just committed to a target. */
+@media (hover: none) {
+  .okt-rail:hover { --okt-rail-h: 12px; --okt-rail-scale: 1; background: var(--bg); box-shadow: none; }
 }
 /* The track. It has to be visible or the ticks read as a row of
    floating marks with nothing joining them — and the line joining them
@@ -490,7 +541,10 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
    comfortably large while the mark stays a hairline. */
 .okt-rail-mark {
   position: absolute;
-  top: 0; height: 13px; width: 14px; margin-left: -7px;
+  /* The box follows the strip so an expanded rail is also a bigger
+     target. It only ever grows downward from top: 0 — the x and the top
+     of every mark are the same in every state. */
+  top: 0; height: max(13px, var(--okt-rail-h, 12px)); width: 14px; margin-left: -7px;
   padding: 0; border: 0; background: none;
   -webkit-appearance: none; appearance: none;
   cursor: pointer; pointer-events: auto;
@@ -501,37 +555,66 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
   /* The swell. `transform` only — it never triggers layout, so the
      pointermove handler is cheap and the boxes above stay put.
      transform-origin at the top centre grows the mark downward from
-     the track, the way a tick lengthens rather than floats. */
-  transform: translateX(-50%) scale(var(--okt-mag, 1));
+     the track, the way a tick lengthens rather than floats.
+     Two multipliers: the rail-wide one (hover opens the map) and the
+     per-mark dock one (the pointer picks a neighbourhood out of it). */
+  transform: translateX(-50%) scale(calc(var(--okt-mag, 1) * var(--okt-rail-scale, 1)));
   transform-origin: 50% 0;
   transition: background-color 0.18s ease, opacity 0.18s ease, transform 0.12s ease;
 }
 /* ---- shapes: what kind of thing is at this position ---- */
-/* Heading — a bar crossing the track. Two depths, so a page of six
-   sections and a page of six sections with thirty sub-headings do not
-   draw the same picture. */
+/* Headings — a bar crossing the track, and the bar gets THICKER as the
+   heading gets more important. Depth alone (the old two heights) says
+   "there is a hierarchy"; depth plus weight says which level you are
+   looking at without measuring it against its neighbour. Three tiers,
+   matching the three the page can have. */
+.okt-rail-mark[data-kind="title"]::before {
+  width: 3px; height: 9px; border-radius: 0 0 1px 1px;
+  background: var(--text); opacity: 1;
+}
 .okt-rail-mark[data-kind="section"]::before {
   width: 2px; height: 7px; border-radius: 0 0 1px 1px;
   background: var(--text-soft); opacity: 0.9;
 }
 .okt-rail-mark[data-kind="sub"]::before {
-  width: 2px; height: 4px; border-radius: 0 0 1px 1px;
+  width: 1.5px; height: 4px; border-radius: 0 0 1px 1px;
   background: var(--text-soft); opacity: 0.5;
 }
 /* Figures sit below the track, quieter than any heading — the shape of
    the page is its headings; figures are the things you go back for. */
 .okt-rail-mark[data-kind="figure"]::before {
-  top: 5px;
+  top: calc(5px * var(--okt-rail-scale, 1));
   background: var(--text-faint); opacity: 0.62;
 }
+/* The three kinds a reader actually hunts for by name get a silhouette
+   of their own, and none of them is shared with anything else:
+   a table is a filled square (a grid of cells),
+   a chart is a filled circle (a point on an axis),
+   a diagram is a diamond (a topology, a square turned off-axis).
+   Everything else — KPI grids, comparison grids, step flows, snippets,
+   annotated code, example pairs — is a hollow square: recognisably "a
+   figure", recognisably not one of the three. At 4px this is the whole
+   budget; the hover expansion is what makes the four resolve, and the
+   tooltip carries the name. */
 .okt-rail-mark[data-shape="square"]::before { width: 4px; height: 4px; border-radius: 1px; }
 .okt-rail-mark[data-shape="round"]::before  { width: 4px; height: 4px; border-radius: 50%; }
-/* Diamond — a square on its corner. The rotation composes with the
-   swell rather than replacing it, so a magnified diamond stays a
+.okt-rail-mark[data-shape="hollow"]::before {
+  width: 4px; height: 4px; border-radius: 1px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--text-faint);
+}
+/* Diamond — a square on its corner. The rotation composes with both
+   scales rather than replacing them, so a magnified diamond stays a
    diamond. */
 .okt-rail-mark[data-shape="angle"]::before {
   width: 4px; height: 4px; border-radius: 1px;
-  transform: translateX(-50%) scale(var(--okt-mag, 1)) rotate(45deg);
+  transform: translateX(-50%) scale(calc(var(--okt-mag, 1) * var(--okt-rail-scale, 1))) rotate(45deg);
+}
+.okt-rail-mark[data-shape="hollow"]:hover::before,
+.okt-rail-mark[data-shape="hollow"]:focus-visible::before,
+.okt-rail-mark[data-shape="hollow"].is-current::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 .okt-rail-mark:hover::before,
 .okt-rail-mark:focus-visible::before,
@@ -550,7 +633,10 @@ body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
 /* Absolutely positioned and pointer-transparent, so revealing it cannot
    move the rail, the marks, or anything on the page. */
 .okt-rail-tip {
-  position: absolute; top: 16px;
+  /* Below the strip at whatever height the strip currently is — the tip
+     only ever shows while the rail is open, so this resolves to 34px in
+     practice and never lands on top of a mark. */
+  position: absolute; top: calc(var(--okt-rail-h, 12px) + 6px);
   transform: translateX(-50%);
   max-width: min(300px, 66vw);
   padding: 7px 10px;
@@ -1566,21 +1652,16 @@ code:not(pre code) {
   background: transparent !important;
   color: inherit !important;
 }
-/* Size to content rather than stretching three short cells across the
-   full content width — "Plan | manifest list | rewrite groups" spread
-   over 970px reads as a layout accident. Still capped at 100%, so a
-   small table with long cells behaves exactly as before. */
-.okt-table-wrap[data-scale="small"] .okt-table-scroll > table {
-  width: auto;
-  max-width: 100%;
-}
-/* The card has to shrink with it. Left at full width, the header band
-   and the row rules stop mid-card and the empty remainder reads as a
-   rendering fault. */
-.okt-table-wrap[data-scale="small"] {
-  width: fit-content;
-  max-width: 100%;
-}
+/* A small table spans the column like every other block. It once sized
+   to its content — three short cells stretched over 970px was read as a
+   layout accident — but the card that shrank with it then ended short of
+   the paragraph above and the code block below, and a right edge that
+   steps in and out down the page reads as the bigger fault. Same rule as
+   prose, callouts and diagrams: one column, one right edge. Columns
+   distribute the slack; `table-layout: auto` on a full-width table gives
+   each column its content share, so the cells stay legible.
+   Pinned by test_presentation_measure.py and
+   test_presentation_defaults.py::test_a_small_table_shares_the_column_edge. */
 /* Force-show whenever the table is in a non-default state — an
    active filter (input has text), an active chip, or a view other
    than the default table view. The user must always be able to see
@@ -5744,6 +5825,36 @@ main .example-pair {
    with the width toggle, which moves every block together.
    Pinned by test_presentation_measure.py — every block in a section
    shares one right edge, at every width. */
+
+/* Running prose is justified, and the hyphenation is not optional.
+   Justify alone at this measure opens rivers — the browser can only
+   stretch word spaces, so one long word at the end of a line drags a
+   whole line apart. `hyphens: auto` gives it break points and the
+   inter-word spacing stays close to the ragged-right value.
+   Scope is deliberately a list, not `main`: a justified table cell, axis
+   label, chip or caption is a short string stretched to a box edge,
+   which looks broken. Only blocks that run several lines of sentence
+   text are in. Code is never justified — `pre` keeps its own spacing. */
+main > section > p,
+main > section > ul li,
+main > section > ol li,
+main > section > blockquote p,
+main .callout p,
+main .callout li,
+main .tldr li,
+main .insight p,
+main .example-pair p {
+  text-align: justify;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  /* Cap the damage on the pathological line: a long unbreakable token
+     (a URL, an identifier) can still force one over-stretched line, and
+     without a limit the browser will take the word spaces anywhere. */
+  text-justify: inter-word;
+}
+/* A single-line block needs no exception: `justify` leaves the LAST line
+   of a block ragged, and a one-line paragraph is all last line. Nothing
+   short gets stretched. */
 
 /* The one block that broke that rule without anyone writing a line of
    CSS: the kit never styled <blockquote>, so it took the UA default

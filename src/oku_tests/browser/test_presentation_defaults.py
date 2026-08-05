@@ -263,9 +263,7 @@ def test_a_title_only_cover_shrinks_to_fit(defaults_url, browser):
 
 
 def test_prose_fills_the_column_like_everything_else(rendered):
-    """A paragraph and a table on the same page end at the same x. (A
-    SMALL table is the stated exception — it sizes to its content — so
-    this measures one past the threshold.)"""
+    """A paragraph and a table on the same page end at the same x."""
     got = rendered.evaluate(
         """() => {
         const t = document.querySelector('#big .okt-table-wrap');
@@ -275,6 +273,50 @@ def test_prose_fills_the_column_like_everything_else(rendered):
     }"""
     )
     assert abs(got["table"] - got["para"]) <= 1, got
+
+
+def test_running_prose_is_justified_to_both_edges(rendered):
+    """A justified paragraph ends every line except its last at exactly
+    the column's right edge — which is the same edge the table, the code
+    block and the cover use. Measured as line boxes, not as a computed
+    property, because `text-align: justify` without `hyphens: auto` is
+    the failure this has to distinguish itself from: it computes the
+    same and renders as rivers."""
+    got = rendered.evaluate(
+        """() => {
+        const p = document.querySelector('#why p');
+        const r = document.createRange(); r.selectNodeContents(p);
+        const lines = [...r.getClientRects()].filter(b => b.width > 1);
+        const edge = Math.round(p.getBoundingClientRect().right);
+        const cs = getComputedStyle(p);
+        return { align: cs.textAlign,
+                 hyphens: cs.hyphens || cs.webkitHyphens,
+                 count: lines.length,
+                 shortfall: lines.slice(0, -1).map(b => edge - Math.round(b.right)) };
+    }"""
+    )
+    assert got["count"] >= 3, f"the fixture paragraph did not wrap: {got}"
+    assert got["align"] == "justify", got
+    assert got["hyphens"] == "auto", f"justify without hyphenation opens rivers: {got}"
+    assert max(got["shortfall"]) <= 1, f"a line stopped short of the column edge: {got}"
+
+
+def test_short_strings_are_not_stretched_to_a_box_edge(rendered):
+    """The scope is running prose, deliberately. A table cell, a chart
+    label or a caption justified to its box edge is a fragment pulled
+    apart, so nothing outside sentence text is in the selector list."""
+    got = rendered.evaluate(
+        """() => {
+        const al = sel => { const e = document.querySelector(sel);
+                            return e ? getComputedStyle(e).textAlign : null; };
+        return { cell: al('#what .okt-table-wrap td'),
+                 head: al('#what .okt-table-wrap th'),
+                 heading: al('main > section > h2') };
+    }"""
+    )
+    assert got["cell"] != "justify", got
+    assert got["head"] != "justify", got
+    assert got["heading"] != "justify", got
 
 
 # ---------- small tables ----------
@@ -313,19 +355,26 @@ def test_a_small_table_does_not_offer_to_sort_three_rows(rendered):
     assert got["arrow"] in ("none", "normal"), got
 
 
-def test_a_small_table_sizes_to_its_content(rendered):
-    """Three short cells stretched across the full content width read as
-    a layout accident. The cap at 100% still holds."""
+def test_a_small_table_shares_the_column_edge(rendered):
+    """A small table is a size rule about its CONTROLS, not about its
+    box. The card spans the column and the table fills the card, the
+    same as a paragraph, a callout or a diagram — one column, one right
+    edge. This was once the other way round (fit-content, so three short
+    cells were not stretched over 970px) and the card then stopped short
+    of every block around it, which reads as a rendering fault."""
     got = rendered.evaluate(
         """() => {
         const w = document.querySelector('#what .okt-table-wrap');
         const t = w.querySelector('table');
-        return { table: Math.round(t.getBoundingClientRect().width),
-                 wrap: Math.round(w.getBoundingClientRect().width) };
+        const p = document.querySelector('main > section > p');
+        return { table: Math.round(t.getBoundingClientRect().right),
+                 wrap: Math.round(w.getBoundingClientRect().right),
+                 para: Math.round(p.getBoundingClientRect().right) };
     }"""
     )
-    assert got["table"] < got["wrap"], got
-    assert got["table"] <= got["wrap"], got
+    assert abs(got["wrap"] - got["para"]) <= 1, got
+    # The table fills the card it sits in, minus the card's own padding.
+    assert 0 <= got["wrap"] - got["table"] <= 14, got
 
 
 def test_a_table_past_the_threshold_keeps_its_controls(rendered):

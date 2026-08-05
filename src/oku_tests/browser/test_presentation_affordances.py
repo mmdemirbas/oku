@@ -323,6 +323,89 @@ def test_list_cards_carry_the_same_edge(rendered):
     assert got["shadow"] != "none", got
 
 
+# ---------- chrome buttons ----------
+
+
+def _ctrl(page, sel):
+    return page.evaluate(
+        """(sel) => {
+        const b = document.querySelector(sel);
+        const r = b.getBoundingClientRect();
+        return { opacity: parseFloat(getComputedStyle(b).opacity),
+                 box: [Math.round(r.x), Math.round(r.y),
+                       Math.round(r.width), Math.round(r.height)] };
+    }""",
+        sel,
+    )
+
+
+def test_chrome_buttons_quiet_down_when_the_pointer_is_elsewhere(rendered):
+    """Four opaque 44px boxes float over the top of the reading column at
+    every scroll position, competing with the cover for the first thing
+    the eye lands on. They fade to a hint when nothing is reaching for
+    them and come back up on approach — per button, so walking toward
+    the theme cycler brings the theme cycler up.
+
+    The floor is not zero and the box does not change: a control the
+    reader cannot see is a control the reader cannot find, and a control
+    that resizes as you approach is one you have to chase."""
+    rendered.mouse.move(700, 700)
+    rendered.wait_for_timeout(300)
+    far = _ctrl(rendered, ".theme-toggle")
+
+    rendered.mouse.move(1400, 30)  # onto the top-right cluster
+    rendered.wait_for_timeout(300)
+    near = _ctrl(rendered, ".theme-toggle")
+
+    rendered.mouse.move(700, 700)
+    rendered.wait_for_timeout(300)
+
+    assert 0.2 < far["opacity"] < 0.5, f"dimmed out of existence, or not dimmed: {far}"
+    assert near["opacity"] > 0.98, f"the button did not come back on approach: {near}"
+    assert far["box"] == near["box"], "the button moved or resized as the pointer approached"
+
+
+def test_approaching_one_cluster_leaves_the_other_alone(rendered):
+    """Proximity is per button, measured to the button's BOX. A single
+    top-of-page threshold would light the whole strip whenever the
+    pointer crossed y=100, which is every scroll gesture."""
+    rendered.mouse.move(1400, 30)
+    rendered.wait_for_timeout(300)
+    got = {
+        "theme": _ctrl(rendered, ".theme-toggle")["opacity"],
+        "drawer": _ctrl(rendered, ".drawer-toggle")["opacity"],
+    }
+    rendered.mouse.move(700, 700)
+    rendered.wait_for_timeout(300)
+    assert got["theme"] > 0.98, got
+    assert got["drawer"] < 0.5, f"the far cluster lit up too: {got}"
+
+
+def test_the_dimming_never_arms_without_a_pointer(afford_url, browser):
+    """A touch device has no approach to detect, and a browser where the
+    script never ran has no proximity at all. Both must see full-strength
+    controls — the attribute the stylesheet keys off is set only once a
+    fine pointer has actually moved."""
+    ctx = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    page = ctx.new_page()
+    try:
+        page.goto(f"{afford_url}/page.html")
+        page.wait_for_timeout(1500)
+        page.tap(".drawer-toggle")
+        page.wait_for_timeout(300)
+        got = page.evaluate(
+            """() => ({
+            armed: document.body.getAttribute('data-ctrl-proximity'),
+            theme: parseFloat(getComputedStyle(document.querySelector('.theme-toggle')).opacity),
+        })"""
+        )
+        assert got["armed"] is None, f"touch armed the proximity dimming: {got}"
+        assert got["theme"] > 0.98, got
+    finally:
+        page.close()
+        ctx.close()
+
+
 def test_touch_keeps_the_controls_reachable(afford_url, browser):
     """Hover-to-reveal has no meaning without a pointer. On a device
     reporting `hover: none` the bar must stay visible, or filtering and

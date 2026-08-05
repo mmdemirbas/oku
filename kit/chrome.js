@@ -1259,9 +1259,11 @@ class PageChrome extends HTMLElement {
     var topLabel = this.getAttribute('top-label') || 'Back to top';
 
     // The Contents button is the sidebar's only affordance, at every
-    // width. It carries a visible label, not just a glyph: this is the
-    // control a reader looks for by name, and an icon-only hamburger
-    // reads as "site menu" rather than "contents of this page".
+    // width. Icon only, like every other chrome button: the label was
+    // the one control wearing a word, which made the top-left corner
+    // the heaviest thing above the cover. The name still travels — as
+    // `aria-label` for a screen reader and as `title` for the hover
+    // tooltip — so nothing is lost except the ink.
     this.innerHTML =
       '<a class="skip-link" href="#main-content">' + skipLabel + '</a>' +
       '<div class="okt-rail" id="oku-rail">' +
@@ -1270,8 +1272,7 @@ class PageChrome extends HTMLElement {
         '<div class="okt-rail-tip" role="status" aria-live="off"></div>' +
       '</div>' +
       '<button class="ctrl-btn drawer-toggle" type="button" aria-expanded="false" aria-controls="oku-page-nav"' +
-        ' aria-label="' + drawerLabel + '" title="' + drawerLabel + '">' + ICON_MENU +
-        '<span class="drawer-toggle-label">' + drawerLabel + '</span></button>' +
+        ' aria-label="' + drawerLabel + '" title="' + drawerLabel + '">' + ICON_MENU + '</button>' +
       '<button class="ctrl-btn width-toggle" type="button" aria-label="' + widthLabel + '" title="' + widthLabel + '">' + ICON_WIDTH + '</button>' +
       '<button class="ctrl-btn theme-toggle" type="button" aria-label="' + themeLabel + '" title="' + themeLabel + '">' +
         '<span class="icon-system">' + ICON_SYSTEM + '</span>' +
@@ -1564,27 +1565,39 @@ function buildTOC(tocList) {
 // line, which is the "annoying" failure this is trying to avoid.
 // `oku-annotated-code` IS here — that one is a figure, not an aside.
 // selector · label · shape. The shape is what the reader sees; the
-// label is what the tooltip says. Four shapes, not eleven, because a
-// 3px mark can carry a silhouette and cannot carry an alphabet:
-//   bar     headings — the page's own divisions
-//   square  a grid of values you read cell by cell
-//   round   something plotted on an axis
-//   angle   a topology or a walkthrough — boxes and arrows
-// Shapes this small are only half-legible at rest, which is what the
-// hover swell is for: the neighbourhood around the pointer grows and
-// the silhouettes resolve.
+// label is what the tooltip says. Five shapes, not eleven, because a
+// 4px mark can carry a silhouette and cannot carry an alphabet:
+//   bar     headings — the page's own divisions, three thicknesses
+//   square  a table: a grid of cells you read one at a time
+//   round   a chart: something plotted on an axis
+//   angle   a diagram: a topology, a square turned off its axis
+//   hollow  every other figure — recognisably a figure, recognisably
+//           not one of the three above
+// The three that get a silhouette of their own are the three a reader
+// hunts for by name ("where was that table"). Shapes this small are only
+// half-legible at rest, which is what the hover expansion and the dock
+// swell are for: the rail opens, the neighbourhood around the pointer
+// grows, and the silhouettes resolve.
+// ORDER IS THE PRIORITY. A figure that overlaps one already claimed is
+// dropped, in either nesting direction, so whatever appears first here
+// wins the position. That is what keeps a chart from being reported as
+// "Example": on docs/charts.md every chart sits inside an .example-pair,
+// and the pair starts a few pixels above the chart it wraps — so with
+// both claiming a mark, the thinner dropped the chart and a page of 48
+// charts drew no chart shape at all. Named kinds first, generic
+// containers last.
 var RAIL_FIGURES = [
+  ['.okt-chart-grid', 'Charts', 'round'],
   ['.okt-table-wrap', 'Table', 'square'],
-  ['.kpi-grid', 'Figures', 'square'],
-  ['.compare-grid', 'Comparison', 'square'],
   ['oku-chart', 'Chart', 'round'],
   ['.bar-chart', 'Chart', 'round'],
-  ['.okt-chart-grid', 'Charts', 'round'],
   ['oku-diagram', 'Diagram', 'angle'],
-  ['.step-cards', 'Steps', 'angle'],
-  ['oku-annotated-code', 'Annotated code', 'square'],
-  ['oku-live-snippet', 'Snippet', 'square'],
-  ['.example-pair', 'Example', 'square'],
+  ['.kpi-grid', 'Figures', 'hollow'],
+  ['.compare-grid', 'Comparison', 'hollow'],
+  ['.step-cards', 'Steps', 'hollow'],
+  ['oku-annotated-code', 'Annotated code', 'hollow'],
+  ['oku-live-snippet', 'Snippet', 'hollow'],
+  ['.example-pair', 'Example', 'hollow'],
 ];
 
 // How far from the pointer the swell reaches, and how much it swells.
@@ -1592,10 +1605,14 @@ var RAIL_FIGURES = [
 // so the numbers are small and the falloff is a cosine — abrupt
 // falloff reads as a jump when the pointer moves one pixel.
 var RAIL_MAG_RADIUS_PX = 46;
-// 1.6, not more: a section bar is 7px and grows downward from the top
-// of the track, so anything past 1.7 pushes it out of the 12px strip
-// and onto the page content — the exact illegibility the strip was
-// made tall enough to prevent.
+// 1.6, not more. The swell only ever runs while the pointer is on the
+// rail, which is also when the rail is open (12px -> 32px, marks x2), so
+// the two multiply: the 9px title bar becomes 9 x 2 x 1.6 = 28.8px and
+// grows downward from the top of the track. That fits the 32px open
+// strip; past ~1.75 it hangs onto the page content underneath, which is
+// the exact illegibility the strip is tall enough to prevent. Change
+// RAIL_MAG_MAX, the open height or the open scale and the other two
+// have to be re-checked against the 9px bar.
 var RAIL_MAG_MAX = 1.6;
 
 // Set by buildRail so the existing rAF-throttled scroll handler can
@@ -1621,6 +1638,20 @@ function buildRail() {
   // actually looking for, and a caption is not always there.
   var marks = [];
   var seen = [];
+  // The page title, at the top of the bar hierarchy. The rail's three
+  // bar weights are h1 / h2 / h3, and without this the top weight never
+  // appears on a page — the body of a markdown page starts at `##`, so
+  // the only h1 is the cover's. It is worth a mark on its own terms
+  // too: the leftmost tick is where the document starts.
+  var h1 = document.querySelector('main h1');
+  if (h1) {
+    var hc = h1.cloneNode(true);
+    var hp = hc.querySelector('.permalink'); if (hp) hp.remove();
+    var htitle = hc.textContent.trim();
+    if (htitle) {
+      marks.push({ el: h1, kind: 'title', shape: 'bar', label: htitle, tipKind: 'Title' });
+    }
+  }
   document.querySelectorAll('main > section').forEach(function (sec) {
     var h2 = sec.querySelector('h2');
     var title = '';
@@ -1647,10 +1678,16 @@ function buildRail() {
     });
     RAIL_FIGURES.forEach(function (spec) {
       sec.querySelectorAll(spec[0]).forEach(function (el) {
-        // A chart inside a chart-grid, a table inside a lightbox clone:
-        // only the outermost match of a nested pair earns a dot.
+        // One dot per position. Overlap is rejected in BOTH nesting
+        // directions — an outer container that wraps a claimed figure is
+        // dropped exactly as an inner one under a claimed container is —
+        // so the winner is decided by RAIL_FIGURES order, which is
+        // specificity, rather than by which happens to be outermost.
+        // Checking only `contains` let a wrapper claim its own mark a few
+        // pixels above the figure inside it, and the thinner then dropped
+        // the figure.
         for (var i = 0; i < seen.length; i++) {
-          if (seen[i] === el || seen[i].contains(el)) return;
+          if (seen[i] === el || seen[i].contains(el) || el.contains(seen[i])) return;
         }
         seen.push(el);
         marks.push({
@@ -1684,10 +1721,13 @@ function buildRail() {
   // that happen to precede it in document order. A single pass left a
   // figure sitting 1px from the next section heading.
   var placed = marks.filter(function (m) { return m.kind === 'section'; });
-  // Sub-headings then figures, each measured against everything already
-  // down. Priority is the order of the page's own hierarchy: a section
-  // outranks a sub-section outranks a figure.
-  ['sub', 'figure'].forEach(function (kind) {
+  // Title, then sub-headings, then figures, each measured against
+  // everything already down. Priority is the order of the page's own
+  // hierarchy — except that the TITLE is thinned rather than pinned:
+  // it sits at pct 0 and the first section can be a pixel behind it on
+  // a short page, and of the two the section is the one nothing else
+  // can reach (back-to-top already goes where the title goes).
+  ['title', 'sub', 'figure'].forEach(function (kind) {
     if (kind === 'figure' && railW < FIGURES_NEED_PX) return;
     marks.forEach(function (m) {
       if (m.kind !== kind) return;
@@ -1937,6 +1977,89 @@ function buildRail() {
       new ResizeObserver(rebuild).observe(document.body);
     });
   }
+})();
+
+/* ============ Chrome buttons: proximity ============ *
+ * The fixed chrome buttons are the only permanently-opaque things
+ * floating over the reading column. They fade to a hint and come back up
+ * as the pointer approaches, per button, on the same cosine falloff the
+ * rail's dock swell uses — an abrupt threshold reads as a flicker when
+ * the pointer moves one pixel across it.
+ *
+ * Distance is to the button's BOX, not its centre: point-to-rect, zero
+ * inside. A 44px box measured from its centre is already 22px "away"
+ * when the pointer is on its edge, which makes a button you are about to
+ * click still visibly dim.
+ *
+ * Nothing here changes a bounding box or a layout property — opacity
+ * only, driven by a custom property the stylesheet reads. The buttons
+ * stay exactly where they are, at their full hit size, at every value.
+ * ------------------------------------------------------------------ */
+(function () {
+  // The floor. Not zero: a control the reader cannot see is a control
+  // the reader cannot find, and the whole point is to quiet these, not
+  // to hide them.
+  var CTRL_DIM_FLOOR = 0.32;
+  // How far away the fade starts. Roughly "the pointer is heading for
+  // the corner" rather than "the pointer is over the button" — by the
+  // time you arrive it is already at full strength.
+  var CTRL_NEAR_PX = 190;
+
+  var rects = null;
+  var buttons = [];
+  var pending = false;
+  var px = -1e4, py = -1e4;
+
+  // position: fixed, so a rect only moves on resize or a visual-viewport
+  // shift. Cached, and the pointermove path never touches the layout.
+  function measure() {
+    buttons = Array.prototype.slice.call(document.querySelectorAll('.ctrl-btn'));
+    rects = buttons.map(function (b) { return b.getBoundingClientRect(); });
+  }
+
+  function apply() {
+    if (!rects || rects.length !== document.querySelectorAll('.ctrl-btn').length) measure();
+    for (var i = 0; i < buttons.length; i++) {
+      var r = rects[i];
+      if (!r || !r.width) continue;
+      var dx = Math.max(r.left - px, 0, px - r.right);
+      var dy = Math.max(r.top - py, 0, py - r.bottom);
+      var d = Math.sqrt(dx * dx + dy * dy);
+      var v = d >= CTRL_NEAR_PX
+        ? CTRL_DIM_FLOOR
+        : CTRL_DIM_FLOOR + (1 - CTRL_DIM_FLOOR) * Math.cos((d / CTRL_NEAR_PX) * Math.PI / 2);
+      buttons[i].style.setProperty('--okt-ctrl-near', v.toFixed(3));
+    }
+  }
+
+  function schedule() {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () { pending = false; apply(); });
+  }
+
+  document.addEventListener('pointermove', function (e) {
+    // A touch pointer has no hover, so there is no "approaching" to
+    // respond to and dimming would just make the controls harder to hit.
+    // The attribute is what arms the stylesheet, so until a mouse or a
+    // pen actually moves, every button stays at full opacity.
+    if (e.pointerType === 'touch') return;
+    if (document.body.getAttribute('data-ctrl-proximity') !== '1') {
+      document.body.setAttribute('data-ctrl-proximity', '1');
+      measure();
+    }
+    px = e.clientX; py = e.clientY;
+    schedule();
+  }, { passive: true });
+
+  // Pointer left the window: nothing is being approached.
+  document.addEventListener('pointerleave', function () {
+    px = -1e4; py = -1e4;
+    schedule();
+  }, { passive: true });
+
+  window.addEventListener('resize', function () { rects = null; schedule(); }, { passive: true });
+  window.addEventListener('oku:rendered', function () { rects = null; });
 })();
 
 /* ============ Reading aids: progress, back-to-top, copy-btn, glossary ============ */

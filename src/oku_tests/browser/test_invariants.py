@@ -55,7 +55,11 @@ def test_contents_drawer_is_off_canvas_until_asked_for(page, site_url, size):
     box = button.bounding_box()
     assert box["width"] >= 24 and box["height"] >= 24, "touch target below 24px minimum"
     assert button.get_attribute("aria-expanded") == "false"
-    assert "Contents" in button.inner_text(), "the opener carries a visible label"
+    # Icon only, like every other chrome button. The name has to survive
+    # somewhere a screen reader and a hover tooltip can reach it.
+    assert button.inner_text().strip() == "", "the opener is icon-only"
+    assert button.get_attribute("aria-label") == "Contents", "the opener lost its accessible name"
+    assert button.get_attribute("title") == "Contents", "the opener lost its hover tooltip"
 
     button.click()
     page.wait_for_function("document.querySelector('page-nav').getBoundingClientRect().left > -1")

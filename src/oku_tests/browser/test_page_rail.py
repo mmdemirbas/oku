@@ -45,23 +45,45 @@ TABLE = "\n".join(
 
 CODE = "```python\nvalue = 'a plain code block, which earns no mark'\n```"
 
+# A figure that is none of the three named shapes — it must land on the
+# hollow fallback rather than borrowing the table's square.
+KPI = (
+    "```oku-kpi-grid\n"
+    '{"tiles":[{"num":"12","label":"Files per minute"},'
+    '{"num":"5","label":"Second checkpoint interval"}]}\n'
+    "```"
+)
+
+
+CHART = '```oku-chart\n{"type":"bar","rows":[{"label":"a","value":6},{"label":"b","value":9}]}\n```'
+
+# A chart wrapped in a generic container. docs/charts.md is built entirely
+# out of these, and the wrapper used to claim the position a few pixels
+# above the chart it contains — so the thinner dropped every chart and a
+# page of 48 of them drew no chart shape at all.
+WRAPPED_CHART = (
+    "```oku-example\n"
+    '{"code":{"k":"code","src":"{\\"type\\":\\"bar\\"}","lang":"json"},'
+    '"output":{"k":"chart","type":"bar","rows":[{"label":"a","value":6},'
+    '{"label":"b","value":9}]}}\n'
+    "```"
+)
+
 
 def _section(n: int, body: str) -> str:
-    return (
-        f"## Section {n} {{#s{n}}}\n\n{PARA * 6}\n\n{body}\n\n"
-        f"### Detail {n}\n\n{PARA * 6}\n"
-    )
+    return f"## Section {n} {{#s{n}}}\n\n{PARA * 6}\n\n{body}\n\n### Detail {n}\n\n{PARA * 6}\n"
 
 
 LONG_MD = (
     "---\ntitle: Rail\nsummary: Landmarks on the progress strip.\n---\n\n"
     + _section(1, TABLE)
     + _section(2, "```mermaid\nflowchart LR\n  A[write] --> B[read]\n```")
-    + _section(
-        3, '```oku-chart\n{"type":"bar","rows":[{"label":"a","value":6},{"label":"b","value":9}]}\n```'
-    )
-    + _section(4, CODE)
-    + _section(5, TABLE)
+    + _section(3, CHART)
+    + _section(4, CODE + "\n\n" + KPI)
+    # The wrapped chart needs prose on both sides: the thinner drops a
+    # figure that lands within 6px of a neighbour, and the point of the
+    # test is which of the two overlapping CLAIMS wins, not thinning.
+    + _section(5, TABLE + "\n\n" + PARA * 6 + "\n\n" + WRAPPED_CHART)
     + _section(6, CODE)
 )
 
@@ -96,6 +118,15 @@ def rendered(rail_url, browser):
     page.wait_for_timeout(2200)
     yield page
     page.close()
+
+
+@pytest.fixture(autouse=True)
+def _pointer_parked(rendered):
+    """The page is module-scoped and the rail now reacts to hover, so a
+    test that leaves the pointer on the strip changes the state the next
+    test measures. Park it over the document before each one."""
+    rendered.mouse.move(700, 600)
+    rendered.wait_for_timeout(250)
 
 
 BOXES = """() => {
@@ -287,20 +318,48 @@ def test_the_rail_is_one_tab_stop_with_arrow_keys_inside(rendered):
 
 
 def test_nothing_moves_on_hover(rendered):
+    """The rail OPENS on hover — 12px of hairline becomes 28px of legible
+    map. "Thicker, without drifting the UI" is the whole constraint, and
+    it is satisfied by the direction of the growth: the strip is fixed
+    with a fixed top edge, so it can only grow downward, and every mark
+    keeps its x, its width and its top. Nothing the pointer is aiming at
+    moves, and nothing in the document moves at all."""
     before = rendered.evaluate(BOXES)
+    before_main = rendered.evaluate(
+        """() => Math.round(document.querySelector('main').getBoundingClientRect().top)"""
+    )
     rendered.hover(".okt-rail-mark >> nth=2")
     rendered.wait_for_timeout(350)
     after = rendered.evaluate(BOXES)
-    assert before == after, "the rail or its marks moved under the pointer"
+    after_main = rendered.evaluate(
+        """() => Math.round(document.querySelector('main').getBoundingClientRect().top)"""
+    )
+
+    # x, y, width: identical. Height: the rail and its targets grow.
+    assert [b[:3] for b in before["marks"]] == [a[:3] for a in after["marks"]], (
+        "a mark moved or changed width under the pointer"
+    )
+    assert before["rail"][:3] == after["rail"][:3], "the strip moved under the pointer"
+    assert before["rail"][3] == 12, before["rail"]
+    assert after["rail"][3] == 32, after["rail"]
+    assert after["marks"][0][3] > before["marks"][0][3], "the targets did not grow with the strip"
+    assert before_main == after_main, "the page content moved when the rail opened"
 
 
 def test_nothing_moves_on_focus(rendered):
+    """Same growth for the keyboard: a 3px mark you cannot see is not a
+    target, so focus opens the rail too — and moves nothing."""
     before = rendered.evaluate(BOXES)
     rendered.evaluate("""() => document.querySelectorAll('.okt-rail-mark')[2].focus()""")
     rendered.wait_for_timeout(350)
     after = rendered.evaluate(BOXES)
     rendered.evaluate("""() => document.activeElement.blur()""")
-    assert before == after, "the rail or its marks moved on focus"
+    rendered.wait_for_timeout(300)
+    assert [b[:3] for b in before["marks"]] == [a[:3] for a in after["marks"]], (
+        "a mark moved or changed width on focus"
+    )
+    assert before["rail"][:3] == after["rail"][:3], "the strip moved on focus"
+    assert after["rail"][3] == 32, after["rail"]
 
 
 def test_nothing_moves_when_the_current_mark_changes(rendered):
@@ -387,9 +446,11 @@ def test_marks_never_collide_at_any_width(rail_url, browser, width, expect_figur
 
 
 def test_marks_are_shaped_by_what_they_point_at(rendered):
-    """A 3px mark can carry a silhouette; it cannot carry an alphabet.
-    Four shapes: a bar for headings, a square for grids of values, a
-    round for something plotted on an axis, an angle for a topology."""
+    """A 4px mark can carry a silhouette; it cannot carry an alphabet.
+    The three kinds a reader hunts for by name get one each — a square
+    for a table, a round for a chart, an angle for a diagram — and
+    every other figure gets the hollow fallback, so none of the three
+    is ever confused with something else."""
     got = rendered.evaluate(
         """() => {
         const out = {};
@@ -401,28 +462,96 @@ def test_marks_are_shaped_by_what_they_point_at(rendered):
     }"""
     )
     assert got.get("section/bar") == 6, got
-    assert got.get("figure/square", 0) >= 2, got  # tables
+    assert got.get("figure/square", 0) == 2, got  # the two tables, and only those
     assert got.get("figure/round", 0) >= 1, got  # the chart
     assert got.get("figure/angle", 0) >= 1, got  # the mermaid diagram
+    assert got.get("figure/hollow", 0) >= 1, got  # the KPI grid — not a square
+
+
+def test_a_table_a_chart_and_a_diagram_never_share_a_silhouette(rendered):
+    """ "So I can find what I'm looking for at a glance" is only true if
+    the three shapes are actually distinguishable geometry, not three
+    names for one 4px box. Border-radius separates square from round;
+    the diamond's rotation separates it from both; the hollow fallback
+    has no fill at all."""
+    got = rendered.evaluate(
+        """() => {
+        const of = shape => {
+            const m = document.querySelector(`.okt-rail-mark[data-shape="${shape}"]`);
+            if (!m) return null;
+            const s = getComputedStyle(m, '::before');
+            return { radius: s.borderTopLeftRadius, transform: s.transform,
+                     bg: s.backgroundColor, ring: s.boxShadow };
+        };
+        return { square: of('square'), round: of('round'),
+                 angle: of('angle'), hollow: of('hollow') };
+    }"""
+    )
+    assert got["square"]["radius"] != got["round"]["radius"], got
+    # A 4x4 box with a 50% radius is a circle; 1px is a square.
+    assert got["round"]["radius"] in ("50%", "2px"), got["round"]
+    # The diamond carries a rotation the others do not — matrix(a,b,c,d…)
+    # with a non-zero b is a rotated box.
+    assert got["angle"]["transform"] != got["square"]["transform"], got
+    assert "none" not in got["angle"]["transform"], got["angle"]
+    # Hollow is a ring, not a fill.
+    assert got["hollow"]["bg"] in ("rgba(0, 0, 0, 0)", "transparent"), got["hollow"]
+    assert "inset" in got["hollow"]["ring"], got["hollow"]
+
+
+def test_a_wrapped_chart_still_reads_as_a_chart(rendered):
+    """One dot per position, and the kind that wins is the specific one.
+    Every chart in docs/charts.md sits inside an example pair; the pair
+    starts a few pixels above the chart, so with both claiming a mark the
+    thinner kept the pair and dropped the chart — 48 charts, no chart
+    shape, and a tooltip that said "Example" where the reader was looking
+    for "Chart". RAIL_FIGURES order decides it now, and overlap is
+    rejected in both nesting directions."""
+    got = rendered.evaluate(
+        """() => {
+        const pair = document.querySelector('#s5 .example-pair');
+        const chart = pair && pair.querySelector('oku-chart, .bar-chart');
+        const marks = [...document.querySelectorAll('.okt-rail-mark')];
+        const near = el => {
+            const top = el.getBoundingClientRect().top + scrollY;
+            const h = document.documentElement;
+            const pct = (top / (h.scrollHeight - h.clientHeight)) * 100;
+            return marks.filter(m => Math.abs(parseFloat(m.style.left) - pct) < 1.5)
+                        .map(m => m.dataset.shape + ':' + m.getAttribute('aria-label'));
+        };
+        return { hasPair: !!pair, hasChart: !!chart, at: chart ? near(chart) : [] };
+    }"""
+    )
+    assert got["hasPair"] and got["hasChart"], f"the fixture grew no wrapped chart: {got}"
+    assert len(got["at"]) == 1, f"the wrapper and its chart both claimed a mark: {got}"
+    assert got["at"][0].startswith("round:"), got
+    assert "Chart" in got["at"][0] and "Example" not in got["at"][0], got
 
 
 def test_heading_depth_is_visible_in_the_rail(rendered):
     """A page of six sections and a page of six sections with thirty
     sub-headings must not draw the same picture. Depth is carried by
-    the bar's height, so it stays one glance rather than one legend."""
+    BOTH the bar's height and its thickness — the title is the thickest
+    bar, a section is thinner, a sub-heading thinner still — so the
+    level reads without measuring one bar against its neighbour."""
     got = rendered.evaluate(
         """() => {
-        const h = sel => {
+        const dim = sel => {
             const m = document.querySelector(sel);
-            return m ? parseFloat(getComputedStyle(m, '::before').height) : null;
+            if (!m) return null;
+            const s = getComputedStyle(m, '::before');
+            return { h: parseFloat(s.height), w: parseFloat(s.width) };
         };
-        return { section: h('.okt-rail-mark[data-kind="section"]'),
-                 sub: h('.okt-rail-mark[data-kind="sub"]'),
+        return { title: dim('.okt-rail-mark[data-kind="title"]'),
+                 section: dim('.okt-rail-mark[data-kind="section"]'),
+                 sub: dim('.okt-rail-mark[data-kind="sub"]'),
                  subCount: document.querySelectorAll('.okt-rail-mark[data-kind="sub"]').length };
     }"""
     )
     assert got["subCount"] >= 2, f"the fixture grew no sub-headings: {got}"
-    assert got["sub"] < got["section"], got
+    assert got["title"] is not None, f"the page title earned no mark: {got}"
+    assert got["sub"]["h"] < got["section"]["h"] < got["title"]["h"], got
+    assert got["sub"]["w"] < got["section"]["w"] < got["title"]["w"], got
 
 
 # ---------- the swell ----------
@@ -480,27 +609,50 @@ def test_the_swell_moves_nothing(rendered):
     assert got["railH"] == 12, got
 
 
+def _worst_reach(page, swell):
+    """Tallest point any mark can reach, in strip coordinates, given the
+    rail's current open scale and `swell` as the dock multiplier. The
+    transform is anchored at the ::before's own top, so the reach is
+    top + height * railScale * swell, not (top + height) * scale."""
+    return page.evaluate(
+        """(swell) => {
+        const rail = document.getElementById('oku-rail');
+        const scale = parseFloat(getComputedStyle(rail).getPropertyValue('--okt-rail-scale')) || 1;
+        let worst = 0;
+        for (const m of document.querySelectorAll('.okt-rail-mark')) {
+            const s = getComputedStyle(m, '::before');
+            worst = Math.max(worst,
+                parseFloat(s.top || 0) + parseFloat(s.height || 0) * scale * swell);
+        }
+        return { railH: rail.getBoundingClientRect().height, scale, worst };
+    }""",
+        swell,
+    )
+
+
 def test_a_swollen_mark_stays_inside_the_strip(rendered):
     """The strip is opaque and the marks have to stay in it — a mark
     that grows past the bottom edge is drawn over whatever prose is
     scrolling underneath, which is the illegibility the strip's height
-    exists to prevent."""
-    got = rendered.evaluate(
-        """() => {
-        const railH = document.getElementById('oku-rail').getBoundingClientRect().height;
-        let worst = 0, worstMag = 0;
-        for (const m of document.querySelectorAll('.okt-rail-mark')) {
-            const s = getComputedStyle(m, '::before');
-            const reach = parseFloat(s.top || 0) + parseFloat(s.height || 0);
-            // The scale is anchored at the ::before's own top, so the
-            // magnified reach is top + height*mag, not (top+height)*mag.
-            worst = Math.max(worst, reach);
-            worstMag = Math.max(worstMag, parseFloat(s.top || 0) + parseFloat(s.height || 0) * 1.6);
-        }
-        return { railH, worstAtRest: worst, worstMagnified: worstMag };
-    }"""
-    )
-    assert got["worstMagnified"] <= got["railH"] + 1, got
+    exists to prevent.
+
+    Two multipliers compound now, and they compound in exactly one
+    state. The dock swell only ever runs while the pointer is ON the
+    rail, which is the same condition that opens it — so the closed
+    strip is checked without the swell, and the open one with it at
+    maximum. Checking the closed strip against a swell it can never
+    receive is what makes a 9px title bar look like a 14.4px overflow."""
+    at_rest = _worst_reach(rendered, 1)
+    assert at_rest["scale"] == 1, at_rest
+    assert at_rest["railH"] == 12, at_rest
+    assert at_rest["worst"] <= at_rest["railH"] + 1, at_rest
+
+    rendered.hover(".okt-rail-mark >> nth=2")
+    rendered.wait_for_timeout(350)
+    hovered = _worst_reach(rendered, 1.6)
+    assert hovered["scale"] > 1, "the rail did not open on hover"
+    assert hovered["railH"] == 32, hovered
+    assert hovered["worst"] <= hovered["railH"] + 1, hovered
 
 
 def test_touch_does_not_trigger_the_swell(rendered):

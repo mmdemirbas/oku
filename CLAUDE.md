@@ -208,8 +208,13 @@ measure is centred and **never moves when the drawer opens**. On a wide
 window the drawer lands in the empty gutter beside the column.
 
 One affordance: the **`.ctrl-btn.drawer-toggle` in the top-left chrome
-strip**, labelled "Contents" (icon + visible text, `aria-expanded`,
-`aria-controls`). It is visible at every width.
+strip** — icon only, in the same 44px box every other chrome button
+uses, with the name carried by `aria-label` + `title` (plus
+`aria-expanded` / `aria-controls`). It is present at every width. The
+visible word "Contents" was removed: it made the one control that wears
+text the heaviest thing above the cover, and `test_invariants.py`
+now asserts the button's `inner_text` is empty and both name attributes
+are there.
 
 Removed, do not bring back: the permanent sidebar grid column, the
 full-height right-edge handle (`.page-nav-edge`) that doubled as
@@ -228,10 +233,11 @@ judged on. Concretely, and each pinned by a test in
 - Every block in a section ends at the same x — paragraph, list,
   blockquote, callout, TL;DR, code, diagram, table. See "One column,
   one right edge" below; nothing caps a block below `--content-width`.
-- A table at or below `SMALL_TABLE_ROWS` (chrome.js) sizes to its
-  content and keeps only copy + expand. The controls stay in the DOM
-  with their listeners bound; CSS hides them, so a table that grows
-  past the threshold needs no re-init.
+- A table at or below `SMALL_TABLE_ROWS` (chrome.js) keeps only copy +
+  expand. That threshold is a rule about its CONTROLS, not about its
+  box: the card spans the column like every other block. The controls
+  stay in the DOM with their listeners bound; CSS hides them, so a
+  table that grows past the threshold needs no re-init.
 - The cover subtitle falls back to `summary`; a cover holding only an
   h1 gets `.cover-bare`; `updated` is suppressed when it equals `date`.
 
@@ -252,44 +258,95 @@ wants a per-block cap. `test_presentation_measure.py` pins the rule at
 every width, including the computed `max-width: none`, so re-applying
 the cap fails rather than merely looking different.
 
-**The rail does not move.** The 9px strip at the top carries read
-progress plus a tick per `##` and a dot per figure, each a button that
-jumps there. It sits where a mis-click costs a scroll position, so
-hover, focus and the current-position highlight change **colour and
-opacity only** — every bounding box is identical in every state, and
-`test_page_rail.py` compares them. The label is absolutely positioned
-and `pointer-events: none`, so revealing it cannot push anything.
+A small table was the one block exempt from this, sizing to its content
+so three short cells were not stretched over 970px. The card then ended
+short of the paragraph above and the code block below, which is the
+same stepped right edge in a different guise, and the exemption is
+gone. Columns distribute the slack; `table-layout: auto` gives each its
+content share.
 
-Two decisions inside it are load-bearing. Marks and the fill share one
+**Running prose is justified, and the hyphenation is part of it.**
+`text-align: justify` + `hyphens: auto` on paragraphs, list items,
+callout and TL;DR bodies. Justify without hyphenation computes the same
+and renders rivers — the browser can only stretch word spaces, so one
+long word at the end of a line drags the whole line apart. The scope is
+a selector list, not `main`: a justified table cell, axis label or chip
+is a short string pulled to a box edge. Single-line blocks need no
+exception — `justify` leaves a block's LAST line ragged, and a one-line
+paragraph is all last line.
+
+**The rail does not move — and opening it is not moving.** The strip at
+the top carries read progress plus a tick per heading and a dot per
+figure, each a button that jumps there. Hover and focus OPEN it: 12px
+of hairline becomes a 32px map, marks scale x2, and the swell still
+applies on top of that. Nothing drifts, because the strip is `fixed`
+with a fixed top edge and can therefore only grow **downward** — every
+mark keeps its x, its width and its top, `main` does not move, and
+`test_page_rail.py` compares all of it across states. The three numbers
+(32px open height, x2 open scale, `RAIL_MAG_MAX` 1.6) are one
+constraint against the 9px title bar: 9 x 2 x 1.6 = 28.8 has to fit
+inside 32. Change one, re-check the other two. The label is absolutely
+positioned and `pointer-events: none`, so revealing it cannot push
+anything.
+
+Three decisions inside it are load-bearing. Marks and the fill share one
 scale (`elementTop / maxScroll`), so the fill edge reaches a mark
 exactly when that landmark hits the top of the viewport — a second
-scale would let the highlight contradict the bar beside it. And marks
-are **thinned** in hierarchy order: sections first because they are the
-shape of the page, then sub-headings, then figures, each placed only
-where it clears everything already down by 6px, and figures not at all
-below a 560px rail. Unthinned, `docs/reference.md` put 49 marks 0px
-apart at phone width. Plain `<pre>` is not a landmark kind — marking
-every code block turns the rail into a dotted line.
+scale would let the highlight contradict the bar beside it. Marks are
+**thinned** in hierarchy order: sections first because they are the
+shape of the page, then the title, then sub-headings, then figures,
+each placed only where it clears everything already down by 6px, and
+figures not at all below a 560px rail. Unthinned, `docs/reference.md`
+put 49 marks 0px apart at phone width. Plain `<pre>` is not a landmark
+kind — marking every code block turns the rail into a dotted line.
+
+And **`RAIL_FIGURES` order is priority**: overlapping figures are
+rejected in BOTH nesting directions, so whichever selector is listed
+first claims the position. Named kinds are listed before generic
+containers for a reason — every chart on `docs/charts.md` sits inside
+an `.example-pair`, the pair starts a few pixels above the chart it
+wraps, and with both claiming a mark the thinner kept the pair. 48
+charts, no chart shape on the rail, and a tooltip reading "Example"
+where the reader was looking for "Chart".
 
 **The swell is a transform, and that is the whole safety argument.**
 Marks within 46px of the pointer scale on a cosine falloff, like a
 dock. A dock that reflows makes you chase the thing you were aiming
 at; this one scales the mark's `::before`, so no layout is computed
-and no button box moves. `RAIL_MAG_MAX` is 1.6 because a 7px section
-bar grows downward from the track and anything past ~1.7 pushes it out
-of the 12px strip onto the page content. Touch pointers are ignored —
-there is no hover to respond to, and a swell on tap moves the target
-out from under the finger.
+and no button box moves. It multiplies with the rail's open scale, and
+the pair is bounded by the open height (see above). Touch pointers are
+ignored — there is no hover to respond to, and a swell on tap moves the
+target out from under the finger.
 
-**Shape says what kind of thing it is**: a bar for headings (two
-heights, `##` and `###`), a square for grids of values, a circle for
-something on an axis, a diamond for a topology. Four shapes, not
-eleven — 3px carries a silhouette, not an alphabet, which is also why
-the swell exists: it resolves them. The tooltip carries the name, and
-for a chart or a diagram a thumbnail cloned from the rendered SVG. The
-clone's ids are rewritten; `page-chrome` precedes `<main>`, so a
-duplicate id would make `getElementById` return the thumbnail instead
-of the real figure.
+**Shape says what kind of thing it is.** A bar for a heading, thicker
+and taller the higher its level — h1 (the cover title) 3x9, `##` 2x7,
+`###` 1.5x4. Depth alone says "there is a hierarchy"; depth plus weight
+says which level, without measuring one bar against its neighbour. For
+figures, the three kinds a reader hunts for by name get a silhouette
+each and share it with nothing: a filled square is a **table**, a
+filled circle is a **chart**, a diamond is a **diagram**. Every other
+figure — KPI grid, comparison grid, step flow, snippet, annotated code,
+example pair — is a hollow square: recognisably a figure, recognisably
+not one of the three. Four figure shapes, not eleven; 4px carries a
+silhouette, not an alphabet, which is why the rail opens on hover. The
+tooltip carries the name, and for a chart or a diagram a thumbnail
+cloned from the rendered SVG. The clone's ids are rewritten;
+`page-chrome` precedes `<main>`, so a duplicate id would make
+`getElementById` return the thumbnail instead of the real figure.
+
+**The chrome buttons quiet down when nothing is reaching for them.**
+Four fixed 44px boxes float over the top of the reading column at every
+scroll position. They sit at a 0.32 floor and rise to full on a cosine
+falloff over 190px of pointer distance, measured **to the button's box**
+(point-to-rect, zero inside) so a button you are about to click is not
+still dim. Per button, not per region: approaching the theme cycler
+does not light the Contents button. Three things keep it from becoming
+a hidden control — the floor is not zero, hover / focus-visible /
+`aria-expanded="true"` pin it to full, and the whole mechanism only
+arms once a non-touch pointer has actually moved
+(`body[data-ctrl-proximity="1"]`), so touch, screen readers and a
+no-script page see full opacity. The warning indicator is excluded: an
+alert that dims itself is a bug. Opacity only — no box changes.
 
 **Front-matter is `title` + `summary`.** Plus `order` / `parent` for
 tree placement. `accent` and `audience` are tree-wide in `docs/kit.json`;
