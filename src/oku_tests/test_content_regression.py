@@ -1527,9 +1527,18 @@ class TestChromeKitMarkers:
         triples the gap and swaps the outer border from --border-soft to
         --line, with a box-shadow to lift each card off the page.
 
+        Reported again on the same surface, which is why the numbers here
+        moved: gap, border token and shadow were all present and the
+        boundary still could not be found. The cause was not the card at
+        all — the card and the space behind it were both `--surface`, so
+        a hairline was the entire separation. The field moved to
+        `--surface-2` and the border to `--line-strong`. Both halves are
+        asserted below; a card on a same-coloured field is the defect
+        whatever its border says.
+
         Enforce by checking the .okt-table-list / .okt-list-card block
-        carries (a) a meaningful gap (≥16px), (b) a non-soft outer border
-        token, and (c) a box-shadow declaration.
+        carries (a) a meaningful gap (≥16px), (b) a field distinct from
+        the card, (c) a strong outer border token, (d) a box-shadow.
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         # Match the BASE list rule (the data-view variants are display:none
@@ -1547,9 +1556,17 @@ class TestChromeKitMarkers:
         assert gap_px >= 16, (
             f"list gap is {gap_px}px — items need ≥16px breathing room to read as distinct cards"
         )
+        # The card sits on a field of its own, not on the same colour.
+        field = re.search(r"\.okt-table-cards,\s*\n\.okt-table-list\s*\{([^}]*)\}", css)
+        assert field, "list/cards views need a shared field rule"
+        assert "background: var(--surface-2)" in field.group(1), (
+            "the list/cards field must differ from the card's --surface — a card on a "
+            "same-coloured background is separated by its border alone, which is the "
+            "boundary the reader reported twice as unfindable"
+        )
         # Stronger outer border (not the soft variant).
-        assert "border: 1px solid var(--line)" in card_block, (
-            "card outer border must use --line (stronger) so it stands out "
+        assert "border: 1px solid var(--line-strong)" in card_block, (
+            "card outer border must use --line-strong so it stands out "
             "from the inner row dividers using --border-soft"
         )
         # Shadow to lift the card off the page.
@@ -2173,26 +2190,50 @@ class TestTableCopyTSV:
 
 
 class TestMermaidUniversalHover:
-    """Hover emphasis must apply to every Mermaid diagram type, not
-    only flowchart. Earlier the `.node:hover` rule only matched
-    flowcharts; state / class / ER / sequence / gantt / pie etc.
-    had no hover at all."""
+    """Every Mermaid diagram type must be covered by the same rule —
+    and what that rule says has flipped.
 
-    def test_hover_targets_each_type(self, repo_root: Path) -> None:
+    It used to give each type an accent glow and `cursor: pointer` on
+    hover. The coverage was the point (only flowcharts reacted before),
+    but the treatment was a lie: nothing handles a click unless the
+    author wrote mermaid's `click NodeId "url"`, and a reader who
+    probes a diagram for behaviour it does not have stops trusting the
+    affordances that are real.
+
+    So the coverage assertion stays and the treatment inverts. Every
+    type must land in the `cursor: default` set, and no type may carry
+    a hover glow — except `.clickable`, which mermaid stamps on exactly
+    the nodes that do go somewhere."""
+
+    def test_every_type_is_covered_and_none_claims_a_click(self, repo_root: Path) -> None:
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        # The hover rule must include selectors for major diagram types.
+        # The selector list that ends in `cursor: default` — the block
+        # declaring "these shapes are not buttons".
+        quiet = re.search(r"((?:oku-diagram \.okd-render svg [^,{]+,\s*(?:/\*.*?\*/\s*)?)+[^,{]+\{[^}]*cursor:\s*default[^}]*\})", css, re.S)
+        assert quiet, "the mermaid shape rule no longer sets cursor: default"
+        block = quiet.group(1)
         for sel in (
             ".actor",  # sequence
             ".statediagram-state",  # state
             ".classGroup",  # class
             ".entityBox",  # ER
             ".task",  # gantt + journey
+            ".slice",  # pie wedges
+            ".timeline-node",  # timeline
         ):
-            assert f"oku-diagram .okd-render svg {sel}:hover" in css, (
-                f"Mermaid hover rule must include {sel} so {sel}-shaped "
-                f"diagrams (state / class / ER / sequence / gantt) "
-                f"react to hover"
+            assert f"oku-diagram .okd-render svg {sel}" in block, (
+                f"{sel} dropped out of the shape rule — {sel}-shaped diagrams "
+                f"(state / class / ER / sequence / gantt / pie / timeline) would "
+                f"fall back to whatever cursor mermaid ships"
             )
+            assert f"oku-diagram .okd-render svg {sel}:hover" not in css, (
+                f"{sel} still gets a hover treatment. A shape with no click "
+                f"handler must not react like a button"
+            )
+        assert "oku-diagram .okd-render svg .clickable" in css, (
+            "the pointer cursor has to come back for the nodes mermaid marks "
+            "`.clickable` — those are the ones that really do go somewhere"
+        )
 
     def test_gantt_sample_is_realistic(self, repo_root: Path) -> None:
 
@@ -2334,16 +2375,18 @@ class TestSelfReviewMisses:
             "so the label clears the bubble's edge regardless of size"
         )
 
-    def test_mermaid_hover_targets_slice_for_pie(self, repo_root: Path) -> None:
-        """Pie's interactive shapes are .slice (the wedges), not
-        .pieCircle (the outer ring)."""
+    def test_mermaid_shape_rule_targets_slice_for_pie(self, repo_root: Path) -> None:
+        """Pie's own shapes are .slice (the wedges), not .pieCircle (the
+        outer ring) — so .slice is the class the rule has to name. What
+        the rule now says about it is `cursor: default`; see
+        TestMermaidUniversalHover for why the glow went away."""
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "oku-diagram .okd-render svg .slice" in css, (
-            "Mermaid hover rule must include .slice — the wedge class "
-            "is where pie's interaction actually lives"
+            "the mermaid shape rule must include .slice — the wedge class "
+            "is where pie's shapes actually live"
         )
-        assert "oku-diagram .okd-render svg .slice:hover" in css, (
-            "Mermaid hover rule must give .slice a :hover styling"
+        assert "oku-diagram .okd-render svg .slice:hover" not in css, (
+            "a pie wedge with no click handler must not react like a button"
         )
 
     def test_mermaid_hover_targets_timeline_classes(self, repo_root: Path) -> None:

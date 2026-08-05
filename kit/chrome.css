@@ -1352,37 +1352,43 @@ code:not(pre code) {
      stats and view-toggle when everything fits on one line. */
   flex-wrap: wrap;
   margin-bottom: 8px;
-  /* Notebook-quiet by default: controls are present but unobtrusive
-     so the table reads as content first, chrome second. Hover or
-     keyboard focus on the wrap lights them up; any active filter /
-     chip / non-default view forces full visibility too so the user
-     can always see the state they're already in. */
-  opacity: 0.15;
+  /* Gone until asked for — the same contract as the copy button on a
+     code block and the expand chip on a diagram. A table is content;
+     its chrome should not be competing with the first row for the
+     reader's attention. The bar keeps its layout box so revealing it
+     never reflows the table, and `pointer-events: none` stops an
+     invisible control from swallowing a click.
+     Hover or keyboard focus on the wrap brings it back, and any active
+     filter / chip / non-default view pins it open — the reader must
+     always be able to see the state they are already in. */
+  opacity: 0;
+  pointer-events: none;
   transition: opacity 0.18s ease;
 }
+/* Left: what narrows the data, and the count that answers it.
+   Right: the three buttons that act on the table as a whole — copy,
+   configure, expand. Copy belongs with them; sitting between the
+   filter and its own count it split a pair that is read together. */
 .okt-table-controls .okt-filter   { order: 0; }
 .okt-table-controls .okt-stats    { order: 1; }
 .okt-table-controls .okt-groupby  { order: 2; }
 .okt-table-controls .okt-view-group { order: 3; }
-/* Separator before the configure / expand pair so they read as
-   "the chart-side affordances" rather than blending into the
-   data-shaping controls on the left. */
-.okt-table-controls .okt-ctrl-sep-after { order: 4; }
+.okt-table-controls [data-copy]   { order: 4; }
 .okt-table-controls [data-cfg]    { order: 5; }
 .okt-table-controls [data-expand] { order: 6; }
-.okt-table-controls .okt-ctrl-sep-after::before {
-  content: '';
-  display: inline-block;
-  width: 1px;
-  height: 18px;
-  background: var(--border);
-  margin: 0 4px;
-}
 /* When groupby wraps to a new line, push it to the LEFT edge
    instead of inheriting justify-content: flex-end. */
 .okt-table-controls .okt-groupby { margin-right: auto; }
 .okt-table-wrap:hover .okt-table-controls,
-.okt-table-wrap:focus-within .okt-table-controls { opacity: 1; }
+.okt-table-wrap:focus-within .okt-table-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* A touch device has no hover, so hover-to-reveal would make the
+   controls unreachable. Keep them visible there. */
+@media (hover: none) {
+  .okt-table-controls { opacity: 1; pointer-events: auto; }
+}
 /* Small table (see SMALL_TABLE_ROWS in chrome.js): the reader can see
    every row already, so filtering, counting, grouping and view-switching
    have nothing to act on. Copy and expand stay — those are useful at any
@@ -1390,7 +1396,6 @@ code:not(pre code) {
    affordance goes. */
 .okt-table-wrap[data-scale="small"] .okt-filter,
 .okt-table-wrap[data-scale="small"] .okt-stats,
-.okt-table-wrap[data-scale="small"] .okt-ctrl-sep-after,
 .okt-table-wrap[data-scale="small"] .okt-view-group,
 .okt-table-wrap[data-scale="small"] .okt-ctrl-sep,
 .okt-table-wrap[data-scale="small"] .okt-table-controls [data-cfg] {
@@ -1430,6 +1435,7 @@ code:not(pre code) {
 .okt-table-wrap:has(.okt-chip.active) .okt-table-controls,
 .okt-table-wrap[data-view]:not([data-view="table"]) .okt-table-controls {
   opacity: 1;
+  pointer-events: auto;
 }
 .okt-table-controls button {
   font: 600 11px 'Inter', sans-serif;
@@ -1804,11 +1810,28 @@ code:not(pre code) {
   min-width: 100%;
 }
 
-/* Cards view — auto-fit grid, key/value stack per cell */
+/* Cards view — auto-fit grid, key/value stack per cell.
+   The container is a FIELD, not more card. Both this and the list
+   view used to paint --surface behind cards that are themselves
+   --surface, which left the border as the only thing separating a
+   card from the space around it — and a hairline on a same-coloured
+   background is exactly the boundary a reader cannot find. The table
+   view already solved this: .okt-table-scroll sits on a darker field.
+   Same treatment here. */
+.okt-table-cards,
+.okt-table-list {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 12px;
+}
 .okt-table-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
+  /* Size each card to its own content. Stretching a row to its tallest
+     member was invisible while the card edge was — but now that the
+     edge reads, the slack shows up as an empty panel. */
+  align-items: start;
 }
 /* Group rows from the source table become full-width subheaders in
    the cards grid. Same vocabulary in the list view below. */
@@ -1824,16 +1847,16 @@ code:not(pre code) {
   border-bottom: 2px solid var(--accent-soft);
 }
 .okt-cards-group:first-child { margin-top: 0; }
+/* Border defines the edge, a tight two-layer shadow lifts it off the
+   field. Diffuse shadows read as fog; the 1px contact layer is what
+   actually makes an edge legible. No hover state — a card that lifts
+   under the pointer promises a click it does not handle. */
 .okt-card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
   padding: 14px 16px;
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.18s ease;
-}
-.okt-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-1px);
+  box-shadow: 0 1px 2px var(--shadow-soft), 0 4px 10px -6px var(--shadow-strong);
 }
 /* Anchor / clickable cards — match the table-row affordance: pointer
    cursor, hover lift, the whole card is the click target, no link blue. */
@@ -1844,6 +1867,7 @@ a.okt-card,
   text-decoration: none;
   color: inherit;
   display: block;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.18s ease;
 }
 a.okt-card:hover,
 .okt-card[onclick]:hover,
@@ -1889,24 +1913,19 @@ a.okt-card:focus-visible,
 }
 .okt-list-group:first-child { margin-top: 0; }
 /* Each list item: clear visual card boundary so two consecutive items
-   never blur together. Outer border uses --line (stronger than the
-   inner row dividers below, which stay --border-soft); a subtle shadow
-   lifts the card off the page background. Hover deepens both so the
-   reader can confirm what they're focused on. */
+   never blur together. Outer border is --line-strong against the
+   --surface-2 field on .okt-table-list, plus the same two-layer
+   contact shadow the cards view uses. No hover state — the card is
+   not a button, and deepening its edge under the pointer said it was. */
 .okt-list-card {
   width: 100%;
   border-collapse: collapse;
   margin: 0;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 1px 2px var(--shadow-soft);
-  transition: box-shadow 0.18s ease, border-color 0.18s ease;
-}
-.okt-list-card:hover {
-  border-color: var(--line-strong);
-  box-shadow: 0 2px 6px var(--shadow-strong, var(--shadow-soft));
+  box-shadow: 0 1px 2px var(--shadow-soft), 0 4px 10px -6px var(--shadow-strong);
 }
 
 /* ====== Board (kanban) view ====== *
@@ -2865,7 +2884,28 @@ table.okt-nowrap td { white-space: nowrap; overflow-wrap: normal; }
    author multi-paragraph cell content with `\n` instead of inlining
    `<br>` tags or splitting across multiple columns. */
 table td[data-wrap="1"] { white-space: pre-line; }
-table tr:hover td { background: var(--surface-2); }
+/* Hover tint ONLY where the row actually does something. A tint that
+   follows the pointer down a table reads as "this row is selectable",
+   and when the click does nothing the reader stops trusting the whole
+   surface — they hesitate before clicking anything. The affordance and
+   the behaviour have to agree, so the tint is scoped to the same
+   markers `classify()` in chrome.js treats as clickable, and the
+   pointer cursor comes with it. A cell that merely contains a link is
+   not an interactive row; the link carries its own affordance. */
+table tbody tr[onclick]:hover > td,
+table tbody tr[data-href]:hover > td,
+table tbody tr[role="button"]:hover > td,
+table tbody tr[role="link"]:hover > td,
+table tbody tr[tabindex]:hover > td {
+  background: var(--surface-2);
+}
+table tbody tr[onclick],
+table tbody tr[data-href],
+table tbody tr[role="button"],
+table tbody tr[role="link"],
+table tbody tr[tabindex] {
+  cursor: pointer;
+}
 /* Column-resize grabber — thin right-edge strip on every thead <th>.
    Invisible until hovered, then a 3px accent line + ew-resize
    cursor. While dragging, the table gains .okt-table-resizing to
@@ -4845,11 +4885,19 @@ oku-diagram {
    where the inline view ends up clipping anything important. */
 oku-diagram .okd-render { display: block; min-height: 60px; color: var(--text-soft); font-size: 13px; overflow-x: auto; overflow-y: hidden; }
 
-/* Mermaid diagram interactivity — minimal: hover on a node lifts
-   it visually (accent stroke + slight scale via filter). Click
-   handlers are mermaid's own `click NodeId "url"` syntax which
-   the renderer already honours. Pan/zoom in fullscreen is the
-   shared lightbox lightbox-stage. */
+/* Mermaid node hover.
+   What this is NOT: a click affordance. Every node used to take
+   `cursor: pointer` and an accent drop-shadow on hover, which is the
+   vocabulary of a button — and nothing happens on click unless the
+   author wrote mermaid's `click NodeId "url"`. The reader ends up
+   probing a diagram for behaviour it does not have.
+   What it IS: a reading aid. Hovering a node dims the rest of the
+   graph and keeps the node with its incident edges and neighbours
+   loud (see `_wireNeighborHighlight` below), which answers "what is
+   this connected to" on a graph too dense to trace by eye. That is
+   information, so it stays — with the arrow cursor, and without the
+   glow. `cursor: pointer` is restored further down for the nodes
+   mermaid itself marks `.clickable`. */
 oku-diagram .okd-render svg .node,
 oku-diagram .okd-render svg [class*="node"],
 oku-diagram .okd-render svg .actor,
@@ -4876,45 +4924,22 @@ oku-diagram .okd-render svg .mindmap-node,
 oku-diagram .okd-render svg .timeline-node,
 oku-diagram .okd-render svg .taskWrapper,
 oku-diagram .okd-render svg .note {
-  cursor: pointer;
+  cursor: default;
   transition: filter 0.15s ease;
 }
-oku-diagram .okd-render svg .node:hover,
-oku-diagram .okd-render svg .actor:hover,
-oku-diagram .okd-render svg .actor-box:hover,
-oku-diagram .okd-render svg .statediagram-state:hover,
-oku-diagram .okd-render svg .classGroup:hover,
-oku-diagram .okd-render svg .entityBox:hover,
-oku-diagram .okd-render svg .task:hover,
-oku-diagram .okd-render svg .task-rect:hover,
-oku-diagram .okd-render svg .pieCircle:hover,
-oku-diagram .okd-render svg .slice:hover,
-oku-diagram .okd-render svg .section:hover,
-oku-diagram .okd-render svg [class*="section"]:hover,
-oku-diagram .okd-render svg .mindmap-node:hover,
-oku-diagram .okd-render svg .timeline-node:hover,
-oku-diagram .okd-render svg .taskWrapper:hover,
-oku-diagram .okd-render svg .note:hover {
-  filter: drop-shadow(0 0 4px var(--accent));
+/* Mermaid tags a node `.clickable` when the source binds a click to
+   it. That is the only case where the pointer cursor is true. */
+oku-diagram .okd-render svg .clickable,
+oku-diagram .okd-render svg .clickable * {
+  cursor: pointer;
 }
-oku-diagram .okd-render svg .node:hover > rect,
-oku-diagram .okd-render svg .node:hover > circle,
-oku-diagram .okd-render svg .node:hover > polygon,
-oku-diagram .okd-render svg .node:hover > path,
-oku-diagram .okd-render svg .statediagram-state:hover > rect,
-oku-diagram .okd-render svg .classGroup:hover > rect,
-oku-diagram .okd-render svg .entityBox:hover,
-oku-diagram .okd-render svg .actor:hover,
-oku-diagram .okd-render svg .actor-box:hover,
-oku-diagram .okd-render svg .task:hover rect,
-oku-diagram .okd-render svg .task-rect:hover,
-oku-diagram .okd-render svg .pieCircle:hover,
-oku-diagram .okd-render svg .slice:hover,
-oku-diagram .okd-render svg .timeline-node:hover rect,
-oku-diagram .okd-render svg .taskWrapper:hover rect,
-oku-diagram .okd-render svg .note:hover rect {
-  stroke: var(--accent) !important;
-  stroke-width: 2px;
+/* The accent glow and the accent stroke that used to fire on plain
+   hover are gone. On a flowchart the neighbour highlight below is the
+   feedback, and it says something ("these are the connected nodes").
+   On the diagram types that carry no graph structure — sequence, pie,
+   gantt, timeline — hover now does nothing, which is the truth. */
+oku-diagram .okd-render svg .clickable:hover {
+  filter: drop-shadow(0 0 4px var(--accent));
 }
 
 /* Neighbor highlight — wired by `_wireNeighborHighlight` on flowchart

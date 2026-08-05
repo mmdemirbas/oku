@@ -1990,7 +1990,7 @@ function initReadingAids() {
       '</span>' +
       '<span class="okt-ctrl-sep" aria-hidden="true"></span>'
     ) : '';
-    // Order: filter → stats → gear → expand. The gear opens the
+    // Order: filter → stats → copy → gear → expand. The gear opens the
     // configuration popover (group-by, view mode, multi-column sort,
     // per-column filters). Filter + stats stay inline for instant
     // interaction; configuration knobs move into the popover so the
@@ -2005,10 +2005,7 @@ function initReadingAids() {
     // resting state (CSS .okt-config-stashed) and physically moved
     // into the popover on gear click, then moved back on close —
     // same nodes, same listeners.
-    // Visual order after CSS reflow: filter · stats · | · gear · expand.
-    // The separator marker carries no semantic role; CSS draws the
-    // 1px divider between the data-shaping controls (filter / stats)
-    // and the chart-side affordances (gear / expand).
+    // Visual order after CSS reflow: filter · stats · copy · gear · expand.
     // Charts have a "Copy data (TSV)" button; tables deserve the same.
     // Reads the visible <tr>'s cells (skipping group headers), tabs
     // between cells, newlines between rows, prepends the <thead>
@@ -2021,7 +2018,6 @@ function initReadingAids() {
     ctrl.innerHTML =
       filterInputHTML +
       statsHTML +
-      '<span class="okt-ctrl-sep-after" aria-hidden="true"></span>' +
       copyBtnHTML +
       gearBtnHTML +
       '<button data-expand type="button" aria-pressed="false" title="Toggle full-width / fit to column">' +
@@ -2951,7 +2947,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-05-r21';
+var __okuKitBuild = '2026-08-05-r22';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
