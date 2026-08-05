@@ -862,12 +862,23 @@ class TestChromeKitMarkers:
             )
 
     def test_chrome_css_parks_the_drawer_off_canvas(self, repo_root: Path) -> None:
-        """The sidebar is an overlay drawer, not a column: parked
-        off-canvas, slid in by body.drawer-open, with a scrim."""
+        """The sidebar is parked off-canvas and slid in by
+        body.drawer-open — in all three states, which is why that class
+        is still the one that moves it.
+
+        The scrim moved to `body.drawer-modal`: it belongs to the narrow
+        viewport where the panel covers the page. Dimming the page
+        behind a peek, or behind a panel the reader pinned in order to
+        read alongside it, fights the reader.
+        """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "left: -100%" in css, "drawer must park off-canvas"
         assert "body.drawer-open page-nav { left: 0; }" in css, "no open state for the drawer"
-        assert "body.drawer-open::before" in css, "scrim missing"
+        assert "body.drawer-modal::before" in css, "scrim missing from the modal state"
+        assert "body.drawer-open::before" not in css, (
+            "the scrim must not apply to peek or pinned — geometry is asserted in "
+            "test_invariants.py::test_pinning_insets_the_column_rather_than_covering_it"
+        )
         assert "margin-inline: auto" in css, "main must stay centred"
 
     def test_page_nav_spans_full_viewport_height(self, repo_root: Path) -> None:

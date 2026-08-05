@@ -53,6 +53,10 @@
      a chart. The per-mode values are the source of truth; this is the
      fallback for a page with no body attribute yet. */
   --prose-width: 62ch;
+  /* One source of truth for the Contents panel's width: page-nav is
+     this wide, and the pinned inset is exactly this much. Two numbers
+     that had to agree would drift the first time one was tuned. */
+  --oku-drawer-w: min(320px, 88vw);
   --shadow-strong: rgba(30, 27, 41, 0.18);
   --shadow-soft:   rgba(30, 27, 41, 0.06);
   --ctrl-bg:        rgba(255, 255, 255, 0.85);
@@ -177,8 +181,12 @@ table { font-variant-numeric: tabular-nums; }
    the text every time it was used. */
 .layout { display: block; }
 
-/* Scrim behind the open drawer. One pseudo-element, no extra node. */
-body.drawer-open::before {
+/* Scrim + scroll lock belong to the MODAL state only — the narrow
+   viewport, where the panel covers the page and the page behind it is
+   not usable anyway. A peek is transient and pointer-driven, and a
+   pinned panel is something you read alongside; darkening the page or
+   freezing its scroll in either case would fight the reader. */
+body.drawer-modal::before {
   content: '';
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.35);
@@ -186,7 +194,22 @@ body.drawer-open::before {
   animation: htmldoc-fade-in 0.2s ease;
 }
 @keyframes htmldoc-fade-in { from { opacity: 0; } to { opacity: 1; } }
-body.drawer-open { overflow: hidden; }
+body.drawer-modal { overflow: hidden; }
+
+/* The pinned inset. The panel is still `position: fixed` — it has to
+   stay put while the document scrolls under it — so the column is moved
+   by padding the layout, and `main`'s `margin-inline: auto` re-centres
+   it in what is left. Gated at 900px because below that the remainder
+   is narrower than the narrow measure; chrome.js will not enter the
+   pinned state there and unpins if the window shrinks into it. */
+@media (min-width: 900px) {
+  body.drawer-pinned .layout { padding-left: var(--oku-drawer-w); }
+  /* The rail is a map OF the document, so it belongs over the document
+     and not over the panel beside it. Its marks are percentages of its
+     own width, so they rescale; chrome.js rebuilds it on the state
+     change because a class flip fires no resize event. */
+  body.drawer-pinned .okt-rail { left: var(--oku-drawer-w); }
+}
 
 /* The Contents button opens the drawer at every width — the sidebar's
    only affordance. It takes the same 44px icon box as every other chrome
@@ -3546,8 +3569,11 @@ footer {
 @media print {
   .ctrl-btn, .okt-chrome-cluster, .okt-rail, .progress-bar, .skip-link,
   .copy-btn, .permalink { display: none !important; }
-  nav.toc, page-toc { display: none !important; }
-  .layout { display: block; }
+  /* page-nav is listed because of the pinned state. Off-canvas it was
+     invisible on paper for free; at left: 0 it would print, and its
+     inset would print with it. */
+  nav.toc, page-toc, page-nav { display: none !important; }
+  .layout { display: block; padding-left: 0 !important; }
   body { background: white; color: black; font-size: 11pt; }
   main { padding: 0; max-width: none; }
   header.cover { page-break-after: avoid; }
@@ -3765,16 +3791,18 @@ a.okt-cite-domain:focus-visible {
    <page-nav> — site-tree sidebar
    ============================================================ */
 page-nav {
-  /* Overlay drawer at every width: parked off-canvas, slid in by
-     body.drawer-open. `left` rather than a transform so position:sticky
-     inside it (the panel headers) keeps a containing block. Two rows:
-     the scroll region grows, the footer pins to the bottom edge. */
+  /* Parked off-canvas, slid in by body.drawer-open. `left` rather than a
+     transform so position:sticky inside it (the panel headers) keeps a
+     containing block. Two rows: the scroll region grows, the footer pins
+     to the bottom edge. Fixed in every state, pinned included — a panel
+     that scrolls away with the document is not one you can read
+     alongside it. */
   display: flex;
   flex-direction: column;
   position: fixed;
   top: 0;
   left: -100%;
-  width: min(320px, 88vw);
+  width: var(--oku-drawer-w);
   height: 100vh;
   height: 100dvh;
   z-index: 99;
@@ -3789,6 +3817,10 @@ page-nav {
   transition: left 0.25s ease, background 0.25s, border-color 0.25s;
 }
 body.drawer-open page-nav { left: 0; }
+/* Pinned, the panel is not floating over anything — the column moved
+   aside for it. A drop shadow there would draw a seam down a layout
+   that has none. The border stays; that IS the seam. */
+body.drawer-pinned page-nav { box-shadow: none; }
 /* The scroll region: takes ALL space between the top of the sidebar
    and the footer at the bottom. Holds the boxed site tree AND the
    adopted TOC. Footer never scrolls with this content. */

@@ -197,15 +197,53 @@ like "my change didn't take effect" — it did; the runtime is stale.
 
 ## Rules the user has set down
 
-**Contents drawer, centred content.** `page-nav` adopts `page-toc` as
-a child at boot so site-tree + on-page TOC stack in one panel. NO
-dual-pane, NO right-side TOC.
+**Contents drawer: one button, three states.** `page-nav` adopts
+`page-toc` as a child at boot so site-tree + on-page TOC stack in one
+panel. NO dual-pane, NO right-side TOC.
 
-The panel is an **overlay drawer at every width** — parked off-canvas
-at `left: -100%`, slid in by `body.drawer-open`, with a scrim, Escape
-and outside-click to close. `main` is `margin-inline: auto`, so the
-measure is centred and **never moves when the drawer opens**. On a wide
-window the drawer lands in the empty gutter beside the column.
+The panel parks off-canvas at `left: -100%` and is slid in by
+`body.drawer-open`, which is set in all three states. The other three
+classes carry the differences:
+
+| State | `body` class | Entered by | Leaves on | Moves content |
+|---|---|---|---|---|
+| peek | `drawer-peek` | hovering the Contents button (mouse/pen) | clicking a link in it, pointer crossing its right edge + 24px, Escape, outside click | no |
+| pinned | `drawer-pinned` | **clicking** the button, ≥900px | clicking the button again | yes, insets once |
+| modal | `drawer-modal` | clicking the button, <900px | link click, outside click, Escape | no |
+
+- **Peek** is the old behaviour reached without a click: look, jump,
+  gone, nothing on the page moves. It is what a reader lands in without
+  deciding anything, so it must stay free.
+- **Pinned** is the state that answers "I want to see the contents while
+  I read". `.layout` gets `padding-left: var(--oku-drawer-w)` and `main`
+  re-centres in the remainder; the scroll-spy highlight tracks the
+  reading position and the panel scrolls itself to keep that highlight
+  in view. **A heading click does not close it** — that auto-close is
+  the exact complaint it exists to answer. No scrim, no scroll lock:
+  the page behind it is what the reader is reading. Persisted under
+  `oku-drawer-pinned`.
+- **Modal** is the narrow case. There is no pinned state below 900px
+  because the remainder would be narrower than the narrow measure; a
+  window that shrinks past the threshold unpins, and one that grows back
+  re-pins from the stored flag. The flag is only written when the READER
+  changes state, never when the window forces it.
+
+Escape does not dismiss a pinned panel. It is not a dialog — no scrim,
+no focus trap, the page behind it live — so there is nothing to rescue
+the reader from, and losing the state to a stray keypress costs more.
+
+The pinned inset is the ONE place the kit moves the measure, and it is
+a deliberate reversal of the line below it. What CLAUDE.md removed was
+an edge handle that both resized and collapsed, always present, moving
+text as a side effect of a control nobody asked for. This moves it only
+when the reader asks for a panel that has to live somewhere, once, and
+moves it back on unpin. Peek — the state you reach without deciding —
+still moves nothing at all. `test_a_peek_moves_nothing` and
+`test_pinning_insets_the_column_rather_than_covering_it` pin both
+halves; do not collapse them back into one rule.
+
+`--oku-drawer-w` is the single source for the panel's width AND the
+inset. Two numbers that had to agree would drift on the first tuning.
 
 One affordance: the **`.ctrl-btn.drawer-toggle` in the top-left chrome
 strip** — icon only, in the same 44px box every other chrome button
@@ -220,7 +258,12 @@ Removed, do not bring back: the permanent sidebar grid column, the
 full-height right-edge handle (`.page-nav-edge`) that doubled as
 resize + collapse, the 24px collapsed rail, and the persisted
 `sidebarCollapsed` / `sidebarWidth` state. A line down the page that
-reflows the text every time it is used is what this replaced.
+reflows the text every time it is used is what this replaced — the
+handle was the problem, not the column: it was always on the page's
+edge, it did two jobs at once, and using either one moved the text.
+The pinned state above is not a route back to it. There is no handle,
+no resize, one button, and the reader gets the same measure back the
+moment they unpin.
 
 **The default has to render finished.** A page whose author wrote
 `title`, `summary` and content — nothing else — is the case the kit is

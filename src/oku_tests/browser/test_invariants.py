@@ -68,7 +68,23 @@ def test_contents_drawer_is_off_canvas_until_asked_for(page, site_url, size):
     assert abs(nav["height"] - size["height"]) <= 1, "open drawer must span the viewport"
     assert button.get_attribute("aria-expanded") == "true"
 
-    page.keyboard.press("Escape")
+    # What a click MEANS depends on whether there is room to inset the
+    # column beside the panel. Wide: pinned, and it stays until asked to
+    # go. Narrow: the old modal, because a pinned panel on a phone is
+    # the whole screen.
+    state = page.evaluate("() => document.body.className")
+    if size["width"] >= 900:
+        assert "drawer-pinned" in state, state
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(200)
+        assert page.evaluate("() => document.body.classList.contains('drawer-open')"), (
+            "Escape must not discard a pinned panel — it is not a dialog, and losing "
+            "the state to a stray keypress costs more than it saves"
+        )
+        button.click()  # the same button is the way out
+    else:
+        assert "drawer-modal" in state, state
+        page.keyboard.press("Escape")
     page.wait_for_function("!document.body.classList.contains('drawer-open')")
     assert button.get_attribute("aria-expanded") == "false"
 
@@ -123,27 +139,126 @@ def test_the_top_right_chrome_never_overlaps(page, site_url, width):
     assert got["inView"] == got["count"], f"a chrome button sits outside the viewport at {width}px: {got}"
 
 
+_MAIN_BOX = """() => { const r = document.querySelector('main').getBoundingClientRect();
+                       return [Math.round(r.x), Math.round(r.width),
+                               Math.round(window.innerWidth - r.right)]; }"""
+
+
 @pytest.mark.parametrize("width", [1600, 1280, 900])
-def test_content_stays_centred_whether_the_drawer_is_open_or_not(page, site_url, width):
-    """The measure must not move when the contents open — that is the
-    whole reason the sidebar overlays instead of taking a column."""
+def test_a_peek_moves_nothing(page, site_url, width):
+    """Hovering the Contents button shows the panel over the page and
+    changes not one pixel of it. This is the state a reader lands in
+    without deciding anything, so it has to be free: look, jump, gone.
+
+    The measure moving under a pointer that was only passing by is the
+    failure the overlay drawer was built to end, and it stays ended."""
     page.set_viewport_size({"width": width, "height": 900})
     _goto(page, f"{site_url}/docs/architecture.html")
     page.wait_for_timeout(400)
-    before = page.evaluate(
-        """() => { const r = document.querySelector('main').getBoundingClientRect();
-                   return [Math.round(r.x), Math.round(r.width),
-                           Math.round(window.innerWidth - r.right)]; }"""
-    )
+    before = page.evaluate(_MAIN_BOX)
     assert abs(before[0] - before[2]) <= 1, f"main not centred: left {before[0]} vs right {before[2]}"
-    page.click(".ctrl-btn.drawer-toggle")
-    page.wait_for_function("document.querySelector('page-nav').getBoundingClientRect().left > -1")
-    after = page.evaluate(
-        """() => { const r = document.querySelector('main').getBoundingClientRect();
-                   return [Math.round(r.x), Math.round(r.width),
-                           Math.round(window.innerWidth - r.right)]; }"""
+
+    page.hover(".ctrl-btn.drawer-toggle")
+    page.wait_for_function("document.body.classList.contains('drawer-peek')")
+    page.wait_for_timeout(350)
+    assert page.locator("page-nav").bounding_box()["x"] >= -1, "peek must bring the panel on-canvas"
+    assert page.evaluate(_MAIN_BOX) == before, "content moved on a hover"
+
+    # ...and it leaves the same way, when the pointer crosses back out
+    # past the panel's right edge. Horizontally: reading a list of
+    # sections is vertical movement, which must not dismiss anything.
+    page.mouse.move(150, 700)
+    page.wait_for_timeout(200)
+    assert page.evaluate("() => document.body.classList.contains('drawer-peek')"), (
+        "moving DOWN the panel dismissed it — that is how a reader reads it"
     )
-    assert after == before, f"content moved when the drawer opened: {before} -> {after}"
+    page.mouse.move(width - 100, 700)  # relative: x=width is off-viewport and drops the event
+    page.wait_for_function("!document.body.classList.contains('drawer-open')")
+    assert page.evaluate(_MAIN_BOX) == before
+
+
+@pytest.mark.parametrize("width", [1600, 1280, 900])
+def test_pinning_insets_the_column_rather_than_covering_it(page, site_url, width):
+    """A panel you read alongside the document cannot be on top of it.
+    Clicking pins, and pinning moves the column aside by exactly the
+    panel's width — once, because the reader asked — leaving it centred
+    in what remains. Unpinning puts it back exactly.
+
+    This is the one place the kit moves the measure, and it is the
+    difference between this and the sidebar column CLAUDE.md removed:
+    that one moved text as a side effect of a control nobody asked for."""
+    page.set_viewport_size({"width": width, "height": 900})
+    _goto(page, f"{site_url}/docs/architecture.html")
+    page.wait_for_timeout(400)
+    before = page.evaluate(_MAIN_BOX)
+
+    page.click(".ctrl-btn.drawer-toggle")
+    page.wait_for_function("document.body.classList.contains('drawer-pinned')")
+    page.wait_for_timeout(350)
+    got = page.evaluate(
+        """() => {
+        const m = document.querySelector('main').getBoundingClientRect();
+        const n = document.querySelector('page-nav').getBoundingClientRect();
+        return { mainLeft: Math.round(m.x), mainRight: Math.round(m.right),
+                 navRight: Math.round(n.right), vw: window.innerWidth,
+                 scrim: getComputedStyle(document.body, '::before').content,
+                 locked: getComputedStyle(document.body).overflow };
+    }"""
+    )
+    assert got["mainLeft"] >= got["navRight"], (
+        f"the pinned panel overlaps the column it is meant to sit beside: {got}"
+    )
+    # Centred in the remainder: equal gutters between panel and column,
+    # and column and the right edge.
+    left_gutter = got["mainLeft"] - got["navRight"]
+    right_gutter = got["vw"] - got["mainRight"]
+    assert abs(left_gutter - right_gutter) <= 1, f"column not centred beside the panel: {got}"
+    # Neither scrim nor scroll lock: the page behind is what you are reading.
+    assert got["scrim"] == "none", f"a pinned panel must not dim the page: {got}"
+    assert got["locked"] != "hidden", f"a pinned panel must not freeze the page's scroll: {got}"
+
+    page.click(".ctrl-btn.drawer-toggle")
+    page.wait_for_function("!document.body.classList.contains('drawer-open')")
+    page.wait_for_timeout(350)
+    assert page.evaluate(_MAIN_BOX) == before, "unpinning must give the measure back exactly"
+
+
+def test_a_pinned_panel_survives_the_click_that_used_to_close_it(page, site_url):
+    """The complaint this state exists to answer: selecting a heading
+    made the contents disappear, so reading a document with its outline
+    in view was not possible. Pinned, a heading click navigates and the
+    panel stays — and the highlight moves to where the reader now is."""
+    page.set_viewport_size(DESKTOP)
+    _goto(page, f"{site_url}/docs/architecture.html")
+    page.wait_for_timeout(500)
+    page.click(".ctrl-btn.drawer-toggle")
+    page.wait_for_function("document.body.classList.contains('drawer-pinned')")
+
+    links = page.locator("page-toc .toc-sub a, page-toc .toc-head a")
+    assert links.count() >= 3, "the fixture page grew no TOC entries"
+    links.nth(2).click()
+    page.wait_for_timeout(700)
+    assert page.evaluate("() => document.body.classList.contains('drawer-pinned')"), (
+        "clicking a heading closed the pinned panel"
+    )
+
+    # The highlight is a position indicator, so it has to follow the
+    # position — including one the reader scrolled to by hand.
+    got = page.evaluate(
+        """async () => {
+        const h = document.documentElement;
+        const first = document.querySelector('page-toc .toc-h2.active');
+        const firstId = first && first.dataset.target;
+        window.scrollTo(0, (h.scrollHeight - h.clientHeight) * 0.75);
+        await new Promise(r => setTimeout(r, 600));
+        const now = document.querySelector('page-toc .toc-h2.active');
+        return { firstId, nowId: now && now.dataset.target,
+                 stillPinned: document.body.classList.contains('drawer-pinned') };
+    }"""
+    )
+    assert got["stillPinned"], "scrolling closed the pinned panel"
+    assert got["nowId"], "no TOC entry is highlighted after scrolling"
+    assert got["nowId"] != got["firstId"], f"the highlight did not follow the reader down the page: {got}"
 
 
 def test_architecture_renders_fence_lifted_blocks(page, site_url):
@@ -318,9 +433,12 @@ def test_path_router_keeps_url_and_content_in_sync(page, site_url):
     assert page.locator("oku-chart").count() >= 40
 
     page.evaluate("window.__navMarker = 42")
-    # The site tree lives in the Contents drawer now, so a reader opens
-    # it before navigating — and the drawer must close behind the click.
-    page.click(".ctrl-btn.drawer-toggle")
+    # The site tree lives in the Contents drawer, so a reader brings it
+    # up before navigating. Hover, not click: a peek is the state whose
+    # contract is "find it, go there, gone", and this asserts the gone.
+    # (Clicking would pin, and a pinned panel is supposed to survive the
+    # navigation — covered by its own test.)
+    page.hover(".ctrl-btn.drawer-toggle")
     page.wait_for_function("document.querySelector('page-nav').getBoundingClientRect().left > -1")
     page.click('page-nav a[href$="diagrams.html"]')
     page.wait_for_function("document.title === 'Diagrams'")

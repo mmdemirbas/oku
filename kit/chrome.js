@@ -957,34 +957,159 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', fun
   }
 });
 
-/* ============ Contents drawer (one button, one class) ============ *
- * The sidebar — page-nav with page-toc adopted into it — is an overlay
- * drawer at EVERY width, opened by the "Contents" button in the
- * top-left chrome strip. Content stays centred and never reflows when
- * it opens: the reader gets the same measure back when it closes.
+/* ============ Contents drawer — three states ============ *
+ * The sidebar (page-nav, with page-toc adopted into it) has one button
+ * and three states, because "show me the contents" is two different
+ * requests that used to share one answer.
+ *
+ *   peek    hover the Contents button. The panel slides in over the
+ *           page, you find the section you wanted, you click it and it
+ *           is gone. Nothing about the page moves. This is the old
+ *           behaviour, reached without a click.
+ *   pinned  CLICK the Contents button. The panel stays while you read,
+ *           the content column insets to make room for it, and the
+ *           scroll-spy highlight tracks your position down the page.
+ *           Clicking a heading navigates and the panel STAYS.
+ *   modal   the narrow-viewport case (< 900px), where there is no room
+ *           to inset anything. Click opens it over the page with a
+ *           scrim, exactly as before; there is no pinned state to
+ *           reach, because a pinned panel on a phone IS the page.
+ *
+ * `drawer-open` is set for all three, so every existing rule keyed off
+ * it keeps working; the other three classes select the differences.
+ *
+ * On the inset. CLAUDE.md removes the permanent sidebar column, and the
+ * reason it gives is that a line down the page reflowed the text every
+ * time it was used. That reason is about a control the reader never
+ * asked for — an edge handle that both resized and collapsed, always
+ * present, moving the measure as a side effect. This is the opposite
+ * shape: nothing moves unless the reader asks for a panel that has to
+ * live somewhere, it moves once when they ask, and it moves back when
+ * they unpin. Peek — the state you land in without deciding anything —
+ * still moves nothing at all.
  * ---------------------------------------------------------------- */
-function setDrawer(open) {
-  document.body.classList.toggle('drawer-open', open);
+var DRAWER_PIN_KEY = 'oku-drawer-pinned';
+// Below this the inset has nowhere to come from: at 900px the panel is
+// 320px and what is left is already narrower than the narrow measure.
+var DRAWER_PIN_MIN_PX = 900;
+// The pointer has to clear the panel's right edge by this much before a
+// peek closes. Without slack, a pointer resting on the boundary flickers
+// the panel in and out at pointermove frequency.
+var DRAWER_PEEK_SLACK_PX = 24;
+
+var __okuDrawerState = 'closed';
+
+function canPinDrawer() {
+  return window.matchMedia('(min-width: ' + DRAWER_PIN_MIN_PX + 'px)').matches;
+}
+
+// `remember` is false only when the WINDOW forced the change, never the
+// reader: a laptop docked to a narrow screen must not erase a preference
+// the reader set, or widening the window again comes back empty.
+function setDrawerState(state, remember) {
+  if (state === __okuDrawerState) return;
+  __okuDrawerState = state;
+  var body = document.body;
+  body.classList.toggle('drawer-open', state !== 'closed');
+  body.classList.toggle('drawer-peek', state === 'peek');
+  body.classList.toggle('drawer-pinned', state === 'pinned');
+  body.classList.toggle('drawer-modal', state === 'modal');
   var btn = document.querySelector('.ctrl-btn.drawer-toggle');
-  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (btn) btn.setAttribute('aria-expanded', state === 'closed' ? 'false' : 'true');
+  if (remember !== false) {
+    try { localStorage.setItem(DRAWER_PIN_KEY, state === 'pinned' ? '1' : '0'); } catch (e) { /* private mode */ }
+  }
+  // Pinning insets the reading column and the rail with it, so every
+  // mark's x changes. Nothing fires a window resize for a class change.
+  if (window.__okuRebuildRail) window.__okuRebuildRail();
+}
+
+// Compatibility with the call sites that only ever wanted "put it away
+// after navigating". A pinned panel is not put away — that is the whole
+// point of pinning it.
+function setDrawer(open) {
+  if (open) { setDrawerState(canPinDrawer() ? 'pinned' : 'modal'); return; }
+  if (__okuDrawerState !== 'pinned') setDrawerState('closed');
 }
 
 function toggleTOC() {
-  setDrawer(!document.body.classList.contains('drawer-open'));
+  if (__okuDrawerState === 'pinned') { setDrawerState('closed'); return; }
+  // From closed OR from peek, a click means "keep it". Reaching pinned
+  // from a peek without having to move the pointer away first is the
+  // path a reader actually takes: hover, see it is useful, click.
+  setDrawerState(canPinDrawer() ? 'pinned' : 'modal');
 }
 
-// Close on outside click or Escape, at every width.
+function syncDrawerButton() {
+  var btn = document.querySelector('.ctrl-btn.drawer-toggle');
+  if (btn) btn.setAttribute('aria-expanded', __okuDrawerState === 'closed' ? 'false' : 'true');
+}
+
+/* Peek. Hover the button; the panel arrives without a click and leaves
+   without one. Mouse and pen only — a touch pointer has no hover, and
+   opening on tap would fight the click that follows it. */
+function initDrawerPeek() {
+  var btn = document.querySelector('.ctrl-btn.drawer-toggle');
+  if (!btn || btn._okuPeekBound) return;
+  btn._okuPeekBound = true;
+  btn.addEventListener('pointerenter', function (e) {
+    if (e.pointerType === 'touch') return;
+    if (__okuDrawerState === 'closed') setDrawerState('peek');
+  });
+}
+
+// A peek ends when the pointer commits to the page again — measured
+// HORIZONTALLY, against the panel's own right edge. Vertical movement is
+// how you read a list of sections, so it must not dismiss anything;
+// crossing back out to the right is unambiguous.
+document.addEventListener('pointermove', function (e) {
+  if (__okuDrawerState !== 'peek') return;
+  var nav = document.querySelector('page-nav');
+  if (!nav) return;
+  // `offsetWidth`, not the live rect's right edge. The panel slides in
+  // over 250ms and the pointermove that OPENED the peek arrives while it
+  // is still parked at left: -100% — measured live, its right edge is
+  // off-screen to the left, every pointer position is "outside it", and
+  // the peek closes on the same event that opened it. The width is the
+  // one measurement the animation does not touch, and the panel is
+  // anchored at x=0 whenever it is open, so width IS the right edge.
+  if (e.clientX > nav.offsetWidth + DRAWER_PEEK_SLACK_PX) setDrawerState('closed');
+}, { passive: true });
+
 document.addEventListener('click', function (e) {
-  if (!document.body.classList.contains('drawer-open')) return;
+  if (__okuDrawerState === 'closed' || __okuDrawerState === 'pinned') return;
   var nav = document.querySelector('page-nav');
   var button = document.querySelector('.ctrl-btn.drawer-toggle');
-  if (nav && nav.contains(e.target)) return;
-  if (button && button.contains(e.target)) return;
-  setDrawer(false);
+  if (button && button.contains(e.target)) return;   // toggleTOC owns it
+  // Inside the panel: a link is the reader saying "take me there", which
+  // ends a peek. Clicking the panel's own chrome (a folder chevron) is
+  // not, so the panel stays.
+  if (nav && nav.contains(e.target)) {
+    if (e.target.closest && e.target.closest('a[href]')) setDrawerState('closed');
+    return;
+  }
+  setDrawerState('closed');
 });
+
 document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape') setDrawer(false);
+  // Escape dismisses the two transient states. A pinned panel is not a
+  // dialog — no scrim, no focus trap, the page behind it is live — so
+  // there is nothing for Escape to rescue the reader from, and losing
+  // the state to a stray keypress is the worse failure.
+  if (e.key === 'Escape' && __okuDrawerState !== 'pinned') setDrawerState('closed');
 });
+
+// A window that shrinks past the threshold has no room for the inset.
+// Unpin rather than let the panel cover the column it was making room
+// beside; the flag stays in storage, so widening restores it.
+window.addEventListener('resize', function () {
+  if (__okuDrawerState === 'pinned' && !canPinDrawer()) setDrawerState('closed', false);
+  else if (__okuDrawerState === 'closed' && canPinDrawer() && drawerWasPinned()) setDrawerState('pinned', false);
+}, { passive: true });
+
+function drawerWasPinned() {
+  try { return localStorage.getItem(DRAWER_PIN_KEY) === '1'; } catch (e) { return false; }
+}
 
 /* ============ Hash-based SPA navigation ========================== *
  * `oku init` only writes docs/index.html on disk. Sub-pages
@@ -1173,10 +1298,14 @@ document.addEventListener('click', function (e) {
   });
   setDrawer(false);
 });
-// The drawer always starts closed — it overlays the page, so a
-// remembered "open" would cover the text the reader came for. The
-// pre-drawer layout persisted a collapse flag; drop it on sight.
+// PINNED is the one state worth remembering, and only because it insets
+// the column rather than covering it. Peek and modal both start closed:
+// a remembered overlay would sit on top of the text the reader came for,
+// which is why this used to be "always starts closed".
+// The pre-drawer layout persisted a collapse flag and a width; drop both
+// on sight — they belong to the removed resize handle, not to this.
 try { localStorage.removeItem('sidebarCollapsed'); localStorage.removeItem('sidebarWidth'); } catch (e) {}
+if (drawerWasPinned() && canPinDrawer()) setDrawerState('pinned', false);
 
 /* Content-width mode (D3) — reader picks narrow / wide / max, persists.
  * narrow = 860px (optimal line length); wide = 1100px (more cards per
@@ -1302,6 +1431,11 @@ class PageChrome extends HTMLElement {
     this.querySelector('.back-to-top').addEventListener('click', function () {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+    // The button is written with aria-expanded="false", but a remembered
+    // pinned state was restored before this element existed. Wire hover
+    // and re-sync aria here, where the button is finally in the DOM.
+    initDrawerPeek();
+    syncDrawerButton();
 
     // Width and theme belong to the top-right cluster, which lives on
     // <body> and survives this element's innerHTML rewrite. Guarded
@@ -1472,6 +1606,28 @@ function buildTOC(tocList) {
   var idToSubLink = {};
   allSubLinks.forEach(function (a) { idToSubLink[a.getAttribute('href').slice(1)] = a; });
 
+  /* A pinned panel is read WHILE the document scrolls, so the highlight
+     has to stay somewhere the reader can see it. On a long page the
+     active entry walks off the bottom of the panel within a few
+     sections and the highlight becomes a thing you have to go looking
+     for — which is the opposite of what a position indicator is for.
+     Scrolls the panel's own container, never the page: `scrollIntoView`
+     on a descendant of an overflow box will happily take the document
+     with it, and the document's scroll position is what the reader is
+     controlling. */
+  var lastRevealed = null;
+  function revealActive(el) {
+    if (!el || el === lastRevealed) return;
+    if (!document.body.classList.contains('drawer-open')) return;
+    var scroller = document.querySelector('page-nav .page-nav-scroll');
+    if (!scroller) return;
+    lastRevealed = el;
+    var r = el.getBoundingClientRect();
+    var s = scroller.getBoundingClientRect();
+    if (r.top >= s.top + 8 && r.bottom <= s.bottom - 8) return;   // already in view
+    scroller.scrollTop += (r.top - s.top) - (s.height - r.height) / 2;
+  }
+
   function setActive(sectionId, h3Id) {
     tocItems.forEach(function (it) { it.classList.remove('active'); });
     allSubLinks.forEach(function (a) { a.classList.remove('active'); });
@@ -1480,7 +1636,9 @@ function buildTOC(tocList) {
       item.classList.add('active', 'expanded');
       tocItems.forEach(function (it) { if (it !== item) it.classList.remove('expanded'); });
     }
-    if (h3Id && idToSubLink[h3Id]) idToSubLink[h3Id].classList.add('active');
+    var sub = h3Id && idToSubLink[h3Id];
+    if (sub) sub.classList.add('active');
+    revealActive(sub || item);
   }
 
   var headings = [];
