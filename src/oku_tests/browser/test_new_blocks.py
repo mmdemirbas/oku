@@ -153,6 +153,15 @@ def test_a_bar_chart_prints_the_unit_it_was_given(page, served):
     box = unit.bounding_box()
     assert box["height"] > 0 and box["width"] > 0, box
 
+    # It names the unit the BARS are drawn in, so it starts where the
+    # bars start. Spanning from column 1 put it under the labels, at the
+    # far left of a chart whose numbers are at the far right, where it
+    # reads as a stray word instead of an axis unit.
+    track = page.locator(".bar-chart .bar-row .bar-track").first.bounding_box()
+    assert abs(box["x"] - track["x"]) <= 1, (
+        f"the unit must share the bars' left origin: unit x={box['x']} track x={track['x']}"
+    )
+
 
 def test_bar_chart_shares_origin(page, served):
     """All bars in a horizontal bar chart must start at the same x —

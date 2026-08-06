@@ -2929,12 +2929,17 @@ figure.okt-figure figcaption {
   color: var(--text-soft);
 }
 
-/* The unit line under a bar chart, from `x_label`. Sits under the bars
-   in the value column's own grid track so it reads as a note about the
-   numbers rather than a caption for the whole figure. */
+/* The unit line under a bar chart, from `x_label`. Column 2, not the
+   full width: it names the unit the BARS are drawn in, so it starts
+   where the bars start. Spanning from column 1 put it under the labels,
+   at the far left of a chart whose numbers are at the far right, and it
+   read as a stray word rather than as an axis unit — visible the first
+   time it shipped on a real page. */
+.bar-chart:not(.bar-chart-vertical) > .bar-chart-unit {
+  grid-column: 2 / -1;
+}
 .bar-chart > .bar-chart-unit {
-  grid-column: 1 / -1;
-  margin-top: 8px;
+  margin-top: 6px;
   font: 500 11.5px 'Inter', sans-serif;
   color: var(--text-faint);
 }
