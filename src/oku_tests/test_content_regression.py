@@ -404,6 +404,69 @@ class TestChromeKitMarkers:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "_hdtDetectBraceFolds" in src, "code-block brace-fold detector missing from chrome.js"
 
+    # Properties that change an element's box. A hover rule that sets one
+    # of these on something carrying content moves the content.
+    _MOVES_THE_BOX = (
+        "transform",
+        "padding",
+        "margin",
+        "font-size",
+        "letter-spacing",
+        "gap",
+        "border-width",
+        "width",
+        "height",
+        "inset",
+    )
+    # Decoration and chrome, where a transform moves nothing a reader is
+    # reading: a marker dot growing about its own centre, a "→" drawn by
+    # a pseudo-element, the sidebar tab thumbs, a donut slice responding
+    # under the pointer that put it there.
+    _NOT_CONTENT = ("::after", "::before", "-marker", "-thumb", ".okc-slice")
+
+    def test_no_hover_rule_moves_the_content_under_the_pointer(self, repo_root: Path) -> None:
+        """A card answers the pointer with light, never with position.
+
+        Every card kind used to hover with `transform: translateY(-2px)`
+        and the Contents tree grew its left padding 8px → 12px. Both
+        take the text with them. Two to four pixels is too small to read
+        as an effect and exactly the right size to read as a rendering
+        fault, and it fires on everything the pointer crosses on its way
+        somewhere else — which is most of the page, most of the time.
+
+        The raise is box-shadow now: a ring grows out of the card's edge
+        and the shadow deepens under it. Paint only, no layout, and the
+        browser test pins the geometry
+        (test_presentation_affordances.py::
+        test_hovering_a_card_does_not_move_what_is_written_on_it).
+
+        This is the class-level half. The browser can only check the
+        cards a fixture happens to render; this reads every `:hover`
+        rule in the stylesheet, so a new primitive that reaches for
+        translateY fails here on the day it is written."""
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        offenders = []
+        for m in re.finditer(r"(?m)^([^{}\n][^{}]*)\{([^{}]*)\}", css):
+            selector, body = m.group(1).strip(), m.group(2)
+            if ":hover" not in selector:
+                continue
+            if any(token in selector for token in self._NOT_CONTENT):
+                continue
+            for decl in body.split(";"):
+                prop = decl.strip().split(":")[0].strip()
+                if prop.startswith(self._MOVES_THE_BOX):
+                    # border-color and border-*-color are colour, not box.
+                    if prop.endswith("color"):
+                        continue
+                    line = css[: m.start()].count("\n") + 1
+                    offenders.append(f"chrome.css:{line} `{selector.splitlines()[0]}` sets {decl.strip()}")
+        assert not offenders, (
+            "a hover rule changes the box of something carrying content — "
+            "the text under the pointer will shift. Use box-shadow (see the "
+            '"The raise" comment in chrome.css) or add the selector to '
+            "_NOT_CONTENT if it is genuinely decoration:\n  " + "\n  ".join(offenders)
+        )
+
     def test_chrome_has_a_contents_toggle(self, repo_root: Path) -> None:
         """One affordance for the sidebar, at every width. Icon only —
         the visible word was removed, so the name has to survive in the

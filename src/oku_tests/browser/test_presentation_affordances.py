@@ -90,6 +90,24 @@ flowchart LR
   A[write] --> B[compact]
   B --> C[read]
 ```
+
+## Cards the pointer will cross {{#cards}}
+
+```oku-kpi-grid
+{{"tiles":[{{"num":"12","label":"files per minute per bucket"}},
+ {{"num":"5s","label":"checkpoint interval"}},
+ {{"num":"1.24x","label":"decode cost, realtime"}}]}}
+```
+
+```oku-step-flow
+{{"steps":[{{"t":"Write","b":"{PARA}","meta":"streaming"}},
+ {{"t":"Compact","b":"{PARA}","meta":"batch"}}]}}
+```
+
+```oku-compare-grid
+{{"cards":[{{"t":"Before","b":"{PARA}","verdict":"out"}},
+ {{"t":"After","b":"{PARA}","verdict":"in"}}]}}
+```
 """
 
 
@@ -443,3 +461,82 @@ def test_touch_keeps_the_controls_reachable(afford_url, browser):
     finally:
         page.close()
         ctx.close()
+
+
+# ---------- hovering a card ----------
+
+CARDS = [
+    (".kpi", ".num"),
+    (".step-card", ".step-num"),
+    (".compare-card", ".compare-card-title, h3, h4"),
+]
+
+
+@pytest.mark.parametrize(("card", "inner"), CARDS, ids=[c[0].lstrip(".") for c in CARDS])
+def test_hovering_a_card_does_not_move_what_is_written_on_it(rendered, card, inner):
+    """A card answers the pointer with light, never with position.
+
+    Every card kind used to hover with `transform: translateY(-2px)`,
+    which takes the card's content up with it. Two pixels is too small
+    to read as an effect and exactly the right size to read as a
+    rendering fault, and it fired on every card the pointer crossed on
+    its way somewhere else.
+
+    So: the card's box, and the box of the text on it, are identical at
+    rest and under the pointer — to the pixel, not to a tolerance. A
+    tolerance is what a 2px nudge hides in."""
+    # Scroll first, measure second. `hover()` scrolls its target into
+    # view, and a viewport-relative reading taken across that scroll
+    # reports a move that has nothing to do with the hover.
+    rendered.locator(card).first.scroll_into_view_if_needed()
+    # x=2 is left of the reading column at every width, so parking there
+    # is off every card whatever scrolled into view.
+    rendered.mouse.move(2, 450)
+    rendered.wait_for_timeout(300)
+    probe = """([card, inner]) => {
+        const el = document.querySelector(card);
+        const t = el.querySelector(inner) || el;
+        const r = e => { const b = e.getBoundingClientRect();
+                         return [b.x, b.y, b.width, b.height].map(v => Math.round(v * 100) / 100); };
+        return { card: r(el), text: r(t), shadow: getComputedStyle(el).boxShadow };
+    }"""
+    before = rendered.evaluate(probe, [card, inner])
+
+    rendered.hover(card)
+    rendered.wait_for_timeout(400)
+    during = rendered.evaluate(probe, [card, inner])
+
+    rendered.mouse.move(2, 450)
+    rendered.wait_for_timeout(250)
+
+    assert during["card"] == before["card"], f"{card} moved or resized under the pointer: {before} → {during}"
+    assert during["text"] == before["text"], (
+        f"the text on {card} moved under the pointer: {before} → {during}"
+    )
+    # And the raise still happens — a test that only pins stillness
+    # passes just as well on a card that stopped responding at all.
+    assert during["shadow"] != before["shadow"], f"{card} no longer answers the pointer: {during['shadow']}"
+
+
+def test_hovering_a_contents_entry_does_not_slide_its_label(rendered):
+    """Same rule, applied where the pointer crosses the most items in a
+    row. The tree entry used to grow its left padding 8px → 12px on
+    hover, so every label the reader passed over on the way down the
+    panel stepped right and back."""
+    rendered.evaluate("() => document.querySelector('.drawer-toggle').click()")
+    rendered.wait_for_timeout(400)
+    link = rendered.locator("page-nav .page-nav-item > a").first
+    before = link.bounding_box()
+    link.hover()
+    rendered.wait_for_timeout(300)
+    during = link.bounding_box()
+    got = rendered.evaluate(
+        "() => getComputedStyle(document.querySelector('page-nav .page-nav-item > a')).backgroundColor"
+    )
+    rendered.keyboard.press("Escape")
+    rendered.wait_for_timeout(300)
+    assert before and during
+    assert during["x"] == before["x"] and during["width"] == before["width"], (
+        f"the tree label slid under the pointer: {before} → {during}"
+    )
+    assert got, "the entry needs some hover cue left after the padding shift was removed"

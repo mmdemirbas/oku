@@ -420,6 +420,34 @@ reader's choice. `test_reader_can_cycle_content_width` asserts the mode
 set is exactly the three, so adding a fourth fails rather than merely
 crowding the cycle.
 
+**A card answers the pointer with light, never with position.** Every
+card kind used to hover with `transform: translateY(-2px)` and the
+Contents tree grew its left padding 8px → 12px. Both take the text with
+them. Two to four pixels is too small to read as an effect and exactly
+the right size to read as a rendering fault, and it fires on everything
+the pointer crosses on its way somewhere else — which is most of the
+page, most of the time.
+
+The raise is box-shadow now: a ring grows out of the card's edge
+(`--okt-ring-off` → `--okt-ring-on`) and the shadow deepens under it.
+Paint only, no layout, so the box a reader is reading from does not
+move. The **resting state carries the same layer count as the hover
+state**, collapsed to zero blur and zero spread so it paints nothing —
+box-shadow interpolates layer-for-layer, and a rule that omits the ring
+at rest snaps it on instead of growing it.
+
+Anything that changes a card's box on hover — transform, padding,
+border-*width*, font-size — is the defect, not the effect. Border
+*colour* is free, and so is opacity.
+`test_no_hover_rule_moves_the_content_under_the_pointer` reads every
+`:hover` rule in the stylesheet, so a new primitive reaching for
+translateY fails on the day it is written; `_NOT_CONTENT` there is the
+list of genuine exceptions (a marker dot growing about its own centre,
+a `::after` arrow, the sidebar tab thumbs, a donut slice responding
+under the pointer that put it there). The geometry itself is pinned in
+`test_hovering_a_card_does_not_move_what_is_written_on_it`, to the
+pixel — a tolerance is what a 2px nudge hides in.
+
 **The chrome buttons quiet down when nothing is reaching for them.**
 Four fixed 44px boxes float over the top of the reading column at every
 scroll position. They sit at a 0.32 floor and rise to full on a cosine

@@ -2151,8 +2151,32 @@ code:not(pre code) {
   padding: 14px 16px;
   box-shadow: 0 1px 2px var(--shadow-soft), 0 4px 10px -6px var(--shadow-strong);
 }
+/* ============ The raise: light moves, content does not ============ *
+ * Every card kind used to answer the pointer with
+ * `transform: translateY(-2px)`. That takes the card's CONTENT with it.
+ * The sentence the reader is on jumps two pixels and settles — too
+ * small to read as an effect, exactly the right size to read as a
+ * rendering fault — and it fires on every card the pointer crosses on
+ * its way somewhere else.
+ *
+ * The raise is made of light now: a ring grows outward from the card's
+ * edge and the shadow deepens under it. Both are box-shadow layers, so
+ * nothing is laid out and nothing reflows; the text stays at the pixel
+ * the reader was reading it at. Anything that changes a card's box —
+ * transform, padding, border-WIDTH, font-size — is the defect, not the
+ * effect. Border COLOUR is free, and so is opacity.
+ *
+ * The resting state carries the same LAYER COUNT as the hover state,
+ * collapsed to zero spread and zero blur so it paints nothing.
+ * box-shadow only interpolates layer-for-layer; a rule that omits the
+ * ring at rest snaps it on instead of growing it. */
+:root {
+  --okt-ring-off: 0 0 0 0 var(--accent-soft);
+  --okt-ring-on:  0 0 0 3px var(--accent-soft);
+}
+
 /* Anchor / clickable cards — match the table-row affordance: pointer
-   cursor, hover lift, the whole card is the click target, no link blue. */
+   cursor, the whole card is the click target, no link blue. */
 a.okt-card,
 .okt-card[onclick],
 .okt-card[role="button"] {
@@ -2160,14 +2184,14 @@ a.okt-card,
   text-decoration: none;
   color: inherit;
   display: block;
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.18s ease;
+  box-shadow: var(--okt-ring-off), 0 1px 2px var(--shadow-soft), 0 4px 10px -6px var(--shadow-strong);
+  transition: border-color 0.15s ease, box-shadow 0.18s ease;
 }
 a.okt-card:hover,
 .okt-card[onclick]:hover,
 .okt-card[role="button"]:hover {
   border-color: var(--accent);
-  box-shadow: 0 6px 16px var(--shadow-soft);
-  transform: translateY(-2px);
+  box-shadow: var(--okt-ring-on), 0 10px 24px -6px var(--shadow-strong), 0 4px 10px -6px var(--shadow-strong);
 }
 a.okt-card:focus-visible,
 .okt-card[tabindex]:focus-visible {
@@ -2281,13 +2305,12 @@ a.okt-card:focus-visible,
   padding: 10px 12px;
   text-decoration: none;
   color: inherit;
-  box-shadow: 0 1px 2px var(--shadow-soft);
-  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
+  box-shadow: var(--okt-ring-off), 0 1px 2px var(--shadow-soft);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
 }
 .okt-board-card:hover {
   border-color: var(--accent);
-  box-shadow: 0 2px 6px var(--shadow-strong, var(--shadow-soft));
-  transform: translateX(2px);
+  box-shadow: var(--okt-ring-on), 0 2px 6px var(--shadow-strong, var(--shadow-soft));
 }
 .okt-board-card:focus-visible {
   outline: 2px solid var(--accent);
@@ -2339,12 +2362,13 @@ a.okt-card:focus-visible,
   color: inherit;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s ease;
 }
 .okt-list-row.okt-list-row-static { cursor: default; }
+/* A filled row is cue enough; the 2px nudge that used to come with it
+   moved the row's text. See "The raise" above. */
 .okt-list-row:not(.okt-list-row-static):hover {
   background: var(--accent-soft);
-  transform: translateX(2px);
 }
 .okt-list-row:focus-visible {
   outline: 2px solid var(--accent);
@@ -3058,17 +3082,13 @@ figure.okt-figure figcaption {
   border-radius: 12px;
   padding: 16px 18px;
   background: var(--surface);
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: var(--okt-ring-off), 0 0 0 var(--shadow-strong);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .step-card:hover {
   border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px var(--shadow-soft);
+  box-shadow: var(--okt-ring-on), 0 10px 24px -6px var(--shadow-strong);
 }
-.step-card:hover .step-num {
-  transform: scale(1.08);
-}
-.step-card .step-num { transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .step-card .step-num {
   display: flex;
   align-items: center;
@@ -3254,10 +3274,12 @@ table tbody tr[tabindex] {
 .pill {
   display: inline-block; padding: 3px 10px; border-radius: 14px;
   font-size: 12px; font-weight: 700; margin-right: 4px; white-space: nowrap;
-  transition: transform 0.15s ease, box-shadow 0.18s ease;
+  box-shadow: 0 0 0 var(--shadow-soft);
+  transition: box-shadow 0.18s ease;
 }
+/* No ring here: a pill already carries its own semantic fill, and an
+   accent ring around a red one is two colours arguing. Depth only. */
 .pill:hover {
-  transform: translateY(-1px);
   box-shadow: 0 2px 6px var(--shadow-soft);
 }
 .pill.ok    { background: var(--success-soft); color: var(--success); }
@@ -3270,19 +3292,17 @@ table tbody tr[tabindex] {
 .kpi {
   text-align: center; padding: 22px 14px;
   background: var(--surface); border-radius: 10px; border: 1px solid var(--border);
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: var(--okt-ring-off), 0 0 0 var(--shadow-strong);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .kpi:hover {
   border-color: var(--accent);
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px var(--shadow-soft);
+  box-shadow: var(--okt-ring-on), 0 10px 24px -6px var(--shadow-strong);
 }
-.kpi:hover .num { transform: scale(1.05); }
 .kpi .num {
   font-size: 30px; font-weight: 800; color: var(--accent);
   line-height: 1.1; letter-spacing: -0.02em;
   display: inline-block;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .kpi .label { font-size: 12.5px; color: var(--text-soft); margin-top: 6px; line-height: 1.4; }
 /* Optional per-tile icon — a semantic glyph above the number so a grid of
@@ -3301,11 +3321,12 @@ table tbody tr[tabindex] {
 .compare-card {
   padding: 22px; border-radius: 10px;
   border: 1px solid var(--border); background: var(--surface);
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: var(--okt-ring-off), 0 0 0 var(--shadow-strong);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .compare-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px var(--shadow-soft);
+  border-color: var(--accent);
+  box-shadow: var(--okt-ring-on), 0 10px 24px -6px var(--shadow-strong);
 }
 /* Clickable variant — whole card is an <a>. Strip default link
    styling so the card reads as a tile, not as a link-coloured
@@ -3886,13 +3907,15 @@ page-nav .page-nav-item > a {
   text-decoration: none;
   border-radius: 4px;
   border-left: 2px solid transparent;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.18s ease, padding-left 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.18s ease;
 }
+/* Fill, colour and the accent edge — no padding shift. The 8→12px
+   nudge this used to carry slid the label out from under the pointer
+   on every item the reader passed over. See "The raise" above. */
 page-nav .page-nav-item > a:hover {
   background: var(--surface-2);
   color: var(--accent);
   border-left-color: var(--accent-soft);
-  padding-left: 12px;
 }
 page-nav .page-nav-item.active > a {
   color: var(--accent);
