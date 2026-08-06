@@ -99,3 +99,61 @@ Flow / share between stages. Use for funnels, energy, traffic.
 ```oku-example
 {"code":{"k":"code","src":"sankey-beta\n\nVisitors,Signups,40\nVisitors,Bounced,60\nSignups,Activated,25\nSignups,Dropped,15","lang":"mermaid"},"output":{"k":"diagram","src":"sankey-beta\n\nVisitors,Signups,40\nVisitors,Bounced,60\nSignups,Activated,25\nSignups,Dropped,15"}}
 ```
+
+## Drawing your own {#hand-drawn}
+
+Mermaid covers topology. When the figure needs a real axis, a before /
+after split, or a shape Mermaid has no grammar for, draw the SVG
+yourself in an HTML island — the island has no restrictions.
+
+The one thing you must not do is reach for a hex literal. A hardcoded
+colour is how a figure ends up invisible in the theme nobody was
+looking at: dark ink on the dark surface, a pale box on the pale one.
+`oku check` says so as `island-hand-styled`. These classes are what it
+is telling you to use — every one of them is driven by the same tokens
+the rest of the page uses, so the figure follows the page accent and
+both themes for free.
+
+<figure class="okt-figure">
+<svg viewBox="0 0 640 250" role="img" aria-label="The class vocabulary for a hand-drawn SVG: node fills, a group region, and three edge weights.">
+<defs>
+<marker id="oku-vocab-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="okt-diag-arrow" d="M 0 0 L 10 5 L 0 10 z"/></marker>
+<marker id="oku-vocab-head-strong" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="okt-diag-arrow strong" d="M 0 0 L 10 5 L 0 10 z"/></marker>
+</defs>
+<rect class="okt-diag-node" x="20" y="24" width="104" height="40" rx="9"/>
+<rect class="okt-diag-node accent" x="144" y="24" width="104" height="40" rx="9"/>
+<rect class="okt-diag-node ok" x="268" y="24" width="104" height="40" rx="9"/>
+<rect class="okt-diag-node warn" x="392" y="24" width="104" height="40" rx="9"/>
+<rect class="okt-diag-node fail" x="516" y="24" width="104" height="40" rx="9"/>
+<text class="okt-diag-label" x="72" y="49" text-anchor="middle">node</text>
+<text class="okt-diag-label accent" x="196" y="49" text-anchor="middle">accent</text>
+<text class="okt-diag-label ok" x="320" y="49" text-anchor="middle">ok</text>
+<text class="okt-diag-label warn" x="444" y="49" text-anchor="middle">warn</text>
+<text class="okt-diag-label fail" x="568" y="49" text-anchor="middle">fail</text>
+<text class="okt-diag-label mono" x="72" y="82" text-anchor="middle">.okt-diag-node</text>
+<text class="okt-diag-label mono" x="196" y="82" text-anchor="middle">.accent</text>
+<text class="okt-diag-label mono" x="320" y="82" text-anchor="middle">.ok</text>
+<text class="okt-diag-label mono" x="444" y="82" text-anchor="middle">.warn</text>
+<text class="okt-diag-label mono" x="568" y="82" text-anchor="middle">.fail</text>
+<rect class="okt-diag-group" x="20" y="112" width="280" height="88" rx="12"/>
+<rect class="okt-diag-node plain" x="40" y="140" width="110" height="34" rx="8"/>
+<rect class="okt-diag-node plain" x="170" y="140" width="110" height="34" rx="8"/>
+<text class="okt-diag-label soft" x="95" y="161" text-anchor="middle">reader</text>
+<text class="okt-diag-label soft" x="225" y="161" text-anchor="middle">writer</text>
+<text class="okt-diag-label mono" x="160" y="236" text-anchor="middle">.okt-diag-group</text>
+<line class="okt-diag-edge" x1="345" y1="128" x2="465" y2="128" marker-end="url(#oku-vocab-head)"/>
+<line class="okt-diag-edge dashed" x1="345" y1="160" x2="465" y2="160"/>
+<line class="okt-diag-edge strong" x1="345" y1="192" x2="465" y2="192" marker-end="url(#oku-vocab-head-strong)"/>
+<text class="okt-diag-label mono" x="478" y="132">.okt-diag-edge</text>
+<text class="okt-diag-label mono" x="478" y="164">.dashed</text>
+<text class="okt-diag-label mono" x="478" y="196">.strong</text>
+</svg>
+<figcaption>Five node fills, a group region, three edge weights. Every fill, stroke and text colour above is a CSS variable, so the same markup renders correctly in both themes and follows whatever accent the tree is set to.</figcaption>
+</figure>
+
+`.okt-diag-label` also takes `.strong`, `.soft`, `.faint` and `.mono`;
+`.okt-diag-arrow` takes the same status modifiers as the edge, because
+a `<marker>` paints with its own fill and the line's stroke colour never
+reaches it. For a figure that encodes a category per shape,
+`.okt-diag-fill-1` through `-10` are the chart ramp, so a hand-drawn
+figure sits in the same palette as every chart around it.

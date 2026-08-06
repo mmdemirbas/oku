@@ -404,6 +404,40 @@ class TestChromeKitMarkers:
         src = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "_hdtDetectBraceFolds" in src, "code-block brace-fold detector missing from chrome.js"
 
+    def test_the_kit_gives_a_hand_drawn_svg_somewhere_to_get_colour(self, repo_root: Path) -> None:
+        """`island-hand-styled` tells an author not to hardcode colours in
+        an SVG island. It has to be able to name what to use instead.
+
+        A hex literal in a figure is how the figure ends up invisible in
+        the theme nobody was looking at — dark ink on the dark surface.
+        So the kit ships the vocabulary, every class driven by a token,
+        and the check's message names it. Both halves or neither: a
+        vocabulary nothing points at goes unused, and a check that says
+        "use the classes" without naming them is a check the author
+        ignores."""
+        css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
+        for cls in (
+            ".okt-diag-node",
+            ".okt-diag-edge",
+            ".okt-diag-arrow",
+            ".okt-diag-label",
+            ".okt-diag-group",
+        ):
+            assert re.search(re.escape(cls) + r"\s*\{", css), f"{cls} missing from the diagram vocabulary"
+        # Driven by tokens, not by literals — that is the entire point.
+        block = css[css.index(".okt-diag-node {") : css.index(".okt-diag-fill-10")]
+        assert not re.search(r"#[0-9a-fA-F]{3,8}\b", block), (
+            "a hex literal in the diagram vocabulary — these classes exist so a figure "
+            "follows the theme, and a literal here breaks every figure that uses it"
+        )
+        assert re.search(r"\.okt-diag-fill-1\s*\{", css), "the series ramp is not exposed to figures"
+        cli_src = (repo_root / "src" / "oku" / "cli.py").read_text(encoding="utf-8")
+        i = cli_src.index('"island-hand-styled"')
+        assert "okt-diag-" in cli_src[i : i + 900], (
+            "island-hand-styled tells the author to use the kit's classes without naming "
+            "the ones for an SVG — name them, or the message is advice they cannot act on"
+        )
+
     # Properties that change an element's box. A hover rule that sets one
     # of these on something carrying content moves the content.
     _MOVES_THE_BOX = (

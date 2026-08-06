@@ -502,6 +502,32 @@ structure from the `.okt-*` classes. Hardcoded hex or an inline
 `<style>` earns `island-hand-styled`, because the hand-rolled copy stops
 following the accent and breaks in the theme nobody was looking at.
 
+**Hand-drawn figures get their colour from the kit.** An author who
+draws their own SVG — in an `oku-svg` block or an HTML island — reaches
+for `.okt-diag-node` / `-edge` / `-arrow` / `-label` / `-group` (each
+with `ok` / `warn` / `fail` / `accent` / `plain` / `soft` / `mono`
+modifiers) and `.okt-diag-fill-1..10` for the chart ramp. Every one is
+driven by a token, so the figure follows the page accent and both
+themes. A hex literal is how a figure ends up invisible in the theme
+nobody was looking at; `island-hand-styled` says so and the message
+names these classes. Both halves are pinned by
+`test_the_kit_gives_a_hand_drawn_svg_somewhere_to_get_colour` — a
+vocabulary nothing points at goes unused, and a check that says "use
+the classes" without naming them is one authors ignore.
+
+**Timeline is not step-flow, and the difference is the point.** A
+step-flow is a procedure the reader is meant to follow, so every step
+is equally true. A timeline is a record of what happened, and an entry
+on it can be a claim that was later dropped — which is why its dot
+carries a status (`note` / `done` / `open` / `dropped`) and a step
+numeral does not. The status carries the colour, the author's `label`
+carries the word ("claim #1", "2026-03-04", "v0.4.0"), so a new kind of
+entry never needs a new colour. The rail and the dots are positioned by
+two independent rules; `test_every_timeline_dot_sits_on_the_rail` and
+its narrow-width twin measure them onto the same axis, because tuning
+the list padding without the dot offset is the failure and it only
+shows below 560px.
+
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never
 English words. The page can flip to TR or EN without touching kit

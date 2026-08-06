@@ -613,7 +613,7 @@
   // arrived as .md (lifted at build time) or as a fence inside a v2
   // markdown string (lifted here).
   const FENCE_KINDS = ['chart', 'chart-grid', 'table', 'kpi-grid', 'step-flow',
-    'compare-grid', 'insight', 'example', 'live-snippet', 'annotated-code', 'diagram', 'tldr'];
+    'timeline', 'compare-grid', 'insight', 'example', 'live-snippet', 'annotated-code', 'diagram', 'tldr'];
 
   function liftTypedFence(lang, src) {
     if (lang === 'mermaid') return { k: 'diagram', src: src };
@@ -1479,6 +1479,7 @@
         case 'table':          el = this._renderTable(block); break;
         case 'kpi-grid':       el = this._renderKpiGrid(block); break;
         case 'step-flow':      el = this._renderStepFlow(block); break;
+        case 'timeline':       el = this._renderTimeline(block); break;
         case 'compare-grid':   el = this._renderCompareGrid(block); break;
         case 'chart':          el = this._renderChart(block); break;
         case 'chart-grid':     el = this._renderChartGrid(block); break;
@@ -1766,6 +1767,42 @@
         wrap.appendChild(card);
       });
       return wrap;
+    }
+
+    /* An ordered sequence where each entry carries a state. The rail is
+       drawn by CSS (one ::before on the list, one per item), so the DOM
+       here is just the reading order — nothing to keep in sync, and the
+       page can be read with the stylesheet off. */
+    _renderTimeline(block) {
+      const STATUSES = ['note', 'done', 'open', 'dropped'];
+      const list = document.createElement('ol');
+      list.className = 'okt-timeline';
+      (block.events || []).forEach((e) => {
+        const item = document.createElement('li');
+        const status = STATUSES.indexOf(e.status) === -1 ? 'note' : e.status;
+        item.className = 'okt-tl-item okt-tl-' + status;
+        const head = document.createElement('div');
+        head.className = 'okt-tl-head';
+        if (e.label) {
+          const chip = document.createElement('span');
+          chip.className = 'okt-tl-chip';
+          chip.textContent = e.label;
+          head.appendChild(chip);
+        }
+        const title = document.createElement('span');
+        title.className = 'okt-tl-title';
+        parseInline(e.t || '', title);
+        head.appendChild(title);
+        item.appendChild(head);
+        if (e.b !== undefined && e.b !== '') {
+          const body = document.createElement('div');
+          body.className = 'okt-tl-body';
+          emitMarkdown(body, parseMarkdown(e.b), null);
+          item.appendChild(body);
+        }
+        list.appendChild(item);
+      });
+      return list;
     }
 
     _renderCompareGrid(block) {
@@ -2411,6 +2448,7 @@
     'kpi-grid': { required: ['tiles'], items: { tiles: ['num', 'label'] } },
     'live-snippet': { required: ['src'] },
     'step-flow': { required: ['steps'], items: { steps: ['t'] } },
+    'timeline': { required: ['events'], items: { events: ['t'] } },
     'svg': { required: ['src'] },
     'table': { items: { groups: ['rows'] } },
   };

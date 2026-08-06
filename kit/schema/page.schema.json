@@ -48,6 +48,7 @@
         { "$ref": "#/$defs/table" },
         { "$ref": "#/$defs/kpi-grid" },
         { "$ref": "#/$defs/step-flow" },
+        { "$ref": "#/$defs/timeline" },
         { "$ref": "#/$defs/compare-grid" },
         { "$ref": "#/$defs/chart" },
         { "$ref": "#/$defs/chart-grid" },
@@ -189,6 +190,34 @@
               "b":    { "type": "string", "description": "Step body as markdown." },
               "meta": { "type": "string", "description": "Small meta line (estimate, files, risk)." },
               "href": { "type": "string", "description": "When set, the step card wraps in an anchor to this target." }
+            }
+          }
+        }
+      }
+    },
+
+    "timeline": {
+      "type": "object",
+      "required": ["k", "events"],
+      "additionalProperties": false,
+      "description": "An ordered sequence of events on a vertical rail, each carrying a status. Use it when the ORDER and the STATE of each entry are both part of the point — a debugging story where a claim is later corrected, a decision log, an incident sequence. A step-flow is the neighbouring shape and answers a different question: it is a procedure the reader is meant to follow, so every step is equally true. Nothing here is a procedure.",
+      "properties": {
+        "k": { "const": "timeline" },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["t"],
+            "additionalProperties": false,
+            "properties": {
+              "t":      { "type": "string", "description": "Event title — one line." },
+              "b":      { "type": "string", "description": "Event body as markdown." },
+              "label":  { "type": "string", "description": "Small chip before the title: the reader's own word for this entry (\"claim #1\", \"corrected\", \"2026-03-04\", \"v0.4.0\"). The status carries the colour; this carries the meaning." },
+              "status": {
+                "enum": ["note", "done", "open", "dropped"],
+                "default": "note",
+                "description": "note (default): a plain event, quiet hollow dot. done: settled / verified / shipped — filled dot, success colour. open: claimed but not settled — hollow warning dot. dropped: retracted, superseded, abandoned — hollow danger dot."
+              }
             }
           }
         }

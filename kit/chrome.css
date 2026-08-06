@@ -135,6 +135,17 @@ html {
      window. Content should reflow, not shrink. */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Reserve the scrollbar's gutter whether or not one is showing. Three
+     paths lock the body's scroll — the lightbox, the search modal and
+     the modal drawer — and on a system with classic (non-overlay)
+     scrollbars, taking the scrollbar away widens the viewport by its
+     gutter, so the centred column jumps sideways at the moment a panel
+     opens over it. Reserving it costs one gutter on a page short enough
+     not to scroll; the alternative is a jump on every reader whose OS
+     does not use overlay scrollbars, which is every Windows machine and
+     any Mac set to "Show scroll bars: Always". Ignored by browsers that
+     do not support it, which leaves them exactly where they were. */
+  scrollbar-gutter: stable;
 }
 body {
   margin: 0; padding: 0;
@@ -1901,20 +1912,24 @@ code:not(pre code) {
   position: sticky;
   top: 0;
   z-index: 2;
-  padding-right: 22px !important;
   transition: background 0.12s ease, color 0.12s ease;
 }
 .okt-sortable:hover { background: var(--accent-soft) !important; color: var(--accent-strong) !important; }
+/* The arrow belongs to the label, so it sits next to the label. Pinned
+   to the cell's right edge it drifted a whole column away on a wide
+   prose column — a control floating in white space, with the word it
+   acts on at the other end of it — and it collided with the multi-sort
+   rank badge, which is pinned there for real. The badge keeps the edge
+   (it is a rank across columns, and ranks line up); only a cell that
+   has one reserves the room. */
 .okt-sortable::after {
   content: '⇅';
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
+  margin-left: 6px;
   font-size: 11px;
   opacity: 0.35;
   transition: opacity 0.15s ease, color 0.15s ease;
 }
+.okt-sortable[data-sort-rank] { padding-right: 22px !important; }
 .okt-sortable:hover::after { opacity: 0.65; }
 .okt-sortable.okt-sort-asc::after  { content: '↑'; opacity: 1; color: var(--accent); }
 .okt-sortable.okt-sort-desc::after { content: '↓'; opacity: 1; color: var(--accent); }
@@ -2883,6 +2898,94 @@ figure.okt-figure figcaption {
   font-style: italic;
 }
 
+/* ============ Hand-drawn diagrams: the theme vocabulary ============ *
+ * An author who draws their own SVG — in an `oku-svg` block or an HTML
+ * island — needs somewhere to get colour from. Without a vocabulary the
+ * only thing to reach for is a hex literal, and a hex literal is how a
+ * figure ends up invisible in the theme nobody was looking at: dark ink
+ * on the dark surface, a pale box on the pale one. `oku check` already
+ * says so (`island-hand-styled`); these classes are what it is telling
+ * the author to use.
+ *
+ * The whole set is presentation attributes driven by the kit's tokens,
+ * so a figure follows the page accent and both themes for free, and
+ * `--series-1..10` keeps a hand-drawn figure in the same palette as
+ * every chart around it.
+ *
+ * Sized in absolute px on purpose: an SVG scales through its viewBox,
+ * so a diagram set in `em` re-sizes its own text against the drawing
+ * whenever the surrounding measure changes. */
+.okt-diag-node {
+  fill: var(--surface-2);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.okt-diag-node.accent { fill: var(--accent-soft); stroke: var(--accent); }
+.okt-diag-node.ok     { fill: var(--success-soft); stroke: var(--success); }
+.okt-diag-node.warn   { fill: var(--warning-soft); stroke: var(--warning); }
+.okt-diag-node.fail   { fill: var(--danger-soft);  stroke: var(--danger); }
+.okt-diag-node.info   { fill: var(--accent-soft);  stroke: var(--accent-strong); }
+.okt-diag-node.plain  { fill: var(--surface); stroke: var(--border-soft); }
+/* A region behind a group of nodes — the box that says "these three are
+   one subsystem". Quieter than a node, or it competes with its own
+   contents. */
+.okt-diag-group {
+  fill: var(--surface-2);
+  stroke: var(--border-soft);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+
+.okt-diag-edge {
+  fill: none;
+  stroke: var(--text-faint);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.okt-diag-edge.strong { stroke: var(--accent); stroke-width: 2; }
+.okt-diag-edge.ok     { stroke: var(--success); }
+.okt-diag-edge.fail   { stroke: var(--danger); }
+.okt-diag-edge.dashed { stroke-dasharray: 5 4; }
+.okt-diag-edge.faint  { stroke: var(--border); }
+/* Arrowheads live inside <marker>, which the stroke colour does not
+   reach — a marker paints with its own fill. Give the head this class
+   and it tracks the same token the line does. */
+.okt-diag-arrow      { fill: var(--text-faint); stroke: none; }
+.okt-diag-arrow.strong { fill: var(--accent); }
+.okt-diag-arrow.ok   { fill: var(--success); }
+.okt-diag-arrow.fail { fill: var(--danger); }
+
+.okt-diag-label {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  fill: var(--text);
+}
+.okt-diag-label.strong { font-weight: 650; }
+.okt-diag-label.soft   { font-size: 11px; fill: var(--text-soft); }
+.okt-diag-label.faint  { font-size: 10.5px; fill: var(--text-faint); }
+.okt-diag-label.mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  fill: var(--text-soft);
+}
+.okt-diag-label.accent { fill: var(--accent); }
+.okt-diag-label.ok     { fill: var(--success); }
+.okt-diag-label.warn   { fill: var(--warning); }
+.okt-diag-label.fail   { fill: var(--danger); }
+
+/* The chart ramp, for a figure that encodes a category per shape. */
+.okt-diag-fill-1  { fill: var(--series-1); }
+.okt-diag-fill-2  { fill: var(--series-2); }
+.okt-diag-fill-3  { fill: var(--series-3); }
+.okt-diag-fill-4  { fill: var(--series-4); }
+.okt-diag-fill-5  { fill: var(--series-5); }
+.okt-diag-fill-6  { fill: var(--series-6); }
+.okt-diag-fill-7  { fill: var(--series-7); }
+.okt-diag-fill-8  { fill: var(--series-8); }
+.okt-diag-fill-9  { fill: var(--series-9); }
+.okt-diag-fill-10 { fill: var(--series-10); }
+
 /* Bar-chart — row-per-item horizontal bars. Layout-safe by structure. */
 .bar-chart { display: grid; gap: 6px; margin: 24px 0; }
 .bar-row {
@@ -3160,10 +3263,21 @@ a.step-card.step-card-link:focus-visible {
 
 /* ============ Tables, pills, KPI tiles, comparison cards, details ============ */
 table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5px; line-height: 1.5; }
+/* A column label is a label, not a heading: small, uppercase, tracked
+   out, and quieter than the data under it. The filled band it used to
+   sit in made the header the loudest row in the table, which is exactly
+   backwards — the reader came for the cells. The 2px rule carries the
+   separation the fill used to.
+
+   The background stays declared because these headers are `sticky`:
+   without an opaque fill the rows scroll THROUGH the label. It is the
+   scroll area's own colour, so it reads as no fill at rest and only
+   does its job once the reader scrolls a long table. */
 table th {
-  text-align: left; background: var(--surface-2);
-  padding: 12px 14px; border-bottom: 2px solid var(--border);
-  font-weight: 700; color: var(--text); font-size: 13px;
+  text-align: left; background: var(--bg);
+  padding: 10px 14px; border-bottom: 2px solid var(--border);
+  font-weight: 650; color: var(--text-soft); font-size: 12.5px;
+  text-transform: uppercase; letter-spacing: 0.04em;
 }
 /* Sticky column headers — only on top-level <thead> rows. Scoped this
    way so row-headers in the list-card view (<th scope="row">) don't
@@ -3185,10 +3299,27 @@ table td {
      minimum exceeds container width, the wrapper's horizontal scroll
      takes over instead of producing illegible word-breaks. */
   white-space: normal;
-  overflow-wrap: anywhere;
+  /* `break-word`, NOT `anywhere`. They paint the same; they size
+     differently, and the sizing is the whole point. `anywhere` lets the
+     auto table layout count a one-character break as a legal minimum,
+     so a column holding `read_time` reports a min-content width of one
+     character, the algorithm hands the slack to a prose column, and the
+     identifier renders as `read_ti / me`. `break-word` keeps
+     min-content at the longest word, so the column claims the width it
+     needs while there is slack to claim, and still breaks the token
+     when there genuinely is not — which is what the paragraph below
+     always said this did. */
+  overflow-wrap: break-word;
   word-break: normal;
   min-width: 9ch;
 }
+/* The last row's rule doubled the wrap's own border into a 2px edge. */
+table tbody tr:last-child td { border-bottom: none; }
+/* An identifier in a cell is one token, and a column label is written
+   to be read on one line. Both used to fold mid-word to save pixels the
+   table had to spare. */
+table td > code,
+table td > a > code { white-space: nowrap; }
 table th {
   /* Headers earn the same readable floor so labelled columns don't
      collapse below the label length. */
@@ -3310,6 +3441,92 @@ table tbody tr[tabindex] {
 .kpi-icon { display: flex; justify-content: center; margin-bottom: 10px; color: var(--accent); opacity: 0.9; }
 .kpi-icon svg { display: block; }
 .kpi:hover .kpi-icon { opacity: 1; }
+
+/* ============ Timeline ============ *
+ * An ordered sequence where each entry carries a STATE. The neighbour
+ * is step-flow, and the difference is worth stating because picking the
+ * wrong one is the usual mistake: a step-flow is a procedure the reader
+ * is meant to follow, so every step is equally true. A timeline is a
+ * record of what happened, and an entry on it can be a claim that was
+ * later dropped. That is why the dot carries a status and the step
+ * numeral does not.
+ *
+ * One rail down the left, one dot per entry, laid out by CSS on
+ * ::before — the DOM is only the reading order, so the list still reads
+ * correctly with the stylesheet off, and nothing has to be kept in
+ * sync. The rail stops 6px short at both ends so it reads as spanning
+ * the entries rather than running off into the prose. */
+ol.okt-timeline {
+  position: relative;
+  list-style: none;
+  margin: 24px 0;
+  padding: 0 0 0 26px;
+}
+ol.okt-timeline::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--border);
+}
+.okt-tl-item { position: relative; margin: 0 0 18px 0; }
+.okt-tl-item:last-child { margin-bottom: 0; }
+/* The dot sits ON the rail, not beside it. The rail spans x 5..7 from
+   the list's left edge, centre 6. The item's box starts at the padding
+   edge, so `left: -26px` puts the 12px dot at x 0..12 — centre 6, the
+   same number, which is why the narrow-width override moves the padding
+   and the offset together and never one alone. Filled from the page
+   background so the rail cannot show through a hollow one. */
+.okt-tl-item::before {
+  content: '';
+  position: absolute;
+  left: -26px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--text-faint);
+}
+/* Filled = settled. Hollow = still a question, in one of two ways. */
+.okt-tl-done::before    { border-color: var(--success); background: var(--success); }
+.okt-tl-open::before    { border-color: var(--warning); }
+.okt-tl-dropped::before { border-color: var(--danger); }
+.okt-tl-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.okt-tl-title { font-weight: 650; font-size: 15px; color: var(--text); }
+/* The chip carries the author's own word for the entry; the dot carries
+   the state. Two jobs, two places — a chip that had to encode both
+   would need one colour per phrase. */
+.okt-tl-chip {
+  flex: none;
+  font: 600 11.5px 'Inter', sans-serif;
+  letter-spacing: 0.01em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--border-soft);
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+.okt-tl-done .okt-tl-chip    { background: var(--success-soft); color: var(--success); }
+.okt-tl-open .okt-tl-chip    { background: var(--warning-soft); color: var(--warning); }
+.okt-tl-dropped .okt-tl-chip { background: var(--danger-soft);  color: var(--danger); }
+.okt-tl-body { color: var(--text-soft); font-size: 14.5px; }
+.okt-tl-body > :first-child { margin-top: 0; }
+.okt-tl-body > :last-child { margin-bottom: 0; }
+@media (max-width: 560px) {
+  ol.okt-timeline { padding-left: 22px; }
+  .okt-tl-item::before { left: -22px; }
+}
 
 .compare-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin: 24px 0; }
 /* A grid item defaults to min-width: auto, so it refuses to shrink below

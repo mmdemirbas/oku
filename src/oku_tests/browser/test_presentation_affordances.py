@@ -540,3 +540,130 @@ def test_hovering_a_contents_entry_does_not_slide_its_label(rendered):
         f"the tree label slid under the pointer: {before} → {during}"
     )
     assert got, "the entry needs some hover cue left after the padding shift was removed"
+
+
+# ---------- timeline ----------
+
+TIMELINE_MD = """---
+title: Timeline
+summary: An ordered sequence where each entry carries a state.
+---
+
+## What happened {#story}
+
+```oku-timeline
+{"events":[
+ {"status":"open","label":"claim #1","t":"First reading","b":"Plausible, and unverified."},
+ {"status":"dropped","label":"corrected","t":"Over-stated","b":"Swung the other way. Also premature."},
+ {"status":"done","label":"verified","t":"Pinned it","b":"Instrumented the path. Fixed."},
+ {"t":"A plain entry with no status"}
+]}
+```
+"""
+
+
+@pytest.fixture(scope="module")
+def timeline_page(tmp_path_factory, browser):
+    d = tmp_path_factory.mktemp("tl")
+    (d / "_oku").symlink_to(KIT, target_is_directory=True)
+    manifest = {
+        "schema_version": 1,
+        "root": ".",
+        "pages": [{"path": "page.html", "source": "page.md", "title": "Timeline", "parent": None}],
+    }
+    (d / "page.md").write_text(TIMELINE_MD, encoding="utf-8")
+    (d / "page.html").write_text(cli._stub_for("Timeline", inline_manifest=manifest), encoding="utf-8")
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), cli._make_serve_handler(d))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    page.goto(f"http://127.0.0.1:{httpd.server_address[1]}/page.html")
+    page.wait_for_timeout(1500)
+    yield page
+    page.close()
+    httpd.shutdown()
+
+
+def test_a_timeline_renders_every_event_in_order(timeline_page):
+    """The fence lifts to a typed block and the block reaches the DOM.
+    Four events in, four items out, in source order — a primitive whose
+    payload the renderer cannot read renders a band of white space, and
+    the reader gets no clue which block it was."""
+    got = timeline_page.evaluate(
+        """() => {
+        const l = document.querySelector('ol.okt-timeline');
+        if (!l) return null;
+        return [...l.querySelectorAll('li')].map(li => ({
+            cls: li.className,
+            chip: (li.querySelector('.okt-tl-chip') || {}).textContent || null,
+            title: (li.querySelector('.okt-tl-title') || {}).textContent || null,
+            body: !!li.querySelector('.okt-tl-body'),
+        }));
+    }"""
+    )
+    assert got, "the oku-timeline fence produced no ol.okt-timeline"
+    assert [e["title"] for e in got] == [
+        "First reading",
+        "Over-stated",
+        "Pinned it",
+        "A plain entry with no status",
+    ], got
+    assert [e["chip"] for e in got] == ["claim #1", "corrected", "verified", None], got
+    # An event with no status falls back to `note`, never to no class at
+    # all — an unclassed item takes the rail's default dot and silently
+    # stops being distinguishable from a settled one.
+    assert [e["cls"].split()[-1] for e in got] == [
+        "okt-tl-open",
+        "okt-tl-dropped",
+        "okt-tl-done",
+        "okt-tl-note",
+    ], got
+    assert [e["body"] for e in got] == [True, True, True, False], got
+
+
+def test_every_timeline_dot_sits_on_the_rail(timeline_page):
+    """The rail and the dots are two independent CSS rules — the rail is
+    positioned from the list, each dot from its own item — so nothing
+    but a measurement keeps them on the same axis. They drift the moment
+    the list's padding is tuned and the offset is not."""
+    got = timeline_page.evaluate(
+        """() => {
+        const l = document.querySelector('ol.okt-timeline');
+        const rail = getComputedStyle(l, '::before');
+        const lx = l.getBoundingClientRect().x;
+        const railLeft = lx + parseFloat(rail.left);
+        const railMid = railLeft + parseFloat(rail.width) / 2;
+        const dots = [...l.querySelectorAll('li')].map(li => {
+            const s = getComputedStyle(li, '::before');
+            const left = li.getBoundingClientRect().x + parseFloat(s.left);
+            return Math.round((left + parseFloat(s.width) / 2) * 10) / 10;
+        });
+        return { railMid: Math.round(railMid * 10) / 10, dots };
+    }"""
+    )
+    assert got["dots"], got
+    for d in got["dots"]:
+        assert abs(d - got["railMid"]) <= 0.5, f"a dot sits {d - got['railMid']}px off the rail: {got}"
+
+
+def test_a_narrow_timeline_keeps_its_dots_on_the_rail(timeline_page):
+    """The narrow-width override moves the list's padding AND the dot's
+    offset. Moving one alone is the whole failure mode, and it only
+    shows below 560px."""
+    timeline_page.set_viewport_size({"width": 380, "height": 800})
+    timeline_page.wait_for_timeout(300)
+    got = timeline_page.evaluate(
+        """() => {
+        const l = document.querySelector('ol.okt-timeline');
+        const rail = getComputedStyle(l, '::before');
+        const railMid = l.getBoundingClientRect().x + parseFloat(rail.left) + parseFloat(rail.width) / 2;
+        const li = l.querySelector('li');
+        const s = getComputedStyle(li, '::before');
+        const dotMid = li.getBoundingClientRect().x + parseFloat(s.left) + parseFloat(s.width) / 2;
+        return { railMid: Math.round(railMid * 10) / 10, dotMid: Math.round(dotMid * 10) / 10,
+                 overflows: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+    }"""
+    )
+    timeline_page.set_viewport_size({"width": 1440, "height": 900})
+    timeline_page.wait_for_timeout(200)
+    assert abs(got["dotMid"] - got["railMid"]) <= 0.5, got
+    assert not got["overflows"], f"the timeline pushed the page sideways at 380px: {got}"

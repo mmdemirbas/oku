@@ -226,6 +226,30 @@ Numbered cards for ordered actions, build steps, or migration paths.
 {"code":{"k":"code","src":"{\n  \"kind\": \"step-flow\",\n  \"steps\": [\n    { \"num\": \"1\", \"title\": \"Init\",  \"meta\": \"~1 min\", \"content\": \"oku init\" },\n    { \"num\": \"2\", \"title\": \"Author\", \"content\": \"Write the JSON page.\" }\n  ]\n}","lang":"json"},"output":{"k":"step-flow","steps":[{"t":"Init","b":"cd into your docs root, then oku init scaffolds the _oku symlink and an index.html stub there.","meta":"~1 min · one-time per project"},{"t":"Author","b":"Write a JSON page and an HTML stub side by side; the renderer fetches the JSON at load time.","meta":"iterative"},{"t":"Build","b":"oku build → dist/standalone/ (single-file HTMLs) and dist/site/ (shared-asset multi-page + manifest + llms.txt + Pagefind).","meta":"before deploy or before sharing standalone"}]}}
 ```
 
+### timeline {#timeline}
+
+An ordered sequence where each entry carries a **state**. Reach for it
+when the order and the state are both part of the point: a debugging
+story where a claim is later corrected, a decision log, an incident
+sequence, a release history.
+
+The neighbour is [step-flow](#step-flow), and picking the wrong one is
+the usual mistake. A step-flow is a **procedure the reader is meant to
+follow**, so every step is equally true. A timeline is a **record of
+what happened**, and an entry on it can be a claim that was dropped —
+which is why the dot carries a status and the step numeral does not.
+
+`status` is one of `note` (default, quiet hollow dot), `done` (filled,
+settled), `open` (hollow, claimed but not settled) or `dropped`
+(hollow, retracted or superseded). `label` is the author's own word for
+the entry — the status carries the colour, the label carries the
+meaning, so `"claim #1"`, `"2026-03-04"` and `"v0.4.0"` all work
+without inventing a colour each.
+
+```oku-example
+{"code":{"k":"code","lang":"json","src":"{\n  \"k\": \"timeline\",\n  \"events\": [\n    {\n      \"status\": \"open\",\n      \"label\": \"claim #1\",\n      \"t\": \"\\\"It is the engine build\\\"\",\n      \"b\": \"First read of the code. Plausible, and **unverified** — a doubt, not a finding.\"\n    },\n    {\n      \"status\": \"dropped\",\n      \"label\": \"corrected\",\n      \"t\": \"Over-stated the other way\",\n      \"b\": \"Then swung to \\\"purely our gap\\\". Also premature; the path was not instrumented yet.\"\n    },\n    {\n      \"status\": \"done\",\n      \"label\": \"verified\",\n      \"t\": \"The gap is real, and it is ours\",\n      \"b\": \"Instrumented the create path. Fixed in `e326b65`.\"\n    }\n  ]\n}"},"output":{"k":"timeline","events":[{"status":"open","label":"claim #1","t":"\"It is the engine build\"","b":"First instinct from reading the code: the vendored build must deliver the value differently. Plausible, and **unverified** — a doubt, not a finding."},{"status":"dropped","label":"corrected","t":"Over-stated, the other way","b":"Then swung to \"purely our gap, the engine is ruled out\". Also premature: the remote path had not been instrumented yet."},{"status":"done","label":"verified","t":"The gap is real, and it is ours","b":"Instrumented the create path. Our converter works *given* the metadata, but the primary API was never overridden — so the value vanished before the converter ran. Fixed in `e326b65`."},{"status":"note","label":"still open","t":"One gap sits downstream, and is not ours","b":"The persisted file omits the field even though the in-memory schema carries it. That loss is inside the vendor's commit path, after it receives a correct schema."}]}}
+```
+
 ## live-snippet {#visual}
 
 Editable HTML/CSS/JS textarea + sandboxed iframe preview.

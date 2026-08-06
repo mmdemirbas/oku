@@ -1799,8 +1799,10 @@ var RAIL_FIGURES = [
   ['.kpi-grid', 'Figures', 'hollow'],
   ['.compare-grid', 'Comparison', 'hollow'],
   ['.step-cards', 'Steps', 'hollow'],
+  ['.okt-timeline', 'Timeline', 'hollow'],
   ['oku-annotated-code', 'Annotated code', 'hollow'],
   ['oku-live-snippet', 'Snippet', 'hollow'],
+  ['figure.okt-figure', 'Figure', 'hollow'],
   ['.example-pair', 'Example', 'hollow'],
 ];
 
@@ -3692,7 +3694,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-06-r30';
+var __okuKitBuild = '2026-08-06-r31';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

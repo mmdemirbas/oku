@@ -546,6 +546,7 @@ _FENCE_KINDS = {
     "table",
     "kpi-grid",
     "step-flow",
+    "timeline",
     "compare-grid",
     "insight",
     "example",
@@ -1495,6 +1496,7 @@ _KNOWN_BLOCK_KINDS = {
     "tldr",
     "kpi-grid",
     "step-flow",
+    "timeline",
     "compare-grid",
     "chart",
     "diagram",
@@ -2156,6 +2158,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             for empty_kind, field in (
                 ("kpi-grid", "tiles"),
                 ("step-flow", "steps"),
+                ("timeline", "events"),
                 ("compare-grid", "cards"),
                 ("chart-grid", "charts"),
             ):
@@ -2299,6 +2302,7 @@ _HTML_ISLAND_RE = re.compile(r"^<[a-zA-Z][^\s>]*", re.MULTILINE)
 _GROUP_PRIMITIVES = {
     "compare-grid": ("cards", "a second option to weigh it against"),
     "step-flow": ("steps", "a second stage to lead to"),
+    "timeline": ("events", "a second moment to sit after"),
     "kpi-grid": ("tiles", "a second figure to sit beside"),
     "chart-grid": ("panels", "a second panel to compare against"),
 }
@@ -2469,7 +2473,10 @@ def _presentation_issues(page: dict, tree_defaults: dict) -> list[tuple[str, str
                     f"b[{i}]",
                     "HTML island carries its own colours or a <style> block. Build on the kit's "
                     "classes and CSS variables (var(--accent), var(--surface), .okt-* ) so the "
-                    "island follows the page accent and the light/dark theme.",
+                    "island follows the page accent and the light/dark theme. Drawing an SVG? "
+                    "The vocabulary is .okt-diag-node / -edge / -arrow / -label / -group, each "
+                    "with ok / warn / fail / accent / soft / mono modifiers, plus "
+                    ".okt-diag-fill-1..10 for the chart ramp.",
                 )
             )
             break
