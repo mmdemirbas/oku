@@ -11492,6 +11492,23 @@ window.addEventListener('oku:theme-changed', function () {
  * Prism highlights the code first; the marker replacement walks the
  * highlighted text-nodes so `(1)` chips survive syntax coloring.
  * --------------------------------------------------------------------- */
+/* The host's own text, minus the nodes that carry the ANNOTATIONS.
+ * Only reached when the author wrote no <script type="text/x-code"> —
+ * the markdown fence always emits one, an HTML island often does not.
+ * Plain `textContent` does not skip <script>, so the annotation payload
+ * was appended to the program and rendered twice: once as code, once in
+ * the side panel. A page carrying several annotated blocks grew by the
+ * full length of its own commentary. */
+function _annoHostCode(host) {
+  var parts = [];
+  Array.prototype.forEach.call(host.childNodes, function (n) {
+    if (n.nodeType === 1
+        && (n.tagName === 'SCRIPT' || n.matches('ol.okc-anno-source, ol.okc-anno-list'))) return;
+    parts.push(n.textContent);
+  });
+  return parts.join('').replace(/^\n/, '').replace(/\s+$/, '');
+}
+
 class OkuAnnotatedCode extends HTMLElement {
   connectedCallback() {
     // Same re-init guard as OkuChart / OkuDiagram: the init below wipes
@@ -11501,7 +11518,7 @@ class OkuAnnotatedCode extends HTMLElement {
     this._initialized = true;
     var srcNode = this.querySelector('script[type="text/x-code"]');
     var jsonNode = this.querySelector('script[type="application/json"]');
-    var code = srcNode ? srcNode.textContent.replace(/^\n/, '') : (this.textContent || '');
+    var code = srcNode ? srcNode.textContent.replace(/^\n/, '') : _annoHostCode(this);
     var annos = [];
     if (jsonNode) {
       try { annos = JSON.parse(jsonNode.textContent || '[]'); } catch (e) { annos = []; }
