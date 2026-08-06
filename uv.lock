@@ -279,7 +279,7 @@ wheels = [
 
 [[package]]
 name = "oku"
-version = "0.6.1"
+version = "0.6.3"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },

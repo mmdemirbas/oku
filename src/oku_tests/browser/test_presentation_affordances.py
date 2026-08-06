@@ -339,6 +339,21 @@ def _ctrl(page, sel):
     )
 
 
+def _approach(page, sel, gap=20):
+    """Park the pointer `gap` px below the named button.
+
+    Derived from the button's own rect, never a hardcoded corner. The
+    fixed point these tests used to aim at was chosen when theme was the
+    rightmost button in the cluster; the moment width took that slot,
+    theme sat 36px away and read 0.97 — a passing test failing on a
+    change it was never about. Outside the box, so `:hover` is not what
+    is being measured: at 20px the cosine falloff gives 0.991, and only
+    the proximity path can produce that."""
+    box = _ctrl(page, sel)["box"]
+    page.mouse.move(box[0] + box[2] / 2, box[1] + box[3] + gap)
+    page.wait_for_timeout(300)
+
+
 def test_chrome_buttons_quiet_down_when_the_pointer_is_elsewhere(rendered):
     """Four opaque 44px boxes float over the top of the reading column at
     every scroll position, competing with the cover for the first thing
@@ -353,8 +368,7 @@ def test_chrome_buttons_quiet_down_when_the_pointer_is_elsewhere(rendered):
     rendered.wait_for_timeout(300)
     far = _ctrl(rendered, ".theme-toggle")
 
-    rendered.mouse.move(1400, 30)  # onto the top-right cluster
-    rendered.wait_for_timeout(300)
+    _approach(rendered, ".theme-toggle")
     near = _ctrl(rendered, ".theme-toggle")
 
     rendered.mouse.move(700, 700)
@@ -369,8 +383,7 @@ def test_approaching_one_cluster_leaves_the_other_alone(rendered):
     """Proximity is per button, measured to the button's BOX. A single
     top-of-page threshold would light the whole strip whenever the
     pointer crossed y=100, which is every scroll gesture."""
-    rendered.mouse.move(1400, 30)
-    rendered.wait_for_timeout(300)
+    _approach(rendered, ".theme-toggle")
     got = {
         "theme": _ctrl(rendered, ".theme-toggle")["opacity"],
         "drawer": _ctrl(rendered, ".drawer-toggle")["opacity"],

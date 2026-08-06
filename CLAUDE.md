@@ -138,7 +138,7 @@ AI/LLM surface.
 | File | Owns |
 |---|---|
 | `chrome.js` | Custom Elements (chart with 28 render modes, diagram, live-snippet, annotated-code, glossary-term, ext-ref, page-chrome / page-nav / page-toc), init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring, bar-chart hover/click-pin/legend toggle), Prism + Mermaid lazy loaders, glossary tooltip controller, lightbox with pan/zoom/pinch fullscreen, the top rail (progress + landmark minimap). ~7k LoC. |
-| `chrome.css` | All visual tokens (light/dark, --series-1..--series-10, --prose-width), layout grid (asymmetric bleed, four-mode content width), every primitive's styling. ~3k LoC. |
+| `chrome.css` | All visual tokens (light/dark, --series-1..--series-10, --prose-width), layout grid (asymmetric bleed, three-mode content width), every primitive's styling. ~3k LoC. |
 | `renderer.js` | page JSON → DOM mapping. Walks `b[]`; strings parsed by the GFM block parser (headings → sections, paragraphs, lists, GFM tables, fences — `oku-*`/`mermaid` fences lift to typed blocks, def-lists, task-lists, HTML islands w/ executing scripts, admonitions); typed objects dispatched to typed renderers. v1→v2 shim keeps older pages rendering. ~1.6k LoC. |
 | `kit/schema/page.schema.json` | JSON-schema for page payloads. Every page (converted from .md) validates against it; the optional `jsonschema` dep makes the check active. Chart `type` enum here is the single source of truth for known chart types. |
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
@@ -396,6 +396,29 @@ never re-derived when search was added, which is what offset tables do.
 A `display: none` child now takes no space and the row closes up on its
 own. `test_invariants.py::test_the_top_right_chrome_never_overlaps`
 asserts no two visible `.ctrl-btn` rects intersect, at four widths.
+
+Within that row, **width sits hard right**, past theme. It is the one
+button that changes what the reader is looking at rather than how it is
+lit, so it gets the corner they can hit without aiming. The order is
+`order:` values in one block — read them there, never re-derive.
+
+**The width control has three stops, and the icon has three segments.**
+`narrow` (860px, a prose measure) · `comfortable` (the default, 1100 →
+1240 → 1400 as the screen grows) · `max` (the whole viewport, for wide
+tables and matrices). One stop per thing a reader wants; each fills one
+more segment of `ICON_WIDTH`, every segment fully on or fully off.
+
+There were four. `wide` (1400 → 1560 → 1760) sat between comfortable and
+max and answered the same want as max — more room — so a reader cycling
+through could not say which of the two they had landed in without
+reading the icon, and the icon had to represent the extra level by
+filling a segment at 50% opacity, which reads as a rendering fault
+rather than as a state. A stored `wide` migrates through
+`WIDTH_ALIASES` to comfortable, the nearest surviving band at every
+breakpoint; dropping a mode without that would silently reset the
+reader's choice. `test_reader_can_cycle_content_width` asserts the mode
+set is exactly the three, so adding a fourth fails rather than merely
+crowding the cycle.
 
 **The chrome buttons quiet down when nothing is reaching for them.**
 Four fixed 44px boxes float over the top of the reading column at every

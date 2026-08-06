@@ -222,7 +222,7 @@ main {
   /* Centred, always. The sidebar overlays rather than occupying a
      column, so nothing competes for the horizontal space and the
      measure never moves when the contents open. The reader-controlled
-     width modes (narrow/comfortable/wide/max) live on body via
+     width modes (narrow/comfortable/max) live on body via
      --content-width; --max-width is the unmodified default. */
   margin-inline: auto;
 }
@@ -375,13 +375,14 @@ body[data-ctrl-proximity="1"] .back-to-top:not(.visible) { opacity: 0; }
 }
 /* Visual order is fixed by `order`, so it does not depend on which
    button was created first — search and the warning indicator arrive
-   whenever their subsystem initialises. Theme stays hard right: it is
-   the one a reader reaches for by position. */
+   whenever their subsystem initialises. Width sits hard right: it is
+   the one that changes what the reader is looking at rather than how it
+   is lit, so it gets the corner they can hit without aiming. */
 .okt-chrome-cluster .personalize-toggle { order: 10; }
 .okt-chrome-cluster .search-toggle      { order: 20; }
 .okt-chrome-cluster .warning-indicator  { order: 30; }
-.okt-chrome-cluster .width-toggle       { order: 40; }
-.okt-chrome-cluster .theme-toggle       { order: 50; }
+.okt-chrome-cluster .theme-toggle       { order: 40; }
+.okt-chrome-cluster .width-toggle       { order: 50; }
 
 /* Content-width modes (D3). The CSS variable wins because <main> reads
    it via max-width; the body attribute is the persisted source of truth. */
@@ -392,39 +393,30 @@ body[data-ctrl-proximity="1"] .back-to-top:not(.visible) { opacity: 0; }
    range of 45-75. Re-measure if the body font changes. */
 body[data-content-width="narrow"]      { --content-width: 860px;  --prose-width: 54ch; }
 body[data-content-width="comfortable"] { --content-width: 1100px; --prose-width: 62ch; }
-body[data-content-width="wide"]        { --content-width: 1400px; --prose-width: 72ch; }
 body[data-content-width="max"]         { --content-width: 100vw;  --prose-width: none; }
-/* Wide-screen bumps. Comfortable + wide both scale up so the page
-   actually USES the available room on 1600px+ monitors. */
+/* Wide-screen bumps, so the default actually USES the room on a
+   1600px+ monitor instead of leaving two hand-widths of margin. */
 @media (min-width: 1500px) {
   body[data-content-width="comfortable"] { --content-width: 1240px; }
-  body[data-content-width="wide"]        { --content-width: 1560px; }
 }
 @media (min-width: 1900px) {
   body[data-content-width="comfortable"] { --content-width: 1400px; }
-  body[data-content-width="wide"]        { --content-width: 1760px; }
 }
 
-/* Width-toggle icon doubles as a state readout. The three <rect> segments
-   inside ICON_WIDTH are outline by default; the active count fills:
-     · narrow              → s1 filled
-     · comfortable (default) → s1 + half s2 (s2 muted)
-     · wide                → s1 + s2 filled
-     · max                 → s1 + s2 + s3 filled
-   So the reader sees at a glance which mode they're in without opening
-   the tooltip. */
+/* Width-toggle icon doubles as a state readout: three outline segments,
+   filled left-to-right, one per mode.
+     · narrow                → s1
+     · comfortable (default) → s1 + s2
+     · max                   → s1 + s2 + s3
+   Every segment is fully on or fully off. The four-mode version filled
+   s2 at 50% opacity to squeeze an extra level out of three boxes, and a
+   muted rectangle does not read as a level — it reads as a rendering
+   fault. Three modes, three segments, no partial states. */
 .width-toggle .w-seg { fill: none; }
 .width-toggle .w-seg.s1,
 body[data-content-width="comfortable"] .width-toggle .w-seg.s2,
-body[data-content-width="wide"] .width-toggle .w-seg.s2,
-body[data-content-width="max"]  .width-toggle .w-seg.s2,
-body[data-content-width="max"]  .width-toggle .w-seg.s3 { fill: currentColor; }
-body[data-content-width="comfortable"] .width-toggle .w-seg.s2 { opacity: 0.5; }
-/* Explicit overrides — keep filled segments stable across mode changes. */
-body[data-content-width="narrow"] .width-toggle .w-seg.s2,
-body[data-content-width="narrow"] .width-toggle .w-seg.s3,
-body[data-content-width="comfortable"] .width-toggle .w-seg.s3,
-body[data-content-width="wide"]   .width-toggle .w-seg.s3 { fill: none; }
+body[data-content-width="max"] .width-toggle .w-seg.s2,
+body[data-content-width="max"] .width-toggle .w-seg.s3 { fill: currentColor; }
 .back-to-top { bottom: 18px; right: 18px; opacity: 0; pointer-events: none; }
 .back-to-top.visible { opacity: 1; pointer-events: auto; }
 

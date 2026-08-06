@@ -140,7 +140,7 @@ def test_the_tldr_panel_ends_where_the_section_does(rendered):
     assert abs(got["tldr"] - got["cover"]) <= 1, got
 
 
-@pytest.mark.parametrize("mode", ["narrow", "comfortable", "wide", "max"])
+@pytest.mark.parametrize("mode", ["narrow", "comfortable", "max"])
 def test_one_edge_holds_at_every_width(rendered, mode):
     """The width toggle moves the column. It must not open a gap
     between the block kinds inside it."""
@@ -183,7 +183,7 @@ def test_the_width_toggle_still_moves_the_measure(rendered):
     they disagreed by 20% on the same paragraph. Width is exact and
     proves the same thing."""
     seen = {}
-    for mode in ("narrow", "comfortable", "wide"):
+    for mode in ("narrow", "comfortable", "max"):
         rendered.evaluate("(m) => document.body.setAttribute('data-content-width', m)", mode)
         rendered.wait_for_timeout(200)
         seen[mode] = rendered.evaluate(
@@ -195,7 +195,7 @@ def test_the_width_toggle_still_moves_the_measure(rendered):
         }"""
         )
     rendered.evaluate("() => document.body.setAttribute('data-content-width', 'comfortable')")
-    assert seen["narrow"]["width"] < seen["comfortable"]["width"] < seen["wide"]["width"], seen
+    assert seen["narrow"]["width"] < seen["comfortable"]["width"] < seen["max"]["width"], seen
     # More lines for the same text is the same statement, arrived at
     # independently of the width: narrow really does wrap sooner.
-    assert seen["narrow"]["lines"] > seen["wide"]["lines"], seen
+    assert seen["narrow"]["lines"] > seen["max"]["lines"], seen

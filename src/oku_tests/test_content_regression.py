@@ -755,16 +755,27 @@ class TestChromeKitMarkers:
             assert selector in css, f"primitive '{selector}' missing the max-width override"
 
     def test_reader_can_cycle_content_width(self, repo_root: Path) -> None:
-        """Reader has a chrome button to cycle content width modes (D3).
+        """Reader has a chrome button to cycle content width, and it has
+        exactly THREE stops.
 
-        Default narrow (860px, optimal line length); wide (1100px, more
-        cards per row); max (fills the grid cell, useful for tables
-        and matrices on wide screens). Mode persists to localStorage so
-        the choice survives reloads.
+        narrow (860px, a prose measure); comfortable (the boot default,
+        1100 → 1240 → 1400 as the screen grows); max (the whole
+        viewport, for wide tables and matrices). The mode persists to
+        localStorage so the choice survives reloads.
+
+        There were four. 'wide' (1400 → 1560 → 1760) sat between
+        comfortable and max and answered the same want as max, so a
+        reader cycling through could not tell which of the two they had
+        landed in without reading the icon — and the icon had to fill a
+        segment at 50% opacity to represent the extra level, which reads
+        as a rendering fault rather than as a state. Three modes, three
+        icon segments, every segment fully on or fully off.
 
         Locks:
-        - chrome.css declares `--content-width` and the three body
-          attribute overrides
+        - chrome.css declares `--content-width` and exactly the three
+          body attribute overrides — a fourth fails here
+        - a stored 'wide' migrates rather than silently reverting to the
+          default, so a reader who had picked it keeps the nearest band
         - chrome.js exposes `cycleContentWidth` and a boot-time restore
           path reading `localStorage['htmldoc-content-width']`
         - PageChrome injects a `.width-toggle` button into the top-right
@@ -774,13 +785,16 @@ class TestChromeKitMarkers:
           Geometry is asserted in the browser now, not by grepping
           offsets out of the stylesheet — see
           test_invariants.py::test_the_top_right_chrome_never_overlaps.
+        - width sits hard right in the cluster, past the theme cycler
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "--content-width" in css, "missing --content-width CSS variable"
-        # P7 — default expanded to four modes; comfortable is now the
-        # boot default and sits between narrow and wide.
-        for mode in ("narrow", "comfortable", "wide", "max"):
-            assert f'body[data-content-width="{mode}"]' in css, f"missing CSS rule for width mode '{mode}'"
+        modes = set(re.findall(r'body\[data-content-width="([a-z]+)"\]', css))
+        assert modes == {"narrow", "comfortable", "max"}, (
+            f"content-width modes are {sorted(modes)}; the control has three stops. "
+            "A fourth band between comfortable and max is the one that was removed — "
+            "a reader could not tell the two apart without reading the icon."
+        )
         assert ".okt-chrome-cluster {" in css, "the top-right cluster must own the corner's layout"
         # Declarations only — the comments explaining the old offsets
         # quote them, and matching those would make this pass or fail on
@@ -790,12 +804,30 @@ class TestChromeKitMarkers:
             "a hand-computed right: offset is back in the top-right corner — "
             "that arithmetic is what put .width-toggle and .search-toggle on the same square"
         )
+        order = {
+            m.group(1): int(m.group(2))
+            for m in re.finditer(r"\.okt-chrome-cluster \.([a-z-]+)\s*\{\s*order:\s*(\d+)", declarations)
+        }
+        assert order.get("width-toggle") and order.get("theme-toggle"), order
+        assert order["width-toggle"] == max(order.values()), (
+            f"width-toggle must be the rightmost button in the cluster, got {order}"
+        )
+        assert order["width-toggle"] > order["theme-toggle"], order
 
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "cycleContentWidth" in js, "cycleContentWidth handler missing"
         assert "htmldoc-content-width" in js, "localStorage key for the width-mode preference missing"
-        for mode in ("'narrow'", "'comfortable'", "'wide'", "'max'"):
-            assert mode in js, f"WIDTH_MODES list must include {mode}"
+        declared = re.search(r"var WIDTH_MODES = \[([^\]]*)\]", js)
+        assert declared, "WIDTH_MODES list missing"
+        assert [m.strip("' ") for m in declared.group(1).split(",")] == [
+            "narrow",
+            "comfortable",
+            "max",
+        ], f"WIDTH_MODES is {declared.group(1)}; the control has three stops, in this order"
+        assert re.search(r"WIDTH_ALIASES = \{[^}]*wide:", js), (
+            "a reader with 'wide' in localStorage must be migrated to the nearest "
+            "surviving band, not silently reset to the default"
+        )
         assert ".width-toggle" in js, "PageChrome must inject a .width-toggle button"
         assert "ICON_WIDTH" in js, "width-toggle icon constant missing"
 

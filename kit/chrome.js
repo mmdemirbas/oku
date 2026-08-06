@@ -54,9 +54,12 @@ const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
 const ICON_SYSTEM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
 const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
-/* Three-segment width indicator. Outline boxes; CSS fills the active
-   segment(s) based on body[data-content-width=...] so the icon doubles
-   as a state readout: 1 box = narrow, 2 = wide, 3 = max. */
+/* Three-segment width indicator, one segment per mode. Outline boxes;
+   CSS fills them left-to-right from body[data-content-width=...] so the
+   icon reads as a level meter: 1 filled = narrow, 2 = comfortable,
+   3 = max. Segment count and mode count are the same number on purpose —
+   a half-filled segment standing in for a fourth mode is what this
+   replaced, and nobody reads a 50%-opacity rectangle as a state. */
 const ICON_WIDTH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect class="w-seg s1" x="3"    y="8" width="5" height="8" rx="1"/><rect class="w-seg s2" x="9.5"  y="8" width="5" height="8" rx="1"/><rect class="w-seg s3" x="16"   y="8" width="5" height="8" rx="1"/></svg>';
 const ICON_CLIPBOARD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>';
 const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -1307,20 +1310,27 @@ document.addEventListener('click', function (e) {
 try { localStorage.removeItem('sidebarCollapsed'); localStorage.removeItem('sidebarWidth'); } catch (e) {}
 if (drawerWasPinned() && canPinDrawer()) setDrawerState('pinned', false);
 
-/* Content-width mode (D3) — reader picks narrow / wide / max, persists.
- * narrow = 860px (optimal line length); wide = 1100px (more cards per
- * row, still readable prose); max = fill the grid cell (tables, code,
- * matrices in particular benefit on wide screens). State lives on
- * `<body data-content-width=...>`; CSS does the rest via --content-width. */
-// P7 — Layout Option A. Default mode is the new 'comfortable' band
-// (960px) — narrow stays available for prose-heavy reading; wide /
-// max are opt-ins for tables, charts, and matrices. Cycle order
-// goes narrow → comfortable → wide → max so a single tap moves up
-// one notch each time.
-var WIDTH_MODES = ['narrow', 'comfortable', 'wide', 'max'];
+/* Content-width mode — the reader picks how wide the column runs, and
+ * the choice persists. State lives on `<body data-content-width=...>`;
+ * CSS does the rest via --content-width.
+ *
+ * THREE modes, one per thing a reader actually wants:
+ *   narrow      — 860px, a prose measure, for reading
+ *   comfortable — the default, 1100 → 1240 → 1400 as the screen grows
+ *   max         — the whole viewport, for wide tables and matrices
+ *
+ * There were four. 'wide' (1400 → 1560 → 1760) sat between comfortable
+ * and max and answered the same want as max — more room — so a reader
+ * cycling through could not say which of the two they were in without
+ * reading the icon. A stored 'wide' resolves to comfortable below, which
+ * is the nearest surviving band at every breakpoint. Adding a fourth
+ * step back is how the control stops being worth clicking. */
+var WIDTH_MODES = ['narrow', 'comfortable', 'max'];
+/* Retired modes → the surviving mode a reader who picked them meant. */
+var WIDTH_ALIASES = { wide: 'comfortable' };
 var DEFAULT_WIDTH = 'comfortable';
 function _widthLabelFor(mode) {
-  return 'Content width: ' + mode + ' — click to cycle (narrow → comfortable → wide → max)';
+  return 'Content width: ' + mode + ' — click to cycle (narrow → comfortable → max)';
 }
 function _syncWidthToggleLabel(mode) {
   var btn = document.querySelector('.width-toggle');
@@ -1339,6 +1349,10 @@ function cycleContentWidth() {
 }
 try {
   var savedWidth = localStorage.getItem('htmldoc-content-width');
+  if (savedWidth && WIDTH_ALIASES[savedWidth]) {
+    savedWidth = WIDTH_ALIASES[savedWidth];
+    localStorage.setItem('htmldoc-content-width', savedWidth);
+  }
   if (savedWidth && WIDTH_MODES.indexOf(savedWidth) !== -1) {
     document.addEventListener('DOMContentLoaded', function () {
       document.body.setAttribute('data-content-width', savedWidth);
@@ -3678,7 +3692,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-06-r28';
+var __okuKitBuild = '2026-08-06-r29';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

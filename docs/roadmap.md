@@ -90,7 +90,7 @@ Each was an open question once; collected here so future contributors don't reli
 - Tooltip width is stable across pin states. Pinned vs unpinned switches the footer text + close-button visibility, NEVER the bounding box.
 - ext-ref host is NOT a navigation link. Clicking pins the tooltip; the destination URL lives as a clickable domain anchor inside the citation card. One affordance per element.
 - Pagefind is a Python dep, not a system binary — `oku[search]` extra pulls `pagefind[bin]>=1.5`.
-- Layout = option A (centered document, four-mode content-width cycle: narrow / comfortable / wide / max).
+- Layout = option A (centered document, three-mode content-width cycle: narrow / comfortable / max).
 - Tier 3 viz (sankey / network / scatter-matrix / parallel-coordinates / chord / geo) all ship as kit-native chart types — no third-party chart library.
 - Charts / tables / diagrams are sub-pages of Reference (meta.parent: 'reference').
 - Source format = v3 markdown-first. A page is `.md`: YAML front-matter + a strict-GFM body (no indented code blocks, no setext headings, no lazy continuation — linted, still valid GFM); kit primitives are ```oku-<kind> fences with one compact JSON body; diagrams are ```mermaid fences with an italic caption line; raw block-level HTML islands (script included) pass through to the kit untouched and are audited by `oku check`. Decided after measuring tokens (markdown ≈ 20% leaner than v2 JSON, far leaner than HTML), LLM emission accuracy, and ecosystem direction; HTML-first was evaluated and rejected for repo-resident continually-edited sources. JSON pages (v1/v2) keep rendering via shims; `oku migrate` converts them.
