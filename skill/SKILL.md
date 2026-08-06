@@ -9,7 +9,7 @@ description: >
   communication medium and prose is the caption. A page is one markdown
   file — front-matter plus a GFM body — where charts, tables, diagrams,
   comparison grids and step flows are typed fences. The kit renders the
-  chrome: Contents drawer, three-mode theming, scroll-spy TOC, search,
+  chrome: Contents drawer, light/dark theming, scroll-spy TOC, search,
   lightbox and print stylesheet. There is no CSS to write; HTML islands
   are the escape hatch and build on the kit's own classes and CSS
   variables.
@@ -347,7 +347,7 @@ no linter will do it for you.
 
 None of the chrome is yours to write, style or position. The renderer
 emits it from the source: the cover, the Contents drawer carrying the
-site tree and the on-page TOC, three-mode theming that follows the OS
+site tree and the on-page TOC, light/dark theming that follows the OS
 until the reader overrides it, the content-width toggle, search,
 scroll-spy, section permalinks, the top rail, back-to-top, code
 line numbers with a language pill and brace folds, glossary tooltips,

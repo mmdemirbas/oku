@@ -65,7 +65,7 @@ Numbers are illustrative — feature coverage shifts release-to-release. The poi
 Demonstrating compare-grid's in / out verdict variant: parallel columns with semantic borders.
 
 ```oku-compare-grid
-{"cards":[{"t":"In v1","b":"- JSON-source rendering at runtime (no build)\n- Glossary tooltips with bridge-hover + click-pin\n- Multi-domain, multi-language glossary architecture\n- Visual Viewport API pinch-zoom stability\n- Core primitives: paragraph, callout, insight, info-tip, kpi-grid, compare-grid, step-flow, chart\n- Three-mode theme cycler + sticky TOC + scroll-spy","verdict":"in"},{"t":"Out (later or never)","b":"- Markdown authoring path\n- Client-side routing / SPA navigation\n- Mermaid diagrams (still TODO in build sequence step 11)\n- Live-snippet primitive (build step 12)\n- Pagefind search (build step 13)\n- Server-side rendering","verdict":"out"}]}
+{"cards":[{"t":"In v1","b":"- JSON-source rendering at runtime (no build)\n- Glossary tooltips with bridge-hover + click-pin\n- Multi-domain, multi-language glossary architecture\n- Visual Viewport API pinch-zoom stability\n- Core primitives: paragraph, callout, insight, info-tip, kpi-grid, compare-grid, step-flow, chart\n- Theme cycler + sticky TOC + scroll-spy","verdict":"in"},{"t":"Out (later or never)","b":"- Markdown authoring path\n- Client-side routing / SPA navigation\n- Mermaid diagrams (still TODO in build sequence step 11)\n- Live-snippet primitive (build step 12)\n- Pagefind search (build step 13)\n- Server-side rendering","verdict":"out"}]}
 ```
 
 ## What's next {#next}

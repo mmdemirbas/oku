@@ -866,7 +866,10 @@ def test_nothing_escapes_its_container(page, site_url, rel, width):
 def test_containment_holds_in_dark_theme(page, site_url):
     """Dark theme swaps tokens, and a token change can change a border
     or padding — so containment is asserted in both themes, not one."""
-    page.add_init_script("try{localStorage.setItem('theme-pref','dark')}catch(e){}")
+    # Emulating the OS setting rather than storing a preference: dark is
+    # now reached by following the OS, and a stored choice that agrees
+    # with the OS is deliberately not an override at all.
+    page.emulate_media(color_scheme="dark")
     page.set_viewport_size(DESKTOP)
     _goto(page, f"{site_url}/docs/charts.html")
     page.wait_for_timeout(1500)

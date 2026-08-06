@@ -514,14 +514,41 @@ body[data-content-width="max"] .width-toggle .w-seg.s3 { fill: currentColor; }
 }
 .okc-personalized:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 
-/* Three-mode theme icon switch (system | light | dark) */
-.theme-toggle .icon-system,
+/* Theme icon: two states, and the icon reports the one that is ON —
+   sun while the page is light, moon while it is dark. Same convention
+   as the width toggle's segments, which read as a state and not as the
+   action the click will perform.
+   Keyed off data-theme (the theme in force), never data-theme-mode
+   (whether the reader pinned it) — those are different questions and
+   the icon answers the first. */
 .theme-toggle .icon-sun,
 .theme-toggle .icon-moon { display: none; }
-:root[data-theme-mode="system"] .theme-toggle .icon-system { display: inline-flex; }
-:root[data-theme-mode="light"]  .theme-toggle .icon-sun    { display: inline-flex; }
-:root[data-theme-mode="dark"]   .theme-toggle .icon-moon   { display: inline-flex; }
-:root:not([data-theme-mode]) .theme-toggle .icon-system { display: inline-flex; }
+:root[data-theme="dark"]      .theme-toggle .icon-moon { display: inline-flex; }
+:root:not([data-theme="dark"]) .theme-toggle .icon-sun { display: inline-flex; }
+
+/* The second question gets a dot, not a third icon. Lit while the page
+   is following the OS; out once the reader has chosen a theme against
+   it, and lit again on its own at the next OS flip (chrome.js).
+   `position: relative` needs the cluster's specificity to beat the
+   `position: static` rule above it; relative does not move the button,
+   it only gives the dot something to sit in. */
+.okt-chrome-cluster .theme-toggle { position: relative; }
+.theme-toggle::after {
+  content: "";
+  position: absolute;
+  /* Pushed into the corner rather than tucked beside the glyph: at 8px
+     it landed against the sun's top-right ray and read as part of the
+     icon instead of as a mark about the button. 6px still sits inside
+     the 12px corner radius with room to spare. */
+  top: 6px; right: 6px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+:root[data-theme-mode="system"] .theme-toggle::after,
+:root:not([data-theme-mode])    .theme-toggle::after { opacity: 1; }
 
 /* ============ Reading aids ============ *
  * The rail: a 12px strip across the top that answers three questions

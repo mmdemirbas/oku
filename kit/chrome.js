@@ -52,7 +52,6 @@ const KIT_VERSION = '0.4.0';
 const ICON_MENU = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>';
 const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.5" y1="4.5" x2="6.6" y2="6.6"/><line x1="17.4" y1="17.4" x2="19.5" y2="19.5"/><line x1="4.5" y1="19.5" x2="6.6" y2="17.4"/><line x1="17.4" y1="6.6" x2="19.5" y2="4.5"/></svg>';
 const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
-const ICON_SYSTEM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
 const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
 /* Three-segment width indicator, one segment per mode. Outline boxes;
    CSS fills them left-to-right from body[data-content-width=...] so the
@@ -910,14 +909,37 @@ var __okuTableConfig = (function () {
   return { open: open, close: close, toggle: toggle };
 })();
 
-/* ============ Three-mode theme cycler (system → light → dark → system) ============ */
+/* ============ Theme: two stops, and a policy that is not one ============ *
+ * The button shows sun or moon and nothing else, because a third stop
+ * that renders identically to one of the other two is a state the
+ * reader can only identify by reading the icon — the same defect that
+ * took the width cycler from four stops to three.
+ *
+ * Following the OS survives that cut as a POLICY rather than a stop.
+ * It is where the page rests, it is re-entered without being clicked,
+ * and an explicit choice expires the next time the OS flips. So:
+ *
+ *   - choosing the theme the OS already shows is not an override at
+ *     all — it clears the key and hands control straight back, which
+ *     also makes two clicks the way back to auto at any time;
+ *   - a choice that contradicts the OS holds until the OS moves;
+ *   - when the OS moves, the page follows it and the choice is gone.
+ *
+ * The cost is that "always dark" cannot be pinned past an OS flip; a
+ * reader whose OS runs on a schedule re-picks it once a day. That is
+ * the trade the two-icon button buys, and it is deliberate.
+ *
+ * The dot at the button's corner is the only mark of which of the two
+ * the page is in. It is lit while the page is following the OS.
+ */
+function systemTheme() {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
 function getThemeMode() {
   return document.documentElement.getAttribute('data-theme-mode') || 'system';
 }
 function applyTheme(mode, persist) {
-  var actual = mode === 'system'
-    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    : mode;
+  var actual = mode === 'system' ? systemTheme() : mode;
   // Suppress every transition during the swap so the whole page
   // flips themes in one paint instead of cascading element-by-
   // element (each independent transition: color / background /
@@ -939,25 +961,35 @@ function applyTheme(mode, persist) {
   });
   if (persist) {
     try {
+      // The OS value travels with the choice so a flip that happens
+      // with the tab closed still expires it — see chrome-boot.js.
       if (mode === 'system') localStorage.removeItem('theme-pref');
-      else localStorage.setItem('theme-pref', mode);
+      else localStorage.setItem('theme-pref', mode + '@' + systemTheme());
     } catch (e) {}
   }
 }
-function cycleTheme() {
-  var current = getThemeMode();
-  var next = current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system';
-  applyTheme(next, true);
-  // Notify subscribers (e.g., <oku-diagram> rerenders Mermaid).
+function announceTheme() {
+  // Subscribers re-render against the new tokens (<oku-diagram> reruns
+  // Mermaid). Every path that changes the theme goes through here,
+  // including the OS flip — a diagram left on the previous theme's
+  // palette is the same bug whether the reader or the clock caused it.
   window.dispatchEvent(new CustomEvent('oku:theme-changed', {
-    detail: { mode: next, theme: document.documentElement.getAttribute('data-theme') }
+    detail: {
+      mode: getThemeMode(),
+      theme: document.documentElement.getAttribute('data-theme')
+    }
   }));
 }
-/* Follow OS changes while in system mode */
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
-  if (getThemeMode() === 'system') {
-    document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
-  }
+function cycleTheme() {
+  var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  applyTheme(next === systemTheme() ? 'system' : next, true);
+  announceTheme();
+}
+/* The OS moved: the page follows it, and whatever the reader had
+   chosen before is spent. */
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+  applyTheme('system', true);
+  announceTheme();
 });
 
 /* ============ Contents drawer — three states ============ *
@@ -1420,7 +1452,7 @@ class PageChrome extends HTMLElement {
   connectedCallback() {
     var skipLabel = this.getAttribute('skip-label') || 'Skip to content';
     var drawerLabel = this.getAttribute('drawer-label') || 'Contents';
-    var themeLabel = this.getAttribute('theme-label') || 'Cycle theme (system / light / dark)';
+    var themeLabel = this.getAttribute('theme-label') || 'Switch theme (light / dark)';
     var widthLabel = this.getAttribute('width-label') || 'Cycle content width (narrow / comfortable / wide / max)';
     var topLabel = this.getAttribute('top-label') || 'Back to top';
 
@@ -1460,7 +1492,6 @@ class PageChrome extends HTMLElement {
       cluster.insertAdjacentHTML('beforeend',
         '<button class="ctrl-btn width-toggle" type="button" aria-label="' + widthLabel + '" title="' + widthLabel + '">' + ICON_WIDTH + '</button>' +
         '<button class="ctrl-btn theme-toggle" type="button" aria-label="' + themeLabel + '" title="' + themeLabel + '">' +
-          '<span class="icon-system">' + ICON_SYSTEM + '</span>' +
           '<span class="icon-sun">' + ICON_SUN + '</span>' +
           '<span class="icon-moon">' + ICON_MOON + '</span>' +
         '</button>');

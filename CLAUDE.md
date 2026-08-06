@@ -420,6 +420,57 @@ reader's choice. `test_reader_can_cycle_content_width` asserts the mode
 set is exactly the three, so adding a fourth fails rather than merely
 crowding the cycle.
 
+**The theme button has two stops, and following the OS is not one of
+them.** Sun while the page is light, moon while it is dark; the icon
+reports the theme in force, the same convention the width segments
+follow. Keyed off `data-theme`, never `data-theme-mode` — those answer
+different questions.
+
+There were three, and two of them rendered identically: with the OS on
+dark, `system` and `dark` are the same pixels, so the only way to know
+which one you were in was to read the icon. Same defect as the fourth
+width stop, and the same cut.
+
+Following the OS survives as a **policy** rather than a stop, because it
+is not a value — it is what the page does when the reader has not said
+otherwise. It is where the page rests, it is re-entered without being
+clicked, and an explicit choice expires the next time the OS flips:
+
+- choosing the theme the OS already shows is not an override at all —
+  the key is dropped and control goes back, which makes two clicks the
+  way back to auto at any time;
+- a choice that contradicts the OS holds until the OS moves;
+- when the OS moves, the page follows it and the choice is spent.
+
+The cost is deliberate and was chosen with it stated: "always dark"
+cannot be pinned past an OS flip, so a reader whose OS runs on a
+schedule re-picks it once a day. That is what the two-icon button buys.
+
+`theme-pref` therefore stores `"<chosen>@<os-at-choice>"`, not a bare
+theme. The OS value is what expires the choice after a flip that
+happened **with the tab closed** — the half a `matchMedia` listener
+cannot see, and the case that actually happens. A bare value from an
+older kit fails the format test and is discarded rather than honoured.
+`chrome-boot.js` applies the rule pre-paint; `chrome.js` writes it.
+
+The auto state is marked by a 5px accent dot at the button's corner and
+by nothing else — no third icon, no badge with a numeral, no word. It is
+lit while the page is following, out once the reader has chosen against
+the OS. Paint only: `test_the_auto_dot_marks_following_and_goes_out_when_pinned`
+asserts the button's box is identical in both states. It sits at
+`top/right: 6px`, not 8px — at 8px it landed against the sun's top-right
+ray and read as part of the glyph. The one thing the dot does not carry
+is a name for assistive tech; the accessible name stays the static
+`theme-label`, because the reader asked for no text on this control.
+
+Every path that changes the theme goes through `announceTheme()`,
+including the OS flip. A diagram left on the previous theme's palette is
+the same bug whether the reader or the clock caused it — the old OS
+listener set `data-theme` directly and skipped the event, so Mermaid
+diagrams kept the outgoing palette until something else re-rendered them.
+
+`test_theme_modes.py` pins the whole rule, expiry branches included.
+
 **A card answers the pointer with light, never with position.** Every
 card kind used to hover with `transform: translateY(-2px)` and the
 Contents tree grew its left padding 8px → 12px. Both take the text with

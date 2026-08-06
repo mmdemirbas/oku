@@ -38,8 +38,9 @@ file copies for offline reading.
   tokens.
 - **Chrome:** single left sidebar with site-tree + on-page TOC
   stacked, drag-to-resize edge handle + off-canvas drawer on
-  mobile, sticky section TOC with scroll-spy, three-mode theme
-  cycler, three-mode content-width cycler (narrow → comfortable →
+  mobile, sticky section TOC with scroll-spy, two-state theme
+  toggle that follows the OS until overridden, three-mode
+  content-width cycler (narrow → comfortable →
   max), full-text search (Pagefind), forward-compat warning
   indicator, reader-side placeholder personalization.
 - **Wide-screen ready.** Asymmetric bleed — prose blocks clamp at
