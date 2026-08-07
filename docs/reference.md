@@ -93,6 +93,11 @@ Every Markdown construct maps to a specific kit block or inline node. The table 
 > [!INFO] Relative .md links rewrite to .html
 > `[overview](other.md#section)` in a Markdown page becomes `other.html#section` at render time, so links between .md pages work the same as between .json pages. Absolute URLs (http, https, mailto), fragment-only refs (`#section`), and absolute paths (`/x`) pass through unchanged.
 
+> [!INFO] Every other .md link opens in the markdown viewer
+> A link that still says `.md` when the reader clicks it — a root-absolute `/notes/plan.md`, anything inside an HTML island, any file that is not a page in this tree — opens in the kit's read-only viewer rather than handing the reader to the browser's plain-text rendering. The viewer shows the file's path, its front-matter title and summary, the rendered document, and a **Source** pane holding the exact bytes with a copy button. **Open file** is the escape hatch to the raw file. Escape, the backdrop and the close button all dismiss it; the page underneath never navigates.
+>
+> It works the same over `file://`: `oku build` inlines every such file into the standalone HTML, because a page on a `file://` origin cannot read the file next to it. A link the build could not resolve is reported at build time, not left to fail silently in front of a reader.
+
 > [!NEUTRAL] Every Markdown file is a page by default
 > README.md, CHANGELOG.md, CLAUDE.md, AGENTS.md, LICENSE.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md and any other `.md` the walker reaches all surface as pages. Hide one by moving it under a SKIP_DIRS subdirectory (`dist/`, `_oku/`, `.git/`, `.venv/`, `node_modules/`, `templates/`, `_internal/`).
 

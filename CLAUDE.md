@@ -471,6 +471,52 @@ diagrams kept the outgoing palette until something else re-rendered them.
 
 `test_theme_modes.py` pins the whole rule, expiry branches included.
 
+**A link to a .md file opens the kit's viewer, not the browser's raw
+text.** The kit renders markdown for a living; handing the reader to
+Chrome's plain-text rendering of a linked file — no typography, no
+theme, no way back but the back button — was the kit declining to do the
+one thing it does. `__okuMdViewer` renders it in the shared lightbox
+frame, over the page they came from: path in the bar, the file's
+front-matter title and summary, the rendered document, a **Source** pane
+with the exact bytes plus copy, and **Open file** as the escape hatch.
+Read-only, deliberately.
+
+Which links reach it is the load-bearing part, and it is a rule about
+what the renderer already does. `renderLink` rewrites a *relative* prose
+`foo.md` to `foo.html`, because that file is a page in this tree and the
+whole page beats a file viewer. What that rewrite deliberately leaves
+alone is what the viewer gets: a root-absolute `/notes/plan.md`, any
+href inside an HTML island, any `.md` that is not a page here. The click
+handler mirrors the kit's existing cross-page handler exactly —
+`defaultPrevented`, modifier keys, `button !== 0`, `target`, `download`
+all mean "the browser's job, not ours".
+
+The `file://` half is why this touches the CLI at all. A page on a
+`file://` origin cannot read the file sitting next to it — the same wall
+`renderFromUrl` documents — so `build_standalone` inlines every such
+file as `__oku_local_docs__`, **keyed by the href as authored**, which is
+exactly what the viewer looks up (`a.getAttribute('href')`). Two sides
+normalising a path independently is how they drift; one key, taken from
+the source, cannot. `collect_local_docs` therefore collects the same two
+shapes the runtime will ask for and no others —
+`test_a_relative_prose_link_is_not_carried` is the test that fails on the
+day the rewrite rule changes on either side. Anything missing, oversize
+or outside the tree is printed at build time, because a standalone that
+quietly cannot open its own link reads as a kit bug.
+
+Two things keep a second render pass safe inside a live document, both
+in `OkuRenderer.renderMarkdownInto`. Ids are prefixed `okv-N-`: a viewed
+file's headings slugify exactly as the page's do, and an unprefixed
+collision would send `getElementById` into the overlay for the rest of
+the session — the same defect the rail's thumbnail clone rewrites its
+ids to avoid. And relative hrefs and image srcs are re-resolved against
+the viewed file's own URL, so a link inside it means on screen what it
+means on disk. The module-level parser state (anchor ids, link and
+footnote definitions, the typed-block hook) is saved and restored around
+the pass.
+
+`test_md_viewer.py` and `test_standalone_local_docs.py` pin both halves.
+
 **A card answers the pointer with light, never with position.** Every
 card kind used to hover with `transform: translateY(-2px)` and the
 Contents tree grew its left padding 8px → 12px. Both take the text with

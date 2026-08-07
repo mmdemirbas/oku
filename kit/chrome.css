@@ -928,7 +928,7 @@ pre > .okt-code-lang {
   font: 500 10.5px 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: 0.04em;
   color: var(--text-faint);
-  background: var(--surface-2, var(--surface));
+  background: var(--surface-2);
   border: 0;
   border-bottom: 1px solid var(--border-soft);
   border-right: 1px solid var(--border-soft);
@@ -1224,6 +1224,163 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+/* ---- Markdown viewer ----------------------------------------------
+   A linked .md file rendered in the lightbox frame. The frame centres
+   its child and scrolls itself, which is right for a figure and wrong
+   for a document — a tall document centred in a scroll container has
+   its first line above the top edge. So the viewer STRETCHES to the
+   frame and owns its own scrolling: the bar stays put, the body
+   scrolls, and the document starts where a document starts.
+
+   No `:has()` on the frame. The stretch belongs to the thing being
+   stretched, and a rule that reaches up to the parent would have to be
+   re-read every time the frame's own layout is touched. */
+.okt-lightbox-content > .okt-mdview {
+  align-self: stretch;
+  flex: 1;
+  min-width: 0; min-height: 0;
+  display: flex; flex-direction: column;
+  text-align: left;
+}
+.okt-mdview-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  /* The lightbox close button is absolutely positioned at top: 10px /
+     right: 10px over this bar. Reserve its 36px box plus its inset so
+     the last action never lands underneath it. */
+  padding: 8px 56px 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+/* The path answers "what am I looking at", so it gets the slack — but
+   the FILENAME is the part that answers it. Two spans rather than one
+   truncated string: the directory absorbs the ellipsis, the filename
+   never shrinks. (The usual one-span trick for this is `direction: rtl`,
+   which reorders the leading slash of an absolute path and prints
+   `docs/notes/plan.md/`.) */
+.okt-mdview-path {
+  display: flex;
+  align-items: baseline;
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 0.82rem 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-faint);
+}
+.okt-mdview-dir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.okt-mdview-file {
+  flex: 0 0 auto;
+  color: var(--text-soft);
+  font-weight: 500;
+}
+.okt-mdview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.okt-mdview-bar .okt-view-btn {
+  padding: 4px 10px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.okt-mdview-bar .okt-view-btn + .okt-view-btn { border-left: 1px solid var(--border); }
+.okt-mdview-bar .okt-view-btn:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.okt-mdview-bar .okt-view-btn.active { background: var(--accent); color: var(--on-accent); }
+.okt-mdview-bar .okt-view-btn[disabled] { opacity: 0.4; cursor: default; }
+.okt-mdview-copy,
+.okt-mdview-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.okt-mdview-copy svg { width: 13px; height: 13px; }
+.okt-mdview-copy:hover,
+.okt-mdview-open:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.okt-mdview-copy.copied { color: var(--success); border-color: currentColor; }
+.okt-mdview-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px 24px 64px;
+}
+/* One reading column, same measure the page uses. The width control
+   changes --content-width on <body>, so the viewer follows it. */
+.okt-mdview-rendered,
+.okt-mdview-source {
+  max-width: var(--content-width, 960px);
+  margin: 0 auto;
+}
+.okt-mdview[data-view="rendered"] .okt-mdview-source { display: none; }
+.okt-mdview[data-view="source"] .okt-mdview-rendered { display: none; }
+.okt-mdview-source {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* The viewed file's own title, from its front-matter. Same relationship
+   to the body as a page cover's h1 — larger than any heading inside the
+   document, and the summary under it quieter than the prose. */
+/* What the FILE says about itself, grouped and ruled off from the file.
+   Ungrouped, the summary reads as the document's own first paragraph —
+   same left edge, same measure, one line apart — and the reader
+   attributes the kit's framing to the author. */
+.okt-mdview-head {
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.okt-mdview-title {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.okt-mdview-summary {
+  margin: 6px 0 0;
+  color: var(--text-soft);
+  font-size: 1.02rem;
+  text-align: left;   /* a one-line subtitle has nothing to justify */
+}
+
+/* The viewed file's first heading opens a <section>, which carries the
+   page's own top margin — unwanted as the first thing under the bar. */
+.okt-mdview-rendered > :first-child { margin-top: 0; }
+.okt-mdview-rendered > section:first-child > h2:first-child { margin-top: 0; }
+.okt-mdview-fail { margin: 0; }
+
+@media (max-width: 640px) {
+  /* The path and the actions cannot share one line at phone width, and
+     the path is what identifies the file — it keeps the full row. */
+  .okt-mdview-bar { flex-wrap: wrap; padding-right: 14px; }
+  .okt-mdview-path { flex: 1 0 100%; padding-right: 42px; }
+  .okt-mdview-body { padding: 20px 14px 48px; }
 }
 
 /* Shared toolbar for diagrams + charts. Lives top-right of the host
@@ -2305,7 +2462,7 @@ a.okt-card:focus-visible,
   flex: 0 0 260px;
   display: flex;
   flex-direction: column;
-  background: var(--surface-2, var(--surface));
+  background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 12px;
   max-height: 70vh;
@@ -4108,7 +4265,7 @@ page-nav .page-nav-scroll {
 page-nav .page-nav-panel {
   margin: 14px 14px 18px 14px;
   padding: 14px 14px;
-  background: var(--surface-2, var(--surface));
+  background: var(--surface-2);
   border: 1px solid var(--border-soft);
   border-radius: 8px;
   min-width: 0;

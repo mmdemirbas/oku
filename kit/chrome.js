@@ -378,6 +378,298 @@ var __okuPanZoom = (function () {
   return { attach: attach };
 })();
 
+/* ============ Markdown viewer ============ *
+ * A link from an oku page to a .md FILE used to hand the reader off to
+ * the browser's plain-text rendering: no typography, no theme, no way
+ * back except the back button. The file is markdown and the kit already
+ * renders markdown, so it renders it here instead — in the shared
+ * lightbox frame, over the page the reader came from.
+ *
+ * Read-only, and deliberately so. Two views of the same bytes:
+ *   rendered — the kit's own block pipeline (headings, tables, callouts,
+ *              typed fences, mermaid — everything a page gets)
+ *   source   — the bytes, in a <pre>, which is what the reader came for
+ *              when they wanted to copy or check exact whitespace
+ *
+ * WHERE THE BYTES COME FROM is the part that shapes everything else.
+ * A page opened over file:// has an opaque origin, so fetch() cannot
+ * read the file sitting next to it — the same wall renderFromUrl hits.
+ * So the standalone build INLINES every .md its pages link to (keyed by
+ * the href as authored) and the viewer reads that map first. Over HTTP
+ * there is no map and it fetches. One viewer, two supply lines, and the
+ * reader cannot tell which one ran.
+ *
+ * `window.__okuLocalDocs` — { "<href as authored>": "<file text>" }.
+ * ---------------------------------------------------------------- */
+var __okuMdViewer = (function () {
+  // Ids emitted by the viewed file are prefixed with this. They land in
+  // the same document as the page's own ids, and a viewed file whose
+  // heading slugifies to one the page already used would otherwise make
+  // getElementById reach into the overlay for the rest of the session.
+  var ID_PREFIX = 'okv-';
+  var seq = 0;
+
+  /* The standalone build's inlined map, hydrated on first use rather
+     than at boot: a page that never links to a .md should not pay for
+     parsing it, and reading it late means the script tag's position in
+     the document cannot matter. */
+  function docMap() {
+    if (window.__okuLocalDocs) return window.__okuLocalDocs;
+    var el = document.getElementById('__oku_local_docs__');
+    if (!el) return null;
+    try {
+      window.__okuLocalDocs = JSON.parse(el.textContent);
+    } catch (e) {
+      window.__okuLocalDocs = {};
+    }
+    return window.__okuLocalDocs;
+  }
+
+  function localDoc(keys) {
+    var map = docMap();
+    if (!map) return null;
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i] && Object.prototype.hasOwnProperty.call(map, keys[i])) return map[keys[i]];
+    }
+    return null;
+  }
+
+  /* The path as the reader thinks of it: what the author typed, not the
+     resolved URL. `/Users/md/dev/x/docs/notes/plan.md` is the same file
+     as `notes/plan.md` and says less about where it sits in the tree. */
+  function displayPath(href, url) {
+    if (href && !/^[a-z][a-z0-9+.-]*:/i.test(href)) return href;
+    try {
+      return decodeURIComponent(String(url).split('#')[0].split('/').pop());
+    } catch (e) { return String(url); }
+  }
+
+  function baseName(path) {
+    var s = String(path);
+    return s.slice(s.lastIndexOf('/') + 1);
+  }
+
+  function build(path, url) {
+    var wrap = document.createElement('div');
+    wrap.className = 'okt-mdview';
+    wrap.innerHTML =
+      '<div class="okt-mdview-bar">' +
+      '  <span class="okt-mdview-path" title="' + escapeAttr(path) + '">' +
+      '    <span class="okt-mdview-dir">' + escapeHtml(path.slice(0, path.length - baseName(path).length)) + '</span>' +
+      '    <span class="okt-mdview-file">' + escapeHtml(baseName(path)) + '</span>' +
+      '  </span>' +
+      '  <div class="okt-mdview-actions">' +
+      // Same segmented control the table chrome uses — one shape for
+      // "pick one of these views" everywhere in the kit.
+      '    <div class="okt-view-group" role="group" aria-label="View">' +
+      '      <button type="button" class="okt-view-btn okt-mdview-view active" data-view="rendered" aria-pressed="true">Rendered</button>' +
+      '      <button type="button" class="okt-view-btn okt-mdview-view" data-view="source" aria-pressed="false">Source</button>' +
+      '    </div>' +
+      '    <button type="button" class="okt-mdview-copy" title="Copy the source">' + ICON_CLIPBOARD + '<span>Copy</span></button>' +
+      '    <a class="okt-mdview-open" href="' + escapeAttr(url) + '" target="_blank" rel="noopener" title="Open the file itself in a new tab">Open file</a>' +
+      '  </div>' +
+      '</div>' +
+      '<div class="okt-mdview-body">' +
+      '  <div class="okt-mdview-rendered"></div>' +
+      '  <pre class="okt-mdview-source"><code></code></pre>' +
+      '</div>';
+    return wrap;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function escapeAttr(s) {
+    return escapeHtml(s).replace(/"/g, '&quot;');
+  }
+
+  function fail(wrap, path, url, reason) {
+    var body = wrap.querySelector('.okt-mdview-rendered');
+    body.innerHTML =
+      '<div class="callout callout-warning okt-mdview-fail">' +
+      '<p><strong>' + escapeHtml(path) + '</strong> could not be read.</p>' +
+      '<p>' + escapeHtml(reason) + '</p>' +
+      '<p><a href="' + escapeAttr(url) + '" target="_blank" rel="noopener">Open it directly</a></p>' +
+      '</div>';
+  }
+
+  function show(wrap, view) {
+    wrap.setAttribute('data-view', view);
+    wrap.querySelectorAll('.okt-mdview-view').forEach(function (b) {
+      var on = b.getAttribute('data-view') === view;
+      b.setAttribute('aria-pressed', String(on));
+      b.classList.toggle('active', on);
+    });
+  }
+
+  /* One scalar out of a front-matter block. Not a YAML parser and not
+     pretending to be one — the viewer wants the two keys every oku
+     source carries, and a file whose `title` is a nested structure is
+     not a file whose title we should be guessing at. */
+  function frontMatterValue(meta, key) {
+    if (!meta) return '';
+    var m = new RegExp('^[ \\t]*' + key + '[ \\t]*:[ \\t]*(.+?)[ \\t]*$', 'm').exec(meta);
+    if (!m) return '';
+    var v = m[1];
+    if (/^"[\s\S]*"$/.test(v) || /^'[\s\S]*'$/.test(v)) v = v.slice(1, -1);
+    return v;
+  }
+
+  function fill(wrap, text, url) {
+    wrap.querySelector('.okt-mdview-source code').textContent = text;
+    wrap._source = text;
+    var host = wrap.querySelector('.okt-mdview-rendered');
+
+    /* The file's own title, which renderMarkdownInto strips with the
+       rest of the front-matter. A reader who clicked "the plan" should
+       see what the document calls itself, not only what the filesystem
+       calls it — and dropping it left the rendered view opening on the
+       first section heading, which reads as a document missing its top. */
+    if (window.OkuRenderer && window.OkuRenderer.splitFrontMatter) {
+      var meta = window.OkuRenderer.splitFrontMatter(text).meta;
+      var title = frontMatterValue(meta, 'title');
+      var summary = frontMatterValue(meta, 'summary');
+      if (title || summary) {
+        var head = document.createElement('div');
+        head.className = 'okt-mdview-head';
+        if (title) {
+          var h = document.createElement('h1');
+          h.className = 'okt-mdview-title';
+          h.textContent = title;
+          head.appendChild(h);
+        }
+        if (summary) {
+          var s = document.createElement('p');
+          s.className = 'okt-mdview-summary';
+          s.textContent = summary;
+          head.appendChild(s);
+        }
+        host.appendChild(head);
+      }
+    }
+    if (!window.OkuRenderer || typeof window.OkuRenderer.renderMarkdownInto !== 'function') {
+      // renderer.js is a separate file and a page can be built without
+      // it. Say so rather than showing an empty pane.
+      show(wrap, 'source');
+      wrap.querySelector('[data-view="rendered"]').disabled = true;
+      return;
+    }
+    wrap._idPrefix = ID_PREFIX + (++seq) + '-';
+    try {
+      window.OkuRenderer.renderMarkdownInto(text, host, {
+        idPrefix: wrap._idPrefix,
+        base: url,
+      });
+    } catch (e) {
+      show(wrap, 'source');
+      return;
+    }
+    // The viewed file's code blocks and tables are new DOM in a page
+    // whose enhancement pass has been and gone. initReadingAids is the
+    // kit's own re-entry point for exactly that (it already runs again
+    // on `oku:rendered`) and every sub-pass guards on what it emitted,
+    // so the page's existing chrome is left alone. Notably it does NOT
+    // rebuild the TOC or the rail: the viewed file's headings belong to
+    // the file, not to the page the reader is on.
+    if (typeof initReadingAids === 'function') initReadingAids();
+  }
+
+  function stripHash(s) {
+    var at = String(s).indexOf('#');
+    return at < 0 ? String(s) : String(s).slice(0, at);
+  }
+
+  function open(url, opts) {
+    opts = opts || {};
+    var href = opts.href || url;
+    // The fragment names a heading INSIDE the file, so it is part of the
+    // request but not part of the file's identity — strip it for the
+    // path, the lookup and the fetch, and honour it once rendered.
+    var frag = String(href).split('#')[1] || '';
+    var fileUrl = stripHash(url);
+    var path = displayPath(stripHash(href), fileUrl);
+    var wrap = build(path, fileUrl);
+    show(wrap, 'rendered');
+
+    wrap.addEventListener('click', function (e) {
+      var view = e.target.closest && e.target.closest('.okt-mdview-view');
+      if (view) { show(wrap, view.getAttribute('data-view')); return; }
+      var copy = e.target.closest && e.target.closest('.okt-mdview-copy');
+      if (copy) {
+        var text = wrap._source || '';
+        var done = function () {
+          copy.classList.add('copied');
+          setTimeout(function () { copy.classList.remove('copied'); }, 1400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, function () {});
+        }
+      }
+    });
+
+    __okuLightbox.open(wrap, { panZoom: false, title: path });
+
+    var done = function (text) {
+      fill(wrap, text, fileUrl);
+      if (!frag) return;
+      var el = document.getElementById(wrap._idPrefix + frag);
+      if (el) el.scrollIntoView();
+    };
+
+    var inline = localDoc([stripHash(href), fileUrl, path]);
+    if (inline != null) { done(inline); return; }
+    if (window.location.protocol === 'file:') {
+      // Not a fetch we can retry — a file:// origin is opaque, so the
+      // browser refuses before a request is made. Calling fetch anyway
+      // only adds a console error the reader cannot act on.
+      fail(wrap, path, fileUrl,
+        'A page opened over file:// cannot read another file next to it. ' +
+        'The standalone build carries every linked .md inside the HTML — ' +
+        'this page was opened without one, or the link was added after it was built.');
+      return;
+    }
+    fetch(fileUrl, { cache: 'no-cache' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.text();
+      })
+      .then(done)
+      .catch(function (e) { fail(wrap, path, fileUrl, e.message); });
+  }
+
+  return { open: open };
+})();
+
+/* A plain left-click on a link to a local .md opens it in the viewer.
+ *
+ * Only a plain one. Cmd / Ctrl / Shift / middle-click, a `target`, and
+ * `download` all mean "give me the file, not your reading of it" — those
+ * keep the browser's behaviour, and so does any link the page has
+ * already handled (defaultPrevented).
+ *
+ * Relative .md links written in PROSE never arrive here: renderLink
+ * rewrites `foo.md` to `foo.html` because that file is a page in this
+ * tree and the whole page is the better answer. What arrives is what
+ * that rewrite deliberately leaves alone — a root-absolute path, a link
+ * inside an HTML island, a .md that is not a page in this site. */
+document.addEventListener('click', function (e) {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  var a = e.target.closest && e.target.closest('a[href]');
+  if (!a || a.hasAttribute('download')) return;
+  var target = a.getAttribute('target');
+  if (target && target !== '_self') return;
+  var href = a.getAttribute('href');
+  if (!href || /^(#|mailto:|tel:|javascript:)/i.test(href)) return;
+  var url;
+  try { url = new URL(a.href, window.location.href); } catch (err) { return; }
+  if (!/\.md$/i.test(url.pathname)) return;
+  // A .md on someone else's origin is their page to serve, not ours to
+  // re-render — and fetching it would fail on CORS anyway.
+  if (url.protocol !== 'file:' && url.origin !== window.location.origin) return;
+  e.preventDefault();
+  __okuMdViewer.open(url.href, { href: href });
+});
+
 /* ============ Chart-config popover ============ *
  * Opens a floating panel anchored to a chart's toolbar button.
  * Initial controls: type switch (compatible types derived from the

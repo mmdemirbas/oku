@@ -3146,6 +3146,85 @@ def build_kit_bundle(src_root: Path) -> str | None:
     return json.dumps(bundle, ensure_ascii=False)
 
 
+# A standalone file is meant to be sent as a file. A linked .md that is
+# itself book-length would double the artifact for a document the reader
+# may never open, so there is a ceiling — and it is reported, not silent.
+MAX_INLINE_DOC_BYTES = 512 * 1024
+
+# The two link shapes that still say `.md` by the time the reader clicks.
+#
+# A RELATIVE markdown link (`[x](notes/plan.md)`) is deliberately absent:
+# renderLink in renderer.js rewrites it to `notes/plan.html`, because that
+# file is a page in this tree and the whole page beats a file viewer. What
+# it leaves alone is a root-absolute destination and anything inside an
+# HTML island — those reach the DOM as `.md` and open the viewer, so those
+# are the ones a file:// build has to carry.
+_ROOT_ABS_MD_LINK_RE = re.compile(r"\]\((/[^)\s]+?\.md)(?:#[^)\s]*)?\)")
+_ISLAND_MD_HREF_RE = re.compile(r"""href\s*=\s*["']([^"'\s]+?\.md)(?:#[^"']*)?["']""")
+
+
+def _iter_strings(node):
+    """Every string anywhere in a page dict. Typed blocks carry prose in
+    fields of their own (an insight's `b`, a table cell, a callout body),
+    so a link can sit outside the top-level `b[]` strings."""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, list):
+        for item in node:
+            yield from _iter_strings(item)
+    elif isinstance(node, dict):
+        for value in node.values():
+            yield from _iter_strings(value)
+
+
+def collect_local_docs(page_data, src: Path, src_root: Path) -> tuple[dict[str, str], list[str]]:
+    """Read every local .md this page links to, keyed by the href AS
+    AUTHORED — which is exactly what the viewer looks up at runtime
+    (`a.getAttribute('href')`), so the two sides cannot drift apart by
+    disagreeing about how to normalise a path.
+
+    Returns (docs, skipped). A miss is never fatal: the link keeps working
+    over HTTP, and over file:// the viewer says why it cannot read it.
+    """
+    docs: dict[str, str] = {}
+    skipped: list[str] = []
+    if page_data is None:
+        return docs, skipped
+
+    hrefs: list[str] = []
+    for text in _iter_strings(page_data):
+        if ".md" not in text:
+            continue
+        hrefs.extend(_ROOT_ABS_MD_LINK_RE.findall(text))
+        hrefs.extend(_ISLAND_MD_HREF_RE.findall(text))
+
+    for href in hrefs:
+        if href in docs or href in skipped:
+            continue
+        if re.match(r"^[a-z][a-z0-9+.-]*:|^//", href, re.I):
+            continue  # someone else's origin — not ours to inline
+        # A root-absolute href means "from the root of what is served",
+        # which at build time is the tree being built.
+        base = src_root if href.startswith("/") else src.parent
+        target = (base / href.lstrip("/")).resolve()
+        try:
+            target.relative_to(src_root.resolve())
+        except ValueError:
+            skipped.append(href)  # outside the tree — not ours to ship
+            continue
+        if not target.is_file():
+            skipped.append(href)
+            continue
+        if target.stat().st_size > MAX_INLINE_DOC_BYTES:
+            skipped.append(href)
+            continue
+        try:
+            docs[href] = target.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            skipped.append(href)
+    return docs, skipped
+
+
 def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
     """Inline kit CSS/JS + the page's JSON content into each HTML.
 
@@ -3192,6 +3271,24 @@ def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
             if kit_bundle:
                 safe_bundle = kit_bundle.replace("</script", "<\\/script")
                 inline += f'\n<script type="application/json" id="__oku_kit_bundle__">{safe_bundle}</script>'
+            # Every .md this page links to, so the markdown viewer has
+            # something to read over file:// — where fetch() cannot reach
+            # the file sitting right next to this one.
+            local_docs, skipped_docs = collect_local_docs(page_data, src, src_root)
+            if local_docs:
+                safe_docs = json.dumps(local_docs, ensure_ascii=False, separators=(",", ":")).replace(
+                    "</script", "<\\/script"
+                )
+                inline += f'\n<script type="application/json" id="__oku_local_docs__">{safe_docs}</script>'
+            for href in skipped_docs:
+                # Not an error — the link still resolves over HTTP. But a
+                # standalone file that quietly cannot open one of its own
+                # links is exactly the kind of gap that reads as a kit bug.
+                print(
+                    f"  ⚠ {src.relative_to(src_root)}: {href} not inlined "
+                    f"(missing, outside the tree, or over {MAX_INLINE_DOC_BYTES // 1024}K) — "
+                    f"the viewer will not open it over file://"
+                )
             # Lambda replacement avoids re.sub interpreting \n in the JSON
             # content as a backslash escape and turning it into a newline.
             html = _BODY_CLOSE_RE.sub(lambda m: inline + "\n</body>", html, count=1)

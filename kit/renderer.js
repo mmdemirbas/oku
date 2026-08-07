@@ -2502,6 +2502,126 @@
     return result;
   };
 
+  /* ================================================================ *
+   * Fragment rendering — a whole .md FILE into a host element
+   *
+   * `render()` is a page: it owns document.title, the accent, the cover
+   * and the anchor-id namespace. The markdown viewer needs the same
+   * typography for a file that is NOT this page, inside a document that
+   * is already rendered — so it needs the block pipeline without any of
+   * the page-level ownership.
+   *
+   * Two things make it safe to run a second pass in a live document:
+   *
+   *   idPrefix — ids are page-global. A viewed file whose heading
+   *     slugifies to one the page already used would make
+   *     getElementById reach the wrong element for the rest of the
+   *     session (the same defect the rail's thumbnail clone rewrites
+   *     its ids to avoid). Every emitted id gets the prefix, and every
+   *     fragment-internal href is rewritten to match.
+   *
+   *   base — relative links and images inside the viewed file point at
+   *     ITS directory, not at the page's. Resolving them here is what
+   *     makes a link in a viewed file mean the same thing it means on
+   *     disk.
+   *
+   * The module-level parser state (anchor ids, link + footnote
+   * definitions, the typed-block hook) is saved and restored around the
+   * pass. The page has finished rendering by the time a viewer opens,
+   * so nothing reads that state in between — but leaving it clobbered
+   * would break the next render for a reason nobody would find.
+   * ================================================================ */
+
+  // Strip a leading YAML front-matter block. Returns { meta, body },
+  // where meta is the raw block text (null when absent) — the viewer
+  // shows the source, not a half-implemented YAML parse.
+  function splitFrontMatter(src) {
+    const text = String(src || '').replace(/^\uFEFF/, '');
+    const m = text.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
+    if (!m) return { meta: null, body: text };
+    return { meta: m[1], body: text.slice(m[0].length) };
+  }
+
+  OkuRenderer.splitFrontMatter = splitFrontMatter;
+
+  /* Render markdown source into `host`. opts:
+   *   idPrefix — string prepended to every emitted id (required in a
+   *              live document; defaults to '' for a bare host)
+   *   base     — URL the file was loaded from; relative hrefs and image
+   *              srcs resolve against it
+   * Returns the warnings the typed-block renderers raised. */
+  OkuRenderer.renderMarkdownInto = function (src, host, opts) {
+    opts = opts || {};
+    const prefix = opts.idPrefix || '';
+    const savedAnchors = __anchorIds;
+    const savedLinkDefs = __linkDefs;
+    const savedFootnoteDefs = __footnoteDefs;
+    const savedFootnoteUses = __footnoteUses;
+    const savedTyped = __renderTypedBlock;
+    const inner = new OkuRenderer({});
+
+    resetAnchorIds();
+    resetDefinitions();
+    __renderTypedBlock = (block) => inner._renderTyped(block);
+
+    // Detached until every id is prefixed — an id must never be live in
+    // the document under its unprefixed name, not even for a frame.
+    const holder = document.createElement('div');
+    try {
+      const body = extractDefinitions(splitFrontMatter(src).body);
+      const nodes = parseMarkdown(body);
+      let section = null;
+      const openSection = (heading) => {
+        section = document.createElement('section');
+        if (heading.id) section.id = uniqueAnchorId(heading.id);
+        const h2 = document.createElement('h2');
+        h2.textContent = heading.title;
+        section.appendChild(h2);
+        holder.appendChild(section);
+      };
+      let buffer = [];
+      const flush = () => {
+        if (buffer.length) { emitMarkdown(section || holder, buffer, null); buffer = []; }
+      };
+      for (const node of nodes) {
+        if (node.k === 'heading' && node.level === 2) { flush(); openSection(node); }
+        else buffer.push(node);
+      }
+      flush();
+      const notes = renderFootnoteSection();
+      if (notes) holder.appendChild(notes);
+    } finally {
+      __anchorIds = savedAnchors;
+      __linkDefs = savedLinkDefs;
+      __footnoteDefs = savedFootnoteDefs;
+      __footnoteUses = savedFootnoteUses;
+      __renderTypedBlock = savedTyped;
+    }
+
+    if (prefix) {
+      holder.querySelectorAll('[id]').forEach((n) => { n.id = prefix + n.id; });
+      holder.querySelectorAll('a[href^="#"]').forEach((a) => {
+        a.setAttribute('href', '#' + prefix + a.getAttribute('href').slice(1));
+      });
+    }
+    if (opts.base) {
+      const rebase = (el, attr) => {
+        const v = el.getAttribute(attr);
+        // Absolute URLs, protocol-relative, fragments and root-absolute
+        // paths already say where they point. Only a genuinely relative
+        // path is ambiguous, and it is ambiguous because the reader is
+        // looking at the file from somewhere else in the tree.
+        if (!v || /^([a-z][a-z0-9+.-]*:|\/\/|#|\/)/i.test(v)) return;
+        try { el.setAttribute(attr, new URL(v, opts.base).href); } catch (e) {}
+      };
+      holder.querySelectorAll('a[href]').forEach((a) => rebase(a, 'href'));
+      holder.querySelectorAll('img[src]').forEach((i) => rebase(i, 'src'));
+    }
+
+    while (holder.firstChild) host.appendChild(holder.firstChild);
+    return inner.warnings;
+  };
+
   window.OkuRenderer = OkuRenderer;
 
   if (document.readyState === 'loading') {
