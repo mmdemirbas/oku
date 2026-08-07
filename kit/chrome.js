@@ -399,6 +399,11 @@ var __okuI18n = (function () {
   var table = null;
   var loading = null;
 
+  /* The language the kit's own strings are written in. It is a property
+   * of the kit, not of the site: the table keys are English sentences,
+   * so an `en` table could only ever be an identity map. */
+  var KIT_SOURCE_LANG = 'en';
+
   /* `data-lang` once the switch has run, and before that the page's own
    * filename — `reference.tr.html` is a Turkish page whether or not a
    * manifest has arrived yet. Deriving it here is what lets the table
@@ -492,7 +497,13 @@ var __okuI18n = (function () {
       loading = Promise.resolve(table);
       return loading;
     }
-    if (!code || window.location.protocol === 'file:') {
+    /* The kit's strings ARE English — that is what the table keys are —
+     * so `en` has no table to fetch and never will. Asking for one 404s
+     * on every English page of a bilingual site, in the console the
+     * reader opens when something else goes wrong. A language that
+     * declares itself and ships no table still 404s, and should: that
+     * one is a missing translation, which is worth saying out loud. */
+    if (!code || code === KIT_SOURCE_LANG || window.location.protocol === 'file:') {
       loading = Promise.resolve(null);
       return loading;
     }

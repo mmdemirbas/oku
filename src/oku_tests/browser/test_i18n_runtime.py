@@ -102,3 +102,37 @@ def test_the_pass_never_touches_the_document_body(page, site_url, name):
 
     assert leaked["h1"], leaked
     assert leaked["p"], leaked
+
+
+def test_an_english_page_asks_for_no_translation_table(page, site_url):
+    """The kit's strings ARE English — the table keys are English
+    sentences — so `en` has no table and never will. Asking for one 404s
+    on every English page of a bilingual site, in the console a reader
+    opens when something else has gone wrong. A language that declares
+    itself and ships no table still 404s, and should: that one is a
+    missing translation and worth saying out loud."""
+    # `data-lang` has to be on <html> BEFORE chrome.js runs, which is the
+    # condition a built site is in and `oku serve` is not: served pages
+    # learn their language from the manifest, by which time load() has
+    # already memoised an empty result and never asks for anything. The
+    # 404 was observed in dist/site, so the test reproduces dist/site.
+    page.add_init_script(
+        "(() => { const set = () => document.documentElement "
+        "&& document.documentElement.setAttribute('data-lang', 'en');"
+        "if (!set()) new MutationObserver((_, o) => { if (set()) o.disconnect(); })"
+        ".observe(document, {childList: true, subtree: true}); })()"
+    )
+    asked = []
+    page.on("request", lambda r: asked.append(r.url) if "/i18n/" in r.url else None)
+    failed = []
+    page.on(
+        "response",
+        lambda r: failed.append((r.url, r.status)) if "/i18n/" in r.url and r.status >= 400 else None,
+    )
+    _open(page, site_url, "charts.html")
+    assert page.evaluate("() => document.documentElement.getAttribute('data-lang')") == "en"
+
+    assert [u for u in asked if u.endswith("/en.json")] == [], (
+        f"the English page fetched a table for its own language: {asked}"
+    )
+    assert failed == [], f"a translation table 404'd: {failed}"
