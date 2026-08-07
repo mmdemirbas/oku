@@ -389,6 +389,15 @@ body[data-ctrl-proximity="1"] .back-to-top:not(.visible) { opacity: 0; }
    whenever their subsystem initialises. Width sits hard right: it is
    the one that changes what the reader is looking at rather than how it
    is lit, so it gets the corner they can hit without aiming. */
+/* Language sits with the other "how is this presented" controls, left
+   of theme and width. It changes which words the reader gets, not what
+   they are looking at, so it does not take the corner width owns. */
+.okt-chrome-cluster .lang-toggle { order: 25; }
+.lang-toggle .lang-code {
+  font: 600 12px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+}
+
 .okt-chrome-cluster .personalize-toggle { order: 10; }
 .okt-chrome-cluster .search-toggle      { order: 20; }
 .okt-chrome-cluster .warning-indicator  { order: 30; }

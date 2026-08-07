@@ -34,7 +34,7 @@ import sys
 import threading
 import time
 import webbrowser
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import unquote
 
 
@@ -911,6 +911,32 @@ def _source_stem_path(p: Path) -> Path:
     return p.with_suffix("")
 
 
+def _source_sibling(p: Path) -> Path:
+    """The `.md` source a virtual `.json`/`.html` page path came from.
+
+    `notes/index.tr.json` → `notes/index.tr.md`. Same trap as
+    `_synth_json_path` in the other direction: `with_suffix` on the stem
+    `index.tr` yields `index.md`, so a translation resolved to its
+    original and every page whose name carries a dot served the wrong
+    file.
+    """
+    return p.with_name(p.name[: -len(p.suffix)] + ".md")
+
+
+def _synth_json_path(p: Path) -> Path:
+    """`notes/index.tr.md` → `notes/index.tr.json`.
+
+    Deliberately not `p.with_suffix("").with_suffix(".json")`.
+    `with_suffix` replaces the LAST dotted part, so the stem `index.tr`
+    becomes `index.json` — the same virtual path `index.md` produces.
+    The walker's dedupe then drops one of the two, and a page vanishes
+    from the site with nothing said. That was true of any `a.b.md`
+    before a language ever entered the picture: `api.v2.md` and
+    `notes.2026-08.md` collided with `api.md` and `notes.md`.
+    """
+    return p.with_name(p.name[: -len(p.suffix)] + ".json")
+
+
 def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
     """Walk *.md files under root, return (md_path, synthesized_page_dict).
 
@@ -1353,8 +1379,7 @@ def find_json_pages(root: Path):
     # SKIP_DIRS-matching subdirectory.
     seen_stems: set = set()
     for p in iter_repo_files(root, _SOURCE_SUFFIXES, extra_skip=extra):
-        stem = _source_stem_path(p)
-        synth_path = stem.with_suffix(".json")
+        synth_path = _synth_json_path(p)
         # Don't shadow a real .json sibling.
         if synth_path in real_json or synth_path in seen_stems:
             continue
@@ -2630,8 +2655,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     for p, _data in pages:
         if p.suffix != ".json" or not p.exists():
             continue
-        stem = p.with_suffix("")
-        for sib in (stem.with_suffix(".md"),):
+        for sib in (_source_sibling(p),):
             if sib.exists():
                 issues.append(
                     {
@@ -2733,6 +2757,47 @@ _NAV_EXCLUDE_STEMS = frozenset(
 )
 
 
+def declared_languages(root: Path) -> tuple[list[str], str]:
+    """The site's language codes and its default, from kit.json.
+
+    Returns ([], "") for a monolingual site — which is every site that
+    does not ask for otherwise, so the whole feature costs nothing until
+    a `languages` key appears.
+
+    `languages` accepts either bare codes or objects carrying a label
+    for the switch: ["en", "tr"] or [{"code": "tr", "label": "Türkçe"}].
+    """
+    kit_path = find_kit_json(root)
+    if kit_path is None:
+        return [], ""
+    try:
+        data = json.loads(kit_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return [], ""
+    raw = data.get("languages") or []
+    codes = [item.get("code") if isinstance(item, dict) else item for item in raw]
+    codes = [c for c in codes if isinstance(c, str) and c]
+    if len(codes) < 2:
+        return [], ""
+    default = data.get("defaultLanguage") or codes[0]
+    return codes, (default if default in codes else codes[0])
+
+
+def split_language_suffix(stem: str, codes: list[str]) -> tuple[str, str | None]:
+    """`("reference.tr", ["en","tr"])` → `("reference", "tr")`.
+
+    Only a DECLARED code counts. Without that check `format-comparison`
+    would split into base `format` with language `comparison`, and a
+    page would vanish from the tree the day someone declared a language
+    whose code collided with a filename's last dotted part.
+    """
+    at = stem.rfind(".")
+    if at <= 0:
+        return stem, None
+    suffix = stem[at + 1 :]
+    return (stem[:at], suffix) if suffix in codes else (stem, None)
+
+
 def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
     """Walk JSON pages under root, return the site manifest dict.
 
@@ -2761,8 +2826,7 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
         # field matches what a reader can open in their editor.
         source_rel = rel
         if not p.exists():
-            stem = p.with_suffix("")
-            for sib in (stem.with_suffix(".md"),):
+            for sib in (_source_sibling(p),):
                 if sib.exists():
                     source_rel = sib.relative_to(root)
                     break
@@ -2778,12 +2842,65 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
         if "summary" in meta:
             entry["summary"] = meta["summary"]
         entries.append(entry)
+    entries = _fold_language_variants(entries, root)
     return {
         "schema_version": 1,
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
         "root": ".",
         "pages": entries,
     }
+
+
+def _fold_language_variants(entries: list[dict], root: Path) -> list[dict]:
+    """Collapse `page.md` + `page.tr.md` into ONE nav entry that knows
+    where its translations live.
+
+    A translation is the same page in another language, not another
+    page. Left as its own entry it appears in the site tree beside the
+    original — so a ten-page site in two languages reads as twenty
+    pages, and every reader sees both halves of a tree they can only
+    read half of.
+
+    So the base keeps the entry and gains `lang` plus a `variants` map
+    (which includes itself, so the switch has no special case for
+    "where do I go back to"). The translations leave the tree. Their
+    HTML is still built and still indexed for search — `iter_page_stubs`
+    emits pages independently of this — they are simply reached by
+    switching rather than by browsing.
+
+    A monolingual site takes the early return and nothing below runs.
+    """
+    codes, default = declared_languages(root)
+    if not codes:
+        return entries
+
+    by_path = {}
+    groups: dict[str, dict[str, str]] = {}
+    for entry in entries:
+        rel = PurePosixPath(entry["path"])
+        base, lang = split_language_suffix(rel.stem, codes)
+        base_path = rel.with_name(base + ".html").as_posix()
+        entry["_base"] = base_path
+        entry["_lang"] = lang or default
+        by_path[entry["path"]] = entry
+        groups.setdefault(base_path, {})[lang or default] = entry["path"]
+
+    kept = []
+    for entry in entries:
+        variants = groups.get(entry["_base"], {})
+        lang = entry.pop("_lang")
+        base_path = entry.pop("_base")
+        # A translation whose base is missing is not a translation — it
+        # is a page whose name happens to end in a language code, and
+        # dropping it would delete it from the tree with no way to reach
+        # it. Keep it, and let it carry its own language.
+        is_translation = entry["path"] != base_path and base_path in by_path
+        entry["lang"] = lang
+        if len(variants) > 1:
+            entry["variants"] = dict(sorted(variants.items()))
+        if not is_translation:
+            kept.append(entry)
+    return kept
 
 
 def build_manifest(root: Path, *, out_dir: Path | None = None, pages: list | None = None) -> Path:
@@ -3752,9 +3869,8 @@ def _make_serve_handler(root: Path):
             if fs.exists():
                 return False
 
-            stem = fs.with_suffix("")
             source_path = None
-            for cand in (stem.with_suffix(".md"),):
+            for cand in (_source_sibling(fs),):
                 if cand.exists():
                     source_path = cand
                     break
@@ -3789,7 +3905,7 @@ def _make_serve_handler(root: Path):
                     body = json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8")
                     content_type = "application/json; charset=utf-8"
                 else:
-                    body = _synth_stub(_page_title(page) or stem.name)
+                    body = _synth_stub(_page_title(page) or fs.stem)
                     content_type = "text/html; charset=utf-8"
             elif url_path.endswith(".html") and json_path.exists():
                 # The .json file IS on disk; only the .html shell is missing.

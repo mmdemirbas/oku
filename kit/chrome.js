@@ -378,6 +378,109 @@ var __okuPanZoom = (function () {
   return { attach: attach };
 })();
 
+/* ============ Language switch ============ *
+ * A page and its translation are the same page in two languages, so the
+ * switch is a property of the PAGE, not of the site: it appears only
+ * where there is somewhere to go.
+ *
+ * Authoring is `<page>.md` + `<page>.<lang>.md` side by side — no new
+ * syntax, each file a complete markdown document that still renders on
+ * GitHub. `kit.json` declares which codes count (`languages`,
+ * `defaultLanguage`); without that key nothing here runs, so a
+ * monolingual site pays nothing.
+ *
+ * The manifest is what carries the pairing (`lang` + a `variants` map
+ * per entry), and it is the right carrier because it already reaches
+ * every page in all three modes — fetched under `oku serve` and
+ * `dist/site`, inlined in a standalone file. A second config fetch
+ * would have worked in two of the three.
+ *
+ * No auto-redirect. A reader who lands on a URL gets the page at that
+ * URL: sending them somewhere else on load breaks the back button and
+ * makes a shared link mean different things to different people. The
+ * button switches; nothing switches on its own.
+ * ---------------------------------------------------------------- */
+var __okuLangSwitch = (function () {
+  // The reader's last explicit choice. Read by nothing yet — the tree
+  // still links where it links — so it is stored and not acted on,
+  // which is the honest state until there is a second consumer.
+  var PREF_KEY = 'oku-lang';
+
+  function currentPagePath() {
+    var explicit = window.__okuCurrentPage;
+    if (explicit) return explicit;
+    var last = (window.location.pathname.split('/').pop() || '');
+    return last.endsWith('.html') ? last : 'index.html';
+  }
+
+  function entryFor(manifest, path) {
+    var pages = (manifest && manifest.pages) || [];
+    for (var i = 0; i < pages.length; i++) {
+      var p = pages[i];
+      if (!p || !p.path) continue;
+      // The entry is the BASE page, so a reader already on a
+      // translation has to be found through the variants map — its own
+      // path is not any entry's `path`.
+      if (p.path === path) return p;
+      if (p.variants) {
+        for (var code in p.variants) {
+          if (p.variants[code] === path) return p;
+        }
+      }
+    }
+    return null;
+  }
+
+  function labelFor(code) {
+    return String(code || '').toUpperCase();
+  }
+
+  function build(manifest) {
+    var path = currentPagePath();
+    var entry = entryFor(manifest, path);
+    var variants = entry && entry.variants;
+    if (!variants) return;
+    var codes = Object.keys(variants);
+    if (codes.length < 2) return;
+
+    // Which of the variants is the page we are looking at? Not
+    // entry.lang — that is the base page's language, and the reader may
+    // be on the translation.
+    var here = entry.lang;
+    for (var code in variants) {
+      if (variants[code] === path) here = code;
+    }
+    document.documentElement.setAttribute('data-lang', here);
+
+    var at = codes.indexOf(here);
+    var next = codes[(at + 1) % codes.length];
+
+    var existing = document.querySelector('.ctrl-btn.lang-toggle');
+    if (existing) existing.remove();
+    var btn = document.createElement('button');
+    btn.className = 'ctrl-btn lang-toggle';
+    btn.type = 'button';
+    var name = 'Read this page in ' + labelFor(next);
+    btn.setAttribute('aria-label', name);
+    btn.title = name;
+    // Two letters, not a flag and not a word: a flag names a country
+    // rather than a language, and a word would have to be translated
+    // into the language the reader has not chosen yet.
+    btn.innerHTML = '<span class="lang-code">' + labelFor(here) + '</span>';
+    okuChromeCluster().appendChild(btn);
+
+    btn.addEventListener('click', function () {
+      try { localStorage.setItem(PREF_KEY, next); } catch (e) {}
+      // The hash is the reader's position in the document. A
+      // translation keeps its anchors, so carrying it over lands them
+      // at the same section rather than at the top.
+      window.location.href = variants[next] + (window.location.hash || '');
+    });
+  }
+
+  return { build: build };
+})();
+
 /* ============ Markdown viewer ============ *
  * A link from an oku page to a .md FILE used to hand the reader off to
  * the browser's plain-text rendering: no typography, no theme, no way
@@ -12640,7 +12743,10 @@ class PageNav extends HTMLElement {
         return;
       }
       loadManifest()
-        .then(function (manifest) { self._renderTree(manifest); })
+        .then(function (manifest) {
+          self._renderTree(manifest);
+          __okuLangSwitch.build(manifest);
+        })
         .catch(function () {
           // No manifest: degrade silently. The sidebar prints an inline
           // hint about running `oku serve` so the user knows how
