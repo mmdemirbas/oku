@@ -588,6 +588,32 @@ language with no phrase of its own falls back to English rather than
 guessing. The kit's own chrome (search, viewer, Contents) is still
 English on every page — localizing it is separate work.
 
+**The kit's own strings follow the page's language.** `kit/i18n/<code>.json`
+maps the ENGLISH STRING to its translation — not an invented id. The call
+sites keep reading as English, so nothing had to be rewritten to
+`okuT('btn.close')` and re-verified, and a key with no entry falls back
+to itself: a missing translation degrades to what shipped before rather
+than to a blank or a raw key. `test_i18n_coverage.py` is what keeps that
+from rotting — a new reader-facing string with no entry fails on the day
+it is written, and a table entry the kit stopped emitting fails too.
+
+Three shapes, and mixing them up is the defect:
+
+- a **whole literal** is matched exactly by `__okuI18n.localize`, scoped
+  to kit-owned elements so author prose is unreachable;
+- a **concatenated fragment** (`'Toggle ' + label + ' series'`) must
+  become a `{0}` template. Turkish puts the verb last, so a translated
+  fragment is broken Turkish however good the fragment is;
+- a string **composed at runtime** (`Last updated 2026-08-07`) is not a
+  table key at all, so the element carries `data-oku-t` plus its
+  arguments and the pass rebuilds it. It replaces the leading text node
+  when the element has children — writing `textContent` would take the
+  permalink `buildTOC` appended with it.
+
+Load the table lazily, never at module scope: `__okuDocsRoot` is a `var`
+assigned thousands of lines below, so an early `load()` fetches
+`undefined_oku/i18n/…`, 404s, and memoises the failure for the page.
+
 **Anything the kit hangs off content must never become content.** Three
 defects of one shape, each of which rendered as a plausible wrong answer
 rather than an error:
