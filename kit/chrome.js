@@ -3122,7 +3122,21 @@ function initReadingAids() {
      block's final highlight, not before — the autoloader replaces
      innerHTML asynchronously and races a then() chain. */
   if (typeof __prismLoader !== 'undefined') {
-    __prismLoader.highlightAll();
+    // Line numbers and brace folds are LOCAL features — nothing about
+    // numbering a line needs a grammar fetched from a CDN. They were
+    // reachable only through Prism's `complete` hook, so a page opened
+    // without that CDN lost the gutter on every block declaring a
+    // language. Measured on dist/standalone/docs/charts.html with the
+    // network blocked: 51 code blocks, 0 gutters — and a standalone
+    // file is the artifact that exists FOR offline reading.
+    //
+    // Sweep however the load settles, and again on a timer for the case
+    // where it never settles at all. Prism arriving afterwards is safe:
+    // it rewrites innerHTML from textContent and _hdtAfterPrismHighlight
+    // re-wraps, which is the same self-healing path a second Prism pass
+    // already takes.
+    __prismLoader.highlightAll().then(_okuWrapPendingCodeBlocks, _okuWrapPendingCodeBlocks);
+    setTimeout(_okuWrapPendingCodeBlocks, PRISM_FALLBACK_MS);
   }
 
   /* Line-number gutter on every <pre><code>. The gutter is an absolute-
@@ -4568,6 +4582,26 @@ function _hdtHighlightNestedLanguages(code) {
  * block comments) are split into per-line clones — same className
  * preserves coloring across the split.
  * ------------------------------------------------------------------- */
+/* How long to wait for Prism before numbering the lines ourselves.
+   Only reached when the load never settles — a resolve or a reject both
+   sweep immediately. Long enough that a slow-but-working CDN wins the
+   race and the sweep finds nothing to do. */
+var PRISM_FALLBACK_MS = 3000;
+
+/* Wrap any numbered block Prism was going to handle and did not.
+   Idempotent by the same test `_hdtAfterPrismHighlight` uses, so calling
+   it twice, or before Prism arrives, costs nothing. */
+function _okuWrapPendingCodeBlocks() {
+  document.querySelectorAll('pre.okt-line-numbered > code').forEach(function (code) {
+    if (code.querySelector(':scope > .okt-code-line')) return;
+    // <oku-annotated-code> drives its own pipeline and puts marker chips
+    // inside the code element; it must be the only thing wrapping there.
+    if (code.closest && code.closest('oku-annotated-code')) return;
+    code.parentElement.setAttribute('data-okt-lines-wrapped', '1');
+    _hdtWrapCodeLines(code);
+  });
+}
+
 function _hdtWrapCodeLines(code) {
   // Each .okt-code-line is a grid row with three cells:
   //   [.okt-code-ln (number)]  [.okt-fold-marker]  [.okt-code-content]
