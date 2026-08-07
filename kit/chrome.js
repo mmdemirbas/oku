@@ -12199,6 +12199,7 @@ class OkuDiagram extends HTMLElement {
             self._snapEdgeEndpoints(svg);
             self._wireNeighborHighlight(svg);
             self._wireNodeTooltips(svg);
+            self._nameForAssistiveTech(svg);
           }
           self._rendered = true;
           self._attachToolbar();
@@ -12254,6 +12255,41 @@ class OkuDiagram extends HTMLElement {
         setTimeout(purgeOrphanMermaidErrors, 50);
         setTimeout(purgeOrphanMermaidErrors, 250);
       });
+  }
+  /* Give the rendered diagram a name, and stop it handing out anonymous
+     tab stops.
+
+     Three things were wrong at once on every diagram, and each is
+     invisible unless you go looking with a keyboard or a screen reader:
+
+     - `.okd-render` still said `aria-label="Diagram loading"` after the
+       render finished. The label is set before mermaid runs and nothing
+       ever replaced it, so the diagram announced itself as loading for
+       the rest of the session.
+     - the `<svg>` carries `role="graphics-document document"` and no
+       accessible name at all — while the caption naming it sits
+       directly underneath.
+     - mermaid puts `tabindex="0"` on its node groups. Ten per diagram
+       here, sixty on this page, every one of them an unnamed stop. A
+       node that is reachable and anonymous is the combination worse
+       than either alone; the kit gives those groups no keyboard
+       behaviour, so the tab stop buys the reader nothing. */
+  _nameForAssistiveTech(svg) {
+    var name = (this.getAttribute('caption') || '').trim() ||
+               (this.getAttribute('title') || '').trim();
+    var host = this.querySelector(':scope > .okd-render');
+    if (host) {
+      if (name) host.setAttribute('aria-label', name);
+      else host.removeAttribute('aria-label');
+    }
+    if (!svg) return;
+    if (name && !svg.getAttribute('aria-label')) svg.setAttribute('aria-label', name);
+    svg.querySelectorAll('[tabindex="0"]').forEach(function (n) {
+      // Anything the kit made interactive keeps its stop; only the
+      // groups mermaid marked on its own lose one.
+      if (n.tagName.toLowerCase() === 'a' || n.hasAttribute('data-oku-interactive')) return;
+      n.removeAttribute('tabindex');
+    });
   }
   _attachToolbar() {
     var self = this;
