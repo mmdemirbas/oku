@@ -91,7 +91,14 @@ def test_an_override_expires_when_the_os_flips_under_a_live_tab(page, site_url):
     _open(page, site_url, os_theme="light")
     assert _click(page)["mode"] == "dark"
     page.emulate_media(color_scheme="dark")
-    page.wait_for_timeout(200)
+    # Wait for the listener to have run, not for a number of
+    # milliseconds. A fixed 200ms is long enough on an idle machine and
+    # not on a loaded one, which is the whole of what makes a browser
+    # suite flaky: this passed alone and failed inside a batch.
+    page.wait_for_function(
+        "() => localStorage.getItem('theme-pref') === null"
+        " && document.documentElement.getAttribute('data-theme') === 'dark'"
+    )
     assert page.evaluate(STATE) == {"theme": "dark", "mode": "system", "pref": None}
 
 
