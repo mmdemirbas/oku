@@ -139,6 +139,53 @@ def test_the_top_right_chrome_never_overlaps(page, site_url, width):
     assert got["inView"] == got["count"], f"a chrome button sits outside the viewport at {width}px: {got}"
 
 
+def test_the_warning_count_sits_on_the_warning_button(page, site_url):
+    """The badge must belong to the button it counts for.
+
+    It is a `::after` with `position: absolute; top: -4px; right: -4px`,
+    and the button it hangs off was `position: static` — the cluster sets
+    that so the flex row does the laying out. So the badge resolved
+    against the CLUSTER, landing at the row's top-right corner over the
+    width toggle and reading as that button's badge. Measured before the
+    fix: cluster [1040,16,224,44], warning button [1100,16,44,44], badge
+    pinned to 1264 rather than 1144.
+
+    Asserted as the containing block rather than as a pixel, because a
+    pixel would only say where it landed today. `::after` has no
+    boundingBox, so the question the test can actually ask is whether the
+    button establishes one.
+    """
+    page.set_viewport_size({"width": 1280, "height": 900})
+    _goto(page, f"{site_url}/docs/architecture.html")
+    page.wait_for_timeout(600)
+    got = page.evaluate(
+        """() => new Promise(resolve => {
+            window.dispatchEvent(new CustomEvent('oku:warnings', {
+                detail: [{code: 'a', msg: 'one'}, {code: 'b', msg: 'two'}],
+            }));
+            setTimeout(() => {
+                const btn = document.querySelector('.ctrl-btn.warning-indicator');
+                if (!btn) return resolve({shown: false});
+                const after = getComputedStyle(btn, '::after');
+                resolve({
+                    shown: getComputedStyle(btn).display !== 'none',
+                    count: btn.getAttribute('data-count'),
+                    position: getComputedStyle(btn).position,
+                    badgePosition: after.position,
+                });
+            }, 500);
+        })"""
+    )
+
+    assert got["shown"], f"the warning indicator never appeared: {got}"
+    assert got["count"] == "2", got
+    assert got["badgePosition"] == "absolute", got
+    assert got["position"] != "static", (
+        "the warning button establishes no containing block, so its count badge "
+        f"hangs off the chrome cluster instead: {got}"
+    )
+
+
 _MAIN_BOX = """() => { const r = document.querySelector('main').getBoundingClientRect();
                        return [Math.round(r.x), Math.round(r.width),
                                Math.round(window.innerWidth - r.right)]; }"""

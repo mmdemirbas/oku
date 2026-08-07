@@ -4533,6 +4533,14 @@ body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
   color: var(--warning);
   background: var(--warning-soft);
   border-color: var(--warning);
+  /* The count badge below is absolutely positioned against this button.
+     `.okt-chrome-cluster .ctrl-btn` sets `position: static` so the row
+     lays the buttons out, which left the badge resolving against the
+     CLUSTER instead — it landed at the cluster's top-right corner, over
+     the width toggle, reading as that button's badge. Same specificity
+     as the cluster rule and later in the file, so this wins on order.
+     Pinned by test_the_warning_count_sits_on_the_warning_button. */
+  position: relative;
 }
 .ctrl-btn.warning-indicator::after {
   content: attr(data-count);
