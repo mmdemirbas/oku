@@ -180,3 +180,45 @@ class TestDottedNamesDoNotCollide:
     def test_the_source_sibling_of_a_dotted_page_resolves_back(self, tmp_path: Path):
         assert cli._source_sibling(Path("docs/index.tr.json")) == Path("docs/index.tr.md")
         assert cli._source_sibling(Path("docs/index.html")) == Path("docs/index.md")
+
+
+class TestDerivedStringsFollowThePage:
+    def test_the_reading_estimate_is_written_in_the_page_language(self, tmp_path: Path):
+        """The one derived value that is words rather than a number or a
+        date, so the one that reads as a mistake on a translated page: a
+        Turkish cover carrying "~17 min read" under a Turkish title."""
+        root = tmp_path / "docs"
+        root.mkdir(parents=True)
+        (root / "kit.json").write_text(KIT, encoding="utf-8")
+        body = "---\ntitle: T\nsummary: s\n---\n\n## S {#s}\n\n" + ("kelime " * 3000) + "\n"
+        (root / "long.md").write_text(body, encoding="utf-8")
+        (root / "long.tr.md").write_text(body, encoding="utf-8")
+
+        en = cli._page_from_source_file(root / "long.md")
+        tr = cli._page_from_source_file(root / "long.tr.md")
+
+        assert "min read" in en["m"]["read_time"], en["m"]["read_time"]
+        assert "dakikalık okuma" in tr["m"]["read_time"], tr["m"]["read_time"]
+
+    def test_a_monolingual_tree_stays_english(self, tmp_path: Path):
+        root = tmp_path / "docs"
+        root.mkdir(parents=True)
+        (root / "kit.json").write_text('{"domains":[]}', encoding="utf-8")
+        (root / "long.md").write_text(
+            "---\ntitle: T\nsummary: s\n---\n\n## S {#s}\n\n" + ("word " * 3000) + "\n",
+            encoding="utf-8",
+        )
+
+        page = cli._page_from_source_file(root / "long.md")
+
+        assert "min read" in page["m"]["read_time"]
+
+    def test_an_undeclared_language_falls_back_rather_than_guessing(self, tmp_path: Path):
+        root = tmp_path / "docs"
+        root.mkdir(parents=True)
+        (root / "kit.json").write_text('{"languages":["en","de"]}', encoding="utf-8")
+
+        assert cli._page_language(root / "page.de.md") == "de"
+        # Declared, but with no phrase of its own: English rather than a guess.
+        page = {"k": "page", "b": ["wort " * 3000]}
+        assert "min read" in cli._read_time_for(page, "de")

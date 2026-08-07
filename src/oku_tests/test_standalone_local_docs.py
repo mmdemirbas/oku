@@ -143,6 +143,37 @@ class TestCollectLocalDocs:
         assert docs == {}
         assert skipped == ["big.md"]
 
+    def test_an_href_inside_backticks_is_a_quotation_not_a_link(self, tmp_path: Path) -> None:
+        """Documenting the viewer made the build warn about the examples
+        that explain it: a table cell reading `<a href="notes/plan.md">`
+        was collected as a link to a file nobody had written. The
+        renderer never turns a code span into an anchor, so the build
+        has nothing to inline for one."""
+        page = _page('Write `<a href="notes/plan.md">` in an island, or `[plan](/notes/plan.md)` in prose.\n')
+
+        docs, skipped = cli.collect_local_docs(page, tmp_path / "index.html", tmp_path)
+
+        assert docs == {}
+        assert skipped == []
+
+    def test_an_href_inside_a_fenced_sample_is_not_collected(self, tmp_path: Path) -> None:
+        page = _page('Example:\n\n```html\n<a href="/notes/plan.md">plan</a>\n```\n')
+
+        docs, skipped = cli.collect_local_docs(page, tmp_path / "index.html", tmp_path)
+
+        assert docs == {}
+        assert skipped == []
+
+    def test_a_real_link_beside_a_quoted_one_is_still_collected(self, tmp_path: Path) -> None:
+        """Stripping code must not swallow the prose around it."""
+        (tmp_path / "plan.md").write_text("# P\n", encoding="utf-8")
+        page = _page('Shown as `<a href="other.md">`, and live here: <a href="plan.md">plan</a>\n')
+
+        docs, skipped = cli.collect_local_docs(page, tmp_path / "index.html", tmp_path)
+
+        assert list(docs) == ["plan.md"], docs
+        assert skipped == []
+
     def test_a_remote_url_is_left_alone(self, tmp_path: Path) -> None:
         page = _page('<p><a href="https://example.com/README.md">x</a></p>')
 

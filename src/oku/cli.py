@@ -749,7 +749,30 @@ def _tree_defaults(source: Path) -> dict:
     return {}
 
 
-def _read_time_for(page: dict) -> str | None:
+# The one derived value that is WORDS rather than a number or a date,
+# so it is the one that reads as a mistake on a translated page: a
+# Turkish cover carrying "~17 min read" under a Turkish title. A code
+# with no entry falls back to English rather than guessing.
+_READ_TIME_PHRASE = {
+    "en": "~{n} min read",
+    "tr": "~{n} dakikalık okuma",
+}
+
+
+def _page_language(source: Path) -> str:
+    """The language a source file is written in, from its name suffix.
+
+    Only a code the tree DECLARES counts, so `format-comparison.md` is
+    not read as language `comparison`.
+    """
+    codes, default = declared_languages(source.parent)
+    if not codes:
+        return "en"
+    _, lang = split_language_suffix(source.stem, codes)
+    return lang or default
+
+
+def _read_time_for(page: dict, lang: str = "en") -> str | None:
     """A reading estimate from the body, or None when the page is short
     enough that the estimate says nothing."""
     words = 0
@@ -761,7 +784,10 @@ def _read_time_for(page: dict) -> str | None:
             # their prose at a discount rather than not at all.
             words += len(json.dumps(blk, ensure_ascii=False).split()) // 2
     minutes = round(words / _WORDS_PER_MINUTE)
-    return f"~{minutes} min read" if minutes >= _MIN_READ_MINUTES else None
+    if minutes < _MIN_READ_MINUTES:
+        return None
+    phrase = _READ_TIME_PHRASE.get(lang, _READ_TIME_PHRASE["en"])
+    return phrase.format(n=minutes)
 
 
 def _git_last_modified(p: Path) -> str | None:
@@ -811,7 +837,7 @@ def _apply_meta_defaults(page: dict, source: Path) -> None:
             derived.append(key)
 
     if not meta.get("read_time"):
-        rt = _read_time_for(page)
+        rt = _read_time_for(page, _page_language(source))
         if rt:
             meta["read_time"] = rt
             derived.append("read_time")
@@ -3293,6 +3319,22 @@ _ROOT_ABS_MD_LINK_RE = re.compile(r"\]\((/[^)\s]+?\.md)(?:#[^)\s]*)?\)")
 _ISLAND_MD_HREF_RE = re.compile(r"""href\s*=\s*["']([^"'\s]+?\.md)(?:#[^"']*)?["']""")
 
 
+_FENCE_RE = re.compile(r"(?:^|\n)(`{3,}|~{3,})[^\n]*\n.*?\n\1[ \t]*(?=\n|$)", re.S)
+_INLINE_CODE_RE = re.compile(r"(`+)(?:.|\n)*?\1")
+
+
+def _strip_code(text: str) -> str:
+    """Prose with its code samples and code spans removed.
+
+    An href inside backticks is a QUOTATION of a link, not a link: the
+    renderer never turns it into an anchor, so the build has nothing to
+    inline for it. Without this, documenting the markdown viewer made
+    the build warn about the very examples that explain it —
+    `<a href="notes/plan.md">` in a table cell became a missing file.
+    """
+    return _INLINE_CODE_RE.sub(" ", _FENCE_RE.sub("\n", text))
+
+
 def _iter_strings(node):
     """Every string anywhere in a page dict. Typed blocks carry prose in
     fields of their own (an insight's `b`, a table cell, a callout body),
@@ -3325,6 +3367,7 @@ def collect_local_docs(page_data, src: Path, src_root: Path) -> tuple[dict[str, 
     for text in _iter_strings(page_data):
         if ".md" not in text:
             continue
+        text = _strip_code(text)
         hrefs.extend(_ROOT_ABS_MD_LINK_RE.findall(text))
         hrefs.extend(_ISLAND_MD_HREF_RE.findall(text))
 

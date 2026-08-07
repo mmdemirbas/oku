@@ -6,5 +6,10 @@
   "audience": "Author",
   "domains": ["data-platforms", "web", "ai-llm", "doc-tooling"],
   "lang": "en",
-  "lang_fallback": ["en"]
+  "lang_fallback": ["en"],
+  "languages": [
+    { "code": "en", "label": "English" },
+    { "code": "tr", "label": "Türkçe" }
+  ],
+  "defaultLanguage": "en"
 }
