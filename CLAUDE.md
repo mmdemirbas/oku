@@ -529,6 +529,66 @@ the pass.
 
 `test_md_viewer.py` and `test_standalone_local_docs.py` pin both halves.
 
+**A translation is the same page, not another page.** Authoring is
+`<page>.md` + `<page>.<lang>.md` side by side — no new syntax, each file
+a complete markdown document that still renders on GitHub. `kit.json`
+declares which codes count (`languages`, `defaultLanguage`); without
+that key none of it runs and a monolingual site pays nothing. Not a
+mirrored `docs/tr/` tree: that duplicates the structure, breaks every
+relative link inside a page, and hides the counterpart from anyone
+reading a directory listing.
+
+The **manifest** carries the pairing — each base entry gains `lang` and
+a `variants` map, and the translations leave the tree. It is the carrier
+because it is the one thing that already reaches every page in all three
+modes: fetched under `oku serve` and `dist/site`, inlined in a
+standalone file. Left in the tree, a ten-page site in two languages
+reads as twenty pages. `variants` includes the base itself, so the
+switch has no special case for "where do I go back to".
+
+The button appears **only where there is somewhere to go**, so there is
+no disabled state to explain. Two letters, never a flag (which names a
+country) and never a word (which would have to be written in the
+language the reader has not chosen). It carries the `#fragment` across,
+which is why **a translation's anchors must be identical to its
+original's** — `{#id}` is copied verbatim, and a heading the English
+side leaves to the slugifier gets its id pinned explicitly on the
+translated side, because `slugify` strips non-ASCII.
+
+**No auto-redirect on load.** A reader who opens a URL gets the page at
+that URL; sending them elsewhere breaks the back button and makes a
+shared link mean different things to different people. `oku-lang` stores
+the choice and nothing reads it back yet — the tree still lists base
+pages under base titles. That is the honest state, not a missing step.
+
+Derived values follow the page's language where they are words:
+`read_time` is `~17 dakikalık okuma` on a `.tr` page. A declared
+language with no phrase of its own falls back to English rather than
+guessing. The kit's own chrome (search, viewer, Contents) is still
+English on every page — localizing it is separate work.
+
+**Anything the kit hangs off content must never become content.** Three
+defects of one shape, each of which rendered as a plausible wrong answer
+rather than an error:
+
+- Prism re-highlighting a block that now holds annotation chips and
+  tooltips (see the pitfall below);
+- the shared copy button reading `code.textContent` at click time, so
+  pasting an annotated block gave commentary interleaved with source —
+  `<oku-annotated-code>` publishes `_okuCopyText` behind
+  `data-oku-copy-source` and the copy pass prefers it;
+- table headers cloned into the Cards / List / Board views *after*
+  `wireColResize` had injected `.okt-col-resize` into every `th`, which
+  is `position: absolute` with a `static` parent there and painted a
+  dead full-height resize bar down a view with no columns.
+
+Before reading an element to hand its text to a reader, ask what else
+has been put inside it since it was built. `_okuHeadingText` exists for
+the same reason: six places need a heading's own words, five had grown
+their own copy of the same two removals, search had none (every result
+read `Prose primitives#`) and the TOC's h3 entry patched the symptom
+with a trailing-hash regex.
+
 **A card answers the pointer with light, never with position.** Every
 card kind used to hover with `transform: translateY(-2px)` and the
 Contents tree grew its left padding 8px → 12px. Both take the text with
@@ -610,6 +670,19 @@ variables (`var(--accent)`, `var(--surface)`, `--series-1..10`) and its
 structure from the `.okt-*` classes. Hardcoded hex or an inline
 `<style>` earns `island-hand-styled`, because the hand-rolled copy stops
 following the accent and breaks in the theme nobody was looking at.
+
+**A Mermaid diagram gets its colour from the kit too, and the kit has
+to do the work.** Mermaid's `classDef` / `style` grammar takes CSS
+*values*, not CSS *functions* — there is no production for `(`, so
+`classDef fmt fill:var(--surface-2)` dies with `got '(-'` and the whole
+diagram becomes a parse-error card. `__okuResolveCssVars` substitutes
+the computed value before Mermaid sees the source, at EVERY hand-off
+(parse, first render, and the re-render on `oku:theme-changed`) — not in
+the source cleaning, because `_src` must keep the token the author
+wrote. Resolving at hand-off is what makes the colour track the theme
+instead of freezing at first paint. A token that resolves to nothing is
+left as written: the parse error then names the token, which is more use
+than a silent substitution rendering the wrong colour.
 
 **Hand-drawn figures get their colour from the kit.** An author who
 draws their own SVG — in an HTML island; there is no `svg` fence, the

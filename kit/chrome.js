@@ -11464,6 +11464,46 @@ var __mermaidLoader = (function () {
   return { load: load, reset: reset };
 })();
 
+/* Resolve `var(--token)` in a Mermaid source before Mermaid sees it.
+ *
+ * Mermaid's classDef/style grammar takes CSS *values*, not CSS
+ * *functions* — it has no production for `(`, so
+ *
+ *     classDef fmt fill:var(--surface-2),stroke:var(--border)
+ *
+ * dies with `Expecting 'SEMI', 'NEWLINE', … got '(-'` and the whole
+ * diagram is replaced by a parse-error card. Which put the kit at odds
+ * with its own instruction: every other hand-drawn figure is told to
+ * take its colour from the kit's tokens so it follows the accent and
+ * both themes, and a diagram was the one place that advice did not work.
+ *
+ * Resolved HERE rather than in the source cleaning, so `_src` keeps the
+ * token the author wrote. Every diagram re-renders on
+ * `oku:theme-changed`, so resolving at hand-off means the colours are
+ * re-read per theme instead of frozen at first paint — the token
+ * behaves the way it does everywhere else in the kit.
+ *
+ * A token that resolves to nothing is left as written: the parse error
+ * that follows names the token, which is more use to the author than a
+ * silent substitution that renders the wrong colour. */
+function __okuResolveCssVars(src) {
+  if (!src || src.indexOf('var(--') < 0) return src;
+  var probe = getComputedStyle(document.documentElement);
+  var out = src;
+  // `var(--a, var(--b))` needs more than one pass; the inner group
+  // cannot match across the nested parens.
+  for (var pass = 0; pass < 4 && out.indexOf('var(--') >= 0; pass++) {
+    var before = out;
+    out = out.replace(/var\(\s*(--[\w-]+)\s*(?:,\s*([^()]*?)\s*)?\)/g, function (whole, name, fallback) {
+      var value = (probe.getPropertyValue(name) || '').trim();
+      if (value) return value;
+      return (fallback !== undefined && fallback !== '') ? fallback : whole;
+    });
+    if (out === before) break;
+  }
+  return out;
+}
+
 /* Make every id inside a rendered diagram unique to that diagram.
  *
  * An id is document-global and `url(#name)` resolves through
@@ -11589,10 +11629,10 @@ class OkuDiagram extends HTMLElement {
         // the error path; render() only runs when we know the source
         // is valid.
         var parseOk = typeof mermaid.parse === 'function'
-          ? mermaid.parse(cleanSrc, { suppressErrors: false })
+          ? mermaid.parse(__okuResolveCssVars(cleanSrc), { suppressErrors: false })
           : Promise.resolve();
         return parseOk.then(function () {
-          return mermaid.render(id, cleanSrc);
+          return mermaid.render(id, __okuResolveCssVars(cleanSrc));
         }).then(function (out) {
           renderHost.innerHTML = out.svg;
           __okuNamespaceSvgIds(renderHost.querySelector('svg'), id);
@@ -12029,7 +12069,7 @@ class OkuDiagram extends HTMLElement {
     __mermaidLoader.reset();
     __mermaidLoader.load().then(function (mermaid) {
       var id = 'okd-' + Math.random().toString(36).slice(2, 9);
-      return mermaid.render(id, self._src).then(function (out) {
+      return mermaid.render(id, __okuResolveCssVars(self._src)).then(function (out) {
         renderHost.innerHTML = out.svg;
         var svg = renderHost.querySelector('svg');
         __okuNamespaceSvgIds(svg, id);
