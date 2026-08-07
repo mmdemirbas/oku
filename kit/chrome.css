@@ -77,7 +77,12 @@
   --series-5: #15803d;
   --series-6: #be185d;
   --series-7: #0369a1;
-  --series-8: #65a30d;
+  /* One step darker than the rest of the ramp was written at: every
+     other light-theme series is a 700, this one was a 600, and it was
+     the only colour in either theme under the 3:1 WCAG asks of a
+     graphical object — 2.82 against --surface-2. At 700 it clears on
+     every surface. See test_colour_contrast.py. */
+  --series-8: #4d7c0f;
   --series-9: #7c2d12;
   --series-10: #4b5563;
 }
