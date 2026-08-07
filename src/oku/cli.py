@@ -2221,14 +2221,33 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                         where,
                         f"{empty_kind} has no `{field}`; it renders as a zero-height gap.",
                     )
-            if kind == "table" and not blk.get("rows"):
-                add(
-                    p,
-                    "info",
-                    "empty-table",
-                    where,
-                    "Table has headers but no rows — intentional as an empty state, a mistake otherwise.",
-                )
+            # A table carries its rows either in `rows` or under
+            # `groups[].rows`, and counting only the first reported every
+            # grouped table on the page as empty.
+            if kind == "table":
+                n_rows = len(blk.get("rows") or [])
+                for grp in blk.get("groups") or []:
+                    n_rows += len(grp.get("rows") or [])
+                if not n_rows and not blk.get("headers"):
+                    # No columns and no rows: the renderer emits a
+                    # `<table>` with nothing inside it. There is no empty
+                    # state this could be — unlike the header-only case
+                    # below, which is one.
+                    add(
+                        p,
+                        "error",
+                        "empty-table",
+                        where,
+                        "Table has neither `headers` nor rows; it renders as an empty table element.",
+                    )
+                elif not n_rows:
+                    add(
+                        p,
+                        "info",
+                        "empty-table",
+                        where,
+                        "Table has headers but no rows — intentional as an empty state, a mistake otherwise.",
+                    )
 
             # Prose nested inside typed payloads (step bodies, card
             # bodies, table cells, …) is markdown too — same glossary /

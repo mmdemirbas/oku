@@ -735,6 +735,32 @@ def test_table_without_rows_is_only_an_info(tmp_path: Path) -> None:
     assert len(empty) == 1 and empty[0]["severity"] == "info"
 
 
+def test_a_table_with_nothing_in_it_is_an_error(tmp_path: Path) -> None:
+    """No columns and no rows renders a `<table>` with nothing inside.
+
+    The header-only case above is a legitimate empty state and stays an
+    info; this one cannot be, and at info severity `--strict` could not
+    tell the two apart. Found by mutating every typed fence in the doc
+    tree and asking which mutations no gate reported.
+    """
+    page = {"k": "page", "t": "T", "b": ["## S {#s}\n", {"k": "table"}]}
+    issues = cli.check_pages([(tmp_path / "p.json", page)], tmp_path)
+    empty = _issues_of(issues, code="empty-table")
+    assert len(empty) == 1 and empty[0]["severity"] == "error", issues
+
+
+def test_a_grouped_table_is_not_reported_empty(tmp_path: Path) -> None:
+    """Rows live in `rows` OR under `groups[].rows`, and counting only
+    the first called every grouped table on the page empty."""
+    page = {
+        "k": "page",
+        "t": "T",
+        "b": ["## S {#s}\n", {"k": "table", "headers": ["a"], "groups": [{"t": "G", "rows": [["x"]]}]}],
+    }
+    issues = cli.check_pages([(tmp_path / "p.json", page)], tmp_path)
+    assert _issues_of(issues, code="empty-table") == [], issues
+
+
 def test_heading_level_skip_is_flagged(tmp_path: Path) -> None:
     """The outline is what a screen reader announces and what the TOC
     nests by, so h2 → h4 is a structural defect. Levels are tracked
