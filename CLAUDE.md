@@ -546,6 +546,27 @@ standalone file. Left in the tree, a ten-page site in two languages
 reads as twenty pages. `variants` includes the base itself, so the
 switch has no special case for "where do I go back to".
 
+**Match the manifest path by SUFFIX, never by equality.** Manifest paths
+are relative to the root the manifest was built from, and that root is
+not the same thing in every mode — `reference.html` under `oku serve`,
+`docs/reference.html` in `dist/site` and in the standalone inline — while
+`location.pathname` is `/docs/reference.html` in the first two and an
+absolute filesystem path in the third. Equality against a bare filename
+matched under `oku serve` and nowhere else, so the button worked in
+development and was missing from both things a reader receives.
+Resolving against `__okuDocsRoot` is not the fix either: it doubles the
+prefix in the two modes that already carry it. The suffix match also
+yields the navigation target — strip it off the pathname and the
+remainder is the prefix every variant hangs from.
+
+**Every standalone page inlines the manifest**, not just the entry stub.
+`build_standalone` injects a freshly computed one; before that only the
+stub `oku init` wrote had any, so every other page opened over file://
+with no site tree and no switch. `page-nav`'s standalone branch still
+removes the site tree — a single file has no site to navigate — but it
+builds the language switch before returning, because a variant is the
+file sitting next to it in the same tree.
+
 The button appears **only where there is somewhere to go**, so there is
 no disabled state to explain. Two letters, never a flag (which names a
 country) and never a word (which would have to be written in the
