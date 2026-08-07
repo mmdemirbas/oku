@@ -2443,6 +2443,23 @@ var RAIL_MAG_RADIUS_PX = 46;
 // have to be re-checked against the 9px bar.
 var RAIL_MAG_MAX = 1.6;
 
+/* The stylesheet's `prefers-reduced-motion` block collapses every
+   transition and animation duration, and it cannot reach this: the
+   swell is a transform written from JS on every pointermove, which is
+   neither. A reader who asked the OS for less movement still got a
+   scale tracking their pointer.
+
+   Read live rather than captured. A MediaQueryList's `.matches` is
+   current at every read, so the predicate needs no listener to stay
+   right — but a flip while marks are already swollen leaves them
+   swollen until the next pointer event, so the flip also flattens
+   them. */
+var __okuMotionQuery =
+  typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)')
+    : { matches: false, addEventListener: function () {} };
+function __okuReducedMotion() { return !!__okuMotionQuery.matches; }
+
 // Set by buildRail so the existing rAF-throttled scroll handler can
 // light the current mark without registering a second listener.
 var __okuRailOnScroll = null;
@@ -2684,10 +2701,11 @@ function buildRail() {
      it — which is the failure mode of a dock that reflows, and the
      reason the brief said "without making it hard to use". */
   function magnify(clientX) {
+    var reduced = __okuReducedMotion();
     for (var i = 0; i < buttons.length; i++) {
       var b = buttons[i];
       var d = Math.abs(b._okuX - clientX);
-      var m = d >= RAIL_MAG_RADIUS_PX
+      var m = (reduced || d >= RAIL_MAG_RADIUS_PX)
         ? 1
         : 1 + (RAIL_MAG_MAX - 1) * Math.cos((d / RAIL_MAG_RADIUS_PX) * Math.PI / 2);
       if (m === b._okuMag) continue;
@@ -2733,6 +2751,12 @@ function buildRail() {
     requestAnimationFrame(function () { magPending = false; magnify(lastX); });
   }, { passive: true });
   rail.addEventListener('pointerleave', unmagnify, { passive: true });
+  // Turning the preference on mid-session would otherwise leave
+  // whatever was swollen at the moment of the flip swollen until the
+  // pointer moved again.
+  __okuMotionQuery.addEventListener('change', function (e) {
+    if (e.matches) unmagnify();
+  });
 
   host.addEventListener('mouseover', function (e) {
     var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;

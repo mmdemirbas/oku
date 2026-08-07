@@ -675,6 +675,45 @@ def test_touch_does_not_trigger_the_swell(rendered):
     assert all(abs(v - 1) < 0.001 for v in got), f"touch magnified the rail: {got}"
 
 
+def test_reduced_motion_flattens_the_swell(rail_url, browser):
+    """The stylesheet's `prefers-reduced-motion` block collapses
+    transition and animation durations, and it cannot reach the swell:
+    that is a transform this code writes on every pointermove, which is
+    neither. A reader who asked the OS for less movement still got a
+    scale tracking their pointer.
+
+    The rail must still WORK — it opens, the marks are still buttons,
+    the tooltip still names them. Reduced motion means no animation, not
+    no feature; only the pointer-tracking scale goes.
+    """
+    page = browser.new_page(viewport={"width": 1440, "height": 900}, reduced_motion="reduce")
+    try:
+        page.goto(f"{rail_url}/long.html")
+        page.wait_for_timeout(2200)
+        got = page.evaluate(
+            """async () => {
+            const rail = document.getElementById('oku-rail');
+            const marks = [...document.querySelectorAll('.okt-rail-mark')];
+            const x = marks[3].getBoundingClientRect().x + 7;
+            rail.dispatchEvent(new PointerEvent('pointermove',
+                { clientX: x, clientY: 5, bubbles: true, pointerType: 'mouse' }));
+            await new Promise(r => setTimeout(r, 250));
+            return {
+                mags: marks.map(m => parseFloat(m.style.getPropertyValue('--okt-mag') || '1')),
+                marks: marks.length,
+                clickable: marks.every(m => m.tagName === 'BUTTON'),
+                queryMatches: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+            };
+        }"""
+        )
+        assert got["queryMatches"], "the browser was not emulating reduced motion"
+        assert got["marks"] > 3, got
+        assert all(abs(v - 1) < 0.001 for v in got["mags"]), f"reduced motion still magnified: {got}"
+        assert got["clickable"], "the marks stopped being buttons"
+    finally:
+        page.close()
+
+
 # ---------- the preview ----------
 
 
