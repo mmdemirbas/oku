@@ -168,7 +168,15 @@ def test_hovering_the_table_reveals_the_controls_without_moving_it(rendered):
     }"""
     before = rendered.evaluate(offset)
     rendered.hover("#big tbody tr:first-child td:first-child")
-    rendered.wait_for_timeout(300)
+    # Wait for the fade to FINISH, not for 300ms. A fixed sleep long
+    # enough on an idle machine is not long enough on a loaded one, and
+    # this assertion is about where the table sits once the controls are
+    # up — not about how fast they get there. Same fix already applied to
+    # the theme-expiry and program-line-count tests.
+    rendered.wait_for_function(
+        "() => getComputedStyle(document.querySelector('#big .okt-table-controls')).opacity === '1'",
+        timeout=10000,
+    )
     got = rendered.evaluate(
         """() => {
         const c = document.querySelector('#big .okt-table-controls');
