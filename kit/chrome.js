@@ -1968,6 +1968,26 @@ function appendPermalink(heading, id, label) {
   heading.appendChild(a);
 }
 
+/* A heading's own words, without the chrome the kit hangs off it.
+ *
+ * buildTOC appends `<a class="permalink">#</a>` to every heading and the
+ * TOC prepends a `.num`. Six places need the clean string — the TOC's
+ * h2 and h3 entries, the rail's title / section / sub-section labels,
+ * and in-page search — and each grew its own copy of the same two
+ * removals. The one that did NOT was search, which read textContent
+ * straight and titled every result "Prose primitives#"; the h3 entry
+ * patched the symptom with `.replace(/#$/, '')` instead. One helper, so
+ * the next consumer inherits the rule instead of rediscovering it.
+ */
+function _okuHeadingText(el) {
+  if (!el) return '';
+  var clone = el.cloneNode(true);
+  Array.prototype.forEach.call(clone.querySelectorAll('.permalink, .num'), function (n) {
+    n.remove();
+  });
+  return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 function buildTOC(tocList) {
   if (!tocList) return;
   var sections = document.querySelectorAll('main > section');
@@ -1984,10 +2004,7 @@ function buildTOC(tocList) {
   sections.forEach(function (sec, i) {
     var h2 = sec.querySelector('h2');
     if (!h2) return;
-    var headingText = h2.cloneNode(true);
-    var pre = headingText.querySelector('.num'); if (pre) pre.remove();
-    var pl0 = headingText.querySelector('.permalink'); if (pl0) pl0.remove();
-    if (!headingText.textContent.trim()) return;
+    if (!_okuHeadingText(h2)) return;
     if (!sec.id) sec.id = 'sec-' + i;
 
     appendPermalink(h2, sec.id);
@@ -1995,10 +2012,7 @@ function buildTOC(tocList) {
     tocIndex++;
     var numEl = h2.querySelector('.num');
     var num = numEl ? numEl.textContent.trim() : tocIndex;
-    var titleClone = h2.cloneNode(true);
-    var n = titleClone.querySelector('.num'); if (n) n.remove();
-    var pl = titleClone.querySelector('.permalink'); if (pl) pl.remove();
-    var title = titleClone.textContent.trim();
+    var title = _okuHeadingText(h2);
 
     var li = document.createElement('li');
     li.className = 'toc-h2';
@@ -2021,7 +2035,7 @@ function buildTOC(tocList) {
       var subLi = document.createElement('li');
       var a = document.createElement('a');
       a.href = hashPrefix + h3.id;
-      a.textContent = h3.textContent.replace(/#$/, '').trim();
+      a.textContent = _okuHeadingText(h3);
       subLi.appendChild(a);
       subOl.appendChild(subLi);
     });
@@ -2277,9 +2291,7 @@ function buildRail() {
   // too: the leftmost tick is where the document starts.
   var h1 = document.querySelector('main h1');
   if (h1) {
-    var hc = h1.cloneNode(true);
-    var hp = hc.querySelector('.permalink'); if (hp) hp.remove();
-    var htitle = hc.textContent.trim();
+    var htitle = _okuHeadingText(h1);
     if (htitle) {
       marks.push({ el: h1, kind: 'title', shape: 'bar', label: htitle, tipKind: 'Title' });
     }
@@ -2288,10 +2300,7 @@ function buildRail() {
     var h2 = sec.querySelector('h2');
     var title = '';
     if (h2) {
-      var clone = h2.cloneNode(true);
-      var n = clone.querySelector('.num'); if (n) n.remove();
-      var p = clone.querySelector('.permalink'); if (p) p.remove();
-      title = clone.textContent.trim();
+      title = _okuHeadingText(h2);
     }
     // A section whose h2 is .okt-sr-only (an untitled TL;DR) has no
     // name to show and no shape to contribute.
@@ -2303,9 +2312,7 @@ function buildRail() {
     // otherwise a page of six sections and a page of six sections with
     // thirty sub-headings draw the same picture.
     sec.querySelectorAll(':scope > h3').forEach(function (h3) {
-      var c = h3.cloneNode(true);
-      var pl = c.querySelector('.permalink'); if (pl) pl.remove();
-      var t = c.textContent.trim();
+      var t = _okuHeadingText(h3);
       if (t) marks.push({ el: h3, kind: 'sub', shape: 'bar', label: t, tipKind: 'Sub-section' });
     });
     RAIL_FIGURES.forEach(function (spec) {
@@ -2801,7 +2808,17 @@ function initReadingAids() {
       host.appendChild(btn);
       btn.addEventListener('click', function () {
         var code = pre.querySelector('code');
-        var text = code ? code.textContent : pre.textContent;
+        // What the reader wants is the PROGRAM, and by click time the
+        // code element may hold more than that. <oku-annotated-code>
+        // puts its marker chips and its hover tooltips — the full
+        // annotation prose — inside <code>, so textContent handed over
+        // the commentary interleaved with the source and what got
+        // pasted did not parse. An element that knows its own source
+        // publishes it; everything else reads the DOM as before.
+        var owner = pre.closest('[data-oku-copy-source]');
+        var text = (owner && typeof owner._okuCopyText === 'string')
+          ? owner._okuCopyText
+          : (code ? code.textContent : pre.textContent);
         navigator.clipboard.writeText(text).then(function () {
           btn.innerHTML = ICON_CHECK;
           btn.classList.add('copied'); btn.classList.remove('error');
@@ -2994,7 +3011,24 @@ function initReadingAids() {
       });
     })();
 
-    var headers = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) { return th.innerHTML; });
+    /* The header markup, minus the chrome the pass above put into it.
+     *
+     * These strings are cloned into the Cards, List and Board views as
+     * key labels. Read raw, every one of them carried a trailing
+     * `<span class="okt-col-resize">` — which is `position: absolute`
+     * with a `static` parent there, so it resolved against
+     * .okt-table-wrap and painted a full-height ew-resize bar at the
+     * right edge of a view that has no columns. Dead as well as wrong:
+     * a string clone carries none of the drag listeners.
+     *
+     * Cloned rather than read before wireColResize runs, because any
+     * future header decoration has the same problem and the same fix
+     * should already cover it. */
+    var headers = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
+      var copy = th.cloneNode(true);
+      Array.prototype.forEach.call(copy.querySelectorAll('.okt-col-resize'), function (n) { n.remove(); });
+      return copy.innerHTML;
+    });
     var colCount = headers.length || (function () {
       var fr = table.querySelector('tr');
       return fr ? fr.children.length : 0;
@@ -12074,6 +12108,11 @@ class OkuAnnotatedCode extends HTMLElement {
 
     this.innerHTML = '';
     this.classList.add('okc-anno-wrap');
+    // The program, kept out of the DOM the decoration goes into. The
+    // shared copy button reads this instead of `code.textContent`,
+    // which by then also holds the chips and the tooltip prose.
+    this.setAttribute('data-oku-copy-source', '');
+    this._okuCopyText = code;
 
     var pre = document.createElement('pre');
     var codeEl = document.createElement('code');
@@ -13330,7 +13369,12 @@ var __okuSearch = (function () {
         ? sec
         : sec.querySelector(':scope > h2, :scope > h3');
       if (!heading) return;
-      var headingText = (heading.textContent || '').replace(/\s+/g, ' ').trim();
+      // Clone and strip, the way the TOC and the rail already do.
+      // buildTOC appends `<a class="permalink">#</a>` to every heading,
+      // so reading textContent straight off it titled every result
+      // "Prose primitives#" — and made a query of "#" report one match
+      // per heading on the page.
+      var headingText = _okuHeadingText(heading);
       // Walk the section's text and look for matches.
       var scopeEl = sec.tagName.toLowerCase().startsWith('h')
         ? (function () {
