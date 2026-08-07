@@ -483,3 +483,65 @@ class TestBuiltMarker:
         once = cli._mark_built("<html><head><title>t</title></head><body></body></html>")
         assert once.count("window.__okuBuilt=1") == 1
         assert cli._mark_built(once) == once
+
+
+class TestPayloadBudget:
+    """The kit's own weight, asserted rather than assumed.
+
+    Every reader downloads chrome.js + chrome.css + renderer.js, and a
+    standalone page carries all three inline, so this is the one number
+    that scales with nothing the author writes. It had no ceiling: the
+    repo's stated rule is that a rule which is not a numeric assertion is
+    not a rule yet, and page weight was carrying no assertion at all.
+
+    These budgets are not targets. They sit close above today so that
+    ordinary work never trips them and a step change does. Raising one is
+    a decision — make it deliberately, in a commit that says what was
+    bought with the bytes.
+    """
+
+    # 1,036 KB today. The gap is headroom for a feature, not for drift.
+    KIT_BUDGET_BYTES = 1_150_000
+    # A standalone page is the kit plus its own content; this page's
+    # content is 45 KB of it. The ceiling is what the kit costs plus a
+    # generous page.
+    STANDALONE_BUDGET_BYTES = 1_400_000
+
+    KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
+
+    def test_the_kit_payload_stays_under_budget(self) -> None:
+        kit = Path(__file__).resolve().parents[2] / "kit"
+        sizes = {n: (kit / n).stat().st_size for n in self.KIT_FILES}
+        total = sum(sizes.values())
+        assert total <= self.KIT_BUDGET_BYTES, (
+            f"kit payload is {total:,} bytes, over the {self.KIT_BUDGET_BYTES:,} budget. "
+            f"Per file: { {k: f'{v:,}' for k, v in sizes.items()} }. "
+            "Raise the budget deliberately, or find the weight."
+        )
+
+    def test_a_standalone_page_stays_under_budget(self, tmp_path: Path) -> None:
+        """A standalone file is what a reader is handed for offline
+        reading, and it inlines the whole kit. Nothing measured its
+        size, so a doubling would have shipped silently."""
+        (tmp_path / "page.md").write_text(
+            "---\ntitle: T\nsummary: S\n---\n\n## S {#s}\n\nBody text.\n", encoding="utf-8"
+        )
+        out = tmp_path / "standalone"
+        cli.build_standalone(cli.iter_page_stubs(tmp_path), out, tmp_path)
+        built = out / "page.html"
+        size = built.stat().st_size
+        assert size <= self.STANDALONE_BUDGET_BYTES, (
+            f"a standalone page is {size:,} bytes, over the {self.STANDALONE_BUDGET_BYTES:,} budget."
+        )
+
+    def test_the_budget_is_not_slack(self) -> None:
+        """A ceiling far above the thing it measures reports success
+        forever. This fails if the kit ever shrinks enough to make the
+        budget meaningless — at which point lower it and keep the gate
+        working."""
+        kit = Path(__file__).resolve().parents[2] / "kit"
+        total = sum((kit / n).stat().st_size for n in self.KIT_FILES)
+        assert total >= self.KIT_BUDGET_BYTES * 0.6, (
+            f"kit payload is {total:,} bytes against a {self.KIT_BUDGET_BYTES:,} budget — "
+            "the ceiling is now so far above the floor that it can never fail. Lower it."
+        )
