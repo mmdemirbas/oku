@@ -100,6 +100,20 @@ Flow / share between stages. Use for funnels, energy, traffic.
 {"code":{"k":"code","src":"sankey-beta\n\nVisitors,Signups,40\nVisitors,Bounced,60\nSignups,Activated,25\nSignups,Dropped,15","lang":"mermaid"},"output":{"k":"diagram","src":"sankey-beta\n\nVisitors,Signups,40\nVisitors,Bounced,60\nSignups,Activated,25\nSignups,Dropped,15"}}
 ```
 
+> [!WARNING] Sankey labels have to be ASCII
+> Mermaid v10 reads the sankey body as CSV, and that grammar rejects a
+> non-ASCII character in a label whether it is quoted or not.
+> `Ziyaretçiler,Kayıtlar,40` fails with `Parse error on line 2`, and
+> `"Ziyaretçiler","Kayıtlar",40` fails the same way; the block renders as
+> the kit's error card carrying the source. `Ziyaretciler,Kayitlar,40`
+> parses. Spaces inside a label are fine — `Visitor Count,Sign Ups,40`
+> renders.
+>
+> The limit is Mermaid's, not the kit's, and it is specific to this
+> diagram type: a flowchart node reading `A[Ziyaretçiler]` renders
+> without complaint. Transliterate the labels, or pick a diagram type
+> that accepts them.
+
 ## Drawing your own {#hand-drawn}
 
 Mermaid covers topology. When the figure needs a real axis, a before /

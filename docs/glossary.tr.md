@@ -10,6 +10,7 @@ summary: Çok alanlı sözlük mimarisi ve nasıl genişletileceği.
 > [!TLDR]
 > Sözlük ve dış kaynak kayıtları _oku/glossary/ ve _oku/extrefs/ altında alan başına ayrı dosyalarda durur. Her projenin kit.json dosyası bu alanların bir alt kümesini öncelik sırasıyla etkinleştirir ve yerel değiştirmeler ekleyebilir. Çözümleme etkin alanları sırayla gezer, yeğlenen diller boyunca geriye düşer, bilinmeyenleri ileri uyumluluk uyarı göstergesiyle görünür kılar.
 >
+> - Bir sayfa, kaydı markdown bağlantısıyla anar — sözlük terimi için [ACID](#g/ACID), dış kaynak için [Pagefind](#x/Pagefind).
 > - Alan başına dosya — veri platformlarındaki ACID ile kimyadaki ACID ayrı, adhd alanındaki RSD ile telsizdeki RSD ayrı.
 > - Kayıt başına çok dilli değişkeler — { "en": {...}, "tr": {...} }. Asıl bağlantı dile göre değişebilir.
 > - Projenin kit.json dosyası etkin alanları, yeğlenen dili ve projeye özgü kayıtları bildirir. Çakışmada yerel kayıt her zaman kazanır.
@@ -106,18 +107,42 @@ Her projenin docs/kit.json dosyası hangi alanların hangi öncelik sırasıyla 
 > [!TIP] Çakışmada yerel kayıt her zaman kazanır
 > Aynı terim hem `kit.json` içindeki `glossary["data-platforms"]` altında hem de merkezî `_oku/glossary/data-platforms.json` dosyasında geçtiğinde projedeki sürüm kullanılır. Birleştirme merkezî dosya yüklendikten sonra yapıldığından, sonradan gelen bir kayıt defteri isteği proje değiştirmesini sessizce silmez.
 
-## Ayrım — aynı terim, farklı alanlar {#disambiguation}
+## Bir kaydı sayfadan anmak {#usage}
 
-İki etkin alan aynı terimi tanımladığında yazar in özniteliğiyle bunu nitelendirebilir. Öntanımlı davranış "eşleşen ilk alan kazanır" olduğundan kullanımın çoğu niteliksizdir.
+Markdown sayfası, kayıt defterindeki bir girdiyi, href'i kit önekiyle başlayan sıradan bir bağlantıyla anar: sözlük için `#g/`, dış kaynaklar için `#x/`. Etiket görünen metindir, önekten sonraki kimlik ise kayıt anahtarıdır.
 
-```json
-// In page JSON, inside a paragraph.content array:
-{ "kind": "glossary-term", "term": "ACID" }                       // first match wins
-{ "kind": "glossary-term", "term": "ACID", "in": "chemistry" }    // explicit
-{ "kind": "glossary-term", "term": "ACID", "lang": "tr" }         // override language
+```text
+Tanım kartı için [ACID](#g/ACID) üzerine gelin.
+[Pagefind](#x/Pagefind) ile çalışır — kaynağı açmak için karta tıklayın.
 ```
 
-`in` özniteliği aramayı tek bir alanla sınırlar, o alan projenin domains listesinde ilk sırada olmasa bile. `lang` özniteliği ise o kullanım için projenin yeğlediği dili geçersiz kılar — TR öntanımlı bir projede tek bir terimin İngilizce kaynaklı bir göndermeye ihtiyaç duyduğu durumlarda işe yarar.
+`renderLink` bunları `<glossary-term term="ACID">` ve `<ext-ref name="Pagefind">` ögelerine çevirir. Sonrasındaki her şey — çözümleme, ipucu balonu, bilinmeyen girdi uyarısı — ortaktır; iki önek yalnızca hangi kayıt defterinde arandığıyla ayrışır.
+
+JSON sayfaları aynı anmayı, bir paragrafın `content` dizisi içinde satır içi nesne olarak taşır:
+
+```json
+{ "kind": "paragraph", "content": [
+  "Tanım kartı için ",
+  { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
+  " üzerine gelin."
+] }
+```
+
+v1 uyarlayıcısı bu nesneyi, renderer sayfayı gezmeden önce `[ACID](#g/ACID)` hâline getirir; böylece iki biçim de aynı ögeye varır. Dış kaynak karşılığı `{ "kind": "ext-ref", "name": "Pagefind" }` şeklindedir.
+
+## Ayrım — aynı terim, farklı alanlar {#disambiguation}
+
+İki etkin alan aynı terimi tanımladığında varsayılan davranış "eşleşen ilk alan kazanır"dır ve bağlantı biçimiyle yapılan anma da bunu ister. Tek bir anmayı nitelemek için öge üzerinde iki öznitelik vardır: `in` aramayı tek bir alanla sınırlar, `lang` ise o örnek için projenin yeğlediği dili geçersiz kılar — varsayılanı Türkçe olan bir projede tek bir terimin İngilizce kaynağa dayanması gerektiğinde işe yarar.
+
+Bağlantı biçimi yalnızca kimliği taşır; bu yüzden nitelenmiş bir anma, ögenin kendisini bir HTML adacığında yazar:
+
+```text
+<p>Aynı sözcüğün iki anlamı:
+<glossary-term term="ACID" in="data-platforms">ACID</glossary-term> ve
+<glossary-term term="ACID" in="chemistry">ACID</glossary-term>.</p>
+```
+
+`in` özniteliği alan sırasını yener — projenin domains listesinde ilk sırada olmayan bir alana da ulaşır.
 
 ## Çözümleme algoritması {#resolution}
 

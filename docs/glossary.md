@@ -11,6 +11,7 @@ summary: Multi-domain glossary architecture and how to extend it.
 > Glossary and ext-ref entries live in per-domain files under _oku/glossary/ and _oku/extrefs/. Each project's kit.json activates a subset of domains in priority order and can add local overrides. Resolution walks active domains, falls back through preferred languages, surfaces unknowns via the forward-compat warning indicator.
 >
 > - Per-domain files — separate ACID in data-platforms from ACID in chemistry, separate RSD in adhd from RSD in radio.
+> - A page references an entry with a markdown link — [ACID](#g/ACID) for a glossary term, [Pagefind](#x/Pagefind) for an ext-ref.
 > - Per-entry multi-language variants — { "en": {...}, "tr": {...} }. The canonical link can differ per language.
 > - Project kit.json declares active domains + preferred language + project-local entries. Local entries always win on conflict.
 > - Unknown terms surface in the forward-compat warning indicator; add the entry to project kit.json or push to central.
@@ -106,18 +107,42 @@ Each project's docs/kit.json declares which domains are active and in what prior
 > [!TIP] Local entries always win on conflict
 > When the same term appears in both `kit.json`'s `glossary["data-platforms"]` AND in the central `_oku/glossary/data-platforms.json`, the project version is used. Merge happens after the central file loads, so a project override is never silently discarded by a later registry fetch.
 
-## Disambiguation — same term, different domains {#disambiguation}
+## Referencing an entry from a page {#usage}
 
-When two active domains define the same term, the author can qualify with the in attribute. Default behavior is "first matching domain wins" so most usage is unqualified.
+A markdown page cites a registry entry with an ordinary link whose href carries a kit prefix: `#g/` for the glossary, `#x/` for ext-refs. The label is the visible text, the id after the prefix is the registry key.
 
-```json
-// In page JSON, inside a paragraph.content array:
-{ "kind": "glossary-term", "term": "ACID" }                       // first match wins
-{ "kind": "glossary-term", "term": "ACID", "in": "chemistry" }    // explicit
-{ "kind": "glossary-term", "term": "ACID", "lang": "tr" }         // override language
+```text
+Hover [ACID](#g/ACID) for the definition card.
+Powered by [Pagefind](#x/Pagefind) — click the card to open the source.
 ```
 
-The `in` attribute restricts lookup to one domain even if it's not first in the project's domains list. The `lang` attribute overrides the project's preferred language for that instance — useful when one term in a TR-default project needs an English-source citation.
+`renderLink` rewrites those into `<glossary-term term="ACID">` and `<ext-ref name="Pagefind">`. Everything downstream — resolution, tooltip, the unknown-entry warning — is shared, so the two prefixes differ only in which registry they search.
+
+JSON pages carry the same reference as an inline object inside a paragraph's `content` array:
+
+```json
+{ "kind": "paragraph", "content": [
+  "Hover ",
+  { "kind": "glossary-term", "term": "ACID", "text": "ACID" },
+  " for the definition card."
+] }
+```
+
+The v1 shim rewrites that object to `[ACID](#g/ACID)` before the renderer walks the page, so both forms land on the same element. `{ "kind": "ext-ref", "name": "Pagefind" }` is the ext-ref counterpart.
+
+## Disambiguation — same term, different domains {#disambiguation}
+
+When two active domains define the same term, the default is "first matching domain wins", and that is what a link-form reference asks for. Two attributes on the element qualify a single reference: `in` restricts lookup to one domain, `lang` overrides the project's preferred language for that instance — useful when one term in a TR-default project needs an English-source citation.
+
+The link form carries the id alone, so a qualified reference writes the element itself in an HTML island:
+
+```text
+<p>Two senses of the same word:
+<glossary-term term="ACID" in="data-platforms">ACID</glossary-term> and
+<glossary-term term="ACID" in="chemistry">ACID</glossary-term>.</p>
+```
+
+The `in` attribute wins over domain order — it reaches a domain that is not first in the project's domains list.
 
 ## Resolution algorithm {#resolution}
 

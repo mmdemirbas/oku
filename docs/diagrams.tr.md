@@ -100,6 +100,13 @@ Aşamalar arasında akış / pay. Huniler, enerji, trafik için kullanın.
 {"code":{"k":"code","src":"sankey-beta\n\nGelenler,Abone olanlar,40\nGelenler,Terk edenler,60\nAbone olanlar,Kullananlar,25\nAbone olanlar,Elenenler,15","lang":"mermaid"},"output":{"k":"diagram","src":"sankey-beta\n\nGelenler,Abone olanlar,40\nGelenler,Terk edenler,60\nAbone olanlar,Kullananlar,25\nAbone olanlar,Elenenler,15"}}
 ```
 
+> [!WARNING] Sankey etiketleri ASCII olmak zorunda
+> Mermaid v10 sankey gövdesini CSV olarak okur ve bu dilbilgisi, tırnak içinde olsun olmasın, etiketteki ASCII dışı karakteri reddeder.
+> `Ziyaretçiler,Kayıtlar,40` `Parse error on line 2` ile başarısız olur; `"Ziyaretçiler","Kayıtlar",40` da aynı şekilde. Blok, kaynağı taşıyan hata kartı olarak görünür.
+> `Ziyaretciler,Kayitlar,40` ayrıştırılır. Etiket içindeki boşluk sorun değildir — `Visitor Count,Sign Ups,40` çalışır.
+> Kısıt Mermaid'e aittir, kite değil: aynı sayfadaki `flowchart` düğüm etiketleri Türkçe harfleri sorunsuz taşır.
+> İki çıkış yolu var — etiketi aksansız yazmak (yukarıdaki örnek bunu yapıyor), ya da başka bir şema türü seçmek.
+
 ## Kendi şemanızı çizmek {#hand-drawn}
 
 Mermaid topolojiyi karşılar. Şeklin gerçek bir eksene, önce / sonra
