@@ -1600,6 +1600,13 @@ _MD_HEADING_LINE_RE = re.compile(r"^(#{1,6})\s+(.*?)(?:\s*\{#([A-Za-z][\w-]*)\})
 # so unresolved ones were never reported.
 _MD_GLOSS_REF_RE = re.compile(r"\]\(#g/([^)\n]+?)\)")
 _MD_EXTREF_REF_RE = re.compile(r"\]\(#x/([^)\n]+?)\)")
+# Every inline-link destination, with the optional title dropped. Images
+# share the syntax and are collected too: a src that resolves nowhere is
+# the same defect wearing a different tag.
+_MD_LINK_TARGET_RE = re.compile(r"\]\(\s*<?([^)\s<>]+?)>?(?:\s+[\"'(][^\n]*?)?\s*\)")
+# A destination the kit does not own: another origin, a registry
+# reference (checked separately), or a data URI.
+_FOREIGN_HREF_RE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//|#g/|#x/)", re.I)
 _MD_SETEXT_EQ_RE = re.compile(r"^=+\s*$")
 _MD_HR_RE = re.compile(r"^-{3,}\s*$")
 _MD_HTML_ISLAND_RE = re.compile(r"^</?([a-zA-Z][\w-]*)(?:[\s/>]|$)")
@@ -1648,6 +1655,25 @@ def _iter_block_strings(obj):
             if key in _PROSE_SKIP_KEYS:
                 continue
             yield from _iter_block_strings(v)
+
+
+def _iter_block_hrefs(obj):
+    """Yield every `href` value nested anywhere inside a typed block.
+
+    A compare-card, a step card and a table row can each carry one, and
+    `compare-grid`'s preview mechanism depends on the href resolving to
+    an in-page anchor — so an href that lands nowhere costs a figure,
+    not just a click.
+    """
+    if isinstance(obj, list):
+        for x in obj:
+            yield from _iter_block_hrefs(x)
+    elif isinstance(obj, dict):
+        for key, v in obj.items():
+            if key == "href" and isinstance(v, str):
+                yield v
+            else:
+                yield from _iter_block_hrefs(v)
 
 
 def _split_md_fences(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, str, str]]]:
@@ -2084,6 +2110,12 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 f"Demo page '{p.name}' is forbidden — fold the example into docs/primitives.json instead.",
             )
 
+    # Anchors and link destinations are collected per page here and
+    # resolved after the loop, because a link can cross pages and the
+    # target's anchors are not known until every page has been read.
+    anchors_by_page: dict[Path, set[str]] = {}
+    links_by_page: dict[Path, list[tuple[str, str]]] = {}
+
     # Per-page passes — every rule below reads the v2 shape (k/t/m/b).
     # Legacy v1 pages are shimmed through _v1_to_v2 first so the lint
     # surface is format-independent: a page authored as markdown, v2
@@ -2126,6 +2158,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         seen_ids: dict[str, int] = {}
         gloss_refs: list[tuple[str, str]] = []
         extref_refs: list[tuple[str, str]] = []
+        link_refs: list[tuple[str, str]] = []
         # Footnote / link-reference definitions resolve page-wide, so they
         # are collected before any string is linted.
         fn_defs, link_defs = _md_reference_definitions([b for b in body if isinstance(b, str)])
@@ -2160,6 +2193,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     seen_ids[hid] = seen_ids.get(hid, 0) + 1
                 gloss_refs.extend((where, t) for t in gloss)
                 extref_refs.extend((where, x) for x in x_refs)
+                link_refs.extend((where, h) for h in _MD_LINK_TARGET_RE.findall(_INLINE_CODE_RE.sub("", blk)))
                 continue
             if not isinstance(blk, dict):
                 add(p, "error", "invalid-block", where, "Block must be a markdown string or a typed object.")
@@ -2252,10 +2286,12 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             # Prose nested inside typed payloads (step bodies, card
             # bodies, table cells, …) is markdown too — same glossary /
             # ext-ref resolution and process-prose rules.
+            link_refs.extend((where, h) for h in _iter_block_hrefs(blk))
             for s in _iter_block_strings(blk):
                 s_refs = _INLINE_CODE_RE.sub("", s)
                 gloss_refs.extend((where, t) for t in _MD_GLOSS_REF_RE.findall(s_refs))
                 extref_refs.extend((where, x) for x in _MD_EXTREF_REF_RE.findall(s_refs))
+                link_refs.extend((where, h) for h in _MD_LINK_TARGET_RE.findall(s_refs))
                 if not is_materialised:
                     for pat in _FORBIDDEN_PROSE_PATTERNS:
                         m = pat.search(s)
@@ -2268,6 +2304,9 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                                 f"Prose contains process/history reference {m.group(0)!r}; the kit documents current behaviour only.",
                             )
                             break
+
+        anchors_by_page[p] = set(seen_ids)
+        links_by_page[p] = link_refs
 
         # 8. Glossary + ext-ref resolution — every inline reference
         # must land on an entry the kit knows about.
@@ -2319,7 +2358,63 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             for issue in _presentation_issues(page, _tree_defaults(p)):
                 add(p, *issue)
 
-    # 11. Accent consistency, per tree. Cross-page, so it runs after the
+    # 11. Link destinations. Glossary and ext-ref ids were resolved
+    # above; every OTHER local destination was unchecked, so a heading
+    # renamed on one page left a dead `#anchor` on another with nothing
+    # to report it. Cross-page, because `guide.md#setup` needs the
+    # target page's anchors and those are only known now.
+    #
+    # Warning rather than error: a page can legitimately link into a
+    # tree this run was not pointed at, and a linter that blocks a build
+    # over a link it cannot see is one authors switch off.
+    # Keyed by the RESOLVED path: a page path and a path built from a
+    # link are the same file by two routes, and on macOS the temp root
+    # alone (/var vs /private/var) is enough to make them compare unequal
+    # — which silently turned every cross-page anchor check into a
+    # file-exists check.
+    anchors_by_target = {k.resolve(): v for k, v in anchors_by_page.items()}
+    for p, refs in links_by_page.items():
+        for where, href in refs:
+            if not href or _FOREIGN_HREF_RE.match(href):
+                continue
+            file_part, _, frag = href.partition("#")
+            if not file_part:
+                if frag and frag not in anchors_by_page.get(p, set()):
+                    add(
+                        p,
+                        "warning",
+                        "unresolved-anchor",
+                        f"{where} #{frag}",
+                        f"Link points at '#{frag}', which is not a heading id on this page.",
+                    )
+                continue
+            if file_part.startswith("/"):
+                continue  # root-absolute: relative to the served root, not to us
+            target = (p.parent / file_part).resolve()
+            # `foo.md` and `foo.html` both name the page whose virtual
+            # path is `foo.json`; renderLink rewrites the first to the
+            # second, so both have to resolve to the same entry.
+            page_key = target.with_suffix(".json")
+            if page_key in anchors_by_target:
+                if frag and frag not in anchors_by_target[page_key]:
+                    add(
+                        p,
+                        "warning",
+                        "unresolved-anchor",
+                        f"{where} {href}",
+                        f"Link points at '#{frag}' on {file_part}, which has no such heading id.",
+                    )
+                continue
+            if not target.exists():
+                add(
+                    p,
+                    "warning",
+                    "unresolved-link",
+                    f"{where} {href}",
+                    f"Link target '{file_part}' does not exist relative to this page.",
+                )
+
+    # 12. Accent consistency, per tree. Cross-page, so it runs after the
     # per-page loop. A tree with a different accent on every page is not
     # a design; the fix is one line in kit.json.
     by_tree: dict[Path, dict[str, list[Path]]] = {}

@@ -761,6 +761,71 @@ def test_a_grouped_table_is_not_reported_empty(tmp_path: Path) -> None:
     assert _issues_of(issues, code="empty-table") == [], issues
 
 
+# ---------- link destinations ----------
+
+
+def _other_page(tmp_path: Path) -> tuple[Path, dict]:
+    """A second page carrying exactly one anchor, `#real`."""
+    (tmp_path / "other.md").write_text("---\ntitle: Other\n---\n\n## Real {#real}\n\nx\n", encoding="utf-8")
+    return tmp_path / "other.json", {"k": "page", "t": "Other", "b": ["## Real {#real}\n\nx\n"]}
+
+
+@pytest.mark.parametrize(
+    ("href", "code"),
+    [
+        ("#nope", "unresolved-anchor"),
+        ("other.md#ghost", "unresolved-anchor"),
+        ("other.html#ghost", "unresolved-anchor"),
+        ("missing.md", "unresolved-link"),
+    ],
+)
+def test_a_link_that_lands_nowhere_is_reported(tmp_path: Path, href: str, code: str) -> None:
+    """Glossary and ext-ref ids were resolved; every other local
+    destination was not, so renaming a heading left dead links across
+    the tree with nothing to report them.
+
+    `other.md` and `other.html` name the same page — renderLink rewrites
+    the first to the second, so both must resolve to the same anchors.
+    """
+    page = {"k": "page", "t": "A", "b": [f"## S {{#s}}\n\nA [link]({href}) here.\n"]}
+    issues = cli.check_pages([(tmp_path / "a.json", page), _other_page(tmp_path)], tmp_path)
+    flagged = _issues_of(issues, code=code)
+    assert len(flagged) == 1 and flagged[0]["severity"] == "warning", issues
+
+
+@pytest.mark.parametrize("href", ["#s", "other.md#real", "other.md", "https://example.com#x", "#g/iceberg"])
+def test_a_link_that_resolves_is_silent(tmp_path: Path, href: str) -> None:
+    """Anything off this origin, and anything the registries own, is not
+    this check's business — a linter that cries over an external URL it
+    never fetched is one authors switch off."""
+    page = {"k": "page", "t": "A", "b": [f"## S {{#s}}\n\nA [link]({href}) here.\n"]}
+    issues = cli.check_pages([(tmp_path / "a.json", page), _other_page(tmp_path)], tmp_path)
+    assert _issues_of(issues, code="unresolved-anchor") == [], issues
+    assert _issues_of(issues, code="unresolved-link") == [], issues
+
+
+def test_an_href_inside_a_typed_block_is_checked_too(tmp_path: Path) -> None:
+    """`compare-grid`'s preview clones the figure after the card's
+    anchor, so an href landing nowhere costs a picture, not just a
+    click."""
+    page = {
+        "k": "page",
+        "t": "A",
+        "b": ["## S {#s}\n", {"k": "compare-grid", "cards": [{"t": "C", "href": "#missing"}]}],
+    }
+    issues = cli.check_pages([(tmp_path / "a.json", page)], tmp_path)
+    flagged = _issues_of(issues, code="unresolved-anchor")
+    assert len(flagged) == 1 and "compare-grid" in flagged[0]["where"], issues
+
+
+def test_a_link_inside_inline_code_is_a_quotation(tmp_path: Path) -> None:
+    """Backticks around a link make it a sample of the syntax, not a
+    link — the same rule the glossary and ext-ref passes already use."""
+    page = {"k": "page", "t": "A", "b": ["## S {#s}\n\nType `[label](#some-id)` to link.\n"]}
+    issues = cli.check_pages([(tmp_path / "a.json", page)], tmp_path)
+    assert _issues_of(issues, code="unresolved-anchor") == [], issues
+
+
 def test_heading_level_skip_is_flagged(tmp_path: Path) -> None:
     """The outline is what a screen reader announces and what the TOC
     nests by, so h2 → h4 is a structural defect. Levels are tracked
