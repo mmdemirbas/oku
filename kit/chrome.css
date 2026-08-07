@@ -1767,6 +1767,31 @@ h4 {
   margin: 22px 0 10px 0; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.06em;
 }
+/* Titles that name a figure or a callout, and are NOT headings.
+ *
+ * `##` opens a section, so every one of these sat under an h2 and an h4
+ * skipped a level — six breaks on docs/architecture.html. h3 is not the
+ * fix either: buildTOC collects every h3 in a section, so promoting
+ * them would list 43 card titles in the on-page contents of
+ * docs/charts.md. They are labels for a box, not sections of the
+ * document, so they are <p> and the box carries the name through
+ * aria-labelledby.
+ *
+ * They still have to LOOK like what they replaced, which is what this
+ * rule restores: the weight came from the h4 element rule above, and
+ * the alignment has to be won back from the justify list — `main
+ * .callout p` outranks a bare class, so these selectors carry `main`
+ * too. A one-line title stretched to both edges is the exact failure
+ * the justify scope was drawn to avoid. */
+main .callout .callout-title,
+main .okt-card-title,
+main .bar-chart-title,
+main .okt-chart-grid-title {
+  font-weight: 700;
+  text-align: start;
+  -webkit-hyphens: manual;
+  hyphens: manual;
+}
 p { margin: 0 0 18px 0; }
 ul, ol { padding-left: 22px; margin: 0 0 18px 0; }
 li { margin: 8px 0; }
@@ -3032,10 +3057,10 @@ pre[class*="language-"] {
 .callout.neutral { border-left-color: var(--text-soft); background: var(--surface-2); }
 .callout.note,
 .callout.info    { border-left-color: var(--accent); background: var(--accent-soft); }
-.callout h4 { margin: 0 0 8px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--accent-strong); }
-.callout.warn h4,
-.callout.warning h4,
-.callout.caution h4 { color: var(--warning); }
+.callout .callout-title { margin: 0 0 8px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--accent-strong); }
+.callout.warn .callout-title,
+.callout.warning .callout-title,
+.callout.caution .callout-title { color: var(--warning); }
 
 /* Insight — pull-quote for a key takeaway. Bigger than a callout. */
 .insight {
@@ -3414,7 +3439,7 @@ figure.okt-figure figcaption {
   font-weight: 700;
   font-size: 14px;
 }
-.step-card h4 {
+.step-card .okt-card-title {
   margin: 0 0 4px 0;
   font-size: 15px;
   text-transform: none;
@@ -3463,12 +3488,12 @@ a.step-card.step-card-link:focus-visible {
   outline-offset: 2px;
 }
 
-.callout.danger h4 { color: var(--danger); }
-.callout.success h4,
-.callout.tip h4 { color: var(--success); }
-.callout.neutral h4 { color: var(--text); }
-.callout.note h4,
-.callout.info h4 { color: var(--accent-strong); }
+.callout.danger .callout-title { color: var(--danger); }
+.callout.success .callout-title,
+.callout.tip .callout-title { color: var(--success); }
+.callout.neutral .callout-title { color: var(--text); }
+.callout.note .callout-title,
+.callout.info .callout-title { color: var(--accent-strong); }
 .callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
 
 /* ============ Tables, pills, KPI tiles, comparison cards, details ============ */
@@ -3803,7 +3828,8 @@ a.compare-card-link:hover {
   width: 100%;
   overflow: hidden;
 }
-.compare-card.compare-card-link h4 {
+.compare-card.compare-card-link .okt-card-title,
+.compare-card.compare-card-link .bar-chart-title {
   margin: 0 0 6px;
   font-size: 12px;
   text-transform: lowercase;
@@ -3950,15 +3976,15 @@ a.compare-card-link:hover {
 .compare-card.warn:hover { border-color: var(--warning); }
 .compare-card.accent { border-top: 4px solid var(--accent); }
 .compare-card.accent:hover { border-color: var(--accent); }
-.compare-card.in h4  { color: var(--success); }
-.compare-card.out h4 { color: var(--text-soft); }
-.compare-card h4 { margin: 0 0 12px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--text); }
+.compare-card.in .okt-card-title  { color: var(--success); }
+.compare-card.out .okt-card-title { color: var(--text-soft); }
+.compare-card .okt-card-title { margin: 0 0 12px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--text); }
 /* Verdict-icon header: a check / cross / triangle / ring at the title makes
    each card readable at a glance instead of a uniform block of text. */
 .compare-card.caution { border-top: 4px solid var(--warning); }
 .compare-card.caution:hover { border-color: var(--warning); }
 .compare-card-head { display: flex; align-items: center; gap: 9px; margin: 0 0 12px 0; }
-.compare-card-head h4 { margin: 0; }
+.compare-card-head .okt-card-title { margin: 0; }
 /* A card that links to a figure shows that figure's silhouette (see
    wireComparePreviews). The box is a fixed height so a row of cards
    keeps one baseline whatever the aspect ratios behind them are — the
@@ -6437,15 +6463,15 @@ main .example-pair {
    label, chip or caption is a short string stretched to a box edge,
    which looks broken. Only blocks that run several lines of sentence
    text are in. Code is never justified — `pre` keeps its own spacing. */
-main > section > p,
+main > section > p:not(.okt-card-title),
 main > section > ul li,
 main > section > ol li,
 main > section > blockquote p,
-main .callout p,
+main .callout p:not(.callout-title):not(.okt-card-title),
 main .callout li,
 main .tldr li,
-main .insight p,
-main .example-pair p {
+main .insight p:not(.okt-card-title),
+main .example-pair p:not(.okt-card-title):not(.callout-title):not(.bar-chart-title) {
   text-align: justify;
   -webkit-hyphens: auto;
   hyphens: auto;

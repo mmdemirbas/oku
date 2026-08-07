@@ -187,8 +187,13 @@ def test_compare_grid_verdict_icons(page, served):
     for verdict in ("good", "warn", "bad", "neutral"):
         sel = f".compare-card.{verdict} .compare-card-icon svg"
         assert page.locator(sel).count() == 1, sel
-    # the title sits inside the icon header (icon precedes the h4)
-    assert page.locator(".compare-card.good .compare-card-head h4").count() == 1
+    # The title sits inside the icon header, icon first. It is NOT a
+    # heading: `##` opens a section, so an h4 here skipped a level, and
+    # h3 would put all 43 card titles on docs/charts.md into the on-page
+    # contents. A card title labels a box; it is not a section of the
+    # document.
+    assert page.locator(".compare-card.good .compare-card-head .okt-card-title").count() == 1
+    assert page.locator(".compare-card.good .compare-card-head :is(h1,h2,h3,h4,h5,h6)").count() == 0
     # verdict drives the icon colour — good/bad/warn must differ
     colors = {
         v: page.eval_on_selector(f".compare-card.{v} .compare-card-icon", "el => getComputedStyle(el).color")

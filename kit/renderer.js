@@ -1110,8 +1110,23 @@
     c.className = 'callout ' + type;
     c.setAttribute('data-callout-symbol', type);
     if (node.title) {
-      const h = document.createElement('h4');
+      // NOT a heading. `##` opens a section, so a callout sits under an
+      // h2 and an h4 here skipped a level — six such breaks on
+      // docs/architecture.html, four of them callouts. h3 is not the fix
+      // either: buildTOC collects every h3 in a section, so promoting
+      // these would put callout titles in the on-page contents.
+      //
+      // A callout is an aside with a name, not a section of the
+      // document. So it becomes a labelled region: the title names the
+      // region for assistive tech through aria-labelledby, and the
+      // reader's heading-navigation list stays the document's own
+      // outline.
+      const h = document.createElement('p');
+      h.className = 'callout-title';
+      h.id = uniqueAnchorId('callout-title');
       h.textContent = node.title;
+      c.setAttribute('role', 'note');
+      c.setAttribute('aria-labelledby', h.id);
       c.appendChild(h);
     }
     const sub = parseMarkdown(node.body);
@@ -1757,7 +1772,8 @@
           card.appendChild(num);
         }
         const body = document.createElement('div');
-        const h = document.createElement('h4');
+        const h = document.createElement('p');
+        h.className = 'okt-card-title';
         h.textContent = s.t || '';
         body.appendChild(h);
         if (s.meta) {
@@ -1849,7 +1865,8 @@
           const ico = document.createElement('span');
           ico.className = 'compare-card-icon';
           ico.innerHTML = iconFor(styleKey);
-          const h = document.createElement('h4');
+          const h = document.createElement('p');
+          h.className = 'okt-card-title';
           h.textContent = c.t;
           head.appendChild(ico);
           head.appendChild(h);
@@ -2185,7 +2202,7 @@
       wrap.setAttribute('role', 'img');
       wrap.setAttribute('aria-label', (block.title ? block.title + ' — ' : '') + mode + ' with ' + categories.length + ' categories');
       if (block.title) {
-        const h = document.createElement('h4');
+        const h = document.createElement('p');
         h.className = 'bar-chart-title';
         h.textContent = block.title;
         wrap.appendChild(h);
@@ -2289,7 +2306,7 @@
       wrap.setAttribute('role', 'img');
       wrap.setAttribute('aria-label', (block.title ? block.title + ' — ' : '') + 'Bar chart with ' + rows.length + ' rows');
       if (block.title) {
-        const h = document.createElement('h4');
+        const h = document.createElement('p');
         h.className = 'bar-chart-title';
         h.textContent = block.title;
         wrap.appendChild(h);
@@ -2346,7 +2363,7 @@
       const wrap = document.createElement('div');
       wrap.className = 'okt-chart-grid';
       if (block.title) {
-        const h = document.createElement('h4');
+        const h = document.createElement('p');
         h.className = 'okt-chart-grid-title';
         h.textContent = block.title;
         wrap.appendChild(h);
