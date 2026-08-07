@@ -54,7 +54,17 @@ def _mount(page, site_url):
     page.goto(f"{site_url}/docs/index.html")
     page.wait_for_selector("main section")
     page.evaluate(MOUNT, SRC)
-    page.wait_for_timeout(4500)
+    # Wait for the render to FINISH, not for a number of milliseconds.
+    # Mermaid arrives from a CDN, so a timeout long enough on an idle
+    # machine is not long enough on a loaded one — and a half-rendered
+    # diagram has the SVG in the DOM before the post-render passes have
+    # run over it, which is exactly the state that made this flake.
+    # `_rendered` is the element's own "all passes done" flag.
+    page.wait_for_function(
+        "() => { const d = document.querySelector('#a11y-probe oku-diagram');"
+        "        return !!d && (d._rendered || /Parse error/.test(d.textContent)); }",
+        timeout=30000,
+    )
     return page.evaluate(STATE)
 
 
