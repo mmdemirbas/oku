@@ -2499,6 +2499,14 @@ function buildRail() {
     });
     RAIL_FIGURES.forEach(function (spec) {
       sec.querySelectorAll(spec[0]).forEach(function (el) {
+        // A comparison-card preview is a CLONE of a figure that already
+        // has its own mark further down the page. Left in, it claims the
+        // position first — `oku-chart` and `.bar-chart` outrank
+        // `.compare-grid` in the list above — so the grid loses its mark
+        // and the rail reports a Chart where the reader is looking at a
+        // picker. Measured on this page as 49 Chart marks against 7
+        // Comparison marks where there are 8 grids.
+        if (el.closest('.okt-compare-preview')) return;
         // One dot per position. Overlap is rejected in BOTH nesting
         // directions — an outer container that wraps a claimed figure is
         // dropped exactly as an inner one under a claimed container is —
@@ -4336,7 +4344,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-06-r31';
+var __okuKitBuild = '2026-08-07-r32';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -11781,6 +11789,230 @@ function __okuNamespaceSvgIds(svg, uid) {
     });
   });
 }
+
+/* ============ Comparison-card previews ============ *
+ *
+ * A compare-card that links to a figure on the same page can show that
+ * figure's silhouette under its title. `docs/charts.md` offers 43 chart
+ * types as 43 cards; without this the reader picks a shape by reading
+ * the word for it, which is the one thing a chooser of shapes should not
+ * ask them to do.
+ *
+ * Three decisions, each load-bearing.
+ *
+ * **The preview is cloned from the rendered figure, never authored.** A
+ * miniature payload beside the real one is a copy, and a copy drifts:
+ * the card would keep previewing a shape its own section had stopped
+ * drawing, and nothing would fail. Cloning cannot disagree with the
+ * target because it IS the target.
+ *
+ * **The words go, the shape stays**, and it takes two mechanisms because
+ * there are two media. The source figures are laid out for ~710px and a
+ * card gives them ~170px, so a label lands near 3px — not small writing,
+ * just dirt. SVG text is deleted here, exhaustively. The HTML bar family
+ * cannot be treated that way: its row label and value readout ARE the
+ * first and third columns of the chart's grid, and removing them
+ * collapses the track between into a 9px speck, so those are hidden in
+ * CSS instead, which keeps the columns.
+ *
+ * The stylesheet's `.compare-card.compare-card-link` block was already
+ * here before this — legends, backdrops and zone chips hidden, strokes
+ * thickened for exactly this reduction. The styling half of the feature
+ * had shipped; the half that puts a figure in the card had not, which is
+ * why the page has been promising a preview nobody could see.
+ *
+ * **Opt-in per grid.** Every compare-grid in the kit links somewhere;
+ * switching this on globally would grow a thumbnail under cards whose
+ * author never asked for one, on pages nobody re-checked.
+ */
+var __okuComparePreviewSeq = 0;
+var __okuComparePreviewRO = null;
+
+/* The figure this anchor owns: the first one after it in document order,
+ * stopping at the next heading that carries an id — that heading owns
+ * everything past it. `anchor.contains` is what lets the anchor be a
+ * section as well as a heading; without it a `<section id=…>` would stop
+ * on its own `<h2 id=…>` and report no figure. */
+function __okuFigureForAnchor(anchor, scope) {
+  var walker = document.createTreeWalker(scope, NodeFilter.SHOW_ELEMENT, null);
+  walker.currentNode = anchor;
+  while (walker.nextNode()) {
+    var e = walker.currentNode;
+    if (!anchor.contains(e) && /^H[1-6]$/.test(e.tagName) && e.id) return null;
+    // `svg.okc-svg` is the plot, and the class is doing real work: an
+    // oku-chart holds its toolbar icons as inline SVG too, and a plain
+    // querySelector('svg') on this page finds 288 of them against 43
+    // plots. The rail's thumbnail carries the same scar.
+    if (e.matches('svg.okc-svg, .bar-chart.okt-host')) return e;
+    if (e.matches('oku-diagram, .mermaid')) {
+      var inner = e.querySelector('svg');
+      if (inner) return inner;
+    }
+  }
+  return null;
+}
+
+function __okuBuildComparePreview(fig) {
+  var wrap = document.createElement('div');
+  wrap.className = 'okt-compare-preview';
+  // The card's title names the figure; the picture repeats it in a form
+  // a screen reader cannot use, so it is decoration here by definition.
+  wrap.setAttribute('aria-hidden', 'true');
+
+  /* aria-hidden and focusable is the one combination that is worse than
+   * either alone: the keyboard lands on something the screen reader has
+   * been told does not exist. The source figures are interactive — a
+   * scatter-matrix gives every cell `tabindex="0"` — and a clone inherits
+   * all of it. `pointer-events: none` covers the mouse and nothing else,
+   * so the tab stops are removed outright. */
+  function makeInert(root) {
+    if (root.hasAttribute('tabindex')) root.removeAttribute('tabindex');
+    Array.prototype.forEach.call(root.querySelectorAll('[tabindex]'), function (n) {
+      n.removeAttribute('tabindex');
+    });
+  }
+
+  // What kind of chart this is, so the stylesheet can tune the reduction
+  // per type. Only one type needs it today (a bubble's radius carries a
+  // value, so it is the one thing that must not be normalised), but the
+  // alternative is a rule that cannot express the exception at all.
+  var host = fig.closest && fig.closest('oku-chart');
+  if (host && host.getAttribute('type')) {
+    wrap.setAttribute('data-oku-figure', host.getAttribute('type'));
+  }
+
+  var seq = ++__okuComparePreviewSeq;
+  if (fig.tagName.toLowerCase() === 'svg') {
+    var copy = fig.cloneNode(true);
+    if (copy.id) copy.id = 'okcp-' + seq + '-' + copy.id;
+    // Gradients, clip paths and markers the figure defines internally
+    // arrive as duplicate ids, and `url(#name)` takes the FIRST match in
+    // the document. The preview sits above <main>'s figures on the page,
+    // so without this the real chart starts drawing with the thumbnail's
+    // definitions — the same defect the diagram thumbnails rewrite away.
+    __okuNamespaceSvgIds(copy, 'okcp' + seq);
+    copy.removeAttribute('width');
+    copy.removeAttribute('height');
+    copy.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    copy.setAttribute('aria-hidden', 'true');
+    copy.removeAttribute('role');
+    // Every remaining word goes, and this is deliberately blunt rather
+    // than a list of label classes. The stylesheet's enumeration removes
+    // FURNITURE — legend boxes, backdrops, zone chips, whole titled
+    // groups — and it can do that because those are named things. Words
+    // are not: dropping the enumerated ones left the gauge reading "92 /
+    // of monthly window remaining" at 3px, and the row labels on
+    // dot-plot, lollipop and dumbbell. A class list has to be extended
+    // by whoever adds the next chart type; `text` cannot rot.
+    Array.prototype.forEach.call(copy.querySelectorAll('text, title'), function (t) {
+      t.parentNode.removeChild(t);
+    });
+    // The clone goes back inside an <oku-chart>, and it has to: 197 rules
+    // in chrome.css are written `oku-chart .okc-…`, so a chart lifted out
+    // of its host matches none of them and every fill falls back to the
+    // initial value — BLACK. That is not a subtle shift; scatter-matrix
+    // rendered as a black square on a white card and the sparkline's area
+    // went from teal to black. Copying resolved colours onto the clone
+    // instead would freeze them at clone time and break on a theme flip.
+    //
+    // The shell is inert by the kit's own reparent guard (`_initialized`,
+    // the same flag that keeps a chart from re-rendering when the
+    // lightbox moves it). `type` is carried over because rules are keyed
+    // on it too, and the rail is taught to skip anything inside a
+    // preview — otherwise this shell would claim a landmark.
+    var shell = document.createElement('oku-chart');
+    shell._initialized = true;
+    shell.setAttribute('aria-hidden', 'true');
+    // Deliberately NOT carrying `type`. No rule in chrome.css keys on
+    // `oku-chart[type=…]`, so it bought nothing — and the shells sit
+    // ABOVE the worked examples in document order, so a `type` on them
+    // made `oku-chart[type="line"]` resolve to a preview. That is not a
+    // hypothetical: it hovered a decoration instead of the real chart,
+    // the toolbar never appeared, and the fullscreen click timed out.
+    // Per-type tuning goes on `data-oku-figure`, on the wrap.
+    shell.setAttribute('data-oku-preview-shell', '1');
+    makeInert(copy);
+    shell.appendChild(copy);
+    wrap.appendChild(shell);
+    return wrap;
+  }
+
+  // The bar family renders as HTML + CSS, so it has no viewBox to scale
+  // through and is fitted by transform instead. Transform only — laying
+  // it out at the smaller width would re-wrap the labels rather than
+  // shrink the bars, and the point is the silhouette.
+  var el = fig.cloneNode(true);
+  el.removeAttribute('role');
+  el.removeAttribute('aria-label');
+  // The bar wiring adopts any host carrying this and would bind hover
+  // and click-pin handlers to a decoration.
+  el.removeAttribute('data-hdc-bars-bound');
+  Array.prototype.forEach.call(el.querySelectorAll('[data-hdc-bars-bound]'), function (n) {
+    n.removeAttribute('data-hdc-bars-bound');
+  });
+  makeInert(el);
+  wrap.appendChild(el);
+  wrap._okuFitScale = function () {
+    // The source is measured every time rather than cached: it is the
+    // one element whose width tracks the reading column, so re-reading
+    // it is what keeps the preview honest when the column changes.
+    var natural = fig.getBoundingClientRect().width;
+    var avail = wrap.clientWidth;
+    if (!natural || !avail) return;
+    el.style.width = natural + 'px';
+    el.style.transformOrigin = 'center center';
+    el.style.transform = 'scale(' + (avail / natural).toFixed(4) + ')';
+  };
+  return wrap;
+}
+
+function wireComparePreviews(root) {
+  var scope = document.querySelector('main');
+  if (!scope) return;
+  var cards = (root || document).querySelectorAll(
+    '.compare-grid[data-oku-preview] .compare-card[href^="#"]'
+  );
+  var pending = [];
+  Array.prototype.forEach.call(cards, function (card) {
+    if (card._okuPreviewBuilt) return;
+    var target = document.getElementById(card.getAttribute('href').slice(1));
+    if (!target) return;
+    var fig = __okuFigureForAnchor(target, scope);
+    if (!fig) return;
+    var preview = __okuBuildComparePreview(fig);
+    if (!preview) return;
+    card._okuPreviewBuilt = true;
+    // Under the title, above the body: the picture of the thing sits
+    // with the name of the thing.
+    var head = card.querySelector('.compare-card-head');
+    if (head && head.nextSibling) card.insertBefore(preview, head.nextSibling);
+    else card.appendChild(preview);
+    if (preview._okuFitScale) pending.push(preview);
+  });
+  // One batched read after every write, rather than a read per card
+  // interleaved with the inserts above.
+  pending.forEach(function (p) { p._okuFitScale(); });
+  // A transform-fitted preview has to be re-fitted whenever its box
+  // changes, and a window-resize listener is not enough: pinning the
+  // Contents drawer insets the reading column without resizing the
+  // window, and so does the width control. Measured at 360px before
+  // this: the SVG previews reflowed to 286px and the three bar previews
+  // stayed at the 170px they were fitted to on the desktop layout.
+  if (pending.length && window.ResizeObserver) {
+    if (!__okuComparePreviewRO) {
+      __okuComparePreviewRO = new ResizeObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.target._okuFitScale) entry.target._okuFitScale();
+        });
+      });
+    }
+    pending.forEach(function (p) { __okuComparePreviewRO.observe(p); });
+  }
+}
+
+window.addEventListener('oku:rendered', function () {
+  wireComparePreviews(document);
+});
 
 class OkuDiagram extends HTMLElement {
   connectedCallback() {

@@ -241,6 +241,8 @@ Side-by-side cards. `verdict` is `good`, `bad`, or `neutral` — sets the top-bo
 
 Scope variant — set `verdict` to `in` (green border) or `out` (muted), and use `items` for a bullet list inside the card. `content` and `items` can coexist — content renders first, items below.
 
+Set `"preview": true` on the grid to turn it into a **picker**: every card whose `href` is an in-page anchor grows a silhouette of the figure that follows that anchor. The picture is cloned from the rendered figure rather than authored beside it, so it can never disagree with what the reader lands on. Writing is dropped — a figure laid out for the full column is shown at roughly a quarter of it, where a label is dirt rather than text — and the card's own title carries the name. A card that links to prose, or to nothing, is left exactly as it is, so the flag is safe to set on a mixed grid. [`docs/charts.md`](charts.md) uses it for all 53 chart types.
+
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"compare-grid\",\n  \"cards\": [\n    { \"verdict\": \"in\",  \"title\": \"v1\",     \"items\": [\"...\"] },\n    { \"verdict\": \"out\", \"title\": \"Future\", \"items\": [\"...\"] }\n  ]\n}","lang":"json"},"output":{"k":"compare-grid","cards":[{"t":"Ships now","b":"- JSON-source runtime rendering\n- Multi-domain glossary with EN/TR\n- Visual Viewport pinch-zoom fix\n- Pagefind search on built sites","verdict":"in"},{"t":"Out of scope","b":"- Markdown authoring path\n- Server-side rendering\n- Per-user authentication\n- Inline glossary editing UI","verdict":"out"}]}}
 ```

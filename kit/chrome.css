@@ -3851,16 +3851,38 @@ a.compare-card-link:hover {
 .compare-card.compare-card-link .okc-bullet-readout,
 .compare-card.compare-card-link .okc-bar-chart-title,
 .compare-card.compare-card-link .bar-chart-legend,
-.compare-card.compare-card-link .bar-chart-title,
-.compare-card.compare-card-link .bar-label,
-.compare-card.compare-card-link .bar-value {
+.compare-card.compare-card-link .bar-chart-title {
   display: none !important;
 }
-/* Thicker strokes + bigger dots for preview legibility. */
+/* The bar family's row label and value readout are the exception, and it
+   is a layout fact rather than a preference: they are the first and
+   third columns of the chart's grid, and the track is the `1fr` between
+   them. Taken out of the flow, the track loses its column and collapses
+   — the three bar cards rendered a 9px speck at the far left of a 170px
+   box. `visibility` hides the writing and keeps the columns. */
+.compare-card.compare-card-link .bar-label,
+.compare-card.compare-card-link .bar-value {
+  visibility: hidden !important;
+}
+/* Thicker strokes + bigger dots for preview legibility.
+   The radius is in viewBox units and the card shows the viewBox at about
+   0.27, so `r: 5` — the value this block carried before anything actually
+   rendered in a card — reached the reader as a 2.7px speck: scatter,
+   bubble and quadrant read as empty cards, which is the defect this
+   whole feature exists to fix. 11 lands near 6px. */
 .compare-card.compare-card-link .okc-svg .okc-dot,
 .compare-card.compare-card-link .okc-svg .okc-bump-dot {
-  r: 5;
+  r: 11;
 }
+/* A bubble's radius IS its third variable. Normalising it draws a
+   scatter plot and labels it bubble, so this one keeps its own sizes. */
+.compare-card.compare-card-link .okt-compare-preview[data-oku-figure="bubble"] .okc-dot {
+  r: auto;
+}
+/* Legend swatches survive their hidden backdrop and read as data — four
+   coloured squares in the corner of a scatter preview are indistinguishable
+   from four data points. */
+.compare-card.compare-card-link .okc-legend-swatch { display: none !important; }
 .compare-card.compare-card-link .okc-svg path,
 .compare-card.compare-card-link .okc-svg polyline,
 .compare-card.compare-card-link .okc-svg line:not(.okc-axis):not(.okc-quadrant):not(.okc-bullet-target) {
@@ -3932,6 +3954,56 @@ a.compare-card-link:hover {
 .compare-card.caution:hover { border-color: var(--warning); }
 .compare-card-head { display: flex; align-items: center; gap: 9px; margin: 0 0 12px 0; }
 .compare-card-head h4 { margin: 0; }
+/* A card that links to a figure shows that figure's silhouette (see
+   wireComparePreviews). The box is a fixed height so a row of cards
+   keeps one baseline whatever the aspect ratios behind them are — the
+   figures on docs/charts.md run from 5:1 to 1:1.1, and letting each card
+   size to its own clone would step the row's bottom edge up and down.
+   Nothing here is interactive: the clone is decoration, and the card
+   itself is the link. */
+.okt-compare-preview {
+  height: 104px;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+  /* The clone is a reduction of a figure drawn for four times the width,
+     so it carries more ink per pixel than anything else on the card. At
+     full strength it out-shouts the title it belongs to. */
+  opacity: .82;
+}
+.compare-card:hover .okt-compare-preview { opacity: 1; }
+/* The inert <oku-chart> shell exists only so the chart's own rules match
+   (see __okuBuildComparePreview). It is given a real box rather than
+   `display: contents`: contents produces no box at all, so anything that
+   measures an `oku-chart` on this page reads 0x0 — a trap for the next
+   pass that walks figures, and one an audit here already fell into. */
+.okt-compare-preview > oku-chart {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  min-width: 0;
+  /* The shell is a scoping device, not a figure. Giving it a real box
+     brought `oku-chart`'s own surface with it — border, background,
+     padding, radius — and the preview appeared inside a second card. */
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.okt-compare-preview svg { width: 100%; height: 100%; display: block; }
+/* The bar family has no viewBox; it is fitted by transform in JS, which
+   means it must first be ALLOWED to lay out at its natural width. The
+   `main .bar-chart { max-width: 100% }` rule that keeps every block
+   inside one right edge would otherwise cap the clone at the card's
+   width and the transform would shrink that again — measured at 39px
+   wide inside a 170px box. Two classes outrank `main .bar-chart`, so
+   this wins on specificity and needs no !important. */
+.okt-compare-preview > .bar-chart { flex: 0 0 auto; max-width: none; }
 .compare-card-icon { flex: 0 0 auto; display: inline-flex; color: var(--text-soft); }
 .compare-card-icon svg { display: block; }
 .compare-card.good .compare-card-icon,

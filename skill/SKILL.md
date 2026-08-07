@@ -386,7 +386,7 @@ reach for first):
 | `oku-chart` | magnitude, distribution, change over time, part-to-whole, correlation | Any set of numbers that share a unit. ~50 types; `bar` and `plot` cover most cases. |
 | `oku-chart-grid` | the same shape repeated across N groups | Small multiples — one chart per region, per engine, per week. |
 | `oku-table` | a matrix — N things × M attributes | More than three parallel things with the same fields. Gains filter, sort, group-by and card/board views past a size threshold. |
-| `oku-compare-grid` | two or more options weighed side by side | A decision with alternatives. `verdict` marks the winner; `accent` colours the card. |
+| `oku-compare-grid` | two or more options weighed side by side | A decision with alternatives. `verdict` marks the winner; `accent` colours the card. `preview: true` turns a grid of in-page links into a picker — each card shows a silhouette of the figure it points at, cloned from the render so it cannot drift. |
 | `oku-step-flow` | ordered stages, or unordered parallel options | A pipeline, a procedure, a migration. `ordered: false` for a 2-up grid of links with no implied sequence. |
 | `oku-kpi-grid` | headline numbers, no shared axis | Two to four figures that open a section — and know that this is a tier-three shape: nothing is encoded, adjacency is not comparison. Values that share a unit belong in a chart. |
 | `mermaid` | topology, sequence, state, containment, timing | Any diagram. Mermaid computes positions and avoids label collision; prefer it over hand-drawn SVG. |

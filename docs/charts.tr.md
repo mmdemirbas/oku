@@ -26,7 +26,7 @@ Türlerin 43'ü, söylemek istediğinize göre gruplanmış. Herhangi bir karta 
 Çubuklar, hedefe karşı noktalar, ışınsal kollar — değerleri yan yana dizip okuyucunun büyüklükleri karşılaştırmasını sağlayan her şey.
 
 ```oku-compare-grid
-{"cards":[{"t":"bar","b":"","href":"#chart-bar"},{"t":"stacked-bar","b":"","href":"#chart-stacked"},{"t":"grouped-bar","b":"","href":"#chart-grouped"},{"t":"bullet","b":"","href":"#chart-bullet"},{"t":"gauge","b":"","href":"#chart-gauge"},{"t":"radar","b":"","href":"#chart-radar"},{"t":"slope","b":"","href":"#chart-slope"},{"t":"parallel-coordinates","b":"","href":"#chart-parallel-coordinates"},{"t":"dot-plot","b":"","href":"#chart-dot-plot"},{"t":"waterfall","b":"","href":"#chart-waterfall"},{"t":"lollipop","b":"","href":"#chart-lollipop"},{"t":"dumbbell","b":"","href":"#chart-dumbbell"}]}
+{"cards":[{"t":"bar","b":"","href":"#chart-bar"},{"t":"stacked-bar","b":"","href":"#chart-stacked"},{"t":"grouped-bar","b":"","href":"#chart-grouped"},{"t":"bullet","b":"","href":"#chart-bullet"},{"t":"gauge","b":"","href":"#chart-gauge"},{"t":"radar","b":"","href":"#chart-radar"},{"t":"slope","b":"","href":"#chart-slope"},{"t":"parallel-coordinates","b":"","href":"#chart-parallel-coordinates"},{"t":"dot-plot","b":"","href":"#chart-dot-plot"},{"t":"waterfall","b":"","href":"#chart-waterfall"},{"t":"lollipop","b":"","href":"#chart-lollipop"},{"t":"dumbbell","b":"","href":"#chart-dumbbell"}],"preview":true}
 ```
 
 #### Eğilim {#chart-fn-trend}
@@ -34,7 +34,7 @@ Türlerin 43'ü, söylemek istediğinize göre gruplanmış. Herhangi bir karta 
 X ekseninin zaman olduğu sürekli eğilimler ya da döngüsel örüntüler.
 
 ```oku-compare-grid
-{"cards":[{"t":"line","b":"","href":"#chart-line"},{"t":"area","b":"","href":"#chart-area"},{"t":"sparkline","b":"","href":"#chart-sparkline"},{"t":"calendar-heatmap","b":"","href":"#chart-calendar-heatmap"},{"t":"candlestick","b":"","href":"#chart-candlestick"},{"t":"stream","b":"","href":"#chart-stream"},{"t":"bump","b":"","href":"#chart-bump"}]}
+{"cards":[{"t":"line","b":"","href":"#chart-line"},{"t":"area","b":"","href":"#chart-area"},{"t":"sparkline","b":"","href":"#chart-sparkline"},{"t":"calendar-heatmap","b":"","href":"#chart-calendar-heatmap"},{"t":"candlestick","b":"","href":"#chart-candlestick"},{"t":"stream","b":"","href":"#chart-stream"},{"t":"bump","b":"","href":"#chart-bump"}],"preview":true}
 ```
 
 #### Dağılım {#chart-fn-distribution}
@@ -42,7 +42,7 @@ X ekseninin zaman olduğu sürekli eğilimler ya da döngüsel örüntüler.
 Değerlerin nerede kümelendiği, yayılımın nasıl göründüğü, tepe noktalarının kategoriler arasında nasıl karşılaştırıldığı.
 
 ```oku-compare-grid
-{"cards":[{"t":"histogram","b":"","href":"#chart-histogram"},{"t":"box-plot","b":"","href":"#chart-box-plot"},{"t":"ridgeline","b":"","href":"#chart-ridgeline"},{"t":"density","b":"","href":"#chart-density"},{"t":"violin","b":"","href":"#chart-violin"},{"t":"beeswarm","b":"","href":"#chart-beeswarm"}]}
+{"cards":[{"t":"histogram","b":"","href":"#chart-histogram"},{"t":"box-plot","b":"","href":"#chart-box-plot"},{"t":"ridgeline","b":"","href":"#chart-ridgeline"},{"t":"density","b":"","href":"#chart-density"},{"t":"violin","b":"","href":"#chart-violin"},{"t":"beeswarm","b":"","href":"#chart-beeswarm"}],"preview":true}
 ```
 
 #### Bileşim {#chart-fn-composition}
@@ -50,7 +50,7 @@ Değerlerin nerede kümelendiği, yayılımın nasıl göründüğü, tepe nokta
 Adlandırılmış dilimlere bölünen ve o dilimlerin toplamı olan tek bir bütün. Biçimi, kaç parçanız olduğuna ve merkezin önemli olup olmadığına göre seçin.
 
 ```oku-compare-grid
-{"cards":[{"t":"pie","b":"","href":"#chart-pie"},{"t":"donut","b":"","href":"#chart-donut"},{"t":"waffle","b":"","href":"#chart-waffle"},{"t":"marimekko","b":"","href":"#chart-marimekko"},{"t":"polar-area","b":"","href":"#chart-polar-area"}]}
+{"cards":[{"t":"pie","b":"","href":"#chart-pie"},{"t":"donut","b":"","href":"#chart-donut"},{"t":"waffle","b":"","href":"#chart-waffle"},{"t":"marimekko","b":"","href":"#chart-marimekko"},{"t":"polar-area","b":"","href":"#chart-polar-area"}],"preview":true}
 ```
 
 #### İlişki {#chart-fn-relationship}
@@ -58,7 +58,7 @@ Adlandırılmış dilimlere bölünen ve o dilimlerin toplamı olan tek bir büt
 Bir değişkenin bir başkasına nasıl bağlı olduğu — çiftler, matrisler, varlıklar arası bağlar.
 
 ```oku-compare-grid
-{"cards":[{"t":"scatter","b":"","href":"#chart-scatter"},{"t":"bubble","b":"","href":"#chart-bubble"},{"t":"quadrant","b":"","href":"#chart-quadrant"},{"t":"heatmap","b":"","href":"#chart-heatmap"},{"t":"chord","b":"","href":"#chart-chord"},{"t":"network","b":"","href":"#chart-network"},{"t":"scatter-matrix","b":"","href":"#chart-scatter-matrix"}]}
+{"cards":[{"t":"scatter","b":"","href":"#chart-scatter"},{"t":"bubble","b":"","href":"#chart-bubble"},{"t":"quadrant","b":"","href":"#chart-quadrant"},{"t":"heatmap","b":"","href":"#chart-heatmap"},{"t":"chord","b":"","href":"#chart-chord"},{"t":"network","b":"","href":"#chart-network"},{"t":"scatter-matrix","b":"","href":"#chart-scatter-matrix"}],"preview":true}
 ```
 
 #### Sıradüzen {#chart-fn-hierarchy}
@@ -66,7 +66,7 @@ Bir değişkenin bir başkasına nasıl bağlı olduğu — çiftler, matrisler,
 İç içe kapsama — bir şeyin içindeki bir şeyin içindeki bir şey.
 
 ```oku-compare-grid
-{"cards":[{"t":"treemap","b":"","href":"#chart-treemap"},{"t":"sunburst","b":"","href":"#chart-sunburst"}]}
+{"cards":[{"t":"treemap","b":"","href":"#chart-treemap"},{"t":"sunburst","b":"","href":"#chart-sunburst"}],"preview":true}
 ```
 
 #### Akış {#chart-fn-flow}
@@ -74,7 +74,7 @@ Bir değişkenin bir başkasına nasıl bağlı olduğu — çiftler, matrisler,
 Bir yerden bir yere hareket eden miktar — huni aşamaları, ağırlıklı kaynak→hedef bağları.
 
 ```oku-compare-grid
-{"cards":[{"t":"funnel","b":"","href":"#chart-funnel"},{"t":"sankey","b":"","href":"#chart-sankey"},{"t":"gantt","b":"","href":"#chart-gantt"}]}
+{"cards":[{"t":"funnel","b":"","href":"#chart-funnel"},{"t":"sankey","b":"","href":"#chart-sankey"},{"t":"gantt","b":"","href":"#chart-gantt"}],"preview":true}
 ```
 
 #### Konum {#chart-fn-location}
@@ -82,7 +82,7 @@ Bir yerden bir yere hareket eden miktar — huni aşamaları, ağırlıklı kayn
 Dünyayı bölgelere göre kabaca yaklaşıklayan bir karo ızgarasına yerleştirilmiş değerler. Gerçek bir koroplet DEĞİLDİR — her bölge, ISO koduyla etiketlenmiş sabit boyutlu bir karodur. Okuyucunun bölgesel farkları tek bakışta taraması gerektiğinde, gerçek bir haritanın görsel bütçesini (ya da topojson bağımlılığını) ödemeden kullanın.
 
 ```oku-compare-grid
-{"cards":[{"t":"geo","b":"","href":"#chart-geo"}]}
+{"cards":[{"t":"geo","b":"","href":"#chart-geo"}],"preview":true}
 ```
 
 ## Kartezyen — eksenli x/y noktaları {#family-cartesian}

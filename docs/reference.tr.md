@@ -241,6 +241,8 @@ Yan yana kartlar. `verdict` değeri `good`, `bad` ya da `neutral` olur — üst 
 
 Kapsam çeşitlemesi — `verdict` değerini `in` (yeşil kenarlık) ya da `out` (soluk) yapın ve kartın içine madde listesi koymak için `items` kullanın. `content` ile `items` bir arada bulunabilir — önce content, altında items işlenir.
 
+Izgaraya `"preview": true` verildiğinde ızgara bir **seçiciye** dönüşür: `href` değeri sayfa içi bir çapa olan her kart, o çapadan sonra gelen figürün siluetini gösterir. Resim, kartın yanına ayrıca yazılmaz; işlenmiş figürden klonlanır, böylece okuyucunun varacağı şeyle çelişmesi olanaksızdır. Yazılar düşürülür — sütunun tamamı için dizilmiş bir figür, sütunun aşağı yukarı dörtte birinde gösterilir ve orada bir etiket yazı değil kirdir — adı zaten kartın kendi başlığı taşır. Düzyazıya ya da hiçbir şeye bağlanan kart olduğu gibi kalır, yani bayrağı karışık bir ızgarada açmak güvenlidir. [`docs/charts.md`](charts.tr.md) bunu 53 grafik türünün tamamı için kullanır.
+
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"compare-grid\",\n  \"cards\": [\n    { \"verdict\": \"in\",  \"title\": \"v1\",      \"items\": [\"...\"] },\n    { \"verdict\": \"out\", \"title\": \"İleride\", \"items\": [\"...\"] }\n  ]\n}","lang":"json"},"output":{"k":"compare-grid","cards":[{"t":"Şimdi çıkıyor","b":"- JSON kaynağından çalışma zamanında işleme\n- EN/TR destekli çok alanlı sözlük\n- Visual Viewport parmakla yakınlaştırma düzeltmesi\n- Derlenmiş sitelerde Pagefind araması","verdict":"in"},{"t":"Kapsam dışı","b":"- Markdown ile yazma yolu\n- Sunucu tarafında işleme\n- Kullanıcı başına kimlik doğrulama\n- Satır içi sözlük düzenleme arayüzü","verdict":"out"}]}}
 ```

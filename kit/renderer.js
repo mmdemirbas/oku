@@ -1834,6 +1834,10 @@
       };
       const grid = document.createElement('div');
       grid.className = 'compare-grid';
+      // Opt-in: a card linking to a figure on this page shows that
+      // figure's silhouette. chrome.js does the cloning on oku:rendered,
+      // when every figure it might copy has been drawn.
+      if (block.preview) grid.setAttribute('data-oku-preview', '1');
       for (const c of (block.cards || [])) {
         const card = document.createElement(c.href ? 'a' : 'div');
         const styleKey = c.accent || c.verdict || 'neutral';

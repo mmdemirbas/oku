@@ -697,6 +697,50 @@ ignore checks. The repo's own tree must stay clean under
 `oku check --strict`; `test_check.py::test_project_docs_pass_check_strict`
 enforces it.
 
+**A card that promises a picture shows the picture, and the picture is a
+clone.** `compare-grid` takes `preview: true`; every card whose `href` is
+an in-page anchor gets a silhouette of the figure after that anchor,
+built by `wireComparePreviews` on `oku:rendered`.
+
+The picture is **cloned from the rendered figure**, never authored beside
+it. A miniature payload next to the real one is a copy, and a copy drifts
+silently — the card keeps previewing a shape its own section stopped
+drawing, and nothing fails.
+
+Four things the clone has to survive, each of which broke first:
+
+- **It leaves the host, so the host's CSS stops applying.** 197 rules are
+  written `oku-chart .okc-…`; a chart lifted out matches none of them and
+  every fill falls back to the initial value, which is BLACK. The clone
+  is re-parented into an inert `<oku-chart>` shell — inert by the kit's
+  own `_initialized` reparent guard. Copying resolved colours instead
+  would freeze them and break on a theme flip.
+- **The writing has to go, and it takes two mechanisms because there are
+  two media.** SVG `text` is deleted outright — a class list has to be
+  extended by whoever adds the next chart type, and the enumeration
+  already missed the gauge readout and three row-label sets. The HTML bar
+  family is the opposite: its label and value ARE the first and third
+  columns of the grid the track spans, so they are hidden with
+  `visibility`, never `display`.
+- **It must not become a landmark.** `oku-chart` and `.bar-chart` outrank
+  `.compare-grid` in `RAIL_FIGURES` and the rail rejects overlap in both
+  nesting directions, so a clone claimed the position and the grid lost
+  its mark. The rail skips anything inside `.okt-compare-preview`.
+- **It must re-fit when its box changes.** The bar family has no viewBox
+  and is fitted by transform, so a `ResizeObserver` — not a window
+  listener, because the width control and the pinned drawer both change
+  the column without resizing the window.
+
+The reason this is written down at length: **the styling half already
+existed.** A `.compare-card.compare-card-link` block hid legends and
+thickened strokes, `.bar-row` carried a comment about "compare-card
+mini-renders", and `docs/charts.md` had told the reader since before the
+markdown migration that "each card has a tiny live preview". Nothing ever
+drew one, and no check could tell — the schema validates, the structural
+lint passes, the tests were green. **An empty box is well-formed.** It
+took opening the page. `test_compare_previews.py` now asserts ink, in
+pixels, so the next empty box fails instead of rendering.
+
 **Visuals are ranked, and the ranking is in the briefing.** Prefer the
 figure that shows the whole at a glance, encodes values into a small
 space, and lands without the reader stopping to work it out: charts

@@ -26,7 +26,7 @@ Single primitive, many render modes via the `type` field. The Cartesian family (
 Bars, dots-vs-targets, radial spokes — anything that lines values up side by side so the reader can compare magnitudes.
 
 ```oku-compare-grid
-{"cards":[{"t":"bar","b":"","href":"#chart-bar"},{"t":"stacked-bar","b":"","href":"#chart-stacked"},{"t":"grouped-bar","b":"","href":"#chart-grouped"},{"t":"bullet","b":"","href":"#chart-bullet"},{"t":"gauge","b":"","href":"#chart-gauge"},{"t":"radar","b":"","href":"#chart-radar"},{"t":"slope","b":"","href":"#chart-slope"},{"t":"parallel-coordinates","b":"","href":"#chart-parallel-coordinates"},{"t":"dot-plot","b":"","href":"#chart-dot-plot"},{"t":"waterfall","b":"","href":"#chart-waterfall"},{"t":"lollipop","b":"","href":"#chart-lollipop"},{"t":"dumbbell","b":"","href":"#chart-dumbbell"}]}
+{"cards":[{"t":"bar","b":"","href":"#chart-bar"},{"t":"stacked-bar","b":"","href":"#chart-stacked"},{"t":"grouped-bar","b":"","href":"#chart-grouped"},{"t":"bullet","b":"","href":"#chart-bullet"},{"t":"gauge","b":"","href":"#chart-gauge"},{"t":"radar","b":"","href":"#chart-radar"},{"t":"slope","b":"","href":"#chart-slope"},{"t":"parallel-coordinates","b":"","href":"#chart-parallel-coordinates"},{"t":"dot-plot","b":"","href":"#chart-dot-plot"},{"t":"waterfall","b":"","href":"#chart-waterfall"},{"t":"lollipop","b":"","href":"#chart-lollipop"},{"t":"dumbbell","b":"","href":"#chart-dumbbell"}],"preview":true}
 ```
 
 #### Trend {#chart-fn-trend}
@@ -34,7 +34,7 @@ Bars, dots-vs-targets, radial spokes — anything that lines values up side by s
 Continuous trends or cyclic patterns where the x-axis is time.
 
 ```oku-compare-grid
-{"cards":[{"t":"line","b":"","href":"#chart-line"},{"t":"area","b":"","href":"#chart-area"},{"t":"sparkline","b":"","href":"#chart-sparkline"},{"t":"calendar-heatmap","b":"","href":"#chart-calendar-heatmap"},{"t":"candlestick","b":"","href":"#chart-candlestick"},{"t":"stream","b":"","href":"#chart-stream"},{"t":"bump","b":"","href":"#chart-bump"}]}
+{"cards":[{"t":"line","b":"","href":"#chart-line"},{"t":"area","b":"","href":"#chart-area"},{"t":"sparkline","b":"","href":"#chart-sparkline"},{"t":"calendar-heatmap","b":"","href":"#chart-calendar-heatmap"},{"t":"candlestick","b":"","href":"#chart-candlestick"},{"t":"stream","b":"","href":"#chart-stream"},{"t":"bump","b":"","href":"#chart-bump"}],"preview":true}
 ```
 
 #### Distribution {#chart-fn-distribution}
@@ -42,7 +42,7 @@ Continuous trends or cyclic patterns where the x-axis is time.
 Where values cluster, what the spread looks like, how peaks compare across categories.
 
 ```oku-compare-grid
-{"cards":[{"t":"histogram","b":"","href":"#chart-histogram"},{"t":"box-plot","b":"","href":"#chart-box-plot"},{"t":"ridgeline","b":"","href":"#chart-ridgeline"},{"t":"density","b":"","href":"#chart-density"},{"t":"violin","b":"","href":"#chart-violin"},{"t":"beeswarm","b":"","href":"#chart-beeswarm"}]}
+{"cards":[{"t":"histogram","b":"","href":"#chart-histogram"},{"t":"box-plot","b":"","href":"#chart-box-plot"},{"t":"ridgeline","b":"","href":"#chart-ridgeline"},{"t":"density","b":"","href":"#chart-density"},{"t":"violin","b":"","href":"#chart-violin"},{"t":"beeswarm","b":"","href":"#chart-beeswarm"}],"preview":true}
 ```
 
 #### Composition {#chart-fn-composition}
@@ -50,7 +50,7 @@ Where values cluster, what the spread looks like, how peaks compare across categ
 One total, broken into named slices that add up to it. Pick the shape to match how many parts you have and whether the centre matters.
 
 ```oku-compare-grid
-{"cards":[{"t":"pie","b":"","href":"#chart-pie"},{"t":"donut","b":"","href":"#chart-donut"},{"t":"waffle","b":"","href":"#chart-waffle"},{"t":"marimekko","b":"","href":"#chart-marimekko"},{"t":"polar-area","b":"","href":"#chart-polar-area"}]}
+{"cards":[{"t":"pie","b":"","href":"#chart-pie"},{"t":"donut","b":"","href":"#chart-donut"},{"t":"waffle","b":"","href":"#chart-waffle"},{"t":"marimekko","b":"","href":"#chart-marimekko"},{"t":"polar-area","b":"","href":"#chart-polar-area"}],"preview":true}
 ```
 
 #### Relationship {#chart-fn-relationship}
@@ -58,7 +58,7 @@ One total, broken into named slices that add up to it. Pick the shape to match h
 How one variable depends on another — pairs, matrices, links between entities.
 
 ```oku-compare-grid
-{"cards":[{"t":"scatter","b":"","href":"#chart-scatter"},{"t":"bubble","b":"","href":"#chart-bubble"},{"t":"quadrant","b":"","href":"#chart-quadrant"},{"t":"heatmap","b":"","href":"#chart-heatmap"},{"t":"chord","b":"","href":"#chart-chord"},{"t":"network","b":"","href":"#chart-network"},{"t":"scatter-matrix","b":"","href":"#chart-scatter-matrix"}]}
+{"cards":[{"t":"scatter","b":"","href":"#chart-scatter"},{"t":"bubble","b":"","href":"#chart-bubble"},{"t":"quadrant","b":"","href":"#chart-quadrant"},{"t":"heatmap","b":"","href":"#chart-heatmap"},{"t":"chord","b":"","href":"#chart-chord"},{"t":"network","b":"","href":"#chart-network"},{"t":"scatter-matrix","b":"","href":"#chart-scatter-matrix"}],"preview":true}
 ```
 
 #### Hierarchy {#chart-fn-hierarchy}
@@ -66,7 +66,7 @@ How one variable depends on another — pairs, matrices, links between entities.
 Nested containment — a thing inside a thing inside a thing.
 
 ```oku-compare-grid
-{"cards":[{"t":"treemap","b":"","href":"#chart-treemap"},{"t":"sunburst","b":"","href":"#chart-sunburst"}]}
+{"cards":[{"t":"treemap","b":"","href":"#chart-treemap"},{"t":"sunburst","b":"","href":"#chart-sunburst"}],"preview":true}
 ```
 
 #### Flow {#chart-fn-flow}
@@ -74,7 +74,7 @@ Nested containment — a thing inside a thing inside a thing.
 Quantity moving from one place to another — funnel stages, weighted source→target links.
 
 ```oku-compare-grid
-{"cards":[{"t":"funnel","b":"","href":"#chart-funnel"},{"t":"sankey","b":"","href":"#chart-sankey"},{"t":"gantt","b":"","href":"#chart-gantt"}]}
+{"cards":[{"t":"funnel","b":"","href":"#chart-funnel"},{"t":"sankey","b":"","href":"#chart-sankey"},{"t":"gantt","b":"","href":"#chart-gantt"}],"preview":true}
 ```
 
 #### Location {#chart-fn-location}
@@ -82,7 +82,7 @@ Quantity moving from one place to another — funnel stages, weighted source→t
 Values laid out on a coarse tile grid that approximates the world by region. NOT a real choropleth — every region is a fixed-size tile labelled by its ISO code. Use when the reader needs to scan regional differences at a glance without the visual budget (or the topojson dependency) of a real map.
 
 ```oku-compare-grid
-{"cards":[{"t":"geo","b":"","href":"#chart-geo"}]}
+{"cards":[{"t":"geo","b":"","href":"#chart-geo"}],"preview":true}
 ```
 
 ## Cartesian — x/y points with axes {#family-cartesian}
