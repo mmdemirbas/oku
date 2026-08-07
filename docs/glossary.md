@@ -25,21 +25,22 @@ oku/                          # the kit repo
 │   ├── data-platforms.json
 │   ├── web.json
 │   ├── ai-llm.json
-│   ├── adhd.json    (structural stub — populate as needed)
-│   ├── hadith.json
-│   └── voice.json
+│   ├── adhd.json          (structural stub — populate as needed)
+│   ├── doc-tooling.json   (structural stub)
+│   ├── hadith.json        (structural stub)
+│   └── voice.json         (structural stub)
 ├── extrefs/
-│   ├── doc-tooling.json
 │   ├── data-platforms.json
-│   ├── web.json
-│   └── ai-llm.json
+│   ├── doc-tooling.json
+│   ├── web.json           (structural stub)
+│   └── ai-llm.json        (structural stub)
 └── ...
 
 your-project/
 └── docs/
     ├── _oku -> /path/to/oku   # symlink
     ├── kit.json                    # active domains + overrides
-    ├── page-a.html / page-a.json
+    ├── page-a.html / page-a.md
     └── ...
 
 ```
@@ -139,8 +140,10 @@ Two paths — project-local for quick iteration, central PR when the term proves
 
 ## Bundled starter content {#starter}
 
-Three domains arrive populated; three are empty structural stubs ready to fill in.
+Seven glossary domains ship with the kit. Three arrive populated with ten entries each; four are empty structural stubs ready to fill in.
 
 ```oku-compare-grid
-{"cards":[{"t":"Populated","b":"- data-platforms — ACID, MVCC, Iceberg, Spark, Flink, Paimon, Catalog, Snapshot, Compaction, Time travel (with TR translations on the most common)\n- web — Custom Elements, Shadow DOM, FOUC, Viewport, Visual Viewport, prefers-color-scheme, localStorage, History API, IntersectionObserver, CSS variable\n- ai-llm — RAG, Tokenization, Prompt cache, Context window, Embedding, Vector DB, Function calling, Hallucination, Few-shot, Top-k / Top-p","verdict":"in"},{"t":"Structural stubs","b":"- adhd — populate with RSD, hyperfocus, executive dysfunction, etc.\n- hadith — populate with isnad, matn, sahih, da'if, etc.\n- voice — populate with phoneme, prosody, formant, etc.\n- Add new domains by dropping a new <domain>.json file in glossary/ and listing it in your project's kit.json","verdict":"out"}]}
+{"cards":[{"t":"Populated — 10 entries each","b":"- data-platforms — ACID, MVCC, Iceberg, Spark, Flink, Paimon, Catalog, Snapshot, Compaction, Time travel (with TR translations on the most common)\n- web — Custom Elements, Shadow DOM, FOUC, Viewport, Visual Viewport, prefers-color-scheme, localStorage, History API, IntersectionObserver, CSS variable\n- ai-llm — RAG, Tokenization, Prompt cache, Context window, Embedding, Vector DB, Function calling, Hallucination, Few-shot, Top-k / Top-p","verdict":"in"},{"t":"Structural stubs — no entries yet","b":"- adhd — populate with RSD, hyperfocus, executive dysfunction, etc.\n- doc-tooling — populate with the kit's own vocabulary.\n- hadith — populate with isnad, matn, sahih, da'if, etc.\n- voice — populate with phoneme, prosody, formant, etc.\n- Add new domains by dropping a new <domain>.json file in glossary/ and listing it in your project's kit.json","verdict":"out"}]}
 ```
+
+Ext-refs ship four domains on the same shape: `data-platforms` (7 entries) and `doc-tooling` (5) carry content; `web` and `ai-llm` are empty stubs.

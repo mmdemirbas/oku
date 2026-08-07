@@ -9,29 +9,29 @@ summary: Runtime mental model + build pipeline.
 ---
 
 > [!TLDR]
-> JSON pages are walked by renderer.js at load time and turned into Custom-Element DOM. chrome.js owns the behavior of those Custom Elements plus the page-level chrome (TOC, search, theme, warnings, viewport tracking). The whole kit lives in three JS files + one CSS file + JSON registry files.
+> A page dict is walked by renderer.js at load time and turned into Custom-Element DOM. The CLI converts each `.md` source into that dict; page-JSON sources are already in it. chrome.js owns the behavior of those Custom Elements plus the page-level chrome (TOC, search, theme, warnings, viewport tracking). The whole kit lives in three JS files + one CSS file + JSON registry files.
 >
-> - Format: JSON tree → renderer.js walks it → Custom Element DOM → chrome.js attaches behavior.
+> - Format: `.md` source → page dict → renderer.js walks it → Custom Element DOM → chrome.js attaches behavior.
 > - kit.json + per-domain glossary/extref JSON files are the registry; loaded once at page start, resolved per element.
 > - Visual Viewport API keeps fixed-position chrome buttons anchored during pinch-zoom on Safari.
 > - Build pipeline (oku CLI) emits two single-purpose trees under dist/: standalone/ (self-contained HTMLs) and site/ (multi-page + Pagefind + manifest + llms.txt). The .md sources are the AI/LLM surface, so no twin tree is emitted.
 
 ## Layered overview {#overview}
 
-Author content sits on top; the kit runtime hydrates it; build outputs flow out the bottom. Same kit, three distribution shapes.
+Author content sits on top; the kit runtime hydrates it; build outputs flow out the bottom. Same kit, two distribution shapes.
 
 ```mermaid
 flowchart TB
     subgraph A[Authoring layer]
       direction LR
-      JSON["docs/*.json"]:::auth
       MD["docs/*.md"]:::auth
+      JSON["docs/*.json — legacy"]:::auth
       KITJ["kit.json"]:::auth
     end
     subgraph R[Kit runtime — single _oku/ symlink]
       direction TB
-      RND["renderer.js — tree walker, ~1k LoC"]:::rt
-      CHR["chrome.js — Custom Elements + chrome, ~6k LoC"]:::rt
+      RND["renderer.js — tree walker, ~2.6k LoC"]:::rt
+      CHR["chrome.js — Custom Elements + chrome, ~13k LoC"]:::rt
       CSS["chrome.css — tokens + every primitive"]:::rt
       REG["glossary / extrefs — per-domain JSON"]:::reg
     end
@@ -61,19 +61,19 @@ The kit repo contains all the runtime plus the registry data plus the CLI.
 
 ```text
 oku/
-├── bin/oku                  # Python CLI — init, build, serve
-├── src/html_doc/                 # CLI implementation
+├── bin/oku                       # PEP 723 shim — run without install
+├── src/oku/                      # CLI: init, build, clean, migrate, check, serve
 │   └── templates/                # starter page pair for `oku init`
-├── src/html_doc_tests/           # pytest suite
+├── src/oku_tests/                # pytest suite
 ├── kit/                          # chrome.{js,css}, chrome-boot.js, renderer.js,
 │                                 # schema/, glossary/, extrefs/
-├── docs/                         # this site — JSON-only sources + _oku symlink
+├── docs/                         # this site — .md sources + _oku symlink
 ├── examples/                     # tour pages — same shape as docs/
 └── README.md, CLAUDE.md
 ```
 
 > [!TIP] Single-file split rationale
-> chrome.js is ~4.5k lines in one file. Splitting it would mean either more script tags in every stub (worse onboarding) or a build step (more complexity, defeating the no-build-for-content goal). The current bet: one file with a clear table of contents at the top (see the section banner there). Reviewed each time the design changes shape; still wins on author ergonomics.
+> chrome.js is ~13k lines in one file. Splitting it would mean either more script tags in every stub (worse onboarding) or a build step (more complexity, defeating the no-build-for-content goal). The current bet: one file with a clear table of contents at the top (see the section banner there). Reviewed each time the design changes shape; still wins on author ergonomics.
 
 ## Runtime — when a page loads {#render-flow}
 
@@ -113,7 +113,7 @@ sequenceDiagram
 
 ## The renderer {#renderer}
 
-renderer.js is a tree walker. It maps each JSON node's kind to a Custom Element instantiation (for interactive primitives) or directly to a styled DOM subtree (for prose primitives). The renderer is ~500 lines of straightforward code.
+renderer.js is a tree walker. It maps each node's kind to a Custom Element instantiation (for interactive primitives) or directly to a styled DOM subtree (for prose primitives), and parses the markdown strings in `b[]` with its own GFM block parser. It is ~2.6k lines.
 
 ```mermaid
 classDiagram
@@ -258,7 +258,7 @@ Any element referencing `_oku/` gives us a URL with the docs root as its prefix 
 
 ## Build pipeline {#build}
 
-bin/oku build walks the project and emits three single-purpose dist/ trees, one per audience. Soft-fails on optional dependencies (Pagefind, jsonschema) so the kit doesn't acquire hard requirements.
+`oku build` walks the project and emits two single-purpose dist/ trees, one per audience: standalone for a human reading one file, site for a human browsing a deployed tree. Pagefind is opt-in and soft-fails, so a project without it still builds.
 
 ```mermaid
 flowchart LR
@@ -291,15 +291,15 @@ flowchart LR
     classDef optional fill:#fef3c7,stroke:#b45309,color:#92400e,stroke-dasharray: 5 3
 ```
 
-*Build inputs and the three dist trees. Colour codes: blue = author content; teal = kit runtime; green = build outputs; amber = optional dependency.*
+*Build inputs and the two dist trees. Colour codes: blue = author content; teal = kit runtime; green = build outputs; amber = optional dependency.*
 
-1. walk the project recursively for JSON pages with `kind: "page"` plus *.md files (skipping project-meta files like README.md, CLAUDE.md).
-2. if jsonschema is installed, validate every page against schema/page.schema.json; print errors with field paths. Structural lint runs regardless of jsonschema.
+1. walk the project recursively for *.md files plus JSON pages with `kind: "page"` (skipping project-meta files like README.md, CLAUDE.md).
+2. validate every page against schema/page.schema.json; print errors with field paths. jsonschema is a required dependency, so this pass runs on any installed oku; the plain `python3 bin/oku` path can miss it and skips with a hint. Structural lint runs either way.
 3. build_standalone: for each page, inline chrome.css + chrome.js + renderer.js + page JSON + kit bundle + window.__okuManifest seed into a single self-contained HTML. No external dependencies beyond Google Fonts and Mermaid CDN (when used).
 4. build_site: copy every HTML stub + sibling JSON into dist/site/<rel-path>; copy _oku/ as dist/site/_oku/ once; embed extracted text via hidden data-pagefind-body div for indexing.
 5. write a single site-manifest.json at the site root (dist/site/). chrome.js resolves the docs root by stripping back to whichever directory holds _oku/, and build_site copies the kit to dist/site/_oku/ once — so the manifest belongs beside it, with page paths relative to the project root.
 6. build_llms_txt: emit one llms.txt sitemap at the site root, next to the manifest. The .md page sources are the canonical AI/LLM surface, so nothing is duplicated into a twin tree.
-7. if pagefind is on PATH, index dist/site/ to dist/site/pagefind/.
+7. if pagefind is available — the bundled binary from the `oku[search]` extra first, then a `pagefind` on PATH, then `npx pagefind` — index dist/site/ to dist/site/pagefind/.
 
 ## Standalone kit bundle {#standalone-bundle}
 
@@ -323,7 +323,7 @@ build_standalone embeds the project's kit.json + active domain glossary + extref
 Five behaviors worth knowing about if you're reading the kit code.
 
 > [!NOTE] Kit assets resolver
-> Two valid asset layouts now: development (chrome.{css,js} at repo root) and installed (chrome.{css,js} inside `html_doc/assets/` in the wheel). `cli._kit_assets_dir()` picks whichever exists, so `oku init` works from a clone OR from `uv tool install .`. Hatchling `force-include` in pyproject packs the assets into the right place at wheel build time.
+> Two valid asset layouts: development (`kit/` in the repo) and installed (the same files inside `oku/assets/` in the wheel). `cli._kit_assets_dir()` picks whichever exists, so `oku init` works from a clone OR from `uv tool install .`. Hatchling `force-include` in pyproject packs the assets into the right place at wheel build time.
 
 > [!NOTE] Generated artifacts live under dist/, never source
 > `oku build` writes site-manifest.json and llms.txt at the site root (dist/site/), where build_site puts the shared _oku/ kit — that is the docs root chrome.js resolves at runtime, so page paths inside the manifest are relative to the project root. `oku serve` doesn't write at all — it synthesizes site-manifest.json, llms.txt and kit.json in memory on each request so source dirs stay authored-content-only.

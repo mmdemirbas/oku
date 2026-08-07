@@ -2,13 +2,13 @@
 title: Charts
 eyebrow: Reference · charts
 order: 21
-summary: 28 chart variants with payloads + live samples — categorical, distribution, time series, hierarchy, relationship, multivariate, flow, graph, geographic.
+summary: 53 chart types, 50 with payloads + live samples — cartesian, categorical, part-to-whole, distribution, trend, flow, network, multivariate, goal, geographic.
 parent: reference
 ---
 
 ## Chart variants {#charts}
 
-28 chart types, one primitive (`chart`). Reach for a type by intent — the families below cluster types that solve the same shape of problem. Each card has a tiny live preview; click through to the variant for its full payload and a live render.
+The `chart` primitive accepts 53 values for `type`. Fifty of them get a worked section on this page — payload plus live render. The three without one are `plot` and `arc`, the base modes the element sets on itself rather than taking from an author, and `geo`, which is an alias the tile-map section covers. Reach for a type by intent — the families below cluster types that solve the same shape of problem. Each card has a tiny live preview; click through to the variant for its full payload and a live render.
 
 ### chart {#chart}
 
@@ -19,7 +19,7 @@ Single primitive, many render modes via the `type` field. The Cartesian family (
 
 ### Pick by function {#chart-families}
 
-29 chart variants, grouped by what you're trying to say. Click any card to jump to the variant's full example — the live tiny render previews the shape.
+43 of the types, grouped by what you're trying to say. Click any card to jump to the variant's full example — the live tiny render previews the shape. The families further down carry all 50.
 
 #### Compare {#chart-fn-compare}
 

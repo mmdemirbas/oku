@@ -1,21 +1,21 @@
 ---
 title: CLI reference
 eyebrow: Reference
-subtitle: Three commands: oku init, oku build, oku serve. Zero flags. Designed so you mostly forget the CLI exists.
+subtitle: Six commands: oku init, build, clean, migrate, check, serve. Designed so you mostly forget the CLI exists.
 date: 2026-05-18
 order: 50
-summary: oku init / build / clean / check / serve — what each does.
+summary: oku init / build / clean / migrate / check / serve — what each does.
 ---
 
 > [!TLDR]
-> init scaffolds the cwd as a docs root: _oku symlink + index.html entry stub. build emits two single-purpose trees — dist/standalone/ and dist/site/ (with manifest + llms.txt + Pagefind). clean wipes dist/. check lints every page. serve runs a local HTTP server and synthesizes the manifest, llms.txt and kit.json in memory — source dirs stay clean apart from the one entry stub.
+> init scaffolds the cwd as a docs root: _oku symlink + index.html entry stub. build emits two single-purpose trees — dist/standalone/ and dist/site/ (with manifest + llms.txt + Pagefind). clean wipes dist/. migrate converts page-JSON sources to v3 markdown. check lints every page. serve runs a local HTTP server and synthesizes the manifest, llms.txt and kit.json in memory — source dirs stay clean apart from the one entry stub.
 >
 > - init treats cwd as the docs root. Run it from wherever you want pages to live (typically cd into your docs/ subdir first).
-> - Source dirs hold JSON (or MD) plus a single index.html entry stub so IDE-served workflows work without the dev server running.
-> - build is idempotent; safe to re-run. dist/{standalone,site,markdown}/ are wiped each time.
+> - Source dirs hold MD (or legacy JSON) plus a single index.html entry stub so IDE-served workflows work without the dev server running.
+> - build is idempotent; safe to re-run. dist/standalone/ and dist/site/ are wiped each time.
 > - clean removes dist/ entirely — no-op if it's already absent.
 > - serve synthesizes the manifest fresh on each request — no source writes.
-> - Optional deps: pagefind (search index), jsonschema (page validation). Both soft-fail.
+> - jsonschema is a required dependency (page validation); pagefind is the opt-in `oku[search]` extra (search index).
 
 ## oku init {#init}
 
@@ -28,7 +28,7 @@ oku init
 # ✓ Linked /path/to/your-project/docs/_oku -> /path/to/oku/kit
 # ✓ Created /path/to/your-project/docs/index.html
 #
-#   Author pages as <name>.json (or .md) next to index.html.
+#   Author pages as <name>.md next to index.html (JSON still works).
 #   Open index.html in your IDE, or run `oku serve` from the
 #   project root for a live-reloading dev server.
 ```
@@ -61,7 +61,7 @@ oku build
 ```
 
 ```oku-step-flow
-{"steps":[{"t":"Walk *.json and *.md pages recursively","b":"Skips dist/, _oku/, node_modules/, .git/, venv/, __pycache__/. Treats files with kind:\"page\" (and any .md) as pages."},{"t":"Schema validation (optional)","b":"If jsonschema is installed (pip install jsonschema), every page is checked against kit/schema/page.schema.json. Errors print with field paths. Without jsonschema, prints a one-line hint and skips."},{"t":"build_standalone — single-file per page (humans, file://)","b":"For each page, synthesize the HTML stub in memory, inline chrome.css/.js, chrome-boot.js, renderer.js, the page JSON, the kit bundle, and the site-manifest seed (window.__okuManifest). One self-contained file per page; no sidecars. Output to dist/standalone/ with directory structure preserved."},{"t":"build_site — multi-page deployable (humans, HTTP)","b":"Write a per-page stub + copy the source JSON to dist/site/ with directory structure preserved. Copy the kit once into dist/site/_oku/. Write a single site-manifest.json at the site root, beside the copied kit (chrome.js resolves the docs root from wherever _oku/ sits and fetches it there at runtime). Inject extracted text into hidden data-pagefind-body for indexing."},{"t":"build_llms_txt (LLM consumers)","b":"Drop one llms.txt sitemap (llmstxt.org convention) at the site root, beside the manifest. The .md page sources are the canonical AI/LLM surface, so no twin tree is emitted."},{"t":"Pagefind index (optional)","b":"If pagefind is on PATH (brew install pagefind, or npx pagefind), run it over dist/site/. Output to dist/site/pagefind/. Soft-fails with install hint if absent."}]}
+{"steps":[{"t":"Walk *.json and *.md pages recursively","b":"Skips dist/, _oku/, node_modules/, .git/, venv/, __pycache__/. Treats files with kind:\"page\" (and any .md) as pages."},{"t":"Schema validation","b":"Every page is checked against kit/schema/page.schema.json. Errors print with field paths. jsonschema is a required dependency, so an installed oku always runs this pass; the plain `python3 bin/oku` path can miss it, and there build prints a one-line hint and skips."},{"t":"build_standalone — single-file per page (humans, file://)","b":"For each page, synthesize the HTML stub in memory, inline chrome.css/.js, chrome-boot.js, renderer.js, the page JSON, the kit bundle, and the site-manifest seed (window.__okuManifest). One self-contained file per page; no sidecars. Output to dist/standalone/ with directory structure preserved."},{"t":"build_site — multi-page deployable (humans, HTTP)","b":"Write a per-page stub + copy the source JSON to dist/site/ with directory structure preserved. Copy the kit once into dist/site/_oku/. Write a single site-manifest.json at the site root, beside the copied kit (chrome.js resolves the docs root from wherever _oku/ sits and fetches it there at runtime). Inject extracted text into hidden data-pagefind-body for indexing."},{"t":"build_llms_txt (LLM consumers)","b":"Drop one llms.txt sitemap (llmstxt.org convention) at the site root, beside the manifest. The .md page sources are the canonical AI/LLM surface, so no twin tree is emitted."},{"t":"Pagefind index (optional)","b":"Run pagefind over dist/site/, preferring the bundled binary from the pagefind[bin] Python package (install it with the oku[search] extra), then a pagefind on PATH, then npx pagefind. Output to dist/site/pagefind/. Soft-fails with an install hint if none is available."}]}
 ```
 
 > [!WARN] build wipes its dist trees
@@ -86,9 +86,35 @@ oku clean
 - Safe to chain: oku clean && oku build.
 - Doesn't touch source pages, the _oku symlink, or kit.json. Only generated output.
 
+## oku migrate {#migrate}
+
+Convert page-JSON sources (v1 or v2) to v3 markdown. Each `foo.json` becomes `foo.md` next to it and the JSON is removed. Migration is optional — the renderer accepts v1/v2 pages indefinitely — so run it when you want the on-disk source in the current authoring format.
+
+```bash
+cd ~/path/to/your-project/docs
+oku migrate
+
+#   migrated architecture.json → architecture.md
+#
+# Migrated 1 page(s).
+
+# Nothing left to convert:
+oku migrate
+
+# ✓ No page-JSON files found under /path/to/your-project/docs
+```
+
+```oku-table
+{"headers":["Argument","Default","Effect"],"rows":[["`path`","`.`","File or directory to migrate. A directory is walked recursively; kit.json, site-manifest.json, package.json and tsconfig.json are skipped, as is anything that is not a page."],["`--dry-run`","off","Print the files that would change and write nothing. Still exits 0."],["`--keep-json`","off","Leave the source .json in place beside the emitted .md. The walkers prefer the .json, so a kept file shadows the .md until you remove it."]]}
+```
+
+Two guards make the deletion safe. A page whose `.md` already exists is skipped rather than overwritten, and every conversion is round-tripped in memory before the JSON is unlinked — the emitted markdown is parsed back and fingerprinted against the source. A page that does not round-trip losslessly is skipped with its source kept and a message asking you to report it.
+
+Exit code is 1 only when the input path does not exist; a run that migrates nothing still exits 0.
+
 ## oku check {#check}
 
-Lint every page-JSON in the project. Schema validation plus structural / content checks. Fast — runs in milliseconds. Designed as the oku skill's auto-verify step.
+Lint every page in the project — `.md` sources and page-JSON alike. Schema validation plus structural / content checks. Fast — runs in milliseconds. Designed as the oku skill's auto-verify step.
 
 ```bash
 oku check
@@ -104,7 +130,7 @@ oku check
 Issues land at three severities. Exit code is 1 if any error is present (or any warning under --strict); 0 otherwise.
 
 ```oku-table
-{"headers":["Severity","Codes","What it catches"],"rows":[["**error**","`schema`, `deprecated-kind`, `unknown-kind`, `duplicate-anchor`, `chart-*`, `stray-demo`, `no-title`, `shadowed-source`, `json-parse-failed`","JSON shape problems, removed primitives still in use, duplicate section / heading IDs, malformed chart payloads, demo pages outside docs/reference.md, a page without a title, a .json shadowing the source you edit."],["**warning**","`process-breadcrumb`, `unresolved-glossary`, `unresolved-extref`, `unknown-inline`","Prose containing process/history references (round-N, vN-review, fixed-in-round; the kit documents current behaviour only). Glossary terms and ext-refs that do not resolve against kit/glossary/ and kit/extrefs/."],["**warning** · presentation","`redundant-meta`, `prose-only-section`, `island-hand-styled`, `group-of-one`, `figure-restates-headings`","A field that repeats another (`subtitle` verbatim from `summary`, `updated` from `date`). A section of three or more paragraphs with nothing for the eye — no table, chart, diagram, card grid or code block; a callout does not count. An HTML island carrying hardcoded colours or its own `<style>` instead of building on the kit's classes and CSS variables. A compare-grid / step flow / KPI grid / chart grid holding one member, where the primitive's whole job is the relationship between members. A diagram whose node labels are the page's own section titles."],["**info**","`code-no-language`, `no-summary`, `html-island`, `hand-set-derivable`, `accent-divergence`","Code blocks with no declared language. Pages with no meta.summary. HTML islands (they render in the kit, external markdown viewers strip them). A field set by hand where the build derives it. Three or more pages in one directory picking different accents with no default in kit.json."]]}
+{"headers":["Severity","Codes","What it catches"],"rows":[["**error**","`schema`, `deprecated-kind`, `unknown-kind`, `invalid-block`, `duplicate-anchor`, `chart-*`, `stray-demo`, `no-title`, `shadowed-source`, `json-parse-failed`","Page shape problems, removed primitives still in use, a body entry that is neither a markdown string nor a typed object, duplicate section / heading IDs, malformed chart payloads, demo pages outside docs/reference.md, a page without a title, a .json shadowing the source you edit."],["**error** · markdown","`fence-not-lifted`, `setext-heading`","An `oku-*` fence whose body is not a single JSON object of a known kind, so it stayed a code block instead of becoming a typed block. A setext (`===` underline) heading — the strict-GFM subset takes ATX `#` headings only."],["**warning**","`process-breadcrumb`, `unresolved-glossary`, `unresolved-extref`","Prose containing process/history references (round-N, vN-review, fixed-in-round; the kit documents current behaviour only). Glossary terms and ext-refs that do not resolve against kit/glossary/ and kit/extrefs/."],["**warning** · markdown","`ambiguous-hr`, `heading-level-skip`, `indented-code`, `lazy-continuation`, `undefined-footnote`, `undefined-link-reference`","A `---` directly under a text line: a setext heading in CommonMark, a thematic break in the kit — insert a blank line before it. A heading that jumps a level (`##` straight to `####`), which breaks the outline for screen readers and the on-page TOC. A four-space-indented block after a blank line, which CommonMark reads as a code block and the kit reads as a paragraph. A blockquote line continued without its `>`. A `[^id]` or `[label]` reference with no definition on the page — it renders as literal text with nothing else to signal it."],["**warning** · presentation","`redundant-meta`, `prose-only-section`, `island-hand-styled`, `group-of-one`, `figure-restates-headings`","A field that repeats another (`subtitle` verbatim from `summary`, `updated` from `date`). A section of three or more paragraphs with nothing for the eye — no table, chart, diagram, card grid or code block; a callout does not count. An HTML island carrying hardcoded colours or its own `<style>` instead of building on the kit's classes and CSS variables. A compare-grid / step flow / KPI grid / chart grid holding one member, where the primitive's whole job is the relationship between members. A diagram whose node labels are the page's own section titles."],["**info**","`code-no-language`, `no-summary`, `html-island`, `empty-table`, `hand-set-derivable`, `accent-divergence`","Code blocks with no declared language. Pages with no meta.summary. HTML islands (they render in the kit, external markdown viewers strip them). A table with headers and no rows. A field set by hand where the build derives it. Three or more pages in one directory picking different accents with no default in kit.json."]]}
 ```
 
 > [!TIP] Adding to the oku skill flow
@@ -140,12 +166,12 @@ oku serve
 > [!NOTE] Optional flags
 > <strong>--no-watch</strong> disables the filesystem watcher + live-reload (serve static only).<br><strong>--no-search</strong> skips the background Pagefind index generation at startup. Both default to on so the dev loop is rich; opt out if you want a leaner serve.
 
-## Optional dependencies {#optional-deps}
+## Dependencies {#optional-deps}
 
-Two external tools the kit will use if present. Both soft-fail — install when you want the feature, skip when you don't.
+One required, one opt-in.
 
 ```oku-compare-grid
-{"cards":[{"t":"Pagefind — search index","b":"Install: `brew install pagefind`, or available via `npx pagefind`. Without it: search button still appears but says \"Search index not found\" when clicked. With it: build adds a ~50–100 KB pagefind/ directory to dist/site/; the search button works on the built site.","verdict":"neutral"},{"t":"jsonschema — page validation","b":"Install: `pip install jsonschema`. Without it: build prints a hint and skips validation. With it: every JSON page validates against schema/page.schema.json on build; errors print field path + message. Catches malformed JSON earlier than the runtime.","verdict":"neutral"}]}
+{"cards":[{"t":"jsonschema — page validation, required","b":"Declared in the base `dependencies`, so every installed oku has it. It was optional once, and the consequence was a page `oku check` called clean while three of its blocks rendered as blank space — the installed tool had no jsonschema, the schema pass silently no-opped, and only the structural checks ran. The soft-fail branch survives for the one path that can still miss it: `python3 bin/oku` without uv. There, build prints a hint and skips validation.","verdict":"neutral"},{"t":"pagefind — search index, opt-in","b":"The `search` extra (`oku[search]`) pulls the `pagefind[bin]` package, which ships its own binary — no brew, npm or npx needed. A `pagefind` on PATH or `npx pagefind` also works; build tries the bundled binary first, then PATH, then npx. Without any of them: the search button still appears but says \"Search index not found\" when clicked. With one: build adds a ~50–100 KB pagefind/ directory to dist/site/.","verdict":"neutral"}]}
 ```
 
 ## Install + run {#future}
@@ -162,7 +188,7 @@ uv tool install .
 oku serve
 ```
 
-Installs oku as a console script. The wheel packs chrome.{css,js}, schema/, glossary/, extrefs/ inside html_doc/assets/ and ships starter templates under html_doc/templates/, so init/build find everything without a git layout.
+Installs oku as a console script. The wheel packs chrome.{css,js}, schema/, glossary/, extrefs/ inside oku/assets/ and ships starter templates under oku/templates/, so init/build find everything without a git layout.
 
 ### In-tree without install
 
@@ -172,4 +198,4 @@ uv run bin/oku serve
 python3 bin/oku serve
 ```
 
-`bin/oku` is a thin shim that adds `src/` to sys.path and runs `html_doc.cli.main()`. PEP 723 inline metadata pulls jsonschema into an ephemeral venv when invoked via uv.
+`bin/oku` is a thin shim that adds `src/` to sys.path and runs `oku.cli.main()`. PEP 723 inline metadata pulls jsonschema into an ephemeral venv when invoked via uv.

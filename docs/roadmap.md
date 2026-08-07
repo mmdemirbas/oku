@@ -8,13 +8,13 @@ accent: amber
 ---
 
 > [!TLDR]
-> Most of the chart kit is interactive now — tooltips, click-pin, cursor sweep, fullscreen-preserving lightbox, deconflicted labels, family-grouped catalog with clickable mini-cards. Open work concentrates on legend interactivity for the long tail, draggable network nodes, lightbox scrollbar + minimap, and nested-language code highlighting.
+> Most of the chart kit is interactive — tooltips, click-pin, cursor sweep, fullscreen-preserving lightbox, deconflicted labels, family-grouped catalog with clickable mini-cards. Open work concentrates on legend interactivity for the long tail, draggable network nodes, lightbox scrollbar + minimap, and nested-language code highlighting.
 >
-> - Interactivity coverage: 29 / 29 chart variants now fire contextual tooltips on hover with real per-anchor data. Cartesian + ridgeline + sparkline + gauge carry a synced cursor that updates the tooltip per-position.
+> - Interactivity coverage: every variant in the table below fires a contextual tooltip on hover with real per-anchor data. Cartesian + ridgeline + sparkline + gauge carry a synced cursor that updates the tooltip per-position.
 > - Visual polish: quadrant + bubble label deconfliction is no-fly-zone aware. Parallel-coordinates line stroke 3.6 → 5px with fade-others on hover. Donut/pie pinned slices scale + accent-stroke. Mermaid fonts clamped to 13px, aspect-fit caps tall portrait diagrams.
-> - Layout: source / render columns universally box-top aligned (zero pixel delta across 21 / 29 / 5 example-pairs on reference / charts / tables).
+> - Layout: source / render columns box-top aligned across every example-pair on reference / charts / tables — zero pixel delta.
 > - Tooltip: width-stable across pin states; explicit × close button when pinned; `_tipPinned` flag stops cursor-driven charts from overwriting pinned content.
-> - Pick-by-family: 29 clickable mini-cards (one per variant) each with a tiny live render — readers scan the shape they want and click straight into the variant's full example.
+> - Pick-by-family: 43 clickable mini-cards each with a tiny live render — readers scan the shape they want and click straight into the variant's full example.
 > - `oku` is on PATH as a system command (uv tool install).
 
 ## Snapshot {#snapshot}
@@ -22,19 +22,19 @@ accent: amber
 Where the kit sits today, in numbers.
 
 ```oku-kpi-grid
-{"tiles":[{"num":"53","label":"Chart variants in the kit"},{"num":"53","label":"Variants with rich tooltip + click-pin"},{"num":"19","label":"Mermaid diagram types catalogued"},{"num":"10","label":"Intent families on the charts page"},{"num":"32","label":"Documentation pages clean under oku check --strict"},{"num":"331","label":"Pytest assertions — green"},{"num":"2","label":"Build trees per oku build (standalone / site)"},{"num":"10","label":"Series colour ramp (--series-1..10)"}]}
+{"tiles":[{"num":"53","label":"Chart types the schema accepts"},{"num":"50","label":"Types with a worked example on the charts page"},{"num":"19","label":"Mermaid diagram types catalogued"},{"num":"10","label":"Intent families on the charts page"},{"num":"24","label":"Documentation pages clean under oku check --strict"},{"num":"696","label":"Pytest tests — green"},{"num":"2","label":"Build trees per oku build (standalone / site)"},{"num":"10","label":"Series colour ramp (--series-1..10)"}]}
 ```
 
 ## Chart interactivity by feature {#interactivity}
 
-Which chart types carry which interaction primitive today. Filled cells are shipped; empty cells are queued.
+Which chart types carry which interaction primitive. Filled cells are shipped; empty cells are queued. The table records 28 of the 53 types; the remainder are not yet catalogued here.
 
 ```oku-table
 {"headers":["Variant",{"label":"Family","filter":"chips","values":["cartesian","categorical","distribution","part-to-whole","flow","hierarchy","matrix","trend","goal","geo"]},"Tooltip","Click-pin","Hover-highlight","Synced cursor","Fullscreen"],"rows":[["scatter",{"value":"cartesian","values":["cartesian"]},"●","●","●","●","●"],["line",{"value":"cartesian","values":["cartesian"]},"●","●","●","●","●"],["area",{"value":"cartesian","values":["cartesian"]},"●","●","●","●","●"],["bubble",{"value":"cartesian","values":["cartesian"]},"●","●","●","●","●"],["quadrant",{"value":"cartesian","values":["cartesian"]},"●","●","●","—","●"],["bar",{"value":"categorical","values":["categorical"]},"●","●","●","—","—"],["stacked-bar",{"value":"categorical","values":["categorical"]},"●","●","●","—","—"],["grouped-bar",{"value":"categorical","values":["categorical"]},"●","●","●","—","—"],["donut",{"value":"part-to-whole","values":["part-to-whole"]},"●","●","●","—","●"],["pie",{"value":"part-to-whole","values":["part-to-whole"]},"●","●","●","—","●"],["waffle",{"value":"part-to-whole","values":["part-to-whole"]},"●","●","○","—","●"],["treemap",{"value":"hierarchy","values":["hierarchy"]},"●","●","○","—","●"],["heatmap",{"value":"matrix","values":["matrix"]},"●","●","○","—","●"],["histogram",{"value":"distribution","values":["distribution"]},"●","●","○","—","●"],["sparkline",{"value":"trend","values":["trend"]},"●","●","—","●","●"],["gauge",{"value":"goal","values":["goal"]},"●","●","—","●","●"],["radar",{"value":"categorical","values":["categorical"]},"●","●","○","—","●"],["box-plot",{"value":"distribution","values":["distribution"]},"●","●","○","—","●"],["bullet",{"value":"goal","values":["goal"]},"●","●","○","—","●"],["slope",{"value":"trend","values":["trend"]},"●","●","○","—","●"],["calendar-heatmap",{"value":"trend","values":["trend"]},"●","●","○","—","●"],["ridgeline",{"value":"distribution","values":["distribution"]},"●","●","○","●","●"],["sankey",{"value":"flow","values":["flow"]},"●","●","○","—","●"],["network",{"value":"flow","values":["flow"]},"●","●","○","—","●"],["scatter-matrix",{"value":"matrix","values":["matrix"]},"●","●","○","—","●"],["parallel-coordinates",{"value":"matrix","values":["matrix"]},"●","●","●","—","●"],["chord",{"value":"flow","values":["flow"]},"●","●","○","—","●"],["geo",{"value":"geo","values":["geo"]},"●","●","○","—","●"]]}
 ```
 
 > [!NEUTRAL] Symbol key
-> ● shipped · ○ queued · — not applicable. Tooltip + click-pin coverage is now complete across all 28 chart variants. Hover-highlight (fade-others when one element is hovered) is still queued for most non-Cartesian types; synced-cursor only makes sense for charts with a sweep axis (Cartesian, ridgeline, sparkline, gauge). Fullscreen lightbox preserves chart interactivity for SVG charts; bar variants are DIV-based and use the page's normal scroll instead.
+> ● shipped · ○ queued · — not applicable. Tooltip + click-pin are shipped on all 28 variants recorded above. Hover-highlight (fade-others when one element is hovered) is still queued for most non-Cartesian types; synced-cursor only makes sense for charts with a sweep axis (Cartesian, ridgeline, sparkline, gauge). Fullscreen lightbox preserves chart interactivity for SVG charts; bar variants are DIV-based and use the page's normal scroll instead.
 
 ## Open / in-flight {#open}
 
@@ -61,10 +61,10 @@ Kanban board — filter by area or priority to scope. Each chip filters; the boa
 Highlights shipped in the current cycle. Full per-commit history lives in git log.
 
 ```oku-kpi-grid
-{"tiles":[{"num":"53","label":"Chart variants with rich tooltip"},{"num":"5","label":"Charts with synced-cursor sweep"},{"num":"10","label":"Intent-grouped families on charts page"},{"num":"0","label":"Visible label-vs-corner overlaps on quadrant Playwright sweep"}]}
+{"tiles":[{"num":"53","label":"Chart types the schema accepts"},{"num":"7","label":"Charts with synced-cursor sweep"},{"num":"10","label":"Intent-grouped families on charts page"},{"num":"0","label":"Visible label-vs-corner overlaps on quadrant Playwright sweep"}]}
 ```
 
-- Pick-by-family rewrite — 29 clickable mini-cards (one per variant) with live tiny renders; click goes straight to the variant's full example.
+- Pick-by-family rewrite — 43 clickable mini-cards with live tiny renders; click goes straight to the variant's full example.
 - Charts page regrouped into 10 intent families (Cartesian / Categorical / Part-to-whole / Distribution / Trend / Flow / Network / Multivariate / Goal / Geographic).
 - Code / output alignment is universally zero-pixel — boxes line up at top across every example-pair on every doc page.
 - Tooltip width is stable across pin states; pinned tooltip gets an × close button; viewport-fixed positioning surfaces it above the fullscreen lightbox.
