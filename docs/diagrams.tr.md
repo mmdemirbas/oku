@@ -97,7 +97,7 @@ Bölümlere ayrılmış, doğrusal olay dizisi.
 Aşamalar arasında akış / pay. Huniler, enerji, trafik için kullanın.
 
 ```oku-example
-{"code":{"k":"code","src":"sankey-beta\n\n\"Ziyaretçiler\",\"Kayıtlar\",40\n\"Ziyaretçiler\",\"Ayrılanlar\",60\n\"Kayıtlar\",\"Etkinleşenler\",25\n\"Kayıtlar\",\"Vazgeçenler\",15","lang":"mermaid"},"output":{"k":"diagram","src":"sankey-beta\n\n\"Ziyaretçiler\",\"Kayıtlar\",40\n\"Ziyaretçiler\",\"Ayrılanlar\",60\n\"Kayıtlar\",\"Etkinleşenler\",25\n\"Kayıtlar\",\"Vazgeçenler\",15"}}
+{"code":{"k":"code","src":"sankey-beta\n\nGelenler,Abone olanlar,40\nGelenler,Terk edenler,60\nAbone olanlar,Kullananlar,25\nAbone olanlar,Elenenler,15","lang":"mermaid"},"output":{"k":"diagram","src":"sankey-beta\n\nGelenler,Abone olanlar,40\nGelenler,Terk edenler,60\nAbone olanlar,Kullananlar,25\nAbone olanlar,Elenenler,15"}}
 ```
 
 ## Kendi şemanızı çizmek {#hand-drawn}

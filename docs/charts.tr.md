@@ -123,7 +123,7 @@ Line ile aynı biçim — {x, y} nokta serisi — ama eğri taban çizgisine kad
 
 ### type: quadrant {#chart-quadrant}
 
-İki referans çizgisiyle dört bölgeye ayrılmış saçılım grafiği. Yazar, `x` (dikey ayrım) ve `y` (yatay ayrım) ile isteğe bağlı dört köşe etiketi (`[SÜ, SağÜ, SA, SağA]`) içeren bir `quadrants` bloğu verir. Tek bakışta 2×2 karar matrisi olarak okunur.
+İki referans çizgisiyle dört bölgeye ayrılmış saçılım grafiği. Yazar, `x` (dikey ayrım) ve `y` (yatay ayrım) ile isteğe bağlı dört köşe etiketi (`[sol üst, sağ üst, sol alt, sağ alt]`) içeren bir `quadrants` bloğu verir. Tek bakışta 2×2 karar matrisi olarak okunur.
 
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"chart\",\n  \"type\": \"quadrant\",\n  \"x_label\": \"Effort\",\n  \"y_label\": \"Value\",\n  \"quadrants\": {\n    \"x\": 5, \"y\": 5,\n    \"labels\": [\"Quick wins\", \"Big bets\", \"Skip\", \"Re-evaluate\"]\n  },\n  \"series\": [\n    { \"label\": \"Items\", \"color\": \"accent\", \"data\": [\n      { \"x\": 2, \"y\": 8, \"label\": \"A\" },\n      { \"x\": 7, \"y\": 8, \"label\": \"B\" },\n      { \"x\": 2, \"y\": 3, \"label\": \"C\" },\n      { \"x\": 8, \"y\": 2, \"label\": \"D\" }\n    ]}\n  ]\n}","lang":"json"},"output":{"type":"quadrant","title":"Emek × değer — karar matrisi","x_label":"Emek","y_label":"Değer","quadrants":{"x":5,"y":5,"labels":["Hızlı kazanımlar","Büyük bahisler","Atla","Yeniden değerlendir"]},"series":[{"label":"Maddeler","color":"accent","data":[{"x":2,"y":8,"label":"A"},{"x":7,"y":8,"label":"B"},{"x":2,"y":3,"label":"C"},{"x":8,"y":2,"label":"D"}]}],"k":"chart"}}
