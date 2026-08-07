@@ -11327,6 +11327,75 @@ var __mermaidLoader = (function () {
   return { load: load, reset: reset };
 })();
 
+/* Make every id inside a rendered diagram unique to that diagram.
+ *
+ * An id is document-global and `url(#name)` resolves through
+ * getElementById, so the FIRST match in the document wins no matter
+ * which SVG asked. Mermaid namespaces most of its ids with the diagram's
+ * root id, and forgets some: on docs/diagrams.html three diagrams each
+ * defined `<marker id="arrowhead">` and nine arrows referenced it. The
+ * sequence diagram's marker is 12x12 with markerUnits="userSpaceOnUse";
+ * the journey and timeline ones are 6x4 with the default strokeWidth
+ * units — so both of those drew the sequence diagram's arrowhead, at the
+ * wrong size, because it happened to come first in the page. The mindmap
+ * and sankey diagrams likewise shared `node-1`..`node-5`.
+ *
+ * Renames only what Mermaid left unprefixed: an id already starting with
+ * the root's is unique by construction, and rewriting it would mean
+ * rewriting the <style> rules Mermaid builds around it for no gain.
+ *
+ * References are rewritten in the same pass — `url(#…)` in any
+ * attribute, `href`/`xlink:href`, and `#…` inside the SVG's own <style>
+ * — because a rename that leaves a reference behind trades a wrong
+ * arrowhead for a missing one. */
+function __okuNamespaceSvgIds(svg, uid) {
+  if (!svg) return;
+  var owned = svg.querySelectorAll('[id]');
+  var renames = [];
+  var taken = {};
+  Array.prototype.forEach.call(owned, function (el) {
+    var id = el.getAttribute('id');
+    if (!id || (svg.id && id.indexOf(svg.id) === 0)) return;
+    var to = uid + '-' + id;
+    if (taken[to]) {
+      // Mermaid can repeat an id WITHIN one diagram too: the timeline
+      // renderer names 13 node backgrounds `node-undefined`, having
+      // interpolated a value it never set. Nothing references them, but
+      // a duplicate id is a hazard whatever today's references are, and
+      // leaving them in makes "no duplicate ids" untestable. Only the
+      // first keeps the plain name — it is the one getElementById would
+      // have returned, so it is the one references below must follow.
+      el.setAttribute('id', to + '-' + (++taken[to]));
+      return;
+    }
+    taken[to] = 1;
+    renames.push([id, to]);
+    el.setAttribute('id', to);
+  });
+  if (!renames.length) return;
+
+  var all = svg.querySelectorAll('*');
+  renames.forEach(function (pair) {
+    var from = pair[0], to = pair[1];
+    var urlFrom = 'url(#' + from + ')';
+    var urlTo = 'url(#' + to + ')';
+    Array.prototype.forEach.call(all, function (el) {
+      Array.prototype.forEach.call(el.attributes, function (attr) {
+        if (attr.value.indexOf(urlFrom) >= 0) {
+          el.setAttribute(attr.name, attr.value.split(urlFrom).join(urlTo));
+        } else if ((attr.name === 'href' || attr.name === 'xlink:href') && attr.value === '#' + from) {
+          el.setAttribute(attr.name, '#' + to);
+        }
+      });
+    });
+    Array.prototype.forEach.call(svg.querySelectorAll('style'), function (style) {
+      if (style.textContent.indexOf('#' + from) >= 0) {
+        style.textContent = style.textContent.split('#' + from).join('#' + to);
+      }
+    });
+  });
+}
+
 class OkuDiagram extends HTMLElement {
   connectedCallback() {
     // Guard against re-init when the host is moved (same reason as
@@ -11389,6 +11458,7 @@ class OkuDiagram extends HTMLElement {
           return mermaid.render(id, cleanSrc);
         }).then(function (out) {
           renderHost.innerHTML = out.svg;
+          __okuNamespaceSvgIds(renderHost.querySelector('svg'), id);
           // Strip Mermaid's intrinsic width/height + inline style so
           // CSS width:100% / height:auto can fit the SVG to the
           // container instead of clipping when the column is narrower
@@ -11825,6 +11895,7 @@ class OkuDiagram extends HTMLElement {
       return mermaid.render(id, self._src).then(function (out) {
         renderHost.innerHTML = out.svg;
         var svg = renderHost.querySelector('svg');
+        __okuNamespaceSvgIds(svg, id);
         if (svg) {
           self._snapEdgeEndpoints(svg);
           self._wireNeighborHighlight(svg);
