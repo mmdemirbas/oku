@@ -52,7 +52,21 @@ PROBE = """(html) => {
   const host = document.createElement('div');
   host.innerHTML = html;
   document.querySelector('main').appendChild(host);
-  return new Promise(r => setTimeout(() => {
+  // Wait for the element to say it has finished, not for a fixed
+  // number of milliseconds. A sleep long enough on an idle machine is
+  // not long enough on a loaded one, and that is the whole of what
+  // makes a browser suite flaky: this assertion failed once in a
+  // 9-minute batch and never again in isolation.
+  const ready = () => {
+    const el = host.querySelector('oku-annotated-code');
+    return el && el._okuMarkersBuilt ? el : null;
+  };
+  const settle = (resolve) => {
+    const el = ready();
+    if (el) { setTimeout(() => resolve(el), 0); return; }
+    setTimeout(() => settle(resolve), 25);
+  };
+  return new Promise(r => settle(() => {
     const el = host.querySelector('oku-annotated-code');
     const code = el.querySelector('pre code');
     // The hover tooltips are legitimately parented inside the code
@@ -70,7 +84,7 @@ PROBE = """(html) => {
       panel: [...el.querySelectorAll('.okc-anno-item .okc-anno-body')]
                .map(n => n.textContent.trim()),
     });
-  }, 600));
+  }));
 }"""
 
 
@@ -81,7 +95,6 @@ def test_annotations_reach_the_panel_and_not_the_code(page, site_url, shape):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{site_url}/docs/index.html")
     page.wait_for_selector("main section")
-    page.wait_for_timeout(600)
     out = page.evaluate(PROBE, ISLANDS[shape])
 
     assert out["panel"] == [a["content"] for a in ANNOS], out["panel"]
@@ -102,6 +115,5 @@ def test_the_program_keeps_its_own_line_count(page, site_url, shape):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{site_url}/docs/index.html")
     page.wait_for_selector("main section")
-    page.wait_for_timeout(600)
     out = page.evaluate(PROBE, ISLANDS[shape])
     assert out["code"].strip().count("\n") + 1 == 3, out["code"]
