@@ -1152,9 +1152,26 @@ class TestChromeKitMarkers:
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         # JS attaches the tooltip with the annotation body.
         assert "okc-anno-tip" in js, "annotation tooltip injection missing"
-        # CSS: 4-column grid override for annotated-code line.
-        assert ".okc-anno-wrap.okc-anno-gutter-on pre.okt-line-numbered .okt-code-line" in css, (
-            "annotation-mode grid override missing"
+        # CSS: 4-column grid override for annotated-code line. Matched by
+        # its parts rather than as one literal string — the selector is
+        # allowed to wrap across lines, and pinning the exact spelling
+        # made a correctness fix to it read as a regression.
+        override = re.search(
+            r"\.okc-anno-wrap\.okc-anno-gutter-on\s+pre\.okt-line-numbered\s+"
+            r"\.okt-code-line([^{]*)\{([^}]*)\}",
+            css,
+        )
+        assert override, "annotation-mode grid override missing"
+        assert "grid-template-columns" in override.group(2), override.group(2)
+        # And it must be keyed off the line HAVING the annotation cell.
+        # Keyed off the host class alone, the rule outlived the cells: a
+        # pass that re-wraps the code lines rebuilds them without the
+        # cells while the host class stays, and the content then landed
+        # in the 22px annotation column — a 27-character line of Python
+        # wrapped to 450px tall.
+        assert ":has(> .okc-anno-line-marker)" in override.group(1), (
+            "the 4-column grid must require the annotation cell, not just the host class: "
+            f"{override.group(1)!r}"
         )
         # Tip uses fixed positioning to escape ancestor clipping.
         assert ".okc-anno-tip" in css and "position: fixed" in css, (

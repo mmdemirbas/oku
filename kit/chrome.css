@@ -2704,8 +2704,20 @@ oku-annotated-code > pre {
    its right" rather than floating in the far gutter. Tooltip on hover
    shows the annotation body so the reader can preview without jumping
    to the list below. */
-.okc-anno-wrap.okc-anno-gutter-on pre.okt-line-numbered .okt-code-line {
-  /* [num 32px] [fold 14px] [anno 22px] [content 1fr] */
+/* [num 32px] [fold 14px] [anno 22px] [content 1fr]
+ *
+ * Keyed off the line HAVING the annotation cell, not off a class on the
+ * host. The host class only says "this block wants a gutter"; whether a
+ * given line carries the cell is a separate fact, and the two came
+ * apart. Any later pass that re-wraps the code lines (the page's own
+ * line-number pass, a second highlight) rebuilds them from cloned text
+ * and the slots go with it — while `okc-anno-gutter-on` stayed on. The
+ * content cell then landed in the 22px annotation column, and a 27-
+ * character line of Python wrapped to 450px tall.
+ *
+ * :has() makes the rule true by construction: no cell, no 4th column. */
+.okc-anno-wrap.okc-anno-gutter-on pre.okt-line-numbered
+  .okt-code-line:has(> .okc-anno-line-marker) {
   grid-template-columns: 32px 14px 22px 1fr;
 }
 .okc-anno-wrap.okc-anno-gutter-on .okc-anno-line-marker {

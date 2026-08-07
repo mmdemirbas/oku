@@ -11062,6 +11062,33 @@ var __prismLoader = (function () {
             _hdtAfterPrismHighlight(env);
           });
         }
+        /* Never re-highlight a block that no longer contains only code.
+         *
+         * highlightElement reads `element.textContent` and then writes
+         * `element.innerHTML`. Once <oku-annotated-code> has built, the
+         * code element also holds its marker chips and the hover
+         * tooltips carrying the annotation bodies — so a second pass
+         * reads the commentary as if it were program text, highlights
+         * it as source, and wipes the chips on the way out. That is the
+         * reported defect: a page inflated by the full length of its
+         * own annotations.
+         *
+         * More than one driver highlights a given block — the element
+         * does its own, and the page-level highlightAll sweeps the
+         * whole document on `oku:rendered` — and neither can see the
+         * other's timing. So the guard cannot live at a call site; it
+         * has to live at the one point every path goes through.
+         *
+         * Blanking env.code makes Prism fire `complete` and return
+         * WITHOUT touching innerHTML, which is the same suppression the
+         * autoloader itself uses while a grammar is in flight. */
+        if (window.Prism && window.Prism.hooks) {
+          window.Prism.hooks.add('before-sanity-check', function (env) {
+            var el = env && env.element;
+            var host = el && el.closest && el.closest('oku-annotated-code');
+            if (host && host._okuMarkersBuilt) env.code = '';
+          });
+        }
         return window.Prism;
       });
     return loadPromise;
@@ -11085,7 +11112,54 @@ var __prismLoader = (function () {
       }));
     });
   }
-  return { load: load, highlightAll: highlightAll };
+  /* Highlight `root` in ONE pass, for a caller that has to decorate the
+     result afterwards.
+   *
+   * highlightAll cannot serve that caller. It hands the element to the
+   * autoloader, which — when the grammar is not loaded yet — blanks the
+   * pass, fetches the module, and calls highlightElement AGAIN. The
+   * second call re-reads `code.textContent`. Anything the caller put
+   * inside the block in between is read as if it were program text and
+   * baked into the code: <oku-annotated-code> injected its marker chips
+   * and hover tooltips there, so a 4-line program came back 4695px tall
+   * with its own commentary highlighted as source, and the markers and
+   * tooltips wiped. The promise from highlightAll resolves when the
+   * highlight was REQUESTED, which is inside that window, so no amount
+   * of waiting on it is safe.
+   *
+   * So load the grammar first and only then highlight. With the module
+   * present the autoloader does not suppress anything, one `complete`
+   * fires, and there is no second read to lose the race to.
+   *
+   * Never rejects — resolves false when Prism could not be used at all,
+   * so the caller can decorate the plain block instead of dropping its
+   * decoration on an offline page. */
+  function highlightOnce(root, lang) {
+    var blocks = root ? root.querySelectorAll('code[class*="language-"]') : [];
+    if (!blocks.length) return Promise.resolve(false);
+    return load().then(function (Prism) {
+      if (!Prism || typeof Prism.highlightAllUnder !== 'function') return false;
+      var auto = Prism.plugins && Prism.plugins.autoloader;
+      var ready = (!lang || !auto)
+        ? Promise.resolve()
+        // loadLanguages resolves aliases (js → javascript) and pulls
+        // dependencies, is a no-op when already loaded, and calls the
+        // error arm for a language that does not exist. Every one of
+        // those ends the same way here: highlight with what we have.
+        : new Promise(function (resolve) { auto.loadLanguages([lang], resolve, resolve); });
+      return ready.then(function () {
+        Prism.highlightAllUnder(root);
+        return true;
+      });
+    }).catch(function (e) {
+      window.dispatchEvent(new CustomEvent('oku:warnings', {
+        detail: [{ code: 'prism-load-failed', msg: 'Could not load Prism: ' + (e.message || e), level: 'info' }]
+      }));
+      return false;
+    });
+  }
+
+  return { load: load, highlightAll: highlightAll, highlightOnce: highlightOnce };
 })();
 
 /* ============ <oku-diagram> — Mermaid (lazy-loaded) ============ */
@@ -11895,39 +11969,65 @@ class OkuAnnotatedCode extends HTMLElement {
       annoTargets[String(a.id)] = { lines: lines, match: match };
     });
 
+    /* Replace every `(N)` naming a real annotation with its chip.
+     *
+     * Matched against the block's FLATTENED text and spliced with a
+     * Range, because after highlighting a marker rarely lives in one
+     * text node. Prism tokenises `(`, `1` and `)` into three separate
+     * token elements whenever the marker sits in live code — a
+     * per-text-node regex cannot see across them and silently matched
+     * nothing, leaving `(1)` in the program as literal text with no
+     * chip anywhere. It worked only where the author had put the marker
+     * inside a comment, which is one token and therefore one text node:
+     * the JavaScript sample in reference.md is written that way, which
+     * is why the defect never showed up on this repo's own pages. */
     function injectMarkers() {
       var c = self.querySelector('pre code');
       if (!c) return;
-      var pattern = /\((\d+)\)/g;
-      var textNodes = [];
+      var placedIds = {};
+
+      var nodes = [];
+      var text = '';
       var walker = document.createTreeWalker(c, NodeFilter.SHOW_TEXT, null);
       var n;
-      while ((n = walker.nextNode())) textNodes.push(n);
-      var placedIds = {};
-      textNodes.forEach(function (textNode) {
-        var text = textNode.nodeValue;
-        if (text.indexOf('(') === -1) return;
-        pattern.lastIndex = 0;
-        var hasMatch = false;
-        var test;
-        while ((test = pattern.exec(text)) !== null) {
-          if (validIds[test[1]]) { hasMatch = true; break; }
+      while ((n = walker.nextNode())) {
+        // Tooltips are parented inside the code element by design.
+        // Their prose is commentary, not program text — scanning it
+        // would let an annotation body place a chip for itself.
+        if (n.parentElement && n.parentElement.closest('.okc-anno-tip')) continue;
+        nodes.push({ node: n, start: text.length, len: n.nodeValue.length });
+        text += n.nodeValue;
+      }
+
+      var hits = [];
+      var pattern = /\((\d+)\)/g;
+      var m;
+      while ((m = pattern.exec(text)) !== null) {
+        if (validIds[m[1]]) hits.push({ id: m[1], start: m.index, end: m.index + m[0].length });
+      }
+
+      function locate(offset) {
+        for (var i = 0; i < nodes.length; i++) {
+          if (offset <= nodes[i].start + nodes[i].len) {
+            return { node: nodes[i].node, offset: offset - nodes[i].start };
+          }
         }
-        if (!hasMatch) return;
-        pattern.lastIndex = 0;
-        var frag = document.createDocumentFragment();
-        var last = 0;
-        var m;
-        while ((m = pattern.exec(text)) !== null) {
-          if (!validIds[m[1]]) continue;
-          if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
-          frag.appendChild(makeMarker(m[1]));
-          placedIds[m[1]] = true;
-          last = m.index + m[0].length;
-        }
-        if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
-        textNode.parentNode.replaceChild(frag, textNode);
-      });
+        return null;
+      }
+
+      // Last match first: splicing an earlier one would move every
+      // offset after it.
+      for (var k = hits.length - 1; k >= 0; k--) {
+        var from = locate(hits[k].start);
+        var to = locate(hits[k].end);
+        if (!from || !to) continue;
+        var range = document.createRange();
+        range.setStart(from.node, from.offset);
+        range.setEnd(to.node, to.offset);
+        range.deleteContents();
+        range.insertNode(makeMarker(hits[k].id));
+        placedIds[hits[k].id] = true;
+      }
 
       // For annotations declaring `lines` but NOT placed inline by an
       // (N) marker in the source, auto-place the chip at the start of
@@ -12279,9 +12379,22 @@ class OkuAnnotatedCode extends HTMLElement {
       injectSubstringMarks(); // wrap `match` occurrences BEFORE injecting (N) markers
       injectMarkers();        // walks text nodes inside per-line spans
       moveMarkersToSlots();
+      /* From here the code element holds things that are not code: the
+       * chips, and the tooltips carrying the annotation bodies. Prism
+       * re-highlights by reading textContent and rewriting innerHTML,
+       * so a later pass over this block would bake the commentary into
+       * the program and wipe the chips. The flag is what the
+       * before-sanity-check hook in __prismLoader reads to leave the
+       * block alone — see there for why that is the only safe point. */
+      self._okuMarkersBuilt = true;
     }
+    // highlightOnce, never highlightAll: the markers below go INSIDE the
+    // code element, and the autoloader's second pass would read them as
+    // program text. See __prismLoader.highlightOnce. No setTimeout — the
+    // `complete` hooks run synchronously inside highlightAllUnder, so by
+    // the time this resolves the block is final.
     if (lang && typeof __prismLoader !== 'undefined') {
-      __prismLoader.highlightAll(this).then(function () { setTimeout(buildMarkers, 0); });
+      __prismLoader.highlightOnce(this, lang).then(buildMarkers);
     } else {
       buildMarkers();
     }

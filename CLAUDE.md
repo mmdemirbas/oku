@@ -718,6 +718,45 @@ computed-style assertion, the rule isn't found yet.
   guard with a one-shot `data-` attribute; the second Prism pass
   wipes the spans, and a one-shot guard then refuses to re-apply.
 
+- **Prism rewrites a block from its own text, so nothing that is not
+  code may be inside `pre code` when it runs.** `highlightElement`
+  reads `element.textContent` and writes `element.innerHTML`. Any
+  decoration living inside the code element is read back as program
+  text on the next pass: `<oku-annotated-code>` puts its marker chips
+  and hover tooltips there, and a second pass highlighted the
+  commentary as source and wiped the chips — reported from another
+  project as a page inflated by 25,000px, reproduced here at 3366px
+  for a three-line program.
+
+  Two rules, and they are separate because they fix different halves:
+
+  1. **A caller that decorates the result uses
+     `__prismLoader.highlightOnce(root, lang)`, never `highlightAll`.**
+     highlightAll hands the block to the autoloader, whose promise
+     resolves when the highlight was *requested* — inside the window
+     before the grammar lands and the block is read again. highlightOnce
+     loads the grammar first, so one pass runs and there is no second
+     read to lose the race to.
+  2. **A block that has finished decorating sets `_okuMarkersBuilt`,
+     and the `before-sanity-check` hook in `__prismLoader` blanks
+     `env.code` for it.** More than one driver highlights a given block
+     — the element does its own, the page-level sweep runs on
+     `oku:rendered` — and neither sees the other's timing, so the guard
+     cannot live at a call site. Blanking `env.code` makes Prism fire
+     `complete` and return without touching innerHTML, which is the
+     same suppression the autoloader itself uses.
+
+  Every annotated block in this repo's docs is **javascript**, whose
+  grammar the loader preloads, so it takes one pass and the defect was
+  invisible here for as long as it existed. `test_annotated_code_
+  highlighting.py` uses python deliberately.
+
+  The related trap: a `(1)` marker in live code is split by Prism into
+  `(`, `1` and `)` in three token elements, so a per-text-node regex
+  matched nothing and silently left `(1)` in the program. `injectMarkers`
+  matches the flattened text and splices with a Range — the same shape
+  `markNeedleInScope` already used next to it.
+
 - **CSS rules silently dropped by Chrome.** A multi-line comment
   inside a rule body, containing certain Unicode punctuation, has
   been observed to make Chrome's parser drop the trailing
