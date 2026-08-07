@@ -154,19 +154,31 @@ carries its OWN COPY of `kit/` inside the wheel. Editing this repo does
 not change what those projects build with until the tool is reinstalled:
 
 ```bash
-uv tool install --force --no-cache --from . oku   # --no-cache is load-bearing
-oku --version    # oku 0.4.0 · kit 2026-08-03-r13 · assets /…/site-packages/oku/assets
+./run install    # the whole procedure, and it verifies itself
 ```
 
-`--force` alone is NOT enough: uv reuses the cached wheel when the
-version string in `pyproject.toml` has not changed, so the tool silently
-stays on the old kit while reporting a successful install. Either bump
-the version on a kit change, or pass `--no-cache`. `oku --version`
-prints the kit build stamp (`__okuKitBuild` in chrome.js) — compare it
-against the repo's to see whether a project is building with the current
-kit. A page rendered by a stale tool is the usual cause of a "the kit
-regressed" report; check the stamp inlined in the artifact first
-(standalone HTML files carry it).
+**Use `./run install`. Do not hand anyone the raw `uv tool install`
+line** — it has a trap in it, and a command with a trap is one nobody
+should be retyping from memory. `--force` alone is NOT enough: uv reuses
+the cached wheel when the version string in `pyproject.toml` has not
+changed, so the tool silently stays on the old kit while reporting a
+successful install. `./run install` passes `--no-cache`, then compares
+the repo's kit stamp against the one the installed tool reports and
+exits non-zero when they differ. That comparison is the point — a stale
+global tool reports success and then builds other projects with the old
+kit, so the symptom arrives later, somewhere else, as "the kit
+regressed".
+
+`./run version` answers the same question without reinstalling.
+`oku --version` prints the kit build stamp (`__okuKitBuild` in
+chrome.js); standalone HTML files carry it inlined, so when a project
+reports a kit bug, check the stamp in the artifact first.
+
+The wheel's copy of `kit/` is assembled from a hand-maintained
+`force-include` list in `pyproject.toml`. `test_packaging.py` checks
+that list against the directory in both directions, because a kit file
+nobody remembered to add ships as a silent absence — this repo renders
+it, the tests pass, and every other project builds without it.
 
 ## Develop / verify
 

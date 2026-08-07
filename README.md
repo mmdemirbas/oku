@@ -37,8 +37,8 @@ file copies for offline reading.
   fullscreen pan/zoom overlay, and tracks the light / dark theme
   tokens.
 - **Chrome:** single left sidebar with site-tree + on-page TOC
-  stacked, drag-to-resize edge handle + off-canvas drawer on
-  mobile, sticky section TOC with scroll-spy, two-state theme
+  stacked, opened by one button in three states (peek on hover,
+  pinned, modal below 900px), sticky section TOC with scroll-spy, two-state theme
   toggle that follows the OS until overridden, three-mode
   content-width cycler (narrow → comfortable →
   max), full-text search (Pagefind), forward-compat warning
@@ -60,8 +60,14 @@ file copies for offline reading.
 ```bash
 git clone git@github.com:mmdemirbas/html-doc.git    # repo URL still legacy upstream
 cd html-doc
-uv tool install .                                   # `oku` on PATH
+./run install                                       # `oku` on PATH
 ```
+
+`./run install` is also how you push a kit change out to the projects
+that use it: it forces a cache-free reinstall and then verifies the
+installed tool reports this repo's kit build, rather than leaving you to
+compare two version strings by eye. `./run` on its own lists everything
+else.
 
 Or run in-tree without installing:
 

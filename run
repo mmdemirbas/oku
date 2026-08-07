@@ -62,17 +62,46 @@ cmd_new() {
 
 # --- ship -------------------------------------------------------------------
 
+repo_kit_stamp() {
+  sed -n "s/.*__okuKitBuild = '\([^']*\)'.*/\1/p" kit/chrome.js | head -1
+}
+
+global_kit_stamp() {
+  command -v oku >/dev/null 2>&1 || return 0
+  oku --version 2>/dev/null | sed -n 's/.*kit \([^ ·]*\).*/\1/p' | head -1
+}
+
 # --no-cache is load-bearing: uv reuses the cached wheel when the version
 # string has not changed, so a plain --force install silently leaves the
 # old kit in place while reporting success.
+#
+# Which is exactly why this ends by COMPARING the stamps rather than
+# printing both and leaving that to the reader. A stale global tool
+# reports a successful install and then builds other projects with the
+# old kit; the symptom arrives later, somewhere else, as "the kit
+# regressed". Whatever goes wrong, it should go wrong here and loudly.
 cmd_install() {
   step "installing the global oku from $REPO"
   uv tool install --force --no-cache --from "$REPO" oku
+  local want have
+  want="$(repo_kit_stamp)"
+  have="$(global_kit_stamp)"
   cmd_version
+  if [ -z "$have" ]; then
+    red "✗ installed, but the global oku does not report a kit build."
+    red "  Is ~/.local/bin on your PATH?"
+    exit 1
+  fi
+  if [ "$want" != "$have" ]; then
+    red "✗ the global oku is still on kit $have, this repo is on $want."
+    red "  A cached wheel was reused. Try: uv cache clean && ./run install"
+    exit 1
+  fi
+  green "✓ global oku is building with this repo's kit ($want)"
 }
 
 cmd_version() {
-  printf '  repo   kit %s\n' "$(sed -n "s/.*__okuKitBuild = '\([^']*\)'.*/\1/p" kit/chrome.js | head -1)"
+  printf '  repo   kit %s\n' "$(repo_kit_stamp)"
   if command -v oku >/dev/null 2>&1; then
     printf '  global %s\n' "$(oku --version 2>/dev/null | tr '\n' ' ')"
   else
