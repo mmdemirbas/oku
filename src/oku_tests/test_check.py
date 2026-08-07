@@ -826,6 +826,65 @@ def test_a_link_inside_inline_code_is_a_quotation(tmp_path: Path) -> None:
     assert _issues_of(issues, code="unresolved-anchor") == [], issues
 
 
+# ---------- translation anchor parity ----------
+
+
+def _bilingual(tmp_path: Path, en_body: str, tr_body: str) -> list[dict]:
+    (tmp_path / "kit.json").write_text(
+        json.dumps({"languages": ["en", "tr"], "defaultLanguage": "en"}), encoding="utf-8"
+    )
+    en = {"k": "page", "t": "A", "b": [en_body]}
+    tr = {"k": "page", "t": "A", "b": [tr_body]}
+    return cli.check_pages([(tmp_path / "a.json", en), (tmp_path / "a.tr.json", tr)], tmp_path)
+
+
+def test_a_translation_with_different_anchors_is_flagged(tmp_path: Path) -> None:
+    """The switch carries the reader's #fragment across, so an id that
+    exists on one side only lands them at the top of a page they were
+    already deep inside — silently, since both pages render fine alone."""
+    issues = _bilingual(
+        tmp_path,
+        "## Setup {#setup}\n\nx\n",
+        "## Kurulum {#kurulum}\n\nx\n",
+    )
+    flagged = _issues_of(issues, code="translation-anchor-drift")
+    assert len(flagged) == 1, issues
+    assert flagged[0]["severity"] == "warning"
+    assert "setup" in flagged[0]["message"] and "kurulum" in flagged[0]["message"]
+
+
+def test_a_translation_that_pins_the_same_anchors_is_clean(tmp_path: Path) -> None:
+    """`slugify` strips non-ASCII, so a Turkish heading cannot produce
+    its original's id by accident — it is pinned by hand, and this is
+    the check that keeps it pinned."""
+    issues = _bilingual(
+        tmp_path,
+        "## Setup {#setup}\n\nx\n",
+        "## Kurulum {#setup}\n\nx\n",
+    )
+    assert _issues_of(issues, code="translation-anchor-drift") == [], issues
+
+
+def test_a_monolingual_tree_is_not_paired(tmp_path: Path) -> None:
+    """Without a `languages` key nothing here runs, and a page whose
+    name merely ends in a dotted word is not a translation."""
+    page = {"k": "page", "t": "A", "b": ["## Setup {#setup}\n\nx\n"]}
+    other = {"k": "page", "t": "B", "b": ["## Other {#other}\n\nx\n"]}
+    issues = cli.check_pages([(tmp_path / "a.json", page), (tmp_path / "a.tr.json", other)], tmp_path)
+    assert _issues_of(issues, code="translation-anchor-drift") == [], issues
+
+
+def test_a_translation_with_no_original_is_not_paired(tmp_path: Path) -> None:
+    """`_fold_language_variants` keeps such a page as its own entry for
+    the same reason: it is a page, not a translation of anything."""
+    (tmp_path / "kit.json").write_text(
+        json.dumps({"languages": ["en", "tr"], "defaultLanguage": "en"}), encoding="utf-8"
+    )
+    orphan = {"k": "page", "t": "A", "b": ["## Kurulum {#kurulum}\n\nx\n"]}
+    issues = cli.check_pages([(tmp_path / "solo.tr.json", orphan)], tmp_path)
+    assert _issues_of(issues, code="translation-anchor-drift") == [], issues
+
+
 def test_heading_level_skip_is_flagged(tmp_path: Path) -> None:
     """The outline is what a screen reader announces and what the TOC
     nests by, so h2 → h4 is a structural defect. Levels are tracked

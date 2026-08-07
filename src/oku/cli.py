@@ -2414,7 +2414,49 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     f"Link target '{file_part}' does not exist relative to this page.",
                 )
 
-    # 12. Accent consistency, per tree. Cross-page, so it runs after the
+    # 12. Translation anchor parity. The language switch carries the
+    # reader's `#fragment` across, so an id that exists on one side and
+    # not the other drops them at the top of a page they were already
+    # deep inside — and it does it silently, because both pages render
+    # perfectly well on their own.
+    #
+    # This cannot be left to the slugifier: it strips non-ASCII, so a
+    # Turkish heading never produces its English original's id by
+    # accident. The translated side has to pin `{#id}` by hand, which is
+    # exactly the kind of manual step that is right on the day it is
+    # written and wrong two edits later.
+    for p, anchors in anchors_by_page.items():
+        codes, default = declared_languages(p.parent)
+        if not codes:
+            continue  # monolingual tree: nothing to pair with
+        base_stem, lang = split_language_suffix(p.stem, codes)
+        if not lang or lang == default:
+            continue
+        base_anchors = anchors_by_target.get((p.parent / (base_stem + p.suffix)).resolve())
+        if base_anchors is None:
+            # A page whose name merely ends in a language code, with no
+            # original beside it. `_fold_language_variants` keeps it as
+            # its own page for the same reason.
+            continue
+        missing = sorted(base_anchors - anchors)
+        extra = sorted(anchors - base_anchors)
+        if missing or extra:
+            parts = []
+            if missing:
+                parts.append(f"absent here: {', '.join(missing)}")
+            if extra:
+                parts.append(f"absent from the original: {', '.join(extra)}")
+            add(
+                p,
+                "warning",
+                "translation-anchor-drift",
+                "(page)",
+                f"Heading ids differ from {base_stem}{p.suffix} — {'; '.join(parts)}. "
+                "The language switch carries the #fragment across, so a reader deep in one "
+                "language lands at the top of the other. Pin the id with {#id} on both sides.",
+            )
+
+    # 13. Accent consistency, per tree. Cross-page, so it runs after the
     # per-page loop. A tree with a different accent on every page is not
     # a design; the fix is one line in kit.json.
     by_tree: dict[Path, dict[str, list[Path]]] = {}
