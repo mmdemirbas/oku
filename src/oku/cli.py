@@ -3398,7 +3398,7 @@ def collect_local_docs(page_data, src: Path, src_root: Path) -> tuple[dict[str, 
     return docs, skipped
 
 
-def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
+def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = None) -> None:
     """Inline kit CSS/JS + the page's JSON content into each HTML.
 
     Produces single self-contained files that render offline, with no
@@ -3439,6 +3439,17 @@ def build_standalone(srcs, out_dir: Path, src_root: Path) -> None:
             # Escape </script in the JSON to be safe inside an inline script.
             safe = data_text.replace("</script", "<\\/script")
             inline = f'<script type="application/json" id="__oku_page__">{safe}</script>'
+            # A standalone page is opened over file://, where the only
+            # manifest chrome.js can reach is an inline one — fetch is
+            # blocked before it is made. Only the entry stub `oku init`
+            # wrote carried one, so every OTHER page in the tree opened
+            # with no site tree and no language switch, which is not
+            # what "self-contained" is supposed to mean.
+            if manifest is not None:
+                safe_manifest = json.dumps(manifest, ensure_ascii=False, separators=(",", ":")).replace(
+                    "</script", "<\\/script"
+                )
+                inline += f"\n<script>window.__okuManifest={safe_manifest};</script>"
             # Inline the kit bundle (project kit.json + active domain
             # glossary/extref entries) so tooltips work offline.
             if kit_bundle:
@@ -3527,7 +3538,10 @@ def cmd_build(args: argparse.Namespace) -> int:
         if tree.exists():
             shutil.rmtree(tree)
 
-    build_standalone(srcs, standalone, root)
+    # One manifest, computed once, used by both trees: the site fetches
+    # it as a sidecar, the standalone pages carry it inline.
+    dist_manifest = compute_manifest(root, pages=json_pages)
+    build_standalone(srcs, standalone, root, manifest=dist_manifest)
     build_site(srcs, site, root)
 
     # Each tree carries only what its audience needs:

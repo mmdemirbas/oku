@@ -12,6 +12,8 @@ and `dist/site`, inlined in a standalone file.
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 
 from oku import cli
@@ -222,3 +224,49 @@ class TestDerivedStringsFollowThePage:
         # Declared, but with no phrase of its own: English rather than a guess.
         page = {"k": "page", "b": ["wort " * 3000]}
         assert "min read" in cli._read_time_for(page, "de")
+
+
+class TestStandaloneCarriesTheManifest:
+    def test_every_standalone_page_inlines_the_manifest(self, tmp_path: Path):
+        """A standalone page is opened over file://, where the only
+        manifest chrome.js can reach is an inline one — fetch is blocked
+        before it is made. Only the entry stub `oku init` wrote carried
+        one, so every OTHER page opened with no site tree and no language
+        switch, which is not what "self-contained" means."""
+        root = tmp_path / "docs"
+        root.mkdir(parents=True)
+        (root / "kit.json").write_text(KIT, encoding="utf-8")
+        _page(root / "index.md", "Home")
+        _page(root / "index.tr.md", "Ana sayfa")
+        out = tmp_path / "out"
+        manifest = cli.compute_manifest(root)
+
+        cli.build_standalone(
+            [(root / "index.html", cli._stub_for("Home"), cli._page_from_source_file(root / "index.md"))],
+            out,
+            root,
+            manifest=manifest,
+        )
+
+        built = (out / "index.html").read_text(encoding="utf-8")
+        assert "window.__okuManifest=" in built
+        payload = re.search(r"window\.__okuManifest=(\{.*?\});", built, re.S)
+        assert payload, built[-400:]
+        pages = json.loads(payload.group(1))["pages"]
+        entry = next(p for p in pages if p["path"] == "index.html")
+        assert entry["variants"] == {"en": "index.html", "tr": "index.tr.html"}
+
+    def test_a_build_without_a_manifest_still_works(self, tmp_path: Path):
+        """The parameter is optional; older callers must not break."""
+        root = tmp_path / "docs"
+        root.mkdir(parents=True)
+        _page(root / "index.md", "Home")
+
+        cli.build_standalone(
+            [(root / "index.html", cli._stub_for("Home"), cli._page_from_source_file(root / "index.md"))],
+            tmp_path / "out",
+            root,
+        )
+
+        built = (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
+        assert "window.__okuManifest=" not in built

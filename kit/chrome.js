@@ -406,25 +406,49 @@ var __okuLangSwitch = (function () {
   // which is the honest state until there is a second consumer.
   var PREF_KEY = 'oku-lang';
 
-  function currentPagePath() {
-    var explicit = window.__okuCurrentPage;
-    if (explicit) return explicit;
-    var last = (window.location.pathname.split('/').pop() || '');
-    return last.endsWith('.html') ? last : 'index.html';
+  /* Manifest paths are relative to the root the manifest was BUILT
+   * from, and that root is not the same thing in every mode:
+   *
+   *   oku serve        reference.html        (docs root is the tree root)
+   *   dist/site        docs/reference.html   (built from the repo root)
+   *   standalone       docs/reference.html   (inline, same origin root)
+   *
+   * while `location.pathname` is `/docs/reference.html` in the first
+   * two and an absolute filesystem path in the third. Comparing the
+   * manifest path to a bare filename matched under `oku serve` and
+   * nowhere else — the button appeared in development and was missing
+   * from both things a reader actually receives.
+   *
+   * Resolving against `__okuDocsRoot` does not fix it either: it would
+   * turn `docs/reference.html` into `…/docs/docs/reference.html` in the
+   * two modes whose manifest already carries the prefix.
+   *
+   * The suffix is the one relation true in all three. It also gives the
+   * navigation target for free: strip the matched suffix off the
+   * current pathname and the remainder is the prefix every variant
+   * hangs from. */
+  function suffixMatch(entryPath) {
+    if (!entryPath) return null;
+    var pathname = window.location.pathname;
+    var tail = '/' + entryPath;
+    return pathname.length >= tail.length && pathname.slice(-tail.length) === tail
+      ? pathname.slice(0, pathname.length - tail.length)
+      : null;
   }
 
-  function entryFor(manifest, path) {
+  function entryFor(manifest) {
     var pages = (manifest && manifest.pages) || [];
     for (var i = 0; i < pages.length; i++) {
       var p = pages[i];
       if (!p || !p.path) continue;
-      // The entry is the BASE page, so a reader already on a
-      // translation has to be found through the variants map — its own
-      // path is not any entry's `path`.
-      if (p.path === path) return p;
+      var prefix = suffixMatch(p.path);
+      if (prefix !== null) return { entry: p, prefix: prefix, path: p.path };
+      // A reader already ON a translation is not at any entry's own
+      // path — only the variants map knows where they are.
       if (p.variants) {
         for (var code in p.variants) {
-          if (p.variants[code] === path) return p;
+          prefix = suffixMatch(p.variants[code]);
+          if (prefix !== null) return { entry: p, prefix: prefix, path: p.variants[code] };
         }
       }
     }
@@ -436,9 +460,10 @@ var __okuLangSwitch = (function () {
   }
 
   function build(manifest) {
-    var path = currentPagePath();
-    var entry = entryFor(manifest, path);
-    var variants = entry && entry.variants;
+    var found = entryFor(manifest);
+    if (!found) return;
+    var entry = found.entry;
+    var variants = entry.variants;
     if (!variants) return;
     var codes = Object.keys(variants);
     if (codes.length < 2) return;
@@ -448,7 +473,7 @@ var __okuLangSwitch = (function () {
     // be on the translation.
     var here = entry.lang;
     for (var code in variants) {
-      if (variants[code] === path) here = code;
+      if (variants[code] === found.path) here = code;
     }
     document.documentElement.setAttribute('data-lang', here);
 
@@ -473,8 +498,10 @@ var __okuLangSwitch = (function () {
       try { localStorage.setItem(PREF_KEY, next); } catch (e) {}
       // The hash is the reader's position in the document. A
       // translation keeps its anchors, so carrying it over lands them
-      // at the same section rather than at the top.
-      window.location.href = variants[next] + (window.location.hash || '');
+      // at the same section rather than at the top. The prefix comes
+      // from the suffix match, so the target is right whichever root
+      // the manifest was built from.
+      window.location.href = found.prefix + '/' + variants[next] + (window.location.hash || '');
     });
   }
 
@@ -12819,6 +12846,13 @@ class PageNav extends HTMLElement {
         var panel = self.querySelector(':scope > .page-nav-scroll > .page-nav-panel');
         if (panel) panel.remove();
         self.classList.add('page-nav-standalone');
+        // The site tree goes, the language switch does not. A variant is
+        // not somewhere else on a site — it is the file sitting next to
+        // this one in the same standalone tree, and the inlined manifest
+        // is how this page knows its name. Skipping it here is why the
+        // button appeared under `oku serve` and in dist/site and was
+        // missing from the artifact people are actually sent.
+        __okuLangSwitch.build(window.__okuManifest);
         return;
       }
       loadManifest()
