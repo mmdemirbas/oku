@@ -93,10 +93,32 @@ Every Markdown construct maps to a specific kit block or inline node. The table 
 > [!INFO] Relative .md links rewrite to .html
 > `[overview](other.md#section)` in a Markdown page becomes `other.html#section` at render time, so links between .md pages work the same as between .json pages. Absolute URLs (http, https, mailto), fragment-only refs (`#section`), and absolute paths (`/x`) pass through unchanged.
 
-> [!INFO] Every other .md link opens in the markdown viewer
-> A link that still says `.md` when the reader clicks it — a root-absolute `/notes/plan.md`, anything inside an HTML island, any file that is not a page in this tree — opens in the kit's read-only viewer rather than handing the reader to the browser's plain-text rendering. The viewer shows the file's path, its front-matter title and summary, the rendered document, and a **Source** pane holding the exact bytes with a copy button. **Open file** is the escape hatch to the raw file. Escape, the backdrop and the close button all dismiss it; the page underneath never navigates.
->
-> It works the same over `file://`: `oku build` inlines every such file into the standalone HTML, because a page on a `file://` origin cannot read the file next to it. A link the build could not resolve is reported at build time, not left to fail silently in front of a reader.
+### Markdown viewer {#markdown-viewer}
+
+A link that still says `.md` when the reader clicks it opens in the kit's read-only viewer instead of handing them to the browser's plain-text rendering of the file.
+
+<div class="callout tip">
+<h4>Try it</h4>
+<p><a href="reference.md">Open this page's own Markdown source</a>. The link is written inside an HTML island, which is why it reaches you still saying <code>.md</code> — a relative link in prose would have been rewritten to <code>reference.html</code> and taken you to the page you are already on.</p>
+</div>
+
+The viewer opens over the page, which never navigates. It carries the file's path, the front-matter `title` and `summary`, the rendered document, and a **Source** pane holding the exact bytes with a copy button. **Open file** is the escape hatch to the raw file. Escape, the backdrop and the close button all dismiss it.
+
+Which links reach it follows from the rewrite above. A *relative* link written in prose becomes `.html`, because that file is a page in this tree and the whole page beats a file viewer. What the rewrite deliberately leaves alone is what the viewer gets:
+
+```oku-table
+{"headers":["Link","Reaches the reader as","Opens"],"rows":[["`[plan](notes/plan.md)` in prose","`notes/plan.html`","the rendered page"],["`[plan](/notes/plan.md)` in prose","`/notes/plan.md`","the viewer"],["`<a href=\"notes/plan.md\">` in an island","`notes/plan.md`","the viewer"],["`[spec](https://example.com/s.md)`","unchanged","the other site, in a new tab"]]}
+```
+
+A plain left-click only. Cmd / Ctrl / Shift / middle-click, a `target`, and `download` all mean *give me the file, not your reading of it*, and keep the browser's behaviour.
+
+The three ways a page is published reach the file differently, and the reader cannot tell which one ran:
+
+```oku-table
+{"headers":["Opened from","How the file is read"],"rows":[["`oku serve`","fetched from the dev server"],["`dist/site/`","fetched — the build copies each `.md` source next to its `.html`"],["`dist/standalone/` over `file://`","read from a map inlined into the HTML at build time"]]}
+```
+
+The `file://` case is why the build is involved at all: a page on a `file://` origin cannot read the file sitting next to it, so `oku build` inlines every `.md` its pages link to, keyed by the href as authored. A link the build could not resolve — missing, outside the tree, or over 512K — is reported at build time rather than failing in front of a reader.
 
 > [!NEUTRAL] Every Markdown file is a page by default
 > README.md, CHANGELOG.md, CLAUDE.md, AGENTS.md, LICENSE.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md and any other `.md` the walker reaches all surface as pages. Hide one by moving it under a SKIP_DIRS subdirectory (`dist/`, `_oku/`, `.git/`, `.venv/`, `node_modules/`, `templates/`, `_internal/`).

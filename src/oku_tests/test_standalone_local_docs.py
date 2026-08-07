@@ -1,14 +1,21 @@
-"""A standalone build carries the .md files its pages link to.
+"""Both published builds can reach the .md files their pages link to.
 
 The markdown viewer renders a linked .md in place of the browser's
-plain-text rendering. Over HTTP it fetches the file. Over file:// it
-cannot — the origin is opaque, so a page cannot read the file sitting
-next to it — and a standalone HTML is exactly the artifact people open
-over file://. So the build inlines what the viewer will be asked for.
+plain-text rendering, and it has two supply lines.
 
-The keys are hrefs AS AUTHORED, because that is what the viewer looks
-up (`a.getAttribute('href')`). Anything else would need both sides to
-normalise a path the same way forever.
+Over HTTP it fetches the file — so `build_site` copies each .md source
+next to its .html. Without that, a published site is the one place the
+viewer cannot read its own tree, while `oku serve` and the standalone
+build both can.
+
+Over file:// it cannot fetch at all: the origin is opaque, so a page
+cannot read the file sitting next to it, and a standalone HTML is
+exactly the artifact people open over file://. So `build_standalone`
+inlines what the viewer will be asked for.
+
+The inline keys are hrefs AS AUTHORED, because that is what the viewer
+looks up (`a.getAttribute('href')`). Anything else would need both
+sides to normalise a path the same way forever.
 """
 
 from __future__ import annotations
@@ -185,3 +192,50 @@ class TestStandaloneCarriesThem:
         built = (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
         assert "<\\/script>" in built, "the closing tag was inlined unescaped"
         assert _local_docs(built) == {"html.md": "Write `</script>` to close it.\n"}
+
+
+class TestSiteCarriesTheSource:
+    def test_the_site_build_copies_the_md_next_to_the_html(self, tmp_path: Path) -> None:
+        """The viewer fetches over HTTP, so the file has to be there. A
+        site that ships only .html is a site where every markdown link
+        opens the viewer's failure card."""
+        root = tmp_path / "docs"
+        root.mkdir(parents=True)
+        (root / "index.md").write_text(
+            "---\ntitle: Home\nsummary: s\n---\n\n## S {#s}\n\nBody.\n", encoding="utf-8"
+        )
+        page = _page("Body.\n")
+        out = tmp_path / "site"
+
+        cli.build_site([(root / "index.html", cli._stub_for("Home"), page)], out, root)
+
+        assert (out / "index.md").exists(), sorted(p.name for p in out.iterdir())
+        assert (out / "index.md").read_text(encoding="utf-8") == (root / "index.md").read_text(
+            encoding="utf-8"
+        )
+
+    def test_a_page_with_no_md_source_is_not_invented(self, tmp_path: Path) -> None:
+        """A hand-authored .html + .json page has no markdown source, and
+        the build must not conjure one."""
+        root = tmp_path / "docs"
+        root.mkdir(parents=True)
+        out = tmp_path / "site"
+
+        cli.build_site([(root / "page.html", cli._stub_for("P"), _page("Body.\n"))], out, root)
+
+        assert not (out / "page.md").exists()
+
+    def test_the_copy_keeps_the_directory_structure(self, tmp_path: Path) -> None:
+        """A nested page's source has to land beside its own .html, not
+        at the site root, or the relative href the viewer resolves goes
+        somewhere else."""
+        root = tmp_path / "docs"
+        (root / "guides").mkdir(parents=True)
+        (root / "guides" / "intro.md").write_text(
+            "---\ntitle: Intro\nsummary: s\n---\n\n## S {#s}\n\nB.\n", encoding="utf-8"
+        )
+        out = tmp_path / "site"
+
+        cli.build_site([(root / "guides" / "intro.html", cli._stub_for("Intro"), _page("B.\n"))], out, root)
+
+        assert (out / "guides" / "intro.md").exists()

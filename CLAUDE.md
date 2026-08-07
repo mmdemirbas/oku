@@ -137,9 +137,9 @@ AI/LLM surface.
 
 | File | Owns |
 |---|---|
-| `chrome.js` | Custom Elements (chart with 28 render modes, diagram, live-snippet, annotated-code, glossary-term, ext-ref, page-chrome / page-nav / page-toc), init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring, bar-chart hover/click-pin/legend toggle), Prism + Mermaid lazy loaders, glossary tooltip controller, lightbox with pan/zoom/pinch fullscreen, the top rail (progress + landmark minimap). ~7k LoC. |
-| `chrome.css` | All visual tokens (light/dark, --series-1..--series-10, --prose-width), layout grid (asymmetric bleed, three-mode content width), every primitive's styling. ~3k LoC. |
-| `renderer.js` | page JSON → DOM mapping. Walks `b[]`; strings parsed by the GFM block parser (headings → sections, paragraphs, lists, GFM tables, fences — `oku-*`/`mermaid` fences lift to typed blocks, def-lists, task-lists, HTML islands w/ executing scripts, admonitions); typed objects dispatched to typed renderers. v1→v2 shim keeps older pages rendering. ~1.6k LoC. |
+| `chrome.js` | Custom Elements (chart with 53 render modes, diagram, live-snippet, annotated-code, glossary-term, ext-ref, page-chrome / page-nav / page-toc), init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring, bar-chart hover/click-pin/legend toggle), Prism + Mermaid lazy loaders, glossary tooltip controller, lightbox with pan/zoom/pinch fullscreen, the top rail (progress + landmark minimap), the markdown viewer. ~13k LoC. |
+| `chrome.css` | All visual tokens (light/dark, --series-1..--series-10, --prose-width), layout grid (asymmetric bleed, three-mode content width), every primitive's styling. ~6.5k LoC. |
+| `renderer.js` | page JSON → DOM mapping. Walks `b[]`; strings parsed by the GFM block parser (headings → sections, paragraphs, lists, GFM tables, fences — `oku-*`/`mermaid` fences lift to typed blocks, def-lists, task-lists, HTML islands w/ executing scripts, admonitions); typed objects dispatched to typed renderers. v1→v2 shim keeps older pages rendering. ~2.6k LoC. |
 | `kit/schema/page.schema.json` | JSON-schema for page payloads. Every page (converted from .md) validates against it; the optional `jsonschema` dep makes the check active. Chart `type` enum here is the single source of truth for known chart types. |
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
 | `src/oku/cli.py` | `oku init / build / clean / check / migrate / serve` plus the v3 converter pair (`md_to_v2_page` / `page_to_md`), the strict-GFM + island lint (`_lint_md_string`), and the v1→v2 page shim (`_v1_to_v2`). |
@@ -612,7 +612,8 @@ structure from the `.okt-*` classes. Hardcoded hex or an inline
 following the accent and breaks in the theme nobody was looking at.
 
 **Hand-drawn figures get their colour from the kit.** An author who
-draws their own SVG — in an `oku-svg` block or an HTML island — reaches
+draws their own SVG — in an HTML island; there is no `svg` fence, the
+`svg` block kind is reachable only from a JSON page — reaches
 for `.okt-diag-node` / `-edge` / `-arrow` / `-label` / `-group` (each
 with `ok` / `warn` / `fail` / `accent` / `plain` / `soft` / `mono`
 modifiers) and `.okt-diag-fill-1..10` for the chart ramp. Every one is

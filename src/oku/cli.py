@@ -3078,6 +3078,19 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
                 text = extract_page_text(page)
                 title = _page_title(page) or src.stem
                 html = inject_pagefind_body(html, text, title)
+
+        # The .md source travels with the page. It is the canonical
+        # authoring surface (llms.txt points readers at it) and it is
+        # what the markdown viewer fetches when a page links to a .md
+        # over HTTP — without it, a published site is the one place the
+        # viewer cannot read its own tree, while `oku serve` and the
+        # standalone build both can.
+        md_sibling = src.with_suffix(".md")
+        if md_sibling.exists():
+            dest_md = out_dir / md_sibling.relative_to(src_root)
+            dest_md.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(md_sibling, dest_md)
+
         dest_html.write_text(_mark_built(html), encoding="utf-8")
 
 
