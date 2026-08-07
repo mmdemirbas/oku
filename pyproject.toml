@@ -71,6 +71,7 @@ packages = ["src/oku"]
 "kit/schema"          = "oku/assets/schema"
 "kit/glossary"        = "oku/assets/glossary"
 "kit/extrefs"         = "oku/assets/extrefs"
+"kit/i18n"            = "oku/assets/i18n"
 
 [tool.hatch.build.targets.sdist]
 include = [

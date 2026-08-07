@@ -9,7 +9,7 @@ This module is the canonical CLI implementation. Two ways to invoke:
   here without any install — handy for in-tree work.
 
 Commands:
-  oku init    — create docs/_kit symlink to the kit repo in the current project
+  oku init    — create an _oku symlink to the kit in the current directory
   oku build   — build all HTMLs in current dir into
                      dist/{standalone,site,markdown}/
   oku clean   — remove dist/ from the current project
@@ -2902,14 +2902,25 @@ def _fold_language_variants(entries: list[dict], root: Path) -> list[dict]:
 
     by_path = {}
     groups: dict[str, dict[str, str]] = {}
+    titles: dict[str, dict[str, str]] = {}
+    summaries: dict[str, dict[str, str]] = {}
     for entry in entries:
         rel = PurePosixPath(entry["path"])
         base, lang = split_language_suffix(rel.stem, codes)
         base_path = rel.with_name(base + ".html").as_posix()
+        code = lang or default
         entry["_base"] = base_path
-        entry["_lang"] = lang or default
+        entry["_lang"] = code
         by_path[entry["path"]] = entry
-        groups.setdefault(base_path, {})[lang or default] = entry["path"]
+        groups.setdefault(base_path, {})[code] = entry["path"]
+        # The tree shows one row per page, so that row has to be able to
+        # say the page's name in whichever language the reader is in.
+        # Without this the drawer on a Turkish page listed English
+        # titles pointing at English pages — the reader switched
+        # language and the navigation stayed behind.
+        titles.setdefault(base_path, {})[code] = entry["title"]
+        if entry.get("summary"):
+            summaries.setdefault(base_path, {})[code] = entry["summary"]
 
     kept = []
     for entry in entries:
@@ -2924,6 +2935,10 @@ def _fold_language_variants(entries: list[dict], root: Path) -> list[dict]:
         entry["lang"] = lang
         if len(variants) > 1:
             entry["variants"] = dict(sorted(variants.items()))
+            entry["titles"] = dict(sorted(titles.get(base_path, {}).items()))
+            group_summaries = summaries.get(base_path, {})
+            if group_summaries:
+                entry["summaries"] = dict(sorted(group_summaries.items()))
         if not is_translation:
             kept.append(entry)
     return kept
@@ -3173,7 +3188,7 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
     for f in KIT_FILES:
         shutil.copy(KIT_DIR / f, kit_out / f)
     # Shared registry directories → _oku/<name>/
-    for d in ("glossary", "extrefs", "schema"):
+    for d in ("glossary", "extrefs", "schema", "i18n"):
         src_dir = KIT_DIR / d
         if src_dir.exists():
             dst_dir = kit_out / d
@@ -3455,6 +3470,15 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
             if kit_bundle:
                 safe_bundle = kit_bundle.replace("</script", "<\\/script")
                 inline += f'\n<script type="application/json" id="__oku_kit_bundle__">{safe_bundle}</script>'
+            # The kit's own strings for THIS page's language. A page on
+            # a file:// origin cannot fetch the table, and its chrome
+            # would otherwise be English inside a translated document.
+            page_lang = _page_language(src.with_suffix(".md"))
+            i18n_path = KIT_DIR / "i18n" / f"{page_lang}.json"
+            if page_lang and i18n_path.is_file():
+                safe_i18n = i18n_path.read_text(encoding="utf-8").replace("</script", "<\\/script")
+                inline += f'\n<script type="application/json" id="__oku_i18n__">{safe_i18n}</script>'
+
             # Every .md this page links to, so the markdown viewer has
             # something to read over file:// — where fetch() cannot reach
             # the file sitting right next to this one.
@@ -3592,7 +3616,7 @@ def cmd_build(args: argparse.Namespace) -> int:
 # ---------- clean ----------
 def cmd_clean(args: argparse.Namespace) -> int:
     """Remove the dist/ tree under the current project root. No-op if
-    dist/ doesn't exist. Source dirs and the _kit symlink are left
+    dist/ doesn't exist. Source dirs and the _oku symlink are left
     alone — only generated artifacts are removed."""
     root = Path.cwd()
     dist = root / "dist"
@@ -3606,7 +3630,7 @@ def cmd_clean(args: argparse.Namespace) -> int:
 
 # ---------- serve ----------
 def find_project_root(start: Path) -> Path:
-    """Walk up to find the directory containing docs/_kit; fallback to start."""
+    """Walk up to find the directory containing _oku; fallback to start."""
     cur = start.resolve()
     for ancestor in [cur, *cur.parents]:
         if (ancestor / "docs" / "_oku").exists():
@@ -4347,7 +4371,7 @@ def main() -> int:
         version=f"oku {_PKG_VERSION} · kit {_kit_build_stamp()} · assets {_kit_assets_dir()}",
     )
     sub = parser.add_subparsers(dest="cmd")
-    sub.add_parser("init", help="create docs/_kit symlink in the current project")
+    sub.add_parser("init", help="create an _oku symlink in the current directory")
     sub.add_parser("build", help="build dist/{standalone,site,markdown}/ from current dir")
     sub.add_parser("clean", help="remove dist/ from the current project")
     migrate_parser = sub.add_parser(

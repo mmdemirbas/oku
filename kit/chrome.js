@@ -378,6 +378,151 @@ var __okuPanZoom = (function () {
   return { attach: attach };
 })();
 
+/* ============ Chrome strings ============ *
+ * The kit writes ~80 strings of its own onto a page — button labels,
+ * tooltips, aria-labels, placeholders. On a translated page every one
+ * of them stayed English, so a reader who switched to Turkish got
+ * Turkish prose inside English furniture.
+ *
+ * Keyed by the ENGLISH STRING, not by an invented id. Two reasons: the
+ * call sites already read as English, so nothing has to be rewritten to
+ * `okuT('btn.close')` and re-verified; and a key with no entry falls
+ * back to itself, so a missing translation degrades to exactly what
+ * shipped before rather than to a blank or a raw key.
+ *
+ * `{0}` placeholders exist because five of these were CONCATENATED
+ * fragments — `'Toggle ' + label + ' series'`. Turkish puts the verb
+ * last, so translating the fragment produces broken Turkish however
+ * good the fragment is. Whole string, substituted, or nothing.
+ * ---------------------------------------------------------------- */
+var __okuI18n = (function () {
+  var table = null;
+  var loading = null;
+
+  /* `data-lang` once the switch has run, and before that the page's own
+   * filename — `reference.tr.html` is a Turkish page whether or not a
+   * manifest has arrived yet. Deriving it here is what lets the table
+   * load at boot instead of waiting on the manifest, which matters
+   * because the chrome buttons are built long before that. */
+  function lang() {
+    var attr = document.documentElement.getAttribute('data-lang');
+    if (attr) return attr;
+    var m = (window.location.pathname.split('/').pop() || '').match(/\.([a-z]{2})\.html$/i);
+    return m ? m[1].toLowerCase() : '';
+  }
+
+  function t(en) {
+    var out = (table && table[en]) || en;
+    for (var i = 1; i < arguments.length; i++) {
+      out = out.split('{' + (i - 1) + '}').join(arguments[i]);
+    }
+    return out;
+  }
+
+  /* Attributes and leaf text on kit-owned elements only.
+   *
+   * Scoped, and exact-match against a curated table, so author prose is
+   * unreachable twice over: a paragraph is not inside `.okt-*`, and a
+   * string that is not in the table is never touched. Idempotent —
+   * translating an already-translated string is a miss, which leaves it
+   * alone. */
+  var SCOPES = [
+    '.ctrl-btn', '.copy-btn', '[class^="okt-"]', '[class*=" okt-"]',
+    '[class^="okc-"]', '[class*=" okc-"]', '[class^="okd-"]', '[class*=" okd-"]',
+    'page-chrome', 'page-nav', 'page-toc', '.callout-personalize',
+    '[data-oku-t]',
+  ];
+  var ATTRS = ['aria-label', 'title', 'placeholder'];
+
+  function localize(root) {
+    if (!table) return;
+    var scope = root || document;
+    var seen = new Set();
+    SCOPES.forEach(function (sel) {
+      var hosts;
+      try { hosts = scope.querySelectorAll(sel); } catch (e) { return; }
+      Array.prototype.forEach.call(hosts, function (host) {
+        if (seen.has(host)) return;
+        seen.add(host);
+        var els = [host].concat(Array.prototype.slice.call(host.querySelectorAll('*')));
+        els.forEach(function (el) {
+          /* A string the kit COMPOSED — `Last updated 2026-05-18` — is
+             not a table key, so exact matching can never see it. The
+             element carries its template and arguments instead, and is
+             rebuilt from them here. */
+          var tpl = el.getAttribute && el.getAttribute('data-oku-t');
+          if (tpl) {
+            var args = [tpl];
+            for (var ai = 0; el.getAttribute('data-oku-t' + ai) !== null; ai++) {
+              args.push(el.getAttribute('data-oku-t' + ai));
+            }
+            var next = t.apply(null, args);
+            if (el.children.length === 0) {
+              el.textContent = next;
+            } else if (el.firstChild && el.firstChild.nodeType === 3) {
+              // A heading carries the permalink anchor buildTOC appended;
+              // setting textContent would take it with the old string.
+              el.firstChild.nodeValue = next;
+            }
+          }
+          ATTRS.forEach(function (attr) {
+            var v = el.getAttribute && el.getAttribute(attr);
+            if (v && table[v]) el.setAttribute(attr, table[v]);
+          });
+          // Leaf text only: an element with element children is a
+          // container, and replacing its textContent would flatten them.
+          if (el.children.length === 0) {
+            var txt = (el.textContent || '').trim();
+            if (txt && table[txt]) el.textContent = table[txt];
+          }
+        });
+      });
+    });
+  }
+
+  /* Fetched, not inlined: a monolingual site should not carry a table it
+   * never reads, and a standalone build inlines its own copy (see
+   * build_standalone) because file:// cannot fetch. */
+  function load() {
+    if (loading) return loading;
+    var code = lang();
+    var inline = document.getElementById('__oku_i18n__');
+    if (inline) {
+      try { table = JSON.parse(inline.textContent); } catch (e) { table = null; }
+      loading = Promise.resolve(table);
+      return loading;
+    }
+    if (!code || window.location.protocol === 'file:') {
+      loading = Promise.resolve(null);
+      return loading;
+    }
+    var wa = (window.__okuWithAuth || function (u) { return u; });
+    loading = fetch(wa(__okuDocsRoot + '_oku/i18n/' + code + '.json'), { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (data) { table = data; return table; });
+    return loading;
+  }
+
+  return { t: t, load: load, localize: localize, lang: lang, table: function () { return table; } };
+})();
+
+function okuT(en) {
+  return __okuI18n.t.apply(null, arguments);
+}
+
+/* Two passes, both at points where the DOM is known to be complete
+ * rather than after a guessed delay: `oku:rendered` fires when the
+ * renderer has finished the page, and the reading-aids pass is what
+ * builds the per-block chrome (copy buttons, table controls, code
+ * toolbars). Idempotent — a string already translated is a miss. */
+/* NOT called at module scope: `__okuDocsRoot` is a `var` assigned some
+ * 3,700 lines below, so a load() up here builds `undefined_oku/i18n/…`,
+ * 404s, and memoises the failure for the rest of the page. */
+window.addEventListener('oku:rendered', function () {
+  __okuI18n.load().then(function () { __okuI18n.localize(document); });
+});
+
 /* ============ Language switch ============ *
  * A page and its translation are the same page in two languages, so the
  * switch is a property of the PAGE, not of the site: it appears only
@@ -401,11 +546,6 @@ var __okuPanZoom = (function () {
  * button switches; nothing switches on its own.
  * ---------------------------------------------------------------- */
 var __okuLangSwitch = (function () {
-  // The reader's last explicit choice. Read by nothing yet — the tree
-  // still links where it links — so it is stored and not acted on,
-  // which is the honest state until there is a second consumer.
-  var PREF_KEY = 'oku-lang';
-
   /* Manifest paths are relative to the root the manifest was BUILT
    * from, and that root is not the same thing in every mode:
    *
@@ -495,7 +635,6 @@ var __okuLangSwitch = (function () {
     okuChromeCluster().appendChild(btn);
 
     btn.addEventListener('click', function () {
-      try { localStorage.setItem(PREF_KEY, next); } catch (e) {}
       // The hash is the reader's position in the document. A
       // translation keeps its anchors, so carrying it over lands them
       // at the same section rather than at the top. The prefix comes
@@ -738,6 +877,7 @@ var __okuMdViewer = (function () {
     });
 
     __okuLightbox.open(wrap, { panZoom: false, title: path });
+    __okuI18n.localize(wrap);
 
     var done = function (text) {
       fill(wrap, text, fileUrl);
@@ -1784,7 +1924,7 @@ var WIDTH_MODES = ['narrow', 'comfortable', 'max'];
 var WIDTH_ALIASES = { wide: 'comfortable' };
 var DEFAULT_WIDTH = 'comfortable';
 function _widthLabelFor(mode) {
-  return 'Content width: ' + mode + ' — click to cycle (narrow → comfortable → max)';
+  return okuT('Content width: {0} — click to cycle (narrow → comfortable → max)', okuT(mode));
 }
 function _syncWidthToggleLabel(mode) {
   var btn = document.querySelector('.width-toggle');
@@ -1875,7 +2015,11 @@ class PageChrome extends HTMLElement {
     var skipLabel = this.getAttribute('skip-label') || 'Skip to content';
     var drawerLabel = this.getAttribute('drawer-label') || 'Contents';
     var themeLabel = this.getAttribute('theme-label') || 'Switch theme (light / dark)';
-    var widthLabel = this.getAttribute('width-label') || 'Cycle content width (narrow / comfortable / wide / max)';
+    // Built from WIDTH_MODES, not written out again: the literal here
+    // still named a `wide` stop that was removed, so the button
+    // announced four stops and cycled three until the first click
+    // replaced the label.
+    var widthLabel = this.getAttribute('width-label') || _widthLabelFor(DEFAULT_WIDTH);
     var topLabel = this.getAttribute('top-label') || 'Back to top';
 
     // The Contents button is the sidebar's only affordance, at every
@@ -2419,7 +2563,7 @@ function buildRail() {
     btn.style.left = pct + '%';
     btn.tabIndex = i === 0 ? 0 : -1;
     btn.setAttribute('aria-label',
-      'Jump to ' + (m.tipKind ? m.tipKind + ' in ' + m.label : m.label));
+      m.tipKind ? okuT('Jump to {0} in {1}', m.tipKind, m.label) : okuT('Jump to {0}', m.label));
     btn._okuMark = m;
     btn._okuPct = pct;
     host.appendChild(btn);
@@ -4305,6 +4449,20 @@ function _hdtAfterPrismHighlight(env) {
 
 function _hdtHighlightNestedLanguages(code) {
   if (!window.Prism) return;
+  /* This walks the block and rewrites `target.innerHTML` from
+   * `target.textContent`, which is the same read-then-rewrite that made
+   * Prism bake an annotated block's commentary into its program. The
+   * guard written for that lives in Prism's `before-sanity-check` hook,
+   * and `Prism.highlight()` — the static function used below — does not
+   * run hooks at all, so the guard cannot see this path.
+   *
+   * Its callback is also deferred through `autoloader.loadLanguages`
+   * when the grammar is not loaded yet, which puts it after the
+   * annotation chips and tooltips have had time to land inside the
+   * block. Check the same flag here rather than leaving one door
+   * unguarded. */
+  var annoHost = code.closest && code.closest('oku-annotated-code');
+  if (annoHost && annoHost._okuMarkersBuilt) return;
   // Two shapes to handle:
   //   (a) explicit `class="language-foo"` spans created by markdown
   //       fences inside markdown, or by author-supplied HTML;
@@ -4510,7 +4668,7 @@ function _hdtApplyFolds(pre, code, folds) {
     // aria-hidden is a control a keyboard user can reach and a screen
     // reader cannot see.
     marker.removeAttribute('aria-hidden');
-    marker.setAttribute('aria-label', 'Fold block starting at line ' + (f.start + 1));
+    marker.setAttribute('aria-label', okuT('Fold block starting at line {0}', f.start + 1));
     marker.dataset.foldStart = String(f.start);
     marker.dataset.foldEnd = String(f.end);
   });
@@ -5178,7 +5336,7 @@ var __okuPersonalization = (function () {
     panel.className = 'personalize-panel';
     var html = '<header><strong>Personalize</strong>' +
                '<button type="button" class="personalize-close" aria-label="Close">×</button>' +
-               '</header><p>Values you enter here swap into every <code>{{key}}</code> placeholder on the page. Stored only in your browser.</p>';
+               '</header><p>' + okuT('Values you enter here swap into every {0} placeholder on the page. Stored only in your browser.', '<code>{{key}}</code>') + '</p>';
     html += '<div class="personalize-fields">';
     keys.forEach(function (k) {
       var current = get(k.key);
@@ -5422,7 +5580,20 @@ class OkuChart extends HTMLElement {
     var extrasNodes = this.querySelectorAll('script[data-extras]');
     var series = [];
     if (dataNode) {
-      try { series = JSON.parse(dataNode.textContent || '[]'); } catch (e) { series = []; }
+      try {
+        series = JSON.parse(dataNode.textContent || '[]');
+      } catch (e) {
+        // An empty box is indistinguishable from a chart of zero rows,
+        // so malformed data used to look like authored emptiness.
+        series = [];
+        window.dispatchEvent(new CustomEvent('oku:warnings', {
+          detail: [{
+            code: 'chart-data-unparseable',
+            msg: 'A chart rendered empty — its data is not valid JSON: ' + (e.message || e),
+            level: 'error'
+          }]
+        }));
+      }
     }
     // Extras hold type-specific payloads that don't fit the `series`
     // shape — quadrant reference lines, donut slices, etc.
@@ -6291,7 +6462,7 @@ class OkuChart extends HTMLElement {
       var color = palette[slice.color] || palette.accent;
       var ly = 64 + idx * 22;
       var pct = Math.round((Math.max(0, +slice.value || 0) / total) * 100);
-      parts.push('<g class="okc-donut-legend" data-slice-idx="' + idx + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml('Toggle ' + (slice.label || 'slice')) + '">' +
+      parts.push('<g class="okc-donut-legend" data-slice-idx="' + idx + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml(okuT('Toggle {0} series', slice.label || 'slice')) + '">' +
                  '<rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/>' +
                  '<text x="' + (lx + 18) + '" y="' + ly + '" class="okc-donut-legend-label">' +
                    escapeXml(slice.label || '') + ' · ' + pct + '%' +
@@ -6554,7 +6725,7 @@ class OkuChart extends HTMLElement {
     segments.forEach(function (seg, idx) {
       var ly = titleTop + 16 + idx * 22;
       var color = palette[seg.color] || palette.accent;
-      parts.push('<g class="okc-waffle-legend" data-segment-idx="' + idx + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml('Toggle ' + (seg.label || 'segment')) + '"><rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/><text x="' + (lx + 18) + '" y="' + ly + '" class="okc-waffle-legend-label">' + escapeXml(wafFit.fit((seg.label || '') + ' · ' + (Math.round((Math.max(0, +seg.count || 0) / total) * 100)) + '%')) + '<title>' + escapeXml(seg.label || '') + '</title></text></g>');
+      parts.push('<g class="okc-waffle-legend" data-segment-idx="' + idx + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml(okuT('Toggle {0} series', seg.label || 'segment')) + '"><rect x="' + lx + '" y="' + (ly - 10) + '" width="12" height="12" rx="2" fill="' + color + '"/><text x="' + (lx + 18) + '" y="' + ly + '" class="okc-waffle-legend-label">' + escapeXml(wafFit.fit((seg.label || '') + ' · ' + (Math.round((Math.max(0, +seg.count || 0) / total) * 100)) + '%')) + '<title>' + escapeXml(seg.label || '') + '</title></text></g>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -6793,7 +6964,7 @@ class OkuChart extends HTMLElement {
     series.forEach(function (s, si) {
       var color = palette[s.color] || palette.accent;
       var lx = 16 + si * 130;
-      parts.push('<g class="okc-radar-legend" data-series-idx="' + si + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml('Toggle ' + (s.label || 'series')) + '"><rect x="' + lx + '" y="' + (lgY - 8) + '" width="10" height="10" rx="2" fill="' + color + '"/><text x="' + (lx + 16) + '" y="' + lgY + '" class="okc-radar-legend-label">' + escapeXml(s.label || '') + '</text></g>');
+      parts.push('<g class="okc-radar-legend" data-series-idx="' + si + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml(okuT('Toggle {0} series', s.label || 'series')) + '"><rect x="' + lx + '" y="' + (lgY - 8) + '" width="10" height="10" rx="2" fill="' + color + '"/><text x="' + (lx + 16) + '" y="' + lgY + '" class="okc-radar-legend-label">' + escapeXml(s.label || '') + '</text></g>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -12107,7 +12278,22 @@ class OkuDiagram extends HTMLElement {
         }
         self._attachToolbar();
       });
-    }).catch(function () { /* swallow */ });
+    }).catch(function (e) {
+      /* A diagram that fails to re-render keeps the OUTGOING theme's
+         palette while every other figure has switched, and says nothing
+         — the exact failure announceTheme() exists to prevent. The
+         initial render surfaces its errors; this path did not. The
+         diagram itself is left standing (renderHost is only written on
+         success), so the reader keeps a readable, mis-tinted figure and
+         the warning indicator tells them why. */
+      window.dispatchEvent(new CustomEvent('oku:warnings', {
+        detail: [{
+          code: 'diagram-rerender-failed',
+          msg: 'A diagram kept the previous theme\'s colours: ' + (e && e.message ? e.message : e),
+          level: 'warn'
+        }]
+      }));
+    });
   }
 }
 if (!customElements.get('oku-diagram')) customElements.define('oku-diagram', OkuDiagram);
@@ -12162,7 +12348,21 @@ class OkuAnnotatedCode extends HTMLElement {
     var code = srcNode ? srcNode.textContent.replace(/^\n/, '') : _annoHostCode(this);
     var annos = [];
     if (jsonNode) {
-      try { annos = JSON.parse(jsonNode.textContent || '[]'); } catch (e) { annos = []; }
+      try {
+        annos = JSON.parse(jsonNode.textContent || '[]');
+      } catch (e) {
+        // Every chip disappears and the code block still renders looking
+        // complete, so nothing on the page says the annotations were
+        // lost rather than never written.
+        annos = [];
+        window.dispatchEvent(new CustomEvent('oku:warnings', {
+          detail: [{
+            code: 'annotations-unparseable',
+            msg: 'An annotated code block lost its annotations — not valid JSON: ' + (e.message || e),
+            level: 'error'
+          }]
+        }));
+      }
     } else {
       var ol = this.querySelector('ol.okc-anno-source, ol.okc-anno-list');
       if (ol) {
@@ -12853,12 +13053,18 @@ class PageNav extends HTMLElement {
         // button appeared under `oku serve` and in dist/site and was
         // missing from the artifact people are actually sent.
         __okuLangSwitch.build(window.__okuManifest);
+        __okuI18n.load().then(function () { __okuI18n.localize(document); });
         return;
       }
       loadManifest()
         .then(function (manifest) {
-          self._renderTree(manifest);
+          // The switch first: it is what stamps `data-lang` on <html>,
+          // and both the string table and _renderTree read that.
           __okuLangSwitch.build(manifest);
+          __okuI18n.load().then(function () {
+            self._renderTree(manifest);
+            __okuI18n.localize(document);
+          });
         })
         .catch(function () {
           // No manifest: degrade silently. The sidebar prints an inline
@@ -13065,11 +13271,11 @@ class PageNav extends HTMLElement {
       // No manifest available — typical when the page is opened directly
       // (IDE-served, file://). Tell the reader how to enable the full
       // site tree without making it look like an error.
-      tree.innerHTML = '<li class="page-nav-empty">Run <code>oku serve</code> for full site navigation.</li>';
+      tree.innerHTML = '<li class="page-nav-empty">' + okuT('Run {0} for full site navigation.', '<code>oku serve</code>') + '</li>';
       return;
     }
     if (!Array.isArray(manifest.pages)) {
-      tree.innerHTML = '<li class="page-nav-empty">site-manifest.json is malformed (no <code>pages</code> array). Run <code>oku build</code>.</li>';
+      tree.innerHTML = '<li class="page-nav-empty">' + okuT('site-manifest.json is malformed (no {0} array). Run {1}.', '<code>pages</code>', '<code>oku build</code>') + '</li>';
       window.dispatchEvent(new CustomEvent('oku:warnings', {
         detail: [{ code: 'manifest-malformed', msg: 'site-manifest.json missing pages[]', level: 'warn' }]
       }));
@@ -13081,7 +13287,24 @@ class PageNav extends HTMLElement {
       }));
     }
 
-    var pages = manifest.pages.slice();
+    /* Show every row in the language the reader is reading, and point it
+     * at that language's file. A translation is not a second entry in
+     * the tree, so the ROW has to carry the counterpart — otherwise the
+     * drawer on a Turkish page lists English titles linking to English
+     * pages, and switching language leaves the navigation behind.
+     *
+     * `data-lang` is set by the language switch from the page it found
+     * itself on. No entry for that language means this page has no
+     * translation, and the row keeps its own title. */
+    var readerLang = document.documentElement.getAttribute('data-lang');
+    var pages = manifest.pages.map(function (p) {
+      if (!readerLang || !p.variants || !p.variants[readerLang]) return p;
+      var row = Object.assign({}, p);
+      row.path = p.variants[readerLang];
+      if (p.titles && p.titles[readerLang]) row.title = p.titles[readerLang];
+      if (p.summaries && p.summaries[readerLang]) row.summary = p.summaries[readerLang];
+      return row;
+    });
     pages.sort(function (a, b) {
       var oa = a.order !== undefined ? a.order : 1000;
       var ob = b.order !== undefined ? b.order : 1000;
@@ -13234,7 +13457,7 @@ var __okuWarnings = (function () {
         // Selector-based jump: scrolls + briefly highlights the offending
         // element so the reader can find the source of the warning
         // without scanning the whole page.
-        html += ' <a class="warning-panel-jump" href="' + escapeHTML(w.target) + '">Jump to</a>';
+        html += ' <a class="warning-panel-jump" href="' + escapeHTML(w.target) + '">' + okuT('Jump to it') + '</a>';
       }
       html += '</li>';
     });
@@ -13570,7 +13793,7 @@ var __okuSearch = (function () {
             'Open the <code>dist/site/</code> build for full-site search.';
         } else if (/pagefind|404|Not Found|fetch|standalone/i.test(msg)) {
           status.innerHTML = 'Site index unavailable and no matches on this page. ' +
-            'Run <code>oku build</code> + view from <code>dist/site/</code> for full-site search.';
+            okuT('Run {0} + view from {1} for full-site search.', '<code>oku build</code>', '<code>dist/site/</code>');
         } else {
           status.textContent = 'Search error: ' + msg;
         }
@@ -13624,6 +13847,17 @@ window.addEventListener('oku:rendered', function () {
   if (tocList) buildTOC(tocList);
   initReadingAids();
   __okuPostRenderLanguagePillSmartHide();
+  // initReadingAids is what creates the per-block chrome, so this is the
+  // first moment those strings exist to be translated — but the table
+  // itself is FETCHED unless a standalone build inlined it, so this has
+  // to wait on the promise rather than run beside it.
+  __okuI18n.load().then(function () {
+    __okuI18n.localize(document);
+    // The width label is COMPOSED through okuT rather than written out,
+    // so the finished string is not a table key and the pass above
+    // cannot see it. Rebuild it instead.
+    _syncWidthToggleLabel(document.body.getAttribute('data-content-width') || DEFAULT_WIDTH);
+  });
 });
 
 /* Smart-hide for the .okt-code-lang language pills.

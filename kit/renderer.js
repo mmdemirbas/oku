@@ -410,7 +410,8 @@
     section.id = uniqueAnchorId('footnotes');
     section.className = 'okt-footnotes';
     const h2 = document.createElement('h2');
-    h2.textContent = 'Footnotes';
+    h2.setAttribute('data-oku-t', 'Footnotes');
+    h2.textContent = (typeof okuT === 'function') ? okuT('Footnotes') : 'Footnotes';
     section.appendChild(h2);
     const ol = document.createElement('ol');
     __footnoteUses.forEach(function (id, idx) {
@@ -1443,7 +1444,13 @@
       if (meta.updated && meta.updated !== meta.date) {
         const u = document.createElement('div');
         u.className = 'meta meta-updated';
-        u.textContent = 'Last updated ' + meta.updated;
+        // Composed, so it cannot be matched as a whole string later —
+        // it carries its template for the localize pass to rebuild.
+        u.setAttribute('data-oku-t', 'Last updated {0}');
+        u.setAttribute('data-oku-t0', meta.updated);
+        u.textContent = (typeof okuT === 'function')
+          ? okuT('Last updated {0}', meta.updated)
+          : 'Last updated ' + meta.updated;
         cover.appendChild(u);
       }
       // A title on its own does not need a 156px tinted panel to sit in.
@@ -2197,7 +2204,8 @@
           chip.className = 'bar-chart-legend-chip ' + (colorInfo.className || '');
           chip.setAttribute('data-series-idx', String(si));
           chip.setAttribute('aria-pressed', 'false');
-          chip.setAttribute('aria-label', 'Toggle ' + s.label + ' series');
+          chip.setAttribute('aria-label',
+            (typeof okuT === 'function' ? okuT('Toggle {0} series', s.label) : 'Toggle ' + s.label + ' series'));
           const sw = document.createElement('span');
           sw.className = 'bar-chart-legend-swatch';
           if (colorInfo.inlineBackground) sw.style.background = colorInfo.inlineBackground;
