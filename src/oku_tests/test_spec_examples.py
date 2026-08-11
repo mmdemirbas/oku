@@ -86,6 +86,66 @@ def test_every_block_example_validates(kind: str, tmp_path) -> None:
     assert errors == [], f"the shipped {kind} example does not validate: {errors}"
 
 
+@pytest.mark.parametrize("kind", BLOCK_KINDS)
+def test_every_block_example_passes_the_structural_checks(kind: str, tmp_path) -> None:
+    """The schema and the structural checks disagree more often than they
+    look like they would — `chart-grid` validated against `$defs` while
+    `oku check` called it an unknown kind. Validating against one gate
+    only is how that survived.
+    """
+    block = {**EXAMPLES["blocks"][kind], "k": kind}
+    issues = cli.check_pages([(tmp_path / "p.json", _page_with(block))], tmp_path)
+    hard = [i for i in issues if i["severity"] == "error"]
+    assert hard == [], f"the shipped {kind} example fails `oku check`: {hard}"
+
+
+# ---------- the authoring form is the one that works ----------
+
+
+@pytest.mark.parametrize("kind", BLOCK_KINDS)
+def test_a_kind_prints_a_form_that_exists(kind: str) -> None:
+    """Three block kinds are real `$defs` entries that no `oku-` fence
+    lifts: `code`, `image` and `svg`. A page written with ```oku-code
+    keeps it as literal text — so those kinds must print their markdown
+    form, and every other kind must have a fence."""
+    entry = cli._spec_entry(kind)
+    assert entry is not None
+    if kind in cli._FENCE_KINDS:
+        assert entry["fence"] == f"oku-{kind}", entry
+    else:
+        assert entry["fence"] is None, entry
+        assert entry["markdown"], f"{kind} has no fence and no markdown form"
+
+
+_MARKDOWN_MARKER = {
+    "code": "```python",
+    "image": "![What the pipeline does](diagram.png)",
+    "svg": "<svg",
+}
+
+
+@pytest.mark.parametrize("kind", sorted(set(BLOCK_KINDS) - set(cli._FENCE_KINDS)))
+def test_the_markdown_form_survives_into_the_page(kind: str, tmp_path) -> None:
+    """Round-trip: paste what `oku spec` prints into a page, and the
+    converter must carry it through without complaint.
+
+    These three stay inside the `b[]` markdown string rather than
+    becoming typed blocks — only a typed fence lifts, and renderer.js
+    parses the rest at load time. So the invariant here is that the text
+    survives and the linter accepts it. An `oku-code` fence would fail
+    both halves: it would not lift, and `fence-not-lifted` would fire.
+    """
+    body = EXAMPLES["markdown"][kind]
+    src = f"---\ntitle: Probe\nsummary: A probe.\n---\n\n## S {{#s}}\n\nLead.\n\n{body}\n"
+    page = cli.md_to_v2_page(src, "p")
+    text = "".join(b for b in page["b"] if isinstance(b, str))
+
+    assert _MARKDOWN_MARKER[kind] in text, f"{kind} did not survive: {page['b']}"
+    issues = cli.check_pages([(tmp_path / "p.json", page)], tmp_path)
+    hard = [i for i in issues if i["severity"] == "error"]
+    assert hard == [], f"what `oku spec {kind}` prints does not pass `oku check`: {hard}"
+
+
 @pytest.mark.parametrize("ctype", CHART_TYPES)
 def test_every_chart_example_validates(ctype: str, tmp_path) -> None:
     block = {**EXAMPLES["charts"][ctype], "k": "chart"}

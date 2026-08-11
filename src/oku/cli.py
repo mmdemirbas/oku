@@ -1652,6 +1652,12 @@ _KNOWN_BLOCK_KINDS = {
     "table",
     "tldr",
     "kpi-grid",
+    # `oku-chart-grid` is a documented fence tag, renderer.js lists it in
+    # FENCE_KINDS and draws it in _renderChartGrid, and the schema has a
+    # `$defs/chart-grid`. Only this set had missed it, so `oku check`
+    # answered a correctly-authored small-multiples fence with
+    # `unknown-kind` — the linter rejecting a page the renderer draws.
+    "chart-grid",
     "step-flow",
     "timeline",
     "compare-grid",
@@ -2351,7 +2357,10 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 ("step-flow", "steps"),
                 ("timeline", "events"),
                 ("compare-grid", "cards"),
-                ("chart-grid", "charts"),
+                # `panels`, not `charts`: it is what `$defs/chart-grid`
+                # requires and what `_renderChartGrid` iterates. Keyed on
+                # `charts`, this fired on every correctly-authored grid.
+                ("chart-grid", "panels"),
             ):
                 if kind == empty_kind and not blk.get(field):
                     add(
@@ -4553,16 +4562,31 @@ def _load_examples() -> dict:
     return _examples_cache
 
 
-def _spec_entry(name: str) -> tuple[str, dict] | None:
-    """Resolve a name to (fence-tag, payload). Block kinds win a tie, and
-    `test_spec_examples` asserts there is never a tie to win."""
+def _spec_entry(name: str) -> dict | None:
+    """Resolve a name to what an author would paste.
+
+    Not every block kind is a typed fence. `code`, `image` and `svg` are
+    real `$defs` entries reachable from a JSON page, but a v3 markdown
+    page writes them as a plain code fence, an `![alt](src)`, and an HTML
+    island — `_FENCE_KINDS` does not lift them, so printing an
+    ```oku-code fence would print something that stays literal text.
+    Those kinds carry their authoring form instead.
+
+    Block kinds win a tie against chart types, and `test_spec_examples`
+    asserts there is never a tie to win.
+    """
     ex = _load_examples()
     blocks = ex.get("blocks") or {}
     charts = ex.get("charts") or {}
+    markdown = ex.get("markdown") or {}
     if name in blocks:
-        return f"oku-{name}", blocks[name]
+        return {
+            "payload": blocks[name],
+            "fence": f"oku-{name}" if name in _FENCE_KINDS else None,
+            "markdown": markdown.get(name),
+        }
     if name in charts:
-        return "oku-chart", charts[name]
+        return {"payload": charts[name], "fence": "oku-chart", "markdown": None}
     return None
 
 
@@ -4588,7 +4612,9 @@ def cmd_spec(args: argparse.Namespace) -> int:
     charts = ex.get("charts") or {}
 
     if not args.name:
-        print(f"block kinds ({len(blocks)}) — fence is ```oku-<kind>")
+        fenced = sorted(k for k in blocks if k in _FENCE_KINDS)
+        plain = sorted(k for k in blocks if k not in _FENCE_KINDS)
+        print(f"block kinds ({len(fenced)}) — fence is ```oku-<kind>")
         # Every name here is hyphenated (`calendar-heatmap`, `kpi-grid`) and
         # is meant to be copied, so the wrapper must never break on a hyphen.
         wrap = {
@@ -4598,7 +4624,10 @@ def cmd_spec(args: argparse.Namespace) -> int:
             "break_on_hyphens": False,
             "break_long_words": False,
         }
-        print(textwrap.fill(" ".join(sorted(blocks)), **wrap))
+        print(textwrap.fill(" ".join(fenced), **wrap))
+        if plain:
+            print(f"\nwritten as plain markdown ({len(plain)}) — no oku- fence")
+            print(textwrap.fill(" ".join(plain), **wrap))
         print(f'\nchart types ({len(charts)}) — fence is ```oku-chart with "type"')
         print(textwrap.fill(" ".join(sorted(charts)), **wrap))
         print("\noku spec <name>   one ready-to-paste payload")
@@ -4615,12 +4644,13 @@ def cmd_spec(args: argparse.Namespace) -> int:
             print("  `oku spec` with no argument lists every name", file=sys.stderr)
         return 1
 
-    tag, payload = entry
-    body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+    body = json.dumps(entry["payload"], separators=(",", ":"), ensure_ascii=False)
     if args.json:
         print(body)
+    elif entry["fence"]:
+        print(f"```{entry['fence']}\n{body}\n```")
     else:
-        print(f"```{tag}\n{body}\n```")
+        print(entry["markdown"])
     return 0
 
 

@@ -1,5 +1,10 @@
 {
   "$comment": "Minimal valid payload per block kind and chart type. Printed by `oku spec`; every entry is asserted valid by src/oku_tests/test_spec_examples.py. The fence tag supplies `k`, so these carry the fence body only.",
+  "markdown": {
+    "code": "```python\nprint(\"hello\")\n```",
+    "image": "![What the pipeline does](diagram.png)\n\n*Pipeline overview*",
+    "svg": "<svg viewBox=\"0 0 100 40\" role=\"img\" aria-label=\"Hand-drawn figure\"><rect class=\"okt-diag-node\" x=\"4\" y=\"4\" width=\"92\" height=\"32\" rx=\"6\"/></svg>"
+  },
   "blocks": {
     "annotated-code": {
       "src": "const x = 1; // (1)\nfunction greet(name) {\n  return `Hello, ${name}!`;\n}",
