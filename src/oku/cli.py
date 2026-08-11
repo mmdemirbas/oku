@@ -161,6 +161,28 @@ def _kit_build_stamp() -> str:
     return m.group(1) if m else "unknown"
 
 
+class _VersionAction(argparse.Action):
+    """Print `--version` verbatim, on one line.
+
+    argparse's built-in version action runs the text through
+    HelpFormatter, which wraps it at terminal width. `./run install`
+    reads the `kit` and `src` fields back out of this line with sed to
+    decide whether the global tool is stale, so a wrap landing mid-field
+    would silently break the staleness gate — the exact failure the
+    digest was added to close. Adding the `src` field moved the wrap onto
+    the space before the assets path and did break it, which is how this
+    was found.
+    """
+
+    def __init__(self, option_strings, dest, version: str = "", help: str | None = None) -> None:
+        super().__init__(option_strings, dest, nargs=0, help=help)
+        self.version = version
+
+    def __call__(self, parser, namespace, values, option_string=None) -> None:
+        print(self.version)
+        parser.exit()
+
+
 def _tool_digest() -> str:
     """A content digest over everything the wheel ships.
 
@@ -4694,10 +4716,10 @@ def main() -> int:
     # change reach the tool?" is otherwise a filesystem hunt.
     parser.add_argument(
         "--version",
-        action="version",
+        action=_VersionAction,
         version=(
-            f"oku {_PKG_VERSION} · kit {_kit_build_stamp()} · src {_tool_digest()} "
-            f"· assets {_kit_assets_dir()}"
+            f"oku {_PKG_VERSION} · kit {_kit_build_stamp()} · src {_tool_digest()}"
+            f" · assets {_kit_assets_dir()}"
         ),
     )
     sub = parser.add_subparsers(dest="cmd")

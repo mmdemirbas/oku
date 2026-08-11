@@ -445,7 +445,14 @@ def test_version_reports_the_kit_build_stamp(tmp_path: Path, repo_root: Path) ->
     assert proc.returncode == 0, proc.stderr
     out = proc.stdout.strip()
     assert out.startswith("oku ")
-    assert " · kit " in out and " · assets " in out
+    # One line, whatever the terminal width. `./run install` reads the
+    # `kit` and `src` fields back out of this with sed to decide whether
+    # the global tool is stale; argparse's built-in version action wraps
+    # at terminal width, and a wrap landing mid-field breaks that gate
+    # silently. Adding `src` moved the wrap onto the space before the
+    # assets path, which is how it was found.
+    assert "\n" not in out, out
+    assert " · kit " in out and " · src " in out and " · assets " in out
     stamp = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
     expected = re.search(r"__okuKitBuild\s*=\s*'([^']+)'", stamp).group(1)
     assert expected in out, out
