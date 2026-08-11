@@ -24,6 +24,7 @@ import argparse
 import collections
 import datetime
 import difflib
+import hashlib
 import http.server
 import json
 import os
@@ -158,6 +159,38 @@ def _kit_build_stamp() -> str:
         return "unknown"
     m = re.search(r"__okuKitBuild\s*=\s*'([^']+)'", text)
     return m.group(1) if m else "unknown"
+
+
+def _tool_digest() -> str:
+    """A content digest over everything the wheel ships.
+
+    The kit stamp above is hand-bumped and lives in chrome.js, so it
+    answers one question: did the *kit* change. It cannot answer "is the
+    installed tool running this repo's code", because a change to cli.py
+    moves neither the stamp nor the version string — and `uv tool install`
+    reuses its cached wheel when the version has not changed.
+
+    That combination has already produced a silent wrong answer: the
+    global tool reported the same version and the same kit stamp as the
+    repo while running a cli.py without a check that had been added to
+    it, so `oku check --strict` called a tree clean that the repo source
+    warns about. A verify gate that reports success from stale code is
+    worse than a slow one.
+
+    Derived rather than declared, so it cannot be forgotten on the day it
+    matters.
+    """
+    h = hashlib.sha256()
+    files = [Path(__file__)]
+    assets = _kit_assets_dir()
+    files += sorted(p for p in assets.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
+    for f in files:
+        try:
+            h.update(f.name.encode())
+            h.update(f.read_bytes())
+        except OSError:
+            return "unknown"
+    return h.hexdigest()[:12]
 
 
 def find_kit_json(root: Path) -> Path | None:
@@ -4662,7 +4695,10 @@ def main() -> int:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"oku {_PKG_VERSION} · kit {_kit_build_stamp()} · assets {_kit_assets_dir()}",
+        version=(
+            f"oku {_PKG_VERSION} · kit {_kit_build_stamp()} · src {_tool_digest()} "
+            f"· assets {_kit_assets_dir()}"
+        ),
     )
     sub = parser.add_subparsers(dest="cmd")
     spec_parser = sub.add_parser(
