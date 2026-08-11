@@ -227,8 +227,8 @@ For the strict gate before delivery, use `oku check --strict`
    - A block-level HTML tag at column 0 is an escape hatch (custom
      elements and `<script>` included) when a primitive genuinely does
      not exist for what you need. `oku check` lists each one.
-   - `docs/reference.md` in the kit repo is the canonical example of
-     every primitive with its payload shape beside the rendered output.
+   - `oku spec <name>` prints a ready-to-paste payload for any block
+     kind or chart type. `oku spec` alone lists all 68 names.
 
    Hand-authored `.json` pages (v1 and v2) still render, and
    `oku migrate` converts one to markdown, but new pages are markdown.
@@ -402,8 +402,22 @@ are GFM blockquotes. **They are not visuals.** A coloured box around a
 paragraph is decorated text — `oku check`'s density rule does not count
 one, and neither should you.
 
-`docs/reference.md` in the kit repo carries every primitive's payload
-shape beside its rendered output. Read it there rather than guessing.
+**Never guess a payload shape — `oku spec <name>` prints it.**
+
+```
+oku spec                # every name: 15 block kinds, 53 chart types
+oku spec sankey         # the fence, ready to paste
+oku spec table --json   # the payload alone
+```
+
+Median output is ~100 tokens. The alternatives are worse in both
+directions: reading `page.schema.json` costs 11.6k tokens, and guessing
+risks a payload that validates clean and renders empty (see `info-tip`
+above) — the one failure the linter cannot catch for you.
+
+`docs/reference.md` and `docs/charts.md` show every primitive beside its
+rendered output, but they live in the kit repo and are **not** in the
+installed wheel. From any other project, `oku spec` is the source.
 
 ## When a primitive does not fit: HTML islands
 

@@ -86,6 +86,28 @@ oku clean
 - Safe to chain: oku clean && oku build.
 - Doesn't touch source pages, the _oku symlink, or kit.json. Only generated output.
 
+## oku spec {#spec}
+
+Print a ready-to-paste payload for any block kind or chart type. The kit
+has 15 block kinds and 53 chart types, and the shape of each is the one
+thing an author cannot infer from the page they are writing.
+
+```bash
+oku spec                # every name, grouped
+oku spec sankey         # the fence, ready to paste
+oku spec table --json   # the payload alone, no fence
+```
+
+```oku-table
+{"headers":["Argument","Default","Effect"],"rows":[["`name`","—","A block kind (`table`, `kpi-grid`, …) or a chart type (`sankey`, `gantt`, …). Omit it to list every name. An unknown name exits 1 and suggests the nearest matches."],["`--json`","off","Print the bare payload instead of the fence that wraps it. Useful when composing a payload programmatically."]]}
+```
+
+The examples ship inside the wheel, so this works from any project that
+installed the tool — unlike [the reference page](reference.md), which
+lives in the kit's own docs tree. Every example is asserted valid
+against both the schema and the structural checks, so what it prints
+passes `oku check` unchanged.
+
 ## oku migrate {#migrate}
 
 Convert page-JSON sources (v1 or v2) to v3 markdown. Each `foo.json` becomes `foo.md` next to it and the JSON is removed. Migration is optional — the renderer accepts v1/v2 pages indefinitely — so run it when you want the on-disk source in the current authoring format.

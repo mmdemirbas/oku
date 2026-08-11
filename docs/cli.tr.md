@@ -86,6 +86,29 @@ oku clean
 - Zincirlemek güvenli: oku clean && oku build.
 - Kaynak sayfalara, _oku sembolik bağına ya da kit.json'a dokunmaz. Yalnızca üretilmiş çıktıyı siler.
 
+## oku spec {#spec}
+
+Herhangi bir blok türü ya da grafik türü için doğrudan yapıştırılabilir
+bir veri gövdesi yazdırır. Kitte 15 blok türü ve 53 grafik türü var;
+bunların biçimi, yazarın o an yazdığı sayfaya bakarak çıkaramayacağı tek
+şey.
+
+```bash
+oku spec                # bütün adlar, gruplanmış
+oku spec sankey         # yapıştırmaya hazır çit
+oku spec table --json   # çitsiz, yalnızca veri gövdesi
+```
+
+```oku-table
+{"headers":["Argüman","Varsayılan","Etkisi"],"rows":[["`name`","—","Bir blok türü (`table`, `kpi-grid`, …) ya da bir grafik türü (`sankey`, `gantt`, …). Bütün adları listelemek için boş bırakın. Tanınmayan bir ad 1 ile çıkar ve en yakın eşleşmeleri önerir."],["`--json`","kapalı","Çiti değil, yalnızca veri gövdesini yazdırır. Veri gövdesini program içinde oluştururken işe yarar."]]}
+```
+
+Örnekler tekerleğin içinde dağıtıldığı için bu komut, aracı kuran her
+projede çalışır — kitin kendi belge ağacında duran
+[kaynak sayfasının](reference.tr.md) aksine. Her örneğin hem şemaya hem
+de yapısal denetimlere uygunluğu sınanır; dolayısıyla yazdırdığı şey
+`oku check`'ten olduğu gibi geçer.
+
 ## oku migrate {#migrate}
 
 Sayfa-JSON kaynaklarını (v1 ya da v2) v3 markdown'a çevirir. Her `foo.json` yanındaki `foo.md` dosyasına dönüşür ve JSON kaldırılır. Göç isteğe bağlıdır — işleyici v1/v2 sayfaları süresiz kabul eder — bu yüzden diskteki kaynağı güncel yazım biçiminde istediğinizde çalıştırın.
