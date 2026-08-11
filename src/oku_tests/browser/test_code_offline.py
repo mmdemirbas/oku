@@ -74,8 +74,13 @@ def code_url(tmp_path_factory):
 def _measure(browser, code_url, *, offline: bool):
     ctx = browser.new_context(viewport={"width": 1280, "height": 900})
     if offline:
-        # Everything the page needs is same-origin; only the CDN is off.
+        # Prism now has a same-origin vendored copy, so blocking the CDN
+        # alone no longer produces the state this file is about — the
+        # highlighter simply loads locally. What is being asserted is
+        # that the GUTTER does not depend on the highlighter arriving at
+        # all, so both sources are cut.
         ctx.route("**cdn.jsdelivr.net**", lambda route: route.abort())
+        ctx.route("**/_oku/vendor/**", lambda route: route.abort())
     pg = ctx.new_page()
     try:
         pg.goto(f"{code_url}/page.html")
@@ -92,8 +97,29 @@ def test_line_numbers_survive_without_the_cdn(browser, code_url):
     assert got["codeBlocks"] == 3, got
     assert got["numbered"] == 3, got
     # 4 + 1 + 1 source lines across the three blocks.
-    assert got["lineNumbers"] == 6, f"blocks lost their gutter with the CDN blocked: {got}"
-    assert got["highlighted"] == 0, f"tokens appeared with the CDN blocked: {got}"
+    assert got["lineNumbers"] == 6, f"blocks lost their gutter with no highlighter: {got}"
+    assert got["highlighted"] == 0, f"tokens appeared with every Prism source blocked: {got}"
+
+
+def test_the_vendored_copy_highlights_when_the_cdn_is_gone(browser, code_url):
+    """The capability the vendored copy adds. Blocking only the CDN used
+    to mean no highlighting at all; now it means the local copy answers,
+    and this is what distinguishes the two from each other."""
+    ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx.route("**cdn.jsdelivr.net**", lambda route: route.abort())
+    pg = ctx.new_page()
+    try:
+        pg.goto(f"{code_url}/page.html")
+        pg.wait_for_timeout(5000)
+        got = pg.evaluate(PROBE)
+    finally:
+        pg.close()
+        ctx.close()
+
+    if not cli.vendor_is_complete():
+        pytest.skip("vendor cache absent — run `oku vendor`")
+    assert got["lineNumbers"] == 6, got
+    assert got["highlighted"] > 0, f"the vendored Prism did not highlight: {got}"
 
 
 def test_the_online_result_is_unchanged(browser, code_url):
