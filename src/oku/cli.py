@@ -688,14 +688,22 @@ def md_to_v2_page(
 
     def flush() -> None:
         chunk = "\n".join(buf)
-        buf.clear()
         if chunk.strip():
+            if block_lines is not None:
+                # `strip("\n")` drops leading blank lines, so the block's
+                # first real line is that many past where the buffer began.
+                lead = len(chunk) - len(chunk.lstrip("\n"))
+                block_lines[len(blocks)] = buf_start + lead + 1 + line_offset
             blocks.append(chunk.strip("\n"))
+        buf.clear()
 
     i = 0
+    buf_start = 0
     plain_fence_close: re.Pattern | None = None
     while i < n:
         line = lines[i]
+        if not buf:
+            buf_start = i
         if plain_fence_close is not None:
             buf.append(line)
             if plain_fence_close.match(line):
@@ -776,6 +784,24 @@ def _locate(path: Path, block_index: int | None) -> tuple[Path, int | None]:
     if block_index is not None:
         line = (_PAGE_BLOCK_LINES.get(path) or {}).get(block_index)
     return source, line
+
+
+def _did_you_mean(needle: str, haystack, limit: int = 3) -> str:
+    """` Did you mean: a, b?` — or nothing when nothing is close.
+
+    Every unresolved-reference check already holds the set of valid
+    values at the point it rejects one, and printed the rejection
+    without them. That leaves the author knowing a name is wrong and not
+    what the right one is, which is answered by opening the page or the
+    registry — a file read to recover a string the checker had in hand.
+
+    Deliberately silent below the cutoff: a wrong suggestion is worse
+    than none, because it gets applied.
+    """
+    near = difflib.get_close_matches(
+        str(needle).lower(), sorted({str(h).lower() for h in haystack}), n=limit, cutoff=0.6
+    )
+    return f" Did you mean: {', '.join(near)}?" if near else ""
 
 
 _BLOCK_INDEX_RE = re.compile(r"\bb[.\[](\d+)")
@@ -2255,7 +2281,11 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         kit_dir = KIT_DIR
     issues: list[dict] = []
 
-    def add(p: Path, severity: str, code: str, where: str, message: str) -> None:
+    def add(p: Path, severity: str, code: str, where: str, message: str, line: int | None = None) -> None:
+        # `line` is for findings that sit at a point INSIDE a block — a
+        # link halfway down a prose chunk. Without it the block's own
+        # line is used, which is right for a typed fence and can be
+        # hundreds of lines off for prose on a page with few fences.
         issues.append(
             {
                 "path": p,
@@ -2263,6 +2293,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 "code": code,
                 "where": where,
                 "message": message,
+                "_line": line,
             }
         )
 
@@ -2334,9 +2365,9 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         is_materialised = meta.get("_materialised_by") == "oku-init"
 
         seen_ids: dict[str, int] = {}
-        gloss_refs: list[tuple[str, str]] = []
-        extref_refs: list[tuple[str, str]] = []
-        link_refs: list[tuple[str, str]] = []
+        gloss_refs: list[tuple[str, str, int | None]] = []
+        extref_refs: list[tuple[str, str, int | None]] = []
+        link_refs: list[tuple[str, str, int | None]] = []
         # Footnote / link-reference definitions resolve page-wide, so they
         # are collected before any string is linted.
         fn_defs, link_defs = _md_reference_definitions([b for b in body if isinstance(b, str)])
@@ -2350,28 +2381,53 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 "screen readers and for the on-page TOC.",
             )
 
+        block_starts = _PAGE_BLOCK_LINES.get(p) or {}
         for idx, blk in enumerate(body):
             where = f"b[{idx}]"
+            # Every line number the string passes report is relative to
+            # the START OF THE BLOCK, and a block boundary is invisible
+            # in the source — the author sees one file. Printed raw, the
+            # number looks precise and points somewhere else; on the
+            # probe that found this, a fence on file line 10 was reported
+            # as line 5. `base` is what converts them.
+            base = block_starts.get(idx)
+
+            def _abs(rel: int | None, _base: int | None = None) -> int | None:
+                _base = base if _base is None else _base
+                return _base + rel - 1 if (_base and rel) else None
+
             if isinstance(blk, str):
                 # 3. Markdown-string passes: strict-GFM subset, HTML
                 # island audit, unlifted fences, process prose.
                 str_issues, heading_ids, gloss, x_refs = _lint_md_string(blk, skip_prose=is_materialised)
                 str_issues = str_issues + _lint_md_reference_forms(blk, fn_defs, link_defs)
                 for severity, code, loc, message in str_issues:
-                    add(p, severity, code, f"{where} {loc}", message)
+                    m_line = re.search(r"\bline (\d+)", loc or "")
+                    absolute = _abs(int(m_line.group(1))) if m_line else None
+                    shown = re.sub(r"\bline \d+", f"line {absolute}", loc) if absolute else loc
+                    add(p, severity, code, f"{where} {shown}", message, line=absolute)
                 for lineno, hid in heading_ids:
                     if hid in seen_ids:
                         add(
                             p,
                             "error",
                             "duplicate-anchor",
-                            f"{where} line {lineno}",
-                            f"Section / heading id '{hid}' already used in this page.",
+                            f"{where} line {_abs(lineno) or lineno}",
+                            f"Section / heading id '{hid}' already used in this page. Ids are "
+                            "document-global, so the second one is unreachable — every link and "
+                            "TOC entry lands on the first. Pin a distinct id with {#other-id}.",
+                            line=_abs(lineno),
                         )
                     seen_ids[hid] = seen_ids.get(hid, 0) + 1
-                gloss_refs.extend((where, t) for t in gloss)
-                extref_refs.extend((where, x) for x in x_refs)
-                link_refs.extend((where, h) for h in _MD_LINK_TARGET_RE.findall(_INLINE_CODE_RE.sub("", blk)))
+                gloss_refs.extend((where, t, None) for t in gloss)
+                extref_refs.extend((where, x, None) for x in x_refs)
+                # Exact line per link: a prose block runs from one typed
+                # fence to the next, so on a page with few fences it can
+                # be the whole document, and the block's own line would
+                # be hundreds of lines from the link that is wrong.
+                scrubbed = _INLINE_CODE_RE.sub("", blk)
+                for m in _MD_LINK_TARGET_RE.finditer(scrubbed):
+                    link_refs.append((where, m.group(1), _abs(scrubbed[: m.start()].count("\n") + 1)))
                 continue
             if not isinstance(blk, dict):
                 add(p, "error", "invalid-block", where, "Block must be a markdown string or a typed object.")
@@ -2395,7 +2451,8 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     "error",
                     "unknown-kind",
                     where,
-                    f"Unknown block kind '{kind}'. Known: {sorted(_KNOWN_BLOCK_KINDS)}.",
+                    f"Unknown block kind '{kind}'.{_did_you_mean(kind, _KNOWN_BLOCK_KINDS)} "
+                    f"Known: {sorted(_KNOWN_BLOCK_KINDS)}. `oku spec <kind>` prints a payload.",
                 )
 
             # 5. Code blocks should declare a language (Prism + the
@@ -2467,12 +2524,12 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             # Prose nested inside typed payloads (step bodies, card
             # bodies, table cells, …) is markdown too — same glossary /
             # ext-ref resolution and process-prose rules.
-            link_refs.extend((where, h) for h in _iter_block_hrefs(blk))
+            link_refs.extend((where, h, None) for h in _iter_block_hrefs(blk))
             for s in _iter_block_strings(blk):
                 s_refs = _INLINE_CODE_RE.sub("", s)
-                gloss_refs.extend((where, t) for t in _MD_GLOSS_REF_RE.findall(s_refs))
-                extref_refs.extend((where, x) for x in _MD_EXTREF_REF_RE.findall(s_refs))
-                link_refs.extend((where, h) for h in _MD_LINK_TARGET_RE.findall(s_refs))
+                gloss_refs.extend((where, t, None) for t in _MD_GLOSS_REF_RE.findall(s_refs))
+                extref_refs.extend((where, x, None) for x in _MD_EXTREF_REF_RE.findall(s_refs))
+                link_refs.extend((where, h, None) for h in _MD_LINK_TARGET_RE.findall(s_refs))
                 if not is_materialised:
                     for pat in _FORBIDDEN_PROSE_PATTERNS:
                         m = pat.search(s)
@@ -2491,23 +2548,27 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
 
         # 8. Glossary + ext-ref resolution — every inline reference
         # must land on an entry the kit knows about.
-        for where, term in gloss_refs:
+        for where, term, ref_line in gloss_refs:
             if term.lower() not in glossary:
                 add(
                     p,
                     "warning",
                     "unresolved-glossary",
                     f"{where} #g/{term}",
-                    f"Glossary term '{term}' not found in any kit/glossary/*.json registry.",
+                    f"Glossary term '{term}' not found in any kit/glossary/*.json registry."
+                    + _did_you_mean(term, glossary),
+                    line=ref_line,
                 )
-        for where, name in extref_refs:
+        for where, name, ref_line in extref_refs:
             if name.lower() not in extrefs:
                 add(
                     p,
                     "warning",
                     "unresolved-extref",
                     f"{where} #x/{name}",
-                    f"External reference '{name}' not found in any kit/extrefs/*.json registry.",
+                    f"External reference '{name}' not found in any kit/extrefs/*.json registry."
+                    + _did_you_mean(name, extrefs),
+                    line=ref_line,
                 )
 
         # 9. Page-level metadata sanity. The no-summary nudge applies
@@ -2555,7 +2616,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
     # file-exists check.
     anchors_by_target = {k.resolve(): v for k, v in anchors_by_page.items()}
     for p, refs in links_by_page.items():
-        for where, href in refs:
+        for where, href, ref_line in refs:
             if not href or _FOREIGN_HREF_RE.match(href):
                 continue
             file_part, _, frag = href.partition("#")
@@ -2566,7 +2627,9 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                         "warning",
                         "unresolved-anchor",
                         f"{where} #{frag}",
-                        f"Link points at '#{frag}', which is not a heading id on this page.",
+                        f"Link points at '#{frag}', which is not a heading id on this page."
+                        + _did_you_mean(frag, anchors_by_page.get(p, set())),
+                        line=ref_line,
                     )
                 continue
             if file_part.startswith("/"):
@@ -2583,7 +2646,9 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                         "warning",
                         "unresolved-anchor",
                         f"{where} {href}",
-                        f"Link points at '#{frag}' on {file_part}, which has no such heading id.",
+                        f"Link points at '#{frag}' on {file_part}, which has no such heading id."
+                        + _did_you_mean(frag, anchors_by_target[page_key]),
+                        line=ref_line,
                     )
                 continue
             if not target.exists():
@@ -2592,7 +2657,9 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     "warning",
                     "unresolved-link",
                     f"{where} {href}",
-                    f"Link target '{file_part}' does not exist relative to this page.",
+                    f"Link target '{file_part}' does not exist relative to this page."
+                    + _did_you_mean(file_part, [q.name for q in p.parent.glob("*") if q.is_file()]),
+                    line=ref_line,
                 )
 
     # 12. Translation anchor parity. The language switch carries the
@@ -2674,7 +2741,10 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
     for issue in issues:
         source, line = _locate(issue["path"], _block_index_in(issue.get("where", ""), issue["message"]))
         issue["path"] = source
-        if line is not None:
+        exact = issue.pop("_line", None)
+        if exact is not None:
+            issue["line"] = exact
+        elif line is not None:
             issue["line"] = line
 
     return issues

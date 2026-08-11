@@ -112,6 +112,57 @@ def test_the_human_line_reads_as_file_colon_line(tmp_path: Path) -> None:
     assert rendered.lstrip().startswith(f"✗ p.md:{KPI_FENCE_LINE}:"), rendered
 
 
+FAR = (
+    "---\ntitle: Line probe\nsummary: References far from the block start.\n---\n\n"
+    "## Overview {#overview}\n\nLead paragraph.\n\n"
+    + "\n".join(f"Filler paragraph {i}." for i in range(1, 40))
+    + "\n\nA [bad anchor](#overvieww) here.\n\n```oku-nope\n{}\n```\n"
+)
+FAR_LINK_LINE = 50
+FAR_FENCE_LINE = 52
+
+
+def test_a_string_pass_reports_the_file_line_not_the_block_line(tmp_path: Path) -> None:
+    """`_lint_md_string` counts from the start of its own string, and a
+    block boundary is invisible in the source — the author sees one file.
+    Printed raw, that number looks precise and points elsewhere: the
+    probe that found this had a fence on file line 10 reported as line 5.
+    """
+    issues = [i for i in _check(tmp_path, FAR) if i["code"] == "fence-not-lifted"]
+
+    assert issues, "the fixture is meant to have an unlifted fence"
+    assert issues[0]["line"] == FAR_FENCE_LINE, issues[0]
+    assert f"line {FAR_FENCE_LINE}" in issues[0]["where"], issues[0]["where"]
+
+
+def test_a_reference_deep_in_a_prose_block_points_at_itself(tmp_path: Path) -> None:
+    """A prose block runs from one typed fence to the next, so on a page
+    with few fences it is most of the document. The block's own line
+    would be 40+ lines from the link that is actually wrong."""
+    issues = [i for i in _check(tmp_path, FAR) if i["code"] == "unresolved-anchor"]
+
+    assert issues, "the fixture is meant to have a broken anchor"
+    assert issues[0]["line"] == FAR_LINK_LINE, issues[0]
+
+
+def test_a_near_miss_reference_is_offered_the_real_one(tmp_path: Path) -> None:
+    """The checker holds the valid set at the point it rejects a value.
+    Printing the rejection without it leaves the author to recover the
+    string by opening the page."""
+    issues = [i for i in _check(tmp_path, FAR) if i["code"] == "unresolved-anchor"]
+
+    assert "Did you mean: overview?" in issues[0]["message"], issues[0]["message"]
+
+
+def test_nothing_is_suggested_when_nothing_is_close(tmp_path: Path) -> None:
+    """A wrong suggestion is worse than none, because it gets applied."""
+    text = FAR.replace("#overvieww", "#zzzzzzzzzzzz")
+    issues = [i for i in _check(tmp_path, text) if i["code"] == "unresolved-anchor"]
+
+    assert issues, "the fixture is meant to have a broken anchor"
+    assert "Did you mean" not in issues[0]["message"], issues[0]["message"]
+
+
 def test_a_real_json_page_is_left_alone(tmp_path: Path) -> None:
     """The mapping is for synthesized paths. A page genuinely authored as
     JSON must still be reported under its own name, with no line."""
