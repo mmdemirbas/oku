@@ -1410,6 +1410,13 @@
       if (this.warnings.length) {
         window.dispatchEvent(new CustomEvent('oku:warnings', { detail: this.warnings }));
       }
+      // An event is only observable by a listener that was already
+      // attached. Anything arriving after the walk — a late subsystem, a
+      // test, a consumer script — has no way to ask whether rendering
+      // happened, so it waits a fixed number of milliseconds instead and
+      // becomes load-dependent. The flag makes the state readable at any
+      // time; the event still fires for anyone who wants the moment.
+      window.__okuRendered = true;
       window.dispatchEvent(new CustomEvent('oku:rendered', { detail: { page: page } }));
     }
 

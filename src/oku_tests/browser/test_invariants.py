@@ -21,6 +21,12 @@ NARROW = {"width": 360, "height": 800}
 def _goto(page, url: str) -> None:
     page.goto(url)
     page.wait_for_selector("main section")
+    # The first section appearing is not the walk finishing, and every
+    # geometry assertion in this file measures a layout. Measuring one
+    # mid-render reports a real number for a page that does not exist
+    # yet — which is how a containment check fails on the heaviest page
+    # at the narrowest width, on a loaded machine, and nowhere else.
+    page.wait_for_function("() => window.__okuRendered === true", timeout=15000)
 
 
 def _literal_tag_text_nodes(page) -> int:
@@ -520,7 +526,16 @@ def test_diagram_fits_container(page, site_url):
     page.set_viewport_size(DESKTOP)
     _goto(page, f"{site_url}/docs/architecture.html")
     page.wait_for_selector("oku-diagram .okd-render svg")
-    page.wait_for_timeout(1500)
+    # The SVG is in the DOM before the post-render passes have sized it,
+    # and mermaid arrives from a CDN — so a fixed wait long enough here
+    # is not long enough on a loaded machine, and the state it lands in
+    # when it is short is the one that fails. `_rendered` is the
+    # element's own "all passes done" flag.
+    page.wait_for_function(
+        "() => [...document.querySelectorAll('oku-diagram')]"
+        ".every((d) => d._rendered || /Parse error/.test(d.textContent))",
+        timeout=30000,
+    )
     data = page.evaluate(
         """() => [...document.querySelectorAll('oku-diagram')].map(d => {
             const s = d.querySelector('.okd-render svg');
@@ -905,7 +920,17 @@ def test_nothing_escapes_its_container(page, site_url, rel, width):
     tables, code blocks — at every breakpoint."""
     page.set_viewport_size({"width": width, "height": 900})
     _goto(page, f"{site_url}/{rel}")
-    page.wait_for_timeout(1500)
+    # Charts and diagrams settle after the walk, and this measures where
+    # everything landed — so wait for the figures, not for 1500ms.
+    #
+    # Not `networkidle`: the dev server holds a live-reload connection
+    # open, so the network never goes idle and the wait times out on
+    # every page at every width.
+    page.wait_for_function(
+        "() => [...document.querySelectorAll('oku-diagram')]"
+        ".every((d) => d._rendered || /Parse error/.test(d.textContent))",
+        timeout=30000,
+    )
     escapes = page.evaluate(CONTAINMENT_PROBE)
     assert escapes == [], f"{rel} @{width}px: {escapes}"
 

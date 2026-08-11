@@ -26,7 +26,7 @@ def _open_page(page, site_url):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{site_url}/docs/index.html")
     page.wait_for_selector("main section")
-    page.wait_for_timeout(400)
+    page.wait_for_function("() => window.__okuRendered === true", timeout=15000)
 
 
 # Islands are how an author writes a link the renderer must not touch, so
@@ -64,8 +64,16 @@ def _open_viewer(page, site_url, href=TARGET):
     _open_page(page, site_url)
     page.evaluate(INJECT, href)
     page.click("#probe")
-    page.wait_for_selector(".okt-mdview .okt-mdview-rendered *", timeout=5000)
-    page.wait_for_timeout(400)
+    page.wait_for_selector(".okt-mdview .okt-mdview-rendered *", timeout=15000)
+    # The viewer fetches the file, so the first child appearing is not the
+    # pass finishing. Wait for what the tests actually read — the prefixed
+    # ids the second render assigns — rather than for a fixed 400ms that
+    # only holds while the machine is idle.
+    page.wait_for_function(
+        "() => { const h = document.querySelector('.okt-mdview .okt-mdview-rendered');"
+        "        return !!h && h.querySelectorAll('[id]').length > 0; }",
+        timeout=15000,
+    )
     return page.evaluate(STATE)
 
 

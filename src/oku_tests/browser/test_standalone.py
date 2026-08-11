@@ -65,6 +65,11 @@ def standalone_url(tmp_path_factory):
 def _goto(page, url: str) -> None:
     page.goto(url)
     page.wait_for_selector("main section")
+    # The first section appearing is not the walk finishing. Tests that
+    # count sections or watch for stray requests were reading a
+    # half-built page and covering it with a fixed sleep, which holds on
+    # an idle machine and fails on a loaded one.
+    page.wait_for_function("() => window.__okuRendered === true", timeout=15000)
 
 
 def test_kit_source_does_not_leak_into_the_page(page, standalone_url):
@@ -92,7 +97,10 @@ def test_no_stray_page_json_fetch(page, standalone_url):
     requested: list[str] = []
     page.on("request", lambda r: requested.append(r.url))
     _goto(page, standalone_url)
-    page.wait_for_timeout(400)
+    # A stray fetch would be in flight or finished by the time the network
+    # goes quiet, so wait for that rather than for a number that has to be
+    # guessed high enough for the slowest machine.
+    page.wait_for_load_state("networkidle")
     strays = [u for u in requested if u.endswith(".json") or u.endswith("/__reload")]
     assert strays == [], f"standalone must not reach the network: {strays}"
 
