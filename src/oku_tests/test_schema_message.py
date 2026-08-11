@@ -33,9 +33,7 @@ def _sankey_with_the_wrong_key(n_nodes: int) -> dict:
         "k": "chart",
         "type": "sankey",
         "nodes": [{"id": f"n{i}", "label": f"Stage {i}"} for i in range(n_nodes)],
-        "edges": [
-            {"source": f"n{i}", "target": f"n{i + 1}", "value": 10 + i} for i in range(n_nodes - 1)
-        ],
+        "edges": [{"source": f"n{i}", "target": f"n{i + 1}", "value": 10 + i} for i in range(n_nodes - 1)],
     }
 
 
