@@ -1462,6 +1462,54 @@ def _get_validator():
     return _validator_cache
 
 
+_MAX_ECHO_CHARS = 160
+
+
+def _focused_schema_message(err, schema: dict) -> str:
+    """Name the fix instead of echoing the payload back.
+
+    A malformed block fails `$defs/block`'s `anyOf`, and jsonschema words
+    that failure as "<the entire instance> is not valid under any of the
+    given schemas". The instance is the author's own JSON, handed back to
+    them in place of the one sentence they needed, and it grows with the
+    payload: on a 14-node sankey with `edges` written for `links`, the echo
+    was 1235 of the 1372 bytes the run printed.
+
+    A block says which shape it means — `k` — so re-validate it against that
+    one `$defs` entry. The blanket rejection becomes `'links' is a required
+    property` plus `Additional properties are not allowed ('edges' was
+    unexpected)`, which is both shorter and the actual answer.
+    """
+    instance = err.instance
+    kind = instance.get("k") if isinstance(instance, dict) else None
+    defs = schema.get("$defs") or {}
+    sub = defs.get(kind) if isinstance(kind, str) else None
+
+    if sub is not None:
+        try:
+            validator_cls = _jsonschema.validators.validator_for(schema)
+            focused = validator_cls({**sub, "$defs": defs})
+            # Deduped and capped: one bad block can fail a dozen ways, and
+            # printing all of them buries the page the same way the echo did.
+            msgs = list(dict.fromkeys(e.message for e in focused.iter_errors(instance)))
+        except _jsonschema.SchemaError:
+            msgs = []
+        if msgs:
+            shown = "; ".join(msgs[:3])
+            more = f" (+{len(msgs) - 3} more)" if len(msgs) > 3 else ""
+            return f"k={kind}: {shown}{more}"
+
+    if err.validator in ("anyOf", "oneOf"):
+        if not isinstance(kind, str):
+            return "block matches no known kind — it has no `k` field."
+        if kind not in defs:
+            return f"k={kind!r} is not a known block kind."
+        return f"k={kind}: does not match the schema for that kind."
+
+    text = err.message
+    return text if len(text) <= _MAX_ECHO_CHARS else text[:_MAX_ECHO_CHARS].rstrip() + "…"
+
+
 def validate_pages(pages) -> list:
     """Validate each parsed page against the schema. Returns a list of
     (path, error_message) tuples. Empty list = clean.
@@ -1474,6 +1522,7 @@ def validate_pages(pages) -> list:
     validator = _get_validator()
     if validator is None:
         return []
+    schema = _load_schema() or {}
     errors: list[tuple[Path, str]] = []
     for p, data in pages:
         # v1 pages still on disk validate against the v2 schema by
@@ -1497,7 +1546,7 @@ def validate_pages(pages) -> list:
             if block_path in seen_paths:
                 continue
             seen_paths.add(block_path)
-            errors.append((p, f"{field}: {err.message}"))
+            errors.append((p, f"{field}: {_focused_schema_message(err, schema)}"))
     return errors
 
 
