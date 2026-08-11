@@ -110,8 +110,10 @@ This applies to:
 Failure recovery rules:
 
 - `additionalProperties: false` failures usually mean a typo'd key or
-  a property name that belongs on a different block kind. Read the
-  schema's `$defs/<kind>` first; don't guess.
+  a property name that belongs on a different block kind. The message
+  names the offending key and the missing one — read it before doing
+  anything else. `oku spec <kind>` prints a correct payload to compare
+  against; never re-derive the shape from the schema.
 - `"is not of type 'array'"` on a `content` field means the caller
   passed a string where a richString was expected, or vice-versa. The
   error message is sometimes misleading — investigate the nearest
@@ -133,8 +135,11 @@ Failure recovery rules:
 **`oku check` passing is not proof the content rendered.** Blocks with
 a wrong-but-valid payload shape (see `info-tip` above) validate clean and
 vanish in the browser. For any block kind you have not used before,
-verify in a real browser that its body is present, not just that the
-build succeeded.
+start from `oku spec <kind>` rather than from memory — a shape that came
+from the shipped examples is asserted valid against both the schema and
+the structural checks, which is the one class of error the linter cannot
+catch on its own. Then verify in a real browser that the body is
+present, not just that the build succeeded.
 
 For the strict gate before delivery, use `oku check --strict`
 (exits 1 on warnings too). For partial passes during iteration, plain
