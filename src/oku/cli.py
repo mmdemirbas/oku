@@ -636,8 +636,19 @@ def _lift_fence_block(lang: str, body: str) -> dict | None:
     return {"k": kind, **payload}
 
 
-def md_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
+def md_to_v2_page(
+    text: str,
+    default_title: str = "Untitled",
+    *,
+    block_lines: dict[int, int] | None = None,
+) -> dict:
     """Convert a markdown (v3) page source into a v2 page dict.
+
+    Pass ``block_lines`` to receive ``{index in b[]: 1-based line in the
+    ORIGINAL file}`` for every lifted fence. `oku check` reports failures
+    by block index, and an index is not a location: an author told that
+    ``b[5]`` is wrong has to count typed fences through their own page to
+    find it. With the line, the message points at the fence.
 
     The body is preserved as VERBATIM markdown strings in ``b[]`` — the
     kit renderer owns markdown parsing, and migration round-trips
@@ -652,6 +663,7 @@ def md_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
     hoist ``title`` → ``t``. Raw HTML islands and every other markdown
     construct pass through untouched inside the strings.
     """
+    original = text
     text, front_meta = _strip_md_front_matter(text)
     title = default_title
     if isinstance(front_meta.get("title"), str) and front_meta["title"].strip():
@@ -663,6 +675,11 @@ def md_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
         if m:
             title = m.group(1).strip()
             text = text[m.end() :]
+
+    # Front-matter and a hoisted H1 are removed above, so a line index into
+    # `lines` is not a line in the file the author edits. Both removals are
+    # prefixes, so the difference in line count is the offset.
+    line_offset = original.count("\n") - text.count("\n") if block_lines is not None else 0
 
     lines = text.split("\n")
     n = len(lines)
@@ -714,6 +731,12 @@ def md_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
                         block["caption"] = cap.group(1).strip()
                         j = k
                 flush()
+                if block_lines is not None:
+                    # The fence's opening line, in the ORIGINAL file: `lines`
+                    # here is the body after front-matter (and possibly a
+                    # hoisted H1) was removed, so the offset is what makes
+                    # the number match what the author's editor shows.
+                    block_lines[len(blocks)] = i + 1 + line_offset
                 blocks.append(block)
                 i = j + 1
                 continue
@@ -727,6 +750,44 @@ def md_to_v2_page(text: str, default_title: str = "Untitled") -> dict:
     if meta:
         page["m"] = meta
     return page
+
+
+# A markdown page is reported under a `.json` path that does not exist on
+# disk — `_synth_json_path` invents it so downstream `with_suffix(".html")`
+# keeps working. That is fine inside the pipeline and wrong in a message:
+# an author (or an agent) told that `notes/plan.json` has an error opens
+# it and finds nothing there. These two registries are what let `oku check`
+# name the file that was actually written, and the line inside it.
+_PAGE_SOURCE_OF: dict[Path, Path] = {}
+_PAGE_BLOCK_LINES: dict[Path, dict[int, int]] = {}
+
+
+def _remember_source(virtual: Path, source: Path, block_lines: dict[int, int]) -> None:
+    _PAGE_SOURCE_OF[virtual] = source
+    if block_lines:
+        _PAGE_BLOCK_LINES[virtual] = block_lines
+
+
+def _locate(path: Path, block_index: int | None) -> tuple[Path, int | None]:
+    """Map a reported page path (possibly virtual) to the real file, plus
+    the source line of a block index when one is known."""
+    source = _PAGE_SOURCE_OF.get(path, path)
+    line = None
+    if block_index is not None:
+        line = (_PAGE_BLOCK_LINES.get(path) or {}).get(block_index)
+    return source, line
+
+
+_BLOCK_INDEX_RE = re.compile(r"\bb[.\[](\d+)")
+
+
+def _block_index_in(where: str, message: str) -> int | None:
+    """Pull the `b[5]` / `b.5` index out of a locator or a message."""
+    for text in (where, message):
+        m = _BLOCK_INDEX_RE.search(text or "")
+        if m:
+            return int(m.group(1))
+    return None
 
 
 def _page_from_source_file(p: Path) -> dict | None:
@@ -746,7 +807,12 @@ def _page_from_source_file(p: Path) -> dict | None:
         text = p.read_text(encoding="utf-8")
     except OSError:
         return None
-    page = parser(text, default_title=_source_stem_path(p).name)
+    if parser is md_to_v2_page:
+        block_lines: dict[int, int] = {}
+        page = parser(text, default_title=_source_stem_path(p).name, block_lines=block_lines)
+        _remember_source(_synth_json_path(p), p, block_lines)
+    else:
+        page = parser(text, default_title=_source_stem_path(p).name)
     if parser is md_to_v2_page:
         _, front_meta = _strip_md_front_matter(text)
         if not front_meta.get("title"):
@@ -2602,6 +2668,15 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     "genuinely differs.",
                 )
 
+    # Point every issue at the file the author edits, and at the line
+    # inside it. Done once here rather than at each of the ~40 `add`
+    # sites: the locator formats differ per check, the mapping does not.
+    for issue in issues:
+        source, line = _locate(issue["path"], _block_index_in(issue.get("where", ""), issue["message"]))
+        issue["path"] = source
+        if line is not None:
+            issue["line"] = line
+
     return issues
 
 
@@ -2882,7 +2957,11 @@ def _format_issue(issue: dict, root: Path) -> str:
     except ValueError:
         rel = issue["path"]
     icon = {"error": "✗", "warning": "!", "info": "·"}.get(issue["severity"], "·")
-    return f"  {icon} {rel}:{issue['where']} [{issue['code']}] {issue['message']}"
+    # `file:line` first, in the shape every editor and every tool that
+    # reads compiler output already knows how to jump to. The block
+    # locator stays after it — it is what the message talks about.
+    line = f":{issue['line']}" if issue.get("line") else ""
+    return f"  {icon} {rel}{line}:{issue['where']} [{issue['code']}] {issue['message']}"
 
 
 def find_unparseable_json(root: Path) -> list[tuple[Path, str]]:
@@ -2975,15 +3054,16 @@ def cmd_check(args: argparse.Namespace) -> int:
                 rel = str(it["path"].relative_to(root))
             except ValueError:
                 rel = str(it["path"])
-            payload.append(
-                {
-                    "path": rel,
-                    "severity": it["severity"],
-                    "code": it["code"],
-                    "where": it["where"],
-                    "message": it["message"],
-                }
-            )
+            entry = {
+                "path": rel,
+                "severity": it["severity"],
+                "code": it["code"],
+                "where": it["where"],
+                "message": it["message"],
+            }
+            if it.get("line"):
+                entry["line"] = it["line"]
+            payload.append(entry)
         print(json.dumps({"page_count": len(pages), "issues": payload}, ensure_ascii=False, indent=2))
     else:
         # Group by severity for the terminal report.
