@@ -43,3 +43,6 @@ _internal/
 
 # Tooling: session-local working dirs (Playwright MCP screenshots/logs)
 .playwright-mcp/
+
+# Fetched once by `oku vendor`; 3.3 MB of mermaid + Prism, not authored content.
+kit/vendor/

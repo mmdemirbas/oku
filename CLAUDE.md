@@ -142,7 +142,7 @@ AI/LLM surface.
 | `renderer.js` | page JSON → DOM mapping. Walks `b[]`; strings parsed by the GFM block parser (headings → sections, paragraphs, lists, GFM tables, fences — `oku-*`/`mermaid` fences lift to typed blocks, def-lists, task-lists, HTML islands w/ executing scripts, admonitions); typed objects dispatched to typed renderers. v1→v2 shim keeps older pages rendering. ~2.6k LoC. |
 | `kit/schema/page.schema.json` | JSON-schema for page payloads. Every page (converted from .md) validates against it; the optional `jsonschema` dep makes the check active. Chart `type` enum here is the single source of truth for known chart types. |
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
-| `src/oku/cli.py` | `oku init / build / clean / check / spec / migrate / serve` plus the v3 converter pair (`md_to_v2_page` / `page_to_md`), the strict-GFM + island lint (`_lint_md_string`), and the v1→v2 page shim (`_v1_to_v2`). |
+| `src/oku/cli.py` | `oku init / build / clean / check / spec / vendor / migrate / serve` plus the v3 converter pair (`md_to_v2_page` / `page_to_md`), the strict-GFM + island lint (`_lint_md_string`), and the v1→v2 page shim (`_v1_to_v2`). |
 | `src/oku/templates/` | `starter.{md,html}` — pair to copy when starting a new page. |
 | `bin/oku` | PEP 723 shim — run without install via `uv run bin/oku …`. Points at `oku.cli:main`. |
 | `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.md` tracks open phases. |
@@ -885,6 +885,33 @@ computed-style assertion, the rule isn't found yet.
    `boundingBox` figures land in the commit message body as the
    verification record. The record is the proof — no record means
    no verification.
+
+**mermaid and Prism are fetched once, not per page.** Both were loaded
+from a CDN at runtime, so a built page with no network drew no diagrams
+and highlighted no code. `oku vendor` fetches them into
+`kit/vendor/` (gitignored, not in the wheel — it is a cache), `oku build`
+does it automatically the first time, and the build copies one shared
+`_oku/vendor/` beside the output. Every loader tries that copy and falls
+back to the CDN, so a page that travels away from its vendor directory
+still works with a network.
+
+**They are deliberately NOT inlined.** mermaid is 3.3 MB against a 1.1 MB
+standalone page, and a tree would carry one copy per page that draws
+anything. Offline does not require a single file — it requires the bytes
+to be reachable, which one shared directory achieves at 1/38th the cost
+here. `test_vendor_offline.py` blocks every origin and asserts the
+diagram draws, the code is coloured, and nothing reached a CDN; the last
+one matters because the fallback would otherwise mask a broken local
+copy. It also asserts the page did NOT grow, which is what catches
+someone "fixing" offline support by inlining.
+
+**`__okuVendorPath()` is a function; `window.__okuVendorBase` is a
+string.** The names differ deliberately. A top-level
+`function __okuVendorBase()` and the injected
+`window.__okuVendorBase = "../_oku/vendor/"` share one global binding,
+and whichever loads second wins — which presented as every dependency
+failing to load, including the line numbers that had nothing to do with
+the change.
 
 ## Common pitfalls
 

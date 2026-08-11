@@ -11413,6 +11413,22 @@ var __okuVisualTools = (function () {
  * uses. Tokens themed via chrome.css custom properties — no second
  * Prism theme stylesheet needed.
  * --------------------------------------------------------------- */
+/* Where the shared runtime dependencies live.
+ *
+ * mermaid and Prism are identical bytes for every document, so `oku
+ * vendor` fetches them once into the kit and every page reads that copy
+ * — offline, and without a browser re-fetching 3.3 MB per cold load.
+ * `__okuVendorBase` is set by build_standalone, whose pages carry no
+ * `_oku/` link tag for __okuDocsRoot to derive a root from.
+ *
+ * Assigned lazily, never at module scope: __okuDocsRoot is a `var`
+ * declared thousands of lines below, and reading it early yields
+ * `undefined_oku/…` — the same trap the i18n table documents. */
+function __okuVendorPath() {
+  if (typeof window.__okuVendorBase === 'string') return window.__okuVendorBase;
+  return (typeof __okuDocsRoot === 'string' ? __okuDocsRoot : '') + '_oku/vendor/';
+}
+
 var __prismLoader = (function () {
   var loadPromise = null;
   var VERSION = '1.29.0';
@@ -11423,10 +11439,21 @@ var __prismLoader = (function () {
       var s = document.createElement('script');
       s.src = src;
       s.async = true;
-      s.crossOrigin = 'anonymous';
+      // Only cross-origin when it IS cross-origin: a local vendored copy
+      // over file:// is refused outright when marked anonymous.
+      if (/^https?:/i.test(src)) s.crossOrigin = 'anonymous';
       s.onload = function () { resolve(); };
       s.onerror = function () { reject(new Error('failed to load ' + src)); };
       document.head.appendChild(s);
+    });
+  }
+
+  /* Vendored copy first, CDN second. `rel` is the path under vendor/,
+   * `cdnUrl` the original. A page that travels away from its vendor
+   * directory still works — it just pays the network again. */
+  function ensureVendored(rel, cdnUrl) {
+    return ensureScript(__okuVendorPath() + rel).catch(function () {
+      return ensureScript(cdnUrl);
     });
   }
 
@@ -11437,13 +11464,22 @@ var __prismLoader = (function () {
     window.Prism = window.Prism || {};
     window.Prism.manual = true;
 
-    loadPromise = ensureScript(CDN + 'prism.min.js')
+    loadPromise = ensureVendored('prism/prism.min.js', CDN + 'prism.min.js')
       .then(function () {
-        return ensureScript(CDN + 'plugins/autoloader/prism-autoloader.min.js');
+        return ensureVendored(
+          'prism/plugins/autoloader/prism-autoloader.min.js',
+          CDN + 'plugins/autoloader/prism-autoloader.min.js'
+        );
       })
       .then(function () {
         if (window.Prism && window.Prism.plugins && window.Prism.plugins.autoloader) {
-          window.Prism.plugins.autoloader.languages_path = CDN + 'components/';
+          // The autoloader takes ONE base, so a language outside the
+          // vendored set cannot fall back to the CDN per-language. It
+          // points at the vendored components when they are there —
+          // an unvendored language then renders unhighlighted, the same
+          // degradation as an offline page has today.
+          window.Prism.plugins.autoloader.languages_path =
+            (window.__okuVendoredPrism ? __okuVendorPath() + 'prism/components/' : CDN + 'components/');
         }
         // Eagerly preload the languages most commonly nested inside
         // other languages — JavaScript inside <script>, CSS inside
@@ -11455,13 +11491,12 @@ var __prismLoader = (function () {
         // until the autoloader's second pass — which we can't safely
         // re-trigger because our line-wrap mutation invalidates the
         // anchor. Cheap: ~5 small CDN fetches once per page.
-        return Promise.all([
-          ensureScript(CDN + 'components/prism-javascript.min.js').catch(function () {}),
-          ensureScript(CDN + 'components/prism-css.min.js').catch(function () {}),
-          ensureScript(CDN + 'components/prism-bash.min.js').catch(function () {}),
-          ensureScript(CDN + 'components/prism-json.min.js').catch(function () {}),
-          ensureScript(CDN + 'components/prism-yaml.min.js').catch(function () {}),
-        ]);
+        return Promise.all(['javascript', 'css', 'bash', 'json', 'yaml'].map(function (lang) {
+          return ensureVendored(
+            'prism/components/prism-' + lang + '.min.js',
+            CDN + 'components/prism-' + lang + '.min.js'
+          ).catch(function () {});
+        }));
       })
       .then(function () {
         // Register the per-element post-process exactly once. The
@@ -11716,8 +11751,11 @@ var __mermaidLoader = (function () {
     if (loadPromise) return loadPromise;
     loadPromise = new Promise(function (resolve, reject) {
       var script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+      // Vendored copy first: mermaid is 3.3 MB and identical for every
+      // page, so re-fetching it per document is the waste this avoids.
+      script.src = __okuVendorPath() + 'mermaid.min.js';
       script.async = true;
+      script.dataset.okuFallback = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
       // To enable SRI: set script.integrity = 'sha384-...';
       //                set script.crossOrigin = 'anonymous';
       script.onload = function () {
@@ -11726,7 +11764,25 @@ var __mermaidLoader = (function () {
           resolve(window.mermaid);
         } catch (e) { reject(e); }
       };
-      script.onerror = function () { reject(new Error('Mermaid CDN load failed')); };
+      script.onerror = function () {
+        // The vendored copy is absent (a file that travelled away from
+        // its vendor directory, or `oku vendor` never run). Fall back to
+        // the CDN once, then give up — a diagram that cannot draw says
+        // so rather than sitting on "loading" forever.
+        var fallback = script.dataset.okuFallback;
+        if (!fallback) { reject(new Error('Mermaid failed to load')); return; }
+        var retry = document.createElement('script');
+        retry.src = fallback;
+        retry.async = true;
+        retry.onload = function () {
+          try {
+            window.mermaid.initialize(buildConfig());
+            resolve(window.mermaid);
+          } catch (e) { reject(e); }
+        };
+        retry.onerror = function () { reject(new Error('Mermaid failed to load')); };
+        document.head.appendChild(retry);
+      };
       document.head.appendChild(script);
     });
     return loadPromise;

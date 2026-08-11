@@ -21,6 +21,17 @@ import pytest
 # Not kit content: editor and OS droppings that would never be assets.
 IGNORED = {".DS_Store"}
 
+# Deliberately NOT packed, which is a different thing from forgotten —
+# and the distinction is the whole point of the test above, so it is
+# spelled out rather than added to IGNORED.
+#
+# `kit/vendor/` holds mermaid and Prism, fetched once per installation by
+# `oku vendor`. Shipping them would put 3.3 MB into the wheel and the
+# same 3.3 MB into git history on every upstream release, to deliver
+# bytes that a single fetch already delivers once per machine. A missing
+# vendor directory degrades to the CDN, which is what happens today.
+UNPACKED = {"kit/vendor"}
+
 
 @pytest.fixture(scope="module")
 def force_include(repo_root: Path) -> dict[str, str]:
@@ -34,13 +45,35 @@ def test_every_kit_entry_is_packed_into_the_wheel(repo_root: Path, force_include
         for p in sorted((repo_root / "kit").iterdir())
         if p.name not in IGNORED and not p.name.startswith(".")
     }
-    missing = sorted(on_disk - set(force_include))
+    missing = sorted(on_disk - set(force_include) - UNPACKED)
 
     assert missing == [], (
         f"{missing} exist under kit/ but are not in "
         "[tool.hatch.build.targets.wheel.force-include]. Other projects would "
         "install an oku missing them."
     )
+
+
+def test_the_unpacked_entries_are_a_cache_and_not_tracked(repo_root: Path):
+    """An entry excused from the wheel must be one that is REGENERATED,
+    never one someone forgot. `kit/vendor/` qualifies because `oku
+    vendor` refetches it; the proof it is not authored content is that
+    git does not track it. Without this, `UNPACKED` becomes a place to
+    silence the check above."""
+    import subprocess
+
+    for entry in sorted(UNPACKED):
+        proc = subprocess.run(
+            ["git", "check-ignore", entry],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0, (
+            f"{entry} is excused from the wheel but IS tracked by git — "
+            "so it is authored content that simply is not shipped, which is "
+            "the exact failure the packing check exists to catch."
+        )
 
 
 def test_the_wheel_list_names_nothing_that_is_gone(repo_root: Path, force_include: dict[str, str]):

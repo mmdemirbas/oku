@@ -1,10 +1,10 @@
 ---
 title: CLI başvurusu
 eyebrow: Başvuru
-subtitle: Altı komut - oku init, build, clean, migrate, check, serve. Çoğu zaman CLI'nin varlığını unutacak şekilde tasarlandı.
+subtitle: Sekiz komut - oku init, build, clean, spec, vendor, migrate, check, serve. Çoğu zaman CLI'nin varlığını unutacak şekilde tasarlandı.
 date: 2026-05-18
 order: 50
-summary: oku init / build / clean / migrate / check / serve — her birinin ne yaptığı.
+summary: oku init / build / clean / spec / vendor / migrate / check / serve — her birinin ne yaptığı.
 ---
 
 > [!TLDR]
@@ -108,6 +108,31 @@ projede çalışır — kitin kendi belge ağacında duran
 [kaynak sayfasının](reference.tr.md) aksine. Her örneğin hem şemaya hem
 de yapısal denetimlere uygunluğu sınanır; dolayısıyla yazdırdığı şey
 `oku check`'ten olduğu gibi geçer.
+
+## oku vendor {#vendor}
+
+İki çalışma zamanı bağımlılığını bir kez indirir; böylece üretilen
+sayfalar ağ olmadan da çalışır. Diyagramları mermaid çizer, kodu Prism
+renklendirir; ikisi de her sayfa açılışında bir CDN'den yükleniyordu.
+
+```bash
+oku vendor            # eksik olanı indir
+oku vendor --update   # yeniden indir (yeni bir sürüm çıktıysa)
+```
+
+```oku-table
+{"headers":["Argüman","Varsayılan","Etkisi"],"rows":[["`--update`","kapalı","Kopya yerinde olsa bile yeniden indirir. Yeni bir sürüme geçerken kullanın."],["(yok)","—","Yalnızca eksik olanı indirir. `oku build` bunu ilk seferde kendisi yapar, dolayısıyla çoğu proje bu komutu hiç çalıştırmaz."]]}
+```
+
+Dosyalar kurulu kitin `vendor/` dizinine iner; yani makine başına bir kez
+indirilir ve bütün projeler aynı kopyayı kullanır. `oku build` çıktının
+yanına tek bir `_oku/vendor/` kopyalar; her sayfa o kopyayı okur, orada
+bulamazsa CDN'e döner.
+
+Bağımlılıklar sayfaların içine **gömülmez**. mermaid tek başına 3,3 MB;
+buna karşılık tek dosyalık bir sayfa 1,1 MB. Gömülseydi, çizim içeren her
+sayfa kendi kopyasını taşırdı. Çevrimdışı çalışmak tek dosya olmayı
+gerektirmez; baytların ağ olmadan erişilebilir olmasını gerektirir.
 
 ## oku migrate {#migrate}
 

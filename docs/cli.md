@@ -1,10 +1,10 @@
 ---
 title: CLI reference
 eyebrow: Reference
-subtitle: Six commands: oku init, build, clean, migrate, check, serve. Designed so you mostly forget the CLI exists.
+subtitle: Eight commands: oku init, build, clean, spec, vendor, migrate, check, serve. Designed so you mostly forget the CLI exists.
 date: 2026-05-18
 order: 50
-summary: oku init / build / clean / migrate / check / serve — what each does.
+summary: oku init / build / clean / spec / vendor / migrate / check / serve — what each does.
 ---
 
 > [!TLDR]
@@ -107,6 +107,31 @@ installed the tool — unlike [the reference page](reference.md), which
 lives in the kit's own docs tree. Every example is asserted valid
 against both the schema and the structural checks, so what it prints
 passes `oku check` unchanged.
+
+## oku vendor {#vendor}
+
+Fetch the two runtime dependencies once so built pages work with no
+network. mermaid draws the diagrams and Prism colours the code; both were
+loaded from a CDN on every page view.
+
+```bash
+oku vendor            # fetch what is missing
+oku vendor --update   # re-fetch (a new upstream release)
+```
+
+```oku-table
+{"headers":["Argument","Default","Effect"],"rows":[["`--update`","off","Re-fetch even when a copy is present. Use after pinning a new upstream version."],["(none)","—","Fetch only what is missing. `oku build` does this automatically the first time, so most projects never run the command."]]}
+```
+
+The files land in the installed kit's `vendor/` directory, so they are
+fetched once per machine and shared by every project. `oku build` copies
+one `_oku/vendor/` beside the output; every page reads that copy and
+falls back to the CDN if it is not there.
+
+They are **not** inlined into each page. mermaid is 3.3 MB against a
+1.1 MB standalone page, so a tree would carry one copy per page that
+draws anything. Offline does not require a single file — it requires the
+bytes to be reachable.
 
 ## oku migrate {#migrate}
 

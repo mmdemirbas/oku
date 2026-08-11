@@ -3844,6 +3844,12 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
     Output preserves the source's directory structure under out_dir.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
+    # One shared copy of the runtime dependencies beside the pages, not a
+    # copy inside each of them. Offline does not require a single file —
+    # it requires the bytes to be reachable without a network.
+    src_vendor = vendor_dir()
+    if src_vendor.is_dir():
+        shutil.copytree(src_vendor, out_dir / "_oku" / "vendor", dirs_exist_ok=True)
 
     def _safe_js(s: str) -> str:
         # Prevent </script> in code (e.g. inside regexes or strings) from
@@ -3886,6 +3892,19 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
                     "</script", "<\\/script"
                 )
                 inline += f"\n<script>window.__okuManifest={safe_manifest};</script>"
+            # Where this page finds mermaid and Prism. A standalone page
+            # carries no `_oku/` link tag, so __okuDocsRoot has nothing to
+            # derive a root from — the base is computed here, relative to
+            # where this page sits in the output tree. The dependencies
+            # are NOT inlined: mermaid alone is 3.3 MB against a 1.1 MB
+            # page, and every page in the tree would carry its own copy.
+            # One shared directory beside them costs it once.
+            depth = len(src.relative_to(src_root).parent.parts)
+            vendor_base = ("../" * depth) + "_oku/vendor/"
+            inline += (
+                f"\n<script>window.__okuVendorBase={json.dumps(vendor_base)};"
+                f"window.__okuVendoredPrism={json.dumps(vendor_is_complete())};</script>"
+            )
             # Inline the kit bundle (project kit.json + active domain
             # glossary/extref entries) so tooltips work offline.
             if kit_bundle:
@@ -3936,6 +3955,17 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
 
 def cmd_build(args: argparse.Namespace) -> int:
     root = Path.cwd()
+    # Fetch the shared dependencies the first time they are needed rather
+    # than making the author discover a command. Once per installation,
+    # then never again; a failure here is not a build failure, because
+    # every loader still falls back to the CDN.
+    if not getattr(args, "no_vendor", False) and not vendor_is_complete():
+        print("  fetching mermaid + Prism once so pages render offline …")
+        fetched, _ = fetch_vendor(quiet=True)
+        if fetched:
+            print(f"  ✓ vendored {fetched} file(s) into {vendor_dir()}")
+        else:
+            print("  ! could not vendor — pages will use the CDN (run `oku vendor` later)")
     # Single walk + parse — every downstream consumer (iter_page_stubs,
     # check, manifest, markdown twins, llms.txt) accepts a pre-computed
     # pages list. Avoids ~5 redundant rglob-parse passes over the tree.
@@ -4696,6 +4726,99 @@ def _page_content_fingerprint(page: dict) -> tuple[str, str, str]:
 
 
 # ---------- main ----------
+# ---------- vendored runtime dependencies ----------
+#
+# Two libraries are fetched from a CDN at RUNTIME: mermaid draws the
+# diagrams, Prism colours the code. Measured on the built
+# docs/architecture.html with the CDN blocked: 6 of 6 diagrams fail and
+# 598 syntax tokens become 0. Line numbers survive — they were made
+# independent of the CDN earlier.
+#
+# Inlining mermaid into each page is the obvious fix and the wrong one:
+# it is 3,337,857 bytes against a 1.1 MB page, and a doc tree pays that
+# per page that draws anything. The files are identical across every
+# document, so they are fetched ONCE into the installed kit and shared —
+# which also stops a reader's browser re-fetching 3.3 MB per cold page
+# load. The CDN stays as the fallback for a file that travels alone.
+_PRISM_VERSION = "1.29.0"
+_MERMAID_VERSION = "10"
+_PRISM_CDN = f"https://cdn.jsdelivr.net/npm/prismjs@{_PRISM_VERSION}/"
+_MERMAID_CDN = f"https://cdn.jsdelivr.net/npm/mermaid@{_MERMAID_VERSION}/dist/mermaid.min.js"
+# The five the loader preloads, plus the languages this kit's own pages
+# and its likely consumers actually use. An unlisted language falls back
+# to no highlighting offline, which is the same degradation as today.
+_PRISM_LANGS = (
+    "javascript css bash json yaml python typescript jsx tsx java go rust sql markup "
+    "diff toml ini docker kotlin scala c cpp csharp php ruby swift graphql markdown"
+).split()
+
+
+def _vendor_files() -> list[tuple[str, str]]:
+    """(path under vendor/, source URL) for every shared dependency."""
+    out = [
+        ("mermaid.min.js", _MERMAID_CDN),
+        ("prism/prism.min.js", _PRISM_CDN + "prism.min.js"),
+        (
+            "prism/plugins/autoloader/prism-autoloader.min.js",
+            _PRISM_CDN + "plugins/autoloader/prism-autoloader.min.js",
+        ),
+    ]
+    out += [
+        (f"prism/components/prism-{lang}.min.js", f"{_PRISM_CDN}components/prism-{lang}.min.js")
+        for lang in _PRISM_LANGS
+    ]
+    return out
+
+
+def vendor_dir() -> Path:
+    return _kit_assets_dir() / "vendor"
+
+
+def vendor_is_complete() -> bool:
+    root = vendor_dir()
+    return all((root / rel).exists() for rel, _url in _vendor_files())
+
+
+def fetch_vendor(*, update: bool = False, quiet: bool = False) -> tuple[int, int]:
+    """Download missing (or all, with update) dependencies. Returns
+    (fetched, skipped). Never raises on a network failure: the CDN
+    fallback still works, so a failed vendor is a slower page, not a
+    broken one."""
+    import urllib.error
+    import urllib.request
+
+    root = vendor_dir()
+    fetched = skipped = 0
+    for rel, url in _vendor_files():
+        dest = root / rel
+        if dest.exists() and not update:
+            skipped += 1
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with urllib.request.urlopen(url, timeout=30) as r:  # noqa: S310 - pinned https CDN
+                data = r.read()
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            if not quiet:
+                print(f"  ! {rel}: {e}", file=sys.stderr)
+            continue
+        dest.write_bytes(data)
+        fetched += 1
+    return fetched, skipped
+
+
+def cmd_vendor(args: argparse.Namespace) -> int:
+    """`oku vendor` — fetch the shared runtime dependencies once."""
+    root = vendor_dir()
+    fetched, skipped = fetch_vendor(update=args.update)
+    total = sum(f.stat().st_size for f in root.rglob("*") if f.is_file()) if root.exists() else 0
+    print(f"✓ vendor: {fetched} fetched, {skipped} already present — {total / 1_000_000:.1f} MB in {root}")
+    if not vendor_is_complete():
+        print("  ! incomplete — pages fall back to the CDN for whatever is missing", file=sys.stderr)
+        return 1
+    return 0
+
+
 _examples_cache: dict | None = None
 
 
@@ -4903,6 +5026,15 @@ def main() -> int:
         ),
     )
     sub = parser.add_subparsers(dest="cmd")
+    vendor_parser = sub.add_parser(
+        "vendor",
+        help="fetch mermaid + Prism once so pages render offline without re-downloading",
+    )
+    vendor_parser.add_argument(
+        "--update",
+        action="store_true",
+        help="re-fetch even when a copy is already present (new upstream release)",
+    )
     spec_parser = sub.add_parser(
         "spec",
         help="print a ready-to-paste payload for a block kind or chart type",
@@ -4918,7 +5050,12 @@ def main() -> int:
         help="print the bare payload instead of the fence that wraps it",
     )
     sub.add_parser("init", help="create an _oku symlink in the current directory")
-    sub.add_parser("build", help="build dist/{standalone,site,markdown}/ from current dir")
+    build_parser = sub.add_parser("build", help="build dist/{standalone,site}/ from current dir")
+    build_parser.add_argument(
+        "--no-vendor",
+        action="store_true",
+        help="skip fetching mermaid + Prism; pages fall back to the CDN",
+    )
     sub.add_parser("clean", help="remove dist/ from the current project")
     migrate_parser = sub.add_parser(
         "migrate",
@@ -4994,6 +5131,8 @@ def main() -> int:
         return cmd_serve(args)
     if args.cmd == "spec":
         return cmd_spec(args)
+    if args.cmd == "vendor":
+        return cmd_vendor(args)
     parser.print_help()
     return 0
 
