@@ -55,6 +55,10 @@ def test_the_button_finds_the_page_whatever_root_the_manifest_used(page, site_ur
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{site_url}/docs/reference.html")
     page.wait_for_selector("main section")
+    # The first section is not the walk finishing, and this test writes
+    # `location.hash` — which a still-settling page overwrites, losing the
+    # reader position the switch is supposed to carry across.
+    page.wait_for_function("() => window.__okuRendered === true", timeout=15000)
 
     got = page.evaluate(BUILD, _manifest(prefix))
 
@@ -71,7 +75,17 @@ def test_the_target_is_built_from_the_matched_prefix(page, site_url, prefix):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{site_url}/docs/reference.html")
     page.wait_for_selector("main section")
+    # The first section is not the walk finishing, and this test writes
+    # `location.hash` — which a still-settling page overwrites, losing the
+    # reader position the switch is supposed to carry across.
+    page.wait_for_function("() => window.__okuRendered === true", timeout=15000)
     page.evaluate("() => { location.hash = '#prose'; }")
+    # Setting the hash starts an ASYNCHRONOUS scroll to the anchor, and the
+    # scroll spy clears the hash entirely while `scrollY < 80` — at the top
+    # of the page no section is current, which is deliberate. Clicking
+    # before the scroll lands therefore tests a page whose fragment the kit
+    # has already dropped, and the switch is blamed for losing it.
+    page.wait_for_function("() => window.scrollY >= 80 && location.hash === '#prose'", timeout=10000)
 
     page.evaluate(BUILD, _manifest(prefix))
     page.click(".ctrl-btn.lang-toggle")
@@ -90,6 +104,10 @@ def test_a_page_with_no_counterpart_gets_no_button(page, site_url):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{site_url}/docs/reference.html")
     page.wait_for_selector("main section")
+    # The first section is not the walk finishing, and this test writes
+    # `location.hash` — which a still-settling page overwrites, losing the
+    # reader position the switch is supposed to carry across.
+    page.wait_for_function("() => window.__okuRendered === true", timeout=15000)
 
     got = page.evaluate(
         BUILD,
