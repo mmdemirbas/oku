@@ -23,6 +23,7 @@ prefix for click-to-open.
 import argparse
 import collections
 import datetime
+import difflib
 import http.server
 import json
 import os
@@ -31,6 +32,7 @@ import re
 import shutil
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 import webbrowser
@@ -4480,6 +4482,93 @@ def _page_content_fingerprint(page: dict) -> tuple[str, str, str]:
 
 
 # ---------- main ----------
+_examples_cache: dict | None = None
+
+
+def _load_examples() -> dict:
+    """Lazy-load and cache the shipped payload examples."""
+    global _examples_cache
+    if _examples_cache is not None:
+        return _examples_cache
+    path = KIT_DIR / "schema" / "examples.json"
+    try:
+        _examples_cache = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        _examples_cache = {}
+    return _examples_cache
+
+
+def _spec_entry(name: str) -> tuple[str, dict] | None:
+    """Resolve a name to (fence-tag, payload). Block kinds win a tie, and
+    `test_spec_examples` asserts there is never a tie to win."""
+    ex = _load_examples()
+    blocks = ex.get("blocks") or {}
+    charts = ex.get("charts") or {}
+    if name in blocks:
+        return f"oku-{name}", blocks[name]
+    if name in charts:
+        return "oku-chart", charts[name]
+    return None
+
+
+def cmd_spec(args: argparse.Namespace) -> int:
+    """Print the payload an author would otherwise go hunting for.
+
+    The hunt was the expensive part. `docs/reference.md` and
+    `docs/charts.md` carry every shape, but neither ships in the wheel —
+    the force-include list is assets only — so from any project that
+    installed the tool, the sole local source of truth was
+    `page.schema.json`: 11.6k tokens, 75 chart properties, 29 `allOf`
+    branches, and no worked example of any of them. The realistic
+    alternatives were to guess and let `oku check` referee, or to read the
+    schema. Both cost more than this prints, and the first also risks a
+    wrong-but-valid payload, which validates clean and renders empty.
+    """
+    ex = _load_examples()
+    if not ex:
+        print(f"! no examples file at {KIT_DIR / 'schema' / 'examples.json'}", file=sys.stderr)
+        return 1
+
+    blocks = ex.get("blocks") or {}
+    charts = ex.get("charts") or {}
+
+    if not args.name:
+        print(f"block kinds ({len(blocks)}) — fence is ```oku-<kind>")
+        # Every name here is hyphenated (`calendar-heatmap`, `kpi-grid`) and
+        # is meant to be copied, so the wrapper must never break on a hyphen.
+        wrap = {
+            "width": 76,
+            "initial_indent": "  ",
+            "subsequent_indent": "  ",
+            "break_on_hyphens": False,
+            "break_long_words": False,
+        }
+        print(textwrap.fill(" ".join(sorted(blocks)), **wrap))
+        print(f'\nchart types ({len(charts)}) — fence is ```oku-chart with "type"')
+        print(textwrap.fill(" ".join(sorted(charts)), **wrap))
+        print("\noku spec <name>   one ready-to-paste payload")
+        return 0
+
+    entry = _spec_entry(args.name)
+    if entry is None:
+        known = sorted(set(blocks) | set(charts))
+        near = difflib.get_close_matches(args.name, known, n=3, cutoff=0.5)
+        print(f"! unknown name {args.name!r}", file=sys.stderr)
+        if near:
+            print(f"  did you mean: {', '.join(near)}", file=sys.stderr)
+        else:
+            print("  `oku spec` with no argument lists every name", file=sys.stderr)
+        return 1
+
+    tag, payload = entry
+    body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+    if args.json:
+        print(body)
+    else:
+        print(f"```{tag}\n{body}\n```")
+    return 0
+
+
 def cmd_migrate(args: argparse.Namespace) -> int:
     """`oku migrate [path]` — convert page-JSON sources (v1 or v2) to
     v3 markdown.
@@ -4576,6 +4665,20 @@ def main() -> int:
         version=f"oku {_PKG_VERSION} · kit {_kit_build_stamp()} · assets {_kit_assets_dir()}",
     )
     sub = parser.add_subparsers(dest="cmd")
+    spec_parser = sub.add_parser(
+        "spec",
+        help="print a ready-to-paste payload for a block kind or chart type",
+    )
+    spec_parser.add_argument(
+        "name",
+        nargs="?",
+        help="block kind (table, kpi-grid, …) or chart type (sankey, gantt, …); omit to list every name",
+    )
+    spec_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="print the bare payload instead of the fence that wraps it",
+    )
     sub.add_parser("init", help="create an _oku symlink in the current directory")
     sub.add_parser("build", help="build dist/{standalone,site,markdown}/ from current dir")
     sub.add_parser("clean", help="remove dist/ from the current project")
@@ -4651,6 +4754,8 @@ def main() -> int:
         return cmd_migrate(args)
     if args.cmd == "serve":
         return cmd_serve(args)
+    if args.cmd == "spec":
+        return cmd_spec(args)
     parser.print_help()
     return 0
 
