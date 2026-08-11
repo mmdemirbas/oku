@@ -156,17 +156,21 @@ def _render(page, url: str, group: str) -> dict:
 
 
 @pytest.fixture(scope="module")
-def page_module():
-    """The plugin's `page` is function-scoped, and this file has 68
-    parametrised cases reading two pages. Opening a browser per case
-    would dominate the suite's runtime for no extra coverage."""
-    from playwright.sync_api import sync_playwright
+def page_module(browser):
+    """One page for all 68 cases: the plugin's `page` is function-scoped,
+    and opening a browser per case would dominate the suite's runtime for
+    no extra coverage.
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        pg = browser.new_page()
-        yield pg
-        browser.close()
+    It takes the plugin's session-scoped `browser` rather than starting
+    its own. Calling `sync_playwright()` here instead passed in isolation
+    and errored all 68 cases inside the full suite, because by then the
+    plugin holds a live sync instance on this thread and a second one
+    cannot be nested — a failure that only appears once some other test
+    has already used a browser.
+    """
+    pg = browser.new_page()
+    yield pg
+    pg.close()
 
 
 @pytest.fixture(scope="module")
