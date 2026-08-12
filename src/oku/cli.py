@@ -2090,6 +2090,21 @@ def _lint_md_string(
                         )
                     )
                     break
+            # "Word-search for placeholders before delivering" was a step
+            # in the skill's manual checklist, which is the wrong place
+            # for anything a regex can do — a checklist step is skipped
+            # silently and a check is not.
+            ph = _PLACEHOLDER_RE.search(line)
+            if ph:
+                issues.append(
+                    (
+                        "warning",
+                        "placeholder-text",
+                        f"line {lineno}",
+                        f"Prose still carries the placeholder {ph.group(0)!r}. "
+                        "Replace it or delete the sentence before delivering.",
+                    )
+                )
         prev_nonblank = line
         prev_blank = False
 
@@ -2851,6 +2866,14 @@ _DERIVABLE_META = {
     "read_time": "the body at 220 words per minute",
     "updated": "the file's last commit date",
 }
+
+# Placeholders that mean "not finished". Word-boundaried and
+# case-sensitive for the acronyms, so prose about a TODO list or the
+# word "todos" does not trip it; `{{ }}` catches an unfilled template.
+_PLACEHOLDER_RE = re.compile(
+    r"\{\{[^}]*\}\}|\b(?:TODO|TBD|FIXME|XXX)\b|\blorem ipsum\b",
+    re.IGNORECASE if False else 0,
+)
 
 _ISLAND_STYLE_RE = re.compile(r"<style[\s>]|style\s*=\s*[\"'][^\"']*(?:#[0-9a-fA-F]{3,8}|rgb\()")
 _HTML_ISLAND_RE = re.compile(r"^<[a-zA-Z][^\s>]*", re.MULTILINE)

@@ -103,3 +103,24 @@ def test_the_derived_keys_are_marked_as_derived(capsys) -> None:
     for key in cli._DERIVABLE_META:
         line = next(ln for ln in out.splitlines() if ln.startswith(f"{key}:"))
         assert "DERIVED" in line and "do not hand-set" in line, line
+
+
+def test_a_placeholder_left_in_prose_is_flagged(tmp_path: Path) -> None:
+    """ "Word-search for placeholders before delivering" was a step in the
+    skill's manual checklist. A checklist step is skipped in silence; a
+    check is not."""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+    (docs / "p.md").write_text(
+        "---\ntitle: T\nsummary: s\n---\n\n## S {#s}\n\n"
+        "Revenue rose to {{ figure }} last quarter.\n\nTODO: check this.\n\n"
+        "We keep a todo list, which is ordinary prose.\n\n"
+        "```python\n# TODO: inside code, not prose\npass\n```\n",
+        encoding="utf-8",
+    )
+    issues = [i for i in cli.check_pages(cli.find_json_pages(docs), docs) if i["code"] == "placeholder-text"]
+    found = {i["message"].split("placeholder ")[1].split(".")[0] for i in issues}
+
+    assert len(issues) == 2, [i["message"] for i in issues]
+    assert found == {"'{{ figure }}'", "'TODO'"}, found

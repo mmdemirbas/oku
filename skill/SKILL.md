@@ -123,12 +123,11 @@ Failure recovery rules:
   pipe-separated-string shape is invalid.
 - `engine` is NOT a valid key on `diagram` blocks — Mermaid is the
   only engine; just pass `source: "..."`.
-- `info-tip.content` must be a **block array**, never a bare string.
-  A string passes `oku check` and then renders as a `<details>` with
-  ONLY the `<summary>` — the body silently disappears. Same silent-drop
-  risk for any `content` field documented as a block list. After adding
-  an `info-tip`, open the page and assert the `<details>` has more than
-  one child element; the linter will not catch this.
+- `info-tip.content` must be a **block array**, never a bare string —
+  the linter now says so (`'…' is not of type 'array'`). It used to
+  pass, render a `<details>` holding only its `<summary>`, and drop the
+  body in silence, which is why this rule asked for a manual browser
+  check. The check is the schema's job now; the manual step is gone.
 
 **Never declare a page edit done if `oku check` exits non-zero.**
 
@@ -560,61 +559,41 @@ What the linter cannot decide, and you still have to:
 
 **Automated (every artifact — run this first):**
 
-Run `oku check --strict` from the project root after you finish
-authoring. The linter validates every page (typed fence payloads
-against the schema) and flags structural / content issues that the
-browser-side checks below can't see:
+Run `oku check --strict` from the project root. It validates every typed
+fence payload against the schema and runs 65 structural and content
+checks, and it names each finding with `file:line`, the offending value
+and — for anything it can compute — the fix. Read what it prints rather
+than working from a list here: a catalogue in this file goes stale
+against the tool independently, and the tool is the one that is right.
 
-- Schema violations (missing required fields, unknown kinds).
-- Deprecated primitives (`bar-chart`, `scope-grid`) — both fold into
-  unified primitives (`chart` with `type:"bar"`, `compare-grid` with
-  `verdict:"in"`/`"out"` + `items[]`); the linter names the migration.
-- Duplicate section / heading anchors within a page.
-- Unresolved glossary terms / ext-refs (the kit drops these silently
-  in the browser; the linter is the only catch).
-- Forbidden process language: `round-N`, `v2 review`, `fixed in round`
-  in any prose. The kit documents current behaviour, not history.
-- Chart shape errors: `type:bar` without `rows`, `type:scatter|line`
-  without `series`, unknown chart types.
-- Layout primitives with an empty collection (`kpi-grid` with no
-  tiles, `step-flow` with no steps, `compare-grid` with no cards,
-  `chart-grid` with no charts) — these render as a zero-height gap
-  with no other signal.
-- Footnote and reference-link labels with no definition anywhere on
-  the page; both render as literal source text otherwise.
-- Headings that skip a level (`##` → `####`), which breaks the
-  outline a screen reader announces and the TOC nests by.
-- Strict-GFM subset violations (setext headings, indented code
-  blocks, lazy blockquote continuation, ambiguous `---`) and
-  ```oku-* fences that failed to lift (bad JSON / unknown kind).
-- HTML islands (info-level audit — each island is a deliberate,
-  visible decision).
-- Stray demo pages (`*-demo.html|md`) outside the one historical
-  exception (`markdown-demo.md`).
-
-Use `--json` for machine-parseable output, `--verbose` to also see
-info-level nudges (missing `meta.summary`, code blocks without a
-declared language). A zero exit code under `--strict` means the
-doctree is clean.
+`--json` for machine-parseable output, `--verbose` to include
+info-level nudges, `--errors-only` to hide warnings. Zero exit under
+`--strict` means the doctree is clean.
 
 **Lightweight (every artifact):**
 
 1. Page opens in a browser; no console errors.
-2. Every TOC link resolves to a section.
-3. Toggle the theme; nothing strobes, and any island or hand-drawn SVG
+2. Toggle the theme; nothing strobes, and any island or hand-drawn SVG
    stays legible — confirm its fills and strokes read CSS variables
    rather than hardcoded hex.
-4. Resize to a narrow viewport; the Contents drawer behaves, and any
+3. Resize to a narrow viewport; the Contents drawer behaves, and any
    SVG scales via `viewBox` instead of clipping.
-5. Word-search for placeholders (`{{ }}`, `TODO`, `TBD`, `XXX`) —
-   none should remain.
+
+Anchors and placeholders were on this list and are checks now
+(`unresolved-anchor`, `placeholder-text`) — a checklist step is skipped
+silently, a check is not.
 
 **Heavier (long reference documents):**
 
-6. Block the CDN domain in devtools; the page is still readable.
-7. Disable JavaScript; the body is still readable.
-8. Mermaid blocks re-render correctly after a theme toggle.
-9. Take screenshots in both modes for the user.
+4. Mermaid blocks re-render correctly after a theme toggle.
+5. Take screenshots in both modes for the user.
+
+Not on this list any more: blocking the CDN (mermaid and Prism are
+vendored — `test_vendor_offline.py` asserts a built page draws with
+every origin refused), and "disable JavaScript; the body is still
+readable". The second was never true: renderer.js builds the DOM, so a
+no-JS page measures 0 characters of body text. Asking for a check that
+cannot pass teaches you to report passes you did not get.
 
 After the checks, announce the file with a 1-3 sentence pointer plus
 the top 1-3 takeaways.
