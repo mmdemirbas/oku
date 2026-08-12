@@ -913,6 +913,31 @@ and whichever loads second wins — which presented as every dependency
 failing to load, including the line numbers that had nothing to do with
 the change.
 
+**Seven sources decide what a block kind is, and they cannot see each
+other.** `_FENCE_KINDS` (cli) and `FENCE_KINDS` (renderer.js) say what
+lifts; `$defs` says what validates; the `case` dispatch says what draws;
+`_KNOWN_BLOCK_KINDS` says what the lint accepts; `examples.json` says
+what `oku spec` can answer for; and the `required` map at the foot of
+renderer.js mirrors the schema's own `required` arrays. A kind in some
+and not the others is never a crash — it is a fence that lifts into a
+block nothing validates, or a linter rejecting a page the kit draws.
+Both have shipped: `oku-chart-grid` (rejected by the lint, drawn by the
+renderer) and `oku-tldr` (documented fence, validated by nothing).
+
+`test_authority_agreement.py` holds them against each other, and
+`test_block_contract.py` covers the required-field mirror. The rule:
+**anything an author can write must validate, draw, and be printable by
+`oku spec`.** Adding a primitive means adding it in all of them — the
+tests name which one you missed.
+
+**`info-tip` is a fence now.** It was drawn by the renderer, documented
+in the briefing as the canonical wrong-but-valid example, and reachable
+from nowhere: no fence, no `$defs`, and the v1 shim turns legacy ones
+into markdown. `docs/reference.md` demonstrated it with a `> [!TIP]`
+admonition standing in for the real thing. It has a schema entry and a
+fence, so the primitive the renderer implements is one an author can
+actually write.
+
 ## Common pitfalls
 
 - **Stale chrome.js in the browser.** The CDN-loaded Prism autoloader
@@ -988,9 +1013,13 @@ the change.
   should change inside the lightbox and was set inline must be
   stashed and restored by the expand handler, not fought in CSS.
 
-- **`tldr` is allowed inside contentBlock** (recent schema change).
-  Don't refactor the schema to remove this — the primitives reference
-  embeds a live tldr sample alongside its code example.
+- **There is exactly one way to write a TL;DR: `> [!TLDR]`.** A
+  ```oku-tldr fence used to lift into a typed block that no `$defs`
+  entry validated and no renderer case drew — so the documented fence
+  could not work, and nothing failed because nothing in this repo used
+  it. The fence is gone; `_MARKDOWN_FORM_OF` names the survivor, so an
+  author who reaches for it is told what to write instead of reading a
+  list that lacks what they typed.
 
 ## Browser verification flow
 

@@ -201,6 +201,17 @@
       "alt": "What the pipeline does",
       "caption": "Pipeline overview"
     },
+    "info-tip": {
+      "summary": "How the lock actually works",
+      "content": [
+        "Two writers race on the same key. The second read lands before the first write, so the update is lost with no error.",
+        {
+          "k": "code",
+          "src": "with lock(key):\n    state = read(key)\n    write(key, mutate(state))",
+          "lang": "python"
+        }
+      ]
+    },
     "insight": {
       "b": "The catalog is the locking primitive. Snapshots are the multi-version mechanism."
     },

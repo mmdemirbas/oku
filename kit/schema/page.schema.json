@@ -122,6 +122,9 @@
         },
         {
           "$ref": "#/$defs/insight"
+        },
+        {
+          "$ref": "#/$defs/info-tip"
         }
       ]
     },
@@ -2443,6 +2446,37 @@
           "items": {
             "type": "object",
             "additionalProperties": true
+          }
+        }
+      }
+    },
+    "info-tip": {
+      "type": "object",
+      "description": "A <details> disclosure: a one-line summary the reader can expand. For the detail the curious minority wants without taxing everyone else.",
+      "required": [
+        "k",
+        "summary",
+        "content"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "k": {
+          "const": "info-tip"
+        },
+        "summary": {
+          "type": "string",
+          "description": "The always-visible line."
+        },
+        "open": {
+          "type": "boolean",
+          "description": "Start expanded. Default false."
+        },
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Markdown strings and/or typed blocks, same as a page body.",
+          "items": {
+            "$ref": "#/$defs/block"
           }
         }
       }

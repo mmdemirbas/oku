@@ -610,7 +610,9 @@ _FENCE_KINDS = {
     "live-snippet",
     "annotated-code",
     "diagram",
-    "tldr",
+    "info-tip",
+    # NOT "tldr": the fence lifts to a block that no v2 renderer case
+    # draws and no `$defs` entry validates. `> [!TLDR]` is the one way.
 }
 
 
@@ -784,6 +786,26 @@ def _locate(path: Path, block_index: int | None) -> tuple[Path, int | None]:
     if block_index is not None:
         line = (_PAGE_BLOCK_LINES.get(path) or {}).get(block_index)
     return source, line
+
+
+# A kind an author may reasonably reach for as `oku-<kind>`, and the one
+# form that actually works. Every entry here is a place the kit offers
+# two spellings of one idea — which is the shape that makes an author
+# guess. The fence is refused and this names the survivor.
+_MARKDOWN_FORM_OF = {
+    "tldr": "a `> [!TLDR]` blockquote",
+    "callout": "a GFM admonition — `> [!NOTE]`, `> [!TIP]`, `> [!WARNING]`, …",
+    "note": "a `> [!NOTE]` blockquote",
+    "tip": "a `> [!TIP]` blockquote",
+    "warning": "a `> [!WARNING]` blockquote",
+    "code": "a plain fenced code block with a language, e.g. ```python",
+    "image": "`![alt](src.png)`",
+    "svg": "an HTML island — the `<svg>` tag at column 0",
+    "heading": "a `##` / `###` markdown heading",
+    "paragraph": "plain markdown prose",
+    "list": "a markdown list",
+    "section": "a `##` heading, which opens a section",
+}
 
 
 def _did_you_mean(needle: str, haystack, limit: int = 3) -> str:
@@ -1940,12 +1962,23 @@ def _lint_md_string(
 
     for lineno, lang, _body in fences:
         if lang.startswith("oku-"):
+            # A kind that has a markdown form is not a missing feature —
+            # it is the same feature spelled the one way that works. Say
+            # which, rather than making the author infer it from a list
+            # that does not contain what they typed.
+            kind = lang[4:]
+            instead = _MARKDOWN_FORM_OF.get(kind)
+            detail = (
+                f" `{kind}` has no fence: write it as {instead}."
+                if instead
+                else f" The body must be a single JSON object and the kind one of {sorted(_FENCE_KINDS)}."
+            )
             issues.append(
                 (
                     "error",
                     "fence-not-lifted",
                     f"line {lineno}",
-                    f"```{lang} fence did not lift to a typed block — the body must be a single JSON object and the kind one of {sorted(_FENCE_KINDS)}.",
+                    f"```{lang} fence did not lift to a typed block.{detail}",
                 )
             )
         elif not lang:

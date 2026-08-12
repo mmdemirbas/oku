@@ -113,7 +113,9 @@ IN_SECTIONS = """() => {
     const painted = s.querySelectorAll(
       'svg rect, svg path, svg circle, svg line, svg polygon, svg polyline, svg image,' +
       ' canvas, img, .bar-track, .kpi, .step-card, .compare-card,' +
-      ' .okt-tl-item, aside.insight, td, th, pre code, .okt-diag-node'
+      // A closed <details> paints its summary and nothing else — that IS
+      // its rendered state, so the box counts rather than its contents.
+      ' .okt-tl-item, aside.insight, details.info-tip, td, th, pre code, .okt-diag-node'
     );
     let widest = 0;
     painted.forEach((el) => {

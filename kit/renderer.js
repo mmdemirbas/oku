@@ -614,7 +614,8 @@
   // arrived as .md (lifted at build time) or as a fence inside a v2
   // markdown string (lifted here).
   const FENCE_KINDS = ['chart', 'chart-grid', 'table', 'kpi-grid', 'step-flow',
-    'timeline', 'compare-grid', 'insight', 'example', 'live-snippet', 'annotated-code', 'diagram', 'tldr'];
+    'timeline', 'compare-grid', 'insight', 'example', 'live-snippet', 'annotated-code', 'diagram', 'info-tip'];
+    // No 'tldr': `> [!TLDR]` is the one way to write one — see chrome/renderer admonition handling.
 
   function liftTypedFence(lang, src) {
     if (lang === 'mermaid') return { k: 'diagram', src: src };
@@ -2480,6 +2481,7 @@
     'diagram': { required: ['src'] },
     'example': { required: ['code', 'output'] },
     'image': { required: ['src'] },
+    'info-tip': { required: ['summary', 'content'] },
     'insight': { required: ['b'] },
     'kpi-grid': { required: ['tiles'], items: { tiles: ['num', 'label'] } },
     'live-snippet': { required: ['src'] },
