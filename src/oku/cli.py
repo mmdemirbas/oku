@@ -205,7 +205,16 @@ def _tool_digest() -> str:
     h = hashlib.sha256()
     files = [Path(__file__)]
     assets = _kit_assets_dir()
-    files += sorted(p for p in assets.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
+    # `vendor/` is a fetched cache that deliberately does not ship, so a
+    # populated one made the repo's digest differ from the installed
+    # tool's forever. A staleness gate that always fires is one nobody
+    # reads — the failure this digest exists to prevent, wearing the
+    # opposite sign.
+    files += sorted(
+        p
+        for p in assets.rglob("*")
+        if p.is_file() and "__pycache__" not in p.parts and "vendor" not in p.parts
+    )
     for f in files:
         try:
             h.update(f.name.encode())

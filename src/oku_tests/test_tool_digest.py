@@ -95,3 +95,22 @@ def test_a_cli_change_moves_the_digest(tmp_path) -> None:
 
     assert unchanged and edited
     assert unchanged != edited, "a cli.py edit left the digest unchanged — the gap is still open"
+
+
+def test_the_vendor_cache_does_not_move_the_digest(tmp_path, monkeypatch) -> None:
+    """`vendor/` is fetched, not authored, and deliberately absent from
+    the wheel. Counting it made the repo's digest differ from the
+    installed tool's permanently — a staleness gate that always fires,
+    which is the failure this digest exists to prevent wearing the
+    opposite sign. It reported drift on a tool that was current.
+    """
+    fake = tmp_path / "assets"
+    (fake / "vendor" / "prism").mkdir(parents=True)
+    (fake / "chrome.js").write_text("var __okuKitBuild = '2026-01-01';\n")
+    monkeypatch.setattr(cli, "_kit_assets_dir", lambda: fake)
+    before = cli._tool_digest()
+
+    (fake / "vendor" / "mermaid.min.js").write_text("// 3.3 MB in real life\n")
+    (fake / "vendor" / "prism" / "prism.min.js").write_text("// also fetched\n")
+
+    assert cli._tool_digest() == before, "vendoring changed the digest"
