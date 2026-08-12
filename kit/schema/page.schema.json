@@ -1939,7 +1939,10 @@
               "type": {
                 "enum": [
                   "stacked-bar",
-                  "grouped-bar"
+                  "grouped-bar",
+                  "bump",
+                  "stream",
+                  "marimekko"
                 ]
               }
             },

@@ -2202,8 +2202,36 @@ def _chart_shape_issues(blk: dict) -> list[tuple[str, str]]:
     ctype = blk.get("type")
     known = _known_chart_types()
     if ctype is not None and known and ctype not in known:
-        bad("chart-unknown-type", f"chart type '{ctype}' is not supported. Known: {', '.join(known)}.")
+        # A near match answers the question outright; without one the
+        # author still needs the menu, and dropping it in favour of the
+        # suggestion left them with less than before.
+        near = _did_you_mean(ctype, known)
+        menu = "" if near else f" Known: {', '.join(known)}."
+        bad(
+            "chart-unknown-type",
+            f"chart type '{ctype}' is not supported.{near}{menu} "
+            "`oku spec <type>` prints a payload for any of them.",
+        )
         return out
+
+    # Every chart needs data, and only 22 of the 53 types had a shape
+    # check saying so. Measured by emptying each shipped example's main
+    # data array: 12 types passed every gate, and dropping the key
+    # entirely got 17 through — each rendering a box with nothing in it,
+    # which is the one failure no linter was catching.
+    #
+    # One rule rather than 53: a chart with no populated collection
+    # anywhere cannot draw, whatever its type. Scalars alone are never
+    # enough — even a gauge carries `zones`.
+    if ctype is not None and not any(
+        isinstance(v, (list, dict)) and len(v) > 0 for k, v in blk.items() if k not in ("k", "type")
+    ):
+        bad(
+            "chart-no-data",
+            f"chart with type:{ctype} carries no data — every collection in it is empty or absent, "
+            "so it renders as an empty box. `oku spec "
+            f"{ctype}` prints a payload with the right shape.",
+        )
     if ctype == "bar":
         if not blk.get("rows"):
             bad("chart-bar-missing-rows", "chart with type:bar requires a `rows` array.")
