@@ -3051,3 +3051,20 @@ class TestDocumentedFenceTags:
             f"CLAUDE.md lists {sorted(listed - cli._FENCE_KINDS)} that are not fences, "
             f"and omits {sorted(cli._FENCE_KINDS - listed)}"
         )
+
+    def test_every_file_that_names_fence_tags_names_them_correctly(self):
+        """A decision table listing the primitives is worth its tokens;
+        a stale one is not. The briefing's table named `oku-tldr` after
+        that fence was removed — the same drift as CLAUDE.md's list, in
+        a file the first test did not look at. The rule is that any list
+        must be right, not that lists are forbidden."""
+        import re
+
+        from oku import cli
+
+        repo_root = Path(__file__).resolve().parents[2]
+        for rel in ("skill/SKILL.md", "skill/references/islands.md"):
+            text = (repo_root / rel).read_text(encoding="utf-8")
+            named = set(re.findall(r"`oku-([a-z][a-z-]*)`", text))
+            gone = sorted(named - cli._FENCE_KINDS - set(cli._MARKDOWN_FORM_OF))
+            assert gone == [], f"{rel} names `oku-{gone}` — not a fence and not a markdown form"

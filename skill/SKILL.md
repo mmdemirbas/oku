@@ -41,43 +41,21 @@ down.
 
 ## Design principles — apply to content, not just visual style
 
-This skill is governed by the four design principles in
-`~/.claude/rules/design-principles.md` (proximity, hierarchy, schema,
-grouping). They apply at three layers — visual, content, code — and
-the **content layer** is the load-bearing one for this skill.
+`~/.claude/rules/design-principles.md` and `teaching-order.md` are
+loaded every session and carry the four principles, the three layers and
+the catalog-vs-teaching decision in full. Restating them here cost
+tokens on every invocation to say what was already in context.
 
-**Before structuring the page, decide catalog or teaching** — see
-`~/.claude/rules/teaching-order.md`. A reference the user returns to
-for lookup is organised by topic; anything meant to be read start to
-finish is organised by the reader's next question, with one spine
-visual that grows through the document. Getting this backwards
-produces a page that is complete and unusable. When both are needed,
-build two pages and link them.
+Two things are specific to this skill and are NOT in those files:
 
-When generating any artifact via this skill, route the content design
-through the four:
-
-- **Proximity** — the caveat sits next to the claim. The example
-  follows the paragraph it illustrates. The link is beside the term
-  it documents. Cross-references do not leave the reader hunting.
-- **Hierarchy** — top-level conclusion before nested reasoning. The
-  most important sentence of a paragraph is first or last, never
-  buried. Visual emphasis matches semantic importance — not the other
-  way around.
-- **Schema** — every kind of artifact has predictable parts. A review
-  has subject / criteria / findings / recommendations. A study doc
-  has overview / key concepts / examples / pitfalls / further reading.
-  A plan has goal / scope / approach / risks / asks. Stick to the
-  schema for the kind; the reader's mental model carries between
-  documents.
-- **Grouping** — bullets for parallel items; numbered lists for ordered
-  steps. Related facts cluster into themed cards or visual regions.
-  Sub-points indented under their parents. One idea per paragraph.
-
-These apply identically whether the artifact is a study guide, a plan
-review, a team-facing brief, or a personal learning note. Same vocabulary,
-same routing. The visual richness this skill describes elsewhere sits
-*on top of* this content discipline, not in place of it.
+- The **content layer** is the load-bearing one here. A page can respect
+  every visual principle and still be organised so the reader cannot use
+  it — hierarchy means the conclusion precedes its reasoning, not that
+  the heading is bigger.
+- **Decide catalog or teaching before the first section**, and say which
+  in the opening. A guide written in catalog order is complete and
+  unusable; that is the single most common failure of a generated
+  document. When both are wanted, build two pages and link them.
 
 ## Verify after every page edit — non-negotiable
 
@@ -211,18 +189,14 @@ For the strict gate before delivery, use `oku check --strict`
    [^1]: Definitions resolve page-wide — put them wherever you like.
    ```
 
-   - **`title` and `summary` are the whole front-matter** on most
-     pages. `order` and `parent` place the page in the tree when it
-     has siblings. Everything else — accent, audience, reading time,
-     last-updated — comes from `kit.json` or from the build, and
-     `oku check` tells you when a page sets a field it did not need.
    - `##` opens a section (the TOC is built from these); `###` is a
      sub-heading inside it. `{#id}` overrides the auto-slug.
    - Every kit primitive is a typed fence whose body is ONE compact
-     JSON object: `oku-chart`, `oku-table`, `oku-kpi-grid`,
-     `oku-step-flow`, `oku-compare-grid`, `oku-example`, `oku-insight`,
-     `oku-live-snippet`, `oku-annotated-code`, `oku-chart-grid`,
-     `oku-tldr`, `oku-diagram` — plus plain `mermaid`.
+     JSON object. **`oku spec` lists every one and prints a
+     ready-to-paste payload; `oku spec front-matter` does the same for
+     the page keys.** Both print from the code, so neither can go stale
+     — the enumeration that used to sit here named a fence that had
+     been removed and omitted two that exist.
    - Admonitions are GFM alerts: `NOTE`, `TIP`, `IMPORTANT`, `WARNING`,
      `CAUTION` and the kit's `TLDR`.
    - Glossary and external references are links:
@@ -394,12 +368,13 @@ reach for first):
 | `oku-step-flow` | ordered stages, or unordered parallel options | A pipeline, a procedure, a migration. `ordered: false` for a 2-up grid of links with no implied sequence. |
 | `oku-kpi-grid` | headline numbers, no shared axis | Two to four figures that open a section — and know that this is a tier-three shape: nothing is encoded, adjacency is not comparison. Values that share a unit belong in a chart. |
 | `mermaid` | topology, sequence, state, containment, timing | Any diagram. Mermaid computes positions and avoids label collision; prefer it over hand-drawn SVG. |
+| `oku-info-tip` | detail the curious 5% want and the rest do not | A `<details>` disclosure. Keeps a long aside off the main line. |
 | `oku-diagram` | the same, with a caption | When the figure needs a caption line. A plain `mermaid` fence with an italic line under it produces the same thing. |
 | `oku-annotated-code` | a line of code and the reason for it | Walking through an implementation. Numbered markers in the source pair with a side panel. |
 | `oku-example` | input beside its rendered output | Documenting a format. This is how `docs/reference.md` shows every primitive. |
 | `oku-live-snippet` | code the reader can edit and re-run | Teaching a syntax where trying it beats reading about it. |
 | `oku-insight` | one sentence that must not be skipped | Sparingly. It is text-shaped, and three of them in a row is a bullet list. |
-| `oku-tldr` | the page in one line plus three points | The opener. Usually written as a `> [!TLDR]` admonition instead. |
+| `> [!TLDR]` | the page in one line plus three points | The opener. A blockquote alert, not a fence — there is no `oku-tldr`. |
 
 Admonitions (`NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION`, `TLDR`)
 are GFM blockquotes. **They are not visuals.** A coloured box around a
@@ -425,58 +400,20 @@ installed wheel. From any other project, `oku spec` is the source.
 
 ## When a primitive does not fit: HTML islands
 
-A block-level HTML tag at column 0 passes through to the DOM untouched
-— custom elements, `<script>` and `<style>` included. Full capability,
-no restrictions. This is the intended escape hatch, and reaching for it
-is not a failure.
+A block-level HTML tag at column 0 passes through to the DOM untouched —
+custom elements, `<script>` and `<style>` included. Full capability, no
+restrictions. Reach for it only after checking that no primitive covers
+the relationship you are showing; `oku spec` lists all 68.
 
-**Build on the kit, not beside it.** An island that carries its own
-colours ignores the page accent and breaks in the theme the author
-wasn't looking at:
+**Colours come from the kit, never from a hex literal.** `var(--accent)`,
+`var(--surface)`, `--series-1..10` for an island; `.okt-diag-node` /
+`-edge` / `-arrow` / `-label` / `-group` and `.okt-diag-fill-1..10` for a
+hand-drawn SVG. A hardcoded colour is how a figure ends up invisible in
+the theme nobody was looking at, and `island-hand-styled` fails on it.
 
-```html
-<!-- yes: follows the accent, follows light/dark -->
-<div class="okt-card" style="background: var(--surface); color: var(--text);
-     border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
-  <strong style="color: var(--accent-strong)">Heading</strong>
-</div>
-
-<!-- no: hardcoded, breaks in dark mode, ignores the accent -->
-<div style="background: #f5f3ff; color: #1e1b29;">…</div>
-```
-
-`oku check` reports `island-hand-styled` for the second shape. The
-variables to build on: `--bg`, `--surface`, `--surface-2`, `--text`,
-`--text-soft`, `--text-faint`, `--border`, `--accent`, `--accent-soft`,
-`--accent-strong`, `--warning`, `--danger`, `--success`, and
-`--series-1` … `--series-10` for categorical data.
-
-### Hand-drawn SVG inside an island
-
-Sometimes the figure genuinely has no primitive — a topology, an
-annotated screenshot, a custom geometry. Then:
-
-- **Inline only**, no external URLs. The artifact has to open offline.
-- **Colours from variables:** `fill="var(--surface)"`,
-  `stroke="var(--text-soft)"`. The theme toggle then needs no JS.
-- **`viewBox` + `width="100%"`** so it scales instead of clipping.
-- `role="img"` + `aria-label`, or a `<title>` first child.
-- Keep it under ~150 lines. Past that the diagram is doing two jobs.
-
-**The hand-positioned-text trap.** Any label placed at a coordinate you
-picked by eye will collide at some content density or viewport width.
-CSS does not compute label collision; you do, and you will get it
-wrong. Two passes before shipping any hand-drawn figure:
-
-1. **Density:** add 50% more items mentally. Do labels overlap?
-2. **Viewport:** open it at 360px. Are any two text elements within 4px?
-
-If either fails, the pattern cannot survive a content or viewport
-change. Switch to a shape where overlap is structurally impossible — a
-row per item, a numbered marker with the text in a table below, a
-flex-wrap row of self-contained boxes — or use Mermaid, which solves
-collision for you. **Reach for Mermaid whenever a custom diagram would
-need four or more hand-positioned labels.**
+Everything else — the two-pass layout test, the full class vocabulary,
+why `<style>` blocks are refused — is in
+`references/islands.md` beside this file. Read it before writing one.
 
 ## Tone
 
