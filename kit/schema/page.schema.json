@@ -44,31 +44,44 @@
           "description": "Kit color token (teal/amber/indigo/rose/violet/green/slate) or any CSS color."
         },
         "eyebrow": {
-          "type": "string"
+          "type": "string",
+          "description": "Small label above the cover title. A category, not a sentence."
         },
         "subtitle": {
-          "type": "string"
+          "type": "string",
+          "description": "One line under the cover title. Falls back to `summary`."
         },
         "audience": {
-          "type": "string"
+          "type": "string",
+          "description": "Who the page is for (Author / Maintainer / Reader). Shown on the cover."
         },
         "date": {
-          "type": "string"
+          "type": "string",
+          "description": "Publication date, YYYY-MM-DD."
         },
         "updated": {
-          "type": "string"
+          "type": "string",
+          "description": "Last-changed date. Derived from the git commit date; suppressed when equal to `date`."
         },
         "read_time": {
-          "type": "string"
+          "type": "string",
+          "description": "Reading estimate. Derived from the body at 220 wpm, in the page's language."
         },
         "lang": {
-          "type": "string"
+          "type": "string",
+          "description": "BCP-47 code for this page. Usually set by the `.<code>.md` filename instead."
         },
         "order": {
-          "type": "number"
+          "type": "number",
+          "description": "Sort position within its level of the site tree. Lower sorts first."
         },
         "summary": {
-          "type": "string"
+          "type": "string",
+          "description": "One line describing the page. Feeds the site tree tooltip, llms.txt and the cover."
+        },
+        "parent": {
+          "type": "string",
+          "description": "Stem of the page this one nests under in the site tree."
         }
       }
     },

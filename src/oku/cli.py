@@ -808,6 +808,16 @@ _MARKDOWN_FORM_OF = {
 }
 
 
+def _known_meta_keys() -> list[str]:
+    """Front-matter keys the kit reads, from the schema rather than a
+    second list that would drift from it. `title` is included because an
+    author writes it in front-matter even though it is hoisted to `t`
+    and never lands in `m`."""
+    schema = _load_schema()
+    props = ((schema.get("$defs") or {}).get("meta") or {}).get("properties") or {}
+    return sorted(set(props) | {"title"})
+
+
 def _did_you_mean(needle: str, haystack, limit: int = 3) -> str:
     """` Did you mean: a, b?` — or nothing when nothing is close.
 
@@ -2636,6 +2646,28 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         # only to hand-authored kit pages — materialised repo markdown
         # (README, CLAUDE, notes/ …) has no front-matter to carry one.
         meta = _page_meta(page)
+        # `$defs/meta` is `additionalProperties: true` on purpose — a
+        # project may carry its own keys — but that also means a typo is
+        # accepted in silence. `sumary:` produced nothing beyond the
+        # info-level no-summary nudge, which is hidden at default
+        # verbosity, so the page shipped without a summary and the check
+        # said nothing at all. Permissive about unknown keys, loud about
+        # ones that look like a known key spelled wrong.
+        if not is_materialised:
+            known_meta = _known_meta_keys()
+            for key in sorted(meta):
+                if key in known_meta or key.startswith("_"):
+                    continue
+                near = _did_you_mean(key, known_meta)
+                if near:
+                    add(
+                        p,
+                        "warning",
+                        "unknown-meta-key",
+                        f"meta.{key}",
+                        f"Front-matter key '{key}' is not one the kit reads.{near} "
+                        "`oku spec front-matter` lists them.",
+                    )
         if not meta.get("summary") and not is_materialised:
             add(
                 p,
@@ -4964,7 +4996,31 @@ def cmd_spec(args: argparse.Namespace) -> int:
             print(textwrap.fill(" ".join(plain), **wrap))
         print(f'\nchart types ({len(charts)}) — fence is ```oku-chart with "type"')
         print(textwrap.fill(" ".join(sorted(charts)), **wrap))
+        # Listed with the rest, because a discoverability feature nobody
+        # can discover is the failure this command exists to fix.
+        print("\nalso: front-matter — every page-level key, with what it does")
         print("\noku spec <name>   one ready-to-paste payload")
+        return 0
+
+    # Not a block kind: the other thing every page has, and the one an
+    # author cannot infer from the body they are writing. 7 of the 10
+    # keys were named nowhere in the briefing.
+    if args.name in ("front-matter", "frontmatter", "meta"):
+        schema = _load_schema()
+        props = ((schema.get("$defs") or {}).get("meta") or {}).get("properties") or {}
+        rows = {"title": {"type": "string", "description": "Page title. Required."}, **props}
+        if args.json:
+            print(json.dumps(rows, ensure_ascii=False))
+            return 0
+        derived = set(_DERIVABLE_META)
+        print("---")
+        for key, spec in rows.items():
+            kind = spec.get("type", "string")
+            note = spec.get("description", "")
+            mark = f" # DERIVED from {_DERIVABLE_META[key]} — do not hand-set" if key in derived else ""
+            print(f"{key}: <{kind}>{mark or ((' # ' + note) if note else '')}")
+        print("---")
+        print("\nAny other key is accepted and ignored; one that resembles these is flagged.")
         return 0
 
     entry = _spec_entry(args.name)
