@@ -15,8 +15,9 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
+import sys
 from pathlib import Path
-
 
 from oku import cli
 
@@ -66,7 +67,28 @@ def _run(docs: Path, cmd) -> int:
         os.chdir(cwd)
 
 
-def test_a_page_that_lints_clean_can_still_fail_verify(tmp_path: Path, capsys) -> None:
+def _verify(docs: Path) -> subprocess.CompletedProcess:
+    """`oku verify` starts its own Playwright, and pytest-playwright is
+    already holding one by the time the suite reaches this file — nesting
+    two sync instances raises "Please use the Async API instead". So the
+    command is run the way a user runs it, as a process. That also makes
+    this a test of the CLI rather than of an internal function, which is
+    what the file claims to be testing.
+
+    It passed when this file ran alone, and only alone: nothing else had
+    opened a browser yet. The same shape as the fixture bug in
+    test_spec_examples_render.py, and invisible the same way.
+    """
+    return subprocess.run(
+        [sys.executable, "-c", "from oku.cli import main; raise SystemExit(main())", "verify"],
+        cwd=docs,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONPATH": str(Path(cli.__file__).resolve().parents[2])},
+    )
+
+
+def test_a_page_that_lints_clean_can_still_fail_verify(tmp_path: Path) -> None:
     docs = _project(tmp_path, BROKEN_MD)
 
     lint = _run(
@@ -76,33 +98,26 @@ def test_a_page_that_lints_clean_can_still_fail_verify(tmp_path: Path, capsys) -
     assert lint == 0, "the fixture is meant to satisfy the source checks"
 
     _run(docs, lambda: cli.cmd_build(argparse.Namespace(no_search=True, no_vendor=True)))
-    capsys.readouterr()
-    rc = _run(docs, lambda: cli.cmd_verify(argparse.Namespace()))
-    err = capsys.readouterr().err
+    proc = _verify(docs)
 
-    assert rc == 1, "sideways scroll went unreported"
-    assert "scrolls sideways" in err, err
-    assert "@360px" in err and "@1440px" in err, "both widths are checked"
+    assert proc.returncode == 1, f"sideways scroll went unreported: {proc.stdout}{proc.stderr}"
+    assert "scrolls sideways" in proc.stderr, proc.stderr
+    assert "@360px" in proc.stderr and "@1440px" in proc.stderr, "both widths are checked"
 
 
-def test_a_sound_page_passes(tmp_path: Path, capsys) -> None:
+def test_a_sound_page_passes(tmp_path: Path) -> None:
     docs = _project(tmp_path, SOUND_MD)
     _run(docs, lambda: cli.cmd_build(argparse.Namespace(no_search=True, no_vendor=True)))
-    capsys.readouterr()
+    proc = _verify(docs)
 
-    rc = _run(docs, lambda: cli.cmd_verify(argparse.Namespace()))
-    captured = capsys.readouterr()
-    out = captured.out
-
-    assert rc == 0, captured.err or out
-    assert "render clean" in out
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert "render clean" in proc.stdout
 
 
-def test_it_says_what_to_do_when_nothing_is_built(tmp_path: Path, capsys) -> None:
+def test_it_says_what_to_do_when_nothing_is_built(tmp_path: Path) -> None:
     docs = _project(tmp_path, SOUND_MD)
 
-    rc = _run(docs, lambda: cli.cmd_verify(argparse.Namespace()))
-    err = capsys.readouterr().err
+    proc = _verify(docs)
 
-    assert rc == 1
-    assert "oku build" in err, err
+    assert proc.returncode == 1
+    assert "oku build" in proc.stderr, proc.stderr
