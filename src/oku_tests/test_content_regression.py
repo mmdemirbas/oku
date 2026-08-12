@@ -3027,3 +3027,27 @@ class TestEveryChartTypeIsDocumented:
             if not _has_heading(charts, id_=anchor):
                 missing.append(f"{t} → expected id={anchor}")
         assert not missing, "Chart types missing docs section in docs/charts.json:\n  " + "\n  ".join(missing)
+
+
+class TestDocumentedFenceTags:
+    """CLAUDE.md's fence-tag sentence is the first thing a session reads,
+    and it is a hand-written copy of `_FENCE_KINDS`. It listed `oku-tldr`
+    after that fence was removed, which is the shape of drift that sends
+    an author to write something the kit rejects."""
+
+    def test_the_briefing_lists_exactly_the_real_fence_tags(self):
+        import re
+
+        from oku import cli
+
+        repo_root = Path(__file__).resolve().parents[2]
+        text = (repo_root / "CLAUDE.md").read_text(encoding="utf-8")
+        # Only the list itself, which ends at the em-dash; the prose
+        # after it may legitimately name a tag as an example.
+        sentence = text.split("- Fence tags:", 1)[1].split("—", 1)[0]
+        listed = set(re.findall(r"`oku-([a-z-]+)`", sentence))
+
+        assert listed == cli._FENCE_KINDS, (
+            f"CLAUDE.md lists {sorted(listed - cli._FENCE_KINDS)} that are not fences, "
+            f"and omits {sorted(cli._FENCE_KINDS - listed)}"
+        )

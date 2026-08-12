@@ -68,31 +68,12 @@ flowchart TB
 
 - Fence tags: `oku-chart`, `oku-table`, `oku-kpi-grid`, `oku-step-flow`,
   `oku-compare-grid`, `oku-example`, `oku-insight`, `oku-live-snippet`,
-  `oku-annotated-code`, `oku-chart-grid`, `oku-tldr`, `oku-diagram` —
-  plus plain `mermaid` (GitHub renders it natively).
-- `##` opens a `<section>`, `###` is a sub-heading inside it. `{#id}`
-  overrides the auto-slug. Glossary / ext-refs: `[label](#g/term-id)`,
-  `[label](#x/source-id)`.
-- Admonitions are GFM blockquotes: `NOTE`, `TIP`, `IMPORTANT`,
-  `WARNING`, `CAUTION` + the kit's `TLDR`. `> [!NOTE] Title` carries
-  an optional title.
-- **Strict-GFM subset** (linted): no indented code blocks, no setext
-  (`===`) headings, no lazy blockquote continuation. The subset is
-  valid GFM, so GitHub/Obsidian render every page.
-- **HTML islands**: a block-level HTML tag at column 0 (custom
-  elements and `<script>`/`<style>` included) passes through to the
-  DOM untouched — full capability, no restrictions. `oku check` lists
-  every island as an info-level audit line; external markdown viewers
-  strip islands. Inline HTML in prose stays literal text.
-- Definition lists (`Term` / `: def`), task lists (`- [x]`), footnotes
-  (`[^id]` + `[^id]: …`) and reference-style links (`[text][label]`,
-  `[label][]`, `[label]` + `[label]: url "title"`) are supported.
-  Both reference forms resolve **page-wide**, not per b[] string —
-  `md_to_v2_page` splits a page at every typed fence, so a definition
-  routinely lands in a different string than its reference. Footnotes
-  render as numbered superscripts plus one "Footnotes" section at the
-  end of the page. `oku check` warns on a reference with no definition
-  (it would otherwise render as literal text with no other signal).
+  `oku-annotated-code`, `oku-chart-grid`, `oku-timeline`, `oku-info-tip`,
+  `oku-diagram` — plus plain `mermaid` (GitHub renders it natively).
+  `oku spec` prints this list from the code, and
+  `test_content_regression.py` holds this sentence against it. The list
+  named a fence that had been removed and omitted one that exists, which
+  is what a hand-copied list does.
 
 ### Older pages (v1/v2 JSON)
 
@@ -142,7 +123,7 @@ AI/LLM surface.
 | `renderer.js` | page JSON → DOM mapping. Walks `b[]`; strings parsed by the GFM block parser (headings → sections, paragraphs, lists, GFM tables, fences — `oku-*`/`mermaid` fences lift to typed blocks, def-lists, task-lists, HTML islands w/ executing scripts, admonitions); typed objects dispatched to typed renderers. v1→v2 shim keeps older pages rendering. ~2.6k LoC. |
 | `kit/schema/page.schema.json` | JSON-schema for page payloads. Every page (converted from .md) validates against it; the optional `jsonschema` dep makes the check active. Chart `type` enum here is the single source of truth for known chart types. |
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
-| `src/oku/cli.py` | `oku init / build / clean / check / spec / vendor / migrate / serve` plus the v3 converter pair (`md_to_v2_page` / `page_to_md`), the strict-GFM + island lint (`_lint_md_string`), and the v1→v2 page shim (`_v1_to_v2`). |
+| `src/oku/cli.py` | `oku init / build / clean / check / spec / vendor / verify / migrate / serve` plus the v3 converter pair (`md_to_v2_page` / `page_to_md`), the strict-GFM + island lint (`_lint_md_string`), and the v1→v2 page shim (`_v1_to_v2`). |
 | `src/oku/templates/` | `starter.{md,html}` — pair to copy when starting a new page. |
 | `bin/oku` | PEP 723 shim — run without install via `uv run bin/oku …`. Points at `oku.cli:main`. |
 | `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.md` tracks open phases. |

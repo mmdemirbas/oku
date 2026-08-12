@@ -4865,7 +4865,7 @@ _MERMAID_CDN = f"https://cdn.jsdelivr.net/npm/mermaid@{_MERMAID_VERSION}/dist/me
 # to no highlighting offline, which is the same degradation as today.
 _PRISM_LANGS = (
     "javascript css bash json yaml python typescript jsx tsx java go rust sql markup "
-    "diff toml ini docker kotlin scala c cpp csharp php ruby swift graphql markdown"
+    "diff toml ini docker kotlin scala c cpp csharp php ruby swift graphql markdown mermaid"
 ).split()
 
 
@@ -5067,6 +5067,148 @@ def cmd_spec(args: argparse.Namespace) -> int:
     return 0
 
 
+# What a browser can decide about a built page, and a linter cannot.
+# `oku check` reads the source; these four read the RESULT, which is
+# where the failures it cannot see live: a payload that validates and
+# draws nothing, a figure that overflows the column, a diagram whose
+# source parsed and whose renderer then failed.
+_VERIFY_PROBE = """() => {
+  const bad = [];
+  document.querySelectorAll('oku-diagram').forEach((d, i) => {
+    if (/Parse error|Syntax error/i.test(d.textContent)) bad.push('diagram ' + (i + 1) + ' failed to parse');
+    else if (!d.querySelector('svg')) bad.push('diagram ' + (i + 1) + ' drew no svg');
+  });
+  const PAINT = 'svg rect, svg path, svg circle, svg line, svg polygon, canvas, img,'
+    + ' .bar-track, .kpi, .step-card, .compare-card, .okt-tl-item, aside.insight,'
+    + ' details.info-tip, td, th, pre code, .okt-diag-node';
+  document.querySelectorAll('oku-chart, .bar-chart, .okt-table-wrap, .kpi-grid,'
+    + ' .step-flow, .compare-grid, .okt-timeline, .okt-chart-grid').forEach((fig) => {
+    // A comparison card's preview is a CLONE of a figure that is itself
+    // checked, deliberately miniature — 203x104 with marks of a few
+    // square pixels. Judging it by the same threshold reports every one
+    // of them as empty, which is how this probe first behaved. The rail
+    // skips them for the same reason.
+    if (fig.closest('.okt-compare-preview')) return;
+    // Total ink, not the largest mark: a dense chart is hundreds of tiny
+    // paths and no single one of them is big.
+    const ink = [...fig.querySelectorAll(PAINT)].reduce((sum, e) => {
+      const r = e.getBoundingClientRect();
+      return sum + r.width * r.height;
+    }, 0);
+    if (ink <= 100) bad.push((fig.tagName.toLowerCase() + '.' + (fig.className || '')).slice(0, 40)
+      + ' rendered an empty box');
+  });
+  const doc = document.documentElement;
+  if (doc.scrollWidth > window.innerWidth + 1) {
+    const wide = [...document.querySelectorAll('main *')].filter((e) => {
+      const r = e.getBoundingClientRect();
+      return r.right > window.innerWidth + 1 && getComputedStyle(e).overflowX !== 'auto';
+    })[0];
+    bad.push('page scrolls sideways' + (wide ? ' — ' + wide.tagName.toLowerCase() + '.' + (wide.className || '') : ''));
+  }
+  return bad;
+}"""
+
+
+def cmd_verify(args: argparse.Namespace) -> int:
+    """`oku verify` — open the built pages and report what a linter cannot see.
+
+    Four of the skill's manual browser steps, run for real: console
+    errors, diagrams that failed to draw, figures that render an empty
+    box, and sideways scroll. Each was prose asking an author to look,
+    and a step you have to remember is a step that gets skipped —
+    especially the one that catches the wrong-but-valid payload, which
+    is the failure no source-level check can reach.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print(
+            "✗ oku verify needs playwright: uv tool install 'oku[verify]' "
+            "(then `playwright install chromium`)",
+            file=sys.stderr,
+        )
+        return 2
+
+    root = Path.cwd()
+    pages = sorted((root / "dist" / "standalone").rglob("*.html"))
+    if not pages:
+        print(
+            f"✗ nothing built under {root / 'dist' / 'standalone'} — run `oku build` first", file=sys.stderr
+        )
+        return 1
+
+    widths = [1440, 360]
+    failures: list[str] = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        for html in pages:
+            rel = html.relative_to(root)
+            errors: list[str] = []
+            missing: list[str] = []
+            page.on("pageerror", lambda e, s=errors: s.append(str(e)[:120]))
+            # A failed request reports as a generic "Failed to load
+            # resource" on the console, with no URL — useless for saying
+            # WHAT is missing, so the request itself is what gets
+            # recorded and the console duplicate is dropped.
+            page.on(
+                "console",
+                lambda m, s=errors: (
+                    s.append(m.text[:120])
+                    if m.type == "error" and "Failed to load resource" not in m.text
+                    else None
+                ),
+            )
+            page.on("requestfailed", lambda r, s=missing: s.append(r.url))
+            for width in widths:
+                page.set_viewport_size({"width": width, "height": 900})
+                page.goto(html.as_uri())
+                try:
+                    page.wait_for_function("() => window.__okuRendered === true", timeout=20000)
+                    page.wait_for_function(
+                        "() => [...document.querySelectorAll('oku-diagram')]"
+                        ".every((d) => d._rendered || /Parse error/i.test(d.textContent))",
+                        timeout=30000,
+                    )
+                except Exception:  # noqa: BLE001 - a page that never finishes IS the finding
+                    failures.append(f"{rel} @{width}px: never finished rendering")
+                    continue
+                for problem in page.evaluate(_VERIFY_PROBE):
+                    failures.append(f"{rel} @{width}px: {problem}")
+            for err in dict.fromkeys(errors):
+                failures.append(f"{rel}: console — {err}")
+            for url in dict.fromkeys(missing):
+                # Prism's markdown grammar probes for the language of any
+                # fence nested inside a markdown sample, so a page that
+                # documents this kit asks for `prism-oku-chart.min.js`.
+                # That set is unbounded and a missing grammar degrades to
+                # unhighlighted code, which is not a build failure.
+                if "/prism/components/" in url:
+                    continue
+                # A remote origin failing is the network's state, not the
+                # page's. Judging the page on it makes this command fail
+                # intermittently for reasons the author cannot fix, which
+                # is how a verification step stops being believed. What
+                # the page IS responsible for is its own local files —
+                # `test_vendor_offline.py` is where the no-network case
+                # is asserted properly.
+                if url.startswith(("http://", "https://")):
+                    continue
+                failures.append(f"{rel}: could not load {url.rsplit('/', 1)[-1]}")
+        browser.close()
+
+    if failures:
+        print(f"✗ {len(failures)} problem(s) a source check cannot see:", file=sys.stderr)
+        for f in failures[:40]:
+            print(f"  ✗ {f}", file=sys.stderr)
+        if len(failures) > 40:
+            print(f"  … {len(failures) - 40} more", file=sys.stderr)
+        return 1
+    print(f"✓ {len(pages)} page(s) render clean at {' and '.join(f'{w}px' for w in widths)}")
+    return 0
+
+
 def cmd_migrate(args: argparse.Namespace) -> int:
     """`oku migrate [path]` — convert page-JSON sources (v1 or v2) to
     v3 markdown.
@@ -5166,6 +5308,10 @@ def main() -> int:
         ),
     )
     sub = parser.add_subparsers(dest="cmd")
+    sub.add_parser(
+        "verify",
+        help="open the built pages in a browser and report what a source check cannot see",
+    )
     vendor_parser = sub.add_parser(
         "vendor",
         help="fetch mermaid + Prism once so pages render offline without re-downloading",
@@ -5273,6 +5419,8 @@ def main() -> int:
         return cmd_spec(args)
     if args.cmd == "vendor":
         return cmd_vendor(args)
+    if args.cmd == "verify":
+        return cmd_verify(args)
     parser.print_help()
     return 0
 

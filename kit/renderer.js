@@ -537,6 +537,16 @@
     return !/[\w]/.test(before) && !/[\w]/.test(after);
   }
 
+  /* An `oku-*` fence that did not lift is a documentation SAMPLE of a
+     kit primitive, and its body is the JSON that primitive takes. Left
+     as `language-oku-chart`, Prism's autoloader goes looking for a
+     grammar that will never exist — a 404 in the reader's console on
+     every page that documents the kit, and no highlighting either.
+     JSON is both what the body is and a grammar that exists. */
+  function codeLanguage(lang) {
+    return /^oku-/.test(lang) ? 'json' : lang;
+  }
+
   function renderImage(alt, src) {
     const url = safeUrl(src, true);
     if (url === null) return textNode(alt);
@@ -978,7 +988,7 @@
         case 'code': {
           const pre = document.createElement('pre');
           const code = document.createElement('code');
-          if (node.lang) code.className = 'language-' + node.lang;
+          if (node.lang) code.className = 'language-' + codeLanguage(node.lang);
           code.textContent = node.src;
           pre.appendChild(code);
           host.appendChild(pre);
@@ -1669,7 +1679,7 @@
     _renderCode(block) {
       const pre = document.createElement('pre');
       const code = document.createElement('code');
-      if (block.lang) code.className = 'language-' + block.lang;
+      if (block.lang) code.className = 'language-' + codeLanguage(block.lang);
       code.textContent = block.src || '';
       pre.appendChild(code);
       return pre;

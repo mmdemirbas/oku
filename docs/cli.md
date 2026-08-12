@@ -1,10 +1,10 @@
 ---
 title: CLI reference
 eyebrow: Reference
-subtitle: Eight commands: oku init, build, clean, spec, vendor, migrate, check, serve. Designed so you mostly forget the CLI exists.
+subtitle: Nine commands: oku init, build, clean, spec, vendor, verify, migrate, check, serve. Designed so you mostly forget the CLI exists.
 date: 2026-05-18
 order: 50
-summary: oku init / build / clean / spec / vendor / migrate / check / serve — what each does.
+summary: oku init / build / clean / spec / vendor / verify / migrate / check / serve — what each does.
 ---
 
 > [!TLDR]
@@ -107,6 +107,29 @@ installed the tool — unlike [the reference page](reference.md), which
 lives in the kit's own docs tree. Every example is asserted valid
 against both the schema and the structural checks, so what it prints
 passes `oku check` unchanged.
+
+## oku verify {#verify}
+
+Open the built pages in a headless browser and report what a source
+check cannot see. `oku check` reads the source; this reads the result.
+
+```bash
+oku build && oku verify
+
+# ✓ 38 page(s) render clean at 1440px and 360px
+```
+
+```oku-table
+{"headers":["Checked","Why a source check cannot"],"rows":[["Diagrams drew","The source parses; the renderer is what fails, and only in a browser."],["No figure is an empty box","A wrong-but-valid payload validates and renders nothing. This is the failure the schema cannot reach by construction."],["No sideways scroll at 1440px or 360px","Overflow is geometry. It has no representation in the source."],["No console or page errors","An island's script throwing is invisible to every static check."]]}
+```
+
+Needs a browser: `uv tool install 'oku[verify]'` then
+`playwright install chromium`. Without it the command says so and exits
+2 rather than reporting a pass it did not get.
+
+A failing request to a remote origin is ignored — that is the network's
+state, not the page's, and a check that fails for reasons the author
+cannot fix stops being believed. Local files missing IS reported.
 
 ## oku vendor {#vendor}
 

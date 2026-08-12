@@ -570,18 +570,29 @@ against the tool independently, and the tool is the one that is right.
 info-level nudges, `--errors-only` to hide warnings. Zero exit under
 `--strict` means the doctree is clean.
 
-**Lightweight (every artifact):**
+**Rendered (every artifact):**
 
-1. Page opens in a browser; no console errors.
-2. Toggle the theme; nothing strobes, and any island or hand-drawn SVG
+```bash
+oku build && oku verify
+```
+
+`oku verify` opens every built page at 1440px and 360px and reports what
+reading the source cannot: a diagram that failed to draw, a figure that
+rendered an empty box, sideways scroll, a console or page error. That
+last class is the one that matters most — a wrong-but-valid payload
+validates clean and draws nothing, and no source check reaches it.
+
+What is left for your eyes, because it needs judgement:
+
+1. Toggle the theme; nothing strobes, and any island or hand-drawn SVG
    stays legible — confirm its fills and strokes read CSS variables
    rather than hardcoded hex.
-3. Resize to a narrow viewport; the Contents drawer behaves, and any
-   SVG scales via `viewBox` instead of clipping.
+2. Does the figure carry the point when you cover the prose?
 
 Anchors and placeholders were on this list and are checks now
-(`unresolved-anchor`, `placeholder-text`) — a checklist step is skipped
-silently, a check is not.
+(`unresolved-anchor`, `placeholder-text`); opening the page, narrow
+width and empty figures are `oku verify`. A step you have to remember is
+a step that gets skipped.
 
 **Heavier (long reference documents):**
 
@@ -602,7 +613,7 @@ the top 1-3 takeaways.
 
 The kit lazy-loads both and re-renders Mermaid on a theme toggle,
 caching the source so a re-render never reads an emptied node. Write a
-```mermaid fence and a fenced code block with a language; there is
+`mermaid` fence or a fenced code block with a language; there is
 nothing to wire.
 
 ## After the round
