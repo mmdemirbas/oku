@@ -3231,7 +3231,13 @@ figure.okt-figure figcaption {
      auto-fits. Previously the label was a fixed 160px which made
      the track collapse to 0 inside ~145px compare-card mini-renders
      — bars were invisible. */
-  grid-template-columns: minmax(40px, max-content) minmax(0, 1fr) auto;
+  /* `fit-content(42%)`, not `minmax(40px, min(max-content, 42%))`:
+     `min()` takes lengths and percentages, never an intrinsic keyword,
+     so that spelling is invalid — and an invalid track list drops the
+     whole declaration, leaving a one-column grid where every element
+     is full width. `fit-content(<pct>)` is the primitive for exactly
+     this: max-content, capped. */
+  grid-template-columns: fit-content(42%) minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   font-size: 13.5px;
@@ -3245,13 +3251,68 @@ figure.okt-figure figcaption {
    keep their own layout. */
 .bar-chart:not(.bar-chart-vertical),
 .bar-chart-multi:not(.bar-chart-vertical) {
-  grid-template-columns: minmax(40px, max-content) minmax(0, 1fr) auto;
+  /* The label column is capped, and the cap is the load-bearing part.
+     `max-content` alone does not shrink: when the row runs out of room
+     it is the `1fr` track that pays, because 1fr floors at 0 while a
+     max-content column holds its ground. Measured at a 360px viewport
+     before this cap — label 143px, value 49px, gaps 24px, track 106px
+     of a 316px chart; with labels a little longer the same arithmetic
+     put every bar between 1px and 4px. A track is a length the reader
+     compares against other lengths, so a track that has been squeezed
+     to single digits is not a small chart, it is no chart. */
+  /* `fit-content(42%)`, not `minmax(40px, min(max-content, 42%))`:
+     `min()` takes lengths and percentages, never an intrinsic keyword,
+     so that spelling is invalid — and an invalid track list drops the
+     whole declaration, leaving a one-column grid where every element
+     is full width. `fit-content(<pct>)` is the primitive for exactly
+     this: max-content, capped. */
+  grid-template-columns: fit-content(42%) minmax(0, 1fr) auto;
   column-gap: 12px;
+  /* Named so the row layout can key off the CHART's width rather than
+     the viewport's. A viewport query answers the wrong question: the
+     same chart collapses in a narrow grid cell on a 1440px desktop, and
+     stays fine on a phone if its labels are short. The name also keeps
+     the compare-card mini-renders out of it — they clear the container
+     below, and a query with no matching container simply never fires. */
+  container-type: inline-size;
+  container-name: okbar;
 }
 .bar-chart:not(.bar-chart-vertical) > .bar-row,
 .bar-chart-multi:not(.bar-chart-vertical) > .bar-row {
   grid-template-columns: subgrid;
   grid-column: 1 / -1;
+}
+/* Below the width where three columns can still give the track
+   something to say, the row becomes two lines: the label with its value
+   at the end, and the track full-width beneath. 340px is where the
+   guarantee stops being satisfiable — at the 42% label cap and a ~50px
+   value, 0.58 x 340 - 73 is about 120, and 120px is roughly the floor
+   at which a length still reads as a length. The row stops being a
+   subgrid here on purpose: it has its own two columns now, and every
+   track is full-width, so bars still share an origin. */
+@container okbar (max-width: 340px) {
+  /* The two gaps have to disagree. A row is now two lines, so the space
+     inside a row and the space between rows are both vertical, and at
+     the base 6px they were the same measurement — six labels and six
+     tracks evenly spaced, with nothing saying which track belonged to
+     which label. Inside tightens to 4px, between widens to 6+10.
+
+     The 10px is a margin on the ROW and not `row-gap` on the chart,
+     which is the one thing a container query cannot do: the chart is
+     the container, and an element may not be styled by a query against
+     its own size. The rows are descendants, so they can be. */
+  .bar-chart:not(.bar-chart-vertical) > .bar-row,
+  .bar-chart-multi:not(.bar-chart-vertical) > .bar-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 4px;
+  }
+  .bar-chart:not(.bar-chart-vertical) > .bar-row:not(:last-child),
+  .bar-chart-multi:not(.bar-chart-vertical) > .bar-row:not(:last-child) {
+    margin-bottom: 10px;
+  }
+  .bar-row > .bar-label { grid-column: 1; grid-row: 1; }
+  .bar-row > .bar-value { grid-column: 2; grid-row: 1; }
+  .bar-row > .bar-track { grid-column: 1 / -1; grid-row: 2; }
 }
 .bar-chart:not(.bar-chart-vertical) > .bar-chart-title,
 .bar-chart:not(.bar-chart-vertical) > .bar-chart-legend,
@@ -3895,6 +3956,17 @@ a.compare-card-link:hover {
 .compare-card.compare-card-link .bar-value {
   visibility: hidden !important;
 }
+/* And for the same reason the preview opts out of the narrow-width
+   two-line row. A card is ~145px wide, so it is under every threshold
+   worth setting — but its label and value are hidden rather than
+   removed, and stacking would spend a line of a 90px-tall card drawing
+   nothing. Clearing the container name is enough: a `@container okbar`
+   query with no okbar ancestor never matches. */
+.compare-card.compare-card-link .bar-chart,
+.compare-card.compare-card-link .bar-chart-multi {
+  container-type: normal;
+  container-name: none;
+}
 /* Thicker strokes + bigger dots for preview legibility.
    The radius is in viewBox units and the card shows the viewBox at about
    0.27, so `r: 5` — the value this block carried before anything actually
@@ -4113,7 +4185,14 @@ footer {
   header.cover .subtitle { font-size: 16px; }
   h2 { font-size: 24px; }
   .kpi-grid, .compare-grid { grid-template-columns: 1fr; }
-  .bar-row { grid-template-columns: 110px 1fr 50px; font-size: 12.5px; gap: 8px; }
+  /* Font and gap only. This rule used to set `110px 1fr 50px` as well,
+     and that declaration never once applied: every row the kit builds
+     sits inside `.bar-chart`, whose `> .bar-row` subgrid rule outranks a
+     bare `.bar-row` in a media query. It read as the narrow-width bar
+     tuning while the real columns came from the chart, which is why the
+     collapse it looks like it prevents was reported anyway. The columns
+     are handled where they resolve — see the @container block. */
+  .bar-row { font-size: 12.5px; gap: 8px; }
   .copy-btn { opacity: 1; }
   .permalink { display: none; }
 }
@@ -4926,8 +5005,13 @@ oku-chart .okc-horizon-label {
    the one its own source comment describes as running "from axis-left to
    dot (light) so the row reads as a single beat". */
 oku-chart .okc-dot-plot-track {
+  /* 1px, not 2. This line runs from the left edge of the plot to the
+     dot, and the left edge of a dot plot is the data's minimum, not
+     zero — drawn with any weight it reads as a bar measured from a
+     baseline that does not exist. At a hairline it reads as what it is,
+     a leader from the label to its mark. */
   stroke: var(--line-strong);
-  stroke-width: 2;
+  stroke-width: 1;
 }
 oku-chart .okc-waterfall-bridge {
   stroke: var(--text-faint);
