@@ -207,10 +207,10 @@ A pull-quote for a key takeaway. Larger and more visually distinct than a paragr
 
 ### info-tip {#info-tip}
 
-Native `<details>` in disguise — collapsed by default, expand on click. Use to defer optional depth without disrupting the skim path. `content` accepts an array of content blocks (paragraphs, code, callouts, ..).
+Native `<details>` in disguise — collapsed by default, expand on click. Use to defer optional depth without disrupting the skim path. `content` is an array of the same things a page body holds: markdown strings for prose, typed blocks for anything else.
 
 ```oku-example
-{"code":{"k":"code","src":"{\n  \"kind\": \"info-tip\",\n  \"summary\": \"How the lock actually works\",\n  \"content\": [\n    { \"kind\": \"paragraph\", \"content\": \"Two writers race ...\" }\n  ]\n}","lang":"json"},"output":"> [!TIP] Click to expand a live info-tip\n> info-tip is the right primitive when the curious 5% of readers want the full story but the other 95% need to keep moving."}
+{"code": {"k": "code", "src": "{\n  \"summary\": \"How the lock actually works\",\n  \"content\": [\n    \"Two writers race on the same key. The second read lands before the first write, so the update is lost with no error.\",\n    { \"k\": \"code\", \"src\": \"with lock(key):\\n    state = read(key)\", \"lang\": \"python\" }\n  ]\n}", "lang": "json"}, "output": {"k": "info-tip", "summary": "How the lock actually works", "content": ["Two writers race on the same key. The second read lands before the first write, so the update is lost with no error.", {"k": "code", "src": "with lock(key):\n    state = read(key)\n    write(key, mutate(state))", "lang": "python"}]}}
 ```
 
 ## Structured-layout primitives {#layout}

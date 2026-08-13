@@ -102,10 +102,11 @@ Failure recovery rules:
 - `engine` is NOT a valid key on `diagram` blocks — Mermaid is the
   only engine; just pass `source: "..."`.
 - `info-tip.content` must be a **block array**, never a bare string —
-  the linter now says so (`'…' is not of type 'array'`). It used to
-  pass, render a `<details>` holding only its `<summary>`, and drop the
-  body in silence, which is why this rule asked for a manual browser
-  check. The check is the schema's job now; the manual step is gone.
+  the linter says so (`'…' is not of type 'array'`). The schema covers
+  the shape and cannot cover the render: a disclosure that drops its
+  whole body still paints its summary, so it reads as a healthy figure
+  from the outside. That is `oku verify`'s job, and it now fails a
+  disclosure that opens onto nothing.
 
 **Never declare a page edit done if `oku check` exits non-zero.**
 

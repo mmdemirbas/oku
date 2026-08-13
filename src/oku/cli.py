@@ -5077,10 +5077,11 @@ def cmd_spec(args: argparse.Namespace) -> int:
 
 
 # What a browser can decide about a built page, and a linter cannot.
-# `oku check` reads the source; these four read the RESULT, which is
-# where the failures it cannot see live: a payload that validates and
-# draws nothing, a figure that overflows the column, a diagram whose
-# source parsed and whose renderer then failed.
+# `oku check` reads the source; this reads the RESULT, which is where
+# the failures it cannot see live: a payload that validates and draws
+# nothing, a figure that overflows the column, a diagram whose source
+# parsed and whose renderer then failed, a block the renderer replaced
+# with an error card, a disclosure that opens onto nothing.
 _VERIFY_PROBE = """() => {
   const bad = [];
   document.querySelectorAll('oku-diagram').forEach((d, i) => {
@@ -5106,6 +5107,19 @@ _VERIFY_PROBE = """() => {
     }, 0);
     if (ink <= 100) bad.push((fig.tagName.toLowerCase() + '.' + (fig.className || '')).slice(0, 40)
       + ' rendered an empty box');
+  });
+  // The renderer already draws a card where a block it cannot read
+  // should have been. Nothing outside the browser was reading them, so
+  // a page could carry a contract violation in plain sight and still
+  // verify clean.
+  document.querySelectorAll('.okt-block-error').forEach((card) => {
+    bad.push('block error: ' + (card.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 90));
+  });
+  // A disclosure holding only its summary. The ink check above cannot
+  // see it — the summary is painted, and that IS a closed <details>'s
+  // rendered state — so an empty body reads as a healthy figure.
+  document.querySelectorAll('details.info-tip').forEach((d, i) => {
+    if (d.childElementCount < 2) bad.push('disclosure ' + (i + 1) + ' opens onto nothing');
   });
   const doc = document.documentElement;
   if (doc.scrollWidth > window.innerWidth + 1) {

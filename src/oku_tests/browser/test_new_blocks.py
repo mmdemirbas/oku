@@ -128,6 +128,11 @@ def test_new_blocks_render(page, served):
     assert det.evaluate("el => el.tagName.toLowerCase()") == "details"
     assert det.evaluate("el => el.open") is False
     assert det.locator("summary").count() == 1
+    # And it has something to open. Stopping at the box is how a
+    # disclosure that dropped its entire body stayed green here for as
+    # long as it did — see test_info_tip_content.py.
+    assert det.evaluate("el => el.childElementCount") > 1
+    assert "gizli cevap" in det.evaluate("el => el.textContent")
 
     # image — figure + img
     assert page.locator("figure.okt-figure img").count() == 1

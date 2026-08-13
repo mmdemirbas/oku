@@ -1615,13 +1615,32 @@
       parseInline(block.summary || '', sum);
       det.appendChild(sum);
       for (const sub of (block.content || [])) {
-        const conv = convertV1Block(sub);
-        if (conv == null) continue;
-        if (typeof conv === 'string') {
-          emitMarkdown(det, parseMarkdown(conv), null);
-        } else {
-          det.appendChild(this._renderTyped(conv));
+        // Three shapes reach here and only one of them is v1. The
+        // markdown pipeline emits bare strings for prose and `k`-keyed
+        // objects for typed blocks, and `convertV1Block` returns null
+        // for both — so converting every item unconditionally discarded
+        // everything an author could write in markdown and left a
+        // <details> holding only its <summary>. Convert what is v1;
+        // pass the rest through.
+        const item = (sub && typeof sub === 'object' && sub.kind && !sub.k)
+          ? convertV1Block(sub)
+          : sub;
+        if (item == null) continue;
+        if (typeof item === 'string') {
+          emitMarkdown(det, parseMarkdown(item), null);
+        } else if (typeof item === 'object') {
+          const el = this._renderTyped(item);
+          if (el) det.appendChild(el);
         }
+      }
+      // The generic empty-block guard cannot see this one: a disclosure
+      // that dropped its whole body still paints its summary, so
+      // `_hasVisibleContent` passes and the page ships a box that opens
+      // onto nothing. Content that was given and did not arrive is the
+      // same defect as a block that drew nothing, and gets the same card.
+      if ((block.content || []).length && det.childElementCount < 2) {
+        this._warn('empty-block', 'Block "info-tip" dropped its content — nothing rendered inside the disclosure.', block);
+        return this._blockError(block);
       }
       return det;
     }
