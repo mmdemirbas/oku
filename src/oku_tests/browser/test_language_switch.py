@@ -85,7 +85,21 @@ def test_the_target_is_built_from_the_matched_prefix(page, site_url, prefix):
     # of the page no section is current, which is deliberate. Clicking
     # before the scroll lands therefore tests a page whose fragment the kit
     # has already dropped, and the switch is blamed for losing it.
-    page.wait_for_function("() => window.scrollY >= 80 && location.hash === '#prose'", timeout=10000)
+    # Crossing y=80 is not the scroll arriving. The smooth scroll is still
+    # in flight when that first becomes true, and the spy keeps rewriting
+    # the hash to whatever section is passing — so the click could carry
+    # `#tldr` and the switch got blamed for a fragment it faithfully
+    # carried. Wait for the scroll to STOP, then require the fragment:
+    # five consecutive frames at the same offset, on a deadline.
+    page.wait_for_function(
+        """() => {
+          const y = window.scrollY;
+          window.__still = (window.__lastY === y) ? (window.__still || 0) + 1 : 0;
+          window.__lastY = y;
+          return window.__still >= 5 && y >= 80 && location.hash === '#prose';
+        }""",
+        timeout=10000,
+    )
 
     page.evaluate(BUILD, _manifest(prefix))
     page.click(".ctrl-btn.lang-toggle")
