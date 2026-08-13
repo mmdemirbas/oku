@@ -3068,3 +3068,46 @@ class TestDocumentedFenceTags:
             named = set(re.findall(r"`oku-([a-z][a-z-]*)`", text))
             gone = sorted(named - cli._FENCE_KINDS - set(cli._MARKDOWN_FORM_OF))
             assert gone == [], f"{rel} names `oku-{gone}` — not a fence and not a markdown form"
+
+
+class TestSplitRuleIndex:
+    """CLAUDE.md loads on every session in this repo; PRESENTATION-RULES.md
+    is read only when its subject is being changed. That saving only holds
+    if the pointer between them is intact — a rule whose explanation cannot
+    be found is worse than one nobody split."""
+
+    def test_every_pointer_resolves(self):
+        import re
+
+        repo_root = Path(__file__).resolve().parents[2]
+        brief = (repo_root / "CLAUDE.md").read_text(encoding="utf-8")
+        rules = (repo_root / "PRESENTATION-RULES.md").read_text(encoding="utf-8")
+
+        anchors = set(re.findall(r"\{#([a-z0-9-]+)\}", rules))
+        refs = set(re.findall(r"PRESENTATION-RULES\.md#([a-z0-9-]+)", brief))
+
+        assert refs, "the index lost its pointers"
+        assert refs <= anchors, f"dangling: {sorted(refs - anchors)}"
+
+    def test_no_rule_was_moved_without_a_pointer(self):
+        """The failure that would make this split a loss: text leaves
+        CLAUDE.md and nothing in CLAUDE.md names it, so a session never
+        learns the rule exists."""
+        import re
+
+        repo_root = Path(__file__).resolve().parents[2]
+        brief = (repo_root / "CLAUDE.md").read_text(encoding="utf-8")
+        rules = (repo_root / "PRESENTATION-RULES.md").read_text(encoding="utf-8")
+
+        moved = set(re.findall(r"\{#([a-z0-9-]+)\}", rules))
+        referenced = set(re.findall(r"PRESENTATION-RULES\.md#([a-z0-9-]+)", brief))
+
+        assert moved == referenced, f"in the companion but not in the index: {sorted(moved - referenced)}"
+
+    def test_nothing_says_see_above_across_the_split(self):
+        """Both files had a reference to 'the line below/above it' that
+        pointed at text now in the other file."""
+        repo_root = Path(__file__).resolve().parents[2]
+        for rel in ("CLAUDE.md", "PRESENTATION-RULES.md"):
+            text = (repo_root / rel).read_text(encoding="utf-8")
+            assert "see above" not in text, f"{rel} still points at a neighbour it may no longer have"
