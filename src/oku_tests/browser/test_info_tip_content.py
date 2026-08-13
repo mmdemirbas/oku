@@ -114,8 +114,12 @@ def served(tmp_path_factory):
     (d / "tips.md").write_text(_md_source(), encoding="utf-8")
     (d / "legacy.json").write_text(json.dumps(V1_PAGE), encoding="utf-8")
     manifest = {"schema_version": 1, "root": ".", "pages": []}
-    (d / "tips.html").write_text(cli._stub_for("Disclosure bodies", inline_manifest=manifest), encoding="utf-8")
-    (d / "legacy.html").write_text(cli._stub_for("Legacy disclosure", inline_manifest=manifest), encoding="utf-8")
+    (d / "tips.html").write_text(
+        cli._stub_for("Disclosure bodies", inline_manifest=manifest), encoding="utf-8"
+    )
+    (d / "legacy.html").write_text(
+        cli._stub_for("Legacy disclosure", inline_manifest=manifest), encoding="utf-8"
+    )
     # The real serve handler, so the markdown page goes through the same
     # md -> page-dict synthesis `oku serve` and `oku build` use.
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), cli._make_serve_handler(d))
