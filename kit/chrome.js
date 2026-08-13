@@ -4382,7 +4382,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-13-r35';
+var __okuKitBuild = '2026-08-14-r36';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -8489,7 +8489,17 @@ class OkuChart extends HTMLElement {
     var vMax = x.max !== undefined ? +x.max : Math.max.apply(null, rows.map(function (r) { return +r.value || 0; }));
     if (vMin === vMax) { vMin -= 1; vMax += 1; }
     var W = 640, rowH = 28;
-    var pad = { top: this._title ? 36 : 12, bottom: 28, left: 140, right: 24 };
+    /* The gutter is measured from the labels, never guessed. A fixed
+       `left: 140` bets that no row is named more than about twenty
+       characters wide — and a row label is exactly the thing an author
+       writes at whatever length the data has. "3627520 | 8036211 —
+       same film" ran 245px into a 130px gutter and was clipped
+       mid-string by the viewBox: no scrollbar, no ellipsis, nothing to
+       hover, just a name that starts partway through. Same helper the
+       gantt already uses, and `fit` keeps the full string in a
+       <title>. */
+    var labelFit = okuFitLabelGutter(rows.map(function (r) { return r.label || ''; }), { width: W, fontPx: 11 });
+    var pad = { top: this._title ? 36 : 12, bottom: 28, left: labelFit.gutter, right: 24 };
     var H = pad.top + rows.length * rowH + pad.bottom;
     var plotW = W - pad.left - pad.right;
     function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
@@ -8505,7 +8515,7 @@ class OkuChart extends HTMLElement {
     rows.forEach(function (r, i) {
       var y = pad.top + i * rowH + rowH / 2;
       var color = palette[r.color] || palette.accent;
-      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-dot-plot-label">' + escapeXml(r.label || '') + '</text>');
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-dot-plot-label">' + escapeXml(labelFit.fit(r.label || '')) + '<title>' + escapeXml(r.label || '') + '</title></text>');
       // Connector from axis-left to dot (light) so the row reads as a single beat.
       parts.push('<line x1="' + pad.left + '" y1="' + y + '" x2="' + xOf(+r.value || 0).toFixed(1) + '" y2="' + y + '" class="okc-dot-plot-track"/>');
       var payload = JSON.stringify({ label: r.label || '', kv: [{ k: 'value', v: fmtNum(+r.value || 0) }] });
@@ -8977,7 +8987,8 @@ class OkuChart extends HTMLElement {
     var vMax = Math.max.apply(null, allValues);
     if (vMin === vMax) { vMin -= 1; vMax += 1; }
     var W = 640, H = 80 + distributions.length * 80;
-    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 120, right: 20 };
+    var labelFit = okuFitLabelGutter(distributions.map(function (d) { return d.label || ''; }), { width: W, fontPx: 11 });
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: labelFit.gutter, right: 20 };
     var plotW = W - pad.left - pad.right;
     var rowH = (H - pad.top - pad.bottom) / distributions.length;
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
@@ -9037,7 +9048,7 @@ class OkuChart extends HTMLElement {
       // Median line.
       parts.push('<line x1="' + xOf(median).toFixed(1) + '" y1="' + (rowMid - 10).toFixed(1) + '" x2="' + xOf(median).toFixed(1) + '" y2="' + (rowMid + 10).toFixed(1) + '" stroke="var(--bg)" stroke-width="2"/>');
       // Label on the left.
-      parts.push('<text x="' + (pad.left - 12) + '" y="' + (rowMid + 4).toFixed(1) + '" text-anchor="end" class="okc-violin-label">' + escapeXml(dist.label || '') + '</text>');
+      parts.push('<text x="' + (pad.left - 12) + '" y="' + (rowMid + 4).toFixed(1) + '" text-anchor="end" class="okc-violin-label">' + escapeXml(labelFit.fit(dist.label || '')) + '<title>' + escapeXml(dist.label || '') + '</title></text>');
     });
     // Bottom axis ticks at vMin / mid / vMax.
     [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
@@ -9305,7 +9316,8 @@ class OkuChart extends HTMLElement {
     var vMax = x.max !== undefined ? +x.max : Math.max.apply(null, rows.map(function (r) { return +r.value || 0; }));
     if (vMin === vMax) { vMax += 1; }
     var W = 640, rowH = 28;
-    var pad = { top: this._title ? 36 : 12, bottom: 28, left: 140, right: 24 };
+    var labelFit = okuFitLabelGutter(rows.map(function (r) { return r.label || ''; }), { width: W, fontPx: 11 });
+    var pad = { top: this._title ? 36 : 12, bottom: 28, left: labelFit.gutter, right: 24 };
     var H = pad.top + rows.length * rowH + pad.bottom;
     var plotW = W - pad.left - pad.right;
     function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
@@ -9318,7 +9330,7 @@ class OkuChart extends HTMLElement {
       var y = pad.top + i * rowH + rowH / 2;
       var color = palette[r.color] || palette.accent;
       var cx = xOf(+r.value || 0);
-      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-lollipop-label">' + escapeXml(r.label || '') + '</text>');
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-lollipop-label">' + escapeXml(labelFit.fit(r.label || '')) + '<title>' + escapeXml(r.label || '') + '</title></text>');
       parts.push('<line x1="' + x0.toFixed(1) + '" y1="' + y + '" x2="' + cx.toFixed(1) + '" y2="' + y + '" stroke="' + color + '" stroke-width="2" class="okc-lollipop-stem"/>');
       var payload = JSON.stringify({ label: r.label || '', kv: [{ k: 'value', v: fmtNum(+r.value || 0) }] });
       parts.push('<circle cx="' + cx.toFixed(1) + '" cy="' + y + '" r="6" fill="' + color + '" class="okc-lollipop-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtNum(+r.value || 0)) + '</title></circle>');
@@ -9349,7 +9361,8 @@ class OkuChart extends HTMLElement {
     var fromColor = palette[x.from_color] || palette.muted;
     var toColor   = palette[x.to_color]   || palette.accent;
     var W = 640, rowH = 32;
-    var pad = { top: this._title ? 36 : 12, bottom: 40, left: 140, right: 24 };
+    var labelFit = okuFitLabelGutter(rows.map(function (r) { return r.label || ''; }), { width: W, fontPx: 11 });
+    var pad = { top: this._title ? 36 : 12, bottom: 40, left: labelFit.gutter, right: 24 };
     var H = pad.top + rows.length * rowH + pad.bottom;
     var plotW = W - pad.left - pad.right;
     function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
@@ -9362,7 +9375,7 @@ class OkuChart extends HTMLElement {
       var toX   = xOf(+r.to   || 0);
       var change = (+r.to || 0) - (+r.from || 0);
       var connectorColor = change >= 0 ? 'var(--success)' : 'var(--danger)';
-      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-dumbbell-label">' + escapeXml(r.label || '') + '</text>');
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-dumbbell-label">' + escapeXml(labelFit.fit(r.label || '')) + '<title>' + escapeXml(r.label || '') + '</title></text>');
       parts.push('<line x1="' + fromX.toFixed(1) + '" y1="' + y + '" x2="' + toX.toFixed(1) + '" y2="' + y + '" stroke="' + connectorColor + '" stroke-width="3" stroke-opacity="0.4" class="okc-dumbbell-connector"/>');
       var fromPayload = JSON.stringify({ label: r.label + ' · ' + (x.from_label || 'from'), kv: [{ k: 'value', v: fmtNum(+r.from || 0) }] });
       var toPayload   = JSON.stringify({ label: r.label + ' · ' + (x.to_label || 'to'), kv: [{ k: 'value', v: fmtNum(+r.to || 0) }, { k: 'Δ', v: (change >= 0 ? '+' : '') + fmtNum(change) }] });
@@ -9755,7 +9768,8 @@ class OkuChart extends HTMLElement {
     if (categories.length < 2 || !series.length) return;
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var W = 640, laneH = 36;
-    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 100, right: 16 };
+    var labelFit = okuFitLabelGutter(series.map(function (s, si) { return s.label || ('series ' + (si + 1)); }), { width: W, fontPx: 11 });
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: labelFit.gutter, right: 16 };
     var H = pad.top + series.length * laneH + pad.bottom;
     var plotW = W - pad.left - pad.right;
     // Determine max abs value across all series for shared scale.
@@ -9782,7 +9796,7 @@ class OkuChart extends HTMLElement {
       // Background bg lane stripe so blank periods read as a row.
       parts.push('<rect x="' + pad.left + '" y="' + laneTop + '" width="' + plotW + '" height="' + (laneH - 2) + '" fill="var(--surface-soft, rgba(127,127,127,0.06))" class="okc-horizon-lane"/>');
       // Label.
-      parts.push('<text x="' + (pad.left - 8) + '" y="' + (laneMid + 4) + '" text-anchor="end" class="okc-horizon-label">' + escapeXml(s.label || ('series ' + (si + 1))) + '</text>');
+      parts.push('<text x="' + (pad.left - 8) + '" y="' + (laneMid + 4) + '" text-anchor="end" class="okc-horizon-label">' + escapeXml(labelFit.fit(s.label || ('series ' + (si + 1)))) + '<title>' + escapeXml(s.label || ('series ' + (si + 1))) + '</title></text>');
       var values = (s.values || []).map(Number);
       // For each band, draw a path with values clipped to that band's range.
       for (var b = 0; b < bandCount; b++) {

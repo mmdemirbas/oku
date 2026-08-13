@@ -4893,6 +4893,46 @@ oku-chart .okc-tick {
   fill: var(--text-soft);
   font: 400 10.5px 'JetBrains Mono', monospace;
 }
+/* Category labels drawn in a chart's own gutter, and the point labels a
+   connected scatter hangs off its dots. One rule because they are one
+   thing — the name of the row, written beside it — and because the way
+   they broke was one thing too: an SVG <text> with no `fill` paints
+   BLACK. Not "a bit dark". Black, on a #0e0c1c page. Eight renderers
+   emitted a labelled <text> and none of them ever had a CSS rule, so
+   every one of these charts lost its row names in dark mode while
+   looking correct in light. Measured on docs/charts.html before the
+   fix: fill rgb(0,0,0) on rgb(26,23,48) — contrast 1.21:1.
+
+   The font is not cosmetic either. Unset, an SVG <text> inherits the
+   16px default, and these renderers size their left gutter for 11px
+   (`pad.left = 140` and friends) — so the labels also ran off the left
+   edge of the viewBox and were clipped mid-word. Same trap the gantt
+   label hit; see the note above it. */
+oku-chart .okc-dot-plot-label,
+oku-chart .okc-violin-label,
+oku-chart .okc-lollipop-label,
+oku-chart .okc-dumbbell-label,
+oku-chart .okc-polar-area-label,
+oku-chart .okc-pop-cat,
+oku-chart .okc-conn-label,
+oku-chart .okc-horizon-label {
+  fill: var(--text-soft);
+  font: 500 11px 'Inter', sans-serif;
+}
+/* The same absence on two guide lines. Both carry a width (and the
+   waterfall bridge a dash pattern) in the markup, which is how you can
+   tell they were meant to be seen — an SVG <line> with no `stroke`
+   defaults to none and simply never paints. The dot-plot's connector is
+   the one its own source comment describes as running "from axis-left to
+   dot (light) so the row reads as a single beat". */
+oku-chart .okc-dot-plot-track {
+  stroke: var(--line-strong);
+  stroke-width: 2;
+}
+oku-chart .okc-waterfall-bridge {
+  stroke: var(--text-faint);
+  stroke-width: 1;
+}
 oku-chart .okc-line { stroke-linejoin: round; stroke-linecap: round; }
 oku-chart .okc-area { stroke: none; }
 /* Quadrant chart — two reference lines dividing the plot into four
