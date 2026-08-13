@@ -325,6 +325,18 @@
     return document.createTextNode(decodeEntities(s));
   }
 
+  /* Sums of decimal values carry binary float error: 26.9 + 10.4 + 9.2 +
+     9.0 + 6.6 + 0.2 prints as 62.300000000000004, and a page that shows
+     that has told the reader its arithmetic cannot be trusted — in a
+     tooltip, right next to the number the reader came for. Rounding at
+     the sixth decimal removes the error without inventing precision: any
+     value an author actually wrote survives it unchanged. */
+  function numText(n) {
+    const v = typeof n === 'number' ? n : parseFloat(n);
+    if (!isFinite(v)) return String(n);
+    return String(parseFloat(v.toFixed(6)));
+  }
+
   /* ================================================================ *
    * Link-reference definitions and footnotes
    * Both are page-scoped, not string-scoped: md_to_v2_page splits a
@@ -2317,18 +2329,18 @@
             series: s.label || '',
             label: cat,
             kv: [
-              { k: 'value', v: String(v) },
+              { k: 'value', v: numText(v) },
               { k: 'share', v: Math.round(share * 100) + '%' }
             ],
-            footer: 'in ' + cat + ' = ' + rowTotal
+            footer: 'in ' + cat + ' = ' + numText(rowTotal)
           }));
-          if (s.label) fill.title = s.label + ': ' + v;
+          if (s.label) fill.title = s.label + ': ' + numText(v);
           track.appendChild(fill);
         });
         row.appendChild(track);
         const val = document.createElement('span');
         val.className = 'bar-value';
-        val.textContent = String(rowTotal);
+        val.textContent = numText(rowTotal);
         row.appendChild(val);
         wrap.appendChild(row);
       });
@@ -2349,6 +2361,14 @@
         wrap.appendChild(h);
       }
       const total = rows.reduce((s, r) => s + (+r.value || 0), 0);
+      // What the total is a total OF. Row values may be written for
+      // display ("26.9 GB"), and a bare "of 62.3" beside them reads as a
+      // different quantity. The unit is only appended when every row
+      // agrees on it — "6.6 GB of compressed pages" disagrees, and
+      // guessing there would be worse than staying silent.
+      const units = rows.map(r => (r.display === undefined ? '' :
+        String(r.display).replace(/^\s*[-+]?[\d.,\s]+/, '').trim()));
+      const unit = units.every(u => u && u === units[0]) ? ' ' + units[0] : '';
       for (const r of rows) {
         const row = document.createElement('div');
         row.className = 'bar-row';
@@ -2366,10 +2386,10 @@
         fill.setAttribute('data-hover-payload', JSON.stringify({
           label: r.label || '',
           kv: [
-            { k: 'value', v: r.display !== undefined ? String(r.display) : String(r.value) },
+            { k: 'value', v: r.display !== undefined ? String(r.display) : numText(r.value) },
             { k: 'share', v: Math.round(share * 100) + '%' }
           ],
-          footer: 'of ' + total
+          footer: 'of ' + numText(total) + unit
         }));
         track.appendChild(fill);
         const val = document.createElement('span');

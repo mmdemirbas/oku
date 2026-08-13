@@ -4382,7 +4382,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-13-r34';
+var __okuKitBuild = '2026-08-13-r35';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -11052,12 +11052,14 @@ function __okuEnhanceBarCharts(root) {
       };
     }
     host.addEventListener('mousemove', function (ev) {
+      if (pinned) return;
       var r = host.getBoundingClientRect();
       var x = ev.clientX - r.left;
       var y = ev.clientY - r.top;
       var pyb = plotYBounds();
       if (x < 0 || x > r.width || !pyb || y < pyb.top || y > pyb.bottom) {
         cursor.style.opacity = '0';
+        hide();
         return;
       }
       // Recompute on every move so a window resize / fold doesn't
@@ -11066,9 +11068,12 @@ function __okuEnhanceBarCharts(root) {
       cursor.style.height = (pyb.bottom - pyb.top) + 'px';
       cursor.style.left = x + 'px';
       cursor.style.opacity = '1';
+      showCrossing(ev.clientX, ev.clientY, ev.target.closest && ev.target.closest('.bar-fill'));
     });
     host.addEventListener('mouseleave', function () {
+      if (pinned) return;
       cursor.style.opacity = '0';
+      hide();
     });
     var tip = null;
     function ensureTip() {
@@ -11080,79 +11085,144 @@ function __okuEnhanceBarCharts(root) {
       host.appendChild(tip);
       return tip;
     }
-    var pinnedFill = null;
-    function show(anchor, payload) {
+    var pinned = null;   // frozen client-x while the reader has pinned the read
+
+    function payloadOf(fill) {
+      try { return JSON.parse(fill.getAttribute('data-hover-payload') || '{}'); }
+      catch (e) { return null; }
+    }
+
+    /* Every bar the cursor line passes through, in row order.
+       A vertical cursor is a statement about a position on the value
+       axis, so what answers it is every bar that reaches that position —
+       reading one bar out of the set the reader is looking at throws
+       away the comparison the cursor just drew. The rule is the same one
+       the line obeys: the fill's horizontal extent contains the cursor.
+       That also does the right thing for the other families — a stacked
+       row contributes the one segment the line falls inside, a vertical
+       chart contributes the column under the pointer.
+       Dimmed series are left out; the reader turned them off. */
+    function crossingAt(clientX) {
+      var out = [];
+      host.querySelectorAll('.bar-fill[data-hover-payload]').forEach(function (fill) {
+        if (fill.classList.contains('dim')) return;
+        var r = fill.getBoundingClientRect();
+        if (r.width <= 0) return;
+        if (clientX >= r.left - 0.5 && clientX <= r.right + 0.5) out.push(fill);
+      });
+      return out;
+    }
+
+    /* The bar's own colour, so a row in the list maps to a bar on the
+       page without counting positions. Read back from computed style
+       rather than the payload — the fill may be themed by a class, an
+       inline gradient, or the series palette. It goes through innerHTML,
+       so only a plain colour value is allowed through. */
+    function swatchOf(fill) {
+      var bg = window.getComputedStyle(fill).backgroundColor || '';
+      return /^(rgba?\([\d.,\s%/]+\)|#[0-9a-fA-F]{3,8})$/.test(bg) ? bg : '';
+    }
+
+    function entryHtml(fill, underPointer, showSwatch) {
+      var p = payloadOf(fill);
+      if (!p) return '';
+      var value = '', share = '';
+      (p.kv || []).forEach(function (kv) {
+        if (kv.k === 'value') value = kv.v;
+        else if (kv.k === 'share') share = kv.v;
+      });
+      var name = p.series ? ((p.label ? p.label + ' · ' : '') + p.series) : (p.label || '');
+      var sw = showSwatch ? swatchOf(fill) : '';
+      var hi = underPointer ? ' is-cursor' : '';
+      return '<dt class="okc-tt-name' + hi + '">' +
+               (sw ? '<span class="okc-tt-swatch" style="background:' + sw + '"></span>' : '') +
+               '<span class="okc-tt-nametext">' + escapeXml(name) + '</span>' +
+             '</dt>' +
+             '<dd class="okc-tt-val' + hi + '">' + escapeXml(value) + '</dd>' +
+             '<dd class="okc-tt-share' + hi + '">' + escapeXml(share) + '</dd>';
+    }
+
+    function showCrossing(clientX, clientY, underFill) {
+      var fills = crossingAt(clientX);
+      if (!fills.length) { hide(); return; }
       var t = ensureTip();
-      var html = '';
-      if (payload.series) html += '<div class="okc-tt-series">' + escapeXml(payload.series) + '</div>';
-      if (payload.label)  html += '<div class="okc-tt-label">'  + escapeXml(payload.label)  + '</div>';
-      if (payload.kv && payload.kv.length) {
-        html += '<dl class="okc-tt-kv">';
-        payload.kv.forEach(function (row) {
-          html += '<dt>' + escapeXml(row.k) + '</dt><dd>' + escapeXml(row.v) + '</dd>';
-        });
-        html += '</dl>';
+      // A colour chip earns its column only where colour means
+      // something. On a single-series chart every bar is the accent, so
+      // it would be six identical squares stealing width from the names.
+      var colours = {};
+      fills.forEach(function (f) { colours[swatchOf(f)] = 1; });
+      var showSwatch = Object.keys(colours).length > 1;
+      var html = '<dl class="okc-tt-kv okc-tt-cross">';
+      fills.forEach(function (f) { html += entryHtml(f, f === underFill, showSwatch); });
+      html += '</dl>';
+      // The footer says what the shares are shares OF. On a single-series
+      // chart that is the chart's total and holds for every row; on a
+      // stacked one it names the row, so it is only printed when every
+      // crossing entry agrees — otherwise it would state one row's total
+      // over a list spanning several.
+      var feet = fills.map(function (f) { var p = payloadOf(f); return (p && p.footer) || ''; });
+      if (feet[0] && feet.every(function (s) { return s === feet[0]; })) {
+        html += '<div class="okc-tt-coords">' + escapeXml(feet[0]) + '</div>';
       }
-      if (payload.footer) html += '<div class="okc-tt-coords">' + escapeXml(payload.footer) + '</div>';
       html += '<span class="okc-tt-pin-hint">click to pin</span>';
       t.innerHTML = html;
+      // A list of rows needs more width than a single reading, and the
+      // 240px clamp squeezed the numbers until "26.9 GB" wrapped and
+      // "43%" was cut to "4". The wider clamp is on the crossing read
+      // only, so the single-value tooltips keep their stable box.
+      t.classList.add('okc-tt-wide');
       t.setAttribute('aria-hidden', 'false');
-      // `.okc-tooltip` is `position: fixed`, so style.left/top must be
-      // **viewport** coords, not host-relative. The earlier code
-      // computed `aRect.left - hostRect.left + aRect.width/2` — a
-      // host-relative number near 0 — which placed the tooltip at the
-      // viewport's left edge, far away from the chart. Use the
-      // module-level viewport-clamped helper the SVG charts use.
-      var aRect = anchor.getBoundingClientRect();
-      __okuPlaceTooltipAt(t, aRect.left + aRect.width / 2, aRect.top - 8);
-      t.__okuAnchor = anchor;
+      // `.okc-tooltip` is `position: fixed`, so left/top are VIEWPORT
+      // coords. Anchored to the cursor's x at the TOP of the plot, not
+      // to the pointer: a list of rows is tall, and hung off the pointer
+      // it covers the very bars it is listing. This is what the SVG
+      // cursor readouts already do (`svg.getBoundingClientRect().top`).
+      var hostRect = host.getBoundingClientRect();
+      var pyb2 = plotYBounds();
+      var topY = pyb2 ? hostRect.top + pyb2.top : clientY - 14;
+      __okuPlaceTooltipAt(t, clientX, topY - 8);
+      t.__okuAnchor = cursor;
       t.__okuAnchorOffset = 8;
       t.classList.add('visible');
     }
+
     function hide(force) {
-      if (pinnedFill && !force) return;
+      if (pinned && !force) return;
       if (tip) {
         tip.classList.remove('visible', 'pinned');
         tip.setAttribute('aria-hidden', 'true');
       }
     }
-    host.querySelectorAll('.bar-fill[data-hover-payload]').forEach(function (fill) {
-      // Drop the native tooltip — we render our own.
-      if (fill.title) { fill.removeAttribute('title'); }
-      var raw = fill.getAttribute('data-hover-payload');
-      var payload;
-      try { payload = JSON.parse(raw); } catch (e) { payload = { label: raw }; }
-      fill.addEventListener('mouseenter', function () {
-        if (pinnedFill && pinnedFill !== fill) return;
-        show(fill, payload);
-      });
-      fill.addEventListener('mouseleave', function () {
-        if (pinnedFill === fill) return;
-        hide();
-      });
-      fill.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        if (pinnedFill === fill) {
-          pinnedFill = null;
-          hide(true);
-        } else {
-          pinnedFill = fill;
-          show(fill, payload);
-          if (tip) tip.classList.add('pinned');
-        }
-      });
+
+    // Drop the native tooltips — the crossing read replaces them, and a
+    // browser tooltip on top of it says something different about the
+    // same pixel.
+    host.querySelectorAll('.bar-fill[title]').forEach(function (fill) {
+      fill.removeAttribute('title');
     });
+
     host.addEventListener('click', function (ev) {
-      if (!pinnedFill) return;
-      if (!pinnedFill.contains(ev.target)) {
-        pinnedFill = null;
+      if (ev.target.closest('.okt-bar, .bar-chart-legend-chip, .okc-tooltip')) return;
+      if (pinned) {
+        pinned = null;
         hide(true);
+        cursor.style.opacity = '0';
+        return;
       }
+      var pyb = plotYBounds();
+      var r = host.getBoundingClientRect();
+      var y = ev.clientY - r.top;
+      if (!pyb || y < pyb.top || y > pyb.bottom) return;
+      if (!crossingAt(ev.clientX).length) return;
+      pinned = ev.clientX;
+      showCrossing(ev.clientX, ev.clientY, ev.target.closest && ev.target.closest('.bar-fill'));
+      if (tip) tip.classList.add('pinned');
     });
-    host.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Escape' && pinnedFill) {
-        pinnedFill = null;
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && pinned) {
+        pinned = null;
         hide(true);
+        cursor.style.opacity = '0';
       }
     });
     // Legend toggle — click a chip to dim the matching series across

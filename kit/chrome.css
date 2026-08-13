@@ -5746,6 +5746,57 @@ oku-chart .okc-legend-chip.off .okc-legend { fill: var(--text-faint); text-decor
   color: var(--text);
   text-align: right;
 }
+/* The crossing read: one line per bar the vertical cursor passes
+   through, so the list is as long as the comparison the cursor drew.
+   Three columns — name, value, share — because a value column that
+   sometimes carries a percentage after it stops lining up, and lining
+   up is the whole reason a reader scans a list like this. The names
+   keep their own case: these are the row labels off the chart, and
+   uppercasing them makes them read as headings for the numbers rather
+   than as the labels beside them. */
+.okc-tooltip.okc-tt-wide { max-width: min(360px, 84vw); }
+.okc-tooltip .okc-tt-kv.okc-tt-cross {
+  /* The names give way, the numbers do not: a label can ellipsise and
+     still be recognised, a value cannot. */
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: 12px;
+  row-gap: 2px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.okc-tooltip .okc-tt-cross .okc-tt-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11.5px;
+}
+.okc-tooltip .okc-tt-cross .okc-tt-nametext {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.okc-tooltip .okc-tt-cross .okc-tt-val,
+.okc-tooltip .okc-tt-cross .okc-tt-share { white-space: nowrap; }
+.okc-tooltip .okc-tt-cross .okc-tt-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+.okc-tooltip .okc-tt-cross .okc-tt-share {
+  color: var(--text-faint);
+  font-size: 10.5px;
+}
+/* The row under the pointer. It is one of the set, not a different
+   kind of thing, so it gets weight — not a colour of its own. */
+.okc-tooltip .okc-tt-cross .is-cursor {
+  color: var(--text);
+  font-weight: 700;
+}
+
 /* The chart wrap (or its outer host) needs relative positioning for
    the absolute tooltip to anchor correctly. */
 .bar-chart,

@@ -619,7 +619,13 @@ class TestChromeKitMarkers:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "__okuPickColor" in js, "missing palette helper"
         assert "pinnedAnchor" in js, "chart tooltip missing click-pin"
-        assert "pinnedFill" in js, "bar enhancer missing click-pin"
+        # The bar enhancer's pin, by what it does rather than by the name
+        # of the variable holding it: `pinnedFill` was a bar, and the
+        # read is no longer one bar. browser/test_bar_cursor_tooltip.py
+        # exercises pin and release for real.
+        enhancer = js[js.index("function __okuEnhanceBarCharts") :]
+        assert "classList.add('pinned')" in enhancer, "bar enhancer missing click-pin"
+        assert "okc-tt-pin-hint" in enhancer, "bar tooltip missing the pin hint"
         assert "bar-chart-legend-chip[data-series-idx]" in js, "bar legend toggle wiring missing"
         renderer = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
         assert "data-series-idx" in renderer, (
@@ -2120,9 +2126,14 @@ class TestBarTooltipViewportPlacement:
             "Module-level __okuPlaceTooltipAt missing — bar enhancer "
             "would need to re-implement viewport clamping"
         )
-        # The bar enhancer must call it with viewport coords, not
-        # host-relative deltas.
-        assert "__okuPlaceTooltipAt(t, aRect.left + aRect.width / 2, aRect.top - 8)" in js, (
+        # That the enhancer calls the helper is checkable here; that the
+        # coords it passes are viewport coords is not, so this used to
+        # pin the whole call expression and broke the moment the anchor
+        # moved from a bar to the cursor's x. The property itself —
+        # the card lands beside the chart, not at the viewport edge — is
+        # measured in browser/test_bar_cursor_tooltip.py.
+        enhancer = js[js.index("function __okuEnhanceBarCharts") :]
+        assert "__okuPlaceTooltipAt(t," in enhancer, (
             "bar tooltip placement must use the viewport-clamped helper "
             "— host-relative coords end up at the viewport's left edge"
         )
