@@ -4564,7 +4564,13 @@ page-nav .page-nav-cmd:not([hidden]) {
   color: var(--text-soft);
   background: var(--surface-2);
   border-radius: 4px;
-  overflow-wrap: anywhere;
+  /* `break-word`, not `anywhere`: a deep source path is one long token
+     and has to break somewhere, but this keeps the break out of
+     `&& oku build`, which fits on its own. Wrapping rather than
+     scrolling because the whole command has to be selectable by hand —
+     that is the fallback when a browser refuses the clipboard, and a
+     fallback you have to drag-scroll through is not one. */
+  overflow-wrap: break-word;
   /* The footer is user-select:none so a drag across the sidebar picks
      up nothing. This one string is the exception — it exists to be
      taken, and hand-selecting it is the fallback for every browser
