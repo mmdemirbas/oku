@@ -67,6 +67,32 @@ oku build
 > [!WARN] build wipes its dist trees
 > build removes dist/standalone/ and dist/site/ before rebuilding (plus dist/markdown/ if an older build left one) so stale files don't accumulate. Anything else you've parked under dist/ is left alone — use oku clean to wipe the entire dist/ tree.
 
+### How do I know the page I am reading is current? {#build-provenance}
+
+You cannot tell by looking at the content, which is how a fixed bug gets reported a second time from an old file. So every built page carries its own provenance in the sidebar footer, under the site tree:
+
+```
+oku v0.6.5 · kit 2026-08-14-r37
+built 3 days ago                     [Rebuild]
+```
+
+`kit` is the same field `oku --version` prints, spelled the same way, so the footer and the terminal compare directly. The stamp carries its own date — that is what lets one number answer "how old is this file" without knowing what the current one is.
+
+**Rebuild copies a command. It does not run one, and it cannot.** A page opened from a `file://` URL or off a static host has no channel to a shell. The one surface with a live server is `oku serve`, and there `_oku/` points at the installed kit, so a served page is never the stale one — a real rebuild button would work only where nothing needs it. Clicking reveals the command and copies it:
+
+```bash
+cd ~/code/notes && oku build
+```
+
+The `cd` is there because an artifact says nothing about where its source sits, and you are reading it from somewhere else. The path collapses to `~` under your home directory, and it is written only into `dist/` and the standalone files — never into the committed `index.html` stub.
+
+What the page cannot tell you is how far behind the installed kit it is. Learning that means asking the network, and a document should not call home because a colleague opened it. `oku build` prints that comparison instead, at the one moment it holds both numbers:
+
+```
+✓ Built 12 HTML file(s):
+  kit 2026-08-11-r33 → 2026-08-14-r37
+```
+
 ## oku clean {#clean}
 
 Remove the dist/ tree under the current project root. Idempotent — no-op when dist/ doesn't exist. Source files and the _oku symlink are untouched.

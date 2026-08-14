@@ -4483,22 +4483,98 @@ page-nav .page-nav-scroll > page-toc {
   padding: 0 22px 18px 22px;
 }
 /* Footer locked to the literal bottom edge of the sidebar via
-   flex-shrink:0. The kit version sits in dimmed text — visible
-   without competing for attention. A 1px top border separates it
-   from the scroll region above. */
+   flex-shrink:0. Dimmed, so it does not compete for attention. A 1px
+   top border separates it from the scroll region above.
+
+   `--text-soft`, not `--text-faint`. Faint at this footer's 0.85
+   opacity measures 2.8:1 light / 3.2:1 dark, which was defensible while
+   the only thing down here was a decorative version number nobody had
+   to read. It stopped being defensible when the build stamp moved in:
+   a reader is meant to compare that string against a terminal, and a
+   fact below the contrast floor is not a fact they have. Soft is still
+   visibly quieter than body text, which is the register this wants.
+
+   The blanket `opacity: 0.85` went with it. A container's opacity is
+   inherited by every child and cannot be raised back by one, so the
+   drift line — the one line in here that has to be READ, and the only
+   one that is ever coloured — sat at 3.86:1 in light with no way out
+   except a different hue. An alert that dims itself is a bug. The
+   quietness lives in the token now, where a child can decline it. */
 page-nav .page-nav-footer {
   flex: 0 0 auto;
   padding: 10px 22px;
   font-size: 11px;
   letter-spacing: 0.04em;
-  color: var(--text-faint);
+  color: var(--text-soft);
   background: var(--surface);
   border-top: 1px solid var(--border-soft);
-  opacity: 0.85;
   user-select: none;
 }
 page-nav .page-nav-footer .page-nav-version {
   font-variant-numeric: tabular-nums;
+}
+/* The build block. Proximity: the facts about which build a reader is
+   looking at, and the control that replaces it, sit on the version
+   that was already here — not in a menu the reader would have to
+   suspect exists. Hierarchy: it stays in footer-dim ink, because a
+   document is not about its own provenance. Only the drift line takes
+   a colour, and only when there is a real mismatch to name; a warning
+   tint on a page that is fine is how a reader learns to skip the line
+   that matters. */
+page-nav .page-nav-stamp {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+page-nav .page-nav-freshness:empty { display: none; }
+page-nav .page-nav-freshline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 3px;
+}
+page-nav .page-nav-age { min-width: 0; }
+page-nav .page-nav-rebuild {
+  flex: 0 0 auto;
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--text-soft);
+  background: none;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  padding: 1px 7px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+page-nav .page-nav-rebuild:hover,
+page-nav .page-nav-rebuild:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+/* `:not([hidden])` rather than a bare `.page-nav-cmd`, because `code`
+   is inline and needs `display: block` here — and an author rule
+   setting `display` outranks the UA stylesheet's `[hidden]`, so the
+   bare form ships the command permanently open. */
+page-nav .page-nav-cmd:not([hidden]) {
+  display: block;
+  margin-top: 6px;
+  padding: 5px 7px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--text-soft);
+  background: var(--surface-2);
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+  /* The footer is user-select:none so a drag across the sidebar picks
+     up nothing. This one string is the exception — it exists to be
+     taken, and hand-selecting it is the fallback for every browser
+     that refuses the clipboard. */
+  user-select: text;
+  -webkit-user-select: text;
+}
+page-nav .page-nav-drift {
+  margin-top: 4px;
+  color: var(--warning);
 }
 page-nav .page-nav-tree { list-style: none; margin: 0; padding: 0; }
 page-nav .page-nav-tree ol { list-style: none; margin: 0; padding-left: 12px; }

@@ -67,6 +67,32 @@ oku build
 > [!WARN] build kendi dist ağaçlarını siler
 > build, yeniden üretmeden önce dist/standalone/ ve dist/site/ dizinlerini kaldırır (eski bir derlemeden kalmışsa dist/markdown/ dizinini de), böylece bayat dosyalar birikmez. dist/ altına koyduğunuz başka her şeye dokunulmaz — bütün dist/ ağacını silmek için oku clean kullanın.
 
+### Okuduğum sayfanın güncel olduğunu nereden bilirim? {#build-provenance}
+
+İçeriğe bakarak anlayamazsınız; giderilmiş bir kusurun eski bir dosyadan ikinci kez bildirilmesi böyle olur. Bu yüzden üretilen her sayfa, kendi künyesini kenar çubuğunun altında, site ağacının hemen altında taşır:
+
+```
+oku v0.6.5 · kit 2026-08-14-r37
+built 3 days ago                     [Rebuild]
+```
+
+`kit`, `oku --version` çıktısındaki alanın aynısıdır ve aynı biçimde yazılır; böylece kenar çubuğu ile uçbirim doğrudan karşılaştırılabilir. Damga kendi tarihini taşır — güncel numarayı bilmeden "bu dosya ne kadar eski" sorusunu tek bir sayının yanıtlamasını sağlayan şey budur.
+
+**Rebuild bir komut kopyalar. Komutu çalıştırmaz, çalıştıramaz da.** `file://` adresinden ya da durağan bir sunucudan açılan bir sayfanın kabuğa ulaşan bir kanalı yoktur. Canlı sunucusu olan tek yüzey `oku serve`'dür; orada da `_oku/` kurulu kiti gösterir, yani sunulan sayfa hiçbir zaman bayat olan değildir — gerçek bir yeniden üretme düğmesi yalnızca kimsenin ihtiyaç duymadığı yerde çalışırdı. Tıklama komutu hem gösterir hem kopyalar:
+
+```bash
+cd ~/code/notes && oku build
+```
+
+`cd` şundan var: üretilmiş bir dosya kaynağının nerede durduğu hakkında hiçbir şey söylemez, siz de onu başka bir yerden okuyorsunuz. Yol, ev dizininizin altındaysa `~` ile kısalır ve yalnızca `dist/` içine ve tek dosyalık sayfalara yazılır — sürüm denetimine giren `index.html` taslağına hiçbir zaman yazılmaz.
+
+Sayfanın size söyleyemeyeceği şey, kurulu kitin ne kadar gerisinde kaldığıdır. Bunu öğrenmek ağa sormak demektir; bir belge de bir meslektaşınız açtı diye kendi başına ağa çıkmamalıdır. Bu karşılaştırmayı, iki sayıyı da elinde tuttuğu tek anda, `oku build` yazdırır:
+
+```
+✓ Built 12 HTML file(s):
+  kit 2026-08-11-r33 → 2026-08-14-r37
+```
+
 ## oku clean {#clean}
 
 Geçerli proje kökündeki dist/ ağacını kaldırır. Yinelenebilir — dist/ yoksa hiçbir şey yapmaz. Kaynak dosyalara ve _oku sembolik bağına dokunulmaz.

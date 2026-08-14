@@ -30,6 +30,7 @@ import json
 import os
 import queue
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -159,6 +160,58 @@ def _kit_build_stamp() -> str:
         return "unknown"
     m = re.search(r"__okuKitBuild\s*=\s*'([^']+)'", text)
     return m.group(1) if m else "unknown"
+
+
+def _rebuild_command(root: Path) -> str:
+    """The command that rebuilds this tree, run from anywhere.
+
+    It carries the absolute source directory on purpose: the reader is
+    looking at an artifact, which says nothing about where its source
+    sits, and a bare ``oku build`` only works from one directory they
+    would have to already know.
+
+    Collapsed to ``~`` when the tree sits under $HOME. The artifact
+    travels to other people, and a home-relative path is the whole
+    instruction to the one person who can act on it without carrying
+    their account name to everyone else. The tilde stays OUTSIDE any
+    quoting `shlex` adds, because a quoted ``~`` is a literal directory
+    name to the shell rather than the home expansion.
+    """
+    resolved = root.resolve()
+    try:
+        home_rel = resolved.relative_to(Path.home()).as_posix()
+    except ValueError:
+        shown = shlex.quote(resolved.as_posix())
+    else:
+        shown = "~/" + shlex.quote(home_rel)
+    return f"cd {shown} && oku build"
+
+
+def _artifact_kit_stamp(dist: Path) -> str | None:
+    """The kit stamp a previous build left in ``dist/``, or None.
+
+    Read before the build overwrites it, because this process is the
+    only place both numbers exist at once. The artifact cannot learn the
+    installed stamp — it would have to reach the network to ask, and a
+    document that calls home when a teammate opens it is a worse defect
+    than the one this reports. The installed tool, for its part, does
+    not know an artifact exists until it is asked to replace one.
+
+    One file answers it: every page in a tree is built from the same kit
+    in the same pass, so the shared copy under ``dist/site`` settles it,
+    and a standalone page is the fallback for a tree built without one.
+    """
+    shared = dist / "site" / "_oku" / "chrome.js"
+    probes = [shared] if shared.exists() else sorted((dist / "standalone").rglob("*.html"))[:1]
+    for probe in probes:
+        try:
+            text = probe.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        m = re.search(r"__okuKitBuild\s*=\s*'([^']+)'", text)
+        if m:
+            return m.group(1)
+    return None
 
 
 class _VersionAction(argparse.Action):
@@ -1214,9 +1267,15 @@ def _init_time_manifest(root: Path) -> dict:
     and trigger a needless re-write) and trims to the fields the
     runtime sidebar actually consumes. The result is what gets
     embedded as window.__okuManifest in docs/index.html.
+
+    ``build`` goes with it, for a second reason on top of the churn: it
+    holds a path on the author's machine and this stub is a SOURCE file
+    that gets committed. The build metadata belongs in the artifacts,
+    which is where `build_standalone` and the dist/site manifest put it.
     """
     manifest = compute_manifest(root)
     manifest.pop("generated_at", None)
+    manifest.pop("build", None)
     return manifest
 
 
@@ -3419,6 +3478,14 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
         "schema_version": 1,
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
         "root": ".",
+        # What this artifact was made from, and how to make it again.
+        # The manifest is the carrier because it is the one thing that
+        # already reaches every page in all three modes — fetched under
+        # `oku serve` and in dist/site, inlined in a standalone file.
+        # `oku` + `kit` are the same two fields `oku --version` prints,
+        # under the same names, so the footer and the terminal can be
+        # compared without translating between them.
+        "build": {"oku": _PKG_VERSION, "kit": _kit_build_stamp(), "cmd": _rebuild_command(root)},
         "pages": entries,
     }
 
@@ -4080,6 +4147,9 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
 
 def cmd_build(args: argparse.Namespace) -> int:
     root = Path.cwd()
+    # Read before anything overwrites it — this is the only reading of
+    # the outgoing artifact there will be.
+    prior_stamp = _artifact_kit_stamp(root / "dist")
     # Fetch the shared dependencies the first time they are needed rather
     # than making the author discover a command. Once per installation,
     # then never again; a failure here is not a build failure, because
@@ -4177,6 +4247,12 @@ def cmd_build(args: argparse.Namespace) -> int:
         print("✓ Pagefind index built: dist/site/pagefind/")
 
     print(f"✓ Built {len(srcs)} HTML file(s):")
+    if prior_stamp and prior_stamp != _kit_build_stamp():
+        # The drift, named at the one moment both numbers are in the
+        # same process. A page can show what it was built with and how
+        # old that is; only the tool that replaces it can say what it
+        # was replaced BY.
+        print(f"  kit {prior_stamp} → {_kit_build_stamp()}")
     print()
     print("  standalone (inline, send-as-file):")
     for src, _, _ in srcs:

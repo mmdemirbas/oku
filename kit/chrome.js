@@ -42,11 +42,16 @@
  *     - Internal helpers:        nested inside their controller IIFE
  * ────────────────────────────────────────────────────────────────── */
 
-/* ============ Kit version ============ *
- * Surfaced in the sidebar footer (dimmed) so a reader can see at a
- * glance which build of oku rendered the page. Bump in lockstep
- * with pyproject.toml's [project] version. */
-const KIT_VERSION = '0.4.0';
+/* The kit version used to be a constant here, told to track
+ * pyproject.toml "in lockstep". It did not: the footer read v0.4.0 for
+ * as long as the package read 0.6.5, and nothing failed, because a
+ * second copy of a fact with no authority rule drifts silently and
+ * only a reader comparing the two would ever notice.
+ *
+ * What replaced it: `__okuKitBuild` below, which the build reads out of
+ * this very file so there is one copy; and the package version, which
+ * the tool writes into the manifest at build time. Neither is
+ * hand-maintained. See PageNav._renderBuild. */
 
 /* ============ SVG icon set ============ */
 const ICON_MENU = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>';
@@ -4382,7 +4387,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-14-r36';
+var __okuKitBuild = '2026-08-14-r37';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -13467,8 +13472,14 @@ class PageNav extends HTMLElement {
     //   .page-nav-footer   ← flex-shrink:0, pinned at the literal
     //                        bottom edge of the sidebar; never scrolls
     //                        and never sits between tree and TOC.
-    // The version label is dimmed; it tells the reader which build
-    // of oku they're reading without competing with content.
+    // The footer says which build of oku the reader is looking at,
+    // quietly enough not to compete with content. The kit STAMP leads
+    // because the version alone cannot answer the question a reader of
+    // an ARTIFACT actually has: `v0.6.5` is the same string for months,
+    // while `2026-08-11-r33` carries its own date, so "how far behind
+    // is this file" is legible without knowing the current one.
+    // `.page-nav-freshness` is filled once the manifest arrives, and
+    // the version with it — see _renderBuild.
     this.innerHTML =
       '<div class="page-nav-scroll">' +
         '<div class="page-nav-panel">' +
@@ -13476,7 +13487,11 @@ class PageNav extends HTMLElement {
         '</div>' +
       '</div>' +
       '<div class="page-nav-footer">' +
-        'oku <span class="page-nav-version">v' + KIT_VERSION + '</span>' +
+        '<div class="page-nav-build">' +
+          'oku<span class="page-nav-version"></span>' +
+          ' · <span class="page-nav-stamp">kit ' + escapeHTML(__okuKitBuild) + '</span>' +
+        '</div>' +
+        '<div class="page-nav-freshness"></div>' +
       '</div>';
     var self = this;
     // Adopt the page-toc into the sidebar so both panels share a single
@@ -13530,7 +13545,13 @@ class PageNav extends HTMLElement {
         // button appeared under `oku serve` and in dist/site and was
         // missing from the artifact people are actually sent.
         __okuLangSwitch.build(window.__okuManifest);
-        __okuI18n.load().then(function () { __okuI18n.localize(document); });
+        __okuI18n.load().then(function () {
+          // The site tree is gone, the build block is not: a standalone
+          // file is exactly the artifact that travels away from its
+          // source and goes stale without anything saying so.
+          self._renderBuild(window.__okuManifest);
+          __okuI18n.localize(document);
+        });
         return;
       }
       loadManifest()
@@ -13540,6 +13561,7 @@ class PageNav extends HTMLElement {
           __okuLangSwitch.build(manifest);
           __okuI18n.load().then(function () {
             self._renderTree(manifest);
+            self._renderBuild(manifest);
             __okuI18n.localize(document);
           });
         })
@@ -13738,6 +13760,111 @@ class PageNav extends HTMLElement {
     } else {
       start();
     }
+  }
+
+  /* How old this artifact is, in days. Days is the granularity the
+   * question has: nobody rebuilds a document to catch an hour. */
+  _buildAge(iso) {
+    var built = Date.parse(iso || '');
+    if (!built) return null;
+    var days = Math.floor((Date.now() - built) / 86400000);
+    if (days < 0) return null;                       // clock skew; say nothing
+    if (days < 1) return okuT('built today');
+    if (days === 1) return okuT('built yesterday');
+    return okuT('built {0} days ago', days);
+  }
+
+  /* The footer's second line: how old this artifact is, and the one
+   * command that replaces it.
+   *
+   * Why a COMMAND and not a rebuild button. A page cannot rebuild
+   * itself — opened from a file:// URL or off a static host it has no
+   * channel to a shell, and there is no daemon to ask. The one surface
+   * with a live server is `oku serve`, where `_oku` symlinks to the
+   * installed kit, so a served page is never the stale one. A rebuild
+   * button would work only where it is not needed. The click copies
+   * the command instead AND reveals it, so a browser that refuses the
+   * clipboard still leaves something to select by hand.
+   *
+   * The command carries its own `cd` because an artifact says nothing
+   * about where its source sits, and the reader is by definition
+   * somewhere else.
+   *
+   * What this cannot do: say how far behind the installed kit the page
+   * is. Learning that means asking the network, and a document that
+   * calls home when a teammate opens it is a worse defect than the one
+   * it would report. The age is the part a page can answer on its own,
+   * and the stamp beside it carries its own date; `oku build` prints
+   * the version-against-version line, at the moment it holds both.
+   */
+  _renderBuild(manifest) {
+    var host = this.querySelector('.page-nav-freshness');
+    if (!host) return;
+    host.innerHTML = '';
+    var build = (manifest && manifest.build) || null;
+
+    // The package version, from the tool that ran the build. Written in
+    // late and left blank when absent, rather than defaulted to a
+    // constant in this file — a wrong version number sitting inside the
+    // control for spotting version drift is worse than no number, and a
+    // hand-kept constant is how the last one went wrong.
+    var ver = this.querySelector('.page-nav-version');
+    if (ver && build && build.oku) ver.textContent = ' v' + build.oku;
+
+    var age = this._buildAge(manifest && manifest.generated_at);
+    if (!age && !build) return;                      // nothing to say; stay empty
+
+    var line = document.createElement('div');
+    line.className = 'page-nav-freshline';
+    if (age) {
+      var when = document.createElement('span');
+      when.className = 'page-nav-age';
+      when.textContent = age;
+      line.appendChild(when);
+    }
+    host.appendChild(line);
+
+    // The running kit against the kit the pages were built with. A
+    // standalone file inlines both, so they agree by construction; they
+    // part company when a dist/site tree has had its shared `_oku/`
+    // replaced without the pages being rebuilt, or the reverse. That is
+    // a half-updated tree, and it is the one drift a page CAN prove.
+    if (build && build.kit && build.kit !== __okuKitBuild) {
+      var drift = document.createElement('div');
+      drift.className = 'page-nav-drift';
+      drift.textContent = okuT('Pages built with {0}; kit running is {1}.', build.kit, __okuKitBuild);
+      host.appendChild(drift);
+    }
+
+    if (!build || !build.cmd) return;
+    var label = okuT('Rebuild');
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'page-nav-rebuild';
+    btn.textContent = label;
+    btn.title = okuT('Copy the command that rebuilds this document');
+    btn.setAttribute('aria-expanded', 'false');
+    var cmd = document.createElement('code');
+    cmd.className = 'page-nav-cmd';
+    cmd.textContent = build.cmd;
+    cmd.hidden = true;
+    btn.setAttribute('aria-controls', cmd.id = 'oku-rebuild-cmd');
+    line.appendChild(btn);
+    host.appendChild(cmd);
+    btn.addEventListener('click', function () {
+      // Reveal first, unconditionally: it is the half that cannot fail,
+      // and it is what the reader falls back to when the copy does.
+      cmd.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+      navigator.clipboard.writeText(build.cmd).then(function () {
+        // Restore to the captured label, never to whatever the button
+        // reads now — a second click during the flash would otherwise
+        // make "Copied" permanent.
+        btn.textContent = okuT('Copied');
+        setTimeout(function () { btn.textContent = label; }, 1500);
+      }, function () { /* revealed above; selecting it by hand is the fallback */ });
+    });
   }
 
   _renderTree(manifest) {

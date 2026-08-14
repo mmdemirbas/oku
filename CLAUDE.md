@@ -306,6 +306,35 @@ arms once a non-touch pointer has actually moved
 no-script page see full opacity. The warning indicator is excluded: an
 alert that dims itself is a bug. Opacity only — no box changes.
 
+**A built page says what it was built from.** The sidebar footer carries
+`oku v0.6.5 · kit 2026-08-14-r37` / `built 3 days ago` / a Rebuild button
+that copies `cd <source> && oku build`. It exists because a delivered
+report was opened, a rendering defect was reported against it, and the
+defect had been fixed three stamps earlier — nothing on the file said it
+was old. The facts ride in the manifest's `build` block, which is the one
+thing that already reaches every page in all three modes.
+
+Three things about it that are decisions, not oversights. **The button
+copies rather than rebuilds**: a `file://` page has no channel to a
+shell, and the one surface with a live server (`oku serve`) symlinks the
+kit, so a served page is never the stale one — a real rebuild button
+would work only where nothing needs it. **The page never says how far
+behind the installed kit it is**: that needs the network, and a document
+that calls home when a colleague opens it is worse than the bug it would
+report. `oku build` prints `kit <old> → <new>` instead, at the one moment
+both numbers are in the same process. **The command is kept out of the
+committed stub** — `_init_time_manifest` pops `build` because
+`docs/index.html` is a source file and the command holds a path from the
+author's machine (collapsed to `~`, so it names a layout and not an
+account). Held by `test_build_provenance.py`, both halves.
+
+The footer's `KIT_VERSION` constant is gone with it. It was told to track
+`pyproject.toml` "in lockstep" and read `v0.4.0` against a `0.6.5`
+package for however long nobody put the two side by side — a second copy
+of a fact with no authority rule. The version now comes from the manifest
+and the stamp is read out of chrome.js by the build, so neither is
+hand-maintained.
+
 **Front-matter is `title` + `summary`.** Plus `order` / `parent` for
 tree placement. `accent` and `audience` are tree-wide in `docs/kit.json`;
 `read_time` and `updated` are derived at build time (220 wpm; the git
