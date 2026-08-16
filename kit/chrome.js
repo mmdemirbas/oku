@@ -5805,6 +5805,8 @@ class OkuChart extends HTMLElement {
       // statically decorated and silent.
       this._wireInteractivity();
       this._attachToolbar();
+      var selfNC = this;
+      __okuScheduleFit(function () { selfNC._fitTextToViewBox(); });
       return;
     }
 
@@ -6163,6 +6165,7 @@ class OkuChart extends HTMLElement {
     // SVG must be in the DOM before getBBox() reports anything sane.
     // Defer to next frame so layout has a chance to settle.
     requestAnimationFrame(function () { self._deconflictLabels(); });
+    __okuScheduleFit(function () { self._fitTextToViewBox(); });
   }
 
   /* Synced cursor for Cartesian charts. Tracks the pointer's x
@@ -6202,7 +6205,12 @@ class OkuChart extends HTMLElement {
     var cx = x0, cy = y0;
     series.forEach(function (s, i) {
       if (!s || !s.label) return;
-      var label = String(s.label);
+      var full = String(s.label);
+      // Wrapping to the next row only helps a chip that is narrower
+      // than the row. One wider than the whole legend has nowhere to
+      // wrap to and ran off the viewBox, so cap it here.
+      var maxChars = Math.max(4, Math.floor((width - swatch - 4 - gap) / 5.6));
+      var label = full.length > maxChars ? full.slice(0, maxChars - 1).replace(/\s+$/, '') + '…' : full;
       // Estimate label width — 5.6px per char at 11px font with a
       // little slack. Cheap heuristic; SVG doesn't tell us the real
       // measure until paint, so we over-estimate by ~10% to be safe.
@@ -6214,7 +6222,7 @@ class OkuChart extends HTMLElement {
       var color = palette[i % palette.length];
       html += '<g class="okc-legend-chip" tabindex="0" data-legend-hover="' + i + '" data-' + idxAttr + '="' + i + '">';
       html +=   '<rect x="' + cx + '" y="' + (cy + 1) + '" width="' + swatch + '" height="' + swatch + '" rx="2" fill="' + color + '"/>';
-      html +=   '<text x="' + (cx + swatch + 4) + '" y="' + (cy + 9) + '" class="okc-legend" font-size="' + fontPx + '">' + escapeXml(label) + '</text>';
+      html +=   '<text x="' + (cx + swatch + 4) + '" y="' + (cy + 9) + '" class="okc-legend" font-size="' + fontPx + '">' + escapeXml(label) + '<title>' + escapeXml(full) + '</title></text>';
       html += '</g>';
       cx += chipW;
     });
@@ -6438,6 +6446,28 @@ class OkuChart extends HTMLElement {
         box.el.classList.add('okc-label-hidden');
       }
     });
+  }
+
+  /* Run the viewBox text fit over whatever this chart just drew.
+     Called by every render path, Cartesian and not, because the
+     clipping it catches is not specific to one family — see
+     __okuFitSvgTextToViewBox. */
+  _fitTextToViewBox() {
+    var svgs = Array.prototype.slice.call(this.querySelectorAll('svg.okc-svg'));
+    if (!svgs.length) return;
+    svgs.forEach(function (svg) { __okuFitSvgTextToViewBox(svg); });
+    if (typeof ResizeObserver !== 'function') return;
+    // Re-decide at every size the chart is actually shown at: a chart
+    // in a closed fold has no box to measure yet, the reading column
+    // has three widths, and the lightbox is a different chart-width
+    // altogether. The fit itself changes no box, so this cannot loop.
+    if (this._fitObserver) this._fitObserver.disconnect();
+    this._fitObserver = new ResizeObserver(function (entries) {
+      var targets = entries.map(function (e) { return e.target; });
+      __okuScheduleFit(function () { targets.forEach(__okuFitSvgTextToViewBox); });
+    });
+    var ro = this._fitObserver;
+    svgs.forEach(function (svg) { ro.observe(svg); });
   }
 
   /* Donut render — distribution over `slices: [{label, value, color?}]`.
@@ -6827,9 +6857,29 @@ class OkuChart extends HTMLElement {
     // arc — same row as the value readout, well-defined location,
     // no arc collision. H bumped to fit the row.
     var zones = (x.zones || []);
-    var hasZoneLegend = zones.some(function (z) { return !!z.label; });
-    var W = 320, H = hasZoneLegend ? 230 : 200;
-    var cx = W / 2, cy = (hasZoneLegend ? H - 66 : H - 36), r = 110, sr = 88;
+    var W = 320;
+    // The legend is laid out BEFORE the viewBox is sized, because how
+    // many rows it needs decides the height. Laid out chip after chip
+    // on one row, a zone named with a phrase instead of a word walked
+    // the row off the right edge — 318px past it for the example on
+    // the reference page, which is most of a second chart's width.
+    var LG = { swatch: 11, gap: 14, fontPx: 11, charW: 5.6, rowH: 18 };
+    var lgRows = [];
+    zones.filter(function (z) { return !!z.label; }).forEach(function (z) {
+      var full = String(z.label);
+      var maxChars = Math.max(3, Math.floor((W - 16 - LG.swatch - 4) / LG.charW));
+      var label = full.length > maxChars ? full.slice(0, maxChars - 1).replace(/\s+$/, '') + '…' : full;
+      var w = LG.swatch + 4 + Math.ceil(label.length * LG.charW);
+      var row = lgRows[lgRows.length - 1];
+      var rowW = row ? row.reduce(function (s, c) { return s + c.w + LG.gap; }, -LG.gap) : 0;
+      if (!row || rowW + LG.gap + w > W - 16) { row = []; lgRows.push(row); }
+      row.push({ label: label, full: full, tone: z.tone, w: w });
+    });
+    var hasZoneLegend = lgRows.length > 0;
+    var H = hasZoneLegend ? 212 + lgRows.length * LG.rowH : 200;
+    // The arc keeps its place whatever the legend costs: extra rows
+    // grow H downward, they do not push the dial down the card.
+    var cx = W / 2, cy = (hasZoneLegend ? H - 66 - (lgRows.length - 1) * LG.rowH : H - 36), r = 110, sr = 88;
     function angleOf(v) {
       var t = Math.max(0, Math.min(1, (v - mn) / (mx - mn)));
       return Math.PI + t * Math.PI; // 180° = mn, 360° = mx (semicircular)
@@ -6879,30 +6929,23 @@ class OkuChart extends HTMLElement {
     // Centre readout.
     parts.push('<text x="' + cx + '" y="' + (cy - 12) + '" text-anchor="middle" class="okc-gauge-value-text">' + escapeXml(fmtNum(val)) + '</text>');
     if (x.label) parts.push('<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" class="okc-gauge-label">' + escapeXml(x.label) + '</text>');
-    // Zone legend row (when at least one zone has a label). Fixed
+    // Zone legend rows (when at least one zone has a label). Fixed
     // location at the bottom of the SVG — same shape as marimekko /
     // stream legends. No arc-rim collision because it lives in its
-    // own row.
-    if (hasZoneLegend) {
-      var lgY = H - 24;
-      var swatch = 11, gap = 14, fontPx = 11;
-      var chips = zones.filter(function (z) { return !!z.label; });
-      // Measure-and-centre: estimate total width, lay chips out
-      // around cx.
-      var charW = 5.6;
-      var widths = chips.map(function (z) { return swatch + 4 + Math.ceil(z.label.length * charW); });
-      var totalW = widths.reduce(function (s, w) { return s + w; }, 0) + (chips.length - 1) * gap;
-      var rowX = Math.max(8, cx - totalW / 2);
-      chips.forEach(function (z, i) {
-        var w = widths[i];
-        var color = palette[z.tone] || palette.muted;
+    // own rows, each centred on the dial.
+    lgRows.forEach(function (row, ri) {
+      var lgY = H - 24 - (lgRows.length - 1 - ri) * LG.rowH;
+      var rowW = row.reduce(function (s, c) { return s + c.w + LG.gap; }, -LG.gap);
+      var rowX = Math.max(8, cx - rowW / 2);
+      row.forEach(function (c) {
+        var color = palette[c.tone] || palette.muted;
         parts.push('<g class="okc-gauge-zone-chip">');
-        parts.push('<rect x="' + rowX + '" y="' + (lgY) + '" width="' + swatch + '" height="' + swatch + '" rx="2" fill="' + color + '"/>');
-        parts.push('<text x="' + (rowX + swatch + 4) + '" y="' + (lgY + swatch - 1) + '" font-size="' + fontPx + '" class="okc-legend">' + escapeXml(z.label) + '</text>');
+        parts.push('<rect x="' + rowX + '" y="' + lgY + '" width="' + LG.swatch + '" height="' + LG.swatch + '" rx="2" fill="' + color + '"/>');
+        parts.push('<text x="' + (rowX + LG.swatch + 4) + '" y="' + (lgY + LG.swatch - 1) + '" font-size="' + LG.fontPx + '" class="okc-legend">' + escapeXml(c.label) + '<title>' + escapeXml(c.full) + '</title></text>');
         parts.push('</g>');
-        rowX += w + gap;
+        rowX += c.w + LG.gap;
       });
-    }
+    });
     // Cursor-driven inspector: hover anywhere on the arc and the
     // tooltip surfaces the value at the cursor's angle, plus which
     // zone that value falls in. Lets the reader read "if we hit 65
@@ -7060,7 +7103,9 @@ class OkuChart extends HTMLElement {
       return this._renderBoxPlotVertical(boxes);
     }
     var W = 640, H = 80 + boxes.length * 56;
-    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 140, right: 24 };
+    var labelFit = okuFitLabelGutter(boxes.map(function (b) { return b.label || ''; }),
+                                     { width: W, fontPx: 12, maxLines: 2 });
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: labelFit.gutter, right: 24 };
     var plotW = W - pad.left - pad.right;
     var rowH = (H - pad.top - pad.bottom) / boxes.length;
     var allVals = [];
@@ -7080,7 +7125,7 @@ class OkuChart extends HTMLElement {
     boxes.forEach(function (b, i) {
       var y = pad.top + i * rowH + rowH / 2;
       var color = palette[b.color] || palette.accent;
-      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-boxplot-label">' + escapeXml(b.label || '') + '</text>');
+      parts.push(labelFit.text(pad.left - 10, y, 'okc-boxplot-label', b.label || ''));
       // Whisker.
       parts.push('<line x1="' + sx(+b.min) + '" y1="' + y + '" x2="' + sx(+b.max) + '" y2="' + y + '" class="okc-boxplot-whisker"/>');
       parts.push('<line x1="' + sx(+b.min) + '" y1="' + (y - 7) + '" x2="' + sx(+b.min) + '" y2="' + (y + 7) + '" class="okc-boxplot-whisker"/>');
@@ -7188,7 +7233,14 @@ class OkuChart extends HTMLElement {
     if (!tracks.length) return;
     var W = 640;
     var rowH = 42;
-    var pad = { top: this._title ? 36 : 16, left: 140, right: 80 };
+    // The gutter is measured from the track names. A bullet chart's
+    // rows are sentences far more often than words ("8 forks resident,
+    // spark-extensions"), and against the fixed 140 they ran off the
+    // left edge of the viewBox and were cut mid-glyph. Two lines fit
+    // inside a 42px row, so the cap costs a tail far less often.
+    var labelFit = okuFitLabelGutter(tracks.map(function (t) { return t.label || ''; }),
+                                     { width: W, fontPx: 12, maxLines: 2 });
+    var pad = { top: this._title ? 36 : 16, left: labelFit.gutter, right: 80 };
     var H = pad.top + tracks.length * rowH + 12;
     var plotW = W - pad.left - pad.right;
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
@@ -7199,7 +7251,7 @@ class OkuChart extends HTMLElement {
       var y = pad.top + i * rowH + 8;
       var trackMax = +t.max || 100;
       function sx(v) { return pad.left + (Math.max(0, Math.min(trackMax, +v || 0)) / trackMax) * plotW; }
-      parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 14) + '" text-anchor="end" class="okc-bullet-label">' + escapeXml(t.label || '') + '</text>');
+      parts.push(labelFit.text(pad.left - 10, y + 11, 'okc-bullet-label', t.label || ''));
       // Background track.
       parts.push('<rect x="' + pad.left + '" y="' + y + '" width="' + plotW + '" height="22" rx="3" class="okc-bullet-bg"/>');
       // Zone bands.
@@ -7455,7 +7507,11 @@ class OkuChart extends HTMLElement {
       return Math.max(0.08, Math.min(1, (v - vmin) / span2));
     }
     var cell = 14, gap = 2;
-    var dayLabelW = 22, monthLabelH = 18;
+    // 22 was a couple of pixels short of the three-letter day names it
+    // holds, so "Mon" arrived as "on" against the left edge of the
+    // viewBox — visible on the reference page, with no long label
+    // needed to trigger it.
+    var dayLabelW = 34, monthLabelH = 18;
     var titleTop = this._title ? 28 : 4;
     // 53 columns covers any year (≤ 53 ISO weeks). Render starting Monday.
     var weekCols = 53;
@@ -7594,7 +7650,16 @@ class OkuChart extends HTMLElement {
         '<title>' + escapeXml(r.item.label + ': ' + fmtNum(v) + ' (' + Math.round(share * 100) + '%)') + '</title>' +
       '</rect>');
       if (labelFits) {
-        parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 18).toFixed(1) + '" class="okc-treemap-label">' + escapeXml(r.item.label) + '</text>');
+        // Fit the name to ITS OWN CELL, not to the chart: a name wider
+        // than its rectangle used to run across the neighbour, and the
+        // rightmost cell's ran off the viewBox. 13px bold ≈ 7px a
+        // character; the measured pass afterwards catches what the
+        // estimate misses.
+        var cellChars = Math.max(2, Math.floor((r.w - 14) / 7));
+        var cellLabel = r.item.label.length > cellChars
+          ? r.item.label.slice(0, cellChars - 1).replace(/\s+$/, '') + '…'
+          : r.item.label;
+        parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 18).toFixed(1) + '" class="okc-treemap-label">' + escapeXml(cellLabel) + '<title>' + escapeXml(r.item.label) + '</title></text>');
         if (r.h > 38) parts.push('<text x="' + (r.x + 8).toFixed(1) + '" y="' + (r.y + 34).toFixed(1) + '" class="okc-treemap-value">' + escapeXml(fmtNum(v)) + '</text>');
       }
       parts.push('</g>');
@@ -7611,7 +7676,11 @@ class OkuChart extends HTMLElement {
     var rowH = 56;
     var titleTop = this._title ? 36 : 16;
     var H = titleTop + distributions.length * rowH + 18;
-    var pad = { left: 130, right: 24 };
+    // One line only: a ridgeline's rows overlap by design, so a second
+    // line would sit under the curve of the row above it.
+    var labelFit = okuFitLabelGutter(distributions.map(function (d) { return d.label || ''; }),
+                                     { width: W, fontPx: 12 });
+    var pad = { left: labelFit.gutter, right: 24 };
     var plotW = W - pad.left - pad.right;
     // Expose layout for the parallel-cursor wiring (see
     // _wireRidgelineCursor below). Bin width + plot bounds are
@@ -7669,7 +7738,7 @@ class OkuChart extends HTMLElement {
         ]
       });
       parts.push('<path d="' + pathPts.join(' ') + '" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-ridgeline-curve" tabindex="0" data-hover-payload="' + escapeXml(ridgePayload) + '"><title>' + escapeXml((d.label || 'distribution') + ': n=' + vs.length + ', median=' + fmtNum(median)) + '</title></path>');
-      parts.push('<text x="' + (pad.left - 10) + '" y="' + (baseY - 2) + '" text-anchor="end" class="okc-ridgeline-label">' + escapeXml(d.label || '') + '</text>');
+      parts.push('<text x="' + (pad.left - 10) + '" y="' + (baseY - 2) + '" text-anchor="end" class="okc-ridgeline-label">' + escapeXml(labelFit.fit(d.label || '')) + '<title>' + escapeXml(d.label || '') + '</title></text>');
     });
     // X axis ticks (5).
     var axisY = titleTop + distributions.length * rowH + 4;
@@ -8390,7 +8459,13 @@ class OkuChart extends HTMLElement {
      for the regions they care about; cells for absent regions render
      as faint outlines. */
   _renderGeo() {
-    var x = (this._extras && this._extras.geo) || {};
+    // `tile-map` is the name new pages are told to use and `geo` is the
+    // alias kept for existing ones — but the renderer keys the payload
+    // by the type the author wrote, so a page using the preferred name
+    // handed this method an extras bag it never looked in and drew
+    // nothing at all. Found by a sweep that rendered every type in the
+    // example set: geo drew, tile-map drew an empty element.
+    var x = (this._extras && (this._extras.geo || this._extras['tile-map'])) || {};
     var regions = (x.regions || []).slice();
     if (!regions.length) return;
     var values = regions.map(function (r) { return +r.value; }).filter(function (v) { return !isNaN(v); });
@@ -8884,7 +8959,8 @@ class OkuChart extends HTMLElement {
         yCursor += segH;
       });
       // Category label at the bottom of the column.
-      parts.push('<text x="' + (xCursor + colW / 2).toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(cat) + '</text>');
+      var mkTickX = xCursor + colW / 2;
+      parts.push('<text x="' + mkTickX.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="' + okuTickAnchor(mkTickX, 0, W) + '" class="okc-tick">' + escapeXml(cat) + '</text>');
       xCursor += colW;
     });
     parts.push('</svg>');
@@ -8947,7 +9023,7 @@ class OkuChart extends HTMLElement {
     });
     // Category ticks at bottom.
     categories.forEach(function (c, i) {
-      parts.push('<text x="' + xOf(i).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(c) + '</text>');
+      parts.push('<text x="' + xOf(i).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="' + okuTickAnchor(xOf(i), 0, W) + '" class="okc-tick">' + escapeXml(c) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -9301,7 +9377,7 @@ class OkuChart extends HTMLElement {
         ]
       });
       parts.push('<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + yT.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2" fill="' + color + '" class="okc-waterfall-bar ' + kindClass + '" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(e.label + ' · ' + (e.value >= 0 ? '+' : '') + fmtNum(e.value) + ' → ' + fmtNum(e.running)) + '</title></rect>');
-      parts.push('<text x="' + cx.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(e.label) + '</text>');
+      parts.push('<text x="' + cx.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="' + okuTickAnchor(cx, 0, W) + '" class="okc-tick">' + escapeXml(e.label) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -9534,7 +9610,13 @@ class OkuChart extends HTMLElement {
     });
     var nSeries = series.length;
     var W = 720, H = this._title ? 320 : 280;
-    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 110, right: 110 };
+    // Series names are written at BOTH ends, so the two gutters come
+    // out of the same width — hence the tighter cap than the one-sided
+    // charts use. Sized from the names either way; the fixed 110 cut
+    // anything longer than "Krakow" off the viewBox at both ends.
+    var labelFit = okuFitLabelGutter(series.map(function (s) { return s.label || ''; }),
+                                     { width: W, fontPx: 11, maxFrac: 0.3, pad: 12 });
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: labelFit.gutter, right: labelFit.gutter };
     var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     function xOf(i) { return pad.left + (i / (categories.length - 1)) * plotW; }
     function yOf(rank) { return pad.top + ((rank - 1) / Math.max(1, nSeries - 1)) * plotH; }
@@ -9560,12 +9642,13 @@ class OkuChart extends HTMLElement {
       // Series label at each end.
       var firstRank = ranks[0][si];
       var lastRank  = ranks[categories.length - 1][si];
-      parts.push('<text x="' + (pad.left - 8) + '" y="' + (yOf(firstRank) + 4) + '" text-anchor="end" class="okc-bump-end-label" fill="' + color + '">' + escapeXml(s.label || '') + '</text>');
-      parts.push('<text x="' + (W - pad.right + 8) + '" y="' + (yOf(lastRank) + 4) + '" text-anchor="start" class="okc-bump-end-label" fill="' + color + '">' + escapeXml(s.label || '') + '</text>');
+      var endLabel = escapeXml(labelFit.fit(s.label || '')) + '<title>' + escapeXml(s.label || '') + '</title>';
+      parts.push('<text x="' + (pad.left - 8) + '" y="' + (yOf(firstRank) + 4) + '" text-anchor="end" class="okc-bump-end-label" fill="' + color + '">' + endLabel + '</text>');
+      parts.push('<text x="' + (W - pad.right + 8) + '" y="' + (yOf(lastRank) + 4) + '" text-anchor="start" class="okc-bump-end-label" fill="' + color + '">' + endLabel + '</text>');
     });
     // Category ticks at bottom.
     categories.forEach(function (c, i) {
-      parts.push('<text x="' + xOf(i).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(c) + '</text>');
+      parts.push('<text x="' + xOf(i).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="' + okuTickAnchor(xOf(i), 0, W) + '" class="okc-tick">' + escapeXml(c) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -9736,7 +9819,13 @@ class OkuChart extends HTMLElement {
           parts.push('<circle cx="' + px + '" cy="' + py + '" r="4" fill="' + color + '" class="okc-conn-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>(' + fmtNum(+p.x) + ', ' + fmtNum(+p.y) + ')</title></circle>');
         }
         if (p.label) {
-          parts.push('<text x="' + (px + 8) + '" y="' + (py - 6) + '" class="okc-conn-label">' + escapeXml(String(p.label)) + '</text>');
+          // The label sits to the RIGHT of its dot, which puts the last
+          // point's label past the right edge — the trailing point is
+          // the one the reader looks for, and "v5" arrived as "v". Past
+          // the halfway mark, hang the label off the left of the dot
+          // instead; the anchor then walks inward as the dot walks out.
+          var onRight = px > pad.left + plotW * 0.55;
+          parts.push('<text x="' + (onRight ? px - 8 : px + 8) + '" y="' + (py - 6) + '" text-anchor="' + (onRight ? 'end' : 'start') + '" class="okc-conn-label">' + escapeXml(String(p.label)) + '</text>');
         }
       });
     });
@@ -9835,7 +9924,7 @@ class OkuChart extends HTMLElement {
     var stride = Math.max(1, Math.floor(categories.length / 6));
     categories.forEach(function (c, i) {
       if (i % stride !== 0 && i !== categories.length - 1) return;
-      parts.push('<text x="' + xOf(i) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(c) + '</text>');
+      parts.push('<text x="' + xOf(i) + '" y="' + (H - 10) + '" text-anchor="' + okuTickAnchor(xOf(i), 0, W) + '" class="okc-tick">' + escapeXml(c) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -10035,7 +10124,9 @@ class OkuChart extends HTMLElement {
     if (!rows.length) return;
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var W = 640, H = Math.max(180, 60 + rows.length * 32);
-    var pad = { top: this._title ? 40 : 16, bottom: 32, left: 130, right: 24 };
+    var labelFit = okuFitLabelGutter(rows.map(function (r) { return r.label || ''; }),
+                                     { width: W, fontPx: 11.5 });
+    var pad = { top: this._title ? 40 : 16, bottom: 32, left: labelFit.gutter, right: 24 };
     var plotW = W - pad.left - pad.right;
     var rowH = (H - pad.top - pad.bottom) / rows.length;
     var bandH = Math.min(rowH * 0.55, 18);
@@ -10078,7 +10169,7 @@ class OkuChart extends HTMLElement {
         ].concat(midDisplay ? [{ k: 'mid', v: midDisplay }] : [])
       });
       // Row label on the left.
-      parts.push('<text x="' + (pad.left - 8) + '" y="' + (rowY + 4) + '" text-anchor="end" class="okc-range-row-label">' + escapeXml(label) + '</text>');
+      parts.push('<text x="' + (pad.left - 8) + '" y="' + (rowY + 4) + '" text-anchor="end" class="okc-range-row-label">' + escapeXml(labelFit.fit(label)) + '<title>' + escapeXml(label) + '</title></text>');
       // Range band — filled rect.
       parts.push('<rect x="' + xLo.toFixed(1) + '" y="' + (rowY - bandH / 2) + '" width="' + (xHi - xLo).toFixed(1) + '" height="' + bandH + '" rx="3" fill="' + color + '" fill-opacity="0.45" stroke="' + color + '" stroke-opacity="0.85" class="okc-range-band" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · [' + fmtNum(rl) + ', ' + fmtNum(rh) + ']' + (midDisplay ? ' · mid ' + midDisplay : '')) + '</title></rect>');
       // Optional midpoint tick.
@@ -11292,6 +11383,13 @@ document.addEventListener('DOMContentLoaded', function () {
 // page render; re-enhance then to catch fresh bar-charts.
 window.addEventListener('oku:rendered', function () {
   __okuEnhanceBarCharts(document);
+  // And once more for the page as a whole, because a chart that drew
+  // before this event may have been measured while the column was still
+  // settling. The pass restores each full string before re-deciding, so
+  // running it again can only improve the answer.
+  __okuScheduleFit(function () {
+    document.querySelectorAll('svg.okc-svg').forEach(__okuFitSvgTextToViewBox);
+  });
 });
 
 function escapeXml(s) {
@@ -11306,14 +11404,16 @@ function escapeXml(s) {
    never cut mid-glyph.
 
    Width is estimated, not measured: the SVG string is built before it
-   is in the DOM, so getComputedTextLength() is unavailable. 0.62em per
+   is in the DOM, so getComputedTextLength() is unavailable. 0.66em per
    character is the observed mean for Inter at mixed-case Latin +
    Turkish; capitals and CJK run wider, which the maxFrac clamp and
-   fit() absorb. */
+   fit() absorb. The estimate errs HIGH on purpose — too wide costs a
+   few pixels of plot, too narrow costs the end of a label, and the
+   measured pass that runs after paint can only take characters away. */
 function okuFitLabelGutter(labels, opts) {
   var o = opts || {};
   var fontPx = o.fontPx || 11;
-  var chW = fontPx * (o.emPerChar || 0.62);
+  var chW = fontPx * (o.emPerChar || 0.66);
   var pad = o.pad === undefined ? 10 : o.pad;
   var maxW = Math.max(40, (o.width || 720) * (o.maxFrac || 0.42));
   var minW = o.minW || 60;
@@ -11323,17 +11423,213 @@ function okuFitLabelGutter(labels, opts) {
   });
   var gutter = Math.min(maxW, Math.max(minW, widest + pad));
   var maxChars = Math.max(3, Math.floor((gutter - pad) / chW));
+  /* How many lines the caller's rows have room for. One by default:
+     a chart with 20px rows cannot take a second line without the
+     labels colliding. Charts with tall rows (bullet 42px, box-plot
+     56px) pass 2, and a label the cap would have cut keeps its tail. */
+  var maxLines = Math.max(1, o.maxLines || 1);
+  var lineH = o.lineH || (fontPx + 2);
+  function wrap(l) {
+    var s = String(l == null ? '' : l).trim();
+    if (s.length <= maxChars) return [s];
+    var words = s.split(/\s+/), out = [], cur = '';
+    for (var i = 0; i < words.length && out.length < maxLines; i++) {
+      var w = words[i];
+      var next = cur ? cur + ' ' + w : w;
+      if (next.length <= maxChars) { cur = next; continue; }
+      if (cur) { out.push(cur); cur = w; }
+      else { out.push(w.slice(0, maxChars)); cur = w.slice(maxChars); }
+      // A single word longer than the gutter keeps spilling; break it
+      // across the remaining lines rather than dropping the tail.
+      while (cur.length > maxChars && out.length < maxLines) {
+        out.push(cur.slice(0, maxChars));
+        cur = cur.slice(maxChars);
+      }
+    }
+    if (cur && out.length < maxLines) out.push(cur);
+    var used = out.join(' ').length;
+    if (used < s.replace(/\s+/g, ' ').length) {
+      var last = out[out.length - 1] || '';
+      out[out.length - 1] = last.slice(0, Math.max(1, maxChars - 1)).replace(/\s+$/, '') + '…';
+    }
+    return out;
+  }
   return {
     gutter: Math.round(gutter),
+    lineH: lineH,
     /* Returns the label unchanged when it fits, else clipped to
        maxChars-1 plus an ellipsis. Callers keep the full string in a
        <title> so the hidden tail stays reachable. */
     fit: function (l) {
       var s = String(l == null ? '' : l);
       return s.length <= maxChars ? s : s.slice(0, maxChars - 1).trimEnd() + '…';
+    },
+    lines: wrap,
+    /* The whole gutter label as markup: one line when it fits, tspans
+       when it wraps, centred on `cy` either way, full string in a
+       <title>. Callers that build the <text> themselves get `fit()`
+       instead — this exists so the multi-line arithmetic is written
+       once rather than at each of the row-label renderers. */
+    text: function (x, cy, cls, l) {
+      var rows = wrap(l);
+      var full = String(l == null ? '' : l);
+      var head = '<text x="' + x + '" y="' + (cy + 4 - (rows.length - 1) * lineH / 2).toFixed(1) +
+                 '" text-anchor="end" class="' + cls + '">';
+      var body = rows.length === 1
+        ? escapeXml(rows[0])
+        : rows.map(function (line, i) {
+            return '<tspan x="' + x + '"' + (i ? ' dy="' + lineH + '"' : '') + '>' + escapeXml(line) + '</tspan>';
+          }).join('');
+      return head + body + '<title>' + escapeXml(full) + '</title></text>';
     }
   };
 }
+/* Shorten any SVG text that still leaves its viewBox.
+
+   Every gutter in this file is sized before the string is in the DOM,
+   where nothing can measure it — okuFitLabelGutter estimates from the
+   character count, the rest guess a constant. Both are wrong for some
+   label: a wide font, CJK, an author writing a sentence where the
+   renderer expected a word. An <svg> clips at the viewBox, so the miss
+   arrives as text cut mid-glyph with no ellipsis, no scrollbar and
+   nothing to hover — the reader cannot tell there is more.
+
+   This runs once the SVG is in the document, where the real rect
+   exists, and shortens ONLY what overflows, keeping the full string in
+   a <title>. Screen rects are used rather than getBBox() because a
+   rotated label (heatmap columns, pareto categories) measures as if it
+   were horizontal otherwise.
+
+   It is a backstop, not the layout. A renderer that sizes its gutter
+   from its own labels never reaches it; the ones that cannot — a label
+   inside a treemap cell, a node name in a network — are why it exists. */
+/* Negative on purpose: a label counts as fitted only once it clears the
+   edge by 2px, not when it merely touches it. Glyph advances round to
+   device pixels, so a label trimmed to exactly the edge crosses it again
+   the next time the text is rasterised at a different size. */
+var __OKU_FIT_SLACK = -2;
+
+/* Run a fit when the page is quiet. Not in a frame and not inline in a
+   ResizeObserver callback: a text rect read while layout is still in
+   flight comes back stale, and a pass measuring stale rects agrees with
+   itself about the wrong width — the label ends one glyph over the edge
+   and nothing reports it. Idle time is the first moment the answer is
+   the one the reader will see; the timeout is the fallback for browsers
+   without requestIdleCallback and for a page that never goes idle. */
+function __okuScheduleFit(fn) {
+  function whenIdle() {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(fn, { timeout: 400 });
+    else setTimeout(fn, 120);
+  }
+  // Wait for the fonts before measuring anything. A face the page names
+  // but has not resolved yet — Inter here, installed locally on some
+  // machines and absent on others — is drawn in the fallback, and the
+  // SAME string measures about 5% narrower in it. Measured on the donut
+  // legend: 271px during load, 284px once Inter landed, identical
+  // computed style at both readings. Every label then passes a fit that
+  // was decided against a width the reader never sees, and lands one
+  // glyph over the edge with nothing reporting it.
+  if (document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function') {
+    document.fonts.ready.then(whenIdle, whenIdle);
+  } else {
+    whenIdle();
+  }
+}
+
+function __okuTextOverflow(el, box) {
+  var r = el.getBoundingClientRect();
+  if (!r.width && !r.height) return 0;
+  return Math.max(box.left - r.left, r.right - box.right, box.top - r.top, r.bottom - box.bottom);
+}
+
+/* The one text run a label is allowed to have. A wrapped label owns
+   several <tspan> lines and has already been fitted by its renderer;
+   trimming its first line would leave the rest hanging outside. */
+function __okuSoleTextRun(el) {
+  var run = null;
+  for (var n = el.firstChild; n; n = n.nextSibling) {
+    if (n.nodeType === 3) { if (run) return null; run = n; }
+    else if (n.nodeName !== 'title') return null;
+  }
+  return run && run.nodeValue.length > 1 ? run : null;
+}
+
+function __okuFitSvgTextToViewBox(svg) {
+  var vb = svg && svg.viewBox && svg.viewBox.baseVal;
+  var m = svg && svg.getScreenCTM && svg.getScreenCTM();
+  if (!vb || !vb.width || !m) return false;
+  function corner(x, y) { var p = svg.createSVGPoint(); p.x = x; p.y = y; return p.matrixTransform(m); }
+  var a = corner(vb.x, vb.y), c = corner(vb.x + vb.width, vb.y + vb.height);
+  var box = {
+    left: Math.min(a.x, c.x), right: Math.max(a.x, c.x),
+    top: Math.min(a.y, c.y), bottom: Math.max(a.y, c.y)
+  };
+  // A chart inside a closed fold or an unpainted tab has no box yet.
+  // Report the miss so the caller can wait for one instead of trimming
+  // every label to a single character.
+  if (box.right - box.left < 1) return false;
+  Array.prototype.forEach.call(svg.querySelectorAll('text'), function (el) {
+    var run = __okuSoleTextRun(el);
+    // Glyph advances round to device pixels, so the same label measures
+    // a few units wider at one rendered size than another — a fit made
+    // while the page was still settling under-trims once it stops. Put
+    // the whole label back first and re-decide at the size on screen;
+    // that is also what lets the lightbox show it in full.
+    if (run && el.__okuFullText != null) run.nodeValue = el.__okuFullText;
+    if (__okuTextOverflow(el, box) <= __OKU_FIT_SLACK) return;
+    if (!run) return;
+    var full = run.nodeValue;
+    el.__okuFullText = full;
+    // Longest prefix that fits. Shortening always moves the box inward
+    // whatever the text-anchor, so the predicate is monotonic.
+    var lo = 1, hi = full.length - 1, best = null;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      run.nodeValue = full.slice(0, mid).replace(/\s+$/, '') + '…';
+      if (__okuTextOverflow(el, box) <= __OKU_FIT_SLACK) { best = run.nodeValue; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    // Nothing fits when the anchor itself sits outside the box. One
+    // character plus the ellipsis still says "there is more here", and
+    // the title carries the whole of it.
+    run.nodeValue = best === null ? full.slice(0, 1) + '…' : best;
+    // Then check the answer instead of trusting it. Reading a rect back
+    // in the same task as the write that caused it can return the
+    // measurement of the PREVIOUS string, which lands the search one
+    // character long — the label looks fitted and is still over the edge
+    // by about one glyph. Verified: re-running the identical search a
+    // task later converged every time. Shaving with a fresh read each
+    // time settles it in one or two steps, and the worst case is one
+    // character shorter than strictly needed.
+    var guard = 8;
+    while (guard-- > 0 && __okuTextOverflow(el, box) > __OKU_FIT_SLACK) {
+      var shown = run.nodeValue.replace(/…$/, '');
+      if (shown.length < 2) break;
+      run.nodeValue = shown.slice(0, shown.length - 1).replace(/\s+$/, '') + '…';
+    }
+    if (!el.querySelector('title')) {
+      var t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      t.textContent = full;
+      el.appendChild(t);
+    }
+  });
+  return true;
+}
+
+/* Anchor for a category label written under a tick.
+
+   The first and last ticks of a categorical axis sit ON the plot's edge,
+   and a centred label there puts half its width outside the viewBox —
+   "20:00" arrived as "20:" on the horizon chart's reference payload,
+   with nothing longer than five characters involved. Anchoring the two
+   edge labels inward costs a few pixels of alignment with their tick and
+   keeps the word. */
+function okuTickAnchor(x, left, right) {
+  if (x - left < 26) return 'start';
+  if (right - x < 26) return 'end';
+  return 'middle';
+}
+
 function fmtNum(n) {
   if (n === undefined || n === null) return '';
   var abs = Math.abs(n);

@@ -2106,9 +2106,16 @@ class TestGaugeZoneLabelsAsLegendRow:
 
     def test_gauge_height_grows_with_legend(self, repo_root: Path) -> None:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
-        # When at least one zone has a label, H bumps to fit the row.
-        assert "hasZoneLegend ? 230 : 200" in js, (
-            "Gauge SVG height must grow to 230 when zone labels are present so the bottom legend row has room"
+        # When at least one zone has a label, H bumps to fit the row —
+        # and by a row's height per row, because a zone named with a
+        # phrase rather than a word wraps onto a second one. The height
+        # used to be the constant 230, which is what this expression
+        # still produces for a single row.
+        # 212 + one 18px row is the 230 this test was written for; the
+        # measurement that a second row makes the SVG taller lives in
+        # browser/test_chart_label_fit.py, where it can be measured.
+        assert "212 + lgRows.length * LG.rowH" in js, (
+            "Gauge SVG height must grow by one row height per legend row so every chip has room"
         )
 
 

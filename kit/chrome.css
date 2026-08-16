@@ -5080,6 +5080,19 @@ oku-chart .okc-horizon-label {
   fill: var(--text-soft);
   font: 500 11px 'Inter', sans-serif;
 }
+/* The bump chart's series names are the same thing — a row name written
+   beside the row — and were the one member of the family that never got
+   a rule. They rendered at the inherited 16px against a gutter sized for
+   11, and ran off BOTH edges of the viewBox, because a bump chart writes
+   each name at both ends of its line.
+
+   Font only, no fill: the renderer paints each name in its own series
+   colour with a `fill` PRESENTATION ATTRIBUTE, and any CSS `fill` here —
+   even `var(--text-soft)` — outranks it and would collapse every name to
+   one colour. That colour is the only thing tying a name to its line. */
+oku-chart .okc-bump-end-label {
+  font: 500 11px 'Inter', sans-serif;
+}
 /* The same absence on two guide lines. Both carry a width (and the
    waterfall bridge a dash pattern) in the markup, which is how you can
    tell they were meant to be seen — an SVG <line> with no `stroke`

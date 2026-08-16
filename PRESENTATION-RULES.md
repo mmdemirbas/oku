@@ -456,3 +456,80 @@ drew one, and no check could tell — the schema validates, the structural
 lint passes, the tests were green. **An empty box is well-formed.** It
 took opening the page. `test_compare_previews.py` now asserts ink, in
 pixels, so the next empty box fails instead of rendering.
+
+## A label is fitted to the space it has, and measured after the font lands. {#a-label-is-fitted-to-the-space-it-has}
+
+**A label is fitted to the space it has, and measured after the font
+lands.** Reported against a delivered document: a bullet chart's track
+names arrived as `.0 tests, as configured` and `lent, spark-extensions`
+— the front of every long name gone, no ellipsis, no scrollbar, nothing
+to hover. An `<svg>` clips at its viewBox, so a label wider than the
+gutter its renderer guessed is not shortened, it is simply absent, and
+the reader has no way to know.
+
+The guess was `pad.left = 140`, written when track names were words.
+Five renderers had the same constant in them (bullet, box-plot,
+ridgeline, range-bar, and bump with the same name at BOTH ends), the
+gauge laid its zone chips end to end on one row whatever the width, and
+the treemap wrote a name across whatever sat to the right of its cell.
+A sweep over every chart type in `kit/schema/examples.json`, each
+rendered twice — as authored, then with every label 40 characters
+longer — found the whole class: **100 labels outside their viewBox
+across 30 of the 53 types**, and three of them (`Mon`, `v5`, `Markdown`)
+were clipped on the reference payloads, with nothing long involved.
+
+Three mechanisms, in the order they run:
+
+1. **The gutter is sized from the labels** — `okuFitLabelGutter`, which
+   the row-label family already used and these five did not. It caps at
+   a fraction of the chart width so the plot cannot vanish, and the
+   bullet and box-plot pass `maxLines: 2` because a 42px row has space
+   for two lines of an 12px label. **Pass the size the CSS actually
+   renders**: the bullet's labels are 12px and its gutter was computed
+   for 11px, which is how `Revenue ($M)` — the kit's own example — came
+   out as `Revenue ($…`. The estimate errs HIGH on purpose (0.66em per
+   character), because too wide costs a few pixels of plot and too
+   narrow costs the end of a name.
+2. **Labels that sit on an edge anchor inward** — `okuTickAnchor` for
+   the first and last category tick, which are centred on a tick that
+   sits ON the plot edge, and the connected scatter's point labels,
+   which hang off the right of their dot until the dot is past halfway.
+3. **Then everything is measured** — `__okuFitSvgTextToViewBox` walks
+   every `<text>` after paint, shortens only what still leaves the box,
+   and moves the whole string into a `<title>`. It is the backstop for
+   what no gutter can fix: a name inside a treemap cell, a node in a
+   network, a radial label on a polar chart.
+
+Two things about that measurement are load-bearing and neither is
+obvious:
+
+- **Screen rects, not `getBBox()`.** getBBox ignores the element's own
+  transform, so every rotated label — heatmap columns, pareto
+  categories — measures as if it were horizontal. Measured that way,
+  19 labels read as overflowing that were fine.
+- **Nothing is measured until `document.fonts.ready`.** The kit loads
+  Inter from a CDN, and the same string measures about 5% narrower in
+  the fallback face — 271px against 284px on a donut legend label, with
+  identical computed style at both readings. A pass that runs before the
+  font lands agrees with itself about a width the reader never sees, and
+  every label it "fitted" ends up one glyph over the edge. This cost the
+  session hours: the fit ran, the labels were trimmed, and they still
+  overflowed, while re-running the identical function from a debugger
+  converged every time. A `ResizeObserver` per chart re-fits when the
+  box changes — the width control has three stops and the lightbox is a
+  fourth — and the pass restores the full string before re-deciding, so
+  running it again can only improve the answer.
+
+Held by `browser/test_chart_label_fit.py`, which is the sweep itself:
+every type in the example set, both variants, plus the reported bullet
+payload and a gauge whose legend needs two rows. Four of its seven
+assertions fail on the code before this rule.
+
+The sweep also found a chart type that drew nothing at all. `tile-map`
+is the name `CLAUDE.md` tells new pages to use and `geo` is the alias
+kept for old ones, but `renderer.js` keys the payload by the type the
+author wrote and `_renderGeo` only ever looked in `extras.geo` — so the
+preferred name produced an empty element. It is the seven-sources
+problem again, and the same lesson: **a name an author is told to write
+has to be rendered, validated and printable, and only rendering it
+proves the first one.**

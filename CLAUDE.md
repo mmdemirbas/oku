@@ -211,6 +211,10 @@ whole below.
 - **Anything the kit hangs off content must never become content.** → [why](PRESENTATION-RULES.md#anything-the-kit-hangs-off-content-must-never-be)
 - **A card answers the pointer with light, never with position.** Held by `test_hovering_a_card_does_not_move_what_is_written_on_it`. → [why](PRESENTATION-RULES.md#a-card-answers-the-pointer-with-light-never-with)
 - **A card that promises a picture shows the picture, and the picture is a clone.** Held by `test_compare_previews`. → [why](PRESENTATION-RULES.md#a-card-that-promises-a-picture-shows-the-picture)
+- **A label is fitted to the space it has, and measured after the font
+  lands.** A chart's gutter is sized from its own labels, never from a
+  constant; anything still too wide is shortened after paint with the
+  whole string kept in a `<title>`. Held by `test_chart_label_fit`. → [why](PRESENTATION-RULES.md#a-label-is-fitted-to-the-space-it-has)
 
 **Running prose is justified, and the hyphenation is part of it.**
 `text-align: justify` + `hyphens: auto` on paragraphs, list items,
