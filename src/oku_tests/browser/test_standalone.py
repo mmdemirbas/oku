@@ -125,14 +125,20 @@ def test_main_owns_the_wide_grid_track(page, standalone_url):
     )
 
 
-def test_sidebar_keeps_the_page_toc_and_drops_the_site_tree(page, standalone_url):
-    """Single-left-sidebar rule still holds without a site manifest."""
+def test_a_lone_standalone_page_keeps_the_page_toc_and_has_no_site_tree(page, standalone_url):
+    """Single-left-sidebar rule still holds without a site manifest.
+
+    This fixture builds ONE page and inlines no manifest, which is the
+    case the tree cannot be drawn for: nothing says what the siblings
+    are or where they sit. A multi-page build does carry that, and keeps
+    its tree — `test_standalone_site_tree.py` holds that half.
+    """
     page.set_viewport_size(DESKTOP)
     _goto(page, standalone_url)
     page.wait_for_selector("page-nav page-toc .toc-h2")
     assert page.locator("page-nav page-toc .toc-h2").count() == 3
     assert page.locator("page-nav .page-nav-tree").count() == 0, (
-        "standalone has no site to navigate — the tree panel must be gone"
+        "no manifest names a sibling, so there is no tree to draw"
     )
     nav = page.locator("page-nav").bounding_box()
     assert nav is not None and abs(nav["height"] - DESKTOP["height"]) <= 1

@@ -660,7 +660,11 @@ var __okuLangSwitch = (function () {
     });
   }
 
-  return { build: build };
+  // `locate` is public because the site tree needs the same answer in a
+  // standalone build: which manifest entry is this file, and what does
+  // the rest of the tree hang from. Two copies of the suffix rule is how
+  // one of them drifts.
+  return { build: build, locate: entryFor };
 })();
 
 /* ============ Markdown viewer ============ *
@@ -1871,6 +1875,14 @@ window.addEventListener('popstate', function () {
 // navigation so refresh-on-page stays robust.
 document.addEventListener('click', function (e) {
   if (e.defaultPrevented) return;
+  // A standalone build is a DIRECTORY of self-contained files, so the
+  // browser's own navigation is already the right one: the target page
+  // carries its whole kit and its own data. SPA-rendering it instead
+  // would fetch the target's JSON, which file:// refuses, and the catch
+  // below would fall back to a full navigation one round trip later.
+  // This fires on every row of the site tree now, so it is worth not
+  // taking the long way round.
+  if (document.getElementById('__oku_page__')) return;
   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   if (e.button !== 0) return;
   var a = e.target && e.target.closest && e.target.closest('a[href]');
@@ -4406,7 +4418,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-17-r39';
+var __okuKitBuild = '2026-08-17-r40';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -13846,25 +13858,51 @@ class PageNav extends HTMLElement {
     // end of body, after <page-nav>).
     function start() {
       if (document.getElementById('__oku_page__')) {
-        // Standalone single-file build: there is no site to navigate, so
-        // the site-tree panel goes away. The ELEMENT stays — it has
-        // adopted page-toc, and removing it would take the on-page
-        // contents down with it.
-        var panel = self.querySelector(':scope > .page-nav-scroll > .page-nav-panel');
-        if (panel) panel.remove();
         self.classList.add('page-nav-standalone');
-        // The site tree goes, the language switch does not. A variant is
-        // not somewhere else on a site — it is the file sitting next to
-        // this one in the same standalone tree, and the inlined manifest
-        // is how this page knows its name. Skipping it here is why the
-        // button appeared under `oku serve` and in dist/site and was
-        // missing from the artifact people are actually sent.
-        __okuLangSwitch.build(window.__okuManifest);
+        /* "Standalone" describes how the file carries the kit, not how
+         * many files the build wrote. `oku build` emits one
+         * self-contained HTML PER PAGE, side by side in
+         * dist/standalone/, and the manifest inlined here lists exactly
+         * those files — so a reader who opens one does have a tree to
+         * navigate, and every row points at a sibling in the same
+         * directory. This branch used to drop the tree on the reasoning
+         * that a single file has no site, which is true only of a
+         * one-page build; for every tree the reader lost the navigation
+         * the served modes give them, with the data to build it sitting
+         * inlined in the same file.
+         *
+         * The language switch already treated a variant as "the file
+         * next to this one" and was right to. The tree is the same
+         * relation, one row wider.
+         *
+         * Two cases still remove the panel: a build of one page (a tree
+         * of one is noise), and a file whose own path is not in the
+         * manifest — without the suffix match there is no root for the
+         * rows to hang from, and a guessed one produces links that 404.
+         * A file forwarded ALONE out of a multi-page build keeps its
+         * rows and they will not resolve; that is the same bet the
+         * language switch makes, and the alternative costs every reader
+         * of a whole tree their navigation. */
+        var inlineManifest = window.__okuManifest;
+        var here = __okuLangSwitch.locate(inlineManifest);
+        var pageCount = inlineManifest && Array.isArray(inlineManifest.pages)
+          ? inlineManifest.pages.length : 0;
+        var showTree = !!here && pageCount > 1;
+        if (!showTree) {
+          // The ELEMENT stays — it has adopted page-toc, and removing it
+          // would take the on-page contents down with it.
+          var panel = self.querySelector(':scope > .page-nav-scroll > .page-nav-panel');
+          if (panel) panel.remove();
+        }
+        __okuLangSwitch.build(inlineManifest);
         __okuI18n.load().then(function () {
-          // The site tree is gone, the build block is not: a standalone
-          // file is exactly the artifact that travels away from its
-          // source and goes stale without anything saying so.
-          self._renderBuild(window.__okuManifest);
+          if (showTree) {
+            self._renderTree(inlineManifest, { base: here.prefix + '/', current: here.path });
+          }
+          // The build block rides along either way: a standalone file is
+          // exactly the artifact that travels away from its source and
+          // goes stale without anything saying so.
+          self._renderBuild(inlineManifest);
           __okuI18n.localize(document);
         });
         return;
@@ -14182,7 +14220,16 @@ class PageNav extends HTMLElement {
     });
   }
 
-  _renderTree(manifest) {
+  /* `opts` is passed only by the standalone build, where neither default
+   * holds: `__okuDocsRoot` falls back to the page's OWN directory (right
+   * for a page at the tree root, wrong by one level for every page in a
+   * subfolder), and the current page is identified by a path relative to
+   * that same root. Both come from the manifest suffix match instead —
+   * `opts.base` is the tree root every row hangs from, `opts.current` is
+   * this file's manifest path. */
+  _renderTree(manifest, opts) {
+    var base = (opts && opts.base) || __okuDocsRoot;
+    var currentPath = opts && opts.current;
     var tree = this.querySelector('.page-nav-tree');
     if (!tree) return;
     tree.innerHTML = '';
@@ -14245,7 +14292,7 @@ class PageNav extends HTMLElement {
     // the right URL. The click interceptor upgrades plain left-clicks
     // to pushState navigation so the SPA feel is kept.
     function currentPage() {
-      return window.__okuCurrentPage || __okuPagePathFromLocation();
+      return currentPath || window.__okuCurrentPage || __okuPagePathFromLocation();
     }
     function isActive(page) {
       return currentPage() === page.path;
@@ -14259,7 +14306,7 @@ class PageNav extends HTMLElement {
         var li = document.createElement('li');
         li.className = 'page-nav-item';
         var anchor = document.createElement('a');
-        anchor.href = __okuDocsRoot + page.path;
+        anchor.href = base + page.path;
         anchor.textContent = page.title || page.path;
         if (page.summary) anchor.title = page.summary;
         if (isActive(page)) {

@@ -270,10 +270,33 @@ remainder is the prefix every variant hangs from.
 **Every standalone page inlines the manifest**, not just the entry stub.
 `build_standalone` injects a freshly computed one; before that only the
 stub `oku init` wrote had any, so every other page opened over file://
-with no site tree and no switch. `page-nav`'s standalone branch still
-removes the site tree — a single file has no site to navigate — but it
-builds the language switch before returning, because a variant is the
-file sitting next to it in the same tree.
+with no site tree and no switch. `page-nav`'s standalone branch reads it
+for the switch AND for the tree, because a variant and a sibling page are
+the same relation: the file sitting next to this one.
+
+**"Standalone" is how the file carries the kit, not how many files there
+are.** `oku build` writes one self-contained HTML per page side by side
+in `dist/standalone/`, so a reader who opens one does have a tree to
+navigate — every row points at a file in the same directory. The branch
+used to drop the tree on the reasoning that a single file has no site,
+which holds only for a one-page build; for every tree the reader lost the
+navigation the served modes give them, with the data to rebuild it
+inlined in the same file. It now draws the tree unless the manifest lists
+one page, or this file's own path is not in it (no suffix match, so no
+root for the rows to hang from). A page forwarded ALONE out of a
+multi-page build keeps rows that will not resolve — the same bet the
+language switch already makes, against the cost of every reader of a
+whole tree losing navigation. Held by `test_standalone_site_tree.py`.
+
+The base is the one part that cannot be shared with the served modes:
+`__okuDocsRoot` falls back to the page's OWN directory when the kit is
+inlined, which is right at the tree root and wrong by one level in every
+subfolder. Both the row hrefs and the active-row marking come from
+`__okuLangSwitch.locate` — the suffix match above — so there is one
+implementation of that rule rather than two that drift. The SPA click
+interceptor sits out standalone entirely: each file is self-contained, so
+the browser's own navigation is already right, and SPA-rendering would
+fetch a JSON `file://` refuses.
 
 The button appears **only where there is somewhere to go**, so there is
 no disabled state to explain. Two letters, never a flag (which names a
