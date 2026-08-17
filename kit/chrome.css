@@ -865,7 +865,7 @@ pre.okt-line-numbered code {
 }
 pre.okt-line-numbered .okt-code-line {
   display: grid;
-  grid-template-columns: 36px 14px 1fr;
+  grid-template-columns: 36px 14px minmax(0, 1fr);
   column-gap: 0;
   align-items: start;
 }
@@ -2210,7 +2210,7 @@ code:not(pre code) {
    survive if it were toggled (within current other-column filters). */
 .okt-chips {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  grid-template-columns: max-content minmax(0, 1fr);
   column-gap: 14px;
   row-gap: 10px;
   align-items: center;
@@ -2556,7 +2556,7 @@ a.okt-card:focus-visible,
 }
 .okt-board-card-row {
   display: grid;
-  grid-template-columns: 80px 1fr;
+  grid-template-columns: 80px minmax(0, 1fr);
   gap: 6px;
   font-size: 12.5px;
   line-height: 1.45;
@@ -2757,7 +2757,7 @@ oku-annotated-code > pre {
  * :has() makes the rule true by construction: no cell, no 4th column. */
 .okc-anno-wrap.okc-anno-gutter-on pre.okt-line-numbered
   .okt-code-line:has(> .okc-anno-line-marker) {
-  grid-template-columns: 32px 14px 22px 1fr;
+  grid-template-columns: 32px 14px 22px minmax(0, 1fr);
 }
 .okc-anno-wrap.okc-anno-gutter-on .okc-anno-line-marker {
   position: relative;          /* anchor for absolute tooltip */
@@ -3469,12 +3469,12 @@ figure.okt-figure figcaption {
    cards (navigation, option lists) instead of a numbered single-column
    sequence. No step-num column, so the card body spans the full width.
    Collapses to one column on narrow viewports like the other grids. */
-.step-cards-grid { grid-template-columns: repeat(2, 1fr); }
-.step-cards-grid .step-card { grid-template-columns: 1fr; }
-@media (max-width: 768px) { .step-cards-grid { grid-template-columns: 1fr; } }
+.step-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.step-cards-grid .step-card { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 768px) { .step-cards-grid { grid-template-columns: minmax(0, 1fr); } }
 .step-card {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 16px;
   align-items: start;
   border: 1px solid var(--border);
@@ -3715,7 +3715,7 @@ table tbody tr[tabindex] {
 .pill.info  { background: var(--accent-soft);  color: var(--accent-strong); }
 .pill.muted { background: var(--border-soft);  color: var(--text-soft); }
 
-.kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 24px 0; }
+.kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 24px 0; }
 .kpi {
   text-align: center; padding: 22px 14px;
   background: var(--surface); border-radius: 10px; border: 1px solid var(--border);
@@ -3824,7 +3824,7 @@ ol.okt-timeline::before {
   .okt-tl-item::before { left: -22px; }
 }
 
-.compare-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin: 24px 0; }
+.compare-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 24px 0; }
 /* A grid item defaults to min-width: auto, so it refuses to shrink below
    the widest unbreakable token it contains — one long path, URL or
    percent-encoded string in a card and the whole PAGE scrolls sideways
@@ -4056,7 +4056,17 @@ a.compare-card-link:hover {
 .compare-card.caution { border-top: 4px solid var(--warning); }
 .compare-card.caution:hover { border-color: var(--warning); }
 .compare-card-head { display: flex; align-items: center; gap: 9px; margin: 0 0 12px 0; }
-.compare-card-head .okt-card-title { margin: 0; }
+/* `min-width: auto` is the initial value for a flex ITEM as well as a
+   grid track, so a title holding one long unbreakable run — a class
+   name, a config key, a path — refuses to shrink and leaves the card,
+   the column and finally the viewport, and the page scrolls sideways at
+   360px. `break-word` does not save it: that wraps a word only once the
+   box is narrow, and the box is sized FROM the word. Every kit box that
+   holds author text says it may be narrower than its longest word;
+   `overflow-wrap: anywhere` is what then makes the word break, because
+   unlike `break-word` it also lowers the min-content size the parent
+   measures. */
+.compare-card-head .okt-card-title { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 /* A card that links to a figure shows that figure's silhouette (see
    wireComparePreviews). The box is a fixed height so a row of cards
    keeps one baseline whatever the aspect ratios behind them are — the
@@ -4184,7 +4194,7 @@ footer {
   header.cover h1 { font-size: 30px; }
   header.cover .subtitle { font-size: 16px; }
   h2 { font-size: 24px; }
-  .kpi-grid, .compare-grid { grid-template-columns: 1fr; }
+  .kpi-grid, .compare-grid { grid-template-columns: minmax(0, 1fr); }
   /* Font and gap only. This rule used to set `110px 1fr 50px` as well,
      and that declaration never once applied: every row the kit builds
      sits inside `.bar-chart`, whose `> .bar-row` subgrid rule outranks a
@@ -6256,14 +6266,14 @@ oku-snippet .hds-reset {
 oku-snippet .hds-reset:hover { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
 oku-snippet .hds-body {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   min-height: 320px;
 }
 /* When nested inside the example-pair render column, the grid is
    tight (~half content-width). Stack editor + preview unconditionally
    in that context so neither gets squashed to a sliver. */
 .example-output oku-snippet .hds-body {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 400px;
 }
 .example-output oku-snippet .hds-editor,
@@ -6336,7 +6346,7 @@ oku-snippet .hds-preview {
   min-height: 200px;
 }
 @media (max-width: 700px) {
-  oku-snippet .hds-body { grid-template-columns: 1fr; }
+  oku-snippet .hds-body { grid-template-columns: minmax(0, 1fr); }
   oku-snippet .hds-editor-wrap { border-right: 0; border-bottom: 1px solid var(--border); }
 }
 
@@ -6519,7 +6529,7 @@ oku-snippet .hds-preview {
   margin-bottom: 0 !important;
 }
 @media (max-width: 900px) {
-  .example-pair { grid-template-columns: 1fr; }
+  .example-pair { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ============ Section / heading card boundaries (P3) ============

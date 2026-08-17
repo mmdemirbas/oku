@@ -1194,12 +1194,15 @@ class TestChromeKitMarkers:
         any future change to that order should fail this test loudly.
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        # Pin the exact column order — 32px line-number, 14px fold,
-        # 22px anno, 1fr content. Changes to widths are fine; column
-        # ORDER (anno third, not first) is the load-bearing rule.
-        assert "grid-template-columns: 32px 14px 22px 1fr" in css, (
-            "annotation gutter column order must be [num] [fold] [anno] [content]"
-        )
+        # Pin the column ORDER — 32px line-number, 14px fold, 22px anno,
+        # then the content track. Changes to widths are fine, and so is
+        # the track FUNCTION: the content column reads `minmax(0, 1fr)`
+        # so one long unbreakable token cannot widen it past the column.
+        # Matching the literal string made that fix a test failure, which
+        # is a test pinning its example rather than its rule.
+        assert re.search(
+            r"grid-template-columns:\s*32px\s+14px\s+22px\s+(minmax\(0,\s*1fr\)|1fr)", css
+        ), "annotation gutter column order must be [num] [fold] [anno] [content]"
 
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         # The DOM insertion must put the slot BEFORE the content cell
