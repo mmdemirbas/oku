@@ -1200,9 +1200,9 @@ class TestChromeKitMarkers:
         # so one long unbreakable token cannot widen it past the column.
         # Matching the literal string made that fix a test failure, which
         # is a test pinning its example rather than its rule.
-        assert re.search(
-            r"grid-template-columns:\s*32px\s+14px\s+22px\s+(minmax\(0,\s*1fr\)|1fr)", css
-        ), "annotation gutter column order must be [num] [fold] [anno] [content]"
+        assert re.search(r"grid-template-columns:\s*32px\s+14px\s+22px\s+(minmax\(0,\s*1fr\)|1fr)", css), (
+            "annotation gutter column order must be [num] [fold] [anno] [content]"
+        )
 
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         # The DOM insertion must put the slot BEFORE the content cell

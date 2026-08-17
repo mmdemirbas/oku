@@ -121,8 +121,7 @@ def test_a_long_token_does_not_widen_the_page(page, narrow_page, width):
     got = page.evaluate(OVERFLOW)
 
     assert got["docWidth"] <= got["inner"] + 1, (
-        f"the page scrolls sideways at {width}px "
-        f"({got['docWidth']} vs {got['inner']}): {got['over']}"
+        f"the page scrolls sideways at {width}px ({got['docWidth']} vs {got['inner']}): {got['over']}"
     )
 
 
