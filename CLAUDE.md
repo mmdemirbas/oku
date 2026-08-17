@@ -558,6 +558,25 @@ actually write.
 
 ## Common pitfalls
 
+- **A standalone page runs chrome.js with `document.body` still null,
+  because an inline script ignores `defer`.** The stub loads the kit as
+  `<script src="_oku/chrome.js" defer>`, so under `oku serve` and in
+  `dist/site` every top-level statement runs against a parsed document.
+  `build_standalone` replaces that tag with the file's contents, and
+  `defer` means nothing on an inline script — the same statements now run
+  mid-`<head>`. Top-level code that touches the DOM must go through the
+  `document.readyState === 'loading'` check the file uses everywhere
+  else; one line that didn't (the drawer-pin restore) threw, and because
+  the throw was top-level the rest of the kit never ran: no chrome
+  cluster, no sidebar, not one control. It reached only readers who had
+  pinned the drawer — file:// shares one localStorage across a whole
+  tree, so after that every standalone page they opened was bare — and
+  they could not undo it, since unpinning needs the button that was lost
+  with the rest. Held by `test_standalone_stored_state.py`, which seeds
+  every key the kit persists (the list is derived from the source, so a
+  new key arrives as a failure) and requires the chrome to be built
+  anyway.
+
 - **Stale chrome.js in the browser.** The CDN-loaded Prism autoloader
   fires `complete` twice per block (once before the language module
   arrives, once after). The line-wrap / fold pass guards against the

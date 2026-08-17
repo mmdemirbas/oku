@@ -1918,7 +1918,26 @@ document.addEventListener('click', function (e) {
 // The pre-drawer layout persisted a collapse flag and a width; drop both
 // on sight — they belong to the removed resize handle, not to this.
 try { localStorage.removeItem('sidebarCollapsed'); localStorage.removeItem('sidebarWidth'); } catch (e) {}
-if (drawerWasPinned() && canPinDrawer()) setDrawerState('pinned', false);
+
+// Restoring the pin writes classes onto <body>, so it has to wait for a
+// <body> to exist. The stub loads this file with `defer`, which promises
+// exactly that — but a STANDALONE page inlines the file instead, and an
+// inline script ignores `defer`. There the same statement ran mid-<head>
+// against a null body, threw, and took every top-level statement after
+// it with it: no chrome cluster, no sidebar, not one control. Only a
+// reader who had pinned the drawer saw it, on every standalone page they
+// opened afterwards — file:// shares one localStorage across the whole
+// tree — and they could not undo it, because the button that unpins was
+// one of the casualties. Every other init in this file already goes
+// through the readyState check below; this line was the one that didn't.
+function restorePinnedDrawer() {
+  if (drawerWasPinned() && canPinDrawer()) setDrawerState('pinned', false);
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', restorePinnedDrawer);
+} else {
+  restorePinnedDrawer();
+}
 
 /* Content-width mode — the reader picks how wide the column runs, and
  * the choice persists. State lives on `<body data-content-width=...>`;
