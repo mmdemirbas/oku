@@ -1782,6 +1782,17 @@ function __okuPagePathFromLocation() {
 
 function __okuRenderIfNeeded(pagePath, anchor) {
   if (typeof OkuRenderer === 'undefined') return Promise.reject(new Error('renderer not loaded'));
+  // A standalone page IS its own rendered page — the data is inline and
+  // there is no other page this file could render. Without this, every
+  // hash change (a TOC row, a rail mark, any `#anchor` link in the prose)
+  // reached __okuFetchAndRender for `<page>.json`, which file:// refuses,
+  // and put "Fetch API cannot load … URL scheme file is not supported" on
+  // the reader's console on their first click. The scroll worked, so the
+  // only symptom was the error — which is exactly how it survived.
+  if (document.getElementById('__oku_page__')) {
+    __okuScrollToAnchor(anchor);
+    return Promise.resolve();
+  }
   if (window.__okuCurrentPage === pagePath) {
     __okuScrollToAnchor(anchor);
     return Promise.resolve();
@@ -4418,7 +4429,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-17-r40';
+var __okuKitBuild = '2026-08-17-r41';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -11867,10 +11878,16 @@ var __prismLoader = (function () {
   /* Vendored copy first, CDN second. `rel` is the path under vendor/,
    * `cdnUrl` the original. A page that travels away from its vendor
    * directory still works — it just pays the network again. */
+  // Which source actually served Prism's core. The autoloader's base has
+  // to match it, and this is the only place that knows — see the comment
+  // where languages_path is set.
+  var servedLocally = false;
+
   function ensureVendored(rel, cdnUrl) {
-    return ensureScript(__okuVendorPath() + rel).catch(function () {
-      return ensureScript(cdnUrl);
-    });
+    return ensureScript(__okuVendorPath() + rel).then(
+      function () { servedLocally = true; },
+      function () { servedLocally = false; return ensureScript(cdnUrl); }
+    );
   }
 
   function load() {
@@ -11894,8 +11911,19 @@ var __prismLoader = (function () {
           // points at the vendored components when they are there —
           // an unvendored language then renders unhighlighted, the same
           // degradation as an offline page has today.
+          //
+          // The test is what just LOADED, not a build-time flag.
+          // `__okuVendoredPrism` is injected by build_standalone only, so
+          // in dist/site and under `oku serve` this read as "no vendored
+          // Prism" however complete the copy sitting next to the page
+          // was, and every component came from the CDN: with the network
+          // gone, a dist/site page highlighted only the grammars inside
+          // prism.min.js. Measured on architecture.html — five Mermaid
+          // fences at 0 tokens against 83/50/72/25/24 in the standalone
+          // build of the same page. If the core came from the local copy,
+          // its components are in the same directory by construction.
           window.Prism.plugins.autoloader.languages_path =
-            (window.__okuVendoredPrism ? __okuVendorPath() + 'prism/components/' : CDN + 'components/');
+            (servedLocally ? __okuVendorPath() + 'prism/components/' : CDN + 'components/');
         }
         // Eagerly preload the languages most commonly nested inside
         // other languages — JavaScript inside <script>, CSS inside

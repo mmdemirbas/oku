@@ -168,8 +168,9 @@ uv sync --extra dev           # pulls pytest, ruff, jsonschema
 oku check                     # schema + structural lint (the fast verify gate)
 oku check --strict            # exit 1 on warnings too
 oku build                     # writes dist/{standalone,site}/
+oku verify                    # opens BOTH built trees in a browser
 oku serve --no-watch          # local server (live-reload on by default)
-uv run pytest -q              # 300+ tests; should all pass
+uv run pytest -q              # 1500+ tests; should all pass
 uv run ruff check . && uv run ruff format --check .
 ```
 
@@ -580,6 +581,29 @@ fence, so the primitive the renderer implements is one an author can
 actually write.
 
 ## Common pitfalls
+
+- **`page.route("https://**", …)` matches NOTHING.** Measured: the
+  callback fires 0 times and the CDN answers 200. `**/*` and
+  `https://*/**` both work; filter inside the handler. This is why
+  `test_vendor_offline.py` — the file CLAUDE.md cited as proof that a
+  built page works with no network — passed for months against a live
+  CDN, with its "nothing reached a CDN" assertion true only because the
+  callback that records the reaching never ran. **A test that blocks,
+  denies or intercepts must assert that it actually did**: count the
+  interceptions and require the count, or the test degrades into a test
+  of the happy path without anyone editing it.
+
+- **`dist/site` and `dist/standalone` are two recipes, and only one of
+  them was covered.** `build_standalone` copied `kit/vendor/`, injected
+  the manifest, the vendor base, the kit bundle and the string table;
+  `build_site` copied none of it and `oku verify` never opened that tree
+  at all. A deployed site therefore drew no diagrams and highlighted no
+  code without internet, and its search index held titles only. `oku
+  verify` walks BOTH trees now (site over a local HTTP server, because
+  those pages fetch), and `test_delivery_parity.py` diffs the two —
+  primitive tally, text length, controls, tree, TOC, rail — so a block
+  that renders in one tree and not the other fails a test rather than
+  being reported by a reader.
 
 - **A standalone page runs chrome.js with `document.body` still null,
   because an inline script ignores `defer`.** The stub loads the kit as

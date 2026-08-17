@@ -3744,9 +3744,25 @@ def extract_page_text(page_json: dict) -> str:
                 if k in node:
                     walk(node[k])
 
-    walk(page_json.get("blocks", []))
+    # `b` is where a v2/v3 page keeps its blocks; `blocks` is the v1 name.
+    # Reading only the v1 key meant every page authored since the format
+    # changed indexed as its title plus its summary and nothing else —
+    # charts.md, 118 blocks, extracted 182 characters. Pagefind then built
+    # a title index, so a search for any word in any page body returned
+    # nothing and the UI fell back to "this page only" as though the index
+    # were missing. The unit tests fed it v1 pages, which is why they were
+    # green the whole time.
+    blocks = page_json.get("b")
+    if blocks is None:
+        blocks = page_json.get("blocks", [])
+    walk(blocks)
     # Strip inline HTML that may live in glossary defs etc.
     raw = " ".join(parts)
+    # A v2 block is a markdown string, so the typed fences come with it —
+    # and their bodies are JSON payloads. Index the prose, not `{"type":
+    # "bar","rows":[…]}`. Plain code fences stay: a reader searching for a
+    # function name they saw in a sample is searching for real content.
+    raw = re.sub(r"```oku-[a-z-]+\n.*?```", " ", raw, flags=re.S)
     text = re.sub(r"<[^>]+>", " ", raw)
     text = re.sub(r"\s+", " ", text).strip()
     return text
@@ -3809,12 +3825,33 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
                 shutil.rmtree(dst_dir)
             shutil.copytree(src_dir, dst_dir)
 
+    # mermaid + Prism, the same shared copy build_standalone lays down.
+    # This was standalone-only, so a dist/site deployed anywhere without
+    # internet — an intranet, an air-gapped host, a laptop on a plane —
+    # drew no diagrams and highlighted no code, after 404ing on
+    # `_oku/vendor/…` first. Measured on this repo's own site build with
+    # the CDNs blocked: 0 of 6 diagrams drawn, 0 highlight tokens, while
+    # the standalone tree of the same pages had all 6 and 598. The loader
+    # falls back to the CDN, so the failure only appears where nobody is
+    # watching, which is the point of vendoring in the first place.
+    src_vendor = vendor_dir()
+    if src_vendor.is_dir():
+        shutil.copytree(src_vendor, kit_out / "vendor", dirs_exist_ok=True)
+
     # Project-level files that pages depend on at runtime. site-manifest
     # and llms.txt are derived; cmd_build writes them into the dist
     # tree's docs_dir directly after this call, NOT into source.
     kit_json = find_kit_json(src_root)
     if kit_json is not None:
         shutil.copy(kit_json, out_dir / "kit.json")
+    else:
+        # Every page asks for kit.json at load. A project that never wrote
+        # one is a normal project, not a broken one — but the browser
+        # still prints "404 (File not found)" on every page of the
+        # deployed site, and a console that cries wolf on every load is
+        # one nobody reads when something real happens. An empty object
+        # is what "no project config" means anyway.
+        (out_dir / "kit.json").write_text("{}\n", encoding="utf-8")
 
     # Page sources (HTML stubs + JSON content) — preserve directory structure.
     # For nested pages, rewrite `_oku/...` URLs in the stub to climb the
@@ -4069,68 +4106,82 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
             data_text = json.dumps(page_data, ensure_ascii=False, indent=2)
         elif json_sibling.exists():
             data_text = json_sibling.read_text(encoding="utf-8")
+        # Everything below except the page data itself belongs to any page
+        # in the tree, source or not. It used to sit inside `if data_text:`,
+        # so the ENTRY STUB — the one page in a tree that legitimately has
+        # no .md behind it — received none of it: no manifest (its site
+        # tree stayed frozen at whatever `oku init` last wrote, missing
+        # every page added since), no vendor base, no kit bundle for
+        # tooltips, no string table, no inlined .md sources. The front door
+        # of a delivered tree was the one page built from a different
+        # recipe than the pages behind it.
+        inline = ""
         if data_text:
             # Escape </script in the JSON to be safe inside an inline script.
             safe = data_text.replace("</script", "<\\/script")
-            inline = f'<script type="application/json" id="__oku_page__">{safe}</script>'
-            # A standalone page is opened over file://, where the only
-            # manifest chrome.js can reach is an inline one — fetch is
-            # blocked before it is made. Only the entry stub `oku init`
-            # wrote carried one, so every OTHER page in the tree opened
-            # with no site tree and no language switch, which is not
-            # what "self-contained" is supposed to mean.
-            if manifest is not None:
-                safe_manifest = json.dumps(manifest, ensure_ascii=False, separators=(",", ":")).replace(
-                    "</script", "<\\/script"
-                )
-                inline += f"\n<script>window.__okuManifest={safe_manifest};</script>"
-            # Where this page finds mermaid and Prism. A standalone page
-            # carries no `_oku/` link tag, so __okuDocsRoot has nothing to
-            # derive a root from — the base is computed here, relative to
-            # where this page sits in the output tree. The dependencies
-            # are NOT inlined: mermaid alone is 3.3 MB against a 1.1 MB
-            # page, and every page in the tree would carry its own copy.
-            # One shared directory beside them costs it once.
-            depth = len(src.relative_to(src_root).parent.parts)
-            vendor_base = ("../" * depth) + "_oku/vendor/"
-            inline += (
-                f"\n<script>window.__okuVendorBase={json.dumps(vendor_base)};"
-                f"window.__okuVendoredPrism={json.dumps(vendor_is_complete())};</script>"
+            inline += f'<script type="application/json" id="__oku_page__">{safe}</script>'
+        # A standalone page is opened over file://, where the only
+        # manifest chrome.js can reach is an inline one — fetch is
+        # blocked before it is made. Only the entry stub `oku init`
+        # wrote carried one, so every OTHER page in the tree opened
+        # with no site tree and no language switch, which is not
+        # what "self-contained" is supposed to mean.
+        if manifest is not None:
+            safe_manifest = json.dumps(manifest, ensure_ascii=False, separators=(",", ":")).replace(
+                "</script", "<\\/script"
             )
-            # Inline the kit bundle (project kit.json + active domain
-            # glossary/extref entries) so tooltips work offline.
-            if kit_bundle:
-                safe_bundle = kit_bundle.replace("</script", "<\\/script")
-                inline += f'\n<script type="application/json" id="__oku_kit_bundle__">{safe_bundle}</script>'
-            # The kit's own strings for THIS page's language. A page on
-            # a file:// origin cannot fetch the table, and its chrome
-            # would otherwise be English inside a translated document.
-            page_lang = _page_language(src.with_suffix(".md"))
-            i18n_path = KIT_DIR / "i18n" / f"{page_lang}.json"
-            if page_lang and i18n_path.is_file():
-                safe_i18n = i18n_path.read_text(encoding="utf-8").replace("</script", "<\\/script")
-                inline += f'\n<script type="application/json" id="__oku_i18n__">{safe_i18n}</script>'
+            inline += f"\n<script>window.__okuManifest={safe_manifest};</script>"
+        # Where this page finds mermaid and Prism. A standalone page
+        # carries no `_oku/` link tag, so __okuDocsRoot has nothing to
+        # derive a root from — the base is computed here, relative to
+        # where this page sits in the output tree. The dependencies
+        # are NOT inlined: mermaid alone is 3.3 MB against a 1.1 MB
+        # page, and every page in the tree would carry its own copy.
+        # One shared directory beside them costs it once.
+        # `__okuVendoredPrism` used to ride along here as the loader's
+        # signal that local Prism components exist. Only this build set
+        # it, so the two server-backed modes were told there were none
+        # however complete the copy beside them was. The loader decides
+        # from the source that actually served prism.min.js now, which is
+        # true in all three modes and cannot go stale in a built page.
+        depth = len(src.relative_to(src_root).parent.parts)
+        vendor_base = ("../" * depth) + "_oku/vendor/"
+        inline += f"\n<script>window.__okuVendorBase={json.dumps(vendor_base)};</script>"
+        # Inline the kit bundle (project kit.json + active domain
+        # glossary/extref entries) so tooltips work offline.
+        if kit_bundle:
+            safe_bundle = kit_bundle.replace("</script", "<\\/script")
+            inline += f'\n<script type="application/json" id="__oku_kit_bundle__">{safe_bundle}</script>'
+        # The kit's own strings for THIS page's language. A page on
+        # a file:// origin cannot fetch the table, and its chrome
+        # would otherwise be English inside a translated document.
+        page_lang = _page_language(src.with_suffix(".md"))
+        i18n_path = KIT_DIR / "i18n" / f"{page_lang}.json"
+        if page_lang and i18n_path.is_file():
+            safe_i18n = i18n_path.read_text(encoding="utf-8").replace("</script", "<\\/script")
+            inline += f'\n<script type="application/json" id="__oku_i18n__">{safe_i18n}</script>'
 
-            # Every .md this page links to, so the markdown viewer has
-            # something to read over file:// — where fetch() cannot reach
-            # the file sitting right next to this one.
-            local_docs, skipped_docs = collect_local_docs(page_data, src, src_root)
-            if local_docs:
-                safe_docs = json.dumps(local_docs, ensure_ascii=False, separators=(",", ":")).replace(
-                    "</script", "<\\/script"
-                )
-                inline += f'\n<script type="application/json" id="__oku_local_docs__">{safe_docs}</script>'
-            for href in skipped_docs:
-                # Not an error — the link still resolves over HTTP. But a
-                # standalone file that quietly cannot open one of its own
-                # links is exactly the kind of gap that reads as a kit bug.
-                print(
-                    f"  ⚠ {src.relative_to(src_root)}: {href} not inlined "
-                    f"(missing, outside the tree, or over {MAX_INLINE_DOC_BYTES // 1024}K) — "
-                    f"the viewer will not open it over file://"
-                )
-            # Lambda replacement avoids re.sub interpreting \n in the JSON
-            # content as a backslash escape and turning it into a newline.
+        # Every .md this page links to, so the markdown viewer has
+        # something to read over file:// — where fetch() cannot reach
+        # the file sitting right next to this one.
+        local_docs, skipped_docs = collect_local_docs(page_data, src, src_root)
+        if local_docs:
+            safe_docs = json.dumps(local_docs, ensure_ascii=False, separators=(",", ":")).replace(
+                "</script", "<\\/script"
+            )
+            inline += f'\n<script type="application/json" id="__oku_local_docs__">{safe_docs}</script>'
+        for href in skipped_docs:
+            # Not an error — the link still resolves over HTTP. But a
+            # standalone file that quietly cannot open one of its own
+            # links is exactly the kind of gap that reads as a kit bug.
+            print(
+                f"  ⚠ {src.relative_to(src_root)}: {href} not inlined "
+                f"(missing, outside the tree, or over {MAX_INLINE_DOC_BYTES // 1024}K) — "
+                f"the viewer will not open it over file://"
+            )
+        # Lambda replacement avoids re.sub interpreting \n in the JSON
+        # content as a backslash escape and turning it into a newline.
+        if inline:
             html = _BODY_CLOSE_RE.sub(lambda m: inline + "\n</body>", html, count=1)
 
         html = LINK_TO_KIT_CSS.sub(lambda m: f"<style>\n{css}\n</style>", html, count=1)
@@ -5230,39 +5281,47 @@ def cmd_verify(args: argparse.Namespace) -> int:
         return 2
 
     root = Path.cwd()
-    pages = sorted((root / "dist" / "standalone").rglob("*.html"))
-    if not pages:
+    standalone = sorted((root / "dist" / "standalone").rglob("*.html"))
+    site_dir = root / "dist" / "site"
+    if not standalone:
         print(
             f"✗ nothing built under {root / 'dist' / 'standalone'} — run `oku build` first", file=sys.stderr
         )
         return 1
 
-    widths = [1440, 360]
     failures: list[str] = []
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
+
+    def check(browser, url: str, rel: str, widths: list[int]) -> None:
+        """Open one page and record everything a source check cannot see.
+
+        A FRESH page per document, deliberately. The listeners below were
+        attached inside the loop on one shared page, so every document
+        added another set that never came off — and any state a page
+        stored (a pinned drawer, a theme, a width) carried into the next
+        one, which is the state that hid a crash for a whole release.
+        """
         page = browser.new_page()
-        for html in pages:
-            rel = html.relative_to(root)
-            errors: list[str] = []
-            missing: list[str] = []
-            page.on("pageerror", lambda e, s=errors: s.append(str(e)[:120]))
-            # A failed request reports as a generic "Failed to load
-            # resource" on the console, with no URL — useless for saying
-            # WHAT is missing, so the request itself is what gets
-            # recorded and the console duplicate is dropped.
-            page.on(
-                "console",
-                lambda m, s=errors: (
-                    s.append(m.text[:120])
-                    if m.type == "error" and "Failed to load resource" not in m.text
-                    else None
-                ),
-            )
-            page.on("requestfailed", lambda r, s=missing: s.append(r.url))
+        errors: list[str] = []
+        missing: list[str] = []
+        page.on("pageerror", lambda e: errors.append(str(e)[:120]))
+        # A failed request reports as a generic "Failed to load
+        # resource" on the console, with no URL — useless for saying
+        # WHAT is missing, so the request itself is what gets
+        # recorded and the console duplicate is dropped.
+        page.on(
+            "console",
+            lambda m: (
+                errors.append(m.text[:120])
+                if m.type == "error" and "Failed to load resource" not in m.text
+                else None
+            ),
+        )
+        page.on("requestfailed", lambda r: missing.append(r.url))
+        page.on("response", lambda r: missing.append(r.url) if r.status == 404 else None)
+        try:
             for width in widths:
                 page.set_viewport_size({"width": width, "height": 900})
-                page.goto(html.as_uri())
+                page.goto(url)
                 try:
                     page.wait_for_function("() => window.__okuRendered === true", timeout=20000)
                     page.wait_for_function(
@@ -5277,24 +5336,59 @@ def cmd_verify(args: argparse.Namespace) -> int:
                     failures.append(f"{rel} @{width}px: {problem}")
             for err in dict.fromkeys(errors):
                 failures.append(f"{rel}: console — {err}")
-            for url in dict.fromkeys(missing):
+            for url_missing in dict.fromkeys(missing):
                 # Prism's markdown grammar probes for the language of any
                 # fence nested inside a markdown sample, so a page that
                 # documents this kit asks for `prism-oku-chart.min.js`.
                 # That set is unbounded and a missing grammar degrades to
                 # unhighlighted code, which is not a build failure.
-                if "/prism/components/" in url:
+                if "/prism/components/" in url_missing:
                     continue
-                # A remote origin failing is the network's state, not the
-                # page's. Judging the page on it makes this command fail
-                # intermittently for reasons the author cannot fix, which
-                # is how a verification step stops being believed. What
-                # the page IS responsible for is its own local files —
-                # `test_vendor_offline.py` is where the no-network case
-                # is asserted properly.
-                if url.startswith(("http://", "https://")):
+                # A REMOTE origin failing is the network's state, not the
+                # page's, and judging the page on it makes this command
+                # fail for reasons the author cannot fix. A local one is
+                # the page asking for something the build did not write,
+                # which is precisely this command's job.
+                if url_missing.startswith(("http://", "https://")) and "127.0.0.1" not in url_missing:
                     continue
-                failures.append(f"{rel}: could not load {url.rsplit('/', 1)[-1]}")
+                failures.append(f"{rel}: could not load {url_missing.rsplit('/', 1)[-1]}")
+        finally:
+            page.close()
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        for html in standalone:
+            check(browser, html.as_uri(), str(html.relative_to(root)), [1440, 360])
+
+        # dist/site is the OTHER tree the build ships, and this command
+        # never opened it. Everything that only breaks there — the shared
+        # `_oku/` assets, the fetched manifest, kit.json, the vendored
+        # dependencies — was outside the gate by construction, so it was
+        # found by opening a deployed page by hand instead. It needs a
+        # server: those pages fetch, and file:// refuses.
+        site_pages = sorted(site_dir.rglob("*.html")) if site_dir.is_dir() else []
+        if site_pages:
+            import functools
+            import http.server
+            import threading
+
+            class _QuietHandler(http.server.SimpleHTTPRequestHandler):
+                def log_message(self, *args):  # noqa: A003 - stdlib hook name
+                    pass  # a verify run reports findings, not a request log
+
+            handler = functools.partial(_QuietHandler, directory=str(site_dir))
+            httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+            threading.Thread(target=httpd.serve_forever, daemon=True).start()
+            base = f"http://127.0.0.1:{httpd.server_address[1]}"
+            try:
+                for html in site_pages:
+                    rel = html.relative_to(site_dir).as_posix()
+                    # One width here: the CSS is the same file in both
+                    # trees, so the narrow pass above already covered
+                    # layout. What differs is what the page can REACH.
+                    check(browser, f"{base}/{rel}", f"dist/site/{rel}", [1440])
+            finally:
+                httpd.shutdown()
         browser.close()
 
     if failures:
@@ -5304,7 +5398,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
         if len(failures) > 40:
             print(f"  … {len(failures) - 40} more", file=sys.stderr)
         return 1
-    print(f"✓ {len(pages)} page(s) render clean at {' and '.join(f'{w}px' for w in widths)}")
+    checked = len(standalone) + len(sorted(site_dir.rglob("*.html")) if site_dir.is_dir() else [])
+    print(f"✓ {checked} page(s) render clean across both built trees (1440px and 360px)")
     return 0
 
 
