@@ -3792,7 +3792,13 @@ def inject_pagefind_body(html: str, text: str, title: str) -> str:
     return html + block
 
 
-def build_site(srcs, out_dir: Path, src_root: Path) -> None:
+# `<script>window.__okuManifest={…};</script>` as `_stub_for` emits it.
+# Anchored on the closing tag rather than the first `};` so a summary
+# containing that pair cannot end the match early.
+_INLINE_MANIFEST_RE = re.compile(r"window\.__okuManifest\s*=\s*\{.*?\};\s*</script>", re.S)
+
+
+def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = None) -> None:
     """Build a self-contained multi-page site at out_dir/.
 
     Layout:
@@ -3899,6 +3905,17 @@ def build_site(srcs, out_dir: Path, src_root: Path) -> None:
             dest_md.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(md_sibling, dest_md)
 
+        # A stub `oku init` wrote carries the manifest of the day it was
+        # written. The site fetches the real one for its sidebar, so the
+        # two disagreed IN THE SAME PAGE: the front page of a delivered
+        # tree listed three pages in its body under a sidebar listing
+        # four, because the body list is rendered from the inline copy.
+        # A built page carries the build's manifest or none at all.
+        if manifest is not None:
+            fresh = json.dumps(manifest, ensure_ascii=False, separators=(",", ":")).replace(
+                "</script", "<\\/script"
+            )
+            html = _INLINE_MANIFEST_RE.sub(lambda m: f"window.__okuManifest={fresh};</script>", html, count=1)
         dest_html.write_text(_mark_built(html), encoding="utf-8")
 
 
@@ -4263,7 +4280,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # it as a sidecar, the standalone pages carry it inline.
     dist_manifest = compute_manifest(root, pages=json_pages)
     build_standalone(srcs, standalone, root, manifest=dist_manifest)
-    build_site(srcs, site, root)
+    build_site(srcs, site, root, manifest=dist_manifest)
 
     # Each tree carries only what its audience needs:
     #   standalone/  humans, file:// — every HTML inlines its own

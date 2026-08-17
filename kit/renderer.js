@@ -1307,6 +1307,14 @@
         );
         return;
       }
+      // Same reasoning as the file:// branch, one step earlier: when the
+      // manifest already SAYS this page has no source of its own, the
+      // fetch is known to 404 and buys nothing but a red line on the
+      // console of every reader who opens the front door of the site.
+      // The entry stub is the one page in a tree with `source: null`,
+      // and it is also the one page that carries the manifest inline, so
+      // the answer is on hand before the request is made.
+      if (this._hasNoPageSource(url) && this._renderManifestIndex(url, host)) return;
       try {
         const res = await fetch(wa(url), { cache: 'no-cache' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -1329,6 +1337,29 @@
      * Scoped to the index: on any other page a missing JSON is a real
      * failure and must keep reporting as one. Returns true if it
      * rendered. */
+    /* Does the manifest name this page as having no source? Matched by
+     * SUFFIX for the same reason the language switch is — a manifest
+     * path is relative to the root it was built from, and that root is a
+     * different thing in each mode. Absent manifest, absent entry or an
+     * entry with a source: answer no and let the fetch decide. */
+    _hasNoPageSource(url) {
+      const m = window.__okuManifest;
+      const pages = (m && Array.isArray(m.pages)) ? m.pages : [];
+      if (!pages.length) return false;  // nothing known — let the fetch decide
+      const here = String(url || '').replace(/\.json$/, '.html');
+      for (const p of pages) {
+        if (!p || !p.path) continue;
+        const tail = '/' + String(p.path).replace(/\.json$/, '.html');
+        if (here === p.path || here.endsWith(tail)) return !p.source;
+      }
+      // Listed nowhere. A manifest lists every page the build wrote a
+      // source for, so a page missing from a manifest that has entries
+      // has no source — the entry stub of a tree whose author never
+      // wrote an index.md is exactly this, and it is the case the
+      // caller has already narrowed to index.json.
+      return true;
+    }
+
     _renderManifestIndex(url, host) {
       if (!/(^|\/)index\.json$/.test(String(url || ''))) return false;
       const m = window.__okuManifest;
