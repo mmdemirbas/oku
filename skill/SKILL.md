@@ -123,6 +123,50 @@ For the strict gate before delivery, use `oku check --strict`
 (exits 1 on warnings too). For partial passes during iteration, plain
 `oku check` is enough.
 
+### Checking a figure in the browser: query the figure, not `svg`
+
+The kit paints its own inline SVGs as chrome - copy buttons, wrap
+toggles, table view switches, the filter icon - and they are typically
+14x14. `container.querySelector('svg')` therefore returns a **button
+icon**, not your figure, whenever the container holds a code block or a
+table first. Concluding "the figure did not render" from that is a
+measurement that answered a different question, and it costs a page
+restructure to fix nothing.
+
+Query the figure's own host and assert on content, not on presence:
+
+```js
+// mermaid: the kit wraps the rendered SVG in .okd-render
+const svgs = [...el.querySelectorAll('.okd-render svg')];
+svgs.map(s => ({ w: s.getBoundingClientRect().width,
+                 nodes: s.querySelectorAll('.nodeLabel').length,
+                 label: s.textContent.includes('SomeNodeLabel') }));
+```
+
+Rules of thumb: filter by `getBoundingClientRect().width > 100`; assert a
+node/label count above zero, not just that an element exists; open every
+`<details>` (`d.forEach(x => x.open = true)`) and wait ~2.5s before
+measuring, because mermaid renders lazily; and check for a **marker
+string you put in the source**, so a stale render cannot pass.
+
+Established by running it (2026-08-18, oku 0.6.5, kit 2026-08-17-r43):
+`code`, `table`, `chart` and `diagram` blocks **all render correctly**
+inside `oku-info-tip.content`. A figure that looks missing there is a
+measurement error until a minimal reproduction says otherwise.
+
+### Reporting an oku defect
+
+Confirmed defects go to `~/dev/mmdemirbas/html-doc/BUGS.md`, newest
+first, in the schema its header states: symptom, minimal reproduction,
+expected vs actual, where the failure was localised, and - kept separate
+- what was *observed* versus what was *inferred from reading source*.
+
+Build the minimal reproduction inside `html-doc` first and confirm the
+failure there. A defect that only appears in a large page is not
+localised yet, and an entry written from a large page usually describes
+the wrong thing. If the reproduction renders correctly, there is no
+entry to write.
+
 ## Workflow
 
 1. **Clarify scope if ambiguous** (skip if user has been explicit).
