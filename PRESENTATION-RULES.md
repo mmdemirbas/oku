@@ -93,11 +93,14 @@ judged on. Concretely, and each pinned by a test in
 - Every block in a section ends at the same x — paragraph, list,
   blockquote, callout, TL;DR, code, diagram, table. See "One column,
   one right edge" below; nothing caps a block below `--content-width`.
-- A table at or below `SMALL_TABLE_ROWS` (chrome.js) keeps only copy +
-  expand. That threshold is a rule about its CONTROLS, not about its
-  box: the card spans the column like every other block. The controls
-  stay in the DOM with their listeners bound; CSS hides them, so a
-  table that grows past the threshold needs no re-init.
+- Every table ships the whole toolbar — filter, count, both copy
+  buttons, gear, expand, sortable columns — whatever its row count. A
+  threshold once stripped the first four below seven rows, on the
+  reasoning that a reader who can see every row has nothing to filter.
+  It compounded with a toolbar that rests below full opacity: on a tree
+  whose tables are mostly small, the controls were never visible
+  anywhere, and the kit read as having lost them. Sorting and column
+  configuration are useful at three rows besides.
 - The cover subtitle falls back to `summary`; a cover holding only an
   h1 gets `.cover-bare`; `updated` is suppressed when it equals `date`.
 

@@ -3752,10 +3752,6 @@ function initReadingAids() {
       return { type: 'row', cells: cellHtml, cellValues: cellValues, iv: iv, el: tr };
     }
 
-    // Row count at or below which a table is "small" — every row is on
-    // screen at once, so filtering and grouping have nothing to do.
-    var SMALL_TABLE_ROWS = 6;
-
     var allClassified = rowEls.map(classify).filter(Boolean);
     var flatRows = allClassified.filter(function (e) { return e.type === 'row'; });
     var authorGroupTitles = allClassified.filter(function (e) { return e.type === 'group'; })
@@ -3774,16 +3770,17 @@ function initReadingAids() {
     // on the expand button pins state and stops auto-toggling.
     wrap.className = 'okt-table-wrap';
     wrap.dataset.view = 'table';
-    // A table the reader can take in at a glance does not need a filter
-    // box, a row counter, a view switcher or a configuration popover —
-    // they cost a control strip above every three-row table and answer
-    // a question nobody has at that size. Marked as an attribute rather
-    // than skipped at build time: every control below stays in the DOM
-    // with its listener attached, so the wiring has one shape and a
-    // table that grows past the threshold needs no re-init. CSS does
-    // the hiding, with display:none, so the affordance is genuinely
-    // gone rather than merely faint.
-    if (rowCount <= SMALL_TABLE_ROWS && !hasAuthorGroups) wrap.dataset.scale = 'small';
+    // Every table gets every control, whatever its size. A row-count
+    // threshold used to strip the filter box, the counter, the view
+    // switcher, the gear and sortable columns below seven rows, on the
+    // reasoning that a reader who can see every row has nothing to
+    // filter. Two things were wrong with it. Sorting and column
+    // configuration are useful at any size — a reader sorts three rows
+    // as readily as thirty. And the toolbar was invisible at rest, so
+    // the two rules compounded: on a tree whose tables are mostly
+    // small, the controls were never visible anywhere, and the kit
+    // read as having lost them. One shape for every table is also one
+    // fewer state to hold in mind when reading this function.
 
     var ctrl = document.createElement('div');
     ctrl.className = 'okt-table-controls';
@@ -4790,7 +4787,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-20-r48';
+var __okuKitBuild = '2026-08-20-r49';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

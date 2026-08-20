@@ -37,6 +37,13 @@
   --success: #15803d;
   --success-soft: #dcfce7;
   --on-accent: #ffffff;
+  /* The resting weight of chrome that belongs to a block rather than
+     to the page: a table's toolbar, the copy button on a path chip.
+     It is a FLOOR and never zero — a control at zero opacity is a
+     control the reader cannot know exists, which is the invisible-
+     toggle state this kit's own invariants forbid. Hover and
+     focus-within take it to 1. */
+  --chrome-floor: 0.4;
   --max-width: 960px;
   /* Reader-controlled content width (D3 + P7). The default is the
      'comfortable' reading width — a hair wider than the prior 860px
@@ -1890,10 +1897,16 @@ code:not(pre code) {
      reader's attention. The bar keeps its layout box so revealing it
      never reflows the table, and `pointer-events: none` stops an
      invisible control from swallowing a click.
-     Hover or keyboard focus on the wrap brings it back, and any active
-     filter / chip / non-default view pins it open — the reader must
-     always be able to see the state they are already in. */
-  opacity: 0;
+     Hover or keyboard focus on the wrap brings it to full, and any
+     active filter / chip / non-default view pins it there — the reader
+     must always be able to see the state they are already in.
+
+     Quiet, NOT gone. It was `opacity: 0`, and a reader who never
+     happened to sweep the pointer across a table had no way to learn
+     that a filter box, a row count, a view switcher and a copy button
+     were sitting above it. That is the invisible-toggle state UI
+     invariant 2 forbids, and it cost the whole toolbar. */
+  opacity: var(--chrome-floor);
   pointer-events: none;
   transition: opacity 0.18s ease;
 }
@@ -1921,30 +1934,7 @@ code:not(pre code) {
 @media (hover: none) {
   .okt-table-controls { opacity: 1; pointer-events: auto; }
 }
-/* Small table (see SMALL_TABLE_ROWS in chrome.js): the reader can see
-   every row already, so filtering, counting, grouping and view-switching
-   have nothing to act on. Copy and expand stay — those are useful at any
-   size. The nodes remain in the DOM with their listeners bound; only the
-   affordance goes. */
-.okt-table-wrap[data-scale="small"] .okt-filter,
-.okt-table-wrap[data-scale="small"] .okt-stats,
-.okt-table-wrap[data-scale="small"] .okt-view-group,
-.okt-table-wrap[data-scale="small"] .okt-ctrl-sep,
-.okt-table-wrap[data-scale="small"] .okt-table-controls [data-cfg] {
-  display: none;
-}
-/* Sorting three rows the reader can already see is the same non-answer
-   as filtering them, so the column affordance goes with the rest. The
-   class stays on the <th> — only the arrow and the hover target go. */
-.okt-table-wrap[data-scale="small"] .okt-sortable {
-  cursor: default;
-}
-.okt-table-wrap[data-scale="small"] .okt-sortable::after { content: none; }
-.okt-table-wrap[data-scale="small"] .okt-sortable:hover {
-  background: transparent !important;
-  color: inherit !important;
-}
-/* A small table spans the column like every other block. It once sized
+/* A short table spans the column like every other block. It once sized
    to its content — three short cells stretched over 970px was read as a
    layout accident — but the card that shrank with it then ended short of
    the paragraph above and the code block below, and a right edge that
@@ -1953,7 +1943,7 @@ code:not(pre code) {
    distribute the slack; `table-layout: auto` on a full-width table gives
    each column its content share, so the cells stay legible.
    Pinned by test_presentation_measure.py and
-   test_presentation_defaults.py::test_a_small_table_shares_the_column_edge. */
+   test_presentation_defaults.py::test_a_three_row_table_shares_the_column_edge. */
 /* Force-show whenever the table is in a non-default state — an
    active filter (input has text), an active chip, or a view other
    than the default table view. The user must always be able to see
@@ -4340,10 +4330,10 @@ footer {
   background: none;
   color: var(--text-faint);
   cursor: pointer;
-  /* A floor, not zero — the same rule the page's own chrome buttons
-     follow. At zero the reserved slot reads as a gap the author left
-     in the path, and a control nobody can see is one nobody uses. */
-  opacity: 0.38;
+  /* A floor, not zero — the same rule the table's toolbar follows. At
+     zero the reserved slot reads as a gap the author left in the path,
+     and a control nobody can see is one nobody uses. */
+  opacity: var(--chrome-floor);
   transition: opacity 0.15s, color 0.15s;
 }
 .okt-fp-copy svg { width: 12px; height: 12px; }

@@ -28,8 +28,8 @@ pytestmark = pytest.mark.browser
 # wrong. The escaped pipe renders as a bare `|`, so the copy has to put
 # the backslash back or the table gains a column on paste.
 #
-# Ten rows because the toolbar's filter is a size rule: a small table
-# ships no filter box, and the filter is what the last test exercises.
+# Ten rows so the last test has rows to filter OUT — the copy has to
+# carry the rows on screen, not the rows in the source.
 ROWS = "\n".join(f"| row{i} | {i} | a \\| b |" for i in range(10))
 PAGE_MD = f"""---
 title: Table

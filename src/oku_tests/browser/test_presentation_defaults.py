@@ -8,7 +8,9 @@ rather than eyeballed:
   * the TL;DR gradient faded to a violet-leaning neutral, so it read
     teal-to-lavender under any accent that was not the default indigo
   * a cover with nothing but a title sat in a 156px tinted panel
-  * a small table shipped a filter box, a row counter and a gear
+  * a three-row table shipped no filter box, no row counter and no
+    gear, on a threshold that compounded with a toolbar resting below
+    full opacity until the controls were visible nowhere
 
 The page below sets exactly two front-matter fields. That is the
 point — anything an author has to add to get a decent result is the
@@ -319,49 +321,73 @@ def test_short_strings_are_not_stretched_to_a_box_edge(rendered):
     assert got["heading"] != "justify", got
 
 
-# ---------- small tables ----------
+# ---------- table chrome is not conditional ----------
 
 
-def test_a_small_table_ships_no_filter_counter_or_gear(rendered):
-    """Three rows, all on screen. A filter box and a row counter above
-    them answer a question nobody has at that size."""
+def test_every_table_ships_the_whole_toolbar(rendered):
+    """Filter, count, view switcher, both copy buttons, gear, expand —
+    on a three-row table and on an eighteen-row one alike.
+
+    A row-count threshold used to strip the first four below seven rows,
+    on the reasoning that a reader who can see every row has nothing to
+    filter. It compounded with a toolbar that was invisible until hover:
+    on a tree whose tables are mostly small, the controls were never
+    visible anywhere, and the kit read as having lost them. Sorting and
+    column configuration are useful at any size besides — a reader sorts
+    three rows as readily as thirty.
+    """
     got = rendered.evaluate(
         """() => {
-        const w = document.querySelector('#what .okt-table-wrap');
-        const vis = s => { const e = w.querySelector(s); if (!e) return false;
-                           const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-        return { scale: w.dataset.scale, filter: vis('.okt-filter'), stats: vis('.okt-stats'),
-                 gear: vis('[data-cfg]'), views: vis('.okt-view-group'),
-                 copy: vis('[data-copy]'), expand: vis('[data-expand]') };
+        const read = sel => {
+          const w = document.querySelector(sel + ' .okt-table-wrap');
+          const vis = s => { const e = w.querySelector(s); if (!e) return false;
+                             const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+          // The LIST view renders each row as its own mini table inside
+          // the same wrap, so count only the main table's own rows.
+          const body = w.querySelector('table');
+          return { rows: body.querySelectorAll(':scope > tbody > tr').length,
+                   scale: w.dataset.scale || null,
+                   filter: vis('.okt-filter'), stats: vis('.okt-stats'),
+                   gear: vis('[data-cfg]'),
+                   // The view switcher is stashed at rest on every table and
+                   // moves into the gear popover on click, so presence is the
+                   // question here, not visibility.
+                   views: !!w.querySelector('.okt-view-group'),
+                   copy: vis('[data-copy="tsv"]'), md: vis('[data-copy="md"]'),
+                   expand: vis('[data-expand]') };
+        };
+        return { small: read('#what'), big: read('#big') };
     }"""
     )
-    assert got["scale"] == "small", got
-    assert got["filter"] is False and got["stats"] is False, got
-    assert got["gear"] is False and got["views"] is False, got
-    # Copy and expand are useful at any size and must survive.
-    assert got["copy"] is True and got["expand"] is True, got
+    assert got["small"]["rows"] <= 6 and got["big"]["rows"] > 6, got
+    for where, one in got.items():
+        assert one["scale"] is None, (where, one)
+        for control in ("filter", "stats", "gear", "views", "copy", "md", "expand"):
+            assert one[control] is True, (where, control, one)
 
 
-def test_a_small_table_does_not_offer_to_sort_three_rows(rendered):
-    """Same non-answer as filtering them."""
+def test_three_rows_are_still_sortable(rendered):
+    """Sorting is not a size question. The column affordance went with
+    the rest of the toolbar under the old threshold, so a reader could
+    not reorder the one table small enough to want reordering by eye."""
     got = rendered.evaluate(
         """() => {
         const th = document.querySelector('#what .okt-table-wrap th');
-        return { cursor: getComputedStyle(th).cursor,
+        return { sortable: th.classList.contains('okt-sortable'),
+                 cursor: getComputedStyle(th).cursor,
                  arrow: getComputedStyle(th, '::after').content };
     }"""
     )
-    assert got["cursor"] == "default", got
-    assert got["arrow"] in ("none", "normal"), got
+    assert got["sortable"], got
+    assert got["cursor"] == "pointer", got
+    assert got["arrow"] not in ("none", "normal"), got
 
 
-def test_a_small_table_shares_the_column_edge(rendered):
-    """A small table is a size rule about its CONTROLS, not about its
-    box. The card spans the column and the table fills the card, the
-    same as a paragraph, a callout or a diagram — one column, one right
-    edge. This was once the other way round (fit-content, so three short
-    cells were not stretched over 970px) and the card then stopped short
-    of every block around it, which reads as a rendering fault."""
+def test_a_three_row_table_shares_the_column_edge(rendered):
+    """A three-row table spans the column like every other block. This
+    was once the other way round (fit-content, so three short cells were
+    not stretched over 970px) and the card then stopped short of every
+    block around it, which reads as a rendering fault."""
     got = rendered.evaluate(
         """() => {
         const w = document.querySelector('#what .okt-table-wrap');
@@ -375,21 +401,6 @@ def test_a_small_table_shares_the_column_edge(rendered):
     assert abs(got["wrap"] - got["para"]) <= 1, got
     # The table fills the card it sits in, minus the card's own padding.
     assert 0 <= got["wrap"] - got["table"] <= 14, got
-
-
-def test_a_table_past_the_threshold_keeps_its_controls(rendered):
-    """The threshold is a size rule, not a removal. Eight rows is past
-    it and the full toolbar comes back."""
-    got = rendered.evaluate(
-        """() => {
-        const w = document.querySelector('#big .okt-table-wrap');
-        const vis = s => { const e = w.querySelector(s); if (!e) return false;
-                           const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-        return { scale: w.dataset.scale || null, filter: vis('.okt-filter'), gear: vis('[data-cfg]') };
-    }"""
-    )
-    assert got["scale"] is None, got
-    assert got["filter"] is True and got["gear"] is True, got
 
 
 def test_the_quiet_surface_has_no_hue_of_its_own(rendered):
