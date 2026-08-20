@@ -3872,12 +3872,17 @@ function initReadingAids() {
     // to a pull request, an issue or another markdown document. One
     // button that guessed which would be wrong half the time, and a
     // menu would hide the affordance the reader came for.
+    //
+    // Both are the COPY glyph, because both copy. The markdown one adds
+    // the format's own M inside the same sheet; it was the Markdown
+    // logo mark, whose descending arrow reads as a download — the one
+    // thing neither button does.
     var copyBtnHTML =
       '<button data-copy="tsv" type="button" title="Copy data (TSV)" aria-label="Copy data as TSV">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 15V5a2 2 0 0 1 2-2h9"/></svg>' +
       '</button>' +
       '<button data-copy="md" type="button" title="Copy as Markdown" aria-label="Copy table as Markdown">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15.5v-7l3 3 3-3v7"/><path d="M17.5 8.5v7"/><path d="M15 13l2.5 2.5L20 13"/></svg>' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 15V5a2 2 0 0 1 2-2h9"/><path d="M11 18v-6l3.5 3.5L18 12v6" stroke-width="1.6"/></svg>' +
       '</button>';
 
     ctrl.innerHTML =

@@ -114,6 +114,28 @@ def test_the_second_button_is_the_same_size_as_the_first(opened):
     assert boxes[1][2] >= 12 and boxes[1][3] >= 12, boxes
 
 
+def test_the_markdown_button_wears_the_copy_icon(opened):
+    """Two buttons that both copy have to read as a pair. The markdown
+    one carried the Markdown logo mark instead — a wide rounded box, an
+    M, and a descending arrow — and the arrow reads as download, which
+    is the one thing neither button does.
+
+    The rule is structural, so it is assertable rather than a matter of
+    taste: every shape in the TSV icon appears in the markdown icon,
+    which adds exactly one of its own for the format.
+    """
+    shapes = opened.evaluate(
+        """() => [...document.querySelectorAll('.okt-table-wrap [data-copy]')].map(b =>
+             [...b.querySelector('svg').children].map(el =>
+               el.tagName.toLowerCase() + ':' + (el.getAttribute('d') ||
+                 ['x', 'y', 'width', 'height'].map(a => el.getAttribute(a)).join(','))))"""
+    )
+    tsv, md = shapes
+    assert len(tsv) == 2, tsv
+    assert set(tsv) <= set(md), (tsv, md)
+    assert len(set(md) - set(tsv)) == 1, (tsv, md)
+
+
 def test_the_markdown_copy_is_a_table_a_markdown_parser_reads(opened):
     text = _copy(opened, MD)
     assert text.startswith(HEAD), text
