@@ -2210,7 +2210,14 @@ code:not(pre code) {
    survive if it were toggled (within current other-column filters). */
 .okt-chips {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  /* `max-content` on the label track sizes the whole rack from the
+     longest column name, and a table's column name is prose an author
+     writes — `B: open-source Spark 3.5.4 + open-source Iceberg 1.10.0`
+     measured 381px against a 360px viewport, so the page scrolled
+     sideways. minmax(0, max-content) keeps the label column exactly as
+     wide as it wants while it fits and lets it wrap when it does not,
+     which is the same repair the `1fr` tracks took. */
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
   column-gap: 14px;
   row-gap: 10px;
   align-items: center;
@@ -2235,6 +2242,21 @@ code:not(pre code) {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+/* Below this, a label and its chips side by side leave neither enough
+   room: the label wraps to four lines and the chips to a 60px column.
+   The rack stacks instead — label above its own chips — which is the
+   same information in the order it is read. */
+@media (max-width: 560px) {
+  .okt-chips {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+  }
+  .okt-chip-label {
+    text-align: left;
+    margin-top: 4px;
+  }
 }
 .okt-chip {
   display: inline-flex;

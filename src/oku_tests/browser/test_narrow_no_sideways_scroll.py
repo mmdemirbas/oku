@@ -13,6 +13,13 @@ Fifteen templates in chrome.css used a bare `1fr`. They take
 and the word wraps instead. The assertion is the page-level one —
 document.scrollWidth against innerWidth — because that is what a reader
 feels, and it holds no matter which primitive is at fault.
+
+The chip rack was the same shape one track over: `max-content` on the
+label column sized the whole rack from the longest column NAME, which is
+prose an author writes. `B: open-source Spark 3.5.4 + open-source
+Iceberg 1.10.0` measured 381px against a 360px viewport, and `oku verify`
+found it on a delivered tree. Below 560px the rack stacks — label above
+its own chips — because side by side leaves neither enough room.
 """
 
 from __future__ import annotations
@@ -61,6 +68,13 @@ summary: Long tokens in every grid the kit lays out.
 
 ```oku-table
 {{"headers":["name","note"],"rows":[["`{LONG}`","long"],["`{LONG}`","also long"]]}}
+```
+
+## Filterable table {{#chips}}
+
+```oku-table
+{{"headers":["file",{{"label":"B: open-source Spark 3.5.4 + open-source Iceberg 1.10.0","filter":"chips","values":["pass","fail"]}}],
+  "rows":[["one",{{"values":["pass"],"value":"pass"}}],["two",{{"values":["fail"],"value":"fail"}}]]}}
 ```
 
 ## Prose {{#prose}}
