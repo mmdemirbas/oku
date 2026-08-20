@@ -500,8 +500,11 @@ class TestPayloadBudget:
     bought with the bytes.
     """
 
-    # 1,036 KB today. The gap is headroom for a feature, not for drift.
-    KIT_BUDGET_BYTES = 1_150_000
+    # 1,125 KB today. Raised from 1,150,000 by the copy-region
+    # primitive: the three clipboard serialisers, the word diff, and
+    # the styling for both. The gap is headroom for a feature, not
+    # for drift.
+    KIT_BUDGET_BYTES = 1_190_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

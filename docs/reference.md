@@ -279,6 +279,30 @@ without inventing a colour each.
 {"code":{"k":"code","lang":"json","src":"{\n  \"k\": \"timeline\",\n  \"events\": [\n    {\n      \"status\": \"open\",\n      \"label\": \"claim #1\",\n      \"t\": \"\\\"It is the engine build\\\"\",\n      \"b\": \"First read of the code. Plausible, and **unverified** — a doubt, not a finding.\"\n    },\n    {\n      \"status\": \"dropped\",\n      \"label\": \"corrected\",\n      \"t\": \"Over-stated the other way\",\n      \"b\": \"Then swung to \\\"purely our gap\\\". Also premature; the path was not instrumented yet.\"\n    },\n    {\n      \"status\": \"done\",\n      \"label\": \"verified\",\n      \"t\": \"The gap is real, and it is ours\",\n      \"b\": \"Instrumented the create path. Fixed in `e326b65`.\"\n    }\n  ]\n}"},"output":{"k":"timeline","events":[{"status":"open","label":"claim #1","t":"\"It is the engine build\"","b":"First instinct from reading the code: the vendored build must deliver the value differently. Plausible, and **unverified** — a doubt, not a finding."},{"status":"dropped","label":"corrected","t":"Over-stated, the other way","b":"Then swung to \"purely our gap, the engine is ruled out\". Also premature: the remote path had not been instrumented yet."},{"status":"done","label":"verified","t":"The gap is real, and it is ours","b":"Instrumented the create path. Our converter works *given* the metadata, but the primary API was never overridden — so the value vanished before the converter ran. Fixed in `e326b65`."},{"status":"note","label":"still open","t":"One gap sits downstream, and is not ours","b":"The persisted file omits the field even though the in-memory schema carries it. That loss is inside the vendor's commit path, after it receives a correct schema."}]}}
 ```
 
+### copy {#copy}
+
+A region the reader is meant to take away, and — when the point is an
+edit rather than a quotation — the text it replaces. It exists for one
+sentence a reviewer writes often: *replace this with that*.
+
+Three formats, one source. **Markdown** is the source verbatim, so a
+round trip through the clipboard changes nothing. **Plain** is the same
+text with the syntax gone, for a field that takes no markup. **Rich** is
+semantic HTML carrying none of this page's classes, ids or inline
+styles — the target applies its own, and a copy that brought this
+page's looks pasted in and follows no theme at all.
+
+Give `before` and the two halves are diffed word by word, so the reader
+sees the edit instead of two paragraphs to compare themselves.
+`"diff": false` turns that off where the halves are a rewrite rather
+than an edit. `formats` narrows the buttons. The `before` half always
+offers plain text alone: its job is to be *found* in the target
+document, and no search box takes rich text.
+
+```oku-example
+{"code": {"k": "code", "lang": "json", "src": "{\n  \"k\": \"copy\",\n  \"t\": \"Compatibility table, third row\",\n  \"before\": \"Iceberg 1.10.0 is unaffected.\",\n  \"b\": \"Iceberg 1.10.0 is affected; the fix landed on Apache main.\"\n}"}, "output": {"k": "copy", "t": "Compatibility table, third row", "before": "Iceberg 1.10.0 is unaffected.", "b": "Iceberg 1.10.0 is affected; the fix landed on Apache main."}}
+```
+
 ## live-snippet {#visual}
 
 Editable HTML/CSS/JS textarea + sandboxed iframe preview.

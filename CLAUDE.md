@@ -69,7 +69,8 @@ flowchart TB
 - Fence tags: `oku-chart`, `oku-table`, `oku-kpi-grid`, `oku-step-flow`,
   `oku-compare-grid`, `oku-example`, `oku-insight`, `oku-live-snippet`,
   `oku-annotated-code`, `oku-chart-grid`, `oku-timeline`, `oku-info-tip`,
-  `oku-diagram` — plus plain `mermaid` (GitHub renders it natively).
+  `oku-diagram`, `oku-copy` — plus plain `mermaid` (GitHub renders it
+  natively).
   `oku spec` prints this list from the code, and
   `test_content_regression.py` holds this sentence against it. The list
   named a fence that had been removed and omitted one that exists, which
@@ -488,6 +489,35 @@ two independent rules; `test_every_timeline_dot_sits_on_the_rail` and
 its narrow-width twin measure them onto the same axis, because tuning
 the list padding without the dot offset is the failure and it only
 shows below 560px.
+
+**A copy region hands over the source, not the DOM.** All three formats
+come from re-rendering the author's markdown into a detached host.
+Reading the visible region would hand over the line-number gutter, the
+fold markers, the kit's own copy button and, in a diffed pair, the
+`<del>` / `<ins>` marks — rendering from source is what makes those
+marks safe to draw at all. **Markdown is the source verbatim**:
+re-serialising the DOM gives back *a* markdown, not *the* one, and the
+round trip is the whole reason that format is offered. Rich is a
+`ClipboardItem` carrying `text/html` AND `text/plain` so a paste into a
+plain field still lands, with every attribute stripped but a per-tag
+keep-list — the target applies its own styles, and `class="okt-card"`
+arriving in a wiki looks pasted in and follows no theme. The `before`
+half offers plain text alone, because its job is to be *found* in the
+target document and no search box takes rich text. Held by
+`test_copy_region.py`.
+
+The diff is word-level and on by default; `"diff": false` is for a
+rewrite rather than an edit. Contiguous changed words become ONE mark,
+not one per word — three abutting boxes read as three separate edits and
+the reader then looks for three. Text inside `<pre>` is deliberately
+skipped: Prism rewrites a block from its own text and the line-wrap pass
+rebuilds its innerHTML, so a mark there would vanish on the next pass.
+Inline `<code>` is diffed.
+
+**Quoted content is not the kit's words.** A copy region's body carries
+`data-oku-verbatim`, and `localize()` returns early inside it. Without
+that, a translated page rewrites a paragraph the reader is about to
+paste somewhere else, because it happened to match a string-table key.
 
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never

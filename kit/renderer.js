@@ -636,7 +636,8 @@
   // arrived as .md (lifted at build time) or as a fence inside a v2
   // markdown string (lifted here).
   const FENCE_KINDS = ['chart', 'chart-grid', 'table', 'kpi-grid', 'step-flow',
-    'timeline', 'compare-grid', 'insight', 'example', 'live-snippet', 'annotated-code', 'diagram', 'info-tip'];
+    'timeline', 'compare-grid', 'insight', 'example', 'live-snippet', 'annotated-code', 'diagram', 'info-tip',
+    'copy'];
     // No 'tldr': `> [!TLDR]` is the one way to write one — see chrome/renderer admonition handling.
 
   function liftTypedFence(lang, src) {
@@ -904,6 +905,121 @@
     }
     pieces.push(src.slice(start));
     return { pieces: pieces, opens: stack };
+  }
+
+
+  /* ================================================================ *
+   * Word-level diff, for a copy region that says what it replaces
+   *
+   * Two rendered regions, marked in place: `<del>` on words the new
+   * text drops, `<ins>` on words it adds. The reader sees the EDIT,
+   * not two paragraphs to compare by eye.
+   *
+   * The marks never reach the clipboard — every copy re-renders from
+   * the source markdown into a detached host, so there is no marked-up
+   * DOM to strip. That is the same reason it does not read the visible
+   * region: line-number gutters, fold markers and the kit's own copy
+   * button all live in there.
+   * ================================================================ */
+
+  // Words, and where each one sits. Punctuation is its own token, so
+  // `affected.` → `affected` + `.` and a full stop turning into a comma
+  // does not repaint the word in front of it.
+  const COPY_WORD_RE = /[\p{L}\p{N}_'’]+|\S/gu;
+
+  function copyWordSpans(root) {
+    const out = [];
+    const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = walk.nextNode())) {
+      // A `pre` is left alone deliberately. Prism rewrites a block from
+      // its own text and would wipe the marks, and the line-wrap pass
+      // rebuilds the same innerHTML — so a diffed code block is a diff
+      // that disappears on the next pass. Inline `<code>` is untouched
+      // by both and IS diffed, which is where the config keys live.
+      if (n.parentElement && n.parentElement.closest('pre, script, style')) continue;
+      COPY_WORD_RE.lastIndex = 0;
+      let m;
+      while ((m = COPY_WORD_RE.exec(n.nodeValue)) !== null) {
+        out.push({ node: n, start: m.index, end: m.index + m[0].length, w: m[0] });
+      }
+    }
+    return out;
+  }
+
+  // Indices into A that the edit removes, and into B that it adds.
+  function copyWordDiff(A, B) {
+    const n = A.length, m = B.length;
+    let p = 0;
+    while (p < n && p < m && A[p] === B[p]) p++;
+    let s = 0;
+    while (s < n - p && s < m - p && A[n - 1 - s] === B[m - 1 - s]) s++;
+    const a = A.slice(p, n - s), b = B.slice(p, m - s);
+    const range = (len, base) => Array.from({ length: len }, (_, i) => base + i);
+    if (!a.length && !b.length) return [[], []];
+    if (!a.length) return [[], range(b.length, p)];
+    if (!b.length) return [range(a.length, p), []];
+    // An LCS table is O(a·b) cells. Past this the pair is not a pointed
+    // edit any more, and marking the whole middle says so honestly —
+    // better than a page that stalls while it computes a wall of green.
+    if (a.length * b.length > 400000) return [range(a.length, p), range(b.length, p)];
+
+    const L = [];
+    for (let i = 0; i <= a.length; i++) L.push(new Uint32Array(b.length + 1));
+    for (let i = a.length - 1; i >= 0; i--) {
+      for (let j = b.length - 1; j >= 0; j--) {
+        L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+      }
+    }
+    const del = [], ins = [];
+    let i = 0, j = 0;
+    while (i < a.length && j < b.length) {
+      if (a[i] === b[j]) { i++; j++; }
+      else if (L[i + 1][j] >= L[i][j + 1]) { del.push(p + i); i++; }
+      else { ins.push(p + j); j++; }
+    }
+    while (i < a.length) { del.push(p + i); i++; }
+    while (j < b.length) { ins.push(p + j); j++; }
+    return [del, ins];
+  }
+
+  function markCopyWords(spans, indices, tag, cls) {
+    if (!indices.length) return;
+    // Contiguous words in one text node become ONE mark, so the spaces
+    // between them are tinted too and a three-word change reads as one
+    // change rather than three.
+    const pieces = [];
+    let run = null;
+    for (const i of indices) {
+      const sp = spans[i];
+      if (!sp) continue;
+      if (run && run.node === sp.node && run.last === i - 1) {
+        run.end = sp.end;
+        run.last = i;
+      } else {
+        run = { node: sp.node, start: sp.start, end: sp.end, last: i };
+        pieces.push(run);
+      }
+    }
+    // Last piece first: splitText only disturbs text AFTER the offset,
+    // so every earlier piece's offsets are still the ones measured.
+    pieces.reverse();
+    for (const pc of pieces) {
+      const tail = pc.node.splitText(pc.start);
+      tail.splitText(pc.end - pc.start);
+      const el = document.createElement(tag);
+      el.className = cls;
+      tail.parentNode.replaceChild(el, tail);
+      el.appendChild(tail);
+    }
+  }
+
+  function diffCopyRegions(oldBody, newBody) {
+    const A = copyWordSpans(oldBody), B = copyWordSpans(newBody);
+    const [del, ins] = copyWordDiff(A.map((s) => s.w), B.map((s) => s.w));
+    markCopyWords(A, del, 'del', 'okt-copy-del');
+    markCopyWords(B, ins, 'ins', 'okt-copy-ins');
+    return del.length + ins.length;
   }
 
   function isBlockStart(line, noIslands) {
@@ -1636,6 +1752,7 @@
         case 'chart-grid':     el = this._renderChartGrid(block); break;
         case 'example':        el = this._renderExample(block); break;
         case 'insight':        el = this._renderInsight(block); break;
+        case 'copy':           el = this._renderCopy(block); break;
         case 'info-tip':       el = this._renderInfoTip(block); break;
         case 'image':          el = this._renderImage(block); break;
         case 'svg':            el = this._renderSvg(block); break;
@@ -2027,6 +2144,110 @@
         grid.appendChild(card);
       }
       return grid;
+    }
+
+/* A region the reader is meant to take away.
+     *
+     * With `before` it reads as a replacement, and the two regions have
+     * different jobs — which is why their controls differ. You copy the
+     * OLD text to find it, and search takes plain text, so that region
+     * has exactly one button. You copy the NEW text to paste it, so the
+     * format choice lives there and only there.
+     *
+     * The three formats all come from `b`, the markdown source, which
+     * travels in a `<script type="text/x-md">` beside the rendering.
+     * chrome.js re-renders it at click time; see wireCopyRegions. */
+    _renderCopy(block) {
+      const FORMATS = ['rich', 'markdown', 'plain'];
+      const LABEL = { rich: 'Rich', markdown: 'Markdown', plain: 'Plain' };
+      const FULL = {
+        rich: 'Copy as rich text',
+        markdown: 'Copy as Markdown',
+        plain: 'Copy as plain text',
+      };
+      const wrap = document.createElement('div');
+      wrap.className = 'okt-copy';
+
+      const wanted = Array.isArray(block.formats) && block.formats.length ? block.formats : FORMATS;
+      // Canonical order, whatever order the author listed them in: the
+      // buttons sit in the same places on every region of every page.
+      const offered = FORMATS.filter((f) => wanted.indexOf(f) >= 0);
+
+      if (block.t) {
+        const head = document.createElement('div');
+        head.className = 'okt-copy-head';
+        parseInline(block.t, head);
+        wrap.appendChild(head);
+      }
+
+      const hasBefore = typeof block.before === 'string' && block.before.trim() !== '';
+
+      const region = (variant, src, role, formats) => {
+        const sec = document.createElement('div');
+        sec.className = 'okt-copy-region okt-copy-' + variant;
+
+        const bar = document.createElement('div');
+        bar.className = 'okt-copy-bar';
+        if (role) {
+          const lb = document.createElement('span');
+          lb.className = 'okt-copy-role';
+          lb.textContent = role;
+          bar.appendChild(lb);
+        }
+        const actions = document.createElement('span');
+        actions.className = 'okt-copy-actions';
+        for (const f of formats) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'okt-copy-btn';
+          btn.setAttribute('data-copy-format', f);
+          btn.title = FULL[f];
+          btn.setAttribute('aria-label', FULL[f]);
+          // The label is its own element because the string table only
+          // rewrites a LEAF, and chrome.js prepends the icon into this
+          // button — after which the button has an element child and
+          // its text would stop being translated on a translated page.
+          const lab = document.createElement('span');
+          lab.className = 'okt-copy-label';
+          // One button means the format is not a choice, so naming it
+          // on the face of the button is chrome with nothing to say.
+          lab.textContent = formats.length > 1 ? LABEL[f] : 'Copy';
+          btn.appendChild(lab);
+          actions.appendChild(btn);
+        }
+        bar.appendChild(actions);
+        sec.appendChild(bar);
+
+        const body = document.createElement('div');
+        body.className = 'okt-copy-body';
+        // The content is quoted verbatim, so the kit's own string table
+        // must not rewrite a paragraph that happens to read `Copy`.
+        body.setAttribute('data-oku-verbatim', '');
+        emitMarkdown(body, parseMarkdown(src), null);
+        sec.appendChild(body);
+
+        const holder = document.createElement('script');
+        holder.type = 'text/x-md';
+        holder.textContent = src;
+        sec.appendChild(holder);
+        return { sec: sec, body: body };
+      };
+
+      let oldRegion = null;
+      if (hasBefore) {
+        // Plain text only, always: this region exists to be found, and
+        // Cmd+F does not take rich text.
+        oldRegion = region('was', block.before, 'Replace', ['plain']);
+        wrap.appendChild(oldRegion.sec);
+      }
+      const newRegion = region('now', block.b || '', hasBefore ? 'With' : '', offered);
+      wrap.appendChild(newRegion.sec);
+
+      if (hasBefore && block.diff !== false) {
+        diffCopyRegions(oldRegion.body, newRegion.body);
+        wrap.classList.add('okt-copy-diffed');
+      }
+      return wrap;
     }
 
     _renderInsight(block) {
@@ -2630,6 +2851,7 @@
     'example': { required: ['code', 'output'] },
     'image': { required: ['src'] },
     'info-tip': { required: ['summary', 'content'] },
+    'copy': { required: ['b'] },
     'insight': { required: ['b'] },
     'kpi-grid': { required: ['tiles'], items: { tiles: ['num', 'label'] } },
     'live-snippet': { required: ['src'] },

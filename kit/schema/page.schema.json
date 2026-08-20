@@ -138,6 +138,9 @@
         },
         {
           "$ref": "#/$defs/info-tip"
+        },
+        {
+          "$ref": "#/$defs/copy"
         }
       ]
     },
@@ -2494,6 +2497,49 @@
           "items": {
             "$ref": "#/$defs/block"
           }
+        }
+      }
+    },
+    "copy": {
+      "type": "object",
+      "required": [
+        "k",
+        "b"
+      ],
+      "additionalProperties": false,
+      "description": "A region the reader is meant to take away, with copy in three formats. With `before`, it reads as a replacement: what to find, and what to put in its place.",
+      "properties": {
+        "k": {
+          "const": "copy"
+        },
+        "t": {
+          "type": "string",
+          "description": "What this region is, and where it goes — e.g. 'Section 2.2, second paragraph'."
+        },
+        "b": {
+          "type": "string",
+          "description": "The content to copy, as markdown. This is the source all three formats are derived from."
+        },
+        "before": {
+          "type": "string",
+          "description": "What this content replaces, as markdown. Its copy button is plain text only — that region's job is to be found, and search takes plain text."
+        },
+        "formats": {
+          "type": "array",
+          "description": "Which formats to offer, out of rich / markdown / plain. Default: all three, always in that order.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "rich",
+              "markdown",
+              "plain"
+            ]
+          }
+        },
+        "diff": {
+          "type": "boolean",
+          "description": "Mark what changed between `before` and `b`, word by word. Default true when `before` is present."
         }
       }
     }

@@ -4232,7 +4232,7 @@ footer {
 /* ============ Print / PDF ============ */
 @media print {
   .ctrl-btn, .okt-chrome-cluster, .okt-rail, .progress-bar, .skip-link,
-  .copy-btn, .permalink { display: none !important; }
+  .copy-btn, .permalink, .okt-copy-actions { display: none !important; }
   /* page-nav is listed because of the pinned state. Off-canvas it was
      invisible on paper for free; at left: 0 it would print, and its
      inset would print with it. */
@@ -4242,7 +4242,8 @@ footer {
   main { padding: 0; max-width: none; }
   header.cover { page-break-after: avoid; }
   h1, h2, h3, h4 { page-break-after: avoid; color: black; }
-  pre, table, .callout, .compare-grid, .kpi-grid, .compare-card, details.card, .tldr { page-break-inside: avoid; }
+  pre, table, .callout, .compare-grid, .kpi-grid, .compare-card, details.card, .tldr,
+  .okt-copy-region { page-break-inside: avoid; }
   a { color: black; text-decoration: underline; }
   a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 9pt; color: #555; }
   details { display: block; }
@@ -6552,6 +6553,94 @@ oku-snippet .hds-preview {
 }
 @media (max-width: 900px) {
   .example-pair { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ============ Copy region ============
+ * A block the reader is meant to take away, optionally paired with the
+ * text it replaces. The two regions share one card because they are one
+ * instruction, not two quotations that happen to be adjacent.
+ * --------------------------------------------------------------- */
+.okt-copy {
+  margin: 22px 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px var(--shadow-soft);
+  overflow: hidden;
+}
+/* The card's own surface, not the recessed one. Grey means exactly one
+   thing inside this card — "this is the text being replaced" — and a
+   head band sharing it made the card read as three stripes of
+   ambiguous rank instead of a caption over a pair. */
+.okt-copy-head {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  font: 600 12.5px 'Inter', sans-serif;
+  color: var(--text-soft);
+}
+.okt-copy-region + .okt-copy-region { border-top: 1px solid var(--border); }
+/* The old text is quoted, not offered. It sits on the recessed surface
+   so the region below it reads as the one to take away. */
+.okt-copy-was { background: var(--surface-2); }
+
+.okt-copy-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px 0 14px;
+}
+/* A lone region has no role word, and space-between would then park the
+   buttons on the left, under the body text instead of over its edge. */
+.okt-copy-bar > .okt-copy-actions:only-child { margin-left: auto; }
+.okt-copy-role {
+  font: 600 10.5px 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.okt-copy-actions { display: inline-flex; gap: 6px; }
+.okt-copy-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px;
+  font: 500 11.5px 'Inter', sans-serif;
+  color: var(--text-soft);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.okt-copy-btn:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
+.okt-copy-btn.is-copied { color: var(--success); border-color: var(--success); background: var(--success-soft); }
+.okt-copy-btn.is-failed { color: var(--danger);  border-color: var(--danger);  background: var(--danger-soft); }
+.okt-copy-icon { display: inline-flex; }
+.okt-copy-icon svg { width: 12px; height: 12px; }
+
+.okt-copy-body { padding: 6px 14px 14px 14px; }
+.okt-copy-body > *:first-child { margin-top: 0; }
+.okt-copy-body > *:last-child { margin-bottom: 0; }
+
+/* Removed and added words. Colour AND a line, because a diff that a
+   reader who cannot separate the two hues can still read is a diff;
+   one keyed on hue alone is a decoration they have to take on trust. */
+.okt-copy-del {
+  background: var(--danger-soft);
+  color: var(--text);
+  text-decoration: line-through;
+  text-decoration-color: var(--danger);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.okt-copy-ins {
+  background: var(--success-soft);
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--success);
+  text-underline-offset: 2px;
+  border-radius: 3px;
+  padding: 0 1px;
 }
 
 /* ============ Section / heading card boundaries (P3) ============

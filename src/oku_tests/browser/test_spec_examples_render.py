@@ -115,7 +115,11 @@ IN_SECTIONS = """() => {
       ' canvas, img, .bar-track, .kpi, .step-card, .compare-card,' +
       // A closed <details> paints its summary and nothing else — that IS
       // its rendered state, so the box counts rather than its contents.
-      ' .okt-tl-item, aside.insight, details.info-tip, td, th, pre code, .okt-diag-node'
+      // A copy region's figure IS its two boxes. Without the box in
+      // this list the only thing matching is the clipboard glyph on
+      // its buttons, and a 12px icon reads as a degenerate figure.
+      ' .okt-tl-item, aside.insight, details.info-tip, .okt-copy-region,'  +
+      ' td, th, pre code, .okt-diag-node'
     );
     let widest = 0;
     painted.forEach((el) => {

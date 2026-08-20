@@ -60,10 +60,28 @@ DYNAMIC = {
     "max",
 }
 
+# Emitted from a lookup keyed by something else — a copy format, a
+# region role — so the literal sits in a map declaration and never in
+# the assignment a pattern above could match. Unlike DYNAMIC the string
+# IS in the source; what is missing is a use site shaped like a string.
+# Named here so the table still has to carry them.
+FROM_LOOKUP = {
+    # kit/renderer.js, _renderCopy: LABEL and FULL, keyed by format.
+    "Rich",
+    "Plain",
+    "Copy as rich text",
+    "Copy as Markdown",
+    "Copy as plain text",
+    # The two region roles, passed to region() as an argument.
+    "Replace",
+    "With",
+}
+
 # Strings that are deliberately the same in every language. Each needs a
 # reason; "we did not get to it" is not one.
 UNTRANSLATED = {
     "TL;DR": "an established abbreviation, used as-is in Turkish technical writing",
+    "Markdown": "the name of the format, written the same way in Turkish",
     "Esc": "the key cap, which is printed on the keyboard in English",
 }
 
@@ -100,7 +118,7 @@ def test_a_language_table_exists(tables):
 
 def test_every_reader_facing_string_is_translated(kit_strings, tables):
     for code, table in tables.items():
-        wanted = kit_strings | DYNAMIC
+        wanted = kit_strings | DYNAMIC | FROM_LOOKUP
         missing = sorted(s for s in wanted if s not in table and s not in UNTRANSLATED)
         assert missing == [], (
             f"{len(missing)} kit string(s) have no {code} translation and will render "
@@ -113,7 +131,8 @@ def test_the_table_names_nothing_the_kit_stopped_saying(kit_strings, tables):
     key survives in the table, so the entry silently stops applying and
     the new wording ships untranslated."""
     for code, table in tables.items():
-        stale = sorted(k for k in table if k not in kit_strings and k not in DYNAMIC)
+        known = kit_strings | DYNAMIC | FROM_LOOKUP
+        stale = sorted(k for k in table if k not in known)
         assert stale == [], f"{code} table has entries the kit no longer emits: {stale}"
 
 

@@ -115,7 +115,7 @@ oku clean
 ## oku spec {#spec}
 
 Print a ready-to-paste payload for any block kind or chart type. The kit
-has 15 block kinds and 53 chart types, and the shape of each is the one
+has 14 block kinds and 53 chart types, and the shape of each is the one
 thing an author cannot infer from the page they are writing.
 
 ```bash

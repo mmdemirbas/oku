@@ -675,6 +675,7 @@ _FENCE_KINDS = {
     "annotated-code",
     "diagram",
     "info-tip",
+    "copy",
     # NOT "tldr": the fence lifts to a block that no v2 renderer case
     # draws and no `$defs` entry validates. `> [!TLDR]` is the one way.
 }
@@ -1861,6 +1862,7 @@ _KNOWN_BLOCK_KINDS = {
     "svg",
     "live-snippet",
     "example",
+    "copy",
 }
 
 _KNOWN_INLINE_KINDS = {"glossary-term", "ext-ref", "code", "em", "strong", "link", "html"}

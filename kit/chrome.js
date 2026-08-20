@@ -456,6 +456,11 @@ var __okuI18n = (function () {
         seen.add(host);
         var els = [host].concat(Array.prototype.slice.call(host.querySelectorAll('*')));
         els.forEach(function (el) {
+          /* Quoted content, not the kit's own words. A copy region
+             holds text the reader is about to paste somewhere else, so
+             translating a paragraph of it because it happens to match
+             a table key would change what they carry away. */
+          if (el.closest && el.closest('[data-oku-verbatim]')) return;
           /* A string the kit COMPOSED — `Last updated 2026-05-18` — is
              not a table key, so exact matching can never see it. The
              element carries its template and arguments instead, and is
@@ -2473,6 +2478,7 @@ var RAIL_FIGURES = [
   ['oku-live-snippet', 'Snippet', 'hollow'],
   ['figure.okt-figure', 'Figure', 'hollow'],
   ['.example-pair', 'Example', 'hollow'],
+  ['.okt-copy', 'Copy region', 'hollow'],
 ];
 
 // How far from the pointer the swell reaches, and how much it swells.
@@ -2978,6 +2984,256 @@ function buildRail() {
   }
 })();
 
+/* ============ Copy regions: three formats from one source ============ */
+/* A reader takes a region away and picks the format. All three come
+   from the markdown the author wrote, re-rendered HERE into a detached
+   host — reading the visible region would hand over the line-number
+   gutter, the fold markers, the kit's own copy button and, when the
+   region says what it replaces, the diff marks. Rendering from source
+   is what makes those marks safe to draw in the first place. */
+
+var __OKU_COPY_KEEP_ATTR = {
+  a: ['href', 'title'],
+  img: ['src', 'alt', 'title'],
+  td: ['colspan', 'rowspan'],
+  th: ['colspan', 'rowspan', 'scope'],
+  ol: ['start'],
+  time: ['datetime'],
+};
+
+var __OKU_COPY_BLOCK_TAGS = [
+  'p', 'div', 'section', 'article', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'blockquote', 'ul', 'ol', 'li', 'pre', 'table', 'dl', 'dt', 'dd',
+  'figure', 'figcaption', 'hr', 'aside', 'details', 'summary',
+];
+
+function __okuCopyRender(src) {
+  var host = document.createElement('div');
+  if (window.OkuRenderer && typeof OkuRenderer.renderMarkdownInto === 'function') {
+    try {
+      OkuRenderer.renderMarkdownInto(src, host, { idPrefix: 'okucopy-' });
+      return host;
+    } catch (e) { /* fall through to the source itself */ }
+  }
+  host.textContent = src;
+  return host;
+}
+
+/* Semantic HTML, stripped of everything that belongs to THIS page. The
+   target applies its own styles — a wiki, a doc, a mail client all do —
+   so carrying `class="okt-card"` and `style="color:var(--accent)"` into
+   it produces text that looks pasted in and follows no theme at all. */
+function __okuCopyHtml(host) {
+  var clone = host.cloneNode(true);
+  Array.prototype.forEach.call(
+    clone.querySelectorAll('script, style, .copy-btn, .okt-code-gutter, .okt-sr-only'),
+    function (n) { n.parentNode.removeChild(n); }
+  );
+  var all = [clone].concat(Array.prototype.slice.call(clone.querySelectorAll('*')));
+  all.forEach(function (el) {
+    var keep = __OKU_COPY_KEEP_ATTR[el.tagName.toLowerCase()] || [];
+    Array.prototype.slice.call(el.attributes || []).forEach(function (at) {
+      if (keep.indexOf(at.name) < 0) el.removeAttribute(at.name);
+    });
+  });
+  // A relative href means nothing once the text is in another system.
+  Array.prototype.forEach.call(clone.querySelectorAll('a[href], img[src]'), function (el) {
+    var attr = el.tagName === 'IMG' ? 'src' : 'href';
+    var v = el.getAttribute(attr);
+    if (!v || /^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(v)) return;
+    try { el.setAttribute(attr, new URL(v, document.baseURI).href); } catch (e) {}
+  });
+  return clone.innerHTML.trim();
+}
+
+function __okuCopyInline(el) {
+  var out = '';
+  Array.prototype.forEach.call(el.childNodes, function (n) {
+    if (n.nodeType === 3) { out += n.nodeValue.replace(/\s+/g, ' '); return; }
+    if (n.nodeType !== 1) return;
+    var tag = n.tagName.toLowerCase();
+    if (tag === 'br') { out += '\n'; return; }
+    if (tag === 'img') { out += n.getAttribute('alt') || ''; return; }
+    var inner = __okuCopyInline(n);
+    if (tag === 'a') {
+      var href = n.getAttribute('href') || '';
+      // A bare URL as its own link text does not need repeating, and a
+      // fragment names a place on THIS page, which the target has not.
+      out += href && href.charAt(0) !== '#' && href !== inner.trim()
+        ? inner + ' (' + href + ')'
+        : inner;
+      return;
+    }
+    out += inner;
+  });
+  return out.replace(/[ \t]+/g, ' ').trim();
+}
+
+function __okuCopyTsv(table) {
+  var rows = [];
+  Array.prototype.forEach.call(table.querySelectorAll('tr'), function (tr) {
+    var cells = Array.prototype.map.call(tr.querySelectorAll('th, td'), function (c) {
+      return __okuCopyInline(c).replace(/[\t\n]/g, ' ');
+    });
+    if (cells.length) rows.push(cells.join('\t'));
+  });
+  return rows.join('\n');
+}
+
+function __okuCopyHasBlockChild(el) {
+  return Array.prototype.some.call(el.children, function (c) {
+    return __OKU_COPY_BLOCK_TAGS.indexOf(c.tagName.toLowerCase()) >= 0;
+  });
+}
+
+function __okuCopyBlock(el) {
+  var tag = el.tagName.toLowerCase();
+  if (tag === 'pre') return el.textContent.replace(/\s+$/, '');
+  // A table read line by line is one cell per line, which is no use to
+  // anyone. TSV is what a spreadsheet and a plain field both take, and
+  // it is already the kit's plain form for a table.
+  if (tag === 'table') return __okuCopyTsv(el);
+  if (tag === 'hr') return '---';
+  if (tag === 'ul' || tag === 'ol') {
+    var num = parseInt(el.getAttribute('start') || '1', 10);
+    var items = [];
+    Array.prototype.forEach.call(el.children, function (li) {
+      if (li.tagName.toLowerCase() !== 'li') return;
+      var bullet = tag === 'ol' ? num++ + '. ' : '- ';
+      var body = __okuCopyHasBlockChild(li) ? __okuCopyContainer(li) : __okuCopyInline(li);
+      items.push(body.split('\n').map(function (line, i) {
+        return (i === 0 ? bullet : '  ') + line;
+      }).join('\n'));
+    });
+    return items.join('\n');
+  }
+  var quote = tag === 'blockquote' ? '> ' : '';
+  if (!__okuCopyHasBlockChild(el)) {
+    var text = __okuCopyInline(el);
+    return text ? quote + text : '';
+  }
+  var inner = __okuCopyContainer(el);
+  if (!quote) return inner;
+  return inner.split('\n').map(function (line) { return line ? quote + line : '>'; }).join('\n');
+}
+
+function __okuCopyContainer(el) {
+  var parts = [];
+  Array.prototype.forEach.call(el.childNodes, function (n) {
+    if (n.nodeType === 3) {
+      var text = n.nodeValue.replace(/\s+/g, ' ').trim();
+      if (text) parts.push(text);
+    } else if (n.nodeType === 1) {
+      var block = __okuCopyBlock(n);
+      if (block) parts.push(block);
+    }
+  });
+  return parts.join('\n\n');
+}
+
+function __okuCopyPlain(host) {
+  return (__okuCopyHasBlockChild(host) ? __okuCopyContainer(host) : __okuCopyInline(host)).trim();
+}
+
+/* Older engines have no ClipboardItem, and rich text is the whole point
+   of that button. A selection copy carries text/html for free. */
+function __okuCopyBySelection(html) {
+  var holder = document.createElement('div');
+  holder.setAttribute('data-oku-verbatim', '');
+  holder.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;overflow:hidden;';
+  holder.innerHTML = html;
+  document.body.appendChild(holder);
+  var sel = window.getSelection();
+  var saved = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+  var ok = false;
+  try {
+    var range = document.createRange();
+    range.selectNodeContents(holder);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    ok = document.execCommand('copy');
+  } catch (e) { ok = false; }
+  if (sel) {
+    sel.removeAllRanges();
+    if (saved) sel.addRange(saved);
+  }
+  // Removed in the same task. A MutationObserver callback is a
+  // microtask and runs after this returns, by which time the node is
+  // gone and none of the kit's own decoration passes can reach it.
+  holder.parentNode.removeChild(holder);
+  return ok;
+}
+
+function __okuCopyWrite(format, src) {
+  var writeText = function (text) {
+    return navigator.clipboard && navigator.clipboard.writeText
+      ? navigator.clipboard.writeText(text)
+      : Promise.reject(new Error('no clipboard'));
+  };
+  // The author's source, verbatim. Re-serialising the DOM would give
+  // back A markdown, not THE markdown, and the round trip is the whole
+  // reason to offer this format.
+  if (format === 'markdown') return writeText(src);
+
+  var host = __okuCopyRender(src);
+  var text = __okuCopyPlain(host);
+  if (format === 'plain') return writeText(text);
+
+  var html = __okuCopyHtml(host);
+  if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+    try {
+      return navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          // Rides along so a paste into a plain field still lands. The
+          // receiving application picks the flavour it can use.
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        }),
+      ]);
+    } catch (e) { /* fall through to the selection copy */ }
+  }
+  return __okuCopyBySelection(html)
+    ? Promise.resolve()
+    : Promise.reject(new Error('no rich clipboard'));
+}
+
+/* Only the ICON changes. Swapping the label would resize the button and
+   move the two beside it, and a control that moves under the pointer is
+   the same defect as a card that does. */
+function __okuCopyFeedback(btn, ok) {
+  var icon = btn.querySelector('.okt-copy-icon');
+  if (icon) icon.innerHTML = ok ? ICON_CHECK : ICON_CROSS;
+  btn.classList.add(ok ? 'is-copied' : 'is-failed');
+  window.setTimeout(function () {
+    btn.classList.remove('is-copied', 'is-failed');
+    if (icon) icon.innerHTML = ICON_CLIPBOARD;
+  }, 1400);
+}
+
+function wireCopyRegions(root) {
+  var scope = root || document;
+  Array.prototype.forEach.call(scope.querySelectorAll('.okt-copy-region'), function (region) {
+    if (region._okuCopyWired) return;
+    region._okuCopyWired = true;
+    var holder = region.querySelector('script[type="text/x-md"]');
+    var src = holder ? holder.textContent : '';
+    Array.prototype.forEach.call(region.querySelectorAll('.okt-copy-btn'), function (btn) {
+      if (!btn.querySelector('.okt-copy-icon')) {
+        var icon = document.createElement('span');
+        icon.className = 'okt-copy-icon';
+        icon.innerHTML = ICON_CLIPBOARD;
+        btn.insertBefore(icon, btn.firstChild);
+      }
+      btn.addEventListener('click', function () {
+        __okuCopyWrite(btn.getAttribute('data-copy-format') || 'plain', src).then(
+          function () { __okuCopyFeedback(btn, true); },
+          function () { __okuCopyFeedback(btn, false); }
+        );
+      });
+    });
+  });
+}
+
 /* ============ Reading aids: progress, back-to-top, copy-btn, glossary ============ */
 // The once-only globals (scroll + keydown listeners) are registered the
 // first time initReadingAids runs; subsequent calls only re-scan the DOM
@@ -2992,6 +3248,7 @@ var __okuAidsInited = false;
 var __okuClipSeq = 0;
 
 function initReadingAids() {
+  wireCopyRegions();
   if (!__okuAidsInited) {
     __okuAidsInited = true;
 
@@ -4429,7 +4686,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-20-r45';
+var __okuKitBuild = '2026-08-20-r46';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

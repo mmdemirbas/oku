@@ -279,6 +279,30 @@ ve `"v0.4.0"` her biri için ayrı renk uydurmadan çalışır.
 {"code":{"k":"code","lang":"json","src":"{\n  \"k\": \"timeline\",\n  \"events\": [\n    {\n      \"status\": \"open\",\n      \"label\": \"iddia #1\",\n      \"t\": \"\\\"Sorun motorun derlemesinde\\\"\",\n      \"b\": \"Kodun ilk okuması. Akla yatkın ve **doğrulanmamış** — bir kuşku, bulgu değil.\"\n    },\n    {\n      \"status\": \"dropped\",\n      \"label\": \"düzeltildi\",\n      \"t\": \"Öteki yöne fazla yüklenildi\",\n      \"b\": \"Sonra \\\"tamamen bizim boşluğumuz\\\" tarafına savruldu. O da erkendi; yol henüz ölçülmemişti.\"\n    },\n    {\n      \"status\": \"done\",\n      \"label\": \"doğrulandı\",\n      \"t\": \"Boşluk gerçek ve bize ait\",\n      \"b\": \"Oluşturma yolu ölçüldü. `e326b65` ile düzeltildi.\"\n    }\n  ]\n}"},"output":{"k":"timeline","events":[{"status":"open","label":"iddia #1","t":"\"Sorun motorun derlemesinde\"","b":"Kodu okurken gelen ilk sezgi: içeri alınmış derleme değeri başka biçimde veriyor olmalı. Akla yatkın ve **doğrulanmamış** — bir kuşku, bulgu değil."},{"status":"dropped","label":"düzeltildi","t":"Öteki yöne fazla yüklenildi","b":"Sonra \"tamamen bizim boşluğumuz, motorun suçu yok\" tarafına savruldu. O da erkendi: uzak yol henüz ölçülmemişti."},{"status":"done","label":"doğrulandı","t":"Boşluk gerçek ve bize ait","b":"Oluşturma yolu ölçüldü. Dönüştürücümüz üstveri *verildiğinde* çalışıyor, ama birincil API hiç geçersiz kılınmamıştı — değer, dönüştürücü çalışmadan önce yok oluyordu. `e326b65` ile düzeltildi."},{"status":"note","label":"hâlâ açık","t":"Bir boşluk aşağı akışta duruyor ve bize ait değil","b":"Bellekteki şema alanı taşıdığı hâlde diske yazılan dosya onu atlıyor. Bu kayıp, doğru şema teslim edildikten sonra, satıcının yazma yolunun içinde oluşuyor."}]}}
 ```
 
+### copy {#copy}
+
+Okuyucunun alıp götürmesi için duran bir bölüm ve — mesele bir alıntı
+değil bir düzeltme ise — onun yerine geçeceği metin. Bir gözden
+geçirenin sık yazdığı tek cümle için var: *şunu şununla değiştirin*.
+
+Tek kaynak, üç biçim. **Markdown** kaynağın kendisidir; panodan geçen
+metin hiç değişmez. **Düz**, aynı metnin sözdizimi ayıklanmış hâlidir;
+biçimlendirme kabul etmeyen alanlar için. **Zengin**, bu sayfanın
+sınıflarını, kimliklerini ve satır içi biçemlerini taşımayan anlamsal
+HTML'dir — hedef kendi biçemini uygular; bunları da taşıyan bir kopya
+yapıştırılmış gibi durur ve hiçbir temayı izlemez.
+
+`before` verirseniz iki yarı sözcük sözcük karşılaştırılır; okuyucu iki
+paragrafı kendi karşılaştırmak yerine doğrudan değişikliği görür. İki
+yarı bir düzeltme değil baştan yazım ise `"diff": false` bunu kapatır.
+`formats` düğmeleri daraltır. `before` yarısı her zaman yalnızca düz
+metin sunar: işi hedef belgede *bulunmaktır* ve hiçbir arama kutusu
+zengin metin almaz.
+
+```oku-example
+{"code": {"k": "code", "lang": "json", "src": "{\n  \"k\": \"copy\",\n  \"t\": \"Uyumluluk tablosu, üçüncü satır\",\n  \"before\": \"Iceberg 1.10.0 etkilenmiyor.\",\n  \"b\": \"Iceberg 1.10.0 etkileniyor; düzeltme Apache main dalına girdi.\"\n}"}, "output": {"k": "copy", "t": "Uyumluluk tablosu, üçüncü satır", "before": "Iceberg 1.10.0 etkilenmiyor.", "b": "Iceberg 1.10.0 etkileniyor; düzeltme Apache main dalına girdi."}}
+```
+
 ## live-snippet {#visual}
 
 Düzenlenebilir HTML/CSS/JS metin alanı + korumalı iframe önizlemesi.

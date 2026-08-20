@@ -3073,6 +3073,27 @@ class TestDocumentedFenceTags:
             f"and omits {sorted(cli._FENCE_KINDS - listed)}"
         )
 
+    def test_the_briefing_counts_the_kinds_it_tells_authors_to_ask_for(self):
+        """Three files tell an author how many kinds there are, and all
+        three hand-copy the number. They read 15 against 13 real kinds —
+        so the one line telling an author the command is worth running
+        was also the line proving nobody had run it."""
+        import re
+
+        from oku import cli
+
+        repo_root = Path(__file__).resolve().parents[2]
+        pages = {
+            "skill/SKILL.md": r"every name: (\d+) block kinds",
+            "docs/cli.md": r"has (\d+) block kinds",
+            "docs/cli.tr.md": r"Kitte (\d+) blok türü",
+        }
+        for rel, pattern in pages.items():
+            text = (repo_root / rel).read_text(encoding="utf-8")
+            claimed = re.search(pattern, text)
+            assert claimed, f"{rel} no longer states a block-kind count"
+            assert int(claimed.group(1)) == len(cli._FENCE_KINDS), rel
+
     def test_every_file_that_names_fence_tags_names_them_correctly(self):
         """A decision table listing the primitives is worth its tokens;
         a stale one is not. The briefing's table named `oku-tldr` after

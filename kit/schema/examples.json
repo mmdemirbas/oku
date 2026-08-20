@@ -310,6 +310,11 @@
           "b": "The persisted file omits the field even though the in-memory schema carries it. That loss is inside the vendor's commit path, after it receives a correct schema."
         }
       ]
+    },
+    "copy": {
+      "t": "Section 2.2, second paragraph",
+      "before": "Only decimal columns are affected.",
+      "b": "Only decimal columns are affected. Iceberg **1.10.0** and **1.10.1** fail on one; the fix is on Apache main."
     }
   },
   "charts": {

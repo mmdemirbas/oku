@@ -417,6 +417,7 @@ reach for first):
 | `oku-diagram` | the same, with a caption | When the figure needs a caption line. A plain `mermaid` fence with an italic line under it produces the same thing. |
 | `oku-annotated-code` | a line of code and the reason for it | Walking through an implementation. Numbered markers in the source pair with a side panel. |
 | `oku-example` | input beside its rendered output | Documenting a format. This is how `docs/reference.md` shows every primitive. |
+| `oku-copy` | text the reader will paste elsewhere, and what it replaces | Pointed edits to a document someone else owns. Three clipboard formats off one source — markdown verbatim, plain, rich — and `before` adds a word-level diff so the edit is visible rather than inferred. |
 | `oku-live-snippet` | code the reader can edit and re-run | Teaching a syntax where trying it beats reading about it. |
 | `oku-insight` | one sentence that must not be skipped | Sparingly. It is text-shaped, and three of them in a row is a bullet list. |
 | `> [!TLDR]` | the page in one line plus three points | The opener. A blockquote alert, not a fence — there is no `oku-tldr`. |
@@ -429,7 +430,7 @@ one, and neither should you.
 **Never guess a payload shape — `oku spec <name>` prints it.**
 
 ```
-oku spec                # every name: 15 block kinds, 53 chart types
+oku spec                # every name: 14 block kinds, 53 chart types
 oku spec sankey         # the fence, ready to paste
 oku spec table --json   # the payload alone
 ```

@@ -115,7 +115,7 @@ oku clean
 ## oku spec {#spec}
 
 Herhangi bir blok türü ya da grafik türü için doğrudan yapıştırılabilir
-bir veri gövdesi yazdırır. Kitte 15 blok türü ve 53 grafik türü var;
+bir veri gövdesi yazdırır. Kitte 14 blok türü ve 53 grafik türü var;
 bunların biçimi, yazarın o an yazdığı sayfaya bakarak çıkaramayacağı tek
 şey.
 
