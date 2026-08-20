@@ -116,3 +116,31 @@ def test_a_kind_with_no_fence_says_how_to_write_it() -> None:
     fenceless = (SCHEMA_KINDS | DISPATCH_KINDS) - cli._FENCE_KINDS
     missing = sorted(k for k in fenceless if k not in cli._MARKDOWN_FORM_OF)
     assert missing == [], f"no stated markdown form for {missing}"
+
+
+def test_the_two_html_tag_tables_agree() -> None:
+    """Where an island ENDS is decided twice: renderer.js walks the
+    tags to know which element the next block goes inside, and the lint
+    walks them to know whether one is left open. Both need the same two
+    tables — an element that takes no closing tag, and one whose body is
+    text rather than markup. A tag in one table and not the other is a
+    lint that reports an island the renderer closed, or the reverse."""
+    void_js = re.search(r"const VOID_HTML_TAGS = \[(.*?)\];", RENDERER, re.S)
+    assert void_js, "VOID_HTML_TAGS moved in renderer.js — this test cannot see it any more"
+    assert set(re.findall(r"'([a-z]+)'", void_js.group(1))) == cli._VOID_HTML_TAGS
+
+    raw_js = re.search(
+        r"tag === 'script' \|\| tag === 'style' \|\| tag === 'pre' \|\| tag === 'textarea'",
+        RENDERER,
+    )
+    assert raw_js, "the raw-text tag test moved in renderer.js"
+    assert cli._RAW_TEXT_TAGS == {"script", "style", "pre", "textarea"}
+
+
+def test_the_two_inline_tag_tables_agree() -> None:
+    """The other half of the same question: which tag at column 0 does
+    NOT open an island. A paragraph beginning `<code>bin/oku</code>` is
+    prose in the browser and must be prose to the lint too."""
+    m = re.search(r"const INLINE_HTML_TAGS = \[(.*?)\];", RENDERER, re.S)
+    assert m, "INLINE_HTML_TAGS moved in renderer.js — this test cannot see it any more"
+    assert set(re.findall(r"'([a-z]+)'", m.group(1))) == cli._INLINE_HTML_TAGS

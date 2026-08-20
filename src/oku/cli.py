@@ -1944,6 +1944,56 @@ def _md_island_tag(line: str) -> str | None:
     return None if tag in _INLINE_HTML_TAGS else tag
 
 
+# Elements that never take a closing tag. Mirrors VOID_HTML_TAGS in
+# renderer.js — an island holding one of these leaves nothing open.
+_VOID_HTML_TAGS = {
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+}
+# Elements whose body is text, not markup — an island opened by one runs
+# to its closing tag whatever blank lines are inside it.
+_RAW_TEXT_TAGS = {"script", "style", "pre", "textarea"}
+_HTML_TAG_RE = re.compile(r"<(/?)([a-zA-Z][\w-]*)([^>]*)>")
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+_HTML_RAW_TEXT_RE = re.compile(r"<(script|style|textarea)\b[^>]*>.*?</\1\s*>", re.I | re.S)
+
+
+def _island_balance(src: str, stack: list[tuple[str, int]], lineno: int = 0) -> None:
+    """Apply one island line's tags to a stack of still-open elements.
+
+    Mirrors ``islandPieces`` in renderer.js. A blank line ends an HTML
+    *block*, never the element — so what an island leaves open takes the
+    blocks that follow, and this is the same walk the renderer does to
+    decide where they go. The stack is mutated in place; each entry is
+    the tag and the line that opened it.
+    """
+    scan = _HTML_RAW_TEXT_RE.sub(lambda m: " " * len(m.group(0)), _HTML_COMMENT_RE.sub("", src))
+    for m in _HTML_TAG_RE.finditer(scan):
+        tag = m.group(2).lower()
+        if tag in _VOID_HTML_TAGS:
+            continue
+        if m.group(1):
+            opened = [i for i, (t, _) in enumerate(stack) if t == tag]
+            if opened:
+                del stack[opened[-1] :]
+            elif stack:
+                stack.pop()
+        elif not m.group(3).rstrip().endswith("/"):
+            stack.append((tag, lineno))
+
+
 _PROSE_SKIP_KEYS = {"src", "source", "code", "k", "language", "lang"}
 
 
@@ -2072,28 +2122,80 @@ def _lint_md_string(
     prev_nonblank: str | None = None
     prev_blank = True
     in_island = False
+    raw_text_close: re.Pattern[str] | None = None
+    # Elements an island opened and has not closed yet. The renderer
+    # keeps writing into them, so one that never closes swallows the
+    # rest of the section — the same defect the truncation used to be,
+    # from the other side, and equally silent.
+    open_els: list[tuple[str, int]] = []
+
+    def _report_unclosed(boundary: str) -> None:
+        for tag, opened_at in open_els:
+            issues.append(
+                (
+                    "error",
+                    "island-unclosed",
+                    f"line {opened_at}",
+                    f"HTML island <{tag}> is never closed {boundary}. Everything after it is "
+                    f"written inside it — add the matching </{tag}>.",
+                )
+            )
+        open_els.clear()
+
     for lineno, line in prose:
         stripped = line.strip()
         if not stripped:
             prev_nonblank = None
             prev_blank = True
-            in_island = False
+            # A blank line ends the html BLOCK. The element stays open —
+            # that is what lets an author put markdown inside an island —
+            # so `open_els` is deliberately untouched here. A raw-text
+            # element (<pre>, <script>) does not even end its block.
+            if raw_text_close is None:
+                in_island = False
             continue
-        island_tag = None if in_island else _md_island_tag(line)
-        if island_tag:
-            issues.append(
-                (
-                    "info",
-                    "html-island",
-                    f"line {lineno}",
-                    f"Raw HTML island <{island_tag}> — renders fully in the kit, stripped by external markdown viewers.",
-                )
-            )
-            in_island = True
-        if in_island:
+        if raw_text_close is not None:
+            if raw_text_close.search(line):
+                _island_balance(line, open_els, lineno)
+                raw_text_close = None
+                in_island = False
             prev_nonblank = line
             prev_blank = False
             continue
+        island_tag = None if in_island else _md_island_tag(line)
+        if island_tag:
+            # One island, one note. A blank line inside an island starts
+            # a second html block — `</div>` on its own line is one —
+            # and reporting each of them names the same island twice.
+            if not open_els:
+                issues.append(
+                    (
+                        "info",
+                        "html-island",
+                        f"line {lineno}",
+                        f"Raw HTML island <{island_tag}> — renders fully in the kit, stripped by external markdown viewers.",
+                    )
+                )
+            in_island = True
+            if island_tag in _RAW_TEXT_TAGS:
+                closer = re.compile(r"</" + island_tag + r"\s*>", re.I)
+                _island_balance(line, open_els, lineno)
+                if not closer.search(line):
+                    raw_text_close = closer
+                prev_nonblank = line
+                prev_blank = False
+                continue
+        if in_island:
+            _island_balance(line, open_els, lineno)
+            prev_nonblank = line
+            prev_blank = False
+            continue
+        # A section boundary ends the run of blocks the renderer emits in
+        # one pass, so an island still open here does not reach its own
+        # closing tag either.
+        hlevel = _MD_HEADING_LINE_RE.match(line)
+        if hlevel and len(hlevel.group(1)) == 2 and open_els:
+            _report_unclosed(f"before the `## {hlevel.group(2)}` heading")
         if _MD_SETEXT_EQ_RE.match(line) and prev_nonblank is not None:
             issues.append(
                 (
@@ -2175,6 +2277,8 @@ def _lint_md_string(
                 )
         prev_nonblank = line
         prev_blank = False
+
+    _report_unclosed("in this page")
 
     # Inline code spans hold convention samples (`[label](#g/term-id)`)
     # — never real references; strip before collecting.

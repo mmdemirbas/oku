@@ -298,6 +298,39 @@ class TestMdStringLint:
         assert "html-island" not in self._codes("<code>bin/oku</code> is a shim.")
         assert "html-island" not in self._codes("<kbd>Cmd</kbd>+<kbd>R</kbd> reloads.")
 
+    def test_island_with_a_blank_line_is_one_island(self) -> None:
+        """A blank line ends the html BLOCK, not the element. The kit
+        keeps writing into the island until its tag arrives, so the
+        second half is not a new island and not an unclosed one."""
+        codes = self._codes("<div>\nfirst\n\nsecond\n</div>")
+        assert codes.count("html-island") == 1, codes
+        assert "island-unclosed" not in codes, codes
+
+    def test_island_that_never_closes_is_an_error(self) -> None:
+        """The failure the fix could introduce and the one it inherits:
+        everything after an unclosed tag is written inside it."""
+        codes = self._codes('<div class="okt-card">\nbody text\n')
+        assert "island-unclosed" in codes, codes
+
+    def test_a_section_heading_is_a_boundary_for_islands(self) -> None:
+        """The renderer emits one section's blocks per pass, so an
+        island still open at a `##` never reaches its own tag."""
+        assert "island-unclosed" in self._codes("<div>\nbody\n\n## Next {#next}\n\ntext\n</div>")
+
+    def test_a_void_element_leaves_nothing_open(self) -> None:
+        assert "island-unclosed" not in self._codes('<img src="a.png" alt="a">')
+        assert "island-unclosed" not in self._codes("<hr/>")
+
+    def test_a_raw_text_island_runs_past_a_blank_line(self) -> None:
+        """`<pre>` / `<script>` end at their closing tag whatever is in
+        between — a `<` in the body is arithmetic, not a tag."""
+        codes = self._codes("<pre><code>a = 1\n\nif (a < 2) b()\n</code></pre>")
+        assert "island-unclosed" not in codes, codes
+        assert "indented-code" not in codes, codes
+
+    def test_nested_islands_balance(self) -> None:
+        assert "island-unclosed" not in self._codes("<div>\n<div>\ninner\n</div>\n\nouter\n</div>")
+
     def test_unlifted_fence_flagged(self) -> None:
         assert "fence-not-lifted" in self._codes("```oku-chart\n{bad\n```")
 

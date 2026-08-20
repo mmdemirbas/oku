@@ -867,6 +867,45 @@
     return INLINE_HTML_TAGS.indexOf(tag) < 0 ? tag : null;
   }
 
+  // Elements that never take a closing tag, so a line holding one is a
+  // complete island and leaves nothing open.
+  const VOID_HTML_TAGS = [
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+    'link', 'meta', 'param', 'source', 'track', 'wbr',
+  ];
+
+  // Cut an island's source at every tag that closes an element some
+  // EARLIER island opened, and report which of its own elements it
+  // leaves open. Everything a `<` could mean that is not a tag —
+  // comments, and the body of a raw-text element, where `a < b` is
+  // arithmetic — is blanked first, at its own length so the offsets
+  // still index into the original string.
+  function islandPieces(src) {
+    const blank = (m) => ' '.repeat(m.length);
+    const scan = src
+      .replace(/<!--[\s\S]*?-->/g, blank)
+      .replace(/<(script|style|textarea)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, blank);
+    const re = /<(\/?)([a-zA-Z][\w-]*)([^>]*)>/g;
+    const stack = [];
+    const pieces = [];
+    let start = 0;
+    let m;
+    while ((m = re.exec(scan)) !== null) {
+      const tag = m[2].toLowerCase();
+      if (VOID_HTML_TAGS.indexOf(tag) >= 0) continue;
+      if (m[1]) {
+        const at = stack.lastIndexOf(tag);
+        if (at >= 0) { stack.length = at; continue; }
+        pieces.push(src.slice(start, m.index));
+        start = m.index + m[0].length;
+      } else if (!/\/\s*$/.test(m[3])) {
+        stack.push(tag);
+      }
+    }
+    pieces.push(src.slice(start));
+    return { pieces: pieces, opens: stack };
+  }
+
   function isBlockStart(line, noIslands) {
     return /^#{1,6}\s/.test(line)
       || /^>\s?/.test(line)
@@ -978,6 +1017,17 @@
    * ================================================================ */
 
   function emitMarkdown(host, blocks, openSection) {
+    // An island that opens more tags than it closes stays OPEN. A blank
+    // line ends the html *block* — that is CommonMark, and it is what
+    // lets an author write markdown inside a `<div>` — but it does not
+    // close the element, so what follows belongs inside it. Rendering
+    // each block as its own fragment auto-closed the element instead,
+    // and the rest of the island landed on the page as a sibling: an
+    // 82-line island rendered with 403 characters in it, everything
+    // else outside, and `oku check --strict` clean. `stillOpen` is what
+    // has not been closed yet; `into()` is where the next block goes.
+    const stillOpen = [];
+    const into = () => (stillOpen.length ? stillOpen[stillOpen.length - 1] : host);
     for (const node of blocks) {
       switch (node.k) {
         case 'heading': {
@@ -988,13 +1038,13 @@
           const h = document.createElement('h' + Math.min(6, Math.max(1, node.level)));
           if (node.id) h.id = uniqueAnchorId(node.id);
           parseInline(node.title, h);
-          host.appendChild(h);
+          into().appendChild(h);
           break;
         }
         case 'paragraph': {
           const p = document.createElement('p');
           parseInline(node.text, p);
-          host.appendChild(p);
+          into().appendChild(p);
           break;
         }
         case 'code': {
@@ -1003,37 +1053,55 @@
           if (node.lang) code.className = 'language-' + codeLanguage(node.lang);
           code.textContent = node.src;
           pre.appendChild(code);
-          host.appendChild(pre);
+          into().appendChild(pre);
           break;
         }
         case 'hr': {
-          host.appendChild(document.createElement('hr'));
+          into().appendChild(document.createElement('hr'));
           break;
         }
         case 'quote': {
           const bq = document.createElement('blockquote');
           const sub = parseMarkdown(node.body);
           emitMarkdown(bq, sub, null);
-          host.appendChild(bq);
+          into().appendChild(bq);
           break;
         }
         case 'admonition': {
-          host.appendChild(renderAdmonition(node));
+          into().appendChild(renderAdmonition(node));
           break;
         }
         case 'list': {
-          host.appendChild(renderList(node));
+          into().appendChild(renderList(node));
           break;
         }
         case 'table': {
-          host.appendChild(renderMarkdownTable(node));
+          into().appendChild(renderMarkdownTable(node));
           break;
         }
         case 'html': {
           // Raw HTML island. createContextualFragment (unlike
           // innerHTML) yields <script> elements that execute on
           // insertion — islands are full-capability by design.
-          host.appendChild(document.createRange().createContextualFragment(node.src));
+          const island = islandPieces(node.src);
+          for (let p = 0; p < island.pieces.length; p++) {
+            // Between two pieces sat a tag closing an element an
+            // earlier island opened — pop one level and carry on.
+            if (p > 0 && stillOpen.length) stillOpen.pop();
+            const piece = island.pieces[p];
+            if (!piece.trim()) continue;
+            into().appendChild(document.createRange().createContextualFragment(piece));
+          }
+          // The fragment auto-closed whatever this island left open, so
+          // walk back down into those elements: the following blocks
+          // are written inside them until their own tags arrive.
+          let cursor = into();
+          for (const tag of island.opens) {
+            const el = cursor.lastElementChild;
+            if (!el || el.tagName.toLowerCase() !== tag) break;
+            stillOpen.push(el);
+            cursor = el;
+          }
           break;
         }
         case 'dl': {
@@ -1049,13 +1117,13 @@
               dl.appendChild(dd);
             }
           }
-          host.appendChild(dl);
+          into().appendChild(dl);
           break;
         }
         case 'typed': {
           if (__renderTypedBlock) {
             const el = __renderTypedBlock(node.block);
-            if (el) host.appendChild(el);
+            if (el) into().appendChild(el);
           }
           break;
         }
