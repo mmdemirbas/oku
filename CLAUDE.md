@@ -531,6 +531,36 @@ attribute name: the toolbar sizes and orders its icons through
 in that list — a 22x10 box around a 0x0 icon. Held by
 `test_table_copy_formats.py`.
 
+**A project may declare .gitignore its skip list, and must ask for
+it.** `kit.json`'s `skip_gitignored: true` adds everything git ignores to
+the walk's prune set — one `git ls-files -o -i --exclude-standard
+--directory` per root, cached, `--directory` collapsing a wholly-ignored
+subtree to one entry so the walk prunes instead of stat-ing it. It exists
+because `SKIP_DIRS` can only list the names somebody remembered, and the
+names that matter differ per project: `tmp`, `build`, `out`, `target`, a
+recovered dataset, a scratch copy of the file being edited. One of those
+is how it was found — a backup of `CLAUDE.md` under `tmp/` was walked,
+turned into a page, and reported as fifteen `unresolved-link` warnings
+against links that are correct where the original sits.
+
+**Off by default, and that is the load-bearing part.** Gitignore is a
+version-control policy; this is a publication policy. Plenty of projects
+gitignore generated pages they fully intend to publish, and with the flag
+on, editing `.gitignore` silently changes what the site contains — action
+at a distance from a file nobody thinks of as build configuration. A
+project that says nothing gets exactly the old walk, and `skip_dirs`
+remains the direct way to say it, needing no git at all.
+
+Switched on, the failure it introduces is a page that should build going
+missing in silence, so: it stands down where it cannot know better (no
+git, no repository, or a root that is ITSELF ignored — git answers `./`
+there and everything below would look like junk), and it names itself
+where it acts, one line counting what git pruned and listing only paths
+the other rules would have walked. `dist` and `.idea` in that line would
+be noise, and a line that is mostly noise is one nobody reads when it
+finally matters. Held by `test_gitignored_walk.py`, whose first two cases
+are the default path.
+
 **A word a reader might also write cannot be a string-table key.** The
 localize walk matches a key against the leaf text of every descendant of
 an `.okt-*` host, and author content lives there too. The comment used to

@@ -335,6 +335,77 @@ def project_skip_dirs(root: Path) -> frozenset[str]:
     return result
 
 
+_git_ignored_cache: dict[str, frozenset[str]] = {}
+
+
+def project_skips_gitignored(root: Path) -> bool:
+    """kit.json's optional ``skip_gitignored`` flag. Off by default.
+
+    Off because gitignore is a VERSION-CONTROL policy and this is a
+    PUBLICATION policy, and they are not the same question. Plenty of
+    projects gitignore generated pages they fully intend to publish, and
+    with the flag on, editing ``.gitignore`` would silently change what
+    the site contains — action at a distance, from a file nobody thinks
+    of as build configuration.
+
+    Where the two policies DO coincide the flag says so explicitly, and
+    then the answer is worth having: ``SKIP_DIRS`` can only ever list
+    the names somebody remembered, and .gitignore is a list the project
+    already maintains.
+
+        {"name": "lakelab", "skip_gitignored": true}
+
+    ``skip_dirs`` remains the direct way to say it, and needs no git.
+    """
+    kit_json = find_kit_json(root)
+    if kit_json is None:
+        return False
+    try:
+        data = json.loads(kit_json.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+    return isinstance(data, dict) and data.get("skip_gitignored") is True
+
+
+def git_ignored_paths(root: Path) -> frozenset[str]:
+    """Absolute paths under ``root`` that git is told to ignore, when the
+    project has opted in with ``skip_gitignored``. Empty otherwise, which
+    is the default and the behaviour every existing project keeps.
+
+    One subprocess per root, cached. ``--directory`` collapses a
+    wholly-ignored directory to one entry, so the walker prunes the
+    subtree instead of stat-ing everything under it.
+
+    Empty also means "no opinion", not "nothing is ignored": when git is
+    absent, when ``root`` is not in a repository, or when ``root`` is
+    ITSELF ignored. Git answers ``./`` in that last case and everything
+    below would look like junk, so a project that gitignores its own
+    docs directory keeps building even with the flag on.
+    """
+    key = str(root.resolve())
+    cached = _git_ignored_cache.get(key)
+    if cached is not None:
+        return cached
+    lines: list[str] = []
+    if project_skips_gitignored(root):
+        try:
+            out = subprocess.run(
+                ["git", "-C", str(root), "ls-files", "-o", "-i", "--exclude-standard", "--directory"],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            if out.returncode == 0:
+                lines = [ln for ln in out.stdout.splitlines() if ln.strip()]
+        except (OSError, subprocess.SubprocessError):
+            lines = []
+        if any(ln.strip().rstrip("/") in ("", ".") for ln in lines):
+            lines = []
+    result = frozenset(os.path.abspath(os.path.join(str(root), ln.rstrip("/"))) for ln in lines)
+    _git_ignored_cache[key] = result
+    return result
+
+
 def iter_repo_files(root: Path, suffixes: tuple[str, ...], *, extra_skip: frozenset[str] | None = None):
     """Yield Path objects under `root` whose name ends with one of `suffixes`,
     pruning at the directory level so we never descend into junk subtrees.
@@ -349,6 +420,10 @@ def iter_repo_files(root: Path, suffixes: tuple[str, ...], *, extra_skip: frozen
       ``.venv`` / ``.cache`` / ``.run`` / ``.claude`` / ``.scratch`` /
       ``.playwright-mcp`` without each having to be enumerated. Hidden
       dirs are almost never docs.
+    - Anything git is told to ignore — ONLY when kit.json opts in with
+      ``skip_gitignored`` (``git_ignored_paths``). Off by default: what
+      a project keeps out of version control and what it keeps out of
+      its site are two different questions.
 
     Path.rglob has no equivalent prune hook — it walks every subdirectory
     and forces the caller to filter post-hoc. That's the dominant cost of
@@ -360,12 +435,21 @@ def iter_repo_files(root: Path, suffixes: tuple[str, ...], *, extra_skip: frozen
     twice.
     """
     skip = SKIP_DIRS | (extra_skip or frozenset())
+    ignored = git_ignored_paths(root)
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
         # In-place mutation is the documented way to prune os.walk.
-        dirnames[:] = [d for d in dirnames if d not in skip and not d.startswith(".")]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in skip
+            and not d.startswith(".")
+            and os.path.abspath(os.path.join(dirpath, d)) not in ignored
+        ]
         for fn in filenames:
             for suf in suffixes:
                 if fn.endswith(suf):
+                    if os.path.abspath(os.path.join(dirpath, fn)) in ignored:
+                        break
                     yield Path(dirpath) / fn
                     break
 
@@ -3350,6 +3434,36 @@ def find_unparseable_json(root: Path) -> list[tuple[Path, str]]:
     return bad
 
 
+def ignored_paths_note(root: Path) -> str | None:
+    """One line naming what git kept out of the walk, or None.
+
+    Only ever non-None for a project that opted in with
+    ``skip_gitignored``. Even there the symptom of a wrong prune is a
+    page missing from the build with nothing said about it — the failure
+    this repo keeps writing rules about — so the mechanism names itself
+    rather than going quiet. A count with two examples: a full list
+    would be its own noise.
+    """
+    ignored = git_ignored_paths(root)
+    if not ignored:
+        return None
+    # Only what git contributed. `.idea`, `.pytest_cache` and `dist` are
+    # already skipped by the dot-prefix rule and SKIP_DIRS, so naming
+    # them here says nothing about why a page is missing — and a line
+    # that is mostly noise is one nobody reads when it finally matters.
+    skip = SKIP_DIRS | project_skip_dirs(root)
+    names = sorted(
+        rel
+        for rel in (os.path.relpath(x, str(root)) for x in ignored)
+        if not any(part.startswith(".") or part in skip for part in Path(rel).parts)
+    )
+    if not names:
+        return None
+    shown = ", ".join(names[:2])
+    more = f", +{len(names) - 2} more" if len(names) > 2 else ""
+    return f"· {len(names)} path(s) not walked — git ignores them ({shown}{more})"
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     """`oku check` — comprehensive doctree lint.
 
@@ -3465,6 +3579,9 @@ def cmd_check(args: argparse.Namespace) -> int:
             print(f"✓ {len(pages)} page(s) clean (schema + structural + content)")
         elif not errors:
             print(f"✓ {len(pages)} page(s) — no errors (warnings present)")
+        note = ignored_paths_note(root)
+        if note:
+            print(f"  {note}")
 
     has_errors = any(i["severity"] == "error" for i in issues)
     has_warnings = any(i["severity"] == "warning" for i in issues)
@@ -4570,6 +4687,9 @@ def cmd_build(args: argparse.Namespace) -> int:
             )
         else:
             print(f"✓ Doctree check: {len(json_pages)} page(s) clean")
+        note = ignored_paths_note(root)
+        if note:
+            print(f"  {note}")
         if not _HAS_JSONSCHEMA:
             print(
                 "  (schema validation skipped — `pip install jsonschema` to enable; structural checks still ran)"
