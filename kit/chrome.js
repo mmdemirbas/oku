@@ -3776,11 +3776,12 @@ function initReadingAids() {
     // reasoning that a reader who can see every row has nothing to
     // filter. Two things were wrong with it. Sorting and column
     // configuration are useful at any size — a reader sorts three rows
-    // as readily as thirty. And the toolbar was invisible at rest, so
-    // the two rules compounded: on a tree whose tables are mostly
-    // small, the controls were never visible anywhere, and the kit
-    // read as having lost them. One shape for every table is also one
-    // fewer state to hold in mind when reading this function.
+    // as readily as thirty. And the toolbar is revealed by hover, so
+    // on a small table there was nothing to reveal: the reader got one
+    // table that answered the pointer with nothing beside others that
+    // answered with six controls, and read it as the kit having lost
+    // them. One shape for every table is also one fewer state to hold
+    // in mind when reading this function.
 
     var ctrl = document.createElement('div');
     ctrl.className = 'okt-table-controls';
@@ -4787,7 +4788,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-20-r49';
+var __okuKitBuild = '2026-08-20-r50';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

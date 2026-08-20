@@ -9,8 +9,8 @@ rather than eyeballed:
     teal-to-lavender under any accent that was not the default indigo
   * a cover with nothing but a title sat in a 156px tinted panel
   * a three-row table shipped no filter box, no row counter and no
-    gear, on a threshold that compounded with a toolbar resting below
-    full opacity until the controls were visible nowhere
+    gear — hidden outright by a size rule, so unlike every other table
+    hovering it brought nothing back
 
 The page below sets exactly two front-matter fields. That is the
 point — anything an author has to add to get a decent result is the
@@ -330,9 +330,10 @@ def test_every_table_ships_the_whole_toolbar(rendered):
 
     A row-count threshold used to strip the first four below seven rows,
     on the reasoning that a reader who can see every row has nothing to
-    filter. It compounded with a toolbar that was invisible until hover:
-    on a tree whose tables are mostly small, the controls were never
-    visible anywhere, and the kit read as having lost them. Sorting and
+    filter. The toolbar is revealed by hover, so on a small table there
+    was nothing to reveal — the reader got a table that answered the
+    pointer with nothing while every larger one answered with six
+    controls, and read it as the kit having lost them. Sorting and
     column configuration are useful at any size besides — a reader sorts
     three rows as readily as thirty.
     """

@@ -140,31 +140,26 @@ def rendered(afford_url, browser):
 # ---------- table chrome ----------
 
 
-def test_table_controls_are_quiet_at_rest_and_never_invisible(rendered):
-    """Quiet is a floor, not zero.
+def test_table_controls_are_invisible_and_inert_at_rest(rendered):
+    """Same contract as the copy button on a code block: gone until the
+    pointer arrives. `opacity: 0` alone would leave an invisible control
+    eating clicks, so the pointer-events half is part of the rule. The
+    bar is inside the wrap, so a pointer moving onto it hovers the wrap
+    and the controls arm before any click can land.
 
-    At `opacity: 0` the toolbar was an invisible control: a reader who
-    never happened to sweep the pointer across a table had no way to
-    learn that a filter box, a row count, two copy buttons and a gear
-    were sitting above it. That is the invisible-toggle state UI
-    invariant 2 forbids, and here it cost the whole bar — which is how
-    it was found, as "tables seem to have lost some features".
-
-    `pointer-events: none` stays. The bar is inside the wrap, so a
-    pointer moving onto it hovers the wrap and the controls arm before
-    any click can land; what the rule prevents is a quiet control
-    catching a click meant for the table."""
+    Reviewed once against the opposite rule — a resting floor, so the
+    toolbar is never wholly invisible — and hover-to-reveal was kept.
+    What had actually gone missing was the toolbar of every table of six
+    rows or fewer, hidden outright by a size rule with no hover to bring
+    it back; that is test_every_table_ships_the_whole_toolbar."""
     got = rendered.evaluate(
         """() => {
         const c = document.querySelector('#big .okt-table-controls');
         const s = getComputedStyle(c);
-        return { opacity: parseFloat(s.opacity), pointer: s.pointerEvents,
-                 floor: parseFloat(getComputedStyle(document.documentElement)
-                          .getPropertyValue('--chrome-floor')) };
+        return { opacity: s.opacity, pointer: s.pointerEvents };
     }"""
     )
-    assert got["opacity"] == got["floor"], got
-    assert 0.25 <= got["floor"] < 1, got
+    assert got["opacity"] == "0", got
     assert got["pointer"] == "none", got
 
 

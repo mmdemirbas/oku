@@ -97,10 +97,14 @@ judged on. Concretely, and each pinned by a test in
   buttons, gear, expand, sortable columns — whatever its row count. A
   threshold once stripped the first four below seven rows, on the
   reasoning that a reader who can see every row has nothing to filter.
-  It compounded with a toolbar that rests below full opacity: on a tree
-  whose tables are mostly small, the controls were never visible
-  anywhere, and the kit read as having lost them. Sorting and column
-  configuration are useful at three rows besides.
+  The toolbar is revealed by hover, so on a small table there was
+  nothing to reveal: one table answered the pointer with nothing while
+  every larger one answered with six controls, and that reads as the
+  kit having lost them. Sorting and column configuration are useful at
+  three rows besides. The resting `opacity: 0` is NOT the defect and
+  has been reviewed once since — chrome that appears when it is reached
+  for is the wanted behaviour, and touch keeps it visible because there
+  is no hover to reveal with.
 - The cover subtitle falls back to `summary`; a cover holding only an
   h1 gets `.cover-bare`; `updated` is suppressed when it equals `date`.
 

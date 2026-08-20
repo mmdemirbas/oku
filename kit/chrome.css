@@ -37,13 +37,6 @@
   --success: #15803d;
   --success-soft: #dcfce7;
   --on-accent: #ffffff;
-  /* The resting weight of chrome that belongs to a block rather than
-     to the page: a table's toolbar, the copy button on a path chip.
-     It is a FLOOR and never zero — a control at zero opacity is a
-     control the reader cannot know exists, which is the invisible-
-     toggle state this kit's own invariants forbid. Hover and
-     focus-within take it to 1. */
-  --chrome-floor: 0.4;
   --max-width: 960px;
   /* Reader-controlled content width (D3 + P7). The default is the
      'comfortable' reading width — a hair wider than the prior 860px
@@ -1897,16 +1890,17 @@ code:not(pre code) {
      reader's attention. The bar keeps its layout box so revealing it
      never reflows the table, and `pointer-events: none` stops an
      invisible control from swallowing a click.
-     Hover or keyboard focus on the wrap brings it to full, and any
-     active filter / chip / non-default view pins it there — the reader
-     must always be able to see the state they are already in.
+     Hover or keyboard focus on the wrap brings it back, and any active
+     filter / chip / non-default view pins it open — the reader must
+     always be able to see the state they are already in.
 
-     Quiet, NOT gone. It was `opacity: 0`, and a reader who never
-     happened to sweep the pointer across a table had no way to learn
-     that a filter box, a row count, a view switcher and a copy button
-     were sitting above it. That is the invisible-toggle state UI
-     invariant 2 forbids, and it cost the whole toolbar. */
-  opacity: var(--chrome-floor);
+     This was raised once as the cause of "the tables have lost their
+     controls" and it was not: what had actually gone was the toolbar
+     of every table of six rows or fewer, hidden outright by a size
+     rule with no hover to bring it back. Hover-to-reveal is the
+     wanted behaviour and stays. Touch keeps them visible (no hover to
+     reveal with) under the `@media (hover: none)` rule below. */
+  opacity: 0;
   pointer-events: none;
   transition: opacity 0.18s ease;
 }
@@ -4330,10 +4324,11 @@ footer {
   background: none;
   color: var(--text-faint);
   cursor: pointer;
-  /* A floor, not zero — the same rule the table's toolbar follows. At
-     zero the reserved slot reads as a gap the author left in the path,
-     and a control nobody can see is one nobody uses. */
-  opacity: var(--chrome-floor);
+  /* A floor, not zero — unlike the table toolbar above, which has a
+     whole card to hover. This button sits inside a line of prose, so
+     at zero the reserved slot reads as a gap the author left in the
+     path rather than as a control waiting to be used. */
+  opacity: 0.38;
   transition: opacity 0.15s, color 0.15s;
 }
 .okt-fp-copy svg { width: 12px; height: 12px; }
