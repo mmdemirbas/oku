@@ -456,7 +456,15 @@ the relationship you are showing; `oku spec` lists all 68.
 hand-drawn SVG. A hardcoded colour is how a figure ends up invisible in
 the theme nobody was looking at, and `island-hand-styled` fails on it.
 
-Everything else — the two-pass layout test, the full class vocabulary,
+**A blank line inside an island does not end it.** It ends the HTML
+block, which is what lets you write markdown between the tags, and the
+element stays open until its closing tag. Multi-line code inside one is
+a real `<pre>`, never `<br>` — a `<br>` renders three lines and copies
+as one. An island that never closes takes the rest of the section with
+it, and `oku check` says so as `island-unclosed`.
+
+Everything else — what goes inside an island, images and other files
+beside the page, the two-pass layout test, the full class vocabulary,
 why `<style>` blocks are refused — is in
 `references/islands.md` beside this file. Read it before writing one.
 
@@ -504,7 +512,9 @@ disguised markdown):
 - Don't over-nest headings — cap at H4.
 - Don't auto-play, auto-scroll, or hijack the reader's pace.
 - Don't include images or fonts that need network unless the page
-  degrades cleanly without them.
+  degrades cleanly without them. A file beside the page is fine — the
+  build carries it, and a standalone page inlines it — but a rendered
+  figure beats a picture of one at every width and in both themes.
 - Don't write a "design decisions" section that's just rationalising
   what you did. List the rejected alternatives.
 - Don't hand-write chrome, a stylesheet, a `:root` block or a per-page

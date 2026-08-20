@@ -403,6 +403,52 @@ structure from the `.okt-*` classes. Hardcoded hex or an inline
 `<style>` earns `island-hand-styled`, because the hand-rolled copy stops
 following the accent and breaks in the theme nobody was looking at.
 
+**A blank line ends an island's BLOCK, never its element.** That is
+CommonMark, and it is the whole reason an author can write markdown
+inside a `<div>` — the `<div>` / blank / `**bold**` / blank / `</div>`
+idiom GitHub documents. The kit rendered each block as its own fragment
+and `createContextualFragment` auto-closed the element, so everything
+after the blank line became a sibling of the island instead of a child:
+an island holding an 82-line block rendered with 403 characters in it,
+the rest on the page styled as though it had never belonged, and
+`oku check --strict` clean. `emitMarkdown` carries a stack of what is
+still open; an island's source is cut at every tag closing something an
+earlier island opened, and whatever it leaves open takes the blocks that
+follow. Held by `test_html_island_spans_blank_lines.py`.
+
+The opposite failure is the one this creates, so it is a check. An
+island that never closes now takes the rest of the section with it, and
+`island-unclosed` names the tag and the line that opened it — at the page
+end and at every `##`, because a section boundary ends the run of blocks
+the renderer emits in one pass. The lint walks tags the way the renderer
+does, and `test_authority_agreement` holds the void and raw-text tag
+tables against each other: a tag in one and not the other is a lint
+reporting an island the renderer closed, or the reverse.
+
+**Multi-line code inside an island is a `<pre>`, never `<br>`.** A `<br>`
+renders three lines and copies as one — it carries no newline character,
+so a SQL block pasted into another system arrives on one line. A `<pre>`
+at column 0 always ran to its own `</pre>`; what was broken was a `<pre>`
+nested in a `<div>`, cut at the first blank line, which left `<br>` as
+the only spelling. The kit's copy button reaches an island's `<pre>` and
+reads the newlines that are there.
+
+**A file the page points at travels with the page.** `![tiny](tiny.png)`
+beside its `.md` built clean and shipped broken: the reference survived,
+the file was copied nowhere, `oku check` passed and `oku build` printed
+nothing. A preview served from the source directory resolves the image,
+so only the handed-over artifact is missing it — a delivered page carried
+a screenshot with `naturalWidth` 0. `collect_page_assets` finds all three
+spellings (markdown `![alt]()`, an island attribute, an `image` block's
+`src`), keyed by the href AS AUTHORED. `dist/site` copies the file at the
+path the href names; a standalone page inlines it as a `data:` URI up to
+`MAX_INLINE_ASSET_BYTES` (2 MB) and past that copies it beside the page
+and says so, because the page has stopped being one file. Rewriting skips
+code spans and fences — a page documenting figures shows the markdown for
+one — and a missing file is left to `unresolved-link` rather than reported
+twice. Held by `test_build_carries_assets.py` and
+`browser/test_image_delivery.py`.
+
 **A Mermaid diagram gets its colour from the kit too, and the kit has
 to do the work.** Mermaid's `classDef` / `style` grammar takes CSS
 *values*, not CSS *functions* — there is no production for `(`, so

@@ -167,3 +167,20 @@ def test_the_island_does_not_swallow_the_rest_of_the_page(opened):
     assert opened.locator("#island-d section").count() == 0
     after = opened.locator("section#after p").inner_text()
     assert after.startswith("A paragraph that belongs to the page")
+
+
+def test_the_copy_control_reaches_code_inside_an_island(opened):
+    """The other half of the code case. Rendering three lines is no use
+    if the clipboard gets one — the `<br>` spelling did exactly that,
+    and a reader pasted a whole SQL block into another system as a
+    single line. A real `<pre>` gets the kit's copy button and the
+    button reads the newlines that are actually there."""
+    btn = opened.locator("#island-c .copy-btn")
+    assert btn.count() == 1, "no copy control on a <pre> inside an island"
+    copied = opened.evaluate(
+        """() => {
+             const pre = document.querySelector('#island-c pre');
+             return pre.querySelector('code').textContent;
+           }"""
+    )
+    assert copied.count("\n") == 2, repr(copied)
