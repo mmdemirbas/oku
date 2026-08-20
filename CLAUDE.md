@@ -582,6 +582,47 @@ Turkish sentence, and the tooltip is built on hover — after the one-shot
 localize pass has already run, which is why the DOM walk was never going
 to reach it.
 
+**A path in a document is a thing the reader can look inside.**
+`[label](#f/<path>)` renders a chip: hover for a preview, click for the
+whole file, copy button for the path. It exists because a path in a code
+span is a dead end — the reader leaves the page, finds the file, comes
+back — and that is what every document does with the paths it mentions.
+
+**The bytes travel inside the page, and that is what shapes the rest.**
+No delivery mode can fetch the file when the reader clicks: `oku serve`
+and `dist/site` serve the docs tree while the references worth making
+point outside it (`../src/oku/cli.py`), and a standalone page is opened
+over `file://`, where fetch is refused before a request is made. So
+`_page_from_source_file` resolves every reference once and puts the
+result in `m._files`, keyed by the path AS AUTHORED — the same key the
+element carries and the runtime looks up, so the two cannot drift by
+disagreeing about how to normalise a path. `m._files` rides in the page
+dict, which is the one thing all three modes already carry, and it is
+computed at the ONE point a page dict is made, so serve, check and both
+build trees get it without three call sites to keep in step.
+
+Two consequences are decisions. **The project root is the fence**:
+nearest ancestor with `.git`, else with `kit.json`. Not the docs root —
+this repo has `docs/kit.json`, and a docs-rooted fence would refuse
+`../src/oku/cli.py`, the reference an author most wants. The fence is
+not about trusting the author, who typed the path; it is about what the
+page PUBLISHES, since the build copies those bytes into an artifact that
+gets sent to people. **A reference that does not resolve still renders a
+chip that still copies** — the failure mode has to be "the preview does
+not open", never "the page lost the reference the author wrote".
+`filepath-missing`, `filepath-outside` and `filepath-not-carried` say so
+at build time instead. Held by `test_filepath.py`, which runs against the
+standalone build because it is the mode with the least to work with.
+
+**A card appears when the pointer arrives, not when the page moves under
+it.** `mouseenter` fires when a layer above an element goes away, so
+closing the popup a chip opened put that chip's card back under a cursor
+that never moved — a dismissed popup returning as a tooltip. The
+controller ignores an enter with no `mousemove` behind it. The same pass
+made the focus branch `:focus-visible` only (a mouse click focuses too)
+and gave every `role="button"` chip a keydown handler, because Enter and
+Space fire click on a real `<button>` and on nothing else.
+
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never
 English words. The page can flip to TR or EN without touching kit

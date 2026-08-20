@@ -587,6 +587,15 @@
       parseInline(label, e);
       return e;
     }
+    // `#f/` names a FILE rather than a registry entry, and the path is
+    // the id: the build resolved that exact string and keyed the
+    // payload by it, so anything normalised here would miss.
+    if (href.startsWith('#f/')) {
+      const e = document.createElement('oku-filepath');
+      e.setAttribute('path', href.slice(3));
+      parseInline(label, e);
+      return e;
+    }
     // Cross-page markdown link: a relative `foo.md(#frag)` href points
     // at the rendered page — rewrite to .html. Absolute URLs,
     // fragment-only and root-absolute hrefs pass through untouched.
@@ -1586,6 +1595,11 @@
       }
 
       const meta = page.m || {};
+      // The file previews this page carries, keyed by the path as
+      // authored. Set before the body is walked: <oku-filepath> reads
+      // it in connectedCallback, which fires the moment the element is
+      // appended.
+      if (meta._files) window.__okuFiles = meta._files;
       if (page.t) document.title = page.t;
       if (meta.lang) {
         document.documentElement.lang = meta.lang;

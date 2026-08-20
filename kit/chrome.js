@@ -66,6 +66,8 @@ const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
    replaced, and nobody reads a 50%-opacity rectangle as a state. */
 const ICON_WIDTH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect class="w-seg s1" x="3"    y="8" width="5" height="8" rx="1"/><rect class="w-seg s2" x="9.5"  y="8" width="5" height="8" rx="1"/><rect class="w-seg s3" x="16"   y="8" width="5" height="8" rx="1"/></svg>';
 const ICON_CLIPBOARD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>';
+const ICON_FILE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+const ICON_FILE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="3" y1="3" x2="21" y2="21"/></svg>';
 const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
 const ICON_CROSS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
 const ICON_BRACES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2"/><path d="M16 3a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2"/></svg>';
@@ -910,6 +912,10 @@ var __okuMdViewer = (function () {
       }
     });
 
+    if (opts.text != null) {
+      var openLink = wrap.querySelector('.okt-mdview-open');
+      if (openLink) openLink.remove();
+    }
     __okuLightbox.open(wrap, { panZoom: false, title: path });
     __okuI18n.localize(wrap);
 
@@ -920,6 +926,11 @@ var __okuMdViewer = (function () {
       if (el) el.scrollIntoView();
     };
 
+    // A caller that already holds the bytes says so. The path chip
+    // does: the build read the file to build its preview, and asking
+    // the viewer to find it again would fail in exactly the case the
+    // chip exists for — a file outside the served tree.
+    if (opts.text != null) { done(opts.text); return; }
     var inline = localDoc([stripHash(href), fileUrl, path]);
     if (inline != null) { done(inline); return; }
     if (window.location.protocol === 'file:') {
@@ -4774,7 +4785,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-20-r47';
+var __okuKitBuild = '2026-08-20-r48';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -5387,6 +5398,15 @@ var __okuTooltip = (function () {
   // elements. Existing attachments keep the wiring they had — acceptable
   // tradeoff vs. listening for matchMedia changes and re-binding.
   function isTouch() { return window.matchMedia('(hover: none)').matches; }
+  /* When the pointer last actually moved. A `mouseenter` with no move
+     behind it is the cursor standing still while the element under it
+     changed — a layer above it closed, or the page scrolled by
+     keyboard. The reader did not reach for the thing now under their
+     cursor, and showing its card there is how a popup they just
+     dismissed comes back as a tooltip. */
+  var lastMove = 0;
+  document.addEventListener('mousemove', function () { lastMove = Date.now(); },
+    { passive: true, capture: true });
   var active = null; // { trigger, tooltip, pinned }
   var hideTimer = null;
   var showTimer = null;
@@ -5433,6 +5453,18 @@ var __okuTooltip = (function () {
   // kit resolver. Do NOT use this controller to render tooltips with
   // arbitrary author input.
   function build(trigger) {
+    /* A caller whose body is not kit-controlled hands over a NODE and
+       never a string — see the security note above. `<oku-filepath>`
+       is the one such caller: its card shows the contents of a file,
+       and a file that happens to contain `<script>` is an ordinary
+       file. Same positioning, same pinning, same hide rules; only the
+       body is built elsewhere. */
+    if (trigger._okuTipRender) {
+      var custom = document.createElement('div');
+      custom.className = 'oku-tooltip';
+      custom.appendChild(trigger._okuTipRender());
+      return custom;
+    }
     var body = trigger.getAttribute('data-def') || trigger.getAttribute('data-summary') || trigger.textContent;
     var link = trigger.getAttribute('data-link');
     var lang = trigger.getAttribute('data-lang-shown');
@@ -5466,23 +5498,60 @@ var __okuTooltip = (function () {
     active = { trigger: trigger, tooltip: tip, pinned: !!pinned };
   }
 
-  function attach(trigger) {
-    if (!trigger.hasAttribute('tabindex')) trigger.setAttribute('tabindex', '0');
+  function attach(trigger, opts) {
+    opts = opts || {};
+    if (opts.render) trigger._okuTipRender = opts.render;
+    // A trigger that already contains its own focusable control says so
+    // and keeps its tab stop: one chip should not cost a keyboard
+    // reader three presses to walk past.
+    if (opts.focusable !== false && !trigger.hasAttribute('tabindex')) {
+      trigger.setAttribute('tabindex', '0');
+    }
     if (!isTouch()) {
       trigger.addEventListener('mouseenter', function () {
+        var enteredAt = Date.now();
         clearTimers();
-        showTimer = setTimeout(function () { show(trigger, false); }, SHOW_DELAY);
+        showTimer = setTimeout(function () {
+          // Checked here rather than on entry, because a browser is
+          // free to dispatch the enter before the move that caused it —
+          // by the time the delay is up, both have landed. No move at
+          // all means the pointer stood still and a layer above this
+          // element went away. See lastMove.
+          if (lastMove < enteredAt - 50) return;
+          show(trigger, false);
+        }, SHOW_DELAY);
       });
       trigger.addEventListener('mouseleave', function () {
         if (showTimer) { clearTimeout(showTimer); showTimer = null; }
         if (active && active.trigger === trigger && active.pinned) return;
         scheduleHide();
       });
-      trigger.addEventListener('focus', function () { show(trigger, false); });
-      trigger.addEventListener('blur', function () {
+      /* Keyboard focus only. A mouse click focuses too, so a plain
+         `focus` handler made the card reappear the moment the reader
+         dismissed whatever the click had opened — the lightbox returns
+         focus to the element that opened it, and the card came back
+         with it, unasked, over the page they had just returned to.
+         `:focus-visible` is the browser's own answer to "did this focus
+         come from the keyboard", which is exactly the question. */
+      /* focusin / focusout rather than focus / blur, because they
+         bubble: a trigger built out of several elements puts the tab
+         stop on the one that does something, and a non-bubbling `focus`
+         on the wrapper never fires. */
+      trigger.addEventListener('focusin', function (e) {
+        var el = e.target;
+        if (el.matches && !el.matches(':focus-visible')) return;
+        show(trigger, false);
+      });
+      trigger.addEventListener('focusout', function (e) {
+        // Moving between the trigger's own parts is not leaving it.
+        if (e.relatedTarget && trigger.contains(e.relatedTarget)) return;
         if (!active || !active.pinned) scheduleHide();
       });
     }
+    // A trigger whose click does something else (opening the file, for
+    // the path chip) must not also pin the card: the reader would get
+    // the popup with a tooltip pinned over the page behind it.
+    if (opts.pinOnClick === false) return;
     trigger.addEventListener('click', function (e) {
       e.stopPropagation();
       if (active && active.trigger === trigger && active.pinned) {
@@ -5496,8 +5565,24 @@ var __okuTooltip = (function () {
   document.addEventListener('click', function (e) {
     if (!e.target.closest('.oku-tooltip, [data-oku-tooltip-trigger]')) hideImmediate();
   });
+  /* Escape dismisses a card whether or not it was pinned. An unpinned
+     one used to have no keyboard exit at all: it hides on mouseleave
+     and on blur, and neither happens to a card the reader reached by
+     keyboard and is still focused on — including the one that appears
+     when the lightbox hands focus back to the element that opened it.
+     This listener is registered after the lightbox's, so one press
+     closes the frame and the card it restores focus into. */
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && active && active.pinned) hideImmediate();
+    if (e.key !== 'Escape') return;
+    if (active) { hideImmediate(); return; }
+    /* Another handler for this same press can OPEN a card as a side
+       effect of what it closes: the lightbox hands focus back to the
+       element that opened it, and a focused trigger shows its card. So
+       Escape leaves a card on screen that Escape was meant to dismiss.
+       Listener order cannot fix it — the lightbox registers its handler
+       on first open, which is after this one — so the second look
+       happens a turn later, when every handler for this press has run. */
+    setTimeout(function () { if (active) hideImmediate(); }, 0);
   });
 
   return { attach: attach, hide: hideImmediate };
@@ -6007,6 +6092,348 @@ if (!customElements.get('ext-ref')) customElements.define('ext-ref', ExtRef);
 // "<cite>" alias — same behavior as <ext-ref> so authors can use the
 // semantically-correct HTML element when citing.
 if (!customElements.get('oku-cite')) customElements.define('oku-cite', class extends ExtRef {});
+
+/* ============ <oku-filepath> — a path you can look inside ============ *
+ * A document that mentions a file writes its path, and a path in a code
+ * span is a dead end: the reader leaves the page, finds the file, comes
+ * back. The chip keeps the mention and adds the file — hover for a
+ * preview, click for the whole thing, and the path stays copyable
+ * either way.
+ *
+ * WHERE THE BYTES COME FROM. Not from a fetch. The interesting
+ * references point outside the served tree (`../src/oku/cli.py`), and a
+ * standalone page has an opaque origin where fetch is refused before a
+ * request is made. The build resolves every reference and puts the
+ * result in the page's own metadata; the renderer hands it to
+ * `window.__okuFiles`, keyed by the path AS AUTHORED, which is the
+ * attribute this element carries. One supply line, three delivery
+ * modes, and no mode where the preview quietly does nothing.
+ *
+ * A chip whose file did not resolve still renders and still copies. The
+ * failure mode of this primitive has to be "the preview does not open",
+ * never "the page lost the reference the author wrote".
+ * ------------------------------------------------------------------ */
+
+function __okuFileRef(path) {
+  var map = window.__okuFiles;
+  if (!map) return null;
+  return Object.prototype.hasOwnProperty.call(map, path) ? map[path] : null;
+}
+
+/* Bytes as a reader reads them. Sizes appear beside a filename, where
+   three significant figures is noise: 41 KB, not 41,231 bytes. */
+function __okuFileSize(n) {
+  if (typeof n !== 'number' || !isFinite(n)) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+  return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+/* The first few lines, and no more of any one of them than fits. A
+   minified file is one line of 200 000 characters, and a tooltip that
+   tries to show it lays out the whole string before deciding it does
+   not fit. */
+function __okuFileHead(text, lines, width) {
+  var out = String(text).split('\n').slice(0, lines);
+  for (var i = 0; i < out.length; i++) {
+    if (out[i].length > width) out[i] = out[i].slice(0, width) + '…';
+  }
+  return out.join('\n');
+}
+
+var __OKU_FILE_LABEL = {
+  markdown: 'Markdown',
+  text: 'Text',
+  image: 'Image',
+  video: 'Video',
+  audio: 'Audio',
+  pdf: 'PDF',
+  binary: 'Binary',
+};
+
+/* Namespaced for the same reason the rail's landmark words are: these
+   are common nouns, the localize walk matches a table key against the
+   leaf text of anything under an `.okt-*` host, and author content
+   lives there. `Text` as a bare key would rewrite every leaf reading
+   `Text` on a translated page. */
+function __okuFileKindWord(kind) {
+  var word = __OKU_FILE_LABEL[kind] || kind;
+  var key = 'file:' + word;
+  var out = okuT(key);
+  return out === key ? word : out;
+}
+
+/* Why a preview is not on offer, in the reader's terms. The status is
+   the build's word for it; this turns each into a sentence that names
+   what to do next. */
+function __okuFileWhy(ref) {
+  if (ref.status === 'missing') return okuT('No file at this path when the page was built.');
+  if (ref.status === 'outside') {
+    return okuT('Outside the project, so its contents do not travel with this page.');
+  }
+  if (ref.status === 'over-cap') {
+    return okuT('Too large to carry inside the page ({0}).', __okuFileSize(ref.bytes));
+  }
+  return okuT('Nothing to preview — the path is here to copy.');
+}
+
+/* An image / video / audio element for a carried file, or null when
+   there is nothing to build one from. `scale` sizes the tooltip's copy
+   down without a second code path. */
+function __okuFileMedia(ref, small) {
+  if (!ref.url) return null;
+  var el = null;
+  if (ref.kind === 'image') {
+    el = document.createElement('img');
+    el.src = ref.url;
+    el.alt = ref.name || ref.path;
+  } else if (ref.kind === 'video') {
+    el = document.createElement('video');
+    el.src = ref.url;
+    el.controls = !small;
+    el.muted = true;
+    el.playsInline = true;
+    if (small) el.preload = 'metadata';
+  } else if (ref.kind === 'audio') {
+    el = document.createElement('audio');
+    el.src = ref.url;
+    el.controls = true;
+  }
+  if (el) el.className = 'okt-fp-media' + (small ? ' okt-fp-media-small' : '');
+  return el;
+}
+
+/* The one line under the filename: what kind of thing this is, how big,
+   and how long. Kind first because it is what decides whether the rest
+   of the card is a picture or a program. */
+function __okuFileMeta(ref) {
+  var bits = [];
+  if (ref.kind) bits.push(__okuFileKindWord(ref.kind));
+  if (ref.bytes != null) bits.push(__okuFileSize(ref.bytes));
+  if (ref.lines != null) bits.push(okuT('{0} lines', ref.lines));
+  return bits.join(' · ');
+}
+
+/* The hover card. Built as DOM, never as an HTML string: the body is
+   the CONTENTS OF A FILE, and a file that happens to contain `<script>`
+   is an ordinary file. The glossary tooltip's own body is
+   kit-controlled and goes through innerHTML; this one cannot. */
+function __okuFileCard(ref) {
+  var card = document.createElement('div');
+  card.className = 'okt-fp-card';
+  card.setAttribute('data-kind', ref.kind || 'unknown');
+
+  var head = document.createElement('div');
+  head.className = 'okt-fp-card-head';
+  var name = document.createElement('span');
+  name.className = 'okt-fp-card-name';
+  name.textContent = ref.name || ref.path;
+  head.appendChild(name);
+  var meta = __okuFileMeta(ref);
+  if (meta) {
+    var m = document.createElement('span');
+    m.className = 'okt-fp-card-meta';
+    m.textContent = meta;
+    head.appendChild(m);
+  }
+  card.appendChild(head);
+
+  var media = __okuFileMedia(ref, true);
+  if (media) {
+    card.appendChild(media);
+  } else if (ref.text != null) {
+    var pre = document.createElement('pre');
+    pre.className = 'okt-fp-card-pre';
+    var code = document.createElement('code');
+    code.textContent = __okuFileHead(ref.text, 12, 120);
+    pre.appendChild(code);
+    card.appendChild(pre);
+    if (ref.lines > 12) {
+      var more = document.createElement('div');
+      more.className = 'okt-fp-card-more';
+      more.textContent = okuT('+{0} more lines', ref.lines - 12);
+      card.appendChild(more);
+    }
+  } else {
+    var why = document.createElement('div');
+    why.className = 'okt-fp-card-why';
+    why.textContent = __okuFileWhy(ref);
+    card.appendChild(why);
+  }
+
+  var hint = document.createElement('div');
+  hint.className = 'okt-fp-card-hint';
+  hint.textContent = __okuFileOpenable(ref) ? okuT('click to open') : okuT('click to pin');
+  card.appendChild(hint);
+  return card;
+}
+
+function __okuFileOpenable(ref) {
+  return !!(ref && (ref.text != null || ref.url));
+}
+
+/* The popup, for a reference that resolved. Markdown goes to the viewer
+   the kit already has — same frame, same rendered/source toggle, same
+   copy button — so a .md file reached through a path chip and one
+   reached through a link are the same experience. Everything else gets
+   a frame built here.
+
+   A reference with nothing to show never reaches this: its chip is not
+   openable, and the reason lives on the hover card, where the reader
+   already is. A popup that explains an absence is a control that
+   answers a question nobody asked it. */
+function __okuFileOpen(ref) {
+  if (ref.kind === 'markdown' && ref.text != null) {
+    __okuMdViewer.open(ref.path, { href: ref.path, text: ref.text });
+    return;
+  }
+  var media = __okuFileMedia(ref, false);
+  if (media) {
+    // Pan/zoom for a still image, where the reader wants to look
+    // closer. Not for a video or an audio player: their own controls
+    // live inside the frame, and a drag that pans the element instead
+    // of scrubbing is a control that fights the reader.
+    __okuLightbox.open(media, { panZoom: ref.kind === 'image', title: ref.path });
+    return;
+  }
+
+  var wrap = document.createElement('div');
+  wrap.className = 'okt-fp-view';
+  var bar = document.createElement('div');
+  bar.className = 'okt-fp-view-bar';
+  var name = document.createElement('span');
+  name.className = 'okt-fp-view-path';
+  name.textContent = ref.path;
+  bar.appendChild(name);
+  var meta = __okuFileMeta(ref);
+  if (meta) {
+    var m = document.createElement('span');
+    m.className = 'okt-fp-view-meta';
+    m.textContent = meta;
+    bar.appendChild(m);
+  }
+  wrap.appendChild(bar);
+
+  // No copy button here: the reading-aids pass puts one on every
+  // `pre code`, and two controls for one action read as two actions.
+  var pre = document.createElement('pre');
+  pre.className = 'okt-fp-view-pre';
+  var code = document.createElement('code');
+  if (ref.lang) code.className = 'language-' + ref.lang;
+  // One trailing newline is how a text file ends, not a fourth line.
+  // Displayed without it; the copy button still hands over ref.text.
+  code.textContent = ref.text.replace(/\n$/, '');
+  pre.appendChild(code);
+  wrap.appendChild(pre);
+  if (ref.truncated) {
+    var cut = document.createElement('div');
+    cut.className = 'okt-fp-view-cut';
+    cut.textContent = okuT('Shown up to the size the page can carry.');
+    wrap.appendChild(cut);
+  }
+  __okuLightbox.open(wrap, { panZoom: false, title: ref.path });
+  __okuI18n.localize(wrap);
+  // highlightOnce, never highlightAll: the block gains a line-number
+  // gutter and fold markers from initReadingAids, and a second Prism
+  // pass reads those back as program text (see the annotated-code
+  // note above `__prismLoader`).
+  if (ref.lang && typeof __prismLoader !== 'undefined') {
+    __prismLoader.highlightOnce(pre, ref.lang).then(function () {
+      if (typeof initReadingAids === 'function') initReadingAids();
+    });
+  } else if (typeof initReadingAids === 'function') {
+    initReadingAids();
+  }
+}
+
+class OkuFilePath extends HTMLElement {
+  connectedCallback() {
+    // The lightbox moves live nodes in and out on expand, and this
+    // element consumes its own text to build its chip. Without the
+    // guard the second pass reads an empty label.
+    if (this._initialized) return;
+    this._initialized = true;
+
+    var path = this.getAttribute('path') || this.textContent.trim();
+    var label = this.textContent.trim() || path;
+    var ref = __okuFileRef(path) || { path: path, name: path.split('/').pop(), status: 'unknown' };
+    ref.path = path;
+    this._ref = ref;
+
+    this.className = 'okt-fp';
+    this.setAttribute('data-kind', ref.kind || 'unknown');
+    this.setAttribute('data-status', ref.status || 'unknown');
+    this.innerHTML = '';
+
+    var icon = document.createElement('span');
+    icon.className = 'okt-fp-icon';
+    icon.innerHTML = ref.status === 'ok' ? ICON_FILE : ICON_FILE_OFF;
+    this.appendChild(icon);
+
+    var text = document.createElement('code');
+    text.className = 'okt-fp-label';
+    text.textContent = label;
+    this.appendChild(text);
+
+    var copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'okt-fp-copy';
+    copy.innerHTML = ICON_CLIPBOARD;
+    copy.title = okuT('Copy the path');
+    copy.setAttribute('aria-label', okuT('Copy the path'));
+    this.appendChild(copy);
+
+    var self = this;
+    copy.addEventListener('click', function (e) {
+      // The chip is a tooltip trigger and the button sits inside it;
+      // without this the copy also pins the card over the thing the
+      // reader just clicked.
+      e.stopPropagation();
+      e.preventDefault();
+      if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+      navigator.clipboard.writeText(path).then(function () {
+        copy.classList.add('okt-flash-ok');
+        setTimeout(function () { copy.classList.remove('okt-flash-ok'); }, 1200);
+      }, function () {
+        copy.classList.add('okt-flash-fail');
+        setTimeout(function () { copy.classList.remove('okt-flash-fail'); }, 1200);
+      });
+    });
+
+    var openable = __okuFileOpenable(ref);
+    this.setAttribute('data-oku-tooltip-trigger', '');
+    __okuTooltip.attach(this, {
+      render: function () { return __okuFileCard(self._ref); },
+      pinOnClick: !openable,
+      // When the file opens, the label is the control and carries the
+      // tab stop; when it does not, the card is all there is and the
+      // chip itself has to be reachable.
+      focusable: !openable,
+    });
+
+    if (openable) {
+      text.setAttribute('role', 'button');
+      text.setAttribute('tabindex', '0');
+      var openFile = function (e) {
+        if (e.target.closest('.okt-fp-copy')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        __okuTooltip.hide();
+        __okuFileOpen(self._ref);
+      };
+      this.addEventListener('click', openFile);
+      // `role="button"` on anything that is not a <button> promises
+      // keyboard activation the browser does not provide: Enter and
+      // Space fire click on a real button and on nothing else. Without
+      // this the chip was reachable by Tab and could not be opened.
+      this.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') openFile(e);
+      });
+    }
+  }
+}
+if (!customElements.get('oku-filepath')) customElements.define('oku-filepath', OkuFilePath);
+
 
 /* ============ Shared chart palette helper ============
  * Resolves a series colour from either:

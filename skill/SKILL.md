@@ -247,6 +247,13 @@ entry to write.
    - Glossary and external references are links:
      `[label](#g/term-id)` and `[label](#x/source-id)`. Registry ids
      may contain spaces.
+   - A file the page talks about is a link too: `[label](#f/path)`
+     renders a chip the reader can hover for a preview, click to open
+     (markdown in the kit's viewer, images and video inline, anything
+     else as highlighted source) and copy the path from. Use it wherever
+     you would have put a path in a code span. The bytes travel inside
+     the page, so the reference must resolve inside the project and fit
+     the size cap; `oku check` reports both.
    - A block-level HTML tag at column 0 is an escape hatch (custom
      elements and `<script>` included) when a primitive genuinely does
      not exist for what you need. `oku check` lists each one.

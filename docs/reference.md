@@ -327,6 +327,18 @@ Hover for a tooltip with the definition; click to pin. Resolves the `term` attri
 {"code":{"k":"code","src":"{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Hover \",\n    { \"kind\": \"glossary-term\", \"term\": \"ACID\", \"text\": \"ACID\" },\n    \" — click to pin; move toward the tooltip to keep it open.\"\n  ]\n}","lang":"json"},"output":"Hover [ACID](#g/ACID) — click to pin; move toward the tooltip to keep it open."}
 ```
 
+### filepath {#filepath}
+
+`[label](#f/<path>)` — a path the reader can look inside. Hover for a preview, click for the whole file, and the copy button hands over the path itself. The path is relative to the page's own source file, or absolute; the label is what shows, so an author writes the path twice and the second one is what GitHub links.
+
+Kind decides what "the whole file" means. A `.md` opens in the kit's [markdown viewer](#markdown-viewer), the same one a prose link to a `.md` opens. An image, video or audio file plays in the lightbox. Anything else that reads as text opens as a highlighted `<pre>`, with the language taken from the extension.
+
+The bytes travel INSIDE the page, which is what makes the preview work in all three delivery modes — no mode can fetch the file at read time, because the interesting references point outside the served tree and a standalone page has no origin to fetch from. That is also the limit: a file over the size cap, or one resolving outside the project root, gets a chip that names it and copies its path and says on hover why there is nothing more. `oku check` reports both, so a preview that will not open is a build-time message rather than something a reader discovers by clicking.
+
+```oku-example
+{"code":{"k":"code","src":"The project's own settings live in [`kit.json`](#f/kit.json), and a new\npage starts from [`starter.md`](#f/../src/oku/templates/starter.md).\n","lang":"markdown"},"output":"The project's own settings live in [`kit.json`](#f/kit.json), and a new page starts from [`starter.md`](#f/../src/oku/templates/starter.md)."}
+```
+
 ### ext-ref {#ext-ref}
 
 Like glossary-term but for external entities (tools, papers, people). Same hover-bridge-pin behavior. Reads from `_oku/extrefs/<domain>.json` (or project kit.json overrides). Each entry has a `summary` and a `link`; the tooltip shows the name + summary, with a Learn more button to the link.

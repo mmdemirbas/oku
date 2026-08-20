@@ -335,6 +335,18 @@ glossary-term gibidir ama dış varlıklar içindir (araçlar, makaleler, kişil
 {"code":{"k":"code","src":"{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Gücünü şuradan alır: \",\n    { \"kind\": \"ext-ref\", \"name\": \"Pagefind\", \"text\": \"Pagefind\" },\n    \" — kart için üzerine gelin, sabitlemek için tıklayın, yeni sekmede açmak için satır içi bağlantıya tıklayın.\"\n  ]\n}","lang":"json"},"output":"Gücünü şuradan alır: [Pagefind](#x/Pagefind) — kart için üzerine gelin, sabitlemek için tıklayın, yeni sekmede açmak için satır içi bağlantıya tıklayın."}
 ```
 
+### filepath {#filepath}
+
+`[etiket](#f/<yol>)` — okurun içine bakabildiği bir yol. Üzerine gelince önizleme, tıklayınca dosyanın tamamı; kopyalama düğmesi de yolun kendisini verir. Yol, sayfanın kaynak dosyasına göre görelidir ya da mutlaktır; görünen kısım etikettir, yani yazar yolu iki kez yazar ve ikincisi GitHub'ın bağladığı yerdir.
+
+Dosyanın türü, "tamamı"nın ne demek olduğunu belirler. `.md` uzantılı bir dosya, bir metin bağlantısının açtığı [markdown görüntüleyicisinde](#markdown-viewer) açılır. Görsel, video ve ses dosyaları ışık kutusunda oynar. Metin olarak okunabilen diğer her şey, uzantısından anlaşılan dille renklendirilmiş bir `<pre>` olarak açılır.
+
+Baytlar sayfanın İÇİNDE taşınır; önizlemenin üç dağıtım biçiminde de çalışmasının nedeni budur — hiçbir biçim dosyayı okuma anında getiremez, çünkü asıl işe yarayan göndermeler sunulan ağacın dışını gösterir ve tek dosyalık sayfanın getirme yapacağı bir kaynak yoktur. Sınır da buradan gelir: boyut sınırını aşan ya da proje kökünün dışına düşen bir dosya için rozet yalnızca adı gösterir, yolu kopyalar ve üzerine gelindiğinde neden fazlası olmadığını söyler. `oku check` her ikisini de bildirir; böylece açılmayacak bir önizleme, okurun tıklayarak keşfettiği bir şey değil, derleme anında verilen bir uyarı olur.
+
+```oku-example
+{"code":{"k":"code","src":"The project's own settings live in [`kit.json`](#f/kit.json), and a new\npage starts from [`starter.md`](#f/../src/oku/templates/starter.md).\n","lang":"markdown"},"output":"The project's own settings live in [`kit.json`](#f/kit.json), and a new page starts from [`starter.md`](#f/../src/oku/templates/starter.md)."}
+```
+
 ### code, em, strong, link {#code-em-strong-link}
 
 ```oku-example

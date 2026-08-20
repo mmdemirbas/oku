@@ -1025,6 +1025,9 @@ def _page_from_source_file(p: Path) -> dict | None:
         if not front_meta.get("title"):
             page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
     _apply_meta_defaults(page, p)
+    refs = collect_file_refs(page, p)
+    if refs:
+        page.setdefault("m", {})["_files"] = refs
     return page
 
 
@@ -1998,7 +2001,7 @@ _MD_EXTREF_REF_RE = re.compile(r"\]\(#x/([^)\n]+?)\)")
 _MD_LINK_TARGET_RE = re.compile(r"\]\(\s*<?([^)\s<>]+?)>?(?:\s+[\"'(][^\n]*?)?\s*\)")
 # A destination the kit does not own: another origin, a registry
 # reference (checked separately), or a data URI.
-_FOREIGN_HREF_RE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//|#g/|#x/)", re.I)
+_FOREIGN_HREF_RE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//|#g/|#x/|#f/)", re.I)
 _MD_SETEXT_EQ_RE = re.compile(r"^=+\s*$")
 _MD_HR_RE = re.compile(r"^-{3,}\s*$")
 _MD_HTML_ISLAND_RE = re.compile(r"^</?([a-zA-Z][\w-]*)(?:[\s/>]|$)")
@@ -2712,6 +2715,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
 
         seen_ids: dict[str, int] = {}
         gloss_refs: list[tuple[str, str, int | None]] = []
+        file_refs: list[tuple[str, str, int | None]] = []
         extref_refs: list[tuple[str, str, int | None]] = []
         link_refs: list[tuple[str, str, int | None]] = []
         # Footnote / link-reference definitions resolve page-wide, so they
@@ -2774,6 +2778,8 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 scrubbed = _INLINE_CODE_RE.sub("", blk)
                 for m in _MD_LINK_TARGET_RE.finditer(scrubbed):
                     link_refs.append((where, m.group(1), _abs(scrubbed[: m.start()].count("\n") + 1)))
+                for m in _MD_FILE_REF_RE.finditer(scrubbed):
+                    file_refs.append((where, m.group(1).strip(), _abs(scrubbed[: m.start()].count("\n") + 1)))
                 continue
             if not isinstance(blk, dict):
                 add(p, "error", "invalid-block", where, "Block must be a markdown string or a typed object.")
@@ -2876,6 +2882,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 gloss_refs.extend((where, t, None) for t in _MD_GLOSS_REF_RE.findall(s_refs))
                 extref_refs.extend((where, x, None) for x in _MD_EXTREF_REF_RE.findall(s_refs))
                 link_refs.extend((where, h, None) for h in _MD_LINK_TARGET_RE.findall(s_refs))
+                file_refs.extend((where, f, None) for f in _MD_FILE_REF_RE.findall(s_refs))
                 if not is_materialised:
                     for pat in _FORBIDDEN_PROSE_PATTERNS:
                         m = pat.search(s)
@@ -2914,6 +2921,48 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     f"{where} #x/{name}",
                     f"External reference '{name}' not found in any kit/extrefs/*.json registry."
                     + _did_you_mean(name, extrefs),
+                    line=ref_line,
+                )
+
+        # 8b. File references. The chip renders and copies whatever
+        # happens here — the point of the check is that a preview which
+        # will not open is reported at build time rather than found by
+        # a reader clicking it.
+        for where, href, ref_line in file_refs:
+            target, status = resolve_file_ref(href, p)
+            if status == "missing":
+                add(
+                    p,
+                    "warning",
+                    "filepath-missing",
+                    f"{where} #f/{href}",
+                    f"No file at '{href}' relative to this page, so the chip has nothing to show.",
+                    line=ref_line,
+                )
+                continue
+            if status == "outside":
+                add(
+                    p,
+                    "warning",
+                    "filepath-outside",
+                    f"{where} #f/{href}",
+                    f"'{href}' resolves to {target}, outside the project root "
+                    f"({project_root_for(p.parent)}). A page carries the bytes of the files it "
+                    "previews, so a reference reaching past the project would publish them; "
+                    "this one renders as a path to copy and nothing else.",
+                    line=ref_line,
+                )
+                continue
+            payload = _file_ref_payload(href, p)
+            if payload.get("status") == "over-cap":
+                add(
+                    p,
+                    "info",
+                    "filepath-not-carried",
+                    f"{where} #f/{href}",
+                    f"'{href}' is {payload.get('bytes')} bytes, over the "
+                    f"{payload.get('cap')}-byte cap for content travelling inside a page. "
+                    "The chip names the file and copies its path; there is no preview.",
                     line=ref_line,
                 )
 
@@ -4498,6 +4547,242 @@ def collect_local_docs(page_data, src: Path, src_root: Path) -> tuple[dict[str, 
         except (OSError, UnicodeDecodeError):
             skipped.append(href)
     return docs, skipped
+
+
+# ------------------------------------------------------------------ #
+# Inline file references — the `filepath` primitive.
+#
+# A document that mentions a file writes its path, and a path in a code
+# span is a dead end: the reader has to leave the page, find the file
+# and come back. `[label](#f/<path>)` keeps the mention and adds the
+# file — hover for a preview, click for the whole thing, and the path
+# stays copyable either way.
+#
+# The bytes have to TRAVEL WITH THE PAGE, and that is the constraint
+# every decision below comes from. None of the three delivery modes can
+# fetch the file at read time: `oku serve` and `dist/site` serve the
+# docs tree, and the interesting references point outside it (`../src`,
+# a sibling repo, an absolute path); `dist/standalone` is opened over
+# file://, where fetch is refused before a request is made. So the
+# payload is computed once, at the point a page dict is made, and rides
+# in `m._files` — which is the one thing all three modes already carry.
+# ------------------------------------------------------------------ #
+
+_MD_FILE_REF_RE = re.compile(r"\]\(#f/([^)\n]+?)\)")
+
+# Two caps because the two contents travel differently: text rides as
+# text, bytes ride as base64 at 4/3 their size.
+MAX_FILE_TEXT_BYTES = MAX_INLINE_DOC_BYTES
+MAX_FILE_BINARY_BYTES = MAX_INLINE_ASSET_BYTES
+
+_FILE_KIND_BY_SUFFIX = {
+    ".md": "markdown",
+    ".markdown": "markdown",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".gif": "image",
+    ".webp": "image",
+    ".avif": "image",
+    ".svg": "image",
+    ".bmp": "image",
+    ".ico": "image",
+    ".mp4": "video",
+    ".webm": "video",
+    ".mov": "video",
+    ".m4v": "video",
+    ".ogv": "video",
+    ".mp3": "audio",
+    ".wav": "audio",
+    ".ogg": "audio",
+    ".m4a": "audio",
+    ".flac": "audio",
+    ".pdf": "pdf",
+}
+
+# Prism's own language ids, so the popup highlights a file the way the
+# page highlights a fence of the same language.
+_FILE_LANG_BY_SUFFIX = {
+    ".py": "python",
+    ".js": "javascript",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
+    ".ts": "typescript",
+    ".tsx": "tsx",
+    ".jsx": "jsx",
+    ".json": "json",
+    ".css": "css",
+    ".scss": "scss",
+    ".html": "markup",
+    ".xml": "markup",
+    ".svg": "markup",
+    ".yml": "yaml",
+    ".yaml": "yaml",
+    ".toml": "toml",
+    ".sh": "bash",
+    ".bash": "bash",
+    ".zsh": "bash",
+    ".sql": "sql",
+    ".go": "go",
+    ".rs": "rust",
+    ".java": "java",
+    ".kt": "kotlin",
+    ".scala": "scala",
+    ".rb": "ruby",
+    ".c": "c",
+    ".h": "c",
+    ".cpp": "cpp",
+    ".hpp": "cpp",
+    ".cs": "csharp",
+    ".php": "php",
+    ".swift": "swift",
+    ".ini": "ini",
+    ".conf": "ini",
+    ".diff": "diff",
+    ".patch": "diff",
+    ".md": "markdown",
+    ".markdown": "markdown",
+}
+
+_project_root_cache: dict[Path, Path] = {}
+
+
+def project_root_for(page_dir: Path) -> Path:
+    """The fence a file reference may not reach past.
+
+    Nearest ancestor holding `.git`, else nearest holding `kit.json`,
+    else the page's own directory. `.git` is asked first on purpose:
+    this repo has `docs/kit.json`, and a docs-rooted fence would refuse
+    `../src/oku/cli.py` — the reference an author most wants to make.
+
+    The fence is not about trust in the author, who typed the path. It
+    is about what a page PUBLISHES: the build reads these files and
+    copies their bytes into the artifact, so a reference reaching into
+    `~/.ssh` or another project would hand them to whoever the document
+    is sent to.
+    """
+    page_dir = page_dir.resolve()
+    hit = _project_root_cache.get(page_dir)
+    if hit is not None:
+        return hit
+    kit_root = None
+    for parent in [page_dir, *page_dir.parents]:
+        if (parent / ".git").exists():
+            _project_root_cache[page_dir] = parent
+            return parent
+        if kit_root is None and (parent / "kit.json").is_file():
+            kit_root = parent
+    root = kit_root or page_dir
+    _project_root_cache[page_dir] = root
+    return root
+
+
+def resolve_file_ref(href: str, page_src: Path) -> tuple[Path | None, str]:
+    """Where a `#f/` reference points, and whether the page may carry it.
+
+    Status is one of `ok`, `missing`, `outside`. Returns the resolved
+    path alongside `outside` too — the message names where it landed,
+    which is the whole diagnosis.
+    """
+    raw = unquote(href).strip()
+    if not raw:
+        return None, "missing"
+    expanded = Path(raw).expanduser()
+    target = expanded if expanded.is_absolute() else (page_src.parent / expanded)
+    try:
+        target = target.resolve()
+    except OSError:
+        return None, "missing"
+    root = project_root_for(page_src.parent)
+    try:
+        target.relative_to(root)
+    except ValueError:
+        return target, "outside"
+    if not target.is_file():
+        return target, "missing"
+    return target, "ok"
+
+
+def _file_kind(target: Path) -> tuple[str, str]:
+    """(kind, mime) for a resolved file. `kind` is what the reader gets:
+    a preview they can look at, or a line saying what the file is."""
+    suffix = target.suffix.lower()
+    mime, _ = mimetypes.guess_type(target.name)
+    kind = _FILE_KIND_BY_SUFFIX.get(suffix)
+    if kind:
+        return kind, mime or "application/octet-stream"
+    return "text", mime or "text/plain"
+
+
+def _file_ref_payload(href: str, page_src: Path) -> dict:
+    """What the page hands the browser for one `#f/` reference.
+
+    Always carries the path, the name and the status; carries content
+    only when it resolved, is inside the fence and fits the cap. A chip
+    with no content still copies its path, which is what the author had
+    before the primitive existed — the failure mode is a preview that
+    does not open, never a page that loses a reference.
+    """
+    target, status = resolve_file_ref(href, page_src)
+    out: dict = {"path": href, "name": Path(unquote(href)).name or href, "status": status}
+    if status != "ok" or target is None:
+        if target is not None:
+            out["resolved"] = str(target)
+        return out
+    kind, mime = _file_kind(target)
+    size = target.stat().st_size
+    out.update({"kind": kind, "mime": mime, "bytes": size})
+    if kind in ("markdown", "text"):
+        if size > MAX_FILE_TEXT_BYTES:
+            out["status"] = "over-cap"
+            out["cap"] = MAX_FILE_TEXT_BYTES
+            return out
+        try:
+            text = target.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            # Not text after all — a `.dat` full of bytes, or a file the
+            # reader cannot see anyway. Say what it is instead of
+            # guessing at its contents.
+            out["kind"] = "binary"
+            return out
+        out["text"] = text
+        out["lines"] = text.count("\n") + (0 if text.endswith("\n") or not text else 1)
+        lang = _FILE_LANG_BY_SUFFIX.get(target.suffix.lower())
+        if lang:
+            out["lang"] = lang
+        return out
+    if kind in ("image", "video", "audio"):
+        if size > MAX_FILE_BINARY_BYTES:
+            out["status"] = "over-cap"
+            out["cap"] = MAX_FILE_BINARY_BYTES
+            return out
+        out["url"] = _data_uri(target)
+        return out
+    # pdf and everything else: named, sized, not previewed. An <embed>
+    # or <iframe> pointed at a data: URI is blocked by the browser, and
+    # a preview pane that renders nothing is worse than a line saying
+    # what the file is.
+    return out
+
+
+def collect_file_refs(page_data, src: Path) -> dict[str, dict]:
+    """Every `#f/` reference on this page, keyed by the path AS AUTHORED.
+
+    The key is what the runtime looks up (`el.getAttribute('path')`), so
+    the two sides cannot drift apart by disagreeing about how to
+    normalise a path — the same rule `collect_local_docs` follows.
+    """
+    refs: dict[str, dict] = {}
+    if page_data is None:
+        return refs
+    for text in _iter_strings(page_data):
+        if "#f/" not in text:
+            continue
+        for href in _MD_FILE_REF_RE.findall(_strip_code(text)):
+            href = href.strip()
+            if href and href not in refs:
+                refs[href] = _file_ref_payload(href, src)
+    return refs
 
 
 def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = None) -> None:

@@ -4232,7 +4232,10 @@ footer {
 /* ============ Print / PDF ============ */
 @media print {
   .ctrl-btn, .okt-chrome-cluster, .okt-rail, .progress-bar, .skip-link,
-  .copy-btn, .permalink, .okt-copy-actions { display: none !important; }
+  .copy-btn, .permalink, .okt-copy-actions,
+  /* A path chip prints as the path. The button that copies it is
+     one of the two things paper cannot do. */
+  .okt-fp-copy { display: none !important; }
   /* page-nav is listed because of the pinned state. Off-canvas it was
      invisible on paper for free; at left: 0 it would print, and its
      inset would print with it. */
@@ -4255,6 +4258,213 @@ footer {
    <glossary-term>, <ext-ref>, and the tooltip popup
    (v2 interactive learning primitives)
    ============================================================ */
+/* ---------------------------------------------------------------- *
+   filepath — an inline path the reader can look inside
+
+   The chip has to read as a path FIRST. An author writes one where
+   they would have written a code span, and a control that announced
+   itself louder than the text around it would make every mention of a
+   file the loudest thing in its paragraph. So: the same monospace
+   face and the same recessed ground inline code already has, plus one
+   affordance — a dotted underline under the path — and a copy button
+   that only appears when the pointer is on the chip.
+   ---------------------------------------------------------------- */
+.okt-fp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 1px 5px 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface-2);
+  vertical-align: baseline;
+  line-height: 1.35;
+}
+.okt-fp:hover,
+.okt-fp:focus-within {
+  border-color: var(--accent);
+}
+.okt-fp-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+.okt-fp-icon svg { width: 13px; height: 13px; }
+.okt-fp[data-status="ok"] .okt-fp-icon { color: var(--accent); }
+.okt-fp-label {
+  font: 500 0.88em 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  background: none;
+  padding: 0;
+  border: 0;
+  overflow-wrap: anywhere;
+  transition: color 0.15s;
+}
+/* The chip already carries a border, an icon and a button, which is
+   enough to read as a control — the dotted underline glossary terms use
+   is their ONLY mark and would be a third one here. The pointer is
+   answered with colour instead, which is also the rule that keeps a
+   hover from moving anything. */
+.okt-fp[data-status="ok"] .okt-fp-label { cursor: pointer; }
+.okt-fp[data-status="ok"]:hover .okt-fp-label { color: var(--accent-strong); }
+.okt-fp:not([data-status="ok"]) {
+  /* A file that is not there is not a whole thing. Dashed says so at a
+     glance and costs no layout, and the icon carries the same word in
+     the same colour. */
+  border-style: dashed;
+}
+.okt-fp:not([data-status="ok"]) .okt-fp-label { cursor: help; }
+.okt-fp:not([data-status="ok"]) .okt-fp-icon { color: var(--warning); }
+.okt-fp-label:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent);
+  border-radius: 2px;
+}
+
+/* The copy button is quiet until the pointer arrives, on the rule the
+   table toolbar already follows: chrome that is always at full weight
+   competes with the content it hangs off. It keeps its box either way,
+   so nothing on the line moves when it appears. */
+.okt-fp-copy {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  /* A floor, not zero — the same rule the page's own chrome buttons
+     follow. At zero the reserved slot reads as a gap the author left
+     in the path, and a control nobody can see is one nobody uses. */
+  opacity: 0.38;
+  transition: opacity 0.15s, color 0.15s;
+}
+.okt-fp-copy svg { width: 12px; height: 12px; }
+/* The glyph is 12px because it sits on a line of prose and a taller box
+   would push the line apart. The TARGET is not: the pseudo-element
+   pushes the hit area out to 26px in both directions without changing
+   the layout box, so the pointer floor is met and nothing on the line
+   moves. */
+.okt-fp-copy::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+}
+.okt-fp:hover .okt-fp-copy,
+.okt-fp-copy:focus-visible { opacity: 1; }
+.okt-fp-copy:hover { color: var(--accent); }
+.okt-fp-copy.okt-flash-ok { opacity: 1; color: var(--success); }
+.okt-fp-copy.okt-flash-fail { opacity: 1; color: var(--danger); }
+
+/* ---- hover card ---- */
+.okt-fp-card { max-width: 380px; }
+.okt-fp-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.okt-fp-card-name {
+  font: 600 12.5px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.okt-fp-card-meta {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.okt-fp-card-pre {
+  margin: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  background: var(--surface-2);
+  max-height: 220px;
+  overflow: hidden;
+}
+.okt-fp-card-pre code {
+  font: 400 11px/1.5 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-soft);
+  white-space: pre;
+}
+.okt-fp-card-more,
+.okt-fp-card-hint {
+  margin-top: 5px;
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.okt-fp-card-why {
+  font-size: 12px;
+  color: var(--warning);
+}
+.okt-fp-media {
+  display: block;
+  max-width: 100%;
+  border-radius: 5px;
+}
+.okt-fp-media-small { max-height: 190px; }
+
+/* ---- popup ---- */
+.okt-fp-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* A three-line file in a full-screen overlay reads as a dialog that
+     failed to load. The floor gives the frame a shape; the ceiling
+     keeps a long file inside the viewport with its own scrollbar. */
+  min-width: min(560px, 90vw);
+  max-width: min(1100px, 94vw);
+  max-height: 86vh;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+/* The reading-aids pass wraps a <pre> in its own host with 16px of
+   block margin, which split the frame into a bar and a separate card
+   floating under it. Inside this frame they are one surface. */
+.okt-fp-view .okt-pre-host { margin: 0; }
+.okt-fp-view .okt-pre-host pre { border: 0; border-radius: 0; margin: 0; }
+.okt-fp-view-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.okt-fp-view-path {
+  font: 500 12.5px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.okt-fp-view-meta {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.okt-fp-view-pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  min-height: 0;
+}
+.okt-fp-view-cut {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
 .oku-gloss,
 .oku-extref {
   border-bottom: 1px dotted var(--accent-strong);

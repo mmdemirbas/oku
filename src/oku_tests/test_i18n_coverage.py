@@ -106,6 +106,21 @@ def _rail_kinds(source: str) -> set[str]:
     return {"rail:" + k for k in kinds}
 
 
+def _file_kinds(source: str) -> set[str]:
+    """The path chip's kind words, under the keys the kit looks them up by.
+
+    Same hazard as the rail's, same answer: `Text`, `Image` and `Video`
+    are common nouns, and a bare key is matched against the leaf text of
+    author content. `__okuFileKindWord` prefixes them with `file:` and
+    builds the key from a variable, so the literal never appears at a
+    call site for the patterns above to find.
+    """
+    block = re.search(r"var __OKU_FILE_LABEL = \{(.*?)\n\};", source, re.S)
+    if not block:
+        return set()
+    return {"file:" + w for w in re.findall(r":\s*'([^']+)'", block.group(1))}
+
+
 @pytest.fixture(scope="module")
 def kit_source(repo_root: Path) -> str:
     return "\n".join(
@@ -125,7 +140,7 @@ def kit_strings(kit_source: str) -> set[str]:
             if text in NOT_STRINGS:
                 continue
             found.add(text)
-    return found | _rail_kinds(source)
+    return found | _rail_kinds(source) | _file_kinds(source)
 
 
 @pytest.fixture(scope="module")
@@ -161,8 +176,8 @@ def test_the_table_names_nothing_the_kit_stopped_saying(kit_strings, tables):
         assert stale == [], f"{code} table has entries the kit no longer emits: {stale}"
 
 
-def test_no_rail_word_is_a_key_in_its_own_right(kit_source, tables):
-    """The safety property behind the `rail:` prefix, stated once.
+def test_no_namespaced_word_is_a_key_in_its_own_right(kit_source, tables):
+    """The safety property behind the `rail:` and `file:` prefixes.
 
     The localize walk matches a table key against the leaf text of every
     descendant of an `.okt-*` host, and author content lives there. A
@@ -171,13 +186,14 @@ def test_no_rail_word_is_a_key_in_its_own_right(kit_source, tables):
     a `<tspan>` inside a diagram. Adding one as a bare key would rewrite
     all of them. Held on the runtime side by
     `browser/test_i18n_runtime.py::test_a_rail_word_in_author_content_survives_the_pass`."""
-    bare = {k.split(":", 1)[1] for k in _rail_kinds(kit_source)}
-    assert bare, "no rail words were derived, so this asserts nothing"
+    namespaced = _rail_kinds(kit_source) | _file_kinds(kit_source)
+    bare = {k.split(":", 1)[1] for k in namespaced}
+    assert bare, "no namespaced words were derived, so this asserts nothing"
     for code, table in tables.items():
         clash = sorted(w for w in bare if w in table)
         assert clash == [], (
-            f"{code} table keys {clash} are rail words. A key is matched against "
-            "author content, so these must stay under the `rail:` prefix."
+            f"{code} table keys {clash} are rail or file-kind words. A key is matched "
+            "against author content, so these must stay under their prefix."
         )
 
 
