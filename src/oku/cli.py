@@ -21,12 +21,14 @@ prefix for click-to-open.
 """
 
 import argparse
+import base64
 import collections
 import datetime
 import difflib
 import hashlib
 import http.server
 import json
+import mimetypes
 import os
 import queue
 import re
@@ -4009,6 +4011,23 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
             dest_md.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(md_sibling, dest_md)
 
+        # The files the page points at, at the paths its own hrefs use.
+        # A page and its image were built as if only the page mattered:
+        # the reference survived, the file was copied nowhere, and the
+        # build said nothing. The author never sees it, because a
+        # preview served from the source directory resolves the image
+        # and only the handed-over artifact is missing it.
+        assets, outside_tree = collect_page_assets(page, src, src_root)
+        for href, target in assets.items():
+            dest_asset = out_dir / target.relative_to(src_root.resolve())
+            dest_asset.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(target, dest_asset)
+        for href in outside_tree:
+            print(
+                f"  ⚠ {src.relative_to(src_root)}: {href} is above the tree being built — "
+                f"not copied into dist/site (the standalone page inlines it)"
+            )
+
         # A stub `oku init` wrote carries the manifest of the day it was
         # written. The site fetches the real one for its sidebar, so the
         # two disagreed IN THE SAME PAGE: the front page of a delivered
@@ -4135,6 +4154,160 @@ def _iter_strings(node):
             yield from _iter_strings(value)
 
 
+# A page's own files — the image beside it above all. Three spellings
+# reach the DOM as a request for a file: markdown's `![alt](path)`, an
+# attribute inside an HTML island, and the `src` of an `image` block on
+# a JSON page. All three shipped as broken references, because the build
+# carried the page and left the file behind.
+_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s<>]+?)>?(?:\s+[\"'(][^\n]*?)?\s*\)")
+_HTML_ASSET_ATTR_RE = re.compile(r"""\b(?:src|poster)\s*=\s*["']([^"'\s]+)["']""", re.I)
+_HTML_SRCSET_RE = re.compile(r"""\bsrcset\s*=\s*["']([^"']+)["']""", re.I)
+
+# Past this, a standalone page stops inlining and copies the file beside
+# itself instead. A 20 MB screenshot base64s to 27 MB, in every page
+# that shows it; one file you can send is the point of that tree, and a
+# file nobody can mail is not one.
+MAX_INLINE_ASSET_BYTES = 2 * 1024 * 1024
+
+
+def _asset_hrefs(page_data) -> list[str]:
+    """Every local file this page asks the browser to fetch, in the
+    spelling the author used — which is the string a rewrite has to
+    match and the path a copy has to land on."""
+    hrefs: list[str] = []
+    seen: set[str] = set()
+
+    def add(href: str) -> None:
+        href = href.strip()
+        if not href or href in seen:
+            return
+        seen.add(href)
+        hrefs.append(href)
+
+    def walk(node) -> None:
+        if isinstance(node, str):
+            text = _strip_code(node)
+            for m in _MD_IMAGE_RE.finditer(text):
+                add(m.group(1))
+            for m in _HTML_ASSET_ATTR_RE.finditer(text):
+                add(m.group(1))
+            for m in _HTML_SRCSET_RE.finditer(text):
+                for candidate in m.group(1).split(","):
+                    parts = candidate.split()
+                    if parts:
+                        add(parts[0])
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+        elif isinstance(node, dict):
+            # An `image` block carries a bare path under `src`, which no
+            # prose regex can see. It is reachable only from a JSON page,
+            # and those keep rendering forever.
+            if node.get("k") == "image" and isinstance(node.get("src"), str):
+                add(node["src"])
+            for value in node.values():
+                walk(value)
+
+    walk(page_data)
+    return hrefs
+
+
+def collect_page_assets(page_data, src: Path, src_root: Path) -> tuple[dict[str, Path], list[str]]:
+    """Local files this page points at, keyed by the href AS AUTHORED.
+
+    Returns (assets, outside). `outside` holds hrefs that resolve to a
+    real file above the tree being built: the site cannot copy one
+    without inventing a path for it, so it says so instead. A href that
+    resolves to nothing is neither — `oku check` already reports it as
+    an unresolved link, and saying it twice trains authors to read
+    neither message.
+    """
+    assets: dict[str, Path] = {}
+    outside: list[str] = []
+    if page_data is None:
+        return assets, outside
+
+    root = src_root.resolve()
+    for href in _asset_hrefs(page_data):
+        if re.match(r"^[a-z][a-z0-9+.-]*:|^//|^#", href, re.I):
+            continue  # someone else's origin, a data: URI, or an anchor
+        base = root if href.startswith("/") else src.parent
+        target = (base / unquote(href.lstrip("/"))).resolve()
+        if not target.is_file():
+            continue
+        try:
+            target.relative_to(root)
+        except ValueError:
+            outside.append(href)
+            continue
+        assets[href] = target
+    return assets, outside
+
+
+def _data_uri(path: Path) -> str:
+    kind, _ = mimetypes.guess_type(path.name)
+    return f"data:{kind or 'application/octet-stream'};base64," + base64.b64encode(path.read_bytes()).decode(
+        "ascii"
+    )
+
+
+def _code_spans(text: str) -> list[tuple[int, int]]:
+    """Where the code samples are. A page that documents figures shows
+    the markdown for one, and a sample rewritten into a 40 KB data: URI
+    stops being a sample."""
+    spans = [m.span() for m in _FENCE_RE.finditer(text)]
+    for m in _INLINE_CODE_RE.finditer(text):
+        if not any(s <= m.start() < e for s, e in spans):
+            spans.append(m.span())
+    spans.sort()
+    return spans
+
+
+def _rewrite_assets(node, uris: dict[str, str]):
+    """A copy of the page with every carried href replaced by its data:
+    URI. Rewriting goes through the same three patterns that found the
+    href, never plain string replacement — `tiny.png` is also ordinary
+    prose — and never inside code, which is a quotation of a reference
+    rather than one.
+    """
+    if isinstance(node, str):
+
+        def sub_group(m):
+            uri = uris.get(m.group(1).strip())
+            return m.group(0) if uri is None else m.group(0).replace(m.group(1), uri, 1)
+
+        def sub_srcset(m):
+            out = []
+            for candidate in m.group(1).split(","):
+                parts = candidate.split()
+                if not parts:
+                    continue
+                out.append(" ".join([uris.get(parts[0], parts[0])] + parts[1:]))
+            return m.group(0).replace(m.group(1), ", ".join(out), 1)
+
+        def rewrite(chunk: str) -> str:
+            chunk = _MD_IMAGE_RE.sub(sub_group, chunk)
+            chunk = _HTML_ASSET_ATTR_RE.sub(sub_group, chunk)
+            return _HTML_SRCSET_RE.sub(sub_srcset, chunk)
+
+        out: list[str] = []
+        pos = 0
+        for start, end in _code_spans(node):
+            out.append(rewrite(node[pos:start]))
+            out.append(node[start:end])
+            pos = end
+        out.append(rewrite(node[pos:]))
+        return "".join(out)
+    if isinstance(node, list):
+        return [_rewrite_assets(item, uris) for item in node]
+    if isinstance(node, dict):
+        out = {k: _rewrite_assets(v, uris) for k, v in node.items()}
+        if node.get("k") == "image" and isinstance(node.get("src"), str):
+            out["src"] = uris.get(node["src"], node["src"])
+        return out
+    return node
+
+
 def collect_local_docs(page_data, src: Path, src_root: Path) -> tuple[dict[str, str], list[str]]:
     """Read every local .md this page links to, keyed by the href AS
     AUTHORED — which is exactly what the viewer looks up at runtime
@@ -4222,8 +4395,43 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
         # rest of the kit renders as visible text.
         # Inline the JSON page content so autoBoot finds it offline.
         json_sibling = src.with_suffix(".json")
+        page = page_data
+        if page is None and json_sibling.exists():
+            try:
+                page = json.loads(json_sibling.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                page = None
+        # The bytes of every file this page shows travel INSIDE it. A
+        # copy beside the page is a copy the reader does not receive —
+        # the promise of this tree is one file you can send, and an
+        # image left behind is the one part of the page that fails
+        # silently, in the artifact nobody re-opens before sending.
+        # Past the cap the file is copied instead and the build says so.
+        uris: dict[str, str] = {}
+        page_assets, outside_tree = collect_page_assets(page, src, src_root)
+        for href, target in page_assets.items():
+            if target.stat().st_size <= MAX_INLINE_ASSET_BYTES:
+                uris[href] = _data_uri(target)
+                continue
+            dest_asset = out_dir / target.relative_to(src_root.resolve())
+            dest_asset.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(target, dest_asset)
+            print(
+                f"  ⚠ {src.relative_to(src_root)}: {href} not inlined "
+                f"(over {MAX_INLINE_ASSET_BYTES // 1024}K) — it was copied beside the page, "
+                f"so this page is no longer a single file"
+            )
+        # A file above the tree has no path the site could copy it to,
+        # but a standalone page carries bytes, not paths, so it can
+        # simply hold it.
+        for href in outside_tree:
+            target = (src.parent / unquote(href)).resolve()
+            if target.is_file() and target.stat().st_size <= MAX_INLINE_ASSET_BYTES:
+                uris[href] = _data_uri(target)
         data_text = None
-        if page_data is not None:
+        if uris and page is not None:
+            data_text = json.dumps(_rewrite_assets(page, uris), ensure_ascii=False, indent=2)
+        elif page_data is not None:
             data_text = json.dumps(page_data, ensure_ascii=False, indent=2)
         elif json_sibling.exists():
             data_text = json_sibling.read_text(encoding="utf-8")
