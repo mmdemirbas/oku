@@ -3654,6 +3654,30 @@ def split_language_suffix(stem: str, codes: list[str]) -> tuple[str, str | None]
     return (stem[:at], suffix) if suffix in codes else (stem, None)
 
 
+def nav_sort_key(entry: dict) -> tuple:
+    """The one order the site tree is in: folder, then `order`, then title.
+
+    Three things consume it — the sidebar tree, `llms.txt`, and
+    `_pick_open_target` when it decides which page `oku serve` opens —
+    and for a while each carried its own idea of the answer. The manifest
+    was emitted in path order while a comment two thousand lines away
+    asserted it was already sorted, so `pages[0]` was the alphabetically
+    first page rather than the tree's first row. It went unnoticed here
+    only because this repo commits one HTML stub: the loop found nothing
+    to match until it reached `index.html`.
+
+    `order` defaults to 1000, which parks an unordered page after
+    everything explicit. Title is the tie-break, lowercased so `Zebra`
+    and `apple` do not sort by case. `chrome.js` mirrors this rule at
+    render time and `test_manifest_order.py` holds the two together.
+    """
+    return (
+        entry.get("parent") or "",
+        entry.get("order", 1000),
+        (entry.get("title") or entry.get("path") or "").lower(),
+    )
+
+
 def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
     """Walk JSON pages under root, return the site manifest dict.
 
@@ -3699,6 +3723,7 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
             entry["summary"] = meta["summary"]
         entries.append(entry)
     entries = _fold_language_variants(entries, root)
+    entries.sort(key=nav_sort_key)
     return {
         "schema_version": 1,
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -3825,7 +3850,6 @@ def compute_llms_txt(root: Path, *, pages: list | None = None) -> str:
     if description:
         lines += ["> " + description, ""]
     lines += ["## Pages", ""]
-    # Sort by parent (folder), then order, then title.
     entries = []
     for p, data in pages:
         rel = p.relative_to(root)
@@ -3840,7 +3864,7 @@ def compute_llms_txt(root: Path, *, pages: list | None = None) -> str:
                 "summary": meta.get("summary", ""),
             }
         )
-    entries.sort(key=lambda e: (e["parent"], e["order"], e["title"].lower()))
+    entries.sort(key=nav_sort_key)
     for e in entries:
         line = "- [" + e["title"] + "](" + e["path"] + ")"
         if e["summary"]:
@@ -5275,9 +5299,9 @@ def _make_serve_handler(root: Path):
 
 def _pick_open_target(htmls: list[Path], user_cwd: Path, root: Path) -> Path | None:
     """Choose the page to auto-open. Preference order:
-    1. First page in the site tree (manifest order: parent, meta.order,
-       title) — this is what the sidebar would show as "page 1", so the
-       user lands on real content instead of an empty index.
+    1. First page in the site tree (`nav_sort_key` order) — this is what
+       the sidebar shows as "page 1", so the user lands on real content
+       instead of an empty index.
     2. <user_cwd>/index.html if it's on disk under the user's directory.
     3. Fallbacks: first index.html under user_cwd, first HTML, etc.
     """
@@ -5290,10 +5314,9 @@ def _pick_open_target(htmls: list[Path], user_cwd: Path, root: Path) -> Path | N
     user_prefix = (root / rel_user).resolve()
     html_set = {h.resolve() for h in htmls}
 
-    # Primary: the first page in the manifest. compute_manifest already
-    # sorts by (parent, meta.order, title.lower()), so manifest[0] is
-    # the natural top-of-tree page — the one a user would open first if
-    # browsing the sidebar.
+    # Primary: the first page in the manifest, which compute_manifest
+    # sorts with `nav_sort_key` — so pages[0] IS the tree's first row,
+    # the one a user would open first if browsing the sidebar.
     try:
         manifest = compute_manifest(root)
         entries = manifest.get("pages") or []
