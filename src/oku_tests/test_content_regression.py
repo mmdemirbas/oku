@@ -3132,3 +3132,38 @@ class TestSplitRuleIndex:
         for rel in ("CLAUDE.md", "PRESENTATION-RULES.md"):
             text = (repo_root / rel).read_text(encoding="utf-8")
             assert "see above" not in text, f"{rel} still points at a neighbour it may no longer have"
+
+
+class TestCheckCodesAreDocumented:
+    """Every code `oku check` can emit appears in the severity table on
+    `docs/cli.md`, and in its Turkish twin.
+
+    The table is where an author looks up a code they have just been
+    shown, so a code missing from it is a message with no explanation.
+    Nothing failed when one drifted: six had — five of them for long
+    enough that nobody remembered adding them — because a hand-copied
+    list is right on the day it is written and wrong two edits later.
+    Same shape as the seven block-kind authorities, one layer down.
+    """
+
+    CLI_SRC = (Path(__file__).resolve().parents[2] / "src" / "oku" / "cli.py").read_text(encoding="utf-8")
+    DOCS = Path(__file__).resolve().parents[2] / "docs"
+
+    @classmethod
+    def _emitted(cls) -> set[str]:
+        codes = set(re.findall(r'add\(\s*\w+,\s*"(?:error|warning|info)",\s*"([a-z0-9-]+)"', cls.CLI_SRC))
+        codes |= set(re.findall(r'\(\s*"(?:error|warning|info)",\s*"([a-z0-9-]+)",', cls.CLI_SRC))
+        return codes
+
+    def test_the_linter_still_has_codes_to_find(self) -> None:
+        """The regexes above read source. If they stop matching, this
+        whole class passes by finding nothing — which is the failure
+        mode a coverage check has to rule out first."""
+        assert len(self._emitted()) >= 30, sorted(self._emitted())
+
+    @pytest.mark.parametrize("page", ["cli.md", "cli.tr.md"])
+    def test_every_code_is_in_the_severity_table(self, page: str) -> None:
+        text = (self.DOCS / page).read_text(encoding="utf-8")
+        documented = set(re.findall(r"`([a-z0-9*-]+)`", text))
+        missing = sorted(c for c in self._emitted() if c not in documented)
+        assert missing == [], f"{page} does not list {missing}"
