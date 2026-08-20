@@ -12,6 +12,84 @@ carries the record, including what was measured before and after.
 
 ---
 
+## A page-adjacent image never reaches the build, in either dist output
+
+*Found 2026-08-20. oku 0.6.5, kit 2026-08-17-r43, src df8c6fcb3b3d.*
+
+**Symptom.** A markdown image pointing at a file next to its page builds clean
+and ships broken. The reference survives into the page, the file is copied
+nowhere, and nothing in the build says so. The author does not see it, because
+a preview served from the source directory resolves the image; only the
+artifact that gets handed over is broken.
+
+**Minimal reproduction.** One page and one image beside it:
+
+```
+docs/imgtest.md
+docs/tiny.png
+```
+
+```markdown
+---
+title: Image carry test
+summary: Does a page-adjacent image survive oku build.
+---
+
+## The image {#img}
+
+![tiny](tiny.png)
+```
+
+```bash
+cd docs && oku init && oku check && oku build
+find dist -name '*.png'
+```
+
+**Expected.** Either `tiny.png` copied next to the built page, or inlined as a
+`data:` URI in `dist/standalone/` (which already inlines the kit's own assets to
+be a send-as-file artifact), or an error naming the unresolvable reference.
+
+**Actual.** `oku check` reports 1 page clean. `oku build` reports success and
+prints no warning. `find dist -name '*.png'` returns nothing: neither
+`dist/standalone/` nor `dist/site/` holds the file. Serving
+`dist/standalone/` over loopback, the page is 200 and `tiny.png` is 404.
+
+**Where the failure was localised.** Not localised in the kit's source. The
+asset pipeline was not read. What is established is the input/output pair: the
+image sits beside the page before the build and exists in neither output after
+it, with a zero exit code and no diagnostic.
+
+**Observed.**
+
+- `find dist -name '*.png'` empty after a successful build, on the reproduction
+  above and on a real page carrying a screenshot.
+- `python3 -m http.server --bind 127.0.0.1` over `dist/standalone/`: the page
+  200s, the image 404s from the same directory.
+- `oku check` exits 0 on the page.
+- On the real page, the `<img>` reported `naturalWidth` 0 in the browser. The
+  page had been built and opened before anyone noticed the figure was blank.
+
+**Inferred, not verified.**
+
+- That the standalone inliner walks only kit assets and not page-referenced
+  ones. That is consistent with standalone inlining everything else, but the
+  code was not read.
+- That the same omission explains `dist/site/`. Both outputs lack the file, so
+  the behaviour is shared; whether it is one code path or two is unknown.
+
+**A trap while reproducing it.** Naming the page `index.md` collides with the
+`index.html` launcher `oku init` writes into the same directory, and the build
+then emits the launcher under that name, so the page under test is not what
+gets inspected. Two earlier readings of this defect were wrong for that reason
+before the page was renamed. That collision may itself deserve an entry.
+
+**Why it is worth a check rather than a documentation note.** It is the same
+shape as the two entries below: the source looks right, the linter passes, and
+the delivered artifact is missing content. An image is the case where the loss
+is largest, because the figure is usually the reason the page exists.
+
+---
+
 ## An HTML island is cut at the first blank line, and `check` does not notice
 
 *Found 2026-08-14. oku 0.6.5, kit 2026-08-14-r38, src 42447c724eb4.*
