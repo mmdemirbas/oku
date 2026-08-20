@@ -3234,6 +3234,92 @@ function wireCopyRegions(root) {
   });
 }
 
+/* ---- A live table, in the two shapes a reader takes it away in ----
+   Filtered-out rows and group headers are chrome, not data, so neither
+   format carries them: the clipboard holds what the reader is looking
+   at. Both come off ONE reading of the table, because a spreadsheet
+   copy and a pull-request copy that disagree about which rows are in
+   the table is worse than either being wrong on its own. */
+function __okuCellText(cell) {
+  return (cell.textContent || '').trim().replace(/\s+/g, ' ');
+}
+
+function __okuTableData(table) {
+  var head = [];
+  var align = [];
+  Array.prototype.forEach.call(table.querySelectorAll('thead th'), function (th) {
+    head.push(__okuCellText(th));
+    // The GFM parser writes the column alignment as an inline style, so
+    // reading it back is what makes the copy round-trip.
+    align.push(th.style.textAlign || '');
+  });
+  var rows = [];
+  Array.prototype.forEach.call(table.querySelectorAll('tbody tr'), function (tr) {
+    if (tr.classList.contains('group-header') ||
+        tr.classList.contains('okt-row-hidden') ||
+        tr.hidden) return;
+    var cells = Array.prototype.map.call(tr.cells, __okuCellText);
+    if (cells.length) rows.push(cells);
+  });
+  return { head: head, rows: rows, align: align };
+}
+
+function __okuTableTsv(table) {
+  var d = __okuTableData(table);
+  return [d.head.join('\t')]
+    .concat(d.rows.map(function (r) { return r.join('\t'); }))
+    .join('\n');
+}
+
+/* GFM. The pipe is the delimiter, so a pipe inside a cell is escaped the
+   way GitHub documents it; and every row is padded to the widest one,
+   because a row with fewer cells than the header silently drops its
+   tail and a row with more ends the table early. */
+function __okuTableMarkdown(table) {
+  var d = __okuTableData(table);
+  var width = d.rows.reduce(function (n, r) { return Math.max(n, r.length); }, d.head.length);
+  if (!width) return '';
+  var row = function (cells) {
+    var out = cells.slice(0, width).map(function (s) { return String(s).replace(/\|/g, '\\|'); });
+    while (out.length < width) out.push('');
+    return '| ' + out.join(' | ') + ' |';
+  };
+  var rule = [];
+  for (var i = 0; i < width; i++) {
+    var a = d.align[i];
+    rule.push(a === 'center' ? ':---:' : a === 'right' ? '---:' : a === 'left' ? ':---' : '---');
+  }
+  var lines = [row(d.head), '| ' + rule.join(' | ') + ' |'];
+  d.rows.forEach(function (r) { lines.push(row(r)); });
+  return lines.join('\n');
+}
+
+/* One writer for both buttons, so the failure path is the same one.
+   The pre-clipboard-API branch used to report nothing at all — a reader
+   on a file:// page clicked and could not tell whether it had worked. */
+function __okuTableCopy(btn, text) {
+  var flash = function (cls) {
+    btn.classList.add(cls);
+    window.setTimeout(function () { btn.classList.remove(cls); }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      function () { flash('okt-flash-ok'); },
+      function () { flash('okt-flash-fail'); }
+    );
+    return;
+  }
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;opacity:0;left:-9999px;';
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  flash(ok ? 'okt-flash-ok' : 'okt-flash-fail');
+}
+
 /* ============ Reading aids: progress, back-to-top, copy-btn, glossary ============ */
 // The once-only globals (scroll + keydown listeners) are registered the
 // first time initReadingAids runs; subsequent calls only re-scan the DOM
@@ -3749,9 +3835,16 @@ function initReadingAids() {
     // Reads the visible <tr>'s cells (skipping group headers), tabs
     // between cells, newlines between rows, prepends the <thead>
     // labels — paste-ready into a spreadsheet or scratch doc.
+    // Two destinations, two buttons. TSV goes to a spreadsheet; GFM goes
+    // to a pull request, an issue or another markdown document. One
+    // button that guessed which would be wrong half the time, and a
+    // menu would hide the affordance the reader came for.
     var copyBtnHTML =
-      '<button data-copy type="button" title="Copy data (TSV)" aria-label="Copy data as TSV">' +
+      '<button data-copy="tsv" type="button" title="Copy data (TSV)" aria-label="Copy data as TSV">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>' +
+      '</button>' +
+      '<button data-copy="md" type="button" title="Copy as Markdown" aria-label="Copy table as Markdown">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15.5v-7l3 3 3-3v7"/><path d="M17.5 8.5v7"/><path d="M15 13l2.5 2.5L20 13"/></svg>' +
       '</button>';
 
     ctrl.innerHTML =
@@ -4586,43 +4679,16 @@ function initReadingAids() {
     // non-group-header) <tbody> row's textContent, tabs between cells,
     // newlines between rows. Hidden / filtered-out rows are skipped,
     // so the clipboard reflects what the user is actually looking at.
-    var copyBtn = ctrl.querySelector('[data-copy]');
+    var copyBtn = ctrl.querySelector('[data-copy="tsv"]');
     if (copyBtn) {
       copyBtn.addEventListener('click', function () {
-        var headers = Array.prototype.map.call(
-          table.querySelectorAll('thead th'),
-          function (th) { return (th.textContent || '').trim().replace(/[\t\n\r]+/g, ' '); }
-        );
-        var rows = [headers.join('\t')];
-        Array.prototype.forEach.call(
-          table.querySelectorAll('tbody tr'),
-          function (tr) {
-            if (tr.classList.contains('group-header') ||
-                tr.classList.contains('okt-row-hidden') ||
-                tr.hidden) return;
-            var cells = Array.prototype.map.call(tr.cells, function (td) {
-              return (td.textContent || '').trim().replace(/[\t\n\r]+/g, ' ');
-            });
-            if (cells.length) rows.push(cells.join('\t'));
-          }
-        );
-        var tsv = rows.join('\n');
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(tsv).then(
-            function () { copyBtn.classList.add('okt-flash-ok'); setTimeout(function () { copyBtn.classList.remove('okt-flash-ok'); }, 1200); },
-            function () { copyBtn.classList.add('okt-flash-fail'); setTimeout(function () { copyBtn.classList.remove('okt-flash-fail'); }, 1200); }
-          );
-        } else {
-          // Pre-clipboard-API fallback: select a hidden textarea + execCommand.
-          var ta = document.createElement('textarea');
-          ta.value = tsv;
-          ta.style.position = 'fixed';
-          ta.style.opacity = '0';
-          document.body.appendChild(ta);
-          ta.select();
-          try { document.execCommand('copy'); } catch (e) { /* noop */ }
-          document.body.removeChild(ta);
-        }
+        __okuTableCopy(copyBtn, __okuTableTsv(table));
+      });
+    }
+    var copyMdBtn = ctrl.querySelector('[data-copy="md"]');
+    if (copyMdBtn) {
+      copyMdBtn.addEventListener('click', function () {
+        __okuTableCopy(copyMdBtn, __okuTableMarkdown(table));
       });
     }
     var expBtn = ctrl.querySelector('[data-expand]');

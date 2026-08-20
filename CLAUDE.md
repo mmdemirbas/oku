@@ -519,6 +519,18 @@ Inline `<code>` is diffed.
 that, a translated page rewrites a paragraph the reader is about to
 paste somewhere else, because it happened to match a string-table key.
 
+**A table copies to two destinations, and one attribute names which.**
+TSV goes to a spreadsheet; GFM goes to a pull request, an issue or
+another markdown document — and that second one had no button, so the
+only way out of the page was to retype the table. Both come off ONE
+reading of the live table, so a filtered table copies the rows on screen
+in either format and the two never disagree about which rows those are.
+The buttons are `data-copy="tsv"` and `data-copy="md"`, not a second
+attribute name: the toolbar sizes and orders its icons through
+`[data-copy]`, and a button called `data-copy-md` fell out of every rule
+in that list — a 22x10 box around a 0x0 icon. Held by
+`test_table_copy_formats.py`.
+
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never
 English words. The page can flip to TR or EN without touching kit
