@@ -429,13 +429,22 @@ var __okuI18n = (function () {
     return out;
   }
 
-  /* Attributes and leaf text on kit-owned elements only.
+  /* Attributes and leaf text on kit-owned elements, and everything
+   * underneath them.
    *
-   * Scoped, and exact-match against a curated table, so author prose is
-   * unreachable twice over: a paragraph is not inside `.okt-*`, and a
-   * string that is not in the table is never touched. Idempotent —
-   * translating an already-translated string is a miss, which leaves it
-   * alone. */
+   * That second half is the part to keep in mind. The walk descends into
+   * every descendant of an `.okt-*` host, and an author's content lives
+   * there too — a table cell, a timeline entry, a label inside a
+   * diagram. Measured on this repo's own docs: the single word "Charts"
+   * as a table key would rewrite 18 places, among them a page title in
+   * the tree, an `<h2>` and a `<tspan>`. So the exact-match table is the
+   * ONLY thing keeping author prose safe, and what may go in it is
+   * decided by that: a string the kit composed, not a common noun.
+   * A word the kit needs that a reader might also write gets a
+   * namespaced key instead — see `railKind`.
+   *
+   * Idempotent: translating an already-translated string is a miss,
+   * which leaves it alone. */
   var SCOPES = [
     '.ctrl-btn', '.copy-btn', '[class^="okt-"]', '[class*=" okt-"]',
     '[class^="okc-"]', '[class*=" okc-"]', '[class^="okd-"]', '[class*=" okd-"]',
@@ -2464,6 +2473,19 @@ function buildTOC(tocList) {
 // both claiming a mark, the thinner dropped the chart and a page of 48
 // charts drew no chart shape at all. Named kinds first, generic
 // containers last.
+/* The rail's landmark words — "Chart", "Table", "Section". Every one is
+   a common noun, so as a plain string-table key it would be applied by
+   the localize walk to any leaf that happens to match; on this repo's
+   own docs "Charts" alone matches 18 of them. The table carries these
+   under a `rail:` prefix, which no author writes, and the English word
+   is the fallback rather than the key. The lookup is a variable so the
+   prefix is not itself a string anyone has to translate. */
+function railKind(en) {
+  var key = 'rail:' + en;
+  var out = okuT(key);
+  return out === key ? en : out;
+}
+
 var RAIL_FIGURES = [
   ['.okt-chart-grid', 'Charts', 'round'],
   ['.okt-table-wrap', 'Table', 'square'],
@@ -2545,7 +2567,7 @@ function buildRail() {
   if (h1) {
     var htitle = _okuHeadingText(h1);
     if (htitle) {
-      marks.push({ el: h1, kind: 'title', shape: 'bar', label: htitle, tipKind: 'Title' });
+      marks.push({ el: h1, kind: 'title', shape: 'bar', label: htitle, tipKind: railKind('Title') });
     }
   }
   document.querySelectorAll('main > section').forEach(function (sec) {
@@ -2557,7 +2579,7 @@ function buildRail() {
     // A section whose h2 is .okt-sr-only (an untitled TL;DR) has no
     // name to show and no shape to contribute.
     if (title && !(h2 && h2.classList.contains('okt-sr-only'))) {
-      marks.push({ el: sec, kind: 'section', shape: 'bar', label: title, tipKind: 'Section' });
+      marks.push({ el: sec, kind: 'section', shape: 'bar', label: title, tipKind: railKind('Section') });
     }
     // Sub-headings get the same bar at two thirds the height. The page
     // outline is a hierarchy and the rail should show it as one —
@@ -2565,7 +2587,7 @@ function buildRail() {
     // thirty sub-headings draw the same picture.
     sec.querySelectorAll(':scope > h3').forEach(function (h3) {
       var t = _okuHeadingText(h3);
-      if (t) marks.push({ el: h3, kind: 'sub', shape: 'bar', label: t, tipKind: 'Sub-section' });
+      if (t) marks.push({ el: h3, kind: 'sub', shape: 'bar', label: t, tipKind: railKind('Sub-section') });
     });
     RAIL_FIGURES.forEach(function (spec) {
       sec.querySelectorAll(spec[0]).forEach(function (el) {
@@ -2591,7 +2613,7 @@ function buildRail() {
         seen.push(el);
         marks.push({
           el: el, kind: 'figure', shape: spec[2],
-          label: title || 'Figure', tipKind: spec[1],
+          label: title || railKind('Figure'), tipKind: railKind(spec[1]),
         });
       });
     });
@@ -4752,7 +4774,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-20-r46';
+var __okuKitBuild = '2026-08-20-r47';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

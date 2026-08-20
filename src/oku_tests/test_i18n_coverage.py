@@ -86,11 +86,36 @@ UNTRANSLATED = {
 }
 
 
+def _rail_kinds(source: str) -> set[str]:
+    """The rail's landmark words, under the keys the kit looks them up by.
+
+    They are common nouns — "Chart", "Table", "Section" — so they cannot
+    be plain table keys: the localize walk would apply them to any leaf
+    that matched, and on this repo's own docs "Charts" alone matches 18.
+    `railKind` prefixes them, and because the prefix is built from a
+    variable no pattern above can see the literal at the call site.
+
+    Derived from the source rather than listed here. A new row in
+    RAIL_FIGURES ships a word a reader sees on hover, and it should fail
+    this test the day it is written, not the day someone remembers.
+    """
+    kinds = set(re.findall(r"railKind\('([^']+)'\)", source))
+    block = re.search(r"var RAIL_FIGURES = \[(.*?)\n\];", source, re.S)
+    if block:
+        kinds |= set(re.findall(r"\[\s*'[^']*'\s*,\s*'([^']+)'\s*,", block.group(1)))
+    return {"rail:" + k for k in kinds}
+
+
 @pytest.fixture(scope="module")
-def kit_strings(repo_root: Path) -> set[str]:
-    source = "\n".join(
+def kit_source(repo_root: Path) -> str:
+    return "\n".join(
         (repo_root / "kit" / name).read_text(encoding="utf-8") for name in ("chrome.js", "renderer.js")
     )
+
+
+@pytest.fixture(scope="module")
+def kit_strings(kit_source: str) -> set[str]:
+    source = kit_source
     found: set[str] = set()
     for pattern in PATTERNS:
         for hit in pattern.findall(source):
@@ -100,7 +125,7 @@ def kit_strings(repo_root: Path) -> set[str]:
             if text in NOT_STRINGS:
                 continue
             found.add(text)
-    return found
+    return found | _rail_kinds(source)
 
 
 @pytest.fixture(scope="module")
@@ -134,6 +159,26 @@ def test_the_table_names_nothing_the_kit_stopped_saying(kit_strings, tables):
         known = kit_strings | DYNAMIC | FROM_LOOKUP
         stale = sorted(k for k in table if k not in known)
         assert stale == [], f"{code} table has entries the kit no longer emits: {stale}"
+
+
+def test_no_rail_word_is_a_key_in_its_own_right(kit_source, tables):
+    """The safety property behind the `rail:` prefix, stated once.
+
+    The localize walk matches a table key against the leaf text of every
+    descendant of an `.okt-*` host, and author content lives there. A
+    rail word is a common noun — `Charts` matches 18 places in this
+    repo's own docs, among them a page title in the tree, an `<h2>` and
+    a `<tspan>` inside a diagram. Adding one as a bare key would rewrite
+    all of them. Held on the runtime side by
+    `browser/test_i18n_runtime.py::test_a_rail_word_in_author_content_survives_the_pass`."""
+    bare = {k.split(":", 1)[1] for k in _rail_kinds(kit_source)}
+    assert bare, "no rail words were derived, so this asserts nothing"
+    for code, table in tables.items():
+        clash = sorted(w for w in bare if w in table)
+        assert clash == [], (
+            f"{code} table keys {clash} are rail words. A key is matched against "
+            "author content, so these must stay under the `rail:` prefix."
+        )
 
 
 def test_a_placeholder_template_keeps_its_slots(tables):

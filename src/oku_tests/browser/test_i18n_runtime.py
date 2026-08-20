@@ -136,3 +136,79 @@ def test_an_english_page_asks_for_no_translation_table(page, site_url):
         f"the English page fetched a table for its own language: {asked}"
     )
     assert failed == [], f"a translation table 404'd: {failed}"
+
+
+RAIL = """() => {
+  const marks = [...document.querySelectorAll('.okt-rail-mark')];
+  return {
+    count: marks.length,
+    labels: marks.map(m => m.getAttribute('aria-label')),
+    kinds: [...new Set(marks.map(m => m._okuMark && m._okuMark.tipKind))],
+  };
+}"""
+
+
+def _rail(page, site_url, name):
+    _open(page, site_url, name)
+    # The rail places its marks off measured geometry, so it needs a laid
+    # out page — and the marks are rebuilt when the table lands.
+    page.wait_for_function("() => document.querySelectorAll('.okt-rail-mark').length > 3", timeout=8000)
+    page.wait_for_timeout(400)
+    return page.evaluate(RAIL)
+
+
+def test_the_rail_names_its_landmarks_in_the_page_language(page, site_url):
+    """Every mark carries `Jump to <kind> in <label>`, and the kind was
+    interpolated raw — so a Turkish page read `Jump to Chart in …` with
+    the sentence around it translated and the noun inside it not."""
+    tr = _rail(page, site_url, "reference.tr.html")
+
+    assert tr["count"] > 3, tr
+    assert all(lbl and lbl.endswith("ögesine git") for lbl in tr["labels"]), tr["labels"]
+    assert "Bölüm" in tr["kinds"], tr["kinds"]
+    # The English nouns are gone from the rail entirely, not merely
+    # outnumbered: `Section`, `Chart`, `Table` are what a reader saw.
+    assert not ({"Section", "Chart", "Table", "Title"} & set(tr["kinds"])), tr["kinds"]
+
+
+def test_the_rail_stays_english_where_it_should(page, site_url):
+    en = _rail(page, site_url, "reference.html")
+
+    assert "Section" in en["kinds"], en["kinds"]
+    assert all(lbl and lbl.startswith("Jump to ") for lbl in en["labels"]), en["labels"]
+
+
+def test_a_rail_word_in_author_content_survives_the_pass(page, site_url):
+    """The walk descends into every descendant of an `.okt-*` host, and
+    author content lives there — a table cell, a heading, a label inside
+    a diagram. So a rail word as a plain table key would rewrite the
+    author's text: measured, `Charts` alone matches 18 places in this
+    repo's docs. The `rail:` prefix is what makes that impossible, and
+    this is the assertion that it holds.
+
+    The probes are injected and the pass run by hand, because the real
+    pass has already finished by the time a test can reach the page."""
+    _open(page, site_url, "reference.tr.html")
+    got = page.evaluate(
+        """() => {
+             const host = document.querySelector('.okt-table-wrap') ||
+                          document.querySelector('[class^="okt-"]');
+             const words = ['Charts', 'Chart', 'Table', 'Section', 'Figure', 'Example'];
+             const made = words.map(w => {
+               const el = document.createElement('span');
+               el.textContent = w;
+               host.appendChild(el);
+               return el;
+             });
+             window.__okuI18n.localize(document);
+             const after = made.map(el => el.textContent);
+             made.forEach(el => el.remove());
+             return { before: words, after: after,
+                      hasTable: !!window.__okuI18n.table() };
+           }"""
+    )
+
+    # Without a loaded table the pass is a no-op and would pass for the
+    # wrong reason. The one thing this test must not do is agree quietly.
+    assert got["hasTable"], "no tr table was loaded, so the pass did nothing"
+    assert got["after"] == got["before"], got

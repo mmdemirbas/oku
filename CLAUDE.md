@@ -531,6 +531,27 @@ attribute name: the toolbar sizes and orders its icons through
 in that list — a 22x10 box around a 0x0 icon. Held by
 `test_table_copy_formats.py`.
 
+**A word a reader might also write cannot be a string-table key.** The
+localize walk matches a key against the leaf text of every descendant of
+an `.okt-*` host, and author content lives there too. The comment used to
+say author prose was "unreachable twice over"; it is not. Measured on
+this repo's own docs, the single word `Charts` as a key would rewrite 18
+places — a page title in the tree, an `<h2>`, a `<tspan>` inside a
+diagram. So the rail's landmark words (`Chart`, `Table`, `Section`,
+`Figure`, …) go in under a `rail:` prefix that no author writes, reached
+through `railKind()`, which falls back to the English word rather than to
+the key. `test_i18n_coverage.py` derives the required set from
+`RAIL_FIGURES` itself — a new rail figure fails on the day it is added,
+not the day someone remembers — and asserts no bare rail word is a key;
+`test_i18n_runtime.py` injects those words into author content, runs the
+pass by hand, and requires them to come through unchanged.
+
+Until then the rail was English on every page: `tipKind` was interpolated
+raw into `Jump to {0} in {1}`, so a Turkish page read `Chart` inside a
+Turkish sentence, and the tooltip is built on hover — after the one-shot
+localize pass has already run, which is why the DOM walk was never going
+to reach it.
+
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never
 English words. The page can flip to TR or EN without touching kit
