@@ -4687,7 +4687,15 @@ def resolve_file_ref(href: str, page_src: Path) -> tuple[Path | None, str]:
     raw = unquote(href).strip()
     if not raw:
         return None, "missing"
-    expanded = Path(raw).expanduser()
+    try:
+        expanded = Path(raw).expanduser()
+    except RuntimeError:
+        # `~someone/notes.md` where no such user exists, and `~~~` — a
+        # path the OS cannot expand is a file that is not there, which
+        # this function already has a word for. Letting it out crashes
+        # `oku check` and `oku build` with a traceback on a page whose
+        # only fault is a typo in a link.
+        expanded = Path(raw)
     target = expanded if expanded.is_absolute() else (page_src.parent / expanded)
     try:
         target = target.resolve()
