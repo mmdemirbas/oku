@@ -221,3 +221,49 @@ def test_the_listing_never_breaks_a_name_across_lines(capsys) -> None:
         assert not line.rstrip().endswith("-"), f"a name was split: {line!r}"
     for name in list(EXAMPLES["charts"]) + list(EXAMPLES["blocks"]):
         assert name in out, f"{name} is missing from the listing"
+
+
+# ---------- the kinds written as a link, not as a fence ----------
+
+
+@pytest.mark.parametrize("name", sorted(cli._INLINE_KINDS))
+def test_an_inline_kind_prints_its_syntax_and_when_to_use_it(name: str, capsys) -> None:
+    """`oku spec` is the one surface that ships in the wheel, so it is
+    where an author working from another project finds out what they
+    can write. It listed 14 block kinds and 53 chart types and did not
+    know the inline kinds existed — filepath was reachable from the
+    skill briefing and from docs/reference.md, neither of which travels
+    with the tool.
+
+    The note is half the entry. Syntax answers "how"; an author
+    choosing between a code span and a chip is asking "when"."""
+    import argparse
+
+    rc = cli.cmd_spec(argparse.Namespace(name=name, json=False))
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert cli._INLINE_KINDS[name] in out, out
+    # Syntax line, blank line, note.
+    assert len(out.strip().splitlines()) >= 3, out
+
+
+def test_the_listing_names_every_inline_kind_with_its_prefix(capsys) -> None:
+    """A name alone would send the reader back to the reference page to
+    learn it is a link and not a fence."""
+    import argparse
+
+    cli.cmd_spec(argparse.Namespace(name=None, json=False))
+    out = capsys.readouterr().out
+    assert "inline (3)" in out, out
+    for name, prefix in cli._INLINE_KINDS.items():
+        assert f"{name} {prefix}" in out, (name, out)
+
+
+def test_an_inline_kind_prints_json_that_parses(capsys) -> None:
+    """--json exists for callers that compose rather than paste."""
+    import argparse
+
+    cli.cmd_spec(argparse.Namespace(name="filepath", json=True))
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["markdown"].startswith("The resolver lives in")
+    assert payload["note"]

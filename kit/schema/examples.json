@@ -1,5 +1,5 @@
 {
-  "$comment": "Minimal valid payload per block kind and chart type. Printed by `oku spec`; every entry is asserted valid by src/oku_tests/test_spec_examples.py. The fence tag supplies `k`, so these carry the fence body only.",
+  "$comment": "Minimal valid payload per block kind and chart type. Printed by `oku spec`; every entry is asserted valid by src/oku_tests/test_spec_examples.py. The fence tag supplies `k`, so these carry the fence body only. `inline` holds the three primitives written as a link instead of a fence; their authority table is _INLINE_KINDS in cli.py.",
   "markdown": {
     "code": "```python\nprint(\"hello\")\n```",
     "image": "![What the pipeline does](diagram.png)\n\n*Pipeline overview*",
@@ -2354,6 +2354,20 @@
           "kind": "end"
         }
       ]
+    }
+  },
+  "inline": {
+    "filepath": {
+      "markdown": "The resolver lives in [`src/oku/cli.py`](#f/src/oku/cli.py).",
+      "note": "A path the reader can look inside: hover for a preview, click to open (markdown in the kit's viewer, an image or video inline, anything else as highlighted source), copy button for the path itself. Use it wherever you would otherwise have put a path in a code span. Resolved against the page's own directory first, then the project root; the bytes travel inside the page, so the file must be inside the project and under the size cap. `oku check` reports filepath-missing, filepath-outside and filepath-not-carried."
+    },
+    "glossary-term": {
+      "markdown": "Compaction rewrites [small files](#g/small-files) into larger ones.",
+      "note": "A term defined once in kit/glossary/<domain>.json and explained on hover wherever it appears. The id may contain spaces. `oku check` reports unresolved-glossary with a did-you-mean."
+    },
+    "ext-ref": {
+      "markdown": "Measured against [the Iceberg spec](#x/iceberg-spec).",
+      "note": "A source registered in kit/extrefs/<domain>.json — title, publisher and URL in one place, rendered as a citation the reader can open. `oku check` reports unresolved-extref."
     }
   }
 }

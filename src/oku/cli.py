@@ -2002,6 +2002,15 @@ _MD_LINK_TARGET_RE = re.compile(r"\]\(\s*<?([^)\s<>]+?)>?(?:\s+[\"'(][^\n]*?)?\s
 # A destination the kit does not own: another origin, a registry
 # reference (checked separately), or a data URI.
 _FOREIGN_HREF_RE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//|#g/|#x/|#f/)", re.I)
+# The three primitives an author writes as a link rather than a fence.
+# They were reachable from the skill briefing and from docs/reference.md,
+# and from nothing that ships in the wheel — `oku spec` listed 17 block
+# kinds and 53 chart types and did not know these existed. A primitive
+# nobody can discover is the failure that command exists to fix, so the
+# names live here, `oku spec` prints them from this table, and
+# test_authority_agreement holds it against the prefixes renderer.js
+# actually dispatches on.
+_INLINE_KINDS = {"filepath": "#f/", "glossary-term": "#g/", "ext-ref": "#x/"}
 _MD_SETEXT_EQ_RE = re.compile(r"^=+\s*$")
 _MD_HR_RE = re.compile(r"^-{3,}\s*$")
 _MD_HTML_ISLAND_RE = re.compile(r"^</?([a-zA-Z][\w-]*)(?:[\s/>]|$)")
@@ -2379,6 +2388,59 @@ def _lint_md_string(
     return issues, heading_ids, gloss, x_refs
 
 
+_MD_ONE_CODE_SPAN_RE = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
+_MD_LINK_CONSTRUCT_RE = re.compile(r"\[[^\]]*\]\([^)\n]*\)")
+_MD_FENCE_DELIM_RE = re.compile(r"^ {0,3}(?:```|~~~)")
+
+
+def _md_code_spans(md: str):
+    """Yield `(line, text)` for every inline code span outside a fence.
+
+    The inverse of `_INLINE_CODE_RE`, which every other pass uses to
+    throw code spans away. This one keeps them, because a path written
+    in one is the thing `path-in-code-span` is looking for.
+
+    Two exclusions, both about not reporting an author who already did
+    the right thing. A fenced block is a program, not prose about a
+    file. And a code span inside a link label is already clickable: the
+    label of a `#f/` link sits inside the chip the nudge would
+    recommend, and ``[`docs/charts.md`](charts.md)`` — a real line in
+    this repo — points the reader at the rendered page, which is a
+    better destination than a preview of its source.
+    """
+    infence = False
+    for lineno, line in enumerate(md.splitlines(), 1):
+        if _MD_FENCE_DELIM_RE.match(line):
+            infence = not infence
+            continue
+        if infence:
+            continue
+        for m in _MD_ONE_CODE_SPAN_RE.finditer(_MD_LINK_CONSTRUCT_RE.sub("", line)):
+            yield lineno, m.group(1).strip()
+
+
+def _looks_like_a_path(text: str) -> bool:
+    """Cheap gate before the filesystem is asked about a code span.
+
+    A page carries hundreds of code spans and two or three of them name
+    files; resolving every `--dry-run`, `k`, `title` and `SELECT *`
+    against the disk would be one stat per span.
+
+    A separator is required, and that is precision rather than economy.
+    A bare `kit.json` in "add a kit.json to your project" names a file
+    the READER is going to create; that this repo happens to have one of
+    its own does not make it the file the sentence is about. Measured on
+    this repo's docs, requiring a separator drops 8 of 12 notes and
+    every one it drops is that case. A check that guesses trains authors
+    to ignore checks, so the nudge takes the loss.
+    """
+    if not (2 <= len(text) <= 200) or any(c.isspace() for c in text):
+        return False
+    if text.startswith(("-", "#", "$", "@")) or "://" in text:
+        return False
+    return "/" in text
+
+
 _MD_FOOTNOTE_DEF_RE = re.compile(r"^ {0,3}\[\^([^\]]+)\]:")
 _MD_FOOTNOTE_REF_RE = re.compile(r"\[\^([^\]]+?)\]")
 _MD_LINK_DEF_RE = re.compile(r"^ {0,3}\[([^\]^][^\]]*)\]:\s*(\S+)")
@@ -2716,6 +2778,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         seen_ids: dict[str, int] = {}
         gloss_refs: list[tuple[str, str, int | None]] = []
         file_refs: list[tuple[str, str, int | None]] = []
+        code_spans: list[tuple[str, str, int | None]] = []
         extref_refs: list[tuple[str, str, int | None]] = []
         link_refs: list[tuple[str, str, int | None]] = []
         # Footnote / link-reference definitions resolve page-wide, so they
@@ -2780,6 +2843,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     link_refs.append((where, m.group(1), _abs(scrubbed[: m.start()].count("\n") + 1)))
                 for m in _MD_FILE_REF_RE.finditer(scrubbed):
                     file_refs.append((where, m.group(1).strip(), _abs(scrubbed[: m.start()].count("\n") + 1)))
+                code_spans.extend((where, text, _abs(rel)) for rel, text in _md_code_spans(blk))
                 continue
             if not isinstance(blk, dict):
                 add(p, "error", "invalid-block", where, "Block must be a markdown string or a typed object.")
@@ -2883,6 +2947,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 extref_refs.extend((where, x, None) for x in _MD_EXTREF_REF_RE.findall(s_refs))
                 link_refs.extend((where, h, None) for h in _MD_LINK_TARGET_RE.findall(s_refs))
                 file_refs.extend((where, f, None) for f in _MD_FILE_REF_RE.findall(s_refs))
+                code_spans.extend((where, text, None) for _rel, text in _md_code_spans(s))
                 if not is_materialised:
                     for pat in _FORBIDDEN_PROSE_PATTERNS:
                         m = pat.search(s)
@@ -2936,7 +3001,8 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     "warning",
                     "filepath-missing",
                     f"{where} #f/{href}",
-                    f"No file at '{href}' relative to this page, so the chip has nothing to show.",
+                    f"No file at '{href}' — tried it against this page's directory and against "
+                    "the project root. The chip renders and copies the path; nothing opens.",
                     line=ref_line,
                 )
                 continue
@@ -2965,6 +3031,32 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     "The chip names the file and copies its path; there is no preview.",
                     line=ref_line,
                 )
+
+        # 8c. A path in a code span is a dead end. The reader who
+        # wants to see the file leaves the page, finds it, and comes
+        # back — which is what every document does with the paths it
+        # mentions, and the reason the filepath chip exists. The nudge
+        # is decidable, and only fires where it is certain: the span
+        # names a file that is really there, inside the project, and
+        # the author has not already made it a chip.
+        span_seen: set[str] = set()
+        for where, text, span_line in code_spans:
+            if text in span_seen or not _looks_like_a_path(text):
+                continue
+            _target, status = resolve_file_ref(text, p)
+            if status != "ok":
+                continue
+            span_seen.add(text)
+            add(
+                p,
+                "info",
+                "path-in-code-span",
+                f"{where} `{text}`",
+                f"'{text}' is a file that exists. Written as [`{text}`](#f/{text}) the reader "
+                "gets a preview on hover, the whole file on click and a button that copies the "
+                "path — instead of a string they have to go and find.",
+                line=span_line,
+            )
 
         # 9. Page-level metadata sanity. The no-summary nudge applies
         # only to hand-authored kit pages — materialised repo markdown
@@ -3608,6 +3700,16 @@ def cmd_check(args: argparse.Namespace) -> int:
             print(f"· {len(infos)} info note(s):")
             for it in infos:
                 print(_format_issue(it, root))
+        elif infos:
+            # One line, not the notes themselves. An info note is a
+            # suggestion, and a suggestion printed in full on every run
+            # trains an author to stop reading the report — but a note
+            # nothing ever mentions is one nobody knows to ask for, and
+            # `path-in-code-span` exists precisely to tell an author
+            # about a primitive they have not met.
+            codes = sorted({i["code"] for i in infos})
+            shown = ", ".join(codes[:3]) + ("…" if len(codes) > 3 else "")
+            print(f"· {len(infos)} info note(s) ({shown}) — print them with --verbose")
 
         if not _HAS_JSONSCHEMA:
             # Never print a tick for a pass that did not run. This exact
@@ -4683,6 +4785,25 @@ def resolve_file_ref(href: str, page_src: Path) -> tuple[Path | None, str]:
     Status is one of `ok`, `missing`, `outside`. Returns the resolved
     path alongside `outside` too — the message names where it landed,
     which is the whole diagnosis.
+
+    Two bases, tried in that order: the page's own directory, then the
+    project root. The page comes first because that is what a relative
+    path means everywhere else in a markdown file — an image, a link to
+    a sibling page — and a reference that resolves there must not change
+    meaning because a file of the same name appeared at the root.
+
+    The root is the fallback because prose does not write paths that
+    way. A sentence about `src/oku/cli.py` says it from the root of the
+    project, which is how the reader would type it into an editor; from
+    `docs/reference.md` that path resolves nowhere, so the chip rendered
+    and its preview never opened. Measured on this repo's own docs, 10
+    of 803 inline code spans named a file the page-relative rule could
+    find; the paths people actually write are root-relative.
+
+    The fallback is strictly additive — it only runs where the answer
+    was already `missing` or `outside` — and when it fails, the reported
+    status is the PAGE-relative one, because that is what the author
+    wrote.
     """
     raw = unquote(href).strip()
     if not raw:
@@ -4696,19 +4817,29 @@ def resolve_file_ref(href: str, page_src: Path) -> tuple[Path | None, str]:
         # `oku check` and `oku build` with a traceback on a page whose
         # only fault is a typo in a link.
         expanded = Path(raw)
-    target = expanded if expanded.is_absolute() else (page_src.parent / expanded)
-    try:
-        target = target.resolve()
-    except OSError:
-        return None, "missing"
     root = project_root_for(page_src.parent)
-    try:
-        target.relative_to(root)
-    except ValueError:
-        return target, "outside"
-    if not target.is_file():
-        return target, "missing"
-    return target, "ok"
+
+    def _from(base: Path) -> tuple[Path | None, str]:
+        target = expanded if expanded.is_absolute() else (base / expanded)
+        try:
+            target = target.resolve()
+        except OSError:
+            return None, "missing"
+        try:
+            target.relative_to(root)
+        except ValueError:
+            return target, "outside"
+        if not target.is_file():
+            return target, "missing"
+        return target, "ok"
+
+    target, status = _from(page_src.parent)
+    if status == "ok" or expanded.is_absolute():
+        return target, status
+    alt_target, alt_status = _from(root)
+    if alt_status == "ok":
+        return alt_target, alt_status
+    return target, status
 
 
 def _file_kind(target: Path) -> tuple[str, str]:
@@ -5871,6 +6002,16 @@ def _spec_entry(name: str) -> dict | None:
     blocks = ex.get("blocks") or {}
     charts = ex.get("charts") or {}
     markdown = ex.get("markdown") or {}
+    inline = ex.get("inline") or {}
+    if name in inline:
+        entry = inline[name]
+        return {
+            "payload": entry,
+            "fence": None,
+            "markdown": entry.get("markdown"),
+            "note": entry.get("note"),
+            "inline": True,
+        }
     if name in blocks:
         return {
             "payload": blocks[name],
@@ -5922,6 +6063,15 @@ def cmd_spec(args: argparse.Namespace) -> int:
             print(textwrap.fill(" ".join(plain), **wrap))
         print(f'\nchart types ({len(charts)}) — fence is ```oku-chart with "type"')
         print(textwrap.fill(" ".join(sorted(charts)), **wrap))
+        # Written inside a sentence, so they belong to no fence and were
+        # listed nowhere. An author reading this list concluded the kit
+        # had 70 primitives and none of them for a path.
+        inline = ex.get("inline") or {}
+        if inline:
+            print(f"\ninline ({len(inline)}) — written as a link, inside a sentence")
+            print(
+                textwrap.fill(" ".join(f"{k} {v}" for k, v in _INLINE_KINDS.items() if k in inline), **wrap)
+            )
         # Listed with the rest, because a discoverability feature nobody
         # can discover is the failure this command exists to fix.
         print("\nalso: front-matter — every page-level key, with what it does")
@@ -5951,7 +6101,7 @@ def cmd_spec(args: argparse.Namespace) -> int:
 
     entry = _spec_entry(args.name)
     if entry is None:
-        known = sorted(set(blocks) | set(charts))
+        known = sorted(set(blocks) | set(charts) | set(ex.get("inline") or {}))
         near = difflib.get_close_matches(args.name, known, n=3, cutoff=0.5)
         print(f"! unknown name {args.name!r}", file=sys.stderr)
         if near:
@@ -5959,6 +6109,17 @@ def cmd_spec(args: argparse.Namespace) -> int:
         else:
             print("  `oku spec` with no argument lists every name", file=sys.stderr)
         return 1
+
+    if entry.get("inline"):
+        if args.json:
+            print(json.dumps(entry["payload"], ensure_ascii=False))
+            return 0
+        print(entry["markdown"])
+        # The syntax alone answers "how"; an author reaching for a
+        # primitive is asking "when", and that is the half that decides
+        # whether it gets used at all.
+        print("\n" + textwrap.fill(entry["note"] or "", width=76))
+        return 0
 
     body = json.dumps(entry["payload"], separators=(",", ":"), ensure_ascii=False)
     if args.json:

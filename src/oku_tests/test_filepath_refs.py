@@ -131,3 +131,108 @@ def test_a_file_over_the_cap_says_the_preview_will_not_open(tmp_path):
     issues = [i for i in cli.check_pages([(p, page)], root) if i["code"] == "filepath-not-carried"]
     assert len(issues) == 1, issues
     assert issues[0]["severity"] == "info", issues
+
+
+def test_a_root_relative_path_resolves_too(tmp_path):
+    """Prose writes paths from the project root — a sentence about
+    `src/app.py` says it the way the reader would type it into an
+    editor. From `docs/page.md` that resolves nowhere, so the chip
+    rendered and its preview never opened."""
+    root = _project(tmp_path)
+    target, status = cli.resolve_file_ref("src/app.py", root / "docs" / "page.md")
+    assert status == "ok" and target == (root / "src" / "app.py").resolve()
+
+
+def test_the_page_wins_when_both_bases_resolve(tmp_path):
+    """A relative path in a markdown file means "beside this file"
+    everywhere else — an image, a link to a sibling page. A file of the
+    same name appearing at the root must not change what an existing
+    reference points at."""
+    root = _project(tmp_path)
+    (root / "docs" / "src").mkdir()
+    (root / "docs" / "src" / "app.py").write_text("beside the page\n", encoding="utf-8")
+    target, _status = cli.resolve_file_ref("src/app.py", root / "docs" / "page.md")
+    assert target == (root / "docs" / "src" / "app.py").resolve()
+
+
+def test_a_path_that_resolves_from_neither_base_reports_the_page(tmp_path):
+    """The status has to describe what the author wrote, not the last
+    thing the resolver tried."""
+    root = _project(tmp_path)
+    target, status = cli.resolve_file_ref("nope/app.py", root / "docs" / "page.md")
+    assert status == "missing"
+    assert target == (root / "docs" / "nope" / "app.py"), target
+
+
+# ---------- the nudge that makes the primitive findable ----------
+
+
+def _spans(root: Path, page_src: Path, body: str) -> list[dict]:
+    page = {"k": "doc", "t": "Page", "m": {"summary": "s"}, "b": ["## S {#s}", body]}
+    return [i for i in cli.check_pages([(page_src, page)], root) if i["code"] == "path-in-code-span"]
+
+
+def test_a_path_in_a_code_span_is_named_once_with_the_link_to_write(tmp_path):
+    """A path in a code span is a dead end: the reader leaves the page,
+    finds the file, comes back. The note is how an author who has never
+    heard of the chip finds out it exists, so it has to carry the exact
+    replacement rather than the name of a feature."""
+    root = _project(tmp_path)
+    got = _spans(root, root / "docs" / "page.md", "The code is in `src/app.py`, see `src/app.py`.")
+    assert len(got) == 1, got
+    assert "#f/src/app.py" in got[0]["message"], got
+    assert got[0]["severity"] == "info", got
+
+
+def test_a_span_that_is_already_a_chip_is_not_reported(tmp_path):
+    """The label of a `#f/` link is a code span sitting inside the chip
+    the note would recommend."""
+    root = _project(tmp_path)
+    assert _spans(root, root / "docs" / "page.md", "See [`src/app.py`](#f/src/app.py).") == []
+
+
+def test_a_path_inside_a_fenced_block_is_program_text(tmp_path):
+    """A fence is a program, not prose about a file. Rewriting a path
+    there would change what the reader is meant to run."""
+    root = _project(tmp_path)
+    body = "Run it:\n\n```bash\ncat src/app.py `src/app.py`\n```\n"
+    assert _spans(root, root / "docs" / "page.md", body) == []
+
+
+def test_a_code_span_that_is_not_a_path_is_never_stat_ed(tmp_path):
+    """A page carries hundreds of code spans and two or three name
+    files. The gate is what keeps the check from asking the filesystem
+    about every flag and identifier on the page."""
+    for text in ("--dry-run", "title", "k", "SELECT", "$HOME", "https://example.com/a.png"):
+        assert not cli._looks_like_a_path(text), text
+    for text in ("src/app.py", "../src/app.py", "docs/kit.json"):
+        assert cli._looks_like_a_path(text), text
+
+
+def test_a_bare_filename_is_not_a_path_to_this_project(tmp_path):
+    """ "Add a `kit.json` to your project" names a file the READER is
+    going to create. That this project has one of its own does not make
+    it the file the sentence is about, and a chip pointing at it would
+    send the reader to the wrong repository. The separator is what
+    tells the two apart."""
+    root = _project(tmp_path)
+    (root / "docs" / "notes.md").write_text("x", encoding="utf-8")
+    assert not cli._looks_like_a_path("kit.json")
+    assert _spans(root, root / "docs" / "page.md", "Every project needs a `notes.md`.") == []
+
+
+def test_a_path_that_names_no_file_is_not_a_suggestion(tmp_path):
+    """The note claims the file is there. It has to be right about
+    that, or it is a check that guesses — and an author who is nagged
+    about a path they invented stops reading the report."""
+    root = _project(tmp_path)
+    assert _spans(root, root / "docs" / "page.md", "Put it in `src/nope.py`.") == []
+
+
+def test_a_span_that_is_already_a_link_label_is_left_alone(tmp_path):
+    """``[`src/app.py`](app.html)`` is a path the author has already
+    made clickable, and the destination they chose may well be better
+    than a preview of the file — a link to the rendered page rather than
+    to its source."""
+    root = _project(tmp_path)
+    assert _spans(root, root / "docs" / "page.md", "See [`src/app.py`](notes.md) for it.") == []

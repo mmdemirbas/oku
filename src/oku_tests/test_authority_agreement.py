@@ -144,3 +144,33 @@ def test_the_two_inline_tag_tables_agree() -> None:
     m = re.search(r"const INLINE_HTML_TAGS = \[(.*?)\];", RENDERER, re.S)
     assert m, "INLINE_HTML_TAGS moved in renderer.js — this test cannot see it any more"
     assert set(re.findall(r"'([a-z]+)'", m.group(1))) == cli._INLINE_HTML_TAGS
+
+
+def test_every_inline_prefix_the_renderer_dispatches_is_a_named_kind() -> None:
+    """The link-shaped primitives are decided in three places too:
+    renderer.js dispatches on the href prefix, the lint collects the
+    same prefixes as foreign hrefs, and `oku spec` has to be able to
+    name them. `filepath` shipped with the first two and neither the
+    third nor an entry in examples.json, so the one command that ships
+    in the wheel and exists to answer "what can I write here" listed 70
+    primitives and not that one."""
+    prefixes = set(re.findall(r"href\.startsWith\('(#[a-z]/)'\)", RENDERER))
+    assert prefixes, "the inline-prefix dispatch moved in renderer.js"
+    assert set(cli._INLINE_KINDS.values()) == prefixes
+
+    cli_src = Path(cli.__file__).read_text(encoding="utf-8")
+    foreign = re.search(r"_FOREIGN_HREF_RE = re\.compile\((.*?)\)\n", cli_src, re.S)
+    assert foreign, "the foreign-href pattern moved in cli.py"
+    for prefix in prefixes:
+        assert prefix in foreign.group(1), f"{prefix} is not treated as a foreign href by the lint"
+
+    examples = json.loads((KIT / "schema" / "examples.json").read_text(encoding="utf-8"))
+    assert set(examples.get("inline") or {}) == set(cli._INLINE_KINDS)
+    for name in cli._INLINE_KINDS:
+        entry = cli._spec_entry(name)
+        assert entry and entry.get("inline"), name
+        # The syntax alone answers "how". An author reaching for a
+        # primitive is asking "when", which is the half that decides
+        # whether it gets used at all.
+        assert cli._INLINE_KINDS[name] in (entry["markdown"] or ""), name
+        assert (entry.get("note") or "").strip(), f"{name} has no note saying when to use it"

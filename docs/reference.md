@@ -329,7 +329,9 @@ Hover for a tooltip with the definition; click to pin. Resolves the `term` attri
 
 ### filepath {#filepath}
 
-`[label](#f/<path>)` — a path the reader can look inside. Hover for a preview, click for the whole file, and the copy button hands over the path itself. The path is relative to the page's own source file, or absolute; the label is what shows, so an author writes the path twice and the second one is what GitHub links.
+`[label](#f/<path>)` — a path the reader can look inside. Hover for a preview, click for the whole file, and the copy button hands over the path itself. Reach for it wherever you would otherwise have put a path in a code span; `oku check` says `path-in-code-span` when it finds one that names a real file. The label is what shows, so an author writes the path twice and the second one is what GitHub links.
+
+The path is resolved against the page's own directory first, then against the project root — prose writes paths from the root (`src/oku/cli.py`), which is how a reader would type them into an editor, and a path beside the page keeps meaning that even if a file of the same name appears at the root. An absolute path is taken as written.
 
 Kind decides what "the whole file" means. A `.md` opens in the kit's [markdown viewer](#markdown-viewer), the same one a prose link to a `.md` opens. An image, video or audio file plays in the lightbox. Anything else that reads as text opens as a highlighted `<pre>`, with the language taken from the extension.
 

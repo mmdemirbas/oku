@@ -337,7 +337,9 @@ glossary-term gibidir ama dış varlıklar içindir (araçlar, makaleler, kişil
 
 ### filepath {#filepath}
 
-`[etiket](#f/<yol>)` — okurun içine bakabildiği bir yol. Üzerine gelince önizleme, tıklayınca dosyanın tamamı; kopyalama düğmesi de yolun kendisini verir. Yol, sayfanın kaynak dosyasına göre görelidir ya da mutlaktır; görünen kısım etikettir, yani yazar yolu iki kez yazar ve ikincisi GitHub'ın bağladığı yerdir.
+`[etiket](#f/<yol>)` — okurun içine bakabildiği bir yol. Üzerine gelince önizleme, tıklayınca dosyanın tamamı; kopyalama düğmesi de yolun kendisini verir. Bir yolu kod aralığı içine yazacağınız her yerde buna uzanın; `oku check`, gerçek bir dosyayı adlandıran böyle bir aralık bulduğunda `path-in-code-span` der. Görünen kısım etikettir, yani yazar yolu iki kez yazar ve ikincisi GitHub'ın bağladığı yerdir.
+
+Yol önce sayfanın kendi dizinine, sonra proje köküne göre çözülür — metin, yolları kökten yazar (`src/oku/cli.py`), okur da onları bir düzenleyiciye böyle yazar; sayfanın yanındaki bir dosya ise kökte aynı adlı bir dosya belirse bile anlamını korur. Mutlak yol yazıldığı gibi alınır.
 
 Dosyanın türü, "tamamı"nın ne demek olduğunu belirler. `.md` uzantılı bir dosya, bir metin bağlantısının açtığı [markdown görüntüleyicisinde](#markdown-viewer) açılır. Görsel, video ve ses dosyaları ışık kutusunda oynar. Metin olarak okunabilen diğer her şey, uzantısından anlaşılan dille renklendirilmiş bir `<pre>` olarak açılır.
 

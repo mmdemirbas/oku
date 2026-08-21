@@ -588,6 +588,31 @@ whole file, copy button for the path. It exists because a path in a code
 span is a dead end — the reader leaves the page, finds the file, comes
 back — and that is what every document does with the paths it mentions.
 
+**Two bases, page first then the project root.** A relative path in a
+markdown file means "beside this file" everywhere else, so that is tried
+first and an existing reference cannot change meaning because a file of
+the same name appeared at the root. But prose does not write paths that
+way: a sentence about `src/oku/cli.py` says it from the root, which is
+how the reader would type it into an editor, and from `docs/reference.md`
+that resolved nowhere — the chip rendered and its preview never opened.
+The fallback only runs where the answer was already `missing`, and a
+failure still reports the page-relative attempt, because that is what the
+author wrote.
+
+**A primitive nobody can discover is not a primitive.** Three surfaces
+tell an author this one exists, and only one of them used to: the skill
+briefing carries the decision rule (use it wherever you would have put a
+path in a code span), `oku spec` lists the three inline kinds beside the
+fences and `oku spec filepath` prints the syntax WITH a note on when to
+reach for it, and `oku check` says `path-in-code-span` at `info` when a
+code span names a file that is really there. Info, not warning: the check
+cannot tell "this file" from "a file of that name", so a page telling a
+reader to create a `kit.json` would be nagged by a warning. The report
+prints one line naming the info codes when `--verbose` is off, because a
+note nothing ever mentions is one nobody knows to ask for.
+`_INLINE_KINDS` in cli.py is the authority for the set, held against
+renderer.js's own prefix dispatch by `test_authority_agreement`.
+
 **The bytes travel inside the page, and that is what shapes the rest.**
 No delivery mode can fetch the file when the reader clicks: `oku serve`
 and `dist/site` serve the docs tree while the references worth making

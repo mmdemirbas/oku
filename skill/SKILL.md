@@ -250,10 +250,17 @@ entry to write.
    - A file the page talks about is a link too: `[label](#f/path)`
      renders a chip the reader can hover for a preview, click to open
      (markdown in the kit's viewer, images and video inline, anything
-     else as highlighted source) and copy the path from. Use it wherever
-     you would have put a path in a code span. The bytes travel inside
-     the page, so the reference must resolve inside the project and fit
-     the size cap; `oku check` reports both.
+     else as highlighted source) and copy the path from. **Use it
+     wherever you would have put a path in a code span** — that is the
+     whole decision rule, and `oku check` says `path-in-code-span` when
+     it finds a span naming a file that is really there. The path
+     resolves against the page's directory first, then the project root,
+     so the root-relative spelling prose already uses works. The bytes
+     travel inside the page, so the file must be inside the project and
+     under the size cap; `oku check` reports both.
+   - `oku spec` lists the three inline kinds (`filepath`,
+     `glossary-term`, `ext-ref`) beside the fences, and `oku spec
+     filepath` prints the syntax with a note on when to reach for it.
    - A block-level HTML tag at column 0 is an escape hatch (custom
      elements and `<script>` included) when a primitive genuinely does
      not exist for what you need. `oku check` lists each one.
