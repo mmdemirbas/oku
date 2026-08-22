@@ -112,6 +112,8 @@ Which links reach it follows from the rewrite above. A *relative* link written i
 
 A plain left-click only. Cmd / Ctrl / Shift / middle-click, a `target`, and `download` all mean *give me the file, not your reading of it*, and keep the browser's behaviour.
 
+**The viewer renders a document; it does not run one.** A `<script>`, an `on*` handler, a `javascript:` destination and a framing element (`iframe`, `object`, `embed`) are removed before the file reaches the page, and the viewer says how many went — Source still holds every byte. An HTML island in a *page* is unaffected and keeps full capability: the author wrote it into their own page. A linked file is a different thing, and the difference is who reviewed it. Diagrams, charts and live snippets draw as they always do, because their payloads travel in `text/x-mermaid`, `text/x-code` and `application/json` holders, which are data. An author who wants a live island in a document makes that document a page.
+
 The three ways a page is published reach the file differently, and the reader cannot tell which one ran:
 
 ```oku-table

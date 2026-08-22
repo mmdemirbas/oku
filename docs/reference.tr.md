@@ -112,6 +112,8 @@ Hangi bağlantıların oraya ulaştığı yukarıdaki yeniden yazma kuralından 
 
 Yalnızca düz sol tıklama sayılır. Cmd / Ctrl / Shift / orta tıklama, bir `target` ve `download` — hepsi *bana dosyayı ver, senin okuyuşunu değil* demektir ve tarayıcının davranışını korur.
 
+**Görüntüleyici bir belgeyi işler, çalıştırmaz.** Dosya sayfaya ulaşmadan önce `<script>`, `on*` işleyicileri, `javascript:` hedefleri ve çerçeve ögeleri (`iframe`, `object`, `embed`) çıkarılır; görüntüleyici kaçının çıkarıldığını söyler ve Kaynak görünümü her baytı olduğu gibi tutar. Bir *sayfadaki* HTML adası bundan etkilenmez, tüm yeteneğini korur: yazar onu kendi sayfasına yazmıştır. Bağlantı verilen dosya başka bir şeydir, fark da onu kimin gözden geçirdiğidir. Şema, grafik ve canlı parçacıklar her zamanki gibi çizilir; çünkü yükleri veri niteliğindeki `text/x-mermaid`, `text/x-code` ve `application/json` taşıyıcılarında gelir. Belgesinde canlı bir ada isteyen yazar, o belgeyi bir sayfaya dönüştürür.
+
 Bir sayfanın yayımlandığı üç yol dosyaya farklı biçimde ulaşır; okuyucu hangisinin çalıştığını ayırt edemez:
 
 ```oku-table
