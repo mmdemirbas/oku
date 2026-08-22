@@ -55,7 +55,7 @@ summary: Long tokens in every grid the kit lays out.
 ## Comparison {{#compare}}
 
 ```oku-compare-grid
-{{"cards":[{{"t":"`{LONG}`","body":"left"}},{{"t":"Other","body":"`{LONG}` on the right"}}]}}
+{{"cards":[{{"t":"`{LONG}`","b":"left"}},{{"t":"Other","b":"`{LONG}` on the right"}}]}}
 ```
 
 ## Numbers {{#kpi}}
