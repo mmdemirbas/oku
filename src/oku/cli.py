@@ -3386,6 +3386,15 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                         line=ref_line,
                     )
                 continue
+            # A `.html` that is not on disk yet may still be a page: it is
+            # what the build will write beside a source this walk did not
+            # reach. `oku check` from the repo root resolved these through
+            # `anchors_by_target`; the same command from `docs/` reported
+            # nine of them as broken, on links that build and open fine.
+            # The walk root is a choice about scope, not about which links
+            # exist, so the two runs have to agree.
+            if not target.exists() and any(target.with_suffix(s).exists() for s in (".md", ".json")):
+                continue
             if not target.exists():
                 add(
                     p,
@@ -6685,7 +6694,11 @@ def _lossy_detail(before: tuple, after: tuple) -> str:
         keys = sorted(set(was) | set(now))
         lost = [k for k in keys if was.get(k) != now.get(k)]
         return " These front-matter keys would not survive: " + ", ".join(lost) + "."
-    return " Would change: " + ", ".join(changed) + "." if changed else " Report this page; the JSON still renders."
+    return (
+        " Would change: " + ", ".join(changed) + "."
+        if changed
+        else " Report this page; the JSON still renders."
+    )
 
 
 def cmd_migrate(args: argparse.Namespace) -> int:
