@@ -357,6 +357,16 @@ committed stub** — `_init_time_manifest` pops `build` because
 author's machine (collapsed to `~`, so it names a layout and not an
 account). Held by `test_build_provenance.py`, both halves.
 
+A layout is still something the page hands to everyone it reaches, so a
+project that ships pages off the machine sets `"rebuild_command": false`
+in `kit.json` and the command goes, taking the button with it — the
+footer already draws nothing when `cmd` is absent, so there is no
+disabled state to explain. Everything that is about the ARTIFACT rather
+than about where it was made stays: version, kit stamp, build age, drift
+warning. On by default, and that is the load-bearing half — the defect
+this whole mechanism exists for is a page that could not say how old it
+was, and `cmd` is the only field that names a machine.
+
 The footer's `KIT_VERSION` constant is gone with it. It was told to track
 `pyproject.toml` "in lockstep" and read `v0.4.0` against a `0.6.5`
 package for however long nobody put the two side by side — a second copy

@@ -368,6 +368,43 @@ def project_skips_gitignored(root: Path) -> bool:
     return isinstance(data, dict) and data.get("skip_gitignored") is True
 
 
+def project_shows_rebuild_command(root: Path) -> bool:
+    """kit.json's optional ``rebuild_command`` flag. On by default.
+
+        {"name": "lakelab", "rebuild_command": false}
+
+    A built page says what it was built from, and the Rebuild button
+    carries the one fact a reader cannot derive from the artifact: where
+    the source lives. That path names a directory on the author's
+    machine — collapsed to ``~`` when it sits under $HOME, so it names a
+    layout rather than an account, but a layout is still something a
+    page hands to everyone it reaches.
+
+    Off, the page keeps every fact that does not identify a machine: the
+    tool version, the kit stamp, how old the build is, and the drift
+    warning when a site tree's `_oku/` no longer matches its pages. Only
+    the command goes, and with it the button — the runtime already draws
+    nothing when `cmd` is absent, so there is no disabled state to
+    explain.
+
+    On by default because the defect this exists for is the opposite
+    one: a delivered report was opened, a rendering bug was reported
+    against it, and the bug had been fixed three stamps earlier with
+    nothing on the file to say it was old. A page that cannot say how to
+    remake itself is the common failure; a page that should not say
+    where it came from is the exception, and an exception is a thing a
+    project asks for.
+    """
+    kit_json = find_kit_json(root)
+    if kit_json is None:
+        return True
+    try:
+        data = json.loads(kit_json.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return True
+    return not (isinstance(data, dict) and data.get("rebuild_command") is False)
+
+
 def git_ignored_paths(root: Path) -> frozenset[str]:
     """Absolute paths under ``root`` that git is told to ignore, when the
     project has opted in with ``skip_gitignored``. Empty otherwise, which
@@ -4200,16 +4237,31 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
         "schema_version": 1,
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
         "root": ".",
-        # What this artifact was made from, and how to make it again.
-        # The manifest is the carrier because it is the one thing that
-        # already reaches every page in all three modes — fetched under
-        # `oku serve` and in dist/site, inlined in a standalone file.
-        # `oku` + `kit` are the same two fields `oku --version` prints,
-        # under the same names, so the footer and the terminal can be
-        # compared without translating between them.
-        "build": {"oku": _PKG_VERSION, "kit": _kit_build_stamp(), "cmd": _rebuild_command(root)},
+        # The manifest is the carrier for build provenance because it is
+        # the one thing that already reaches every page in all three
+        # modes — fetched under `oku serve` and in dist/site, inlined in
+        # a standalone file. What goes in it: `_build_block`.
+        "build": _build_block(root),
         "pages": entries,
     }
+
+
+def _build_block(root: Path) -> dict:
+    """What this artifact was made from, and how to make it again.
+
+    `oku` + `kit` are the same two fields `oku --version` prints, under
+    the same names, so the footer and the terminal can be compared
+    without translating between them. `cmd` is the only field naming a
+    machine, so it is the only one a
+    project can turn off (`rebuild_command: false` in kit.json). The
+    other two are the same pair `oku --version` prints, under the same
+    names, so the footer and the terminal can be compared without
+    translating between them.
+    """
+    out = {"oku": _PKG_VERSION, "kit": _kit_build_stamp()}
+    if project_shows_rebuild_command(root):
+        out["cmd"] = _rebuild_command(root)
+    return out
 
 
 def _fold_language_variants(entries: list[dict], root: Path) -> list[dict]:

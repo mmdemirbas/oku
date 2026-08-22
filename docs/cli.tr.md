@@ -89,6 +89,14 @@ cd ~/code/notes && oku build
 
 `cd` şundan var: üretilmiş bir dosya kaynağının nerede durduğu hakkında hiçbir şey söylemez, siz de onu başka bir yerden okuyorsunuz. Yol, ev dizininizin altındaysa `~` ile kısalır ve yalnızca `dist/` içine ve tek dosyalık sayfalara yazılır — sürüm denetimine giren `index.html` taslağına hiçbir zaman yazılmaz.
 
+**Makineden çıkacak bir sayfa komuttan vazgeçebilir.** `~/code/notes` bir hesabı değil bir dizin düzenini adlandırır; ama düzen de sayfanın ulaştığı herkese verdiği bir bilgidir. kit.json içinde `"rebuild_command": false` yazarsanız komut da düğme de gider — kapalı bir düğme durumu yoktur, çünkü alan yokken kenar çubuğu hiçbir şey çizmez:
+
+```json
+{"name": "notes", "rebuild_command": false}
+```
+
+Üretildiği yeri değil üretilen dosyayı anlatan her şey kalır: sürüm, kit damgası, derleme yaşı ve sapma uyarısı. Varsayılan olarak açıktır, çünkü bu bölümün var olma nedeni ne kadar eski olduğunu söyleyemeyen bir sayfaydı — nereden geldiğini söylememesi gereken sayfa istisnadır, istisna da projenin isteyeceği bir şeydir.
+
 Sayfanın size söyleyemeyeceği şey, kurulu kitin ne kadar gerisinde kaldığıdır. Bunu öğrenmek ağa sormak demektir; bir belge de bir meslektaşınız açtı diye kendi başına ağa çıkmamalıdır. Bu karşılaştırmayı, iki sayıyı da elinde tuttuğu tek anda, `oku build` yazdırır:
 
 ```

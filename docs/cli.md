@@ -89,6 +89,14 @@ cd ~/code/notes && oku build
 
 The `cd` is there because an artifact says nothing about where its source sits, and you are reading it from somewhere else. The path collapses to `~` under your home directory, and it is written only into `dist/` and the standalone files — never into the committed `index.html` stub.
 
+**A page written to leave the machine can drop the command.** `~/code/notes` names a layout rather than an account, but a layout is still something the page hands to everyone it reaches. Set `"rebuild_command": false` in kit.json and the command goes, and the button with it — there is no disabled state, because the footer draws nothing when the field is absent:
+
+```json
+{"name": "notes", "rebuild_command": false}
+```
+
+Everything that is about the artifact rather than about where it was made stays: the version, the kit stamp, the build age, and the drift warning. On by default, because the failure this section exists for is a page that could not say how old it was — a page that should not say where it came from is the exception, and an exception is a thing a project asks for.
+
 What the page cannot tell you is how far behind the installed kit it is. Learning that means asking the network, and a document should not call home because a colleague opened it. `oku build` prints that comparison instead, at the one moment it holds both numbers:
 
 ```

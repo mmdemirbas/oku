@@ -96,3 +96,90 @@ def test_a_tree_built_without_a_site_still_answers(tmp_path):
     alone.mkdir(parents=True)
     (alone / "a.html").write_text("<script>var __okuKitBuild = '2020-02-02-r9';</script>", encoding="utf-8")
     assert cli._artifact_kit_stamp(tmp_path / "dist") == "2020-02-02-r9"
+
+
+# ---------- the opt-out ----------
+#
+# `cmd` is the one field that names a machine. Collapsed to `~` it names
+# a layout rather than an account, but a layout is still something the
+# page hands to everyone it reaches — and some pages are written to
+# leave the machine. The flag drops the command and keeps every fact
+# that is about the artifact rather than about where it was made.
+
+
+def _project(tmp_path, kit_json: str):
+    cli._project_root_cache.clear()
+    root = tmp_path / "proj"
+    root.mkdir(exist_ok=True)
+    (root / "kit.json").write_text(kit_json, encoding="utf-8")
+    (root / "page.md").write_text("---\ntitle: P\nsummary: s\n---\n\n## X {#x}\n\nText.\n", encoding="utf-8")
+    return root
+
+
+def test_the_command_is_there_unless_a_project_says_otherwise(tmp_path):
+    """On by default: the defect this exists for is a delivered page
+    that could not say how old it was, not one that said too much."""
+    build = cli.compute_manifest(_project(tmp_path, '{"name": "p"}'))["build"]
+    assert build["cmd"].endswith("&& oku build")
+    assert build["oku"] and build["kit"]
+
+
+def test_a_project_can_keep_its_directory_out_of_the_page(tmp_path):
+    build = cli.compute_manifest(_project(tmp_path, '{"name": "p", "rebuild_command": false}'))["build"]
+    assert "cmd" not in build, build
+
+
+def test_turning_it_off_keeps_the_facts_that_name_no_machine(tmp_path):
+    """Version, kit stamp and build age are what let a reader tell a
+    stale artifact from a fresh one. Dropping those with the path would
+    trade one defect for the one that came first."""
+    manifest = cli.compute_manifest(_project(tmp_path, '{"name": "p", "rebuild_command": false}'))
+    assert manifest["build"]["oku"] == cli._PKG_VERSION
+    assert manifest["build"]["kit"] == cli._kit_build_stamp()
+    assert manifest["generated_at"]
+
+
+def test_only_false_turns_it_off(tmp_path):
+    """A missing key, a true, and a typo'd value all mean "on". The flag
+    removes information from a delivered page, so it takes the explicit
+    word for it."""
+    for value in (
+        '{"name": "p"}',
+        '{"name": "p", "rebuild_command": true}',
+        '{"name": "p", "rebuild_command": "no"}',
+    ):
+        cli._project_root_cache.clear()
+        assert "cmd" in cli.compute_manifest(_project(tmp_path, value))["build"], value
+
+
+def _build_and_read(root: Path) -> str:
+    import argparse
+    import os
+
+    (root / "page.html").write_text(cli._stub_for("P"), encoding="utf-8")
+    cwd = Path.cwd()
+    os.chdir(root)
+    try:
+        assert cli.cmd_build(argparse.Namespace(no_search=True, no_vendor=True)) == 0
+    finally:
+        os.chdir(cwd)
+    return (root / "dist" / "standalone" / "page.html").read_text(encoding="utf-8")
+
+
+def test_a_built_page_carries_no_path_when_it_is_off(tmp_path):
+    """The manifest is inlined into every standalone page, so the flag
+    has to reach the artifact and not only the dict. The assertion is on
+    the DIRECTORY, not on the words of the command: `&& oku build` is in
+    the inlined chrome.css as prose about the button, and a test that
+    matched it would pass for the wrong reason."""
+    root = _project(tmp_path, '{"name": "p", "rebuild_command": false}')
+    html = _build_and_read(root)
+    assert root.resolve().as_posix() not in html, "the source directory reached the artifact anyway"
+    assert cli._kit_build_stamp() in html, "the provenance that names no machine went with it"
+
+
+def test_the_same_page_does_carry_it_by_default(tmp_path):
+    """The other half: without this, the test above passes on a build
+    that never wrote a command in the first place."""
+    root = _project(tmp_path, '{"name": "p"}')
+    assert root.resolve().as_posix() in _build_and_read(root)
