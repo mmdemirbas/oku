@@ -2424,7 +2424,49 @@ def _lint_md_string(
 
 _MD_ONE_CODE_SPAN_RE = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
 _MD_LINK_CONSTRUCT_RE = re.compile(r"\[[^\]]*\]\([^)\n]*\)")
-_MD_FENCE_DELIM_RE = re.compile(r"^ {0,3}(?:```|~~~)")
+
+
+_MD_FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+
+
+def _md_fence_mask(md: str) -> str:
+    """Blank every fenced code block, keeping the line count.
+
+    A link, a `#f/` reference or a path inside a fence is a picture of
+    markdown, not markdown — `docs/reference.md` shows the source of
+    every primitive it draws, and this file's own briefing shows a page
+    skeleton with `![images](path.png)` in it. Checking those reports
+    the author for writing an example.
+
+    Nothing here is new behaviour: `_INLINE_CODE_RE` used to run
+    unbounded across newlines, so a fence's opening and closing
+    backticks matched each other as ONE enormous code span and the body
+    fell out of every scan by accident. Bounding that regex to a
+    paragraph — which is what stops it backtracking for eleven seconds
+    on a page with an odd backtick — took the accident away, so the
+    exclusion is stated on purpose instead.
+
+    CommonMark's closing rule, not a toggle: a closer is the same
+    character, at least as long as the opener, and carries no info
+    string. A toggle reads ```` ```oku-chart ```` as the END of an
+    enclosing ```` ```markdown ```` block and everything after it
+    inverts.
+    """
+    out: list[str] = []
+    fence: tuple[str, int] | None = None
+    for line in md.split("\n"):
+        m = _MD_FENCE_OPEN_RE.match(line)
+        if fence is None:
+            if m:
+                fence = (m.group(1)[0], len(m.group(1)))
+                out.append("")
+                continue
+            out.append(line)
+            continue
+        if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= fence[1] and not m.group(2).strip():
+            fence = None
+        out.append("")
+    return "\n".join(out)
 
 
 def _md_code_spans(md: str):
@@ -2442,13 +2484,7 @@ def _md_code_spans(md: str):
     this repo — points the reader at the rendered page, which is a
     better destination than a preview of its source.
     """
-    infence = False
-    for lineno, line in enumerate(md.splitlines(), 1):
-        if _MD_FENCE_DELIM_RE.match(line):
-            infence = not infence
-            continue
-        if infence:
-            continue
+    for lineno, line in enumerate(_md_fence_mask(md).splitlines(), 1):
         for m in _MD_ONE_CODE_SPAN_RE.finditer(_MD_LINK_CONSTRUCT_RE.sub("", line)):
             yield lineno, m.group(1).strip()
 
@@ -2872,7 +2908,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 # fence to the next, so on a page with few fences it can
                 # be the whole document, and the block's own line would
                 # be hundreds of lines from the link that is wrong.
-                scrubbed = _INLINE_CODE_RE.sub("", blk)
+                scrubbed = _INLINE_CODE_RE.sub("", _md_fence_mask(blk))
                 for m in _MD_LINK_TARGET_RE.finditer(scrubbed):
                     link_refs.append((where, m.group(1), _abs(scrubbed[: m.start()].count("\n") + 1)))
                 for m in _MD_FILE_REF_RE.finditer(scrubbed):

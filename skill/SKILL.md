@@ -209,7 +209,7 @@ entry to write.
    JSON to hand-assemble — `oku serve` and `oku build` convert the
    source on the fly.
 
-   ```markdown
+   ````markdown
    ---
    title: Storage engines
    summary: One line for the nav tooltip, search, llms.txt and the cover.
@@ -232,7 +232,7 @@ entry to write.
    ```
 
    [^1]: Definitions resolve page-wide — put them wherever you like.
-   ```
+   ````
 
    - `##` opens a section (the TOC is built from these); `###` is a
      sub-heading inside it. `{#id}` overrides the auto-slug.
