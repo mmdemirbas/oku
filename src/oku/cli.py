@@ -694,39 +694,91 @@ def _md_slug(text: str) -> str:
 
 def _strip_md_front_matter(text: str) -> tuple[str, dict]:
     """Pull a leading ``---\\n...\\n---\\n`` YAML block off the front of a
-    markdown source and return ``(remaining_text, meta_dict)``. Parser
-    is minimal — handles ``key: value`` lines only; nested mappings or
-    flow style fall through as raw strings. The first ``title`` value
-    (if present) is hoisted to the page title at the call site."""
+    markdown source and return ``(remaining_text, meta_dict)``.
+
+    The parser handles ``key: value`` lines plus **continuation lines** —
+    an indented line after a key continues that key's value, joined with
+    a single space, which is how a `summary:` too long for one line is
+    written. Nested mappings and flow style still fall through as raw
+    strings.
+
+    A line inside the block that is none of those — not a key, not a
+    continuation, not blank, not a `#` comment — means this is not
+    front-matter, and the whole text is returned untouched with
+    ``_front_matter_error`` in the meta for `oku check` to report.
+
+    Both rules exist because the scanner used to stop at the NEXT ``---``
+    wherever it was, and silently discard every line it had passed over.
+    A page whose front-matter was missing its closing delimiter lost the
+    paragraphs above the first thematic break in the body, and
+    `oku check --strict` was clean, because the deleted text never
+    reached any pass that could see it. The folded `summary:` in this
+    repo's own `docs/format-comparison.md` lost its second and third
+    lines that way, and the truncated sentence — cut mid-clause at
+    "converter weight and" — shipped in `site-manifest.json`, in
+    `llms.txt` and on the page's cover.
+    """
+    # A UTF-8 BOM is not whitespace to `str.strip()`, so a file saved by
+    # Notepad or written by PowerShell redirection failed the `---` test
+    # below, kept its front-matter as body text, and — having no title —
+    # was tagged `_materialised_by: oku-init`, which turns the prose lint
+    # off. The whole page silently changed category because of one
+    # invisible character.
+    if text.startswith("\ufeff"):
+        text = text[1:]
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
         return text, {}
     meta: dict = {}
+    order: list[str] = []
     j = 1
+    last_key: str | None = None
     while j < len(lines) and lines[j].strip() != "---":
         line = lines[j]
         m = re.match(r"^([A-Za-z_][\w-]*)\s*:\s*(.*)$", line)
         if m:
-            key, raw = m.group(1), m.group(2).strip()
-            # Quoted string — strip the wrapping quotes.
-            if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
-                raw = raw[1:-1]
-            # Best-effort numeric / bool coercion.
-            if raw.lower() in {"true", "false"}:
-                meta[key] = raw.lower() == "true"
-            else:
-                try:
-                    meta[key] = int(raw)
-                except ValueError:
-                    try:
-                        meta[key] = float(raw)
-                    except ValueError:
-                        meta[key] = raw
+            key, raw = m.group(1), m.group(2)
+            meta[key] = raw.strip()
+            order.append(key)
+            last_key = key
+        elif last_key is not None and line[:1] in (" ", "\t") and line.strip():
+            meta[last_key] = (str(meta[last_key]) + " " + line.strip()).strip()
+        elif not line.strip() or line.lstrip().startswith("#"):
+            pass
+        else:
+            # Not front-matter. Give the text back whole rather than
+            # discarding the lines this loop has already walked past.
+            return text, {"_front_matter_error": (j + 1, line.strip()[:60])}
         j += 1
     if j >= len(lines):
         # Unterminated front-matter — back off and keep the text intact.
         return text, {}
+    for key in order:
+        meta[key] = _coerce_front_matter_value(str(meta[key]))
     return "\n".join(lines[j + 1 :]), meta
+
+
+def _coerce_front_matter_value(raw: str):
+    """Quotes off, then a best-effort number or bool.
+
+    Kept separate from the scanner so a continuation line is joined
+    BEFORE coercion — otherwise `summary: 42` on one line and its
+    continuation on the next would have coerced to an int and then
+    concatenated onto one.
+    """
+    raw = raw.strip()
+    if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+        raw = raw[1:-1]
+    if raw.lower() in {"true", "false"}:
+        return raw.lower() == "true"
+    try:
+        return int(raw)
+    except ValueError:
+        pass
+    try:
+        return float(raw)
+    except ValueError:
+        return raw
 
 
 # A fence opens with three or more backticks OR tildes; the closing run
@@ -3132,6 +3184,20 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         # only to hand-authored kit pages — materialised repo markdown
         # (README, CLAUDE, notes/ …) has no front-matter to carry one.
         meta = _page_meta(page)
+        fm_err = meta.get("_front_matter_error")
+        if fm_err:
+            bad_line, snippet = fm_err
+            add(
+                p,
+                "error",
+                "front-matter-malformed",
+                f"line {bad_line}",
+                f"Front-matter opened with `---` but line {bad_line} is not `key: value`, "
+                f"a continuation or a comment: `{snippet}`. The whole block is being read as "
+                "body text. Close the front-matter above this line, indent it to continue the "
+                "key above, or delete the opening `---`.",
+                line=bad_line,
+            )
         # `$defs/meta` is `additionalProperties: true` on purpose — a
         # project may carry its own keys — but that also means a typo is
         # accepted in silence. `sumary:` produced nothing beyond the
