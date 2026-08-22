@@ -404,6 +404,28 @@ structure from the `.okt-*` classes. Hardcoded hex or an inline
 `<style>` earns `island-hand-styled`, because the hand-rolled copy stops
 following the accent and breaks in the theme nobody was looking at.
 
+**A tag the kit calls inline is a tag the kit draws.** `INLINE_HTML_TAGS`
+answers one question, so it has to answer both halves of it: a tag on
+that list never opens an island — a paragraph starting `<kbd>` stays
+prose — AND parseInline builds an element for it where it stands. The
+pattern is spliced from the list at `__TAGS__` rather than repeating it,
+because a repeat is what happened: the island rule listed fourteen tags,
+the parser drew nine, and `a` / `code` / `em` / `strong` sat in the gap
+as prose nobody drew. A delivered page read
+`<code>ilimler→ilimleri</code>` with the angle brackets showing, inside
+a compare-grid card, past a clean `oku check --strict`. `b` and `i` were
+on neither list, so one tag meant two things — an island at the start of
+a paragraph, literal text one word later. The pass-through REBUILDS: the
+element is made by name, the body parsed as markdown (CommonMark's rule
+between raw tags), and only `title` survives from the attributes, plus
+`href` on an `<a>` through renderLink and therefore through `safeUrl`.
+Held by `test_inline_html.py`, whose case list is read out of
+INLINE_HTML_TAGS at collection time, and by `test_authority_agreement`.
+
+There is no check for a tag OUTSIDE the list, deliberately. Prose here
+writes `<name>`, `<rel-path>` and `<docs>` as metavariables, and a check
+cannot tell those from a typo'd tag without guessing.
+
 **A blank line ends an island's BLOCK, never its element.** That is
 CommonMark, and it is the whole reason an author can write markdown
 inside a `<div>` — the `<div>` / blank / `**bold**` / blank / `</div>`
