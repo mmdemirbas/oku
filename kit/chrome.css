@@ -5,10 +5,71 @@
    in a small <style> block on the page itself.
    ============================================================ */
 
-/* Web fonts. Loaded here (not via a <link> in the page stub) so the
-   per-page HTML stays minimal. The stylesheet itself blocks render,
-   which @import would too — there's no extra waterfall cost. */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+/* Web fonts, from the copy that travels with the kit.
+
+   This was an @import of fonts.googleapis.com, on every page of every
+   built tree. Three costs, and the first is the one that decided it:
+   every reader of every delivered document announced themselves — IP,
+   referrer, page URL — to a third party, which is the thing the
+   rebuild button was deliberately built NOT to do ("a document that
+   calls home when a colleague opens it is worse than the bug it would
+   report"). Second, a page opened with no network lost the typography
+   the layout is measured in. Third, 330 ms on the critical path, since
+   an @import inside a render-blocking stylesheet is a second serial
+   round trip before the first paint.
+
+   `oku vendor` fetches four variable woff2 (Inter + JetBrains Mono,
+   latin + latin-ext — Turkish needs latin-ext, and this kit ships
+   Turkish pages) into `vendor/fonts/` beside this file. The URLs below
+   are relative to THIS stylesheet, so they resolve under `oku serve`
+   and in `dist/site` without anything being injected; the standalone
+   build rewrites them to its own `_oku/vendor/` copy, and drops these
+   blocks entirely when the fonts were never fetched, so a page can
+   never ship a font URL that reaches outside itself.
+
+   Absent the vendored files the browser falls back to the system stack
+   named in each font-family declaration, which is why `font-display`
+   is swap and why no @font-face here names a network host. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("vendor/fonts/inter-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("vendor/fonts/inter-latin-ext-wght-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("vendor/fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("vendor/fonts/jetbrains-mono-latin-ext-wght-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
 /* ============ Tokens — light ============ */
 :root {

@@ -179,9 +179,10 @@ cannot fix stops being believed. Local files missing IS reported.
 
 ## oku vendor {#vendor}
 
-Fetch the two runtime dependencies once so built pages work with no
-network. mermaid draws the diagrams and Prism colours the code; both were
-loaded from a CDN on every page view.
+Fetch the shared runtime files once so built pages work with no network.
+mermaid draws the diagrams, Prism colours the code, and four variable
+woff2 files carry the two typefaces the layout is measured in — all of
+which used to arrive from a third party on every page view.
 
 ```bash
 oku vendor            # fetch what is missing
@@ -196,6 +197,14 @@ The files land in the installed kit's `vendor/` directory, so they are
 fetched once per machine and shared by every project. `oku build` copies
 one `_oku/vendor/` beside the output; every page reads that copy and
 falls back to the CDN if it is not there.
+
+The fonts have no CDN behind them, deliberately. A page that fetches a
+typeface tells a third party who is reading it, which is the reason they
+were vendored; without the vendored copy a page renders in the system
+stack instead, and the build ships no `@font-face` rule at all rather
+than a URL pointing at a file it did not carry. Both Latin subsets are
+fetched: `ş` and `ğ` live in latin-ext, so shipping only latin changes
+typeface in the middle of a Turkish word.
 
 They are **not** inlined into each page. mermaid is 3.3 MB against a
 1.1 MB standalone page, so a tree would carry one copy per page that

@@ -180,9 +180,11 @@ bir denetime kimse güvenmez. Yerel dosyaların eksikliği bildirilir.
 
 ## oku vendor {#vendor}
 
-İki çalışma zamanı bağımlılığını bir kez indirir; böylece üretilen
+Ortak çalışma zamanı dosyalarını bir kez indirir; böylece üretilen
 sayfalar ağ olmadan da çalışır. Diyagramları mermaid çizer, kodu Prism
-renklendirir; ikisi de her sayfa açılışında bir CDN'den yükleniyordu.
+renklendirir, dört değişken woff2 dosyası da sayfanın ölçüsünü kuran iki
+yazı tipini taşır; hepsi eskiden her sayfa açılışında dışarıdan
+geliyordu.
 
 ```bash
 oku vendor            # eksik olanı indir
@@ -197,6 +199,14 @@ Dosyalar kurulu kitin `vendor/` dizinine iner; yani makine başına bir kez
 indirilir ve bütün projeler aynı kopyayı kullanır. `oku build` çıktının
 yanına tek bir `_oku/vendor/` kopyalar; her sayfa o kopyayı okur, orada
 bulamazsa CDN'e döner.
+
+Yazı tiplerinin arkasında bilerek CDN yok. Yazı tipini dışarıdan çeken
+bir sayfa, kendisini kimin okuduğunu üçüncü bir tarafa söyler; zaten
+bunun için pakete alındılar. Kopya yoksa sayfa sistem yazı tipiyle
+görünür ve derleme, taşımadığı bir dosyayı gösteren `@font-face` kuralı
+yazmak yerine kuralı hiç yazmaz. İki Latin alt kümesi de indirilir: `ş`
+ve `ğ` latin-ext içinde durur, yalnızca latin taşımak Türkçe bir kelimenin
+ortasında yazı tipini değiştirir.
 
 Bağımlılıklar sayfaların içine **gömülmez**. mermaid tek başına 3,3 MB;
 buna karşılık tek dosyalık bir sayfa 1,1 MB. Gömülseydi, çizim içeren her

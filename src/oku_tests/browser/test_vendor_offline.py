@@ -83,8 +83,10 @@ def offline_state(browser, vendored_page):
     """Load the page with every network origin refused."""
     pg = browser.new_page()
     reached = []
+    calls = [0]
 
     def refuse(route, request):
+        calls[0] += 1
         if not request.url.startswith(("http://", "https://")):
             route.continue_()
             return
@@ -108,18 +110,18 @@ def offline_state(browser, vendored_page):
     )
     state = pg.evaluate(STATE)
     pg.close()
-    return state, reached
+    return state, reached, calls[0]
 
 
 def test_the_diagram_draws_with_no_network(offline_state) -> None:
-    state, _ = offline_state
+    state, _, _ = offline_state
     assert state["diagrams"] == 1, state
     assert state["broken"] == 0, f"the diagram did not render offline: {state}"
     assert state["drawn"] == 2, f"the diagram drew no nodes: {state}"
 
 
 def test_the_code_is_highlighted_with_no_network(offline_state) -> None:
-    state, _ = offline_state
+    state, _, _ = offline_state
     assert state["tokens"] > 0, f"no syntax highlighting offline: {state}"
     assert state["lineNumbers"] == 2, state
 
@@ -127,7 +129,11 @@ def test_the_code_is_highlighted_with_no_network(offline_state) -> None:
 def test_nothing_reaches_for_a_cdn(offline_state) -> None:
     """The fallback makes silence the only proof. A page that quietly
     fetched mermaid would satisfy every assertion above."""
-    _, reached = offline_state
+    _, reached, calls = offline_state
+    # The route has to have RUN. `page.route("https://**", …)` matched
+    # nothing here and made this assertion true by never recording a
+    # thing — for months, against a live CDN.
+    assert calls > 0, "the route never fired — this test proves nothing"
     cdn = [u for u in reached if "jsdelivr" in u or "unpkg" in u]
     assert cdn == [], f"the page went to a CDN despite a local copy: {cdn}"
 
@@ -193,8 +199,10 @@ def site_offline_state(browser, site_tree):
 
     pg = browser.new_page()
     reached = []
+    calls = [0]
 
     def route(r, request):
+        calls[0] += 1
         if "127.0.0.1" in request.url or not request.url.startswith(("http://", "https://")):
             r.continue_()
             return
@@ -213,7 +221,7 @@ def site_offline_state(browser, site_tree):
     state = pg.evaluate(STATE)
     pg.close()
     httpd.shutdown()
-    return state, reached
+    return state, reached, calls[0]
 
 
 def test_the_site_build_carries_the_shared_copy(site_tree) -> None:
@@ -222,7 +230,7 @@ def test_the_site_build_carries_the_shared_copy(site_tree) -> None:
 
 
 def test_the_site_build_draws_and_highlights_with_no_internet(site_offline_state) -> None:
-    state, _ = site_offline_state
+    state, _, _ = site_offline_state
     assert state["broken"] == 0, f"the diagram did not render: {state}"
     assert state["drawn"] == 2, f"the diagram drew no nodes: {state}"
     # python is an autoloader COMPONENT, not part of prism core — this is
@@ -231,6 +239,7 @@ def test_the_site_build_draws_and_highlights_with_no_internet(site_offline_state
 
 
 def test_the_site_build_reaches_no_cdn_either(site_offline_state) -> None:
-    _, reached = site_offline_state
+    _, reached, calls = site_offline_state
+    assert calls > 0, "the route never fired — this test proves nothing"
     cdn = [u for u in reached if "jsdelivr" in u or "unpkg" in u]
     assert cdn == [], f"dist/site went to a CDN despite a local copy: {cdn}"

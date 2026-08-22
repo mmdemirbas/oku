@@ -1533,6 +1533,30 @@ def _retarget_kit_urls(html: str, depth: int) -> str:
     return _KIT_URL_RE.sub(lambda m: m.group(1) + prefix + m.group(2), html)
 
 
+_FONT_FACE_RE = re.compile(r"@font-face\s*\{[^}]*vendor/fonts/[^}]*\}\s*", re.S)
+_FONT_URL_RE = re.compile(r'url\("vendor/fonts/')
+
+
+def _retarget_font_urls(css: str, vendor_base: str) -> str:
+    """Point chrome.css's @font-face rules at a copy the page can reach.
+
+    Two callers, two answers. Served or copied, the stylesheet is a file
+    and `vendor/fonts/x.woff2` resolves beside it — nothing to do. Inlined
+    into a standalone page, the same string resolves against the PAGE, so
+    it names a directory that does not exist and the reader silently gets
+    the system font stack.
+
+    When the fonts were never fetched the whole rule is dropped rather
+    than repointed. A shipped @font-face whose file is absent costs a
+    failed request per page for a fallback the font-family declarations
+    already provide — and the point of vendoring was that a delivered
+    page reaches for nothing.
+    """
+    if not vendor_fonts_present():
+        return _FONT_FACE_RE.sub("", css)
+    return _FONT_URL_RE.sub(f'url("{vendor_base}fonts/', css)
+
+
 def _is_page(data) -> bool:
     """True for either v1 ({kind:'page'}) or v2 ({k:'page'}) shape."""
     return isinstance(data, dict) and (data.get("k") == "page" or data.get("kind") == "page")
@@ -4457,6 +4481,14 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
     # Runtime chrome files → _oku/
     for f in KIT_FILES:
         shutil.copy(KIT_DIR / f, kit_out / f)
+    # The stylesheet lands beside `_oku/vendor/`, so its own relative
+    # font URLs already resolve — but only if the fonts were fetched.
+    # Passing an empty base leaves them untouched in that case and drops
+    # the rules in the other, so this tree never asks for a file it did
+    # not ship either.
+    if not vendor_fonts_present():
+        css_out = kit_out / "chrome.css"
+        css_out.write_text(_retarget_font_urls(css_out.read_text(encoding="utf-8"), ""), encoding="utf-8")
     # Shared registry directories → _oku/<name>/
     for d in ("glossary", "extrefs", "schema", "i18n"):
         src_dir = KIT_DIR / d
@@ -5314,7 +5346,12 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
         if inline:
             html = _BODY_CLOSE_RE.sub(lambda m: inline + "\n</body>", html, count=1)
 
-        html = LINK_TO_KIT_CSS.sub(lambda m: f"<style>\n{css}\n</style>", html, count=1)
+        # chrome.css names its font files relative to ITSELF; inlined,
+        # they would resolve against the page instead. Same `vendor_base`
+        # the kit's own loaders get, so both point at the one copy this
+        # tree carries.
+        page_css = _retarget_font_urls(css, vendor_base)
+        html = LINK_TO_KIT_CSS.sub(lambda m: f"<style>\n{page_css}\n</style>", html, count=1)
         html = SCRIPT_TO_KIT_BOOT.sub(lambda m: f"<script>\n{boot}\n</script>", html, count=1)
         html = SCRIPT_TO_KIT_MAIN.sub(lambda m: f"<script>\n{main}\n</script>", html, count=1)
         html = SCRIPT_TO_KIT_RENDERER.sub(lambda m: f"<script>\n{renderer}\n</script>", html, count=1)
@@ -6249,6 +6286,34 @@ _PRISM_LANGS = (
 ).split()
 
 
+# The two families chrome.css asks for, as variable woff2 — one file per
+# family per subset, every weight inside. Fontsource publishes the same
+# files Google Fonts serves, under the same OFL-1.1 licence, at a URL
+# that does not change per request.
+#
+# latin-ext is not optional here: Turkish `ş` and `ğ` live in it, and
+# this kit ships Turkish pages. Without it those two letters fall back to
+# the system font mid-word.
+_FONTSOURCE = "https://cdn.jsdelivr.net/npm/@fontsource-variable/"
+_VENDOR_FONTS = (
+    ("inter-latin-wght-normal.woff2", "inter"),
+    ("inter-latin-ext-wght-normal.woff2", "inter"),
+    ("jetbrains-mono-latin-wght-normal.woff2", "jetbrains-mono"),
+    ("jetbrains-mono-latin-ext-wght-normal.woff2", "jetbrains-mono"),
+)
+
+
+def vendor_fonts_present() -> bool:
+    """True when every face chrome.css declares is on disk.
+
+    All or nothing on purpose: half the faces present means a page that
+    renders Latin in Inter and Turkish in the system font, which reads as
+    a rendering bug rather than as a missing dependency.
+    """
+    root = vendor_dir() / "fonts"
+    return all((root / name).exists() for name, _pkg in _VENDOR_FONTS)
+
+
 def _vendor_files() -> list[tuple[str, str]]:
     """(path under vendor/, source URL) for every shared dependency."""
     out = [
@@ -6263,6 +6328,7 @@ def _vendor_files() -> list[tuple[str, str]]:
         (f"prism/components/prism-{lang}.min.js", f"{_PRISM_CDN}components/prism-{lang}.min.js")
         for lang in _PRISM_LANGS
     ]
+    out += [(f"fonts/{name}", f"{_FONTSOURCE}{pkg}/files/{name}") for name, pkg in _VENDOR_FONTS]
     return out
 
 
@@ -6310,7 +6376,15 @@ def cmd_vendor(args: argparse.Namespace) -> int:
     total = sum(f.stat().st_size for f in root.rglob("*") if f.is_file()) if root.exists() else 0
     print(f"✓ vendor: {fetched} fetched, {skipped} already present — {total / 1_000_000:.1f} MB in {root}")
     if not vendor_is_complete():
-        print("  ! incomplete — pages fall back to the CDN for whatever is missing", file=sys.stderr)
+        # Two different fallbacks, so the line says which one applies.
+        # mermaid and Prism have a CDN behind them; the fonts do not, by
+        # design — reaching a font host is the defect vendoring them
+        # fixed, so their absence is a typeface change, not a slow page.
+        missing_fonts = not vendor_fonts_present()
+        note = "pages fall back to the CDN for whatever is missing"
+        if missing_fonts:
+            note += "; without the fonts, pages render in the system stack"
+        print(f"  ! incomplete — {note}", file=sys.stderr)
         return 1
     return 0
 

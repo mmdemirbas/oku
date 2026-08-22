@@ -774,6 +774,32 @@ one matters because the fallback would otherwise mask a broken local
 copy. It also asserts the page did NOT grow, which is what catches
 someone "fixing" offline support by inlining.
 
+**The typefaces are vendored too, and they have no CDN behind them.**
+`chrome.css` used to open with an `@import` of fonts.googleapis.com, so
+every page of every built tree fetched two families from a third party
+on load — measured on a standalone page opened over `file://`: three
+requests, one to fonts.googleapis.com and two to fonts.gstatic.com. That
+is the kit telling Google who is reading a document it was handed, which
+is the exact thing the rebuild button refuses to do for its own build
+stamp. `oku vendor` fetches four variable woff2 (Inter + JetBrains Mono,
+latin + latin-ext) into `vendor/fonts/`, and the `@font-face` rules name
+them relative to chrome.css — so serve and `dist/site` resolve them with
+nothing injected, and `build_standalone` repoints them at its own
+`_oku/vendor/` copy through `_retarget_font_urls`.
+
+Three parts of that are decisions. **latin-ext is not optional**: `ş` and
+`ğ` live there, so shipping only latin changes typeface in the middle of
+a Turkish word. **No file, no rule** — when the fonts were never fetched
+both builds DROP the `@font-face` blocks rather than shipping a URL to a
+file they did not carry, because a failed request per page buys nothing
+the font-family fallbacks do not already give. And **a missing face
+counts as none at all** (`vendor_fonts_present` is all-or-nothing), since
+half a set renders one alphabet in Inter and the other in the system
+stack, which reads as a rendering bug. Held by
+`test_fonts_are_local.py`, which loads both delivered trees with every
+non-local origin refused, asserts the route actually fired, and asserts
+Turkish letters resolve to a loaded face.
+
 **`__okuVendorPath()` is a function; `window.__okuVendorBase` is a
 string.** The names differ deliberately. A top-level
 `function __okuVendorBase()` and the injected
