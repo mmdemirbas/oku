@@ -258,3 +258,40 @@ def test_the_bar_never_hides_behind_the_close_button(page, site_url):
         )
         assert not overlap, (width, a, c)
         assert not boxes["pageScrollsSideways"], width
+
+
+def test_a_file_that_cannot_be_read_says_so_in_the_failure_colour(page, site_url):
+    """The notice shipped as `class="callout callout-warning"`, which the
+    stylesheet keys nothing off — so a file that could not be read
+    announced itself in the accent colour, under a solid square where the
+    icon belongs (an unset `--callout-icon` leaves `::before` unmasked).
+    Measured against a callout that IS a warning, in the same page."""
+    _open_page(page, site_url)
+    page.evaluate(INJECT, "nope-there-is-no-such-file.md")
+    page.click("#probe")
+    page.wait_for_selector(".okt-mdview-fail", timeout=15000)
+    measured = page.evaluate("""() => {
+      const fail = document.querySelector('.okt-mdview-fail');
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:absolute;left:-4000px;top:0';
+      probe.innerHTML = '<div class="callout warning"></div><div class="callout"></div>';
+      document.body.appendChild(probe);
+      const read = (el) => ({
+        border: getComputedStyle(el).borderLeftColor,
+        glyph: getComputedStyle(el, '::before').backgroundColor,
+        icon: getComputedStyle(el, '::before').maskImage,
+      });
+      const out = {
+        fail: read(fail),
+        warning: read(probe.children[0]),
+        plain: read(probe.children[1]),
+      };
+      probe.remove();
+      return out;
+    }""")
+    assert measured["warning"] != measured["plain"], (
+        "the two controls are identical — nothing is being compared"
+    )
+    assert measured["fail"]["border"] == measured["warning"]["border"], measured
+    assert measured["fail"]["glyph"] == measured["warning"]["glyph"], measured
+    assert measured["fail"]["icon"] not in ("none", ""), measured["fail"]["icon"]

@@ -791,7 +791,12 @@ var __okuMdViewer = (function () {
   function fail(wrap, path, url, reason) {
     var body = wrap.querySelector('.okt-mdview-rendered');
     body.innerHTML =
-      '<div class="callout callout-warning okt-mdview-fail">' +
+      // `warning`, not `callout-warning`: the stylesheet keys the type
+      // off a bare class, and the hyphenated spelling matched no rule —
+      // so a file that could not be read announced itself in the accent
+      // colour, under a solid square where the icon should be (an unset
+      // --callout-icon leaves ::before unmasked).
+      '<div class="callout warning okt-mdview-fail">' +
       '<p><strong>' + escapeHtml(path) + '</strong> could not be read.</p>' +
       '<p>' + escapeHtml(reason) + '</p>' +
       '<p><a href="' + escapeAttr(url) + '" target="_blank" rel="noopener">Open it directly</a></p>' +
@@ -4856,7 +4861,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-22-r55';
+var __okuKitBuild = '2026-08-22-r56';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
