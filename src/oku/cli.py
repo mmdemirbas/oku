@@ -2042,7 +2042,31 @@ _INLINE_HTML_TAGS = {
     "u",
     "var",
 }
-_INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+# A code span, bounded by the paragraph it sits in. The opening run is
+# 1..10 backticks and the body takes anything that does not start that
+# same run and does not cross a BLANK line — which is CommonMark's own
+# rule, and the renderer's: `joinParagraph` glues a paragraph's lines
+# before inline parsing, so a span may wrap across one newline and can
+# never reach past the paragraph.
+#
+# It was defined twice — here, and `(`+)(?:.|\n)*?\1` two thousand lines
+# below, which won at call time for BOTH. That one pairs any backtick run
+# with the next equal run across ANY distance, so one stray backtick in
+# prose swallowed everything up to the next code span on the page. The
+# swallowed region is invisible to `collect_page_assets`, so an image in
+# it was never copied into `dist/site` and never inlined into the
+# standalone page — the reader got a broken image and the build said
+# nothing — and invisible to the link scan that would have reported the
+# same region's broken links.
+#
+# The 1..10 bound is what keeps it linear: the unbounded `(`+)` form
+# backtracks over every run length at every position, and 8000
+# consecutive backticks took 11.6 s to scan (the old cross-line form took
+# 17 s at 4000). Bounded, the same input is under a millisecond. A span
+# opened with more than ten backticks is not recognised, and that
+# direction is the safe one — an unrecognised span means a link inside it
+# is CHECKED rather than a real reference being dropped.
+_INLINE_CODE_RE = re.compile(r"(`{1,10})(?:(?!\1)(?:[^\n]|\n(?![ \t]*\n)))*\1")
 
 
 def _md_island_tag(line: str) -> str | None:
@@ -4429,7 +4453,6 @@ _ISLAND_MD_HREF_RE = re.compile(r"""href\s*=\s*["']([^"'\s]+?\.md)(?:#[^"']*)?["
 
 
 _FENCE_RE = re.compile(r"(?:^|\n)(`{3,}|~{3,})[^\n]*\n.*?\n\1[ \t]*(?=\n|$)", re.S)
-_INLINE_CODE_RE = re.compile(r"(`+)(?:.|\n)*?\1")
 
 
 def _strip_code(text: str) -> str:
