@@ -199,6 +199,80 @@ class TestIslandStyling:
         assert "island-hand-styled" not in _codes(issues), issues
 
 
+# ---------- mermaid ----------
+
+
+def _diagram(body: str) -> str:
+    return "---\ntitle: T\n---\n\n## S {#s}\n\n```mermaid\n" + body + "\n```\n"
+
+
+class TestMermaidStyling:
+    """A `classDef` with a hex literal is the same defect as an inline
+    style on an island, so it carries the same code. It went unnoticed
+    longer because the lint only ever walked string blocks, and a
+    mermaid fence lifts to a typed `diagram` block before it gets
+    there — this repo's own architecture page had nine of them.
+    """
+
+    def test_a_classdef_with_a_hex_fill_is_flagged(self, tmp_path):
+        issues = _issues(
+            tmp_path,
+            _diagram("flowchart TB\n  A --> B\n  classDef x fill:#dbeafe,stroke:#1d4ed8\n  class A x"),
+        )
+        hit = [i for i in issues if i["code"] == "island-hand-styled"]
+        assert hit and hit[0]["severity"] == "warning", issues
+        assert "diagram" in hit[0]["where"], hit
+
+    def test_the_message_names_the_tokens_to_use_instead(self, tmp_path):
+        """A check that says "do not do that" without naming the
+        replacement is one authors work around."""
+        issues = _issues(
+            tmp_path, _diagram("flowchart TB\n  A --> B\n  classDef x fill:#dbeafe\n  class A x")
+        )
+        msg = [i for i in issues if i["code"] == "island-hand-styled"][0]["message"]
+        assert "--series-N-soft" in msg and "--text" in msg, msg
+
+    def test_a_style_statement_is_flagged_too(self, tmp_path):
+        issues = _issues(tmp_path, _diagram("flowchart TB\n  A --> B\n  style A fill:#fff"))
+        assert "island-hand-styled" in _codes(issues), issues
+
+    def test_a_theme_directive_is_flagged_too(self, tmp_path):
+        issues = _issues(
+            tmp_path,
+            _diagram("%%{init: {'themeVariables': {'primaryColor': '#ff0000'}}}%%\nflowchart TB\n  A --> B"),
+        )
+        assert "island-hand-styled" in _codes(issues), issues
+
+    def test_an_rgb_call_is_flagged_too(self, tmp_path):
+        issues = _issues(
+            tmp_path, _diagram("flowchart TB\n  A --> B\n  classDef x fill:rgb(255,0,0)\n  class A x")
+        )
+        assert "island-hand-styled" in _codes(issues), issues
+
+    def test_a_classdef_on_kit_tokens_is_not_flagged(self, tmp_path):
+        issues = _issues(
+            tmp_path,
+            _diagram(
+                "flowchart TB\n  A --> B\n"
+                "  classDef x fill:var(--series-1-soft),stroke:var(--series-1),color:var(--text)\n"
+                "  class A x"
+            ),
+        )
+        assert "island-hand-styled" not in _codes(issues), issues
+
+    def test_a_hex_in_a_node_label_is_not_flagged(self, tmp_path):
+        """Only the lines that carry colour are read. `#3` in a label is
+        a number, and a check that guesses is one authors ignore."""
+        issues = _issues(tmp_path, _diagram('flowchart TB\n  A["#3 pick"] --> B["ticket #42"]'))
+        assert "island-hand-styled" not in _codes(issues), issues
+
+    def test_an_uncoloured_diagram_is_not_flagged(self, tmp_path):
+        issues = _issues(
+            tmp_path, _diagram("flowchart TB\n  A --> B\n  classDef x stroke-width:2px\n  class A x")
+        )
+        assert "island-hand-styled" not in _codes(issues), issues
+
+
 # ---------- accent divergence ----------
 
 

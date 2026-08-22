@@ -470,8 +470,11 @@ the relationship you are showing; `oku spec` lists all 68.
 **Colours come from the kit, never from a hex literal.** `var(--accent)`,
 `var(--surface)`, `--series-1..10` for an island; `.okt-diag-node` /
 `-edge` / `-arrow` / `-label` / `-group` and `.okt-diag-fill-1..10` for a
-hand-drawn SVG. A hardcoded colour is how a figure ends up invisible in
-the theme nobody was looking at, and `island-hand-styled` fails on it.
+hand-drawn SVG; `fill:var(--series-N-soft),stroke:var(--series-N),color:var(--text)`
+for a mermaid `classDef`, where the `-soft` plate is what makes the node
+label readable in both themes. A hardcoded colour is how a figure ends up
+invisible in the theme nobody was looking at, and `island-hand-styled`
+fails on it — in an island and in a mermaid fence alike.
 
 **A blank line inside an island does not end it.** It ends the HTML
 block, which is what lets you write markdown between the tags, and the

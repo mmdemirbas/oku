@@ -509,6 +509,26 @@ instead of freezing at first paint. A token that resolves to nothing is
 left as written: the parse error then names the token, which is more use
 than a silent substitution rendering the wrong colour.
 
+The kit had the substitution and no way to notice its absence:
+`island-hand-styled` walked only string blocks, and a mermaid fence lifts
+to a typed `diagram` block before the lint gets there — so this repo's
+own architecture page carried nine hardcoded `classDef` fills past
+`oku check --strict`, pale plates that stayed pale on a dark page under a
+label that inverted without them. The lint reads a diagram's `classDef` /
+`style` / `linkStyle` lines and its `%%{init}%%` directive, and only
+those: a `#3` in a node label is a number, and a check that guesses is
+one authors ignore. The vocabulary it names is
+`fill:var(--series-N-soft),stroke:var(--series-N),color:var(--text)`.
+**The ramp is for marks, and the plates are a second set** — a node is
+something with a label written on it, and `--series-3` under `--text` is
+dark-on-dark in one theme and light-on-light in the other. Ten
+`--series-N-soft` per theme, pale in light and deep in dark; tokens
+rather than a `color-mix()` at the call site, because Mermaid's grammar
+has no `(`. Held by `test_check_presentation.py::TestMermaidStyling`,
+by `test_colour_contrast.py` (the label clears 4.5:1 on every plate in
+both themes, the stroke 3:1 on its own fill) and by
+`browser/test_diagram_tokens.py`.
+
 **Hand-drawn figures get their colour from the kit.** An author who
 draws their own SVG — in an HTML island; there is no `svg` fence, the
 `svg` block kind is reachable only from a JSON page — reaches

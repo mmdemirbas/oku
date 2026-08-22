@@ -47,10 +47,10 @@ flowchart TB
     RND -->|oku rendered event| CHR
     CSS --> CHR
     A -->|oku build| O
-    classDef auth fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a
-    classDef rt fill:#ccfbf1,stroke:#0f766e,color:#115e59,stroke-width:2px
-    classDef reg fill:#e0e7ff,stroke:#4338ca,color:#312e81
-    classDef out fill:#dcfce7,stroke:#15803d,color:#14532d
+    classDef auth fill:var(--series-7-soft),stroke:var(--series-7),color:var(--text)
+    classDef rt fill:var(--series-1-soft),stroke:var(--series-1),color:var(--text),stroke-width:2px
+    classDef reg fill:var(--series-3-soft),stroke:var(--series-3),color:var(--text)
+    classDef out fill:var(--series-5-soft),stroke:var(--series-5),color:var(--text)
 ```
 
 *Author → kit → build at a single glance.*
@@ -284,11 +284,11 @@ flowchart LR
     BUILD --> S["📦 dist/standalone/<br/>self-contained HTML"]:::output
     BUILD --> SI["🌍 dist/site/<br/>multi-page + manifest"]:::output
     BUILD -.-> PF["🔍 dist/site/pagefind/"]:::optional
-    classDef content fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a
-    classDef kit fill:#ccfbf1,stroke:#0f766e,color:#115e59
-    classDef builder fill:#fef3c7,stroke:#b45309,color:#78350f,stroke-width:2px
-    classDef output fill:#dcfce7,stroke:#15803d,color:#14532d
-    classDef optional fill:#fef3c7,stroke:#b45309,color:#92400e,stroke-dasharray: 5 3
+    classDef content fill:var(--series-7-soft),stroke:var(--series-7),color:var(--text)
+    classDef kit fill:var(--series-1-soft),stroke:var(--series-1),color:var(--text)
+    classDef builder fill:var(--series-2-soft),stroke:var(--series-2),color:var(--text),stroke-width:2px
+    classDef output fill:var(--series-5-soft),stroke:var(--series-5),color:var(--text)
+    classDef optional fill:var(--series-2-soft),stroke:var(--series-2),color:var(--text),stroke-dasharray: 5 3
 ```
 
 *Build inputs and the two dist trees. Colour codes: blue = author content; teal = kit runtime; green = build outputs; amber = optional dependency.*

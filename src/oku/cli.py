@@ -3537,6 +3537,10 @@ _PLACEHOLDER_RE = re.compile(
 
 _ISLAND_STYLE_RE = re.compile(r"<style[\s>]|style\s*=\s*[\"'][^\"']*(?:#[0-9a-fA-F]{3,8}|rgb\()")
 _HTML_ISLAND_RE = re.compile(r"^<[a-zA-Z][^\s>]*", re.MULTILINE)
+# The lines of a mermaid source that carry colour. A hex anywhere else is
+# part of a label ("#3 pick") and none of this rule's business.
+_MERMAID_STYLE_LINE_RE = re.compile(r"^\s*(?:classDef|style|linkStyle)\s|^\s*%%\{")
+_RAW_COLOUR_RE = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(")
 
 # Primitives whose whole job is the relationship BETWEEN their members.
 # With one member there is no relationship left — what remains is a
@@ -3684,6 +3688,28 @@ def _presentation_issues(page: dict, tree_defaults: dict) -> list[tuple[str, str
                         f"one entry in `{field}`. This primitive draws the relationship between "
                         f"its members, and there is no relationship without {need}. Add the "
                         "second member, or write the single point as prose.",
+                    )
+                )
+        if kind == "diagram":
+            hand = [
+                ln.strip()
+                for ln in str(blk.get("src") or "").split("\n")
+                if _MERMAID_STYLE_LINE_RE.match(ln) and _RAW_COLOUR_RE.search(ln)
+            ]
+            if hand:
+                out.append(
+                    (
+                        "warning",
+                        "island-hand-styled",
+                        f"b[{i}] diagram",
+                        f"{len(hand)} mermaid style line(s) carry their own colours, starting "
+                        f"`{hand[0][:60]}`. A hex freezes the figure to one theme, so the diagram "
+                        "keeps light fills on a dark page. Use the kit's tokens — "
+                        "fill:var(--series-N-soft), stroke:var(--series-N), color:var(--text), "
+                        "with N in 1..10 — and the kit substitutes the computed value at every "
+                        "hand-off, so the colours follow the theme. The -soft tokens exist for "
+                        "this: Mermaid's grammar takes CSS values and not CSS functions, so "
+                        "color-mix() will not parse.",
                     )
                 )
         if kind == "diagram" and headings:

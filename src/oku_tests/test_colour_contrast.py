@@ -129,3 +129,85 @@ def test_the_ramp_has_ten_distinct_colours(ramps: dict[str, list[str]], theme: s
     apart."""
     ramp = ramps[theme]
     assert len(set(ramp)) == 10, f"{theme} ramp repeats a colour: {ramp}"
+
+
+# ---------- the soft plates ----------
+#
+# A figure that groups nodes by category needs a plate to write a label
+# on, and the ramp above is for marks: `fill:var(--series-3)` under
+# `color:var(--text)` is dark-on-dark in one theme and light-on-light in
+# the other. --series-N-soft is the tint of the same hue, so the pair
+# fill/stroke/text reads in both themes. Mermaid `classDef` is the
+# caller that forced them to be tokens rather than a color-mix(): its
+# grammar takes CSS values, not CSS functions.
+#
+# The threshold changes with the job. A label ON the plate is text, so
+# 4.5:1 (SC 1.4.3). The stroke around it is a graphical object, so 3:1.
+
+MIN_TEXT_RATIO = 4.5
+
+
+@pytest.fixture(scope="module")
+def softs(css: str) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {"light": [], "dark": []}
+    for i in range(1, 11):
+        values = _hex_tokens(css, f"--series-{i}-soft")
+        assert len(values) == 2, f"--series-{i}-soft is declared {len(values)} times, expected light + dark"
+        out["light"].append(values[0])
+        out["dark"].append(values[1])
+    return out
+
+
+@pytest.fixture(scope="module")
+def texts(css: str) -> dict[str, str]:
+    values = _hex_tokens(css, "--text")
+    assert len(values) == 2, f"--text is declared {len(values)} times, expected light + dark"
+    return {"light": values[0], "dark": values[1]}
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("index", range(1, 11))
+def test_a_label_on_a_soft_plate_clears_four_and_a_half(
+    softs: dict[str, list[str]], texts: dict[str, str], theme: str, index: int
+) -> None:
+    """The whole reason the tokens exist. A hardcoded pale fill kept its
+    pale on a dark page, so the label sat light-on-light and the node
+    read as empty."""
+    plate = softs[theme][index - 1]
+    ratio = contrast_ratio(texts[theme], plate)
+    assert ratio >= MIN_TEXT_RATIO, (
+        f"--text ({texts[theme]}) on --series-{index}-soft ({plate}) in the {theme} "
+        f"theme is {ratio:.2f}:1, under the {MIN_TEXT_RATIO}:1 WCAG 2.1 SC 1.4.3 asks "
+        "of body text."
+    )
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("index", range(1, 11))
+def test_a_series_stroke_is_visible_on_its_own_plate(
+    ramps: dict[str, list[str]], softs: dict[str, list[str]], theme: str, index: int
+) -> None:
+    """The pair is used together — `fill:var(--series-N-soft),
+    stroke:var(--series-N)` — so the border has to be visible against
+    the fill it encloses, not only against the page."""
+    ratio = contrast_ratio(ramps[theme][index - 1], softs[theme][index - 1])
+    assert ratio >= MIN_RATIO, (
+        f"--series-{index} on --series-{index}-soft in the {theme} theme is "
+        f"{ratio:.2f}:1, under {MIN_RATIO}:1."
+    )
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_soft_ramp_has_ten_distinct_plates(softs: dict[str, list[str]], theme: str) -> None:
+    ramp = softs[theme]
+    assert len(set(ramp)) == 10, f"{theme} soft ramp repeats a colour: {ramp}"
+
+
+@pytest.mark.parametrize("index", range(1, 11))
+def test_a_soft_plate_is_pale_in_light_and_deep_in_dark(softs: dict[str, list[str]], index: int) -> None:
+    """A plate that did not flip with the theme would pass both contrast
+    tests above by being mid-grey, and defeat the point."""
+    light = _relative_luminance(softs["light"][index - 1])
+    dark = _relative_luminance(softs["dark"][index - 1])
+    assert light > 0.5, f"--series-{index}-soft light ({softs['light'][index - 1]}) is not a pale plate"
+    assert dark < 0.2, f"--series-{index}-soft dark ({softs['dark'][index - 1]}) is not a deep plate"

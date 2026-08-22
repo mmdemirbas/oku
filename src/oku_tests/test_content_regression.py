@@ -448,10 +448,20 @@ class TestChromeKitMarkers:
         )
         assert re.search(r"\.okt-diag-fill-1\s*\{", css), "the series ramp is not exposed to figures"
         cli_src = (repo_root / "src" / "oku" / "cli.py").read_text(encoding="utf-8")
-        i = cli_src.index('"island-hand-styled"')
-        assert "okt-diag-" in cli_src[i : i + 900], (
+        # One code, two surfaces: an HTML island and a mermaid fence. Each
+        # message has to name the vocabulary for ITS surface — a reader of
+        # the mermaid warning cannot act on a list of CSS classes, since
+        # Mermaid takes CSS values and not selectors.
+        sites = [m for m in re.finditer(r'"island-hand-styled"', cli_src)]
+        assert len(sites) == 2, f"{len(sites)} island-hand-styled sites; the test knows about 2"
+        messages = [cli_src[m.end() : m.end() + 900] for m in sites]
+        assert any("okt-diag-" in m for m in messages), (
             "island-hand-styled tells the author to use the kit's classes without naming "
             "the ones for an SVG — name them, or the message is advice they cannot act on"
+        )
+        assert any("--series-N-soft" in m for m in messages), (
+            "the mermaid warning does not name the token to use instead — a classDef "
+            "cannot take a CSS class, so the SVG vocabulary is no help to it"
         )
 
     # Properties that change an element's box. A hover rule that sets one

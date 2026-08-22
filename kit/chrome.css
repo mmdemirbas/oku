@@ -146,6 +146,25 @@
   --series-8: #4d7c0f;
   --series-9: #7c2d12;
   --series-10: #4b5563;
+  /* The fill that goes with each series colour. A figure that groups
+     nodes by category needs a plate to write on, and the ramp above is
+     for marks: `fill:var(--series-3)` under `color:var(--text)` is
+     dark-on-dark in one theme and light-on-light in the other. These
+     are the tint of the same hue — pale here, deep in the dark theme —
+     so `fill:var(--series-N-soft), stroke:var(--series-N),
+     color:var(--text)` reads in both. It is the vocabulary a mermaid
+     `classDef` has to use, since Mermaid's grammar takes CSS values and
+     not CSS functions, so `color-mix()` is not available to it. */
+  --series-1-soft: #ccfbf1;
+  --series-2-soft: #fef3c7;
+  --series-3-soft: #e0e7ff;
+  --series-4-soft: #ffedd5;
+  --series-5-soft: #dcfce7;
+  --series-6-soft: #fce7f3;
+  --series-7-soft: #e0f2fe;
+  --series-8-soft: #ecfccb;
+  --series-9-soft: #fed7aa;
+  --series-10-soft: #e5e7eb;
 }
 :root[data-theme="light"] { color-scheme: light; }
 /* Not in print. Paper is white, and every token below is chosen for a
@@ -198,6 +217,19 @@
   --series-8: #bef264;
   --series-9: #fca5a5;
   --series-10: #d1d5db;
+  /* Soft plates, dark theme. Deep rather than pale, and lifted off
+     --surface far enough to read as a plate: 1.52 to 1.99 against it,
+     with --text at 7.1 to 9.3 on top. See test_colour_contrast.py. */
+  --series-1-soft: #134e4a;
+  --series-2-soft: #78350f;
+  --series-3-soft: #312e81;
+  --series-4-soft: #7c2d12;
+  --series-5-soft: #14532d;
+  --series-6-soft: #831843;
+  --series-7-soft: #0c4a6e;
+  --series-8-soft: #365314;
+  --series-9-soft: #7f1d1d;
+  --series-10-soft: #374151;
   color-scheme: dark;
 }
 }
