@@ -2274,10 +2274,24 @@ function buildTOC(tocList) {
 
     var head = document.createElement('div');
     head.className = 'toc-head';
-    head.innerHTML =
-      '<span class="chevron">▸</span>' +
-      '<span class="num">' + num + '.</span>' +
-      '<a href="' + hashPrefix + sec.id + '">' + title + '</a>';
+    // Nodes, not innerHTML. `title` comes from `_okuHeadingText`, which
+    // returns `clone.textContent` — so it UN-escapes whatever the
+    // renderer escaped for display, and a heading like `## The <img>
+    // tag` became a live element in the sidebar while the body showed
+    // it correctly as text. The h3 branch a few lines down was already
+    // written this way; this one was the outlier.
+    var chev = document.createElement('span');
+    chev.className = 'chevron';
+    chev.textContent = '▸';
+    var numEl = document.createElement('span');
+    numEl.className = 'num';
+    numEl.textContent = num + '.';
+    var headLink = document.createElement('a');
+    headLink.href = hashPrefix + sec.id;
+    headLink.textContent = title;
+    head.appendChild(chev);
+    head.appendChild(numEl);
+    head.appendChild(headLink);
     li.appendChild(head);
 
     var h3s = sec.querySelectorAll('h3');
@@ -5475,7 +5489,12 @@ var __okuTooltip = (function () {
     t.className = 'oku-tooltip';
     var html = '<div class="okt-body">' + body + '</div>';
     if (lang) html += '<span class="okt-lang">' + lang + '</span>';
-    if (link) html += '<div class="okt-link"><a href="' + link + '" target="_blank" rel="noopener">Learn more →</a></div>';
+    // The value comes from a registry file (kit/glossary/*.json or a
+    // project's kit.json override) and lands inside an attribute, so a
+    // quote in it closed the attribute and the rest became markup. The
+    // ext-ref path escaped the same field and this one did not.
+    var safeLink = link ? __okuSafeUrl(link) : '';
+    if (safeLink) html += '<div class="okt-link"><a href="' + safeLink + '" target="_blank" rel="noopener">Learn more →</a></div>';
     html += '<span class="okt-pin-hint">click to pin</span>';
     t.innerHTML = html;
     return t;
@@ -6035,8 +6054,9 @@ function __okuBuildCitationBody(hit, name, element) {
     // plus a redundant "Learn more →" row; the chip read as code and
     // doubled the click affordances. One link, clearly styled, is
     // enough.
-    if (hit.link) {
-      html += '<a class="okt-cite-domain" href="' + escapeXml(hit.link) +
+    var citeHref = __okuSafeUrl(hit.link);
+    if (citeHref) {
+      html += '<a class="okt-cite-domain" href="' + citeHref +
               '" target="_blank" rel="noopener">' + escapeXml(domain) + ' ↗</a>';
     } else {
       html += '<div class="okt-cite-domain">' + escapeXml(domain) + '</div>';
@@ -6048,7 +6068,10 @@ function __okuBuildCitationBody(hit, name, element) {
     if (published) html += '<span class="okt-cite-date">' + escapeXml(published) + '</span>';
     html += '</div>';
   }
-  if (hit.summary) html += '<div class="okt-cite-summary">' + hit.summary + '</div>';
+  // `name`, `link`, `domain`, `author` and `published` on this card all
+  // go through escapeXml; `summary` was the one that did not, so a `<`
+  // in an ordinary sentence rendered as broken markup.
+  if (hit.summary) html += '<div class="okt-cite-summary">' + escapeXml(hit.summary) + '</div>';
   html += '</div>';
   return html;
 }
@@ -12211,6 +12234,16 @@ window.addEventListener('oku:rendered', function () {
 
 function escapeXml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+/* A URL from a registry, ready to sit inside an href attribute.
+   Empty for anything carrying a scheme that is not http, https or
+   mailto — `javascript:` and `data:` in a glossary entry would run on
+   click, and a registry travels between projects. A relative path, a
+   `#fragment` and a bare query carry no scheme and pass through. */
+function __okuSafeUrl(u) {
+  var raw = String(u == null ? '' : u).trim();
+  if (/^[a-z][a-z0-9+.-]*:/i.test(raw) && !/^(https?|mailto):/i.test(raw)) return '';
+  return escapeXml(raw);
 }
 /* Size a left label gutter to the labels it must hold.
    Renderers that put row labels in a left gutter used a FIXED pad
