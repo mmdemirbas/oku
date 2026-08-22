@@ -689,13 +689,28 @@
   // between them, nothing else on the line.
   const HR_RE = /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/;
 
-  // Slugify a heading title for a default anchor id.
+  /* A heading's id. Mirrors `_md_slug` in src/oku/cli.py exactly, and
+     `test_heading_slug.py` holds them against each other — `oku check`
+     validates a page's `#fragment` links against ITS answer while this
+     is what the reader lands on, so a disagreement is a link the check
+     calls fine and the reader finds broken.
+
+     Unicode classes rather than `a-z0-9`: a Turkish `## Özet` used to
+     become `zet`, and a Chinese heading became the empty string and fell
+     back to a positional `sec-3` that moves when a section is inserted
+     above it. Composed first, then marks dropped: NFC makes the same title give
+     the same id whichever form it was typed in, and dropping what
+     survives turns a lowercased `İ` — `i` plus a combining dot — into
+     the plain `i` a Turkish author would type into a link. An empty
+     result is the caller's to name; here a positional id, which cannot
+     collide. */
   function slugify(text) {
-    return String(text).toLowerCase()
-      .replace(/[^a-z0-9\s-]+/g, '')
+    return String(text).toLowerCase().normalize('NFC')
+      .replace(/[^\p{L}\p{N}\s_-]+/gu, '')
       .trim()
       .replace(/\s+/g, '-')
-      .replace(/-+/g, '-');
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 
   // Fence tags that lift to typed blocks — mirrors _FENCE_KINDS in
@@ -843,7 +858,10 @@
         continue;
       }
       // Heading. A closing sequence of #s is decoration, not title text.
-      const head = line.match(/^(#{1,6})\s+(.+?)(?:\s+\{#([\w-]+)\})?\s*$/);
+      // `\w` is ASCII here, so `{#a-özet}` used to miss the optional
+      // group and render as literal text inside the heading — which is
+      // exactly what an author pinning an id on a translated page writes.
+      const head = line.match(/^(#{1,6})\s+(.+?)(?:\s+\{#([\p{L}\p{N}\p{M}_-]+)\})?\s*$/u);
       if (head) {
         const level = head[1].length;
         const title = head[2].replace(/\s+#+\s*$/, '');

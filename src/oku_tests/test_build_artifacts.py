@@ -37,6 +37,7 @@ SAMPLE_STUB = """<!DOCTYPE html>
 
 
 _SCRIPT_OPEN_RE = re.compile(r"<script\b[^>]*>", re.I)
+_SCRIPT_CLOSE_RE = re.compile(r"</script", re.IGNORECASE)
 
 
 def _script_bodies(html: str) -> list[str]:
@@ -46,11 +47,19 @@ def _script_bodies(html: str) -> list[str]:
     regardless of JS syntax — which is exactly the failure mode this file
     guards against. Mirroring that rule here (rather than counting tags)
     keeps the assertions honest.
+
+    The close tag is found with a case-insensitive search rather than on
+    `html.lower()`: `str.lower()` is not length-preserving — a Turkish
+    `İ` lowercases to `i` plus a combining dot — so every index after the
+    first one is off by one, and the body comes back with a stray `<` on
+    the end. It arrived the day chrome.js gained an `İ` in a comment, and
+    it presented as the page JSON failing to parse.
     """
     bodies: list[str] = []
     pos = 0
     while (m := _SCRIPT_OPEN_RE.search(html, pos)) is not None:
-        end = html.lower().find("</script", m.end())
+        close = _SCRIPT_CLOSE_RE.search(html, m.end())
+        end = close.start() if close else -1
         if end == -1:
             bodies.append(html[m.end() :])
             break
@@ -517,8 +526,11 @@ class TestPayloadBudget:
     # Then from 1,210,000 by `markSpan` / `markSize` and the ten call
     # sites that order a pair before drawing it. 1,343 bytes, of which
     # the two functions are 240 and the rest is the comment naming what
-    # produced 904 `<rect> attribute width` errors on one page.
-    KIT_BUDGET_BYTES = 1_213_000
+    # produced 904 `<rect> attribute width` errors on one page. Then from
+    # 1,213,000 by the five long-token declarations and by one heading
+    # slug rule replacing three: 975 bytes, nearly all of it the two
+    # comments saying which languages the old rules dropped.
+    KIT_BUDGET_BYTES = 1_215_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

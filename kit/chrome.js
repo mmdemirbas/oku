@@ -2299,9 +2299,16 @@ class PageToc extends HTMLElement {
 customElements.define('page-toc', PageToc);
 
 /* ============ TOC builder + scroll-spy ============ */
+/* The same rule as renderer.js and `_md_slug`. It used to name six
+   Turkish letters explicitly, which is what patching one language at
+   a time looks like: every other script still collapsed to nothing,
+   so two Chinese h3s under one section got the same id. */
 function slugify(text) {
-  return text.toLowerCase()
-    .replace(/[^a-z0-9çğıöşü]+/g, '-')
+  return String(text).toLowerCase().normalize('NFC')
+    .replace(/[^\p{L}\p{N}\s_-]+/gu, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '');
 }
 
@@ -4950,7 +4957,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-23-r64';
+var __okuKitBuild = '2026-08-23-r65';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

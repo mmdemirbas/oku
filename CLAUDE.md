@@ -327,9 +327,11 @@ no disabled state to explain. Two letters, never a flag (which names a
 country) and never a word (which would have to be written in the
 language the reader has not chosen). It carries the `#fragment` across,
 which is why **a translation's anchors must be identical to its
-original's** — `{#id}` is copied verbatim, and a heading the English
-side leaves to the slugifier gets its id pinned explicitly on the
-translated side, because `slugify` strips non-ASCII.
+original's** — `{#id}` is copied verbatim, and a heading whose title
+differs between the two languages needs the id pinned on both sides.
+Pinning is no longer forced by the slugifier: it keeps the letters now
+(see the slug rule below), so a Turkish heading gets a Turkish id and a
+translated page that reuses the original's headings needs nothing.
 
 **No auto-redirect on load.** A reader who opens a URL gets the page at
 that URL; sending them elsewhere breaks the back button and makes a
@@ -622,6 +624,45 @@ names these classes. Both halves are pinned by
 `test_the_kit_gives_a_hand_drawn_svg_somewhere_to_get_colour` — a
 vocabulary nothing points at goes unused, and a check that says "use
 the classes" without naming them is one authors ignore.
+
+**A heading's id is one rule, computed in three places.** `_md_slug` in
+cli.py, `slugify` in renderer.js and `slugify` in chrome.js must give
+the same answer, because `oku check` validates a page's `#fragment`
+links against the first, the second is the id the reader lands on, and
+the third names the h3s under a section. They disagreed for anything not
+written in English: Python's `\w` is Unicode-aware, renderer.js stripped
+`[^a-z0-9\s-]`, and chrome.js named six Turkish letters explicitly —
+which is what patching one language at a time looks like.
+
+What that cost: `## Özet` got the id `zet`; `## 概述` got the empty string
+and fell back to a positional `sec-3` that MOVES when a section is
+inserted above it; two Chinese h3s under one section got the same id;
+`[Özet](#özet)` passed `oku check` and landed nowhere; and in the other
+direction the check reported a `duplicate-anchor` between an h2 and an
+h3 whose DOM ids differ, refusing to build a page that was fine. The
+escape hatch had the same defect one layer up — the renderer's explicit
+`\{#([\w-]+)\}` used JavaScript's ASCII `\w`, so `{#a-özet}` missed the
+group and rendered as literal text inside the heading.
+
+The rule now: lowercase, **compose to NFC**, drop everything that is not
+a letter, number, space, `_` or `-`, whitespace runs to `-`, hyphen runs
+to `-`, trim. NFC is what makes one title give one id whichever
+normalisation form it was typed in; dropping what survives composition
+is what turns a lowercased `İ` — `i` plus a combining dot — into the
+plain `i` a Turkish author would type into a link. An empty result is
+the caller's to name: `"section"` for the check, a positional id for the
+renderer, which cannot collide. Not GitHub's slugger, which keeps runs
+of hyphens (`A - B` is `a-b` here, `a---b` there); that predates this and
+changing it would move every existing id. Held end to end by
+`test_heading_slug.py` — the id Python predicts is read off the rendered
+DOM for a heading in nine scripts, and every authored link must land.
+
+One more thing fell out of it, in the test helper rather than the kit:
+`str.lower()` is not length-preserving, so `html.lower().find("</script")`
+returns an index into a string one character longer than the one being
+sliced. It had been correct for as long as no kit file contained an `İ`.
+**Never do index arithmetic on a case-folded copy** — search the
+original case-insensitively instead.
 
 **Every kit box that holds author text may be narrower than its longest
 word.** A grid or flex item defaults to `min-width: auto`, so it refuses

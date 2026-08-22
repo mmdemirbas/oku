@@ -33,6 +33,7 @@ import mimetypes
 import os
 import queue
 import re
+import unicodedata
 import shlex
 import shutil
 import subprocess
@@ -724,10 +725,37 @@ def iter_page_stubs(root: Path, json_pages: list | None = None):
 
 
 def _md_slug(text: str) -> str:
-    """ATX-heading style id: lowercase, non-alnum → '-', trimmed."""
-    s = re.sub(r"[^\w\s-]", "", text.lower()).strip()
-    s = re.sub(r"[\s_]+", "-", s)
-    return s.strip("-") or "section"
+    """ATX-heading style id: lowercase, punctuation dropped, spaces → '-'.
+
+    The body of this function is mirrored EXACTLY by `slugify` in
+    kit/renderer.js and in kit/chrome.js, and `test_heading_slug.py`
+    holds the three against each other. The reason is one defect wearing
+    three hats: `oku check` validates a page's `#fragment` links against
+    THIS answer, the renderer writes the id the reader actually lands on,
+    and chrome.js names the h3s under a section. When they disagreed, a
+    Turkish `## Özet` got the id `zet`, a Chinese heading got a
+    positional `sec-3` that moves when a section is inserted above it,
+    and `[Özet](#özet)` passed the check and landed nowhere.
+
+    Composed first, then marks dropped. NFC is what makes the same title
+    give the same id whichever normalisation form it was typed in — a
+    decomposed `é` is `e` plus an acute, and without the compose step it
+    would slug as `e` while the composed one slugs as `é`. Marks that
+    survive composition are then dropped, which is what turns a
+    lowercased `İ` — `i` plus a combining dot — into the plain `i` a
+    Turkish author would type into a link.
+
+    An empty result is the CALLER's decision — the check wants a name it
+    can report, the renderer wants a positional id that cannot collide.
+
+    Not identical to GitHub's slugger, which keeps runs of hyphens: a
+    heading `A - B` is `a-b` here and `a---b` there. That difference
+    predates this and changing it would move every existing id.
+    """
+    s = re.sub(r"[^\w\s-]", "", unicodedata.normalize("NFC", text.lower())).strip()
+    s = re.sub(r"\s+", "-", s)
+    s = re.sub(r"-+", "-", s)
+    return s.strip("-")
 
 
 def _strip_md_front_matter(text: str) -> tuple[str, dict]:
@@ -2192,7 +2220,7 @@ def _load_registry(kit_dir: Path, kind: str) -> dict:
     return out
 
 
-_MD_HEADING_LINE_RE = re.compile(r"^(#{1,6})\s+(.*?)(?:\s*\{#([A-Za-z][\w-]*)\})?\s*$")
+_MD_HEADING_LINE_RE = re.compile(r"^(#{1,6})\s+(.*?)(?:\s*\{#([\w-]+)\})?\s*$")
 # Registry ids are human-readable keys, spaces included ("Iceberg paper",
 # "Time travel") — a \w-only id silently skipped most real references,
 # so unresolved ones were never reported.
@@ -2583,7 +2611,7 @@ def _lint_md_string(
             )
         hm = _MD_HEADING_LINE_RE.match(line)
         if hm:
-            heading_ids.append((lineno, hm.group(3) or _md_slug(hm.group(2))))
+            heading_ids.append((lineno, hm.group(3) or _md_slug(hm.group(2)) or "section"))
         if not skip_prose:
             for pat in _FORBIDDEN_PROSE_PATTERNS:
                 m = pat.search(line)
