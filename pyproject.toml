@@ -80,6 +80,22 @@ include = [
     "kit/",
     "README.md",
 ]
+# Every `_oku` is a symlink to ../kit — `oku init` drops one beside each
+# page directory, and this repo has three. hatchling dedupes directories
+# by (st_dev, st_ino) as it walks, and `docs` and `examples` both sort
+# before `kit`, so the kit's real inode was consumed under a name that
+# matches no include pattern; `kit/` was then skipped as already seen.
+# The include spec said yes to `kit/chrome.js` the whole time — the walk
+# simply never offered it. The sdist shipped 9 files with no kit asset
+# among them, and `uv build` then failed on the wheel it builds FROM
+# that sdist: "Forced include not found: kit/chrome-boot.js".
+#
+# The glob rather than the two names: a fourth page directory gets an
+# `_oku` on the day someone runs `oku init` in it, and a release that
+# breaks then would be traced back to this file with nothing here
+# saying why.
+exclude = ["**/_oku"]
+skip-excluded-dirs = true
 
 [tool.uv]
 managed = true

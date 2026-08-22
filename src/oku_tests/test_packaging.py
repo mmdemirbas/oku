@@ -13,6 +13,7 @@ So the list is checked against the directory rather than trusted.
 
 from __future__ import annotations
 
+import shutil
 import tomllib
 from pathlib import Path
 
@@ -94,3 +95,78 @@ def test_every_kit_entry_lands_under_the_assets_root(force_include: dict[str, st
     )
 
     assert astray == [], astray
+
+
+# ---------- the source distribution ----------
+#
+# The list above is checked against the directory, and both agreed while
+# `uv build` was failing outright: the sdist held nine files and not one
+# kit asset, so the wheel built FROM it died on the first force-include.
+# A test that reads configuration cannot see that — only one that builds
+# can.
+
+
+def _sdist_names(repo_root: Path, tmp_path: Path) -> list[str]:
+    import subprocess
+    import tarfile
+
+    out = tmp_path / "dist"
+    proc = subprocess.run(
+        ["uv", "build", "--sdist", "--out-dir", str(out)],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    tarballs = sorted(out.glob("*.tar.gz"))
+    assert tarballs, f"uv build wrote no sdist: {proc.stdout[-500:]}"
+    with tarfile.open(tarballs[0]) as tf:
+        return tf.getnames()
+
+
+def test_the_sdist_carries_every_file_the_wheel_force_includes(
+    repo_root: Path, tmp_path: Path, force_include: dict[str, str]
+) -> None:
+    """`uv build` builds the wheel from the sdist, so a source path
+    missing there is a release that cannot be built at all — and the
+    error names one file, which reads like a typo rather than an empty
+    tree.
+
+    The cause was symlinks: every `_oku` beside a page directory points
+    at `../kit`, hatchling dedupes directories by inode as it walks, and
+    `docs` and `examples` both sort before `kit`. The kit's inode was
+    consumed under a name no include pattern matched, and `kit/` was
+    skipped as already seen.
+    """
+    if shutil.which("uv") is None:
+        pytest.skip("uv is not on PATH")
+    names = _sdist_names(repo_root, tmp_path)
+    prefix = next((n.split("/")[0] for n in names if "/" in n), "")
+    present = {n[len(prefix) + 1 :] for n in names}
+
+    missing = []
+    for source in force_include:
+        src_path = repo_root / source
+        if src_path.is_dir():
+            wanted = {
+                str(f.relative_to(repo_root))
+                for f in src_path.rglob("*")
+                if f.is_file() and f.name not in IGNORED
+            }
+        else:
+            wanted = {source}
+        missing.extend(sorted(w for w in wanted if w not in present))
+
+    assert missing == [], f"the sdist is missing {len(missing)} kit file(s): {missing[:5]}"
+
+
+def test_a_new_oku_symlink_cannot_reintroduce_it(repo_root: Path) -> None:
+    """The exclusion is a glob, not the two paths that happened to exist:
+    a fourth page directory gets an `_oku` the day someone runs
+    `oku init` in it."""
+    data = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
+    sdist = data["tool"]["hatch"]["build"]["targets"]["sdist"]
+
+    assert "**/_oku" in sdist.get("exclude", [])
+    assert sdist.get("skip-excluded-dirs") is True
