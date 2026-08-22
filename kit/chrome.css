@@ -3760,11 +3760,20 @@ table tbody tr[tabindex] {
    cursor. While dragging, the table gains .okt-table-resizing to
    silence pointer events on body text and force the resize cursor
    across the whole document. */
+/* The grab zone sits INSIDE its own cell, and that is the whole rule.
+   Straddling the boundary (`right: -3px`) reads as the obvious way to
+   write it — the pointer is aiming at a line between two columns — and
+   it does not work: a `th` is positioned, later siblings paint over
+   earlier ones, so the next cell covered the outer two-thirds. Of six
+   pixels the reader could see, two answered; the visible grip line was
+   in the dead part, and a click on it sorted the next column instead of
+   resizing this one. Ten pixels inside the cell is both a real target
+   and one nothing can paint over. */
 .okt-col-resize {
   position: absolute;
   top: 0;
-  right: -3px;
-  width: 6px;
+  right: 0;
+  width: 10px;
   height: 100%;
   cursor: ew-resize;
   z-index: 3;
@@ -3774,7 +3783,7 @@ table tbody tr[tabindex] {
   content: '';
   position: absolute;
   top: 6px;
-  right: 2px;
+  right: 1px;
   bottom: 6px;
   width: 2px;
   background: transparent;

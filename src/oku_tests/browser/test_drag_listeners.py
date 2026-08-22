@@ -1,4 +1,4 @@
-"""A drag binds its window pair on press and releases it on release.
+"""What a drag binds, and where the reader has to aim to start one.
 
 Three drags in the kit bound `mousemove` + `mouseup` on `window` or
 `document` permanently, at the moment the thing became draggable rather
@@ -21,6 +21,9 @@ life of the document, and a retained subtree per lightbox open.
 Both halves are asserted here. A drag that no longer leaks but no
 longer works is not a fix, so each count assertion is paired with the
 behaviour it protects.
+
+The last test is a different property of the same feature, found while
+aiming the column drag: the grab zone has to be inside its own cell.
 """
 
 from __future__ import annotations
@@ -222,14 +225,9 @@ def test_a_column_still_resizes_and_gives_its_handlers_back(counted) -> None:
     before = counts(counted)
     box = handle.bounding_box()
     y = box["y"] + box["height"] / 2
-    # One pixel in from the LEFT edge, not the middle. The handle is
-    # `right: -3px`, so its right two-thirds sit inside the next `th`
-    # and the pointer lands on that cell instead — a separate finding,
-    # on the board. Aiming at the middle here would test that defect
-    # rather than this one.
-    counted.mouse.move(box["x"] + 1, y)
+    counted.mouse.move(box["x"] + box["width"] / 2, y)
     counted.mouse.down()
-    counted.mouse.move(box["x"] + 1 + 90, y, steps=4)
+    counted.mouse.move(box["x"] + box["width"] / 2 + 90, y, steps=4)
     during = counts(counted)
     width = counted.evaluate("() => document.querySelector('table colgroup col').style.width")
     counted.mouse.up()
@@ -259,3 +257,34 @@ def test_a_chart_still_pans_and_gives_its_handlers_back(counted) -> None:
     assert during["document:mousemove"] == before["document:mousemove"] + 1, during
     assert view_after != view_before, "the chart did not pan"
     assert counts(counted) == before
+
+
+def test_the_whole_resize_handle_answers_the_pointer(counted) -> None:
+    """The grab zone has to be inside its own cell. Straddling the
+    column boundary (`right: -3px`) reads as the obvious way to write
+    it — the reader is aiming at a line between two columns — and it
+    does not work: a `th` is positioned, later siblings paint over
+    earlier ones, so the next cell covered the outer two-thirds.
+
+    Measured before: of six visible pixels, two answered, and the grip
+    line the reader can see was in the dead part, where a click sorted
+    the NEXT column instead of resizing this one.
+    """
+    handle = counted.query_selector("table th .okt-col-resize")
+    handle.scroll_into_view_if_needed()
+    counted.wait_for_timeout(120)
+    measured = counted.evaluate("""() => {
+      const h = document.querySelector('table th .okt-col-resize');
+      const own = h.parentElement;
+      const r = h.getBoundingClientRect();
+      const at = [];
+      for (let dx = 1; dx < Math.round(r.width); dx++) {
+        const e = document.elementFromPoint(r.x + dx, r.y + r.height / 2);
+        at.push(e === h ? 'handle' : e === own ? 'own th' : e ? e.tagName : 'nothing');
+      }
+      const grip = getComputedStyle(h, '::after');
+      return { width: Math.round(r.width), at, gripRight: grip.right };
+    }""")
+    assert measured["width"] >= 8, f"the grab zone is {measured['width']}px wide"
+    dead = [i + 1 for i, v in enumerate(measured["at"]) if v != "handle"]
+    assert dead == [], f"px {dead} of {measured['width']} do not reach the handle: {measured['at']}"
