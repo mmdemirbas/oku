@@ -165,6 +165,9 @@ var __okuLightbox = (function () {
     // original content node (and can return it to the page).
     var stage = holder && holder.querySelector(':scope > .okt-lightbox-pz');
     if (stage) {
+      // A drag still in flight has a window pair bound; the mouseup that
+      // would release it is about to land on nothing.
+      if (typeof stage._okuReleaseDrag === 'function') stage._okuReleaseDrag();
       var inner = stage.querySelector('.okt-lightbox-pz-inner');
       if (inner) {
         while (inner.firstChild) holder.appendChild(inner.firstChild);
@@ -285,26 +288,41 @@ var __okuPanZoom = (function () {
       var factor = Math.exp(-dy * 0.0025);
       zoomAt(ev.clientX, ev.clientY, factor);
     }, { passive: false });
-    // Drag to pan.
+    /* Drag to pan. The window pair is bound on press and released on
+       release — the kit's rule for every drag, and here it is a leak
+       as well as a cost: attach() runs on EVERY lightbox open, so the
+       permanent version added one mousemove and one mouseup per open
+       (measured 1 -> 11 over ten open/close cycles), each holding this
+       stage and its cloned figure alive for the rest of the session. */
     var dragging = false, lastX = 0, lastY = 0;
-    stage.addEventListener('mousedown', function (ev) {
-      if (ev.button !== 0) return;
-      if (ev.target.closest('.okt-lightbox-pz-toolbar')) return;
-      dragging = true; lastX = ev.clientX; lastY = ev.clientY;
-      stage.classList.add('panning');
-      ev.preventDefault();
-    });
-    window.addEventListener('mousemove', function (ev) {
+    function onPanMove(ev) {
       if (!dragging) return;
       tx += ev.clientX - lastX;
       ty += ev.clientY - lastY;
       lastX = ev.clientX; lastY = ev.clientY;
       apply();
-    });
-    window.addEventListener('mouseup', function () {
-      if (!dragging) return;
+    }
+    function onPanUp() {
       dragging = false;
       stage.classList.remove('panning');
+      releasePan();
+    }
+    function releasePan() {
+      window.removeEventListener('mousemove', onPanMove);
+      window.removeEventListener('mouseup', onPanUp);
+    }
+    // Escape closes the lightbox mid-drag, and the mouseup that would
+    // have released the pair arrives on a stage that is gone. close()
+    // calls this.
+    stage._okuReleaseDrag = releasePan;
+    stage.addEventListener('mousedown', function (ev) {
+      if (ev.button !== 0) return;
+      if (ev.target.closest('.okt-lightbox-pz-toolbar')) return;
+      dragging = true; lastX = ev.clientX; lastY = ev.clientY;
+      stage.classList.add('panning');
+      window.addEventListener('mousemove', onPanMove);
+      window.addEventListener('mouseup', onPanUp);
+      ev.preventDefault();
     });
     // Touch — single-finger drag, two-finger pinch.
     var pointers = new Map();
@@ -3699,7 +3717,25 @@ function initReadingAids() {
         handle.className = 'okt-col-resize';
         handle.setAttribute('aria-hidden', 'true');
         th.appendChild(handle);
+        // One pair per COLUMN, bound permanently, was 14 mousemove and
+        // 14 mouseup handlers on this repo's own tables page before a
+        // reader had touched anything — and this pass runs again for
+        // every table in a file opened in the markdown viewer, whose
+        // tables then go away and leave their handlers behind. Bound on
+        // press, released on release.
         var dragging = false, startX = 0, startW = 0, col;
+        function onResizeMove(ev) {
+          if (!dragging) return;
+          var dx = ev.clientX - startX;
+          var w = Math.max(48, startW + dx);
+          if (col) col.style.width = w + 'px';
+        }
+        function onResizeUp() {
+          dragging = false;
+          table.classList.remove('okt-table-resizing');
+          window.removeEventListener('mousemove', onResizeMove);
+          window.removeEventListener('mouseup', onResizeUp);
+        }
         handle.addEventListener('mousedown', function (ev) {
           ev.preventDefault();
           dragging = true;
@@ -3709,17 +3745,8 @@ function initReadingAids() {
           table.classList.add('okt-table-resizing');
           table.style.tableLayout = 'fixed';
           if (col && !col.style.width) col.style.width = startW + 'px';
-        });
-        window.addEventListener('mousemove', function (ev) {
-          if (!dragging) return;
-          var dx = ev.clientX - startX;
-          var w = Math.max(48, startW + dx);
-          if (col) col.style.width = w + 'px';
-        });
-        window.addEventListener('mouseup', function () {
-          if (!dragging) return;
-          dragging = false;
-          table.classList.remove('okt-table-resizing');
+          window.addEventListener('mousemove', onResizeMove);
+          window.addEventListener('mouseup', onResizeUp);
         });
       });
     })();
@@ -4861,7 +4888,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-22-r56';
+var __okuKitBuild = '2026-08-22-r57';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -11340,6 +11367,7 @@ class OkuChart extends HTMLElement {
         rect: svg.getBoundingClientRect(),
       };
       svg.style.cursor = 'grabbing';
+      bindDrag();
       e.preventDefault();
     });
     function onMove(e) {
@@ -11373,9 +11401,21 @@ class OkuChart extends HTMLElement {
         var svg = getSvg();
         if (svg) svg.style.cursor = 'grab';
       }
+      releaseDrag();
     }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup',   onUp);
+    // Bound on press, released on release. Permanent, this was one
+    // mousemove and one mouseup per zoomable chart on the page — ten of
+    // each on this repo's own charts page, all of them running on every
+    // pointer move for the life of the document, and all of them holding
+    // a chart the reconfigure popover may since have replaced.
+    function bindDrag() {
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup',   onUp);
+    }
+    function releaseDrag() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    }
 
     // Touch — single finger pan, two finger pinch zoom.
     this.addEventListener('touchstart', function (e) {

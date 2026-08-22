@@ -506,9 +506,14 @@ class TestPayloadBudget:
     # pass on Mermaid: five cScale entries and the crit colours read
     # from tokens instead of literals, plus `darkMode`, plus the
     # navigation token and the scroll-behaviour helper. 1.6 KB, most
-    # of it the comments that say why. The gap is headroom for a
-    # feature, not for drift.
-    KIT_BUDGET_BYTES = 1_200_000
+    # of it the comments that say why. Then from 1,200,000 by the inert
+    # markdown viewer (`makeInert`, the notice the viewer draws, and the
+    # comment naming the two orderings that are load-bearing) and by
+    # binding the three drags on press instead of permanently. 864 bytes
+    # over, most of it prose. The gap is headroom for a feature, not for
+    # drift — and the kit's comment share is on the board as its own
+    # row, which is where a real answer to this number lives.
+    KIT_BUDGET_BYTES = 1_210_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
