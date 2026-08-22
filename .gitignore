@@ -50,3 +50,12 @@ tmp/
 
 # Fetched once by `oku vendor`; 3.3 MB of mermaid + Prism, not authored content.
 kit/vendor/
+
+# Coverage runs write these to the working directory, and `--cov` is the
+# first thing anyone reaches for when auditing this suite. `.coverage`
+# alone is not enough: parallel runs write `.coverage.<host>.<pid>.<rand>`
+# beside it, and one of those sat untracked in src/ after a review pass.
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
