@@ -41,7 +41,11 @@ TABLE = {
     "k": "table",
     "headers": ["Engine", {"label": "Tags", "filter": "chips", "values": ["fast", "slow"]}, "Notes"],
     "rows": [
-        ["Spark", {"values": ["fast"]}, "A long note so the table has something to lay out across the column."],
+        [
+            "Spark",
+            {"values": ["fast"]},
+            "A long note so the table has something to lay out across the column.",
+        ],
         ["Flink", {"values": ["slow"]}, "Another long note, long enough to make the row wrap on paper."],
     ],
 }
@@ -189,6 +193,8 @@ def test_the_warning_count_can_be_read_in_both_themes(browser, served) -> None:
                 }""",
                 [LUM, theme],
             )
-            assert m["ratio"] >= MIN_TEXT_RATIO, f"{theme}: count badge is {m['ratio']}:1 ({m['fg']} on {m['bg']})"
+            assert m["ratio"] >= MIN_TEXT_RATIO, (
+                f"{theme}: count badge is {m['ratio']}:1 ({m['fg']} on {m['bg']})"
+            )
     finally:
         pg.close()

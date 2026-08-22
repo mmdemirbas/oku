@@ -143,4 +143,4 @@ def test_a_url_that_is_not_a_url_is_dropped_rather_than_rendered() -> None:
     domain is meant to be shared between projects."""
     js = (KIT / "chrome.js").read_text(encoding="utf-8")
     assert "function __okuSafeUrl(" in js
-    assert "'<div class=\"okt-link\"><a href=\"' + link +" not in js
+    assert '\'<div class="okt-link"><a href="\' + link +' not in js

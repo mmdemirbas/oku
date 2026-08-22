@@ -30,7 +30,9 @@ KIT = Path(__file__).resolve().parents[3] / "kit"
 PANELS = [
     {
         "title": name,
-        "series": [{"label": "rps", "color": "accent", "data": [{"x": i, "y": 10 + i * step} for i in range(1, 7)]}],
+        "series": [
+            {"label": "rps", "color": "accent", "data": [{"x": i, "y": 10 + i * step} for i in range(1, 7)]}
+        ],
     }
     for name, step in (("eu-west", 4), ("us-east", -1), ("ap-south", 9), ("sa-east", 0))
 ]
