@@ -2818,9 +2818,19 @@
       }
       const grid = document.createElement('div');
       grid.className = 'okt-chart-grid-cells';
+      // `cols` is a MAXIMUM, not a fixed count. Pinned at
+      // `repeat(N, minmax(0, 1fr))` it held four columns at 360px too,
+      // where each panel's chart measured 13x7 CSS pixels — a figure
+      // that is present, valid and unreadable. The track floor makes
+      // auto-fit drop to fewer columns when N of them will not fit,
+      // and the per-track cap keeps it from exceeding N when they do.
       const cols = +block.cols;
+      const GAP = 16;      // matches .okt-chart-grid-cells
+      const FLOOR = 150;   // narrowest panel still worth drawing
       if (cols && cols > 0) {
-        grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
+        const share = 'calc((100% - ' + (cols - 1) * GAP + 'px) / ' + cols + ')';
+        grid.style.gridTemplateColumns =
+          'repeat(auto-fit, minmax(max(' + FLOOR + 'px, ' + share + '), 1fr))';
       } else {
         grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
       }

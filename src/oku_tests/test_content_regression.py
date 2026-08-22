@@ -183,8 +183,9 @@ class TestTablePrimitive:
 
     def test_chip_cells_use_object_form(self, reference: dict) -> None:
         """Cells under chip columns must declare a `values` array."""
+        checked = 0
         for block in _walk_blocks(reference):
-            if block.get("kind") != "table":
+            if _block_kind(block) != "table":
                 continue
             chip_cols = []
             for i, h in enumerate(block.get("headers", [])):
@@ -200,7 +201,13 @@ class TestTablePrimitive:
                     assert isinstance(cell, dict) and isinstance(cell.get("values"), list), (
                         f"chip column {col} has a non-object cell: {cell!r}"
                     )
-            return  # one chip-filtered table is enough
+            checked += 1
+            break
+        # `block.get("kind")` against a v2 page matched nothing, so this
+        # walked 661 blocks, entered none of them, and passed on an empty
+        # loop. A test that cannot fail is worse than no test: it reads
+        # as coverage.
+        assert checked, "no chip-filtered table found to check — the walk matched nothing"
 
 
 # ---------- tldr primitive ----------
@@ -353,16 +360,24 @@ class TestRoadmapAndCleanup:
         project-meta-excluded callout. Scope: the primitive-reference
         pages only — the roadmap legitimately mentions the phrase in
         the historical narrative."""
-        primitive_docs = (
-            "reference.json",
-            "charts.json",
-            "diagrams.json",
-            "tables.json",
-        )
-        for name in primitive_docs:
-            path = repo_root / "docs" / name
-            if not path.exists():
+        primitive_docs = ("reference", "charts", "diagrams", "tables")
+        read = 0
+        for stem in primitive_docs:
+            # These were .json before the markdown migration; the loop
+            # kept `continue`-ing past four names that no longer exist
+            # and asserted nothing at all.
+            path = next(
+                (
+                    repo_root / "docs" / f"{stem}{ext}"
+                    for ext in (".md", ".json")
+                    if (repo_root / "docs" / f"{stem}{ext}").exists()
+                ),
+                None,
+            )
+            if path is None:
                 continue
+            read += 1
+            name = path.name
             text = path.read_text(encoding="utf-8")
             assert "Not in the converter" not in text, (
                 f"'Not in the converter' must be retired from {name} (P0)"
@@ -370,6 +385,7 @@ class TestRoadmapAndCleanup:
             assert "Project-meta files excluded" not in text, (
                 f"'Project-meta files excluded' must be retired from {name} (P0)"
             )
+        assert read, "none of the primitive-reference pages were found to read"
 
     def test_cli_section_counts_five_commands(self, index_json: dict) -> None:
         sf = next(
@@ -1349,192 +1365,70 @@ class TestChromeKitMarkers:
         boot = (repo_root / "kit" / "chrome-boot.js").read_text(encoding="utf-8")
         assert "drawer-open" not in boot, "drawer state belongs to chrome.js, not the boot script"
 
-    def test_no_unresolved_references_in_docs(self, repo_root: Path) -> None:
-        """Every glossary-term / ext-ref / anchor link in docs must resolve.
+    # Two tests stood here and neither could fail.
+    #
+    # `test_no_unresolved_references_in_docs` carried its own resolver
+    # for glossary terms, ext-refs and anchors — 108 lines walking
+    # `docs/*.json` for `kind == "page"`, of which the docs tree now has
+    # zero: one `.json` remains (kit.json) and it is skipped by name.
+    # Appending `[x](#g/bogus-term-xyz)` and `[y](#no-such-anchor)` to
+    # `docs/reference.md` left it green. `oku check` implements the same
+    # four resolutions for real — `unresolved-glossary`, `-extref`,
+    # `-link`, `-anchor` — and `test_check.py::test_project_docs_pass_check_strict`
+    # runs it over this tree with zero warnings allowed. A second
+    # implementation in a test is how the two drift apart.
+    #
+    # `test_reference_code_samples_have_live_demos` guarded a v1 shape:
+    # a ```json sample naming a block kind, followed by a live block of
+    # that kind. It walked `data["blocks"]` on a v2 page keyed `b`, so it
+    # read 0 blocks of 66 — appending a sample with no demo left it
+    # green. The drift it guarded cannot occur in the v3 shape: an
+    # ```oku-<kind> fence IS the block, so the sample and the render are
+    # one source. What replaced it is
+    # `test_every_primitive_is_demonstrated_in_the_reference`, which
+    # holds the rule CLAUDE.md states — every primitive's example lives
+    # in docs/reference.md — against `_FENCE_KINDS`.
 
-        Audit findings on first run: 3 broken ext-refs in reference.json
-        (Iceberg paper, RFC 9457, Iceberg 1.4 release) — they were
-        authored but never defined in extrefs/*.json. The user explicitly
-        asked: "Identify the missing references in our docs and fix them."
+    def test_every_primitive_is_demonstrated_in_the_docs(self, repo_root: Path) -> None:
+        """A primitive an author can write, and cannot see anywhere.
 
-        Symbol tables:
-        - Glossary terms: union of `entries` keys across glossary/*.json
-          (case-insensitive match against the term `term` field).
-        - Ext-refs: union of `entries` keys across extrefs/*.json
-          (case-sensitive match against the `name` field).
-        - Anchors: each docs/*.json page collects every `id` from its
-          blocks recursively. `<link href="#foo">` resolves against the
-          current page's anchors; `<link href="page.html#foo">` against
-          the target page's anchors.
+        CLAUDE.md's rule is that every example lives inside the docs
+        tree next to the primitive's heading rather than on a demo
+        sibling page — so a primitive absent from every page is one the
+        reader can only discover by reading the schema. `chart-grid` was
+        that: validated, drawn, printable by `oku spec`, and demonstrated
+        on no page in either language.
+
+        Coverage is counted from the RENDERED kinds, not from fence tags:
+        most examples sit inside an `oku-example` payload, where the
+        typed block is the `output` value and no `oku-<kind>` fence
+        appears at all. A tag-level scan reported 11 of 14 kinds missing
+        when 11 of 14 were right there.
         """
-        glossary_terms: set[str] = set()
-        for p in (repo_root / "kit" / "glossary").glob("*.json"):
-            data = json.loads(p.read_text(encoding="utf-8"))
-            for term in (data.get("entries") or {}).keys():
-                glossary_terms.add(term.lower())
+        from oku.cli import _FENCE_KINDS, md_to_v2_page  # noqa: PLC0415
 
-        extref_names: set[str] = set()
-        for p in (repo_root / "kit" / "extrefs").glob("*.json"):
-            data = json.loads(p.read_text(encoding="utf-8"))
-            for name in (data.get("entries") or {}).keys():
-                extref_names.add(name)
+        seen: dict[str, list[str]] = {}
+        for page_path in sorted((repo_root / "docs").glob("*.md")):
+            page = md_to_v2_page(page_path.read_text(encoding="utf-8"), default_title=page_path.stem)
 
-        all_anchors: dict[str, set[str]] = {}
-        for p in (repo_root / "docs").glob("*.json"):
-            if p.name in ("kit.json", "site-manifest.json"):
-                continue
-            try:
-                data = json.loads(p.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                continue
-            if data.get("kind") != "page":
-                continue
-            ids: set[str] = set()
-
-            def collect(node):  # noqa: ANN001
+            def collect(node, name=page_path.name):
                 if isinstance(node, list):
-                    for x in node:
-                        collect(x)
+                    for item in node:
+                        collect(item, name)
                     return
                 if not isinstance(node, dict):
                     return
-                if isinstance(node.get("id"), str):
-                    ids.add(node["id"])
-                for k in ("content", "children", "blocks", "items"):
-                    if k in node:
-                        collect(node[k])
+                kind = node.get("k") or node.get("kind")
+                if isinstance(kind, str):
+                    seen.setdefault(kind, []).append(name)
+                for value in node.values():
+                    collect(value, name)
 
-            collect(data.get("blocks", []))
-            all_anchors[p.stem] = ids
+            collect(page.get("b") or [])
 
-        anchor_re = re.compile(r"([^#]+)\.html#(.+)$")
-        unresolved: list[str] = []
-
-        def walk(node, page: str, path: str) -> None:
-            if isinstance(node, list):
-                for i, x in enumerate(node):
-                    walk(x, page, f"{path}[{i}]")
-                return
-            if not isinstance(node, dict):
-                return
-            kind = node.get("kind")
-            if kind == "glossary-term":
-                term = (node.get("term") or "").lower()
-                if term and term not in glossary_terms:
-                    unresolved.append(f"{page}:{path} glossary-term {term!r} not in any glossary/*.json")
-            elif kind == "ext-ref":
-                name = node.get("name") or ""
-                if name and name not in extref_names:
-                    unresolved.append(f"{page}:{path} ext-ref {name!r} not in any extrefs/*.json")
-            elif kind == "link":
-                href = node.get("href") or ""
-                if href.startswith("#"):
-                    anchor = href[1:]
-                    if all_anchors.get(page) and anchor not in all_anchors[page]:
-                        unresolved.append(f"{page}:{path} local anchor {href!r} not found on this page")
-                else:
-                    m = anchor_re.match(href)
-                    if m:
-                        target = Path(m.group(1)).name
-                        anchor = m.group(2)
-                        if target in all_anchors and anchor not in all_anchors[target]:
-                            unresolved.append(
-                                f"{page}:{path} cross-page link {href!r} target page exists "
-                                "but anchor missing"
-                            )
-            for k in ("content", "children", "blocks", "items"):
-                if k in node:
-                    walk(node[k], page, f"{path}/{k}")
-
-        for p in (repo_root / "docs").glob("*.json"):
-            if p.name in ("kit.json", "site-manifest.json"):
-                continue
-            try:
-                data = json.loads(p.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                continue
-            if data.get("kind") != "page":
-                continue
-            walk(data.get("blocks", []), p.stem, "/blocks")
-
-        assert not unresolved, "Unresolved references:\n  " + "\n  ".join(unresolved)
-
-    def test_reference_code_samples_have_live_demos(self, repo_root: Path) -> None:
-        """Every code sample in docs/reference.json must have a matching demo.
-
-        Rule: when a `<code>` block contains JSON describing an html-doc
-        block (single top-level object with a `kind` field), one of the
-        next ≤4 sibling blocks must be a block of that kind, OR one of
-        those siblings must contain that kind as an inline element.
-
-        Prevents author-drift where someone edits the code sample but
-        forgets the live demo (or vice versa). User explicitly called
-        out: "Some examples are different than the rendered content
-        below it, some doesn't have a rendered counterpart at all."
-        """
-        page_path = repo_root / "docs" / "reference.md"
-        assert page_path.exists(), "docs/reference.md missing"
-        data = _docs_page(repo_root, "reference.json")
-
-        def inline_kinds(node, acc=None):
-            if acc is None:
-                acc = set()
-            if isinstance(node, list):
-                for item in node:
-                    inline_kinds(item, acc)
-                return acc
-            if not isinstance(node, dict):
-                return acc
-            kind = node.get("kind")
-            if isinstance(kind, str):
-                acc.add(kind)
-            for key in ("content", "children", "blocks", "items"):
-                if key in node:
-                    inline_kinds(node[key], acc)
-            return acc
-
-        issues = []
-
-        def walk(blocks, path):
-            for i, b in enumerate(blocks):
-                if isinstance(b, dict) and _block_kind(b) == "code":
-                    src = (b.get("source") or b.get("code") or "").strip()
-                    if not src.startswith("{") or not src.endswith("}"):
-                        continue
-                    try:
-                        parsed = json.loads(src)
-                    except json.JSONDecodeError:
-                        continue
-                    claimed = parsed.get("kind") if isinstance(parsed, dict) else None
-                    if not claimed:
-                        continue
-                    # Root-level kinds (page) are shown to document the
-                    # top-of-file structure, not as renderable blocks. No
-                    # demo can follow.
-                    if claimed == "page":
-                        continue
-                    found = False
-                    for j in range(i + 1, min(i + 5, len(blocks))):
-                        c = blocks[j]
-                        if not isinstance(c, dict):
-                            continue
-                        if _block_kind(c) == "heading" and j > i + 1:
-                            break
-                        if c.get("kind") == claimed:
-                            found = True
-                            break
-                        if claimed in inline_kinds(c):
-                            found = True
-                            break
-                    if not found:
-                        issues.append(f"{path}[{i}] claims kind={claimed!r} but no demo follows")
-                if isinstance(b, dict):
-                    for key in ("children", "blocks"):
-                        if isinstance(b.get(key), list):
-                            walk(b[key], f"{path}/{b.get('kind')}[{i}].{key}")
-
-        walk(data.get("blocks", []), "")
-        assert not issues, "reference.json drift:\n" + "\n".join(issues)
+        assert seen, "no pages were walked — the docs tree moved"
+        missing = sorted(k for k in _FENCE_KINDS if k not in seen)
+        assert missing == [], f"primitives with no example anywhere in docs/: {missing}"
 
     def test_markdown_pages_convert_to_kit_json(self, repo_root: Path) -> None:
         """cli.md_to_v2_page must surface Markdown sources as kit pages.
