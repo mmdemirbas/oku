@@ -2814,6 +2814,30 @@ def _known_chart_types() -> list[str]:
     return [t for t in enum if isinstance(t, str)]
 
 
+# Fields inside one row of a chart payload that carry an order. A pair
+# written the wrong way round is a data error the author can fix, and it
+# is not one a reader can see: the renderer orders the pair before it
+# draws (`markSpan` in chrome.js), so a box-plot with q3 below q1 draws a
+# perfectly ordinary box in the wrong place. Before that it drew nothing
+# at all and logged `<rect> attribute width: A negative value is not
+# valid` — which named the attribute and not the chart, so the report
+# that arrived said the kit was broken.
+#
+# Equality passes throughout. A zero-width bin or a task that starts and
+# ends in the same week is degenerate, not inverted, and a check that
+# guesses at intent is one authors learn to ignore.
+_CHART_ORDERED_PAIRS: dict[str, tuple[str, tuple[tuple[str, str], ...]]] = {
+    "box-plot": ("boxes", (("min", "q1"), ("q1", "median"), ("median", "q3"), ("q3", "max"))),
+    "range-bar": ("ranges", (("low", "mid"), ("mid", "high"), ("low", "high"))),
+    "histogram": ("bins", (("lo", "hi"),)),
+    "gantt": ("tasks", (("start", "end"),)),
+    "candlestick": (
+        "entries",
+        (("low", "open"), ("low", "close"), ("open", "high"), ("close", "high"), ("low", "high")),
+    ),
+}
+
+
 def _chart_shape_issues(blk: dict) -> list[tuple[str, str]]:
     """Chart payload sanity by type — friendlier than the raw schema
     error. Returns (code, message) tuples."""
@@ -2951,6 +2975,29 @@ def _chart_shape_issues(blk: dict) -> list[tuple[str, str]]:
             bad(
                 "chart-geo-missing-regions",
                 "chart with type:geo requires a `regions` array of {id, value, label?}.",
+            )
+
+    if ctype in _CHART_ORDERED_PAIRS:
+        key, pairs = _CHART_ORDERED_PAIRS[ctype]
+        flipped: list[str] = []
+        for i, row in enumerate(blk.get(key) or []):
+            if not isinstance(row, dict):
+                continue
+            for lower, upper in pairs:
+                a, b = row.get(lower), row.get(upper)
+                if isinstance(a, (int, float)) and isinstance(b, (int, float)) and a > b:
+                    who = row.get("label") or row.get("date") or f"{key}[{i}]"
+                    flipped.append(f"{who}: {lower} {a} is above {upper} {b}")
+        if flipped:
+            # One line per offending row would bury the page report under a
+            # 900-bin histogram; the first two say what the mistake is and
+            # the count says how far it goes.
+            more = f" (+{len(flipped) - 2} more)" if len(flipped) > 2 else ""
+            bad(
+                "chart-inverted-range",
+                f"chart with type:{ctype} has a range written the wrong way round — "
+                f"{'; '.join(flipped[:2])}{more}. The kit draws the pair in order, "
+                "so the figure looks right and reads wrong.",
             )
     return out
 

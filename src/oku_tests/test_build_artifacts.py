@@ -513,7 +513,12 @@ class TestPayloadBudget:
     # over, most of it prose. The gap is headroom for a feature, not for
     # drift — and the kit's comment share is on the board as its own
     # row, which is where a real answer to this number lives.
-    KIT_BUDGET_BYTES = 1_210_000
+    #
+    # Then from 1,210,000 by `markSpan` / `markSize` and the ten call
+    # sites that order a pair before drawing it. 1,343 bytes, of which
+    # the two functions are 240 and the rest is the comment naming what
+    # produced 904 `<rect> attribute width` errors on one page.
+    KIT_BUDGET_BYTES = 1_213_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

@@ -623,6 +623,35 @@ names these classes. Both halves are pinned by
 vocabulary nothing points at goes unused, and a check that says "use
 the classes" without naming them is one authors ignore.
 
+**A mark the kit draws never gets a negative extent.** Chrome refuses a
+negative `width` outright — the rect is not drawn at all, and the console
+says `<rect> attribute width: A negative value is not valid`, which names
+the attribute and not the chart, so the report that arrives says the kit
+broke. One page of adversarial payloads produced 904 of those lines. Two
+families reach it and both come from ordinary work: a gap subtracted from
+a cell thinner than the gap — 900 bins across a 576px plot give each bin
+0.64px, and the 1px inter-bar gap takes the width to -0.36 — and a pair
+written the wrong way round (`q3` below `q1`, `high` below `low`, `end`
+before `start`), where the span is the difference of two scaled
+coordinates. `markSpan(a, b, gap)` orders the pair, never lets the gap
+eat more than half the span, and floors the result at `MIN_MARK_PX`;
+`markSize` is the one-sided half. Ten call sites use them. The floor is
+sub-pixel (0.5) deliberately — at 900 bins the honest picture IS a dense
+band and a 1px floor would make every bar overlap its neighbour — but
+zero is not an option either, because a rect of width 0 draws nothing and
+cannot be hovered.
+
+The inverted pair is ALSO a data error the author can fix, and the
+renderer drawing it ordered is exactly what hides it: the figure looks
+right and reads wrong. So `oku check` reports `chart-inverted-range`
+naming the row and the two fields, for box-plot, range-bar, histogram,
+gantt and candlestick. Equality passes throughout — a zero-width bin is
+degenerate, not backwards, and a check that guesses at intent is one
+authors learn to ignore. Held by `test_chart_degenerate_payloads.py`,
+whose cases are derived from `kit/schema/examples.json` rather than
+listed: every shipped example mutated four ways, so a chart type added
+tomorrow is covered on the day it lands.
+
 **Timeline is not step-flow, and the difference is the point.** A
 step-flow is a procedure the reader is meant to follow, so every step
 is equally true. A timeline is a record of what happened, and an entry

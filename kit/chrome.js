@@ -4950,7 +4950,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-23-r62';
+var __okuKitBuild = '2026-08-23-r63';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -7651,7 +7651,7 @@ class OkuChart extends HTMLElement {
           label: rowLabel + ' × ' + colLabel,
           kv: [{ k: 'value', v: fmtNum(val) }]
         });
-        parts.push('<rect x="' + px + '" y="' + py + '" width="' + (cell - 2) + '" height="' + (cell - 2) + '" rx="3" fill="' + tone(val) + '" fill-opacity="' + alpha(val).toFixed(3) + '" class="okc-heatmap-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(rowLabel + ' × ' + colLabel + ': ' + fmtNum(val)) + '</title></rect>');
+        parts.push('<rect x="' + px + '" y="' + py + '" width="' + markSize(cell - 2) + '" height="' + markSize(cell - 2) + '" rx="3" fill="' + tone(val) + '" fill-opacity="' + alpha(val).toFixed(3) + '" class="okc-heatmap-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(rowLabel + ' × ' + colLabel + ': ' + fmtNum(val)) + '</title></rect>');
       }
     }
     parts.push('</svg>');
@@ -8119,6 +8119,7 @@ class OkuChart extends HTMLElement {
       parts.push('<line x1="' + sx(+b.min) + '" y1="' + (y - 7) + '" x2="' + sx(+b.min) + '" y2="' + (y + 7) + '" class="okc-boxplot-whisker"/>');
       parts.push('<line x1="' + sx(+b.max) + '" y1="' + (y - 7) + '" x2="' + sx(+b.max) + '" y2="' + (y + 7) + '" class="okc-boxplot-whisker"/>');
       // IQR box — rich hover surfaces all 5 quartile stats.
+      var iqr = markSpan(sx(+b.q1), sx(+b.q3), 0);
       var bpPayload = JSON.stringify({
         label: b.label || ('Box ' + (i + 1)),
         kv: [
@@ -8129,7 +8130,7 @@ class OkuChart extends HTMLElement {
           { k: 'max',    v: fmtNum(+b.max) }
         ].concat((b.outliers || []).length ? [{ k: 'outliers', v: (b.outliers || []).map(fmtNum).join(', ') }] : [])
       });
-      parts.push('<rect x="' + sx(+b.q1) + '" y="' + (y - 12) + '" width="' + (sx(+b.q3) - sx(+b.q1)) + '" height="24" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="okc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtNum(+b.min) + ', q1 ' + fmtNum(+b.q1) + ', med ' + fmtNum(+b.median) + ', q3 ' + fmtNum(+b.q3) + ', max ' + fmtNum(+b.max)) + '</title></rect>');
+      parts.push('<rect x="' + iqr.start + '" y="' + (y - 12) + '" width="' + iqr.size + '" height="24" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="okc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtNum(+b.min) + ', q1 ' + fmtNum(+b.q1) + ', med ' + fmtNum(+b.median) + ', q3 ' + fmtNum(+b.q3) + ', max ' + fmtNum(+b.max)) + '</title></rect>');
       // Median line.
       parts.push('<line x1="' + sx(+b.median) + '" y1="' + (y - 12) + '" x2="' + sx(+b.median) + '" y2="' + (y + 12) + '" stroke="' + color + '" stroke-width="2" class="okc-boxplot-median"/>');
       (b.outliers || []).forEach(function (o) {
@@ -8199,8 +8200,8 @@ class OkuChart extends HTMLElement {
           { k: 'max',    v: fmtNum(+b.max) }
         ].concat((b.outliers || []).length ? [{ k: 'outliers', v: (b.outliers || []).map(fmtNum).join(', ') }] : [])
       });
-      var top = sy(+b.q3), bot = sy(+b.q1);
-      parts.push('<rect x="' + (cx - bw / 2) + '" y="' + top + '" width="' + bw + '" height="' + (bot - top) + '" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="okc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtNum(+b.min) + ', q1 ' + fmtNum(+b.q1) + ', med ' + fmtNum(+b.median) + ', q3 ' + fmtNum(+b.q3) + ', max ' + fmtNum(+b.max)) + '</title></rect>');
+      var iqr = markSpan(sy(+b.q3), sy(+b.q1), 0);
+      parts.push('<rect x="' + (cx - bw / 2) + '" y="' + iqr.start + '" width="' + bw + '" height="' + iqr.size + '" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="okc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtNum(+b.min) + ', q1 ' + fmtNum(+b.q1) + ', med ' + fmtNum(+b.median) + ', q3 ' + fmtNum(+b.q3) + ', max ' + fmtNum(+b.max)) + '</title></rect>');
       // Median line (horizontal).
       parts.push('<line x1="' + (cx - bw / 2) + '" y1="' + sy(+b.median) + '" x2="' + (cx + bw / 2) + '" y2="' + sy(+b.median) + '" stroke="' + color + '" stroke-width="2" class="okc-boxplot-median"/>');
       (b.outliers || []).forEach(function (o) {
@@ -8258,7 +8259,7 @@ class OkuChart extends HTMLElement {
         label: t.label || 'metric',
         kv: bulletKv
       });
-      parts.push('<rect x="' + pad.left + '" y="' + (y + 6) + '" width="' + (sx(t.value) - pad.left) + '" height="10" rx="2" fill="' + color + '" class="okc-bullet-value" tabindex="0" data-hover-payload="' + escapeXml(bulletPayload) + '"><title>' + escapeXml((t.label || 'metric') + ': ' + fmtNum(+t.value || 0) + ' / ' + fmtNum(trackMax) + (typeof t.target === 'number' ? ' (target ' + fmtNum(t.target) + ')' : '')) + '</title></rect>');
+      parts.push('<rect x="' + pad.left + '" y="' + (y + 6) + '" width="' + markSize(sx(t.value) - pad.left) + '" height="10" rx="2" fill="' + color + '" class="okc-bullet-value" tabindex="0" data-hover-payload="' + escapeXml(bulletPayload) + '"><title>' + escapeXml((t.label || 'metric') + ': ' + fmtNum(+t.value || 0) + ' / ' + fmtNum(trackMax) + (typeof t.target === 'number' ? ' (target ' + fmtNum(t.target) + ')' : '')) + '</title></rect>');
       // Target tick.
       if (typeof t.target === 'number') {
         var tx = sx(t.target);
@@ -8384,13 +8385,14 @@ class OkuChart extends HTMLElement {
     parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     // Bars + x-axis edge ticks.
     bins.forEach(function (b, i) {
-      var x0 = sx(+b.lo), x1 = sx(+b.hi);
+      var x0 = sx(+b.lo);
+      var span = markSpan(x0, sx(+b.hi), 1);
       var top = sy(+b.count || 0);
       var payload = JSON.stringify({
         label: '[' + fmtNum(+b.lo) + ', ' + fmtNum(+b.hi) + ')',
         kv: [{ k: 'count', v: fmtNum(+b.count || 0) }]
       });
-      parts.push('<rect x="' + (x0 + 0.5) + '" y="' + top + '" width="' + (x1 - x0 - 1) + '" height="' + (pad.top + plotH - top) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
+      parts.push('<rect x="' + span.start + '" y="' + top + '" width="' + span.size + '" height="' + markSize(pad.top + plotH - top) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
       if (i === 0 || i === bins.length - 1 || (i % Math.max(1, Math.floor(bins.length / 6))) === 0) {
         parts.push('<line x1="' + x0 + '" y1="' + (pad.top + plotH) + '" x2="' + x0 + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
         parts.push('<text x="' + x0 + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(+b.lo)) + '</text>');
@@ -8438,13 +8440,14 @@ class OkuChart extends HTMLElement {
     }
     // Bins as horizontal bars.
     bins.forEach(function (b, i) {
-      var y0 = sy(+b.lo), y1 = sy(+b.hi);
-      var w = sx(+b.count || 0) - pad.left;
+      var y0 = sy(+b.lo);
+      var span = markSpan(y0, sy(+b.hi), 1);
+      var w = markSize(sx(+b.count || 0) - pad.left);
       var payload = JSON.stringify({
         label: '[' + fmtNum(+b.lo) + ', ' + fmtNum(+b.hi) + ')',
         kv: [{ k: 'count', v: fmtNum(+b.count || 0) }]
       });
-      parts.push('<rect x="' + pad.left + '" y="' + (y0 + 0.5) + '" width="' + w + '" height="' + (y1 - y0 - 1) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
+      parts.push('<rect x="' + pad.left + '" y="' + span.start + '" width="' + w + '" height="' + span.size + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
       // Y tick label (bin lower bound) at every other bin to avoid clutter.
       if (i === 0 || i === bins.length - 1 || (i % Math.max(1, Math.floor(bins.length / 6))) === 0) {
         parts.push('<line x1="' + (pad.left - 4) + '" y1="' + y0 + '" x2="' + pad.left + '" y2="' + y0 + '" class="okc-axis"/>');
@@ -10113,7 +10116,8 @@ class OkuChart extends HTMLElement {
       }
       var q1 = quantile(0.25), median = quantile(0.5), q3 = quantile(0.75);
       // IQR box.
-      parts.push('<rect x="' + xOf(q1).toFixed(1) + '" y="' + (rowMid - 5).toFixed(1) + '" width="' + (xOf(q3) - xOf(q1)).toFixed(1) + '" height="10" fill="' + color + '" fill-opacity="0.7" stroke="none"/>');
+      var vIqr = markSpan(xOf(q1), xOf(q3), 0);
+      parts.push('<rect x="' + vIqr.start.toFixed(1) + '" y="' + (rowMid - 5).toFixed(1) + '" width="' + vIqr.size.toFixed(1) + '" height="10" fill="' + color + '" fill-opacity="0.7" stroke="none"/>');
       // Median line.
       parts.push('<line x1="' + xOf(median).toFixed(1) + '" y1="' + (rowMid - 10).toFixed(1) + '" x2="' + xOf(median).toFixed(1) + '" y2="' + (rowMid + 10).toFixed(1) + '" stroke="var(--bg)" stroke-width="2"/>');
       // Label on the left.
@@ -10206,7 +10210,8 @@ class OkuChart extends HTMLElement {
       }
       var q1 = quantile(0.25), median = quantile(0.5), q3 = quantile(0.75);
       // IQR box (vertical).
-      parts.push('<rect x="' + (colMid - 5).toFixed(1) + '" y="' + yOf(q3).toFixed(1) + '" width="10" height="' + (yOf(q1) - yOf(q3)).toFixed(1) + '" fill="' + color + '" fill-opacity="0.7" stroke="none"/>');
+      var vIqr = markSpan(yOf(q3), yOf(q1), 0);
+      parts.push('<rect x="' + (colMid - 5).toFixed(1) + '" y="' + vIqr.start.toFixed(1) + '" width="10" height="' + vIqr.size.toFixed(1) + '" fill="' + color + '" fill-opacity="0.7" stroke="none"/>');
       // Median line.
       parts.push('<line x1="' + (colMid - 10) + '" y1="' + yOf(median).toFixed(1) + '" x2="' + (colMid + 10) + '" y2="' + yOf(median).toFixed(1) + '" stroke="var(--bg)" stroke-width="2"/>');
       // Category label at bottom.
@@ -10876,7 +10881,7 @@ class OkuChart extends HTMLElement {
       var laneMid = laneTop + laneH / 2;
       var color = palette[s.color] || palette.accent;
       // Background bg lane stripe so blank periods read as a row.
-      parts.push('<rect x="' + pad.left + '" y="' + laneTop + '" width="' + plotW + '" height="' + (laneH - 2) + '" fill="var(--surface-soft, rgba(127,127,127,0.06))" class="okc-horizon-lane"/>');
+      parts.push('<rect x="' + pad.left + '" y="' + laneTop + '" width="' + plotW + '" height="' + markSize(laneH - 2) + '" fill="var(--surface-soft, rgba(127,127,127,0.06))" class="okc-horizon-lane"/>');
       // Label.
       parts.push('<text x="' + (pad.left - 8) + '" y="' + (laneMid + 4) + '" text-anchor="end" class="okc-horizon-label">' + escapeXml(labelFit.fit(s.label || ('series ' + (si + 1)))) + '<title>' + escapeXml(s.label || ('series ' + (si + 1))) + '</title></text>');
       var values = (s.values || []).map(Number);
@@ -10888,7 +10893,7 @@ class OkuChart extends HTMLElement {
           var abs = Math.abs(v) || 0;
           var clip = Math.max(0, Math.min(bandSize, abs - bandFloor));
           var frac = clip / bandSize;
-          var y = (laneTop + laneH - 2) - frac * (laneH - 2);
+          var y = (laneTop + laneH - 2) - frac * markSize(laneH - 2);
           pathPts.push('L ' + xOf(i) + ' ' + y.toFixed(1));
         });
         pathPts.push('L ' + xOf(categories.length - 1) + ' ' + (laneTop + laneH - 2) + ' Z');
@@ -10905,7 +10910,7 @@ class OkuChart extends HTMLElement {
           label: (s.label || '') + ' · ' + categories[i],
           kv: [{ k: 'value', v: fmtNum(v) }]
         });
-        parts.push('<rect x="' + rectX + '" y="' + laneTop + '" width="' + w + '" height="' + (laneH - 2) + '" fill="transparent" class="okc-horizon-hit" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + categories[i] + ' · ' + fmtNum(v)) + '</title></rect>');
+        parts.push('<rect x="' + rectX + '" y="' + laneTop + '" width="' + w + '" height="' + markSize(laneH - 2) + '" fill="transparent" class="okc-horizon-hit" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + categories[i] + ' · ' + fmtNum(v)) + '</title></rect>');
       });
     });
     // X-axis category ticks at the bottom, sampled (≤6).
@@ -11147,6 +11152,7 @@ class OkuChart extends HTMLElement {
       var rl = +r.low, rh = +r.high;
       if (isNaN(rl) || isNaN(rh)) return;
       var xLo = sx(rl), xHi = sx(rh);
+      var band = markSpan(xLo, xHi, 0);
       var label = r.label || ('row ' + (i + 1));
       var midDisplay = r.mid != null ? fmtNum(+r.mid) : '';
       var payload = JSON.stringify({
@@ -11159,7 +11165,7 @@ class OkuChart extends HTMLElement {
       // Row label on the left.
       parts.push('<text x="' + (pad.left - 8) + '" y="' + (rowY + 4) + '" text-anchor="end" class="okc-range-row-label">' + escapeXml(labelFit.fit(label)) + '<title>' + escapeXml(label) + '</title></text>');
       // Range band — filled rect.
-      parts.push('<rect x="' + xLo.toFixed(1) + '" y="' + (rowY - bandH / 2) + '" width="' + (xHi - xLo).toFixed(1) + '" height="' + bandH + '" rx="3" fill="' + color + '" fill-opacity="0.45" stroke="' + color + '" stroke-opacity="0.85" class="okc-range-band" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · [' + fmtNum(rl) + ', ' + fmtNum(rh) + ']' + (midDisplay ? ' · mid ' + midDisplay : '')) + '</title></rect>');
+      parts.push('<rect x="' + band.start.toFixed(1) + '" y="' + (rowY - bandH / 2) + '" width="' + band.size.toFixed(1) + '" height="' + bandH + '" rx="3" fill="' + color + '" fill-opacity="0.45" stroke="' + color + '" stroke-opacity="0.85" class="okc-range-band" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · [' + fmtNum(rl) + ', ' + fmtNum(rh) + ']' + (midDisplay ? ' · mid ' + midDisplay : '')) + '</title></rect>');
       // Optional midpoint tick.
       if (r.mid != null && !isNaN(+r.mid)) {
         var mx = sx(+r.mid);
@@ -12639,6 +12645,42 @@ function okuTickAnchor(x, left, right) {
   if (x - left < 26) return 'start';
   if (right - x < 26) return 'end';
   return 'middle';
+}
+
+/* The smallest extent a mark is drawn at. Sub-pixel, because at 900
+   bins across 576px the honest picture IS a dense band and a 1px floor
+   would make every bar overlap its neighbour; positive, because a rect
+   of width 0 is drawn as nothing and cannot be hovered. */
+var MIN_MARK_PX = 0.5;
+
+/* A rect the kit draws never gets a negative width or height.
+
+   Chrome refuses the attribute outright — the mark is not drawn at all,
+   and the console says `<rect> attribute width: A negative value is not
+   valid`, which names the attribute and not the chart. One page of
+   adversarial payloads produced 904 of those lines.
+
+   Two things produce one, and they need the same two lines. A gap
+   subtracted from a cell thinner than the gap: a histogram of 900 bins
+   across a 576px plot gives each bin 0.64px, and the 1px inter-bar gap
+   takes it to -0.36. And a pair the author wrote the wrong way round —
+   q3 below q1, high below low — where the span is the difference of two
+   scaled coordinates. `oku check` reports the second as a data error,
+   because it is one; the renderer still draws it, ordered, rather than
+   dropping the mark and blaming the browser.
+
+   `gap` is shared between the two sides, matching the `x + 0.5` /
+   `width - 1` idiom this replaces, and is never allowed to eat more
+   than half the span. */
+function markSize(px) {
+  return px > MIN_MARK_PX ? px : MIN_MARK_PX;
+}
+
+function markSpan(a, b, gap) {
+  var lo = a < b ? a : b;
+  var hi = a < b ? b : a;
+  var g = Math.min(gap || 0, (hi - lo) / 2);
+  return { start: lo + g / 2, size: markSize(hi - lo - g) };
 }
 
 function fmtNum(n) {
