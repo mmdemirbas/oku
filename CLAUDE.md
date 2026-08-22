@@ -623,6 +623,31 @@ names these classes. Both halves are pinned by
 vocabulary nothing points at goes unused, and a check that says "use
 the classes" without naming them is one authors ignore.
 
+**Every kit box that holds author text may be narrower than its longest
+word.** A grid or flex item defaults to `min-width: auto`, so it refuses
+to shrink below the widest unbreakable run inside it — and author text
+holds those constantly: a class name, a config key, a path, a URL, a
+percent-encoded string. One of them in a card and the whole PAGE scrolls
+sideways. The fix is two declarations that go together: `min-width: 0`
+on the item so it can track its column, and `overflow-wrap: anywhere` on
+the text so the word breaks. `break-word` does not save it — that wraps
+a word only once the box is narrow, and the box is sized FROM the word;
+only `anywhere` lowers the min-content size the parent measures. An
+inline-block is the same defect wearing a different hat: it sizes to
+max-content, so it needs `max-width: 100%` beside the wrap. And
+`white-space: nowrap` cannot be rescued by either — with wrapping
+switched off there is no break opportunity to take, so a chip that must
+survive a long label gives up `nowrap` and relies on being `flex: none`
+to keep short labels on one line.
+
+Held by `test_narrow_no_sideways_scroll.py`, whose second page is
+derived from `kit/schema/examples.json` — every shipped example with the
+long token appended to every string it carries — and measured at 1440px
+as well as 360px and 320px. Desktop matters: a KPI numeral put the
+page's scrollWidth at 1818 against a 1440px viewport, and a suite that
+only measured narrow viewports would have stayed green while a desktop
+reader scrolled sideways.
+
 **A mark the kit draws never gets a negative extent.** Chrome refuses a
 negative `width` outright — the rect is not drawn at all, and the console
 says `<rect> attribute width: A negative value is not valid`, which names

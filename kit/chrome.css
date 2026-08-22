@@ -3037,7 +3037,11 @@ oku-annotated-code > pre {
   flex-shrink: 0;
   margin-top: 2px;
 }
-.okc-anno-body { font-size: 14px; line-height: 1.55; color: var(--text); flex: 1; }
+/* `flex: 1` sets a zero basis and leaves `min-width: auto`, which is
+   the part that refuses to shrink below the longest unbreakable run in
+   the annotation — and an annotation is prose about code, so it names
+   identifiers. */
+.okc-anno-body { font-size: 14px; line-height: 1.55; color: var(--text); flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .okc-anno-body p:first-child { margin-top: 0; }
 .okc-anno-body p:last-child  { margin-bottom: 0; }
 .okc-anno-body code {
@@ -3869,7 +3873,15 @@ table tbody tr[tabindex] {
 .kpi .num {
   font-size: 30px; font-weight: 800; color: var(--accent);
   line-height: 1.1; letter-spacing: -0.02em;
+  /* An inline-block sizes to max-content, so a value that is not a bare
+     numeral — `1.2M req/s`, a build stamp, a version string — leaves the
+     tile and takes the viewport with it. Measured at 1440px: one tile
+     put the page's scrollWidth at 1818. `anywhere` rather than
+     `break-word` because only the former lowers the min-content size the
+     grid track measures. */
   display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .kpi .label { font-size: 12.5px; color: var(--text-soft); margin-top: 6px; line-height: 1.4; }
 /* Optional per-tile icon — a semantic glyph above the number so a grid of
@@ -3939,7 +3951,7 @@ ol.okt-timeline::before {
   gap: 8px;
   margin-bottom: 3px;
 }
-.okt-tl-title { font-weight: 650; font-size: 15px; color: var(--text); }
+.okt-tl-title { font-weight: 650; font-size: 15px; color: var(--text); min-width: 0; overflow-wrap: anywhere; }
 /* The chip carries the author's own word for the entry; the dot carries
    the state. Two jobs, two places — a chip that had to encode both
    would need one colour per phrase. */
@@ -3951,7 +3963,13 @@ ol.okt-timeline::before {
   border-radius: 999px;
   background: var(--border-soft);
   color: var(--text-soft);
-  white-space: nowrap;
+  /* The chip is `flex: none`, so it is already as wide as its label and
+     a two-word one never wraps — the cap is what forces a break, and it
+     only binds when the label is wider than the entry. `nowrap` here
+     could not be saved by `overflow-wrap`: with wrapping switched off
+     there is no break opportunity for it to take. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .okt-tl-done .okt-tl-chip    { background: var(--success-soft); color: var(--success); }
 .okt-tl-open .okt-tl-chip    { background: var(--warning-soft); color: var(--warning); }
@@ -6626,8 +6644,13 @@ oku-snippet .hds-header {
 oku-snippet .hds-label {
   font-weight: 600;
   color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 oku-snippet .hds-reset {
+  /* The label is the elastic half of this header; the button is not.
+     Without this the button is the thing pushed off the right edge. */
+  flex: none;
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 4px;
