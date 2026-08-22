@@ -529,8 +529,11 @@ class TestPayloadBudget:
     # produced 904 `<rect> attribute width` errors on one page. Then from
     # 1,213,000 by the five long-token declarations and by one heading
     # slug rule replacing three: 975 bytes, nearly all of it the two
-    # comments saying which languages the old rules dropped.
-    KIT_BUDGET_BYTES = 1_215_000
+    # comments saying which languages the old rules dropped. Then from
+    # 1,215,000 by `__okuLowerWithMap`: 974 bytes, of which the two
+    # functions are about 300 and the rest is the comment saying why an
+    # index into a lowercased copy is not an index into the text.
+    KIT_BUDGET_BYTES = 1_217_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

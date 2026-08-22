@@ -4957,7 +4957,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-23-r65';
+var __okuKitBuild = '2026-08-23-r66';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -12406,6 +12406,38 @@ window.addEventListener('oku:rendered', function () {
   });
 });
 
+/* `toLowerCase()` is not length-preserving. A Turkish `İ` lowercases to
+   `i` plus a combining dot, so a string holding one is a character
+   longer in lowercase and every index past it is off by one — slicing
+   the ORIGINAL with an index found in the lowered copy drifts by one
+   position per `İ` before it. In the in-page search that put the excerpt
+   window one character out and `<mark>` around the wrong characters, on
+   exactly the pages whose author writes Turkish.
+
+   The common case pays nothing: when lowercasing did not change the
+   length, the index already lines up and no map is built. When it did,
+   the pair is built in ONE pass so the text being searched and the map
+   back cannot disagree about what they describe. */
+function __okuLowerWithMap(s) {
+  var lc = s.toLowerCase();
+  if (lc.length === s.length) return { text: lc, at: null };
+  var text = '';
+  var at = [];
+  for (var i = 0; i < s.length; i++) {
+    var one = s[i].toLowerCase();
+    for (var j = 0; j < one.length; j++) at.push(i);
+    text += one;
+  }
+  at.push(s.length);
+  return { text: text, at: at };
+}
+
+/* An index into `low.text`, as an index into the string it came from. */
+function __okuAtSource(low, i) {
+  if (!low.at) return i;
+  return low.at[i < low.at.length ? i : low.at.length - 1];
+}
+
 function escapeXml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -15723,26 +15755,32 @@ var __okuSearch = (function () {
           })()
         : (sec.textContent || '');
       var body = scopeEl.replace(/\s+/g, ' ').trim();
-      var lc = body.toLowerCase();
-      var pos = lc.indexOf(q);
+      var low = __okuLowerWithMap(body);
+      var pos = low.text.indexOf(q);
       var headingMatch = headingText.toLowerCase().indexOf(q) >= 0;
       if (pos < 0 && !headingMatch) return;
       seen.add(id);
       var excerpt = body;
       if (pos >= 0) {
-        var start = Math.max(0, pos - 40);
-        var end = Math.min(body.length, pos + q.length + 80);
-        excerpt = (start > 0 ? '… ' : '') + body.slice(start, end) + (end < body.length ? ' …' : '');
-        // Wrap match in <mark>.
-        var rePos = excerpt.toLowerCase().indexOf(q);
-        if (rePos >= 0) {
-          excerpt =
-            escapeHTML(excerpt.slice(0, rePos)) +
-            '<mark>' + escapeHTML(excerpt.slice(rePos, rePos + q.length)) + '</mark>' +
-            escapeHTML(excerpt.slice(rePos + q.length));
-        } else {
-          excerpt = escapeHTML(excerpt);
-        }
+        // Both ends translated back to the original before anything is
+        // sliced — see __okuLowerWithMap for why an index into the
+        // lowercased copy is not an index into the text.
+        var hitAt = __okuAtSource(low, pos);
+        var hitEnd = __okuAtSource(low, pos + q.length);
+        var start = Math.max(0, hitAt - 40);
+        var end = Math.min(body.length, hitEnd + 80);
+        var lead = start > 0 ? '… ' : '';
+        excerpt = lead + body.slice(start, end) + (end < body.length ? ' …' : '');
+        // Where the match sits in the excerpt is arithmetic, not a
+        // second search: the second `indexOf` was a second chance to
+        // land on the wrong character, and it found nothing at all
+        // whenever the first one had already drifted.
+        var markFrom = lead.length + (hitAt - start);
+        var markTo = lead.length + (hitEnd - start);
+        excerpt =
+          escapeHTML(excerpt.slice(0, markFrom)) +
+          '<mark>' + escapeHTML(excerpt.slice(markFrom, markTo)) + '</mark>' +
+          escapeHTML(excerpt.slice(markTo));
       } else {
         excerpt = escapeHTML(excerpt.slice(0, 120) + (body.length > 120 ? ' …' : ''));
       }

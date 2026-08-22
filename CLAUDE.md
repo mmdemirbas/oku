@@ -657,12 +657,26 @@ changing it would move every existing id. Held end to end by
 `test_heading_slug.py` — the id Python predicts is read off the rendered
 DOM for a heading in nine scripts, and every authored link must land.
 
-One more thing fell out of it, in the test helper rather than the kit:
-`str.lower()` is not length-preserving, so `html.lower().find("</script")`
-returns an index into a string one character longer than the one being
-sliced. It had been correct for as long as no kit file contained an `İ`.
-**Never do index arithmetic on a case-folded copy** — search the
-original case-insensitively instead.
+**Never do index arithmetic on a case-folded copy.** Neither
+`str.lower()` nor `String.prototype.toLowerCase()` preserves length — a
+Turkish `İ` lowercases to `i` plus a combining dot — so an index found
+in the lowered copy is not an index into the text, and every position
+past the first one is off by one. Two sites had it. A test helper
+searched `html.lower().find("</script")` and sliced the original, which
+had been correct for as long as no kit file contained an `İ` and
+presented as the page JSON failing to parse. And the in-page search
+found the query in the lowered body, sliced the body for the excerpt,
+then searched the excerpt's own lowered copy to place `<mark>` — so the
+window drifted one character per expanding character before the match
+and the mark drifted with it, reading `ayıt ` for a search of `kayıt`.
+`__okuLowerWithMap` builds the lowered text and the map back in one
+pass, and only when lowercasing actually changed the length, so the
+English path pays nothing. Where the mark sits in the excerpt is now
+arithmetic rather than a second search: a second `indexOf` is a second
+chance to land on the wrong character. Held by `test_search_excerpt.py`,
+which pins the mark's text AND the 40 characters of lead — the drift
+stated as a number, because an assertion about what the excerpt contains
+cannot see a window that is two characters out.
 
 **Every kit box that holds author text may be narrower than its longest
 word.** A grid or flex item defaults to `min-width: auto`, so it refuses
