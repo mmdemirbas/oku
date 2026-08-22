@@ -42,7 +42,7 @@ import threading
 import time
 import webbrowser
 from pathlib import Path, PurePosixPath
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 
 try:  # installed distribution
@@ -4207,7 +4207,7 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
         if rel.parent == Path(".") and rel.stem.lower() in _NAV_EXCLUDE_STEMS:
             continue
         nav_path = rel.with_suffix(".html").as_posix()
-        path_parent = rel.parent.as_posix() if rel.parent != Path(".") else None
+        path_parent = _url_path(rel.parent.as_posix()) if rel.parent != Path(".") else None
         meta = _page_meta(data)
         # `p` is always a .json virtual path. For .md-derived pages the
         # .json file doesn't exist on disk; the real source is the
@@ -4219,9 +4219,14 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
                 if sib.exists():
                     source_rel = sib.relative_to(root)
                     break
-        parent = meta.get("parent", path_parent)
+        # `path_parent` is already in URL space; an author's own `parent`
+        # is not, and encoding it twice is how `sub#dir` became
+        # `sub%2523dir` and lost every row under it.
+        parent = meta["parent"] if "parent" in meta else path_parent
+        if parent is not path_parent and isinstance(parent, str) and parent:
+            parent = _url_path(parent)
         entry = {
-            "path": nav_path,
+            "path": _url_path(nav_path),
             "source": source_rel.as_posix(),
             "title": _page_title(data) or p.stem,
             "parent": parent,
@@ -4262,6 +4267,27 @@ def _build_block(root: Path) -> dict:
     if project_shows_rebuild_command(root):
         out["cmd"] = _rebuild_command(root)
     return out
+
+
+def _url_path(rel: str) -> str:
+    """A tree-relative path as it has to appear inside a URL.
+
+    Every manifest `path` becomes an href, and every href is compared
+    against `location.pathname`, which the browser hands back
+    percent-encoded. Left raw, a file called `notes#1.md` built into
+    `notes#1.html` and the href pointed at `notes` with the fragment
+    `1` — the page existed, was written, was indexed, and nothing in
+    the tree could reach it. `?` did the same thing with a query
+    string, and a space ended the target of the markdown link in
+    llms.txt, turning the rest of the filename into a link title.
+
+    Per segment, so the separators survive. A name with no special
+    character encodes to itself, which is why this can be applied to
+    every path in the manifest rather than only the awkward ones —
+    including `parent`, since a path and the parent it is grouped
+    under have to be spelled the same way or the tree loses the row.
+    """
+    return "/".join(quote(seg, safe="") for seg in rel.split("/"))
 
 
 def _fold_language_variants(entries: list[dict], root: Path) -> list[dict]:
@@ -4381,9 +4407,9 @@ def compute_llms_txt(root: Path, *, pages: list | None = None) -> str:
         meta = _page_meta(data)
         entries.append(
             {
-                "path": nav_path,
+                "path": _url_path(nav_path),
                 "title": _page_title(data) or p.stem,
-                "parent": rel.parent.as_posix() if rel.parent != Path(".") else "",
+                "parent": _url_path(rel.parent.as_posix()) if rel.parent != Path(".") else "",
                 "order": meta.get("order", 1000),
                 "summary": meta.get("summary", ""),
             }

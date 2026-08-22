@@ -256,6 +256,28 @@ standalone file. Left in the tree, a ten-page site in two languages
 reads as twenty pages. `variants` includes the base itself, so the
 switch has no special case for "where do I go back to".
 
+**A manifest path is in URL space, and `source` is not.** Every `path`
+becomes an href and is compared against `location.pathname`, which the
+browser hands back percent-encoded. Left raw, `notes#1.md` built into
+`notes#1.html` and the href pointed at `notes` with the fragment `1`:
+the page was written, indexed and listed, and the row that named it went
+somewhere else. `?` did the same with a query string, and a space ended
+the target of the markdown link in llms.txt so the rest of the filename
+became a link title. Nothing failed anywhere.
+
+`_url_path` encodes per SEGMENT, so the separators survive, and it runs
+on every path rather than only the awkward ones — a name with no special
+character encodes to itself. It runs on `parent` too, because a path and
+the parent it groups under are compared as strings, and encoding one of
+them loses the row. It runs ONCE: `path_parent` is already in URL space
+and an author's own `parent:` is not, and putting both through the
+encoder turned `sub#dir` into `sub%2523dir`. `source` stays raw — it is
+for a human with an editor, and an encoded path there is one the reader
+decodes by hand. Held by `test_url_safe_paths.py` and
+`browser/test_awkward_filenames.py`, the second one because the chain
+that matters is href → request → the server's `unquote` → the file, and
+only a browser walks all of it.
+
 **Match the manifest path by SUFFIX, never by equality.** Manifest paths
 are relative to the root the manifest was built from, and that root is
 not the same thing in every mode — `reference.html` under `oku serve`,
