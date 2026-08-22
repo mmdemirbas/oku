@@ -65,7 +65,7 @@ oku build
 ```
 
 > [!WARN] build wipes its dist trees
-> build removes dist/standalone/ and dist/site/ before rebuilding (plus dist/markdown/ if an older build left one) so stale files don't accumulate. Anything else you've parked under dist/ is left alone — use oku clean to wipe the entire dist/ tree.
+> build removes dist/standalone/ and dist/site/ before rebuilding (plus dist/markdown/ if an older build left one) so stale files don't accumulate. It also clears dist/_search/, the serve-time Pagefind index, which nothing else removed — a stale one keeps answering for pages the source no longer has. Anything else you've parked under dist/ is left alone, by build and by oku clean alike.
 
 ### How do I know the page I am reading is current? {#build-provenance}
 
@@ -95,12 +95,18 @@ What the page cannot tell you is how far behind the installed kit it is. Learnin
 
 ## oku clean {#clean}
 
-Remove the dist/ tree under the current project root. Idempotent — no-op when dist/ doesn't exist. Source files and the _oku symlink are untouched.
+Remove the trees the build writes under dist/ — standalone/, site/, _search/ and a markdown/ left by an older build — and nothing else. Idempotent, and dist/ itself goes only when those were all it held. Source files and the _oku symlink are untouched.
 
 ```bash
 oku clean
 
 # ✓ Removed /path/to/your-project/dist
+
+# With something of your own parked in there:
+oku clean
+
+# ✓ Removed dist/standalone, dist/site
+#   Kept 2 entries oku did not write: NOTES.md, keepme
 
 # Second run, nothing left:
 oku clean
@@ -111,6 +117,7 @@ oku clean
 - Useful before publishing a release artifact, switching branches, or just to ensure a fresh build.
 - Safe to chain: oku clean && oku build.
 - Doesn't touch source pages, the _oku symlink, or kit.json. Only generated output.
+- dist/ is a conventional name, not one this tool owns. It used to remove the whole directory, so a deploy script or a data file parked beside the build went with it; now the survivors are named in the output.
 
 ## oku spec {#spec}
 

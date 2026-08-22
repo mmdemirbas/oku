@@ -65,7 +65,7 @@ oku build
 ```
 
 > [!WARN] build kendi dist ağaçlarını siler
-> build, yeniden üretmeden önce dist/standalone/ ve dist/site/ dizinlerini kaldırır (eski bir derlemeden kalmışsa dist/markdown/ dizinini de), böylece bayat dosyalar birikmez. dist/ altına koyduğunuz başka her şeye dokunulmaz — bütün dist/ ağacını silmek için oku clean kullanın.
+> build, yeniden üretmeden önce dist/standalone/ ve dist/site/ dizinlerini kaldırır (eski bir derlemeden kalmışsa dist/markdown/ dizinini de), böylece bayat dosyalar birikmez. Ayrıca serve sırasında üretilen Pagefind dizinini (dist/_search/) da temizler; bunu başka hiçbir şey kaldırmıyordu ve bayat bir dizin, kaynakta artık bulunmayan sayfalar için yanıt vermeyi sürdürüyordu. dist/ altına koyduğunuz başka her şeye ne build ne de oku clean dokunur.
 
 ### Okuduğum sayfanın güncel olduğunu nereden bilirim? {#build-provenance}
 
@@ -95,12 +95,18 @@ Sayfanın size söyleyemeyeceği şey, kurulu kitin ne kadar gerisinde kaldığ�
 
 ## oku clean {#clean}
 
-Geçerli proje kökündeki dist/ ağacını kaldırır. Yinelenebilir — dist/ yoksa hiçbir şey yapmaz. Kaynak dosyalara ve _oku sembolik bağına dokunulmaz.
+Derlemenin dist/ altına yazdığı ağaçları — standalone/, site/, _search/ ve eski bir derlemeden kalan markdown/ — kaldırır, başka hiçbir şeyi değil. Yinelenebilir; dist/ dizini ise ancak içinde bunlardan başka bir şey yoksa silinir. Kaynak dosyalara ve _oku sembolik bağına dokunulmaz.
 
 ```bash
 oku clean
 
 # ✓ Removed /path/to/your-project/dist
+
+# İçeride size ait bir şey varsa:
+oku clean
+
+# ✓ Removed dist/standalone, dist/site
+#   Kept 2 entries oku did not write: NOTES.md, keepme
 
 # Second run, nothing left:
 oku clean
@@ -111,6 +117,7 @@ oku clean
 - Bir sürüm çıktısı yayımlamadan, dal değiştirmeden önce ya da sadece temiz bir derlemeden emin olmak için işe yarar.
 - Zincirlemek güvenli: oku clean && oku build.
 - Kaynak sayfalara, _oku sembolik bağına ya da kit.json'a dokunmaz. Yalnızca üretilmiş çıktıyı siler.
+- dist/ yaygın bir addır, bu aracın sahip olduğu bir dizin değil. Eskiden dizinin tamamı kaldırılıyordu; yanına bırakılmış bir dağıtım betiği ya da veri dosyası da onunla birlikte gidiyordu. Artık kalanlar çıktıda adlarıyla listeleniyor.
 
 ## oku spec {#spec}
 

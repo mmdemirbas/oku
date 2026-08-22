@@ -5314,12 +5314,14 @@ def cmd_build(args: argparse.Namespace) -> int:
     dist = root / "dist"
     standalone = dist / "standalone"
     site = dist / "site"
-    legacy_markdown = dist / "markdown"
 
-    # Clean previous outputs to avoid stale files (legacy_markdown is
-    # gone as a build product — sources are markdown; remove leftovers
-    # from older builds so the tree doesn't linger half-stale).
-    for tree in (standalone, site, legacy_markdown):
+    # Clean previous outputs to avoid stale files. The set is
+    # `BUILD_TREES` so `oku build` and `oku clean` cannot disagree about
+    # what this tool owns — `dist/_search` was in neither, and this
+    # repo's own copy was still answering searches for two pages that had
+    # been deleted from the source.
+    for name in BUILD_TREES:
+        tree = dist / name
         if tree.exists():
             shutil.rmtree(tree)
 
@@ -5381,17 +5383,59 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 # ---------- clean ----------
+# The only directories under dist/ this tool writes, and therefore the
+# only ones it may remove. `markdown` is not written any more — the .md
+# sources are the canonical AI surface — but older builds left one, so
+# it is cleaned rather than orphaned. `_search` is the serve-time
+# Pagefind index; it is here because nothing else removes it, and a
+# stale one keeps answering for pages the source no longer has.
+BUILD_TREES = ("standalone", "site", "markdown", "_search")
+
+
 def cmd_clean(args: argparse.Namespace) -> int:
-    """Remove the dist/ tree under the current project root. No-op if
-    dist/ doesn't exist. Source dirs and the _oku symlink are left
-    alone — only generated artifacts are removed."""
+    """Remove the trees `oku build` writes under dist/, and nothing else.
+
+    It used to be `shutil.rmtree(dist)`. `dist/` is a conventional name,
+    not one this tool owns: a project can put a deploy script, a client's
+    notes or a checked-in data file in there, and `oku clean` deleted all
+    of it with a one-line success message and no way back. Removing only
+    what the build writes costs one loop, and the difference is
+    somebody's file.
+    """
     root = Path.cwd()
     dist = root / "dist"
+    if dist.is_symlink():
+        # rmtree refuses a symlink with a raw OSError, which reads as a
+        # crash rather than as the safe outcome it is.
+        print(f"✓ Nothing removed — {dist} is a symlink; delete it yourself if you meant to.")
+        return 0
     if not dist.exists():
         print(f"✓ Nothing to clean — {dist} does not exist.")
         return 0
-    shutil.rmtree(dist)
-    print(f"✓ Removed {dist}")
+    removed: list[str] = []
+    for name in BUILD_TREES:
+        tree = dist / name
+        if not tree.exists():
+            continue
+        try:
+            shutil.rmtree(tree)
+        except OSError as err:
+            print(f"✗ Could not remove {tree}: {err.strerror or err}", file=sys.stderr)
+            return 1
+        removed.append(name)
+    kept = sorted(x.name for x in dist.iterdir()) if dist.exists() else []
+    if not kept:
+        dist.rmdir()
+        print(f"✓ Removed {dist}")
+        return 0
+    if removed:
+        print(f"✓ Removed {', '.join('dist/' + r for r in removed)}")
+    else:
+        print(f"✓ Nothing to clean — {dist} holds no built trees.")
+    # Naming them is the point: a file here is either something the
+    # project put there on purpose, or an old build product this version
+    # no longer knows about, and only the author can tell which.
+    print(f"  Kept {len(kept)} entr{'y' if len(kept) == 1 else 'ies'} oku did not write: {', '.join(kept)}")
     return 0
 
 
