@@ -1231,13 +1231,14 @@ class TestChromeKitMarkers:
             "aligns with the line-number text centre"
         )
 
-    @pytest.mark.skip(
-        reason="v2 markdown parser replaces the inline-HTML auto-conversion path; authors use markdown syntax (*em*, `code`, [link](href)) inside b[] strings instead. Legacy v1 pages keep rendering via the v1→v2 shim before reaching the parser."
-    )
-    def test_renderer_converts_inline_html_tags_in_strings(self, repo_root: Path) -> None:
-        """Renderer auto-converts whitelisted inline HTML in strings."""
-        js = (repo_root / "kit" / "renderer.js").read_text(encoding="utf-8")
-        assert "_splitInlineTags" in js, "inline-tag converter missing"
+    # Inline HTML in a b[] string used to be checked here, by grepping
+    # renderer.js for a converter symbol that no longer exists. It was
+    # skipped with a reason saying authors write markdown instead — which
+    # was never true of the kit and was false in the direction that
+    # mattered: `<code>x</code>` in a string rendered as visible angle
+    # brackets. The behaviour is covered against the rendered DOM now, in
+    # browser/test_inline_html.py, with the case list derived from
+    # INLINE_HTML_TAGS so a new tag cannot be added without one.
 
     def test_source_dirs_stay_clean_of_generated_files(self, repo_root: Path) -> None:
         """Source dirs must hold authored content only. site-manifest,

@@ -2015,22 +2015,32 @@ _MD_SETEXT_EQ_RE = re.compile(r"^=+\s*$")
 _MD_HR_RE = re.compile(r"^-{3,}\s*$")
 _MD_HTML_ISLAND_RE = re.compile(r"^</?([a-zA-Z][\w-]*)(?:[\s/>]|$)")
 # Inline-level tags never open an island — mirrors INLINE_HTML_TAGS in
-# renderer.js: a paragraph that starts with one of these stays prose.
+# renderer.js: a paragraph that starts with one of these stays prose,
+# and parseInline renders it there. The two halves are one list because
+# a tag in only one of them ships as visible angle brackets.
 _INLINE_HTML_TAGS = {
     "a",
     "abbr",
+    "b",
     "br",
+    "cite",
     "code",
     "del",
     "em",
+    "i",
     "ins",
     "kbd",
     "mark",
+    "q",
+    "s",
     "samp",
+    "small",
     "span",
     "strong",
     "sub",
     "sup",
+    "u",
+    "var",
 }
 _INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 

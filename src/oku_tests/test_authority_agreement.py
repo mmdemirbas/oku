@@ -146,6 +146,30 @@ def test_the_two_inline_tag_tables_agree() -> None:
     assert set(re.findall(r"'([a-z]+)'", m.group(1))) == cli._INLINE_HTML_TAGS
 
 
+def test_the_tag_the_lint_calls_inline_is_the_tag_the_parser_renders() -> None:
+    """The third authority, and the one nothing held. Declaring a tag
+    inline says a paragraph carrying it stays prose; it does not say the
+    prose renderer will draw it. `a`, `code`, `em` and `strong` were
+    declared and not drawn, so a page carrying one printed its own tags
+    — measured on a delivered document, past a clean
+    `oku check --strict`. The pattern is now spliced from the list, and
+    this holds the splice: every inline tag except the void `<br>`, which
+    has its own branch, must reach the pass-through."""
+    m = re.search(r"<\(__TAGS__\)", RENDERER)
+    assert m, "the inline-HTML branch no longer splices INLINE_HTML_TAGS into the pattern"
+
+    paired = re.search(
+        r"const INLINE_HTML_PAIRED = INLINE_HTML_TAGS\s*\.filter\(function \(t\) \{ return t !== '(\w+)'; \}\)",
+        RENDERER,
+    )
+    assert paired, "INLINE_HTML_PAIRED moved in renderer.js — this test cannot see it any more"
+    assert paired.group(1) == "br", "only the void <br> may be held out of the pass-through"
+
+    # `<br>` is held out because a void element has no body to parse, not
+    # because it is unsupported — its own branch must still be there.
+    assert re.search(r"<br\\s\*\\/\?>", RENDERER), "the <br> branch left the inline pattern"
+
+
 def test_every_inline_prefix_the_renderer_dispatches_is_a_named_kind() -> None:
     """The link-shaped primitives are decided in three places too:
     renderer.js dispatches on the href prefix, the lint collects the

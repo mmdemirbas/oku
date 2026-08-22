@@ -445,13 +445,78 @@
     return section;
   }
 
+  /* One list decides what "inline HTML" means, because the island rule
+     and the inline renderer are two halves of the same question. A tag
+     here never opens an HTML island — a paragraph that happens to start
+     with `<kbd>` stays prose — AND parseInline renders it where it
+     stands.
+
+     They used to be two lists that overlapped. `a`, `code`, `em` and
+     `strong` were declared inline by the island rule and rendered by
+     neither, so a paragraph carrying one was prose that typed its own
+     tags out: a delivered page showed `<code>ilimler→ilimleri</code>`
+     as visible angle brackets, and `oku check --strict` was clean on
+     it. `b` and `i` were in neither list, which made the same tag mean
+     two things — an island at the start of a paragraph, literal text
+     one word later. `test_authority_agreement` now holds this list
+     against the pattern built from it and against cli.py's copy. */
+  const INLINE_HTML_TAGS = ['a', 'abbr', 'b', 'br', 'cite', 'code', 'del',
+    'em', 'i', 'ins', 'kbd', 'mark', 'q', 's', 'samp', 'small', 'span',
+    'strong', 'sub', 'sup', 'u', 'var'];
+
+  /* The paired tags, longest first. `br` is void and keeps its own
+     alternation branch. Longest-first is not decoration: alternation is
+     first-match-wins, and `s|samp` would try `s` against `<samp>` and
+     survive only on backtracking. Sorting removes the doubt. */
+  const INLINE_HTML_PAIRED = INLINE_HTML_TAGS
+    .filter(function (t) { return t !== 'br'; })
+    .sort(function (a, b) { return b.length - a.length || (a < b ? -1 : 1); });
+
+  /* Written as a literal with `__TAGS__` standing in for the tag
+     alternation — `__TAGS__` is ordinary regex text, so the literal
+     still parses and stays readable, and the one place the tag set
+     enters the pattern is a substitution rather than a copy. Compiled
+     per parseInline call (as the literal was), because parseInline
+     recurses and `lastIndex` is per-object state. */
+  const INLINE_RE_SOURCE = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|(`+)([\s\S]+?)\2(?!`)|!\[([^\]]*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+)>|<(__TAGS__)(\s+[^<>]*)?>([\s\S]*?)<\/\15\s*>|<br\s*\/?>|\[\^([^\]]+?)\]|\[([^\]]+?)\]\[([^\]]*?)\]|\[([^\]^][^\]]*?)\]/
+    .source.replace('__TAGS__', INLINE_HTML_PAIRED.join('|'));
+
+  /* An allow-listed inline tag is REBUILT, never passed through: the
+     element is created by name, its body parsed as markdown (which is
+     what CommonMark does between raw tags, so `<b>*a*</b>` composes),
+     and of the attributes only `title` survives — plus `href` on an
+     `<a>`, which goes through renderLink and therefore through the same
+     sanitiser and the same `#g/` / `#x/` / `#f/` handling every
+     markdown link gets. Everything else is dropped, so a `style` or an
+     `onclick` an author pasted in from somewhere cannot reach the page.
+     An `<a>` with no destination is not a link and keeps its words. */
+  function inlineHtmlElement(tag, attrs, body) {
+    const name = tag.toLowerCase();
+    const title = attrValue(attrs, 'title');
+    if (name === 'a') {
+      const href = attrValue(attrs, 'href');
+      if (href !== null) return renderLink(body, href, title === null ? undefined : title);
+    }
+    const e = document.createElement(name);
+    if (title !== null) e.title = title;
+    parseInline(body, e);
+    return e;
+  }
+
+  function attrValue(attrs, name) {
+    const m = new RegExp('\\b' + name + '\\s*=\\s*("([^"]*)"|\'([^\']*)\')', 'i').exec(attrs || '');
+    if (!m) return null;
+    return decodeEntities(m[2] !== undefined ? m[2] : m[3]);
+  }
+
   function parseInline(text, host) {
     // One regex pass so positions are tracked; alternation order IS the
     // precedence. Escape first (it must win over every construct it
     // protects), then code (literal body — the rule that protects it),
     // then image / emphasis / strike / link / autolink, and finally the
-    // allow-listed inline HTML tags. Inline tags outside the allow-list
-    // stay literal text.
+    // inline HTML tags, spliced in from INLINE_HTML_TAGS so the set that
+    // renders and the set that never opens an island cannot drift. A tag
+    // outside that list stays literal text.
     //
     // Emphasis and link bodies are parsed RECURSIVELY, so `**[a](b)**`,
     // `[**a**](b)`, `**`code`**` and `**bold with *em* inside**` all
@@ -471,7 +536,7 @@
     // lets ``a `b` c`` hold a backtick.
     // The three reference forms sit last: they are the loosest patterns
     // and only fire when the page actually defines that label.
-    const re = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|(`+)([\s\S]+?)\2(?!`)|!\[([^\]]*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+)>|<(kbd|sub|sup|mark|abbr|del|ins|samp|span)(\s+[^<>]*)?>([\s\S]*?)<\/\15\s*>|<br\s*\/?>|\[\^([^\]]+?)\]|\[([^\]]+?)\]\[([^\]]*?)\]|\[([^\]^][^\]]*?)\]/g;
+    const re = new RegExp(INLINE_RE_SOURCE, 'g');
     let pos = 0;
     let m;
     while ((m = re.exec(text)) !== null) {
@@ -517,14 +582,7 @@
       } else if (m[14] !== undefined) {
         host.appendChild(renderLink(m[14], m[14]));
       } else if (m[15] !== undefined) {
-        // Sanitised allow-list pass-through: bare element, recursive
-        // inline body; only `title` survives from the attribute string
-        // (tooltips on <abbr>). Everything else is dropped.
-        const e = document.createElement(m[15].toLowerCase());
-        const title = /\btitle="([^"]*)"/.exec(m[16] || '');
-        if (title) e.title = title[1];
-        parseInline(m[17], e);
-        host.appendChild(e);
+        host.appendChild(inlineHtmlElement(m[15], m[16], m[17]));
       } else if (m[18] !== undefined) {
         host.appendChild(renderFootnoteRef(m[18]));
       } else if (m[19] !== undefined || m[21] !== undefined) {
@@ -661,10 +719,9 @@
     return payload;
   }
 
-  // Inline-level tags never open an HTML island — a paragraph that
-  // happens to start with `<kbd>` stays prose.
-  const INLINE_HTML_TAGS = ['a', 'abbr', 'br', 'code', 'del', 'em', 'ins',
-    'kbd', 'mark', 'samp', 'span', 'strong', 'sub', 'sup'];
+  // Which tags are inline is decided once, beside parseInline — the
+  // renderer that draws them and the island rule that lets them stay
+  // prose have to agree, and a second copy here is how they stopped.
 
   // The active renderer's typed-block dispatch; set per render() pass so
   // emitMarkdown can hand lifted fence nodes to the same renderers that
