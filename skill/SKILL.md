@@ -265,7 +265,9 @@ entry to write.
      elements and `<script>` included) when a primitive genuinely does
      not exist for what you need. `oku check` lists each one.
    - `oku spec <name>` prints a ready-to-paste payload for any block
-     kind or chart type. `oku spec` alone lists all 68 names.
+     kind, chart type or inline kind. `oku spec` alone lists every name
+     it can answer for, grouped, with its own counts — do not carry a
+     total in prose, it goes stale the day a primitive lands.
 
    Hand-authored `.json` pages (v1 and v2) still render, and
    `oku migrate` converts one to markdown, but new pages are markdown.

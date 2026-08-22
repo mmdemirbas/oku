@@ -3189,3 +3189,79 @@ class TestCheckCodesAreDocumented:
         documented = set(re.findall(r"`([a-z0-9*-]+)`", text))
         missing = sorted(c for c in self._emitted() if c not in documented)
         assert missing == [], f"{page} does not list {missing}"
+
+
+class TestDocumentedCountsMatchTheCode:
+    """A number in prose is a copy of a fact, and it rots silently.
+
+    Both halves of this class were found rotten on the day it was
+    written: README said the suite had `696 tests` against 1675, and the
+    skill briefing told an author that `oku spec` "lists all 68 names"
+    against 73. Neither is a crash — they are the kit telling a reader
+    something untrue about itself, which is worse, because a reader who
+    checks one number and finds it wrong stops trusting the others.
+
+    Same shape as the block-kind authorities and the severity table: the
+    code is the source of truth and the prose is held against it.
+    """
+
+    ROOT = Path(__file__).resolve().parents[2]
+    PROSE = ["README.md", "CLAUDE.md", "skill/SKILL.md"]
+
+    @classmethod
+    def _pages(cls) -> list[Path]:
+        return [cls.ROOT / p for p in cls.PROSE] + sorted((cls.ROOT / "docs").glob("*.md"))
+
+    @classmethod
+    def _actual(cls) -> dict[str, int]:
+        from oku import cli
+
+        ex = json.loads((cli.KIT_DIR / "schema" / "examples.json").read_text(encoding="utf-8"))
+        blocks = ex["blocks"]
+        return {
+            "block kinds": len({k for k in blocks if k in cli._FENCE_KINDS}),
+            "chart types": len(ex["charts"]),
+            "render modes": len(ex["charts"]),
+            "inline kinds": len(ex.get("inline") or {}),
+        }
+
+    def test_the_claims_are_still_written_down_somewhere(self) -> None:
+        """This class reads prose with a regex. If the phrasing moves,
+        it passes by finding nothing — the vacuous-check failure mode
+        that has already shipped once in this repo."""
+        found = [
+            (p.name, m.group(0))
+            for p in self._pages()
+            for m in re.finditer(
+                r"\b(\d{1,4}) (block kinds|chart types|render modes|inline kinds)\b",
+                p.read_text(encoding="utf-8"),
+            )
+        ]
+        assert len(found) >= 6, found
+
+    def test_every_counted_claim_matches_what_the_code_ships(self) -> None:
+        actual = self._actual()
+        wrong = []
+        for page in self._pages():
+            for n, line in enumerate(page.read_text(encoding="utf-8").splitlines(), 1):
+                for m in re.finditer(
+                    r"\b(\d{1,4}) (block kinds|chart types|render modes|inline kinds)\b", line
+                ):
+                    claimed, what = int(m.group(1)), m.group(2)
+                    if claimed != actual[what]:
+                        wrong.append(f"{page.name}:{n} says {claimed} {what}, the code ships {actual[what]}")
+        assert wrong == [], wrong
+
+    def test_no_page_freezes_a_test_count(self) -> None:
+        """`696 tests` in README against 1675 on the day it was read.
+        A floor (`1500+ tests`) survives the next test being written;
+        an exact count is wrong within a week and nothing catches it."""
+        frozen = []
+        for page in self._pages():
+            for n, line in enumerate(page.read_text(encoding="utf-8").splitlines(), 1):
+                for m in re.finditer(r"(?<!\+)\b(\d{3,5}) tests?\b", line):
+                    if not line[: m.start()].rstrip().endswith("+"):
+                        frozen.append(
+                            f"{page.name}:{n} {m.group(0)!r} — write a floor (`1500+ tests`) or no number"
+                        )
+        assert frozen == [], frozen

@@ -295,7 +295,7 @@ Click opens a panel listing entries; Dismiss closes it for the session.
 ## Tests
 
 ```bash
-uv run pytest -q                            # 696 tests
+uv run pytest -q                            # the whole suite, CLI + browser
 oku check --strict                          # schema + structural + content lint
 ```
 
