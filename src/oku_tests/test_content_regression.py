@@ -3085,6 +3085,12 @@ class TestCheckCodesAreDocumented:
         assert missing == [], f"{page} does not list {missing}"
 
 
+def cli_kit_dir() -> Path:
+    from oku import cli
+
+    return cli.KIT_DIR
+
+
 class TestDocumentedCountsMatchTheCode:
     """A number in prose is a copy of a fact, and it rots silently.
 
@@ -3144,6 +3150,82 @@ class TestDocumentedCountsMatchTheCode:
                     claimed, what = int(m.group(1)), m.group(2)
                     if claimed != actual[what]:
                         wrong.append(f"{page.name}:{n} says {claimed} {what}, the code ships {actual[what]}")
+        assert wrong == [], wrong
+
+    # ---- KPI tiles carry the same claims, and the regexes above miss them
+
+    @classmethod
+    def _tiles(cls, page: Path) -> list[tuple[str, str]]:
+        """Every (num, label) pair in every `oku-kpi-grid` on the page."""
+        out: list[tuple[str, str]] = []
+        for body in re.findall(r"```oku-kpi-grid\n(.*?)\n```", page.read_text(encoding="utf-8"), re.S):
+            for tile in json.loads(body).get("tiles", []):
+                out.append((str(tile.get("num", "")), str(tile.get("label", ""))))
+        return out
+
+    def test_the_tiles_are_still_where_this_class_looks(self) -> None:
+        """The vacuity guard, again: these three tile tests read a fence
+        by name, and a renamed fence would make all three pass on an
+        empty list."""
+        found = [t for p in self._pages() for t in self._tiles(p)]
+        assert len(found) >= 8, found
+
+    def test_no_tile_freezes_a_test_count(self) -> None:
+        """`696` against 1,760, in the Snapshot grid on the roadmap — in
+        BOTH languages. The prose rule below could not see it: the digits
+        and the word `tests` sit in separate JSON fields, so no regex
+        over the line matches them together."""
+        frozen = []
+        for page in self._pages():
+            for num, label in self._tiles(page):
+                if re.search(r"\btest", label, re.I) and re.fullmatch(r"\d{3,5}", num):
+                    frozen.append(f"{page.name} tile {num!r} / {label!r} — write a floor (`1500+`)")
+        assert frozen == [], frozen
+
+    def test_a_tile_that_counts_the_tree_matches_the_tree(self) -> None:
+        """The four Snapshot numbers that name something countable. The
+        roadmap said 10 intent families against 11 and 24 documentation
+        pages against 20 — both wrong the day a section was added."""
+        charts = (self.ROOT / "docs" / "charts.md").read_text(encoding="utf-8")
+        css = (Path(cli_kit_dir()) / "chrome.css").read_text(encoding="utf-8")
+        actual = {
+            "chart types": self._actual()["chart types"],
+            "worked example": len(set(re.findall(r'"type"\s*:\s*"([a-z-]+)"', charts))),
+            "families": len(re.findall(r"\{#family-", charts)),
+            "pages": len(list((self.ROOT / "docs").glob("*.md"))),
+            "series": len({m for m in re.findall(r"--series-(\d+):", css)}),
+        }
+        keys = {
+            "chart types": r"[Cc]hart types",
+            "worked example": r"worked example",
+            "families": r"[Ii]ntent famil",
+            "pages": r"[Dd]ocumentation pages",
+            "series": r"[Ss]eries colour ramp",
+        }
+        wrong, seen = [], set()
+        for page in self._pages():
+            for num, label in self._tiles(page):
+                for key, pat in keys.items():
+                    if re.search(pat, label):
+                        seen.add(key)
+                        if num != str(actual[key]):
+                            wrong.append(f"{page.name} tile {label!r} says {num}, the tree has {actual[key]}")
+        assert wrong == [], wrong
+        assert seen == set(keys), f"only matched {sorted(seen)} — a label was reworded"
+
+    def test_a_translation_repeats_its_original_s_numbers(self) -> None:
+        """A number is language-independent, and a translated page is
+        the same page. Holding the tiles in order catches the drift the
+        English-only regexes cannot see at all, whatever the wording."""
+        wrong = []
+        for tr in sorted((self.ROOT / "docs").glob("*.tr.md")):
+            base = tr.with_name(tr.name.replace(".tr.md", ".md"))
+            if not base.exists():
+                continue
+            a = [n for n, _ in self._tiles(base)]
+            b = [n for n, _ in self._tiles(tr)]
+            if a != b:
+                wrong.append(f"{tr.name} tiles {b} vs {base.name} {a}")
         assert wrong == [], wrong
 
     def test_no_page_freezes_a_test_count(self) -> None:
