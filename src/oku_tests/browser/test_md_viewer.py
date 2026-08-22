@@ -54,6 +54,14 @@ STATE = """() => {
     headings: [...r.querySelectorAll('h1, h2, h3')].map(h => h.textContent),
     ids: [...r.querySelectorAll('[id]')].map(n => n.id),
     renderedText: r.textContent,
+    // Prose only. A page that documents the markdown format shows
+    // `## Overview {#overview}` inside a fence, and that syntax
+    // reaching the reader as text is the whole point of a code block.
+    proseText: (() => {
+      const clone = r.cloneNode(true);
+      clone.querySelectorAll('pre, code').forEach((n) => n.remove());
+      return clone.textContent;
+    })(),
     source: w.querySelector('.okt-mdview-source code').textContent,
     failed: !!r.querySelector('.okt-mdview-fail'),
   };
@@ -92,8 +100,11 @@ def test_the_file_is_rendered_not_printed(page, site_url):
     state = _open_viewer(page, site_url)
 
     assert len(state["headings"]) > 3, state["headings"]
-    assert "{#" not in state["renderedText"], "anchor syntax reached the reader as text"
-    assert "\n## " not in state["renderedText"], "heading syntax reached the reader as text"
+    assert "{#" not in state["proseText"], "anchor syntax reached the reader as text"
+    assert "\n## " not in state["proseText"], "heading syntax reached the reader as text"
+    # The exclusion has to be narrow, or the assertion above passes on a
+    # page whose whole body failed to parse into one code block.
+    assert len(state["proseText"]) > len(state["renderedText"]) / 2, "almost nothing rendered as prose"
 
 
 def test_the_source_view_is_the_bytes(page, site_url):

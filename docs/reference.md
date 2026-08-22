@@ -42,43 +42,43 @@ After init, your project has a `docs/_oku/` symlink pointing at the kit repo. Ev
 
 ## Anatomy of a page {#anatomy}
 
-Every JSON page is rooted at kind:"page" and has three pieces: title, meta, blocks.
+A page is one markdown file: YAML front-matter, then a GFM body. There is nothing else to keep in step — no wrapper, no build step for the content, no second copy of the page in another format. GitHub renders the same file as ordinary markdown; the kit renders it with the chrome.
 
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
-  "kind": "page",
-  "schema_version": 1,
-  "title": "My note",
-  "accent": "teal",
-  "meta": {
-    "eyebrow": "Notes",
-    "subtitle": "One-line subtitle below the H1.",
-    "date": "2026-05-18",
-    "order": 10,
-    "summary": "One-line summary for nav tooltips and llms.txt."
-  },
-  "blocks": [
-    { "kind": "tldr", "summary": "...", "bullets": ["..."] },
-    { "kind": "section", "id": "overview", "title": "Overview", "blocks": [
-      { "kind": "paragraph", "content": "Plain prose works as a string." }
-    ]}
-  ]
-}
+````markdown
+---
+title: My note
+summary: One line describing the page.
+order: 10
+---
+
+> [!TLDR]
+> What a reader who stops here should leave with.
+
+## Overview {#overview}
+
+Plain prose, with *emphasis*, `code` and a [link](other.md).
+
+```oku-chart
+{"type":"bar","rows":[{"label":"before","value":31},{"label":"after","value":74}]}
 ```
 
-### Top-level fields {#top-level}
+*An italic line right after a figure is its caption.*
+````
 
-- `kind` — must be `"page"`. The renderer rejects anything else.
-- `title` — required. Becomes the `<title>` and the H1 in the cover.
-- `accent` — optional. Either a named token (`teal`, `amber`, `indigo`) or a CSS color value. Overrides the tree default from `kit.json` for this page only.
-- `meta` — optional object. See Per-page metadata below; in a markdown source these are the front-matter keys. Only `summary` is worth writing on most pages.
-- `blocks` — the content tree. Array of top-level blocks (tldr, kpi-grid, section).
+Three things in that file are the whole format:
+
+- **Front-matter is metadata, never content.** `title` is required; `summary` is the one other field worth writing on most pages. [Per-page metadata](#metadata) has the rest, and `oku spec front-matter` prints the list the code itself reads.
+- **`##` opens a section**, and `{#id}` pins its anchor. Left off, the id is slugged from the title — fine until the title changes or the page is translated, because `slugify` strips non-ASCII and a translated heading has to carry its original's id verbatim.
+- **A primitive is a typed fence** whose body is one compact JSON object. `oku spec` lists them; plain `mermaid` works too, and GitHub draws that one natively.
 
 > [!TIP] Why summary matters
-> meta.summary is surfaced in four places: the page-nav tooltip on hover, the llms.txt sitemap line for AI consumers, the Pagefind search excerpt, and the cover subtitle. Keep it one tight sentence focused on what the page contains — not a teaser.
+> `summary` is surfaced in four places: the page-nav tooltip on hover, the llms.txt sitemap line for AI consumers, the Pagefind search excerpt, and the cover subtitle. Keep it one tight sentence focused on what the page contains — not a teaser.
 
-### Markdown sources {#markdown-sources}
+### Older pages: JSON {#json-pages}
+
+A page written before the markdown format keeps rendering, indefinitely and without a flag: v2 (`k` / `t` / `m` / `b`) natively, v1 (`kind` / `title` / `blocks`) through an in-memory shim. `oku migrate <path>` converts one to a `.md` source when you want it converted — deterministic, and it removes the `.json` it replaced. New pages are markdown; the JSON path is for what already exists.
+
+### Existing markdown drops in {#markdown-sources}
 
 Existing `.md` files anywhere under the docs root are first-class pages — they appear in the site tree, render with the kit's TOC + chrome, and survive `oku check / build / serve` alongside JSON pages. You don't have to convert anything before adopting the kit; existing Markdown documentation drops in unchanged.
 

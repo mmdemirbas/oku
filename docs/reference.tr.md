@@ -42,43 +42,43 @@ init'ten sonra projenizde kit deposunu gösteren bir `docs/_oku/` sembolik bağ�
 
 ## Bir sayfanın anatomisi {#anatomy}
 
-Her JSON sayfasının kökü kind:"page" değeridir ve üç parçası vardır: title, meta, blocks.
+Bir sayfa tek bir markdown dosyasıdır: YAML ön bilgisi, ardından GFM gövdesi. Eşgüdümde tutulacak başka bir şey yoktur — sarmalayıcı yok, içerik için derleme adımı yok, sayfanın başka bir biçimdeki ikinci kopyası yok. GitHub aynı dosyayı sıradan markdown olarak işler; kit ise kendi çerçevesiyle.
 
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
-  "kind": "page",
-  "schema_version": 1,
-  "title": "My note",
-  "accent": "teal",
-  "meta": {
-    "eyebrow": "Notes",
-    "subtitle": "One-line subtitle below the H1.",
-    "date": "2026-05-18",
-    "order": 10,
-    "summary": "One-line summary for nav tooltips and llms.txt."
-  },
-  "blocks": [
-    { "kind": "tldr", "summary": "...", "bullets": ["..."] },
-    { "kind": "section", "id": "overview", "title": "Overview", "blocks": [
-      { "kind": "paragraph", "content": "Plain prose works as a string." }
-    ]}
-  ]
-}
+````markdown
+---
+title: Notum
+summary: Sayfayı bir satırda anlatan özet.
+order: 10
+---
+
+> [!TLDR]
+> Burada bırakan okurun yanında götürmesi gereken şey.
+
+## Genel bakış {#overview}
+
+Düz metin; içinde *vurgu*, `kod` ve bir [bağlantı](other.md).
+
+```oku-chart
+{"type":"bar","rows":[{"label":"önce","value":31},{"label":"sonra","value":74}]}
 ```
 
-### Üst düzey alanlar {#top-level}
+*Bir şeklin hemen ardındaki eğik satır, o şeklin açıklamasıdır.*
+````
 
-- `kind` — `"page"` olmak zorundadır. İşleyici başka bir değeri geri çevirir.
-- `title` — zorunlu. Hem `<title>` hem de kapaktaki H1 olur.
-- `accent` — isteğe bağlı. Ya adlandırılmış bir belirteç (`teal`, `amber`, `indigo`) ya da bir CSS renk değeri. `kit.json` içindeki ağaç varsayılanını yalnızca bu sayfa için değiştirir.
-- `meta` — isteğe bağlı nesne. Aşağıdaki Sayfa başına üstveri bölümüne bakın; markdown kaynağında bunlar ön bilgi anahtarlarıdır. Çoğu sayfada yazmaya değen tek alan `summary`dir.
-- `blocks` — içerik ağacı. Üst düzey blokların dizisi (tldr, kpi-grid, section).
+Bu dosyadaki üç şey biçimin tamamıdır:
+
+- **Ön bilgi üstveridir, içerik değil.** `title` zorunludur; çoğu sayfada yazmaya değen tek diğer alan `summary`dir. Gerisi [Sayfa başına üstveri](#metadata) bölümünde; kodun kendi okuduğu listeyi ise `oku spec front-matter` yazdırır.
+- **`##` bir bölüm açar**, `{#id}` de o bölümün çapasını sabitler. Yazılmazsa kimlik başlıktan türetilir — başlık değişene ya da sayfa çevrilene kadar sorun çıkmaz; çünkü `slugify` ASCII dışını atar ve çevrilmiş bir başlığın aslının kimliğini birebir taşıması gerekir.
+- **Yapı taşı, gövdesi tek ve derli toplu bir JSON nesnesi olan türlü çittir.** Listeyi `oku spec` verir; düz `mermaid` de çalışır, üstelik GitHub onu kendisi çizer.
 
 > [!TIP] summary neden önemli
-> meta.summary dört yerde karşınıza çıkar: üzerine gelindiğinde page-nav ipucu, yapay zekâ tüketicileri için llms.txt site haritası satırı, Pagefind arama özeti ve kapak alt başlığı. Sayfanın ne içerdiğine odaklanan tek ve derli toplu bir cümle olsun — merak uyandıran bir tanıtım değil.
+> `summary` dört yerde karşınıza çıkar: üzerine gelindiğinde page-nav ipucu, yapay zekâ tüketicileri için llms.txt site haritası satırı, Pagefind arama özeti ve kapak alt başlığı. Sayfanın ne içerdiğine odaklanan tek ve derli toplu bir cümle olsun — merak uyandıran bir tanıtım değil.
 
-### Markdown kaynakları {#markdown-sources}
+### Eski sayfalar: JSON {#json-pages}
+
+Markdown biçiminden önce yazılmış bir sayfa süresiz olarak ve hiçbir bayrağa gerek kalmadan işlenmeye devam eder: v2 (`k` / `t` / `m` / `b`) doğrudan, v1 (`kind` / `title` / `blocks`) ise bellekteki bir uyarlayıcı üzerinden. İsterseniz `oku migrate <yol>` onu bir `.md` kaynağına dönüştürür — belirlenimcidir ve yerini aldığı `.json` dosyasını siler. Yeni sayfalar markdown olur; JSON yolu, hâlihazırda var olanlar içindir.
+
+### Var olan markdown olduğu gibi girer {#markdown-sources}
 
 docs kökünün altındaki her `.md` dosyası birinci sınıf sayfadır — site ağacında görünür, kitin içindekiler listesi ve çerçevesiyle işlenir, `oku check / build / serve` sırasında JSON sayfaların yanında sağ salim kalır. Kite geçmeden önce hiçbir şeyi dönüştürmeniz gerekmez; var olan Markdown belgeleri olduğu gibi girer.
 

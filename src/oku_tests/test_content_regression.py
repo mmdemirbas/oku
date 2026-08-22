@@ -3251,3 +3251,58 @@ class TestDocumentedCountsMatchTheCode:
                             f"{page.name}:{n} {m.group(0)!r} — write a floor (`1500+ tests`) or no number"
                         )
         assert frozen == [], frozen
+
+
+class TestAnatomyDocumentsTheAuthoringFormat:
+    """The reference page opens with the shape an author types.
+
+    It opened with a v1 JSON page — `kind: "page"`, a `meta` object, a
+    `blocks` tree — under the heading "Anatomy of a page". That shape
+    still renders and is still supported, and it has not been the thing
+    an author writes since the markdown format landed: the first
+    example a reader meets was the one form they should not reach for,
+    and the markdown format was a subsection further down called
+    "Markdown sources", framed as an add-on.
+
+    Held in both languages, because a reader arrives in one of them.
+    """
+
+    PAGES = ["reference.md", "reference.tr.md"]
+
+    def _anatomy(self, repo_root: Path, page: str) -> str:
+        text = (repo_root / "docs" / page).read_text(encoding="utf-8")
+        start = text.index("{#anatomy}")
+        end = text.index("{#markdown-viewer}")
+        return text[start:end]
+
+    @pytest.mark.parametrize("page", PAGES)
+    def test_the_first_example_is_a_markdown_page(self, repo_root: Path, page: str) -> None:
+        body = self._anatomy(repo_root, page)
+        first = re.search(r"^`{3,}([a-z-]+)", body, re.M)
+        assert first, "the anatomy section shows no example at all"
+        assert first.group(1) == "markdown", f"the first example is a {first.group(1)} page"
+
+    @pytest.mark.parametrize("page", PAGES)
+    def test_the_example_carries_front_matter_and_a_typed_fence(self, repo_root: Path, page: str) -> None:
+        """The two halves of the format. An example with neither is a
+        markdown file, not an oku page."""
+        body = self._anatomy(repo_root, page)
+        assert re.search(r"^---\ntitle: ", body, re.M), "no front-matter in the example"
+        assert "```oku-" in body, "no typed fence in the example"
+
+    @pytest.mark.parametrize("page", PAGES)
+    def test_the_v1_json_spelling_is_not_presented_as_the_shape(self, repo_root: Path, page: str) -> None:
+        """`kind` / `blocks` is the v1 shim's spelling. v2 is `k` / `b`,
+        and neither is what an author writes."""
+        body = self._anatomy(repo_root, page)
+        assert '"kind": "page"' not in body, "the v1 page shape is still the anatomy"
+        assert '"blocks": [' not in body, "the v1 block tree is still the anatomy"
+
+    @pytest.mark.parametrize("page", PAGES)
+    def test_json_pages_are_named_as_the_older_form(self, repo_root: Path, page: str) -> None:
+        """Named, not deleted. Those pages render indefinitely, and a
+        reader holding one needs to be told where they stand and how to
+        convert — `oku migrate` is the whole answer."""
+        body = self._anatomy(repo_root, page)
+        assert "{#json-pages}" in body, "nothing tells a reader with a JSON page where they stand"
+        assert "oku migrate" in body, "the older-pages note does not say how to convert one"
