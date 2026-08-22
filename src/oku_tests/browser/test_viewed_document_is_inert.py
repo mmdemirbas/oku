@@ -68,6 +68,14 @@ Text after the script.
 
 <base href="https://example.com/">
 
+<style>
+body {{ display: none }}
+h2 {{ color: rgb(1, 2, 3) }}
+:root {{ --accent: rgb(7, 7, 7) }}
+</style>
+
+<link rel="stylesheet" href="data:text/css,body%7Bbackground-color%3Argb(9%2C9%2C9)%7D">
+
 <meta http-equiv="refresh" content="0;url=https://example.com/">
 
 ```mermaid
@@ -141,9 +149,20 @@ PROBE = """() => {
     notice: view.querySelector('.okt-mdview-inert') ? view.querySelector('.okt-mdview-inert').textContent.trim() : null,
     diagramDrew: !!view.querySelector('oku-diagram svg'),
     barsDrew: view.querySelectorAll('.okt-bar, .okt-bar-row, [class*="okt-bar"]').length,
-    links: [...view.querySelectorAll('a[href]')].map(a => a.getAttribute('href')),
     cardText: view.querySelector('.okt-card') ? view.querySelector('.okt-card').textContent.replace(/\\s+/g, ' ').trim() : null,
     sourceHasScript: !!src && src.textContent.indexOf('__RAN_SCRIPT') >= 0,
+    // The page that opened the file, measured where the sheet aimed.
+    pageBodyDisplay: getComputedStyle(document.body).display,
+    pageHeadingColour: getComputedStyle(document.querySelector('main h2')).color,
+    pageAccent: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(),
+    // …and the document itself, which is meant to keep its styling.
+    viewHeadingColour: view.querySelector('h2') ? getComputedStyle(view.querySelector('h2')).color : null,
+    // The document's own sheet, not the one Mermaid puts inside its SVG
+    // after this pass has run.
+    styles: [...view.querySelectorAll('style')].filter(s => (s.textContent || '').indexOf('display: none') >= 0).length,
+    styleText: ([...view.querySelectorAll('style')].find(s => (s.textContent || '').indexOf('display: none') >= 0) || {}).textContent || '',
+    links: [...view.querySelectorAll('a[href]')].map(a => a.getAttribute('href')),
+    stylesheetLinks: view.querySelectorAll('link').length,
   };
 }"""
 
@@ -275,3 +294,58 @@ def test_a_viewed_document_keeps_its_links_over_file(opened_standalone) -> None:
     way to reach the sibling."""
     assert opened_standalone["links"], "every link in the viewed document was stripped"
     assert any("other" in h for h in opened_standalone["links"]), opened_standalone["links"]
+
+
+# ---------- a stylesheet is confined, not obeyed and not thrown away ----------
+#
+# A `<style>` does not RUN, which is why it survived the first inert
+# pass. It still reaches the whole document it is inserted into, and the
+# document it is inserted into is the reader's page: `body { display:
+# none }` in a linked file blanks the page that opened it, and the
+# control that would close the viewer goes with everything else.
+#
+# Taking the sheet away is the other failure — a document that styles
+# itself renders wrong, and the reader is given no reason. So the sheet
+# is wrapped in one CSS nesting block keyed to the viewer host. The
+# browser's own parser does the hard part; a selector naming `body`,
+# `html` or `:root` becomes a descendant selector that matches nothing,
+# because those three ARE the page that opened the file.
+
+
+def test_a_viewed_stylesheet_does_not_reach_the_page(opened) -> None:
+    assert opened["pageBodyDisplay"] != "none", "a linked file blanked the page that opened it"
+    assert opened["pageHeadingColour"] != "rgb(1, 2, 3)", "a linked file restyled the page's own headings"
+    assert opened["pageAccent"] != "rgb(7, 7, 7)", "a linked file rewrote the page's accent token"
+
+
+def test_the_document_keeps_its_own_styling(opened) -> None:
+    """The half that makes this a confinement rather than a removal. If
+    the sheet were simply deleted, every assertion above would pass and
+    the reader would be looking at a document rendered wrong."""
+    assert opened["styles"] == 1, "the stylesheet was removed rather than confined"
+    assert opened["viewHeadingColour"] == "rgb(1, 2, 3)", (
+        "the confined sheet no longer styles the document it belongs to"
+    )
+
+
+def test_the_confinement_is_one_nesting_block(opened) -> None:
+    """Not a rule-by-rule rewrite. The CSSOM walk that would need drops
+    whatever it has no branch for, starting with the nested rule it was
+    written before anyone used."""
+    text = opened["styleText"]
+    assert text.startswith("[data-oku-inert="), text[:60]
+    assert "display: none" in text, (
+        "the original rules are still there, in a block that cannot reach the page"
+    )
+
+
+def test_a_stylesheet_fetched_from_a_url_goes(opened) -> None:
+    """A cross-origin sheet has no readable rules, so there is nothing
+    to confine — and every other `rel` is a network request made on
+    behalf of a reader who only opened a file."""
+    assert opened["stylesheetLinks"] == 0, "a <link> survived into the viewed document"
+
+
+def test_the_notice_counts_the_confined_sheet(opened) -> None:
+    assert "stylesheet" in (opened["notice"] or ""), opened["notice"]
+    assert "restyle the page" in opened["notice"], opened["notice"]

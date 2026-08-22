@@ -924,16 +924,41 @@ var __okuMdViewer = (function () {
      reads on the file that matters. */
   function noteInert(host, warnings) {
     var removed = 0;
+    var scoped = 0;
     (warnings || []).forEach(function (w) {
-      if (w && w.code === 'inert-document' && w.payload) removed += w.payload.removed || 0;
+      if (!w || w.code !== 'inert-document' || !w.payload) return;
+      removed += w.payload.removed || 0;
+      scoped += w.payload.scoped || 0;
     });
-    if (!removed) return;
+    if (!removed && !scoped) return;
+    // Built as nodes rather than one innerHTML string: the sentences go
+    // through okuT, and a translator handed markup inside a key is a
+    // translator who can break the markup.
     var note = document.createElement('div');
     note.className = 'callout warning okt-mdview-inert';
-    note.innerHTML =
-      '<p>' + removed + (removed === 1 ? ' item was' : ' items were') +
-      ' left out: a linked document is rendered, not run.' +
-      ' Switch to <strong>Source</strong> to read what they were.</p>';
+    var p = document.createElement('p');
+    var say = function (text) {
+      if (p.childNodes.length) p.appendChild(document.createTextNode(' '));
+      p.appendChild(document.createTextNode(text));
+    };
+    if (removed) {
+      say(
+        removed === 1
+          ? okuT('One item was left out: a linked document is rendered, not run.')
+          : okuT('{0} items were left out: a linked document is rendered, not run.', removed)
+      );
+    }
+    if (scoped) {
+      say(
+        scoped === 1
+          ? okuT('One stylesheet was confined to this document so it cannot restyle the page.')
+          : okuT('{0} stylesheets were confined to this document so they cannot restyle the page.', scoped)
+      );
+    }
+    if (removed) {
+      say(okuT('Switch to Source to read what they were.'));
+    }
+    note.appendChild(p);
     host.insertBefore(note, host.firstChild);
   }
 
@@ -4925,7 +4950,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-22-r61';
+var __okuKitBuild = '2026-08-23-r62';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

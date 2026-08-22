@@ -3096,10 +3096,24 @@
    * `on*` handler, a URL that executes on activation, and the elements
    * that reach past their own subtree — see REMOVED_TAGS.
    *
-   * A `<style>` in a viewed document is deliberately LEFT: it does not
-   * run, and taking it would break a document that legitimately styles
-   * itself. It does bleed into the host page, which is an open finding
-   * on the board rather than a decision made here in passing. What stays is everything the primitives need — the
+   * A `<style>` in a viewed document is SCOPED, not taken. Left alone
+   * it restyled the page that opened it — `body { display: none }` in a
+   * linked file blanked the reader's own document, and there was no
+   * control left to undo it with. Taken away, a file that legitimately
+   * styles itself renders wrong. So the sheet is wrapped in one CSS
+   * nesting block keyed to the host element, which delegates every hard
+   * part — comma lists, `:not()`, `@media`, nested rules — to the
+   * browser's own parser instead of a regex. A selector naming `:root`,
+   * `html` or `body` becomes a descendant selector that matches
+   * nothing, which is the right answer rather than a limitation: those
+   * three ARE the page that opened the file.
+   *
+   * `<link>` goes with the framing elements. A stylesheet fetched from
+   * a URL cannot be scoped — a cross-origin sheet has no readable
+   * rules — and every other `rel` is a network request made on the
+   * reader's behalf by a file they only opened to read.
+   *
+   * What stays is everything the primitives need — the
    * `text/x-mermaid`, `text/x-code`, `application/json` and
    * `text/plain` holders the typed renderers emit are data, so a viewed
    * file's diagrams, charts and snippets draw exactly as they do in a
@@ -3113,15 +3127,26 @@
   // reach into; `base` and `meta` do not run anything themselves but
   // change how the WHOLE page resolves and navigates, which is the same
   // reach by another route.
-  const REMOVED_TAGS = 'iframe,frame,frameset,object,embed,base,meta';
+  const REMOVED_TAGS = 'iframe,frame,frameset,object,embed,base,meta,link';
   const URL_ATTRS = ['href', 'src', 'xlink:href', 'formaction', 'action'];
 
-  function makeInert(root) {
+  function makeInert(root, scopeSel) {
     let removed = 0;
+    let scoped = 0;
     root.querySelectorAll('script').forEach((el) => {
       if (EXECUTABLE_TYPE.test((el.getAttribute('type') || '').trim())) { el.remove(); removed++; }
     });
     root.querySelectorAll(REMOVED_TAGS).forEach((el) => { el.remove(); removed++; });
+    root.querySelectorAll('style').forEach((el) => {
+      const css = el.textContent || '';
+      if (!css.trim()) return;
+      // One nesting block. Not a rule-by-rule rewrite: the CSSOM walk
+      // that would need drops whatever it has no branch for, and the
+      // thing it would drop first is the nested rule it was written
+      // before anyone used.
+      el.textContent = scopeSel + ' {\n' + css + '\n}';
+      scoped++;
+    });
     root.querySelectorAll('*').forEach((el) => {
       // Live list — removeAttribute during iteration would skip one.
       for (const name of Array.prototype.map.call(el.attributes, (a) => a.name)) {
@@ -3133,8 +3158,11 @@
         }
       }
     });
-    return removed;
+    return { removed: removed, scoped: scoped };
   }
+
+  // Unique per view, so two open documents cannot style each other.
+  let __inertSeq = 0;
 
   /* Render markdown source into `host`. opts:
    *   idPrefix — string prepended to every emitted id (required in a
@@ -3198,12 +3226,16 @@
     // after the rebase would strip every link in a viewed document on
     // a standalone page, where `opts.base` IS a file: URL.
     if (opts.inert) {
-      const removed = makeInert(holder);
-      if (removed) {
+      const mark = 'oku-inert-' + ++__inertSeq;
+      host.setAttribute('data-oku-inert', mark);
+      const inert = makeInert(holder, '[data-oku-inert="' + mark + '"]');
+      if (inert.removed || inert.scoped) {
         inner.warnings.push({
           code: 'inert-document',
-          msg: removed + ' item(s) that would have run were removed — a linked document is rendered, not executed',
-          payload: { removed: removed },
+          msg:
+            inert.removed +
+            ' item(s) that would have run were removed — a linked document is rendered, not executed',
+          payload: { removed: inert.removed, scoped: inert.scoped },
           level: 'warn',
         });
       }

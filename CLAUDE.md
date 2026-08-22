@@ -446,8 +446,27 @@ in localStorage — a setting the reader cannot see change and would not
 think to undo. An `<img onerror>` fired in the same pass. `makeInert`
 in renderer.js drops what could run (an executable `<script>`, an `on*`
 attribute, a URL `safeUrl` refuses, `iframe` / `frame` / `object` /
-`embed`) and the viewer says how many went, because a silent removal
-reads as a rendering bug to the author whose island stopped working.
+`embed` / `link`) and the viewer says how many went, because a silent
+removal reads as a rendering bug to the author whose island stopped
+working.
+
+**A `<style>` is confined rather than dropped.** It does not run, which
+is why it survived the first pass, and it still reaches the whole
+document it is inserted into — which is the reader's page. `body {
+display: none }` in a linked file blanked the page that opened it, and
+the control that would close the viewer went with everything else; the
+module's own fixture cannot even reach the viewer without the fix, so
+all fifteen of its tests error rather than fail. Dropping the sheet is
+the opposite failure, so the sheet is wrapped in ONE CSS nesting block
+keyed to a `data-oku-inert` mark on the host — the browser's own parser
+takes the comma lists, the `:not()`, the `@media` and the nested rules
+that a rule-by-rule CSSOM rewrite would silently drop. A selector naming
+`:root`, `html` or `body` becomes a descendant selector matching
+nothing, which is the answer and not a limitation: those three ARE the
+page that opened the file. `<link>` cannot be confined — a cross-origin
+sheet has no readable rules — and every `rel` is a request made on
+behalf of a reader who only opened a file, so it goes with the framing
+elements.
 
 Two things about it are load-bearing. **Only executable scripts go**: a
 typed block carries its payload in a `text/x-mermaid`, `text/x-code`,

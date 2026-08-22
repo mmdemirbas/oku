@@ -54,6 +54,8 @@
   "No results.": "Sonuç yok.",
   "Nothing to preview — the path is here to copy.": "Önizlenecek bir şey yok — yol yalnızca kopyalamak için burada.",
   "On this page:": "Bu sayfada:",
+  "One item was left out: a linked document is rendered, not run.": "Bir öge dışarıda bırakıldı: bağlantı verilen belge işlenir, çalıştırılmaz.",
+  "One stylesheet was confined to this document so it cannot restyle the page.": "Bir biçem sayfası bu belgeye sınırlandı; sayfanın biçimini değiştiremez.",
   "Open file": "Dosyayı aç",
   "Open it directly": "Doğrudan aç",
   "Open the file itself in a new tab": "Dosyanın kendisini yeni sekmede aç",
@@ -92,6 +94,7 @@
   "Source": "Kaynak",
   "Subsections of {0}": "{0} alt başlıkları",
   "Switch theme (light / dark)": "Temayı değiştir (açık / koyu)",
+  "Switch to Source to read what they were.": "Ne olduklarını okumak için Kaynak görünümüne geçin.",
   "TL;DR": "TL;DR",
   "Table configuration": "Tablo ayarları",
   "Toggle full-width / fit to column": "Tam genişlik / sütuna sığdır arasında geçiş",
@@ -140,5 +143,7 @@
   "rail:Timeline": "Zaman çizelgesi",
   "rail:Title": "Başlık",
   "site-manifest.json is malformed (no {0} array). Run {1}.": "site-manifest.json bozuk ({0} dizisi yok). {1} çalıştırın.",
-  "{0} lines": "{0} satır"
+  "{0} items were left out: a linked document is rendered, not run.": "{0} öge dışarıda bırakıldı: bağlantı verilen belge işlenir, çalıştırılmaz.",
+  "{0} lines": "{0} satır",
+  "{0} stylesheets were confined to this document so they cannot restyle the page.": "{0} biçem sayfası bu belgeye sınırlandı; sayfanın biçimini değiştiremezler."
 }
