@@ -5755,6 +5755,15 @@ def _make_serve_handler(root: Path):
     """Subclass SimpleHTTPRequestHandler with a /__reload SSE endpoint and
     quiet logging for the keepalive ticks."""
 
+    # Resolved once, here, because every containment check below compares
+    # a resolved filesystem path against this one. Handed a directory
+    # reached through a symlink — `/var/...` on macOS, `~/code` pointing
+    # into another tree, a worktree linked beside its repo — the two sides
+    # disagree, `_serve_synthesized` decides the request is outside the
+    # root, and every page answers 404 for its own JSON. The kit still
+    # loads, so the reader gets the chrome, an empty column and no error.
+    root = Path(root).resolve()
+
     class _Handler(http.server.SimpleHTTPRequestHandler):
         # Serve from the captured root regardless of process cwd changes
         # later in the lifetime.
