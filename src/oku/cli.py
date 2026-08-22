@@ -5294,6 +5294,20 @@ def cmd_build(args: argparse.Namespace) -> int:
             print(f"! Doctree check: {len(errors)} error(s):")
             for it in errors:
                 print(_format_issue(it, root))
+            # The contract every consumer reads is "the build refuses to
+            # ship if it errors", and the build printed these and shipped
+            # anyway with exit code 0 — so CI went green on a tree
+            # carrying a page the linter had rejected, and the reader got
+            # the page. A schema error is not cosmetic: it names a
+            # payload the renderer will draw wrong or not at all.
+            if not getattr(args, "allow_errors", False):
+                print(
+                    "\n✗ Not building. Fix the errors above, or pass --allow-errors to ship anyway.\n"
+                    "  `oku check` prints the full report, warnings included.",
+                    file=sys.stderr,
+                )
+                return 1
+            print("  (--allow-errors: building anyway)")
         elif warnings:
             print(
                 f"✓ Doctree check: {len(json_pages)} page(s) clean (errors); {len(warnings)} warning(s) — run `oku check` for the full report."
@@ -6747,7 +6761,12 @@ def main() -> int:
         action="store_true",
         help="skip fetching mermaid + Prism; pages fall back to the CDN",
     )
-    sub.add_parser("clean", help="remove dist/ from the current project")
+    build_parser.add_argument(
+        "--allow-errors",
+        action="store_true",
+        help="build even when the doctree check reports errors (they are still printed)",
+    )
+    sub.add_parser("clean", help="remove the trees oku built under dist/")
     migrate_parser = sub.add_parser(
         "migrate",
         help="convert page-JSON sources (v1/v2) to v3 markdown",
