@@ -2860,6 +2860,14 @@
         indigo: { light: '#4338ca', soft: '#e0e7ff', strong: '#3730a3', dark: '#a5b4fc', darkSoft: '#1e1b4b', darkStrong: '#c7d2fe' }
       };
       const p = palettes[accent];
+      // The dark half is wrapped in `@media not print` for the same
+      // reason the token table in chrome.css is: paper is white, and a
+      // page printed while the reader had dark mode on painted its
+      // callouts with the dark accent-soft (#042f2e) under the print
+      // block's black text — 1.45:1, measured. The accent arrives as a
+      // stylesheet rather than inline style, so the media query is all
+      // it takes; without the wrapper no CSS rule can reach it.
+      const darkRule = (body) => '@media not print { :root[data-theme="dark"] { ' + body + ' } }';
       let style = document.getElementById('oku-accent');
       if (!style) {
         style = document.createElement('style');
@@ -2869,7 +2877,7 @@
       if (p) {
         style.textContent =
           ':root { --accent: ' + p.light + '; --accent-soft: ' + p.soft + '; --accent-strong: ' + p.strong + '; }' +
-          ':root[data-theme="dark"] { --accent: ' + p.dark + '; --accent-soft: ' + p.darkSoft + '; --accent-strong: ' + p.darkStrong + '; }';
+          darkRule('--accent: ' + p.dark + '; --accent-soft: ' + p.darkSoft + '; --accent-strong: ' + p.darkStrong + ';');
         return;
       }
       // A custom colour used to set --accent and stop there, which left
@@ -2892,9 +2900,9 @@
         ':root { --accent: ' + derived.light.accent +
           '; --accent-soft: ' + derived.light.soft +
           '; --accent-strong: ' + derived.light.strong + '; }' +
-        ':root[data-theme="dark"] { --accent: ' + derived.dark.accent +
+        darkRule('--accent: ' + derived.dark.accent +
           '; --accent-soft: ' + derived.dark.soft +
-          '; --accent-strong: ' + derived.dark.strong + '; }';
+          '; --accent-strong: ' + derived.dark.strong + ';');
     }
 
     _unknown(block) {

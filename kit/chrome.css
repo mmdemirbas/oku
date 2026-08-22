@@ -87,6 +87,16 @@
   --series-10: #4b5563;
 }
 :root[data-theme="light"] { color-scheme: light; }
+/* Not in print. Paper is white, and every token below is chosen for a
+   dark screen — a page printed while the reader had dark mode on came
+   out with `pre` at #e8e6f5 on a white body (1.13:1, code blocks
+   blank) and cards painted #15122a with black text on them (1.19:1).
+   The print block underneath repainted `body` and the headings and
+   could not reach anything token-driven, which is most of the page.
+   `@media not print` is how the light values on :root above win back,
+   without a second copy of thirty-six tokens for someone to keep in
+   step. */
+@media not print {
 :root[data-theme="dark"] {
   --bg: #0e0c1c;
   --surface: #1a1730;
@@ -128,6 +138,7 @@
   --series-9: #fca5a5;
   --series-10: #d1d5db;
   color-scheme: dark;
+}
 }
 
 /* ============ Base layout ============ */
@@ -1927,6 +1938,14 @@ code:not(pre code) {
    controls unreachable. Keep them visible there. */
 @media (hover: none) {
   .okt-table-controls { opacity: 1; pointer-events: auto; }
+  /* Same reasoning, and the wrap toggle is the control that matters
+     most here: it is the fix for a code block scrolling sideways, on
+     the device where that hurts. It was revealed only by
+     `.okt-pre-host:hover`, so on a touch screen it was a 30x30 box at
+     opacity 0 that still took clicks. `.copy-btn` had a rescue keyed
+     off `max-width: 768px` — a WIDTH proxy for a HOVER question, which
+     leaves a touch tablet at 1024px with neither. */
+  .copy-btn, .okt-wrap-btn { opacity: 1; }
 }
 /* A short table spans the column like every other block. It once sized
    to its content — three short cells stretched over 970px was read as a
@@ -4209,7 +4228,10 @@ footer {
      collapse it looks like it prevents was reported anyway. The columns
      are handled where they resolve — see the @container block. */
   .bar-row { font-size: 12.5px; gap: 8px; }
-  .copy-btn { opacity: 1; }
+  /* `.copy-btn { opacity: 1 }` used to sit here — a WIDTH proxy for a
+     HOVER question, which rescued a phone and left a touch tablet at
+     1024px with an invisible button. It moved to the `(hover: none)`
+     block, beside the wrap toggle that never had one. */
   .permalink { display: none; }
 }
 
@@ -4219,7 +4241,14 @@ footer {
   .copy-btn, .permalink, .okt-copy-actions,
   /* A path chip prints as the path. The button that copies it is
      one of the two things paper cannot do. */
-  .okt-fp-copy { display: none !important; }
+  .okt-fp-copy,
+  /* Live table and code chrome. Measured on the built pages: 39
+     language pills, 25 fold markers, 10 column-resize bars and a full
+     table toolbar — filter box, stats counter, both copy buttons —
+     printed onto paper, where none of them can be operated. */
+  .okt-code-lang, .okt-fold-marker, .okt-col-resize,
+  .okt-table-controls, .okt-chip-rack, .okt-view-switch { display: none !important; }
+  .okt-sortable::after { content: none !important; }
   /* page-nav is listed because of the pinned state. Off-canvas it was
      invisible on paper for free; at left: 0 it would print, and its
      inset would print with it. */
@@ -4236,6 +4265,11 @@ footer {
   details { display: block; }
   details > *:not(summary) { display: block !important; }
   details summary::after { content: " (expanded)"; font-size: 9pt; color: #888; }
+  /* Paper does not scroll, so an `overflow: auto` box simply clips.
+     Measured: a table board 1088px wide inside a 742px page lost 346px
+     with nothing on the page to say so. */
+  .okt-table-scroll, .okt-table-board, pre { overflow: visible !important; }
+  pre, pre code { white-space: pre-wrap; word-break: break-word; }
 }
 
 /* ============================================================
@@ -5052,7 +5086,12 @@ body.toc-collapsed .page-toc-tab-thumb svg { transform: rotate(180deg); }
   height: 18px;
   border-radius: 9px;
   background: var(--danger);
-  color: white;
+  /* --danger inverts across themes (#b91c1c → #fca5a5) and a literal
+     `white` does not: 6.5:1 in light, 1.9:1 in dark. This is the one
+     control the chrome-dimming floor exempts, because an alert that
+     dims itself is a bug — an alert whose count cannot be read is the
+     same bug by another route. */
+  color: var(--on-accent);
   font-size: 10px;
   font-weight: 700;
   display: flex;
