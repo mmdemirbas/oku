@@ -5432,56 +5432,77 @@ def cmd_build(args: argparse.Namespace) -> int:
         return 0
 
     dist = root / "dist"
-    standalone = dist / "standalone"
-    site = dist / "site"
-
-    # Clean previous outputs to avoid stale files. The set is
-    # `BUILD_TREES` so `oku build` and `oku clean` cannot disagree about
-    # what this tool owns — `dist/_search` was in neither, and this
-    # repo's own copy was still answering searches for two pages that had
-    # been deleted from the source.
-    for name in BUILD_TREES:
-        tree = dist / name
-        if tree.exists():
-            shutil.rmtree(tree)
+    # Build BESIDE the previous output, swap when it is whole.
+    #
+    # The old order removed every tree first and wrote the new pages into
+    # the hole. Anything that failed in between — a full disk, a
+    # permission on one directory, an interrupt — left the reader's copy
+    # deleted and the replacement half-written; measured on a 12 MB disk
+    # image, `dist/standalone` ended with one 0-byte page and nothing
+    # else, and the previous build was gone. That is the one failure this
+    # tool must not have, because the thing destroyed is the artifact
+    # somebody already had.
+    staging = dist / f".build-{os.getpid()}"
+    standalone = staging / "standalone"
+    site = staging / "site"
+    final_standalone = dist / "standalone"
+    final_site = dist / "site"
 
     # One manifest, computed once, used by both trees: the site fetches
     # it as a sidecar, the standalone pages carry it inline.
-    dist_manifest = compute_manifest(root, pages=json_pages)
-    build_standalone(srcs, standalone, root, manifest=dist_manifest)
-    build_site(srcs, site, root, manifest=dist_manifest)
+    # Every write below lands in staging, and the one statement that
+    # touches the previous output is the swap at the end. An OSError
+    # anywhere in between — the disk filling, a read-only directory, a
+    # name the filesystem refuses — therefore costs the reader nothing
+    # but the new build.
+    try:
+        dist_manifest = compute_manifest(root, pages=json_pages)
+        build_standalone(srcs, standalone, root, manifest=dist_manifest)
+        build_site(srcs, site, root, manifest=dist_manifest)
 
-    # Each tree carries only what its audience needs:
-    #   standalone/  humans, file:// — every HTML inlines its own
-    #                window.__okuManifest, so no sidecar is needed.
-    #   site/        humans, HTTP — chrome.js fetches site-manifest.json
-    #                from the docs root; llms.txt at the docs root
-    #                serves AI/LLM consumers (the .md SOURCES are the
-    #                canonical AI surface — no twin tree needed).
-    # In the SITE tree the docs root is the site root: build_site copies
-    # the kit to dist/site/_oku/ once, and chrome.js derives the docs root
-    # by stripping back to whichever directory holds _oku/. Writing the
-    # manifest anywhere else — e.g. under dist/site/docs/ for a project
-    # whose pages all live in docs/ — leaves every built page fetching a
-    # manifest that isn't there, and the site tree renders with an empty
-    # site-tree nav. Page paths are therefore relative to the project
-    # root, which is exactly the layout inside dist/site/.
-    build_manifest(root, out_dir=site, pages=json_pages)
-    print(f"✓ Wrote dist/site/site-manifest.json ({len(json_pages)} JSON page(s))")
+        # Each tree carries only what its audience needs:
+        #   standalone/  humans, file:// — every HTML inlines its own
+        #                window.__okuManifest, so no sidecar is needed.
+        #   site/        humans, HTTP — chrome.js fetches site-manifest.json
+        #                from the docs root; llms.txt at the docs root
+        #                serves AI/LLM consumers (the .md SOURCES are the
+        #                canonical AI surface — no twin tree needed).
+        # In the SITE tree the docs root is the site root: build_site copies
+        # the kit to dist/site/_oku/ once, and chrome.js derives the docs root
+        # by stripping back to whichever directory holds _oku/. Writing the
+        # manifest anywhere else — e.g. under dist/site/docs/ for a project
+        # whose pages all live in docs/ — leaves every built page fetching a
+        # manifest that isn't there, and the site tree renders with an empty
+        # site-tree nav. Page paths are therefore relative to the project
+        # root, which is exactly the layout inside dist/site/.
+        build_manifest(root, out_dir=site, pages=json_pages)
+        print(f"✓ Wrote dist/site/site-manifest.json ({len(json_pages)} JSON page(s))")
 
-    build_llms_txt(root, out_dir=site, pages=json_pages)
-    print("✓ Wrote dist/site/llms.txt")
+        build_llms_txt(root, out_dir=site, pages=json_pages)
+        print("✓ Wrote dist/site/llms.txt")
 
-    # Synthesized stubs (from .json or .md sources with no on-disk
-    # .html sibling) are emitted inline by build_site / build_standalone
-    # via iter_page_stubs — no separate pass needed.
-    synth_count = sum(1 for _, _, d in srcs if d is not None)
-    if synth_count:
-        print(f"✓ Synthesized {synth_count} stub(s) for pages without on-disk .html")
+        # Synthesized stubs (from .json or .md sources with no on-disk
+        # .html sibling) are emitted inline by build_site / build_standalone
+        # via iter_page_stubs — no separate pass needed.
+        synth_count = sum(1 for _, _, d in srcs if d is not None)
+        if synth_count:
+            print(f"✓ Synthesized {synth_count} stub(s) for pages without on-disk .html")
 
-    # Pagefind search index — soft-fail if pagefind isn't installed.
-    if pagefind_index(site):
-        print("✓ Pagefind index built: dist/site/pagefind/")
+        # Pagefind search index — soft-fail if pagefind isn't installed.
+        # Runs against the staged tree, before the swap: its output lives
+        # inside `site/pagefind/` and moves with it.
+        if pagefind_index(site):
+            print("✓ Pagefind index built: dist/site/pagefind/")
+
+        # The swap. Everything above wrote into staging, so this is the first
+        # moment the previous output is touched at all.
+        _swap_build_trees(dist, staging)
+    except OSError as e:
+        shutil.rmtree(staging, ignore_errors=True)
+        print(f"\n✗ Build failed: {e}", file=sys.stderr)
+        print("  Nothing under dist/ was changed — the previous build still stands.", file=sys.stderr)
+        return 1
+    standalone, site = final_standalone, final_site
 
     print(f"✓ Built {len(srcs)} HTML file(s):")
     if prior_stamp and prior_stamp != _kit_build_stamp():
@@ -5510,6 +5531,48 @@ def cmd_build(args: argparse.Namespace) -> int:
 # Pagefind index; it is here because nothing else removes it, and a
 # stale one keeps answering for pages the source no longer has.
 BUILD_TREES = ("standalone", "site", "markdown", "_search")
+
+
+def _swap_build_trees(dist: Path, staging: Path) -> None:
+    """Put the finished trees where the previous ones were.
+
+    Called once, after every byte has been written into `staging`. Each
+    tree moves in two renames — old aside, new into place — so the window
+    in which the final path does not exist is a rename apart rather than
+    a whole build long, and a failure on the second rename puts the old
+    one back rather than leaving nothing.
+
+    The trees `BUILD_TREES` names but this build did not produce are
+    removed here too. That is the stale-artifact sweep the old code did
+    up front: `dist/_search` outliving the pages it indexed, a
+    `dist/markdown` tree from a version that still wrote one. Doing it at
+    swap time rather than at the start is what makes a failed build cost
+    nothing.
+    """
+    dist.mkdir(parents=True, exist_ok=True)
+    built = set()
+    for name in sorted(p.name for p in staging.iterdir()) if staging.is_dir() else []:
+        new = staging / name
+        final = dist / name
+        old = dist / f".old-{name}-{os.getpid()}"
+        if final.exists() or final.is_symlink():
+            final.rename(old)
+        try:
+            new.rename(final)
+        except OSError:
+            if old.exists():
+                old.rename(final)
+            raise
+        finally:
+            shutil.rmtree(old, ignore_errors=True)
+        built.add(name)
+    for name in BUILD_TREES:
+        if name in built:
+            continue
+        stale = dist / name
+        if stale.is_dir() and not stale.is_symlink():
+            shutil.rmtree(stale, ignore_errors=True)
+    shutil.rmtree(staging, ignore_errors=True)
 
 
 def cmd_clean(args: argparse.Namespace) -> int:

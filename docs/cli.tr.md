@@ -67,8 +67,8 @@ oku build
 > [!WARN] build, denetim hatasında durur
 > Doküman ağacı denetimi önce çalışır ve bir hata derlemeyi 1 çıkış koduyla bitirir: bir şema hatası, motorun yanlış çizeceği ya da hiç çizemeyeceği bir yükü adlandırır; onu yayımlamak bozuk sayfayı okurun önüne koymak demektir. Hatalar her iki durumda da yazdırılır. `--allow-errors`, henüz düzeltmeye hazır olmadığınız eski bir sayfa varsa derlemeyi yine de sürdürür ve bu yolu seçtiğini konsolda söyler.
 
-> [!WARN] build kendi dist ağaçlarını siler
-> build, yeniden üretmeden önce dist/standalone/ ve dist/site/ dizinlerini kaldırır (eski bir derlemeden kalmışsa dist/markdown/ dizinini de), böylece bayat dosyalar birikmez. Ayrıca serve sırasında üretilen Pagefind dizinini (dist/_search/) da temizler; bunu başka hiçbir şey kaldırmıyordu ve bayat bir dizin, kaynakta artık bulunmayan sayfalar için yanıt vermeyi sürdürüyordu. dist/ altına koyduğunuz başka her şeye ne build ne de oku clean dokunur.
+> [!NEUTRAL] build dist ağaçlarını önce boşaltmaz, yerine koyar
+> Her sayfa önce `dist/.build-<pid>/` içine yazılır, en sonda yerine taşınır. Yarıda kalan bir derleme yalnızca yeni sayfalara mal olur; önceki dist/standalone/ ve dist/site/ olduğu gibi durur ve hata, yığın izi yerine bunu söyler. Eski ağaçlar da bu takas anında temizlenir: daha eski bir sürümden kalan dist/markdown/ ve sunum sırasında kullanılan Pagefind dizini dist/_search/ — bayatlamış bir dizin, kaynakta artık olmayan sayfalar için cevap vermeye devam eder. dist/ altına kendi koyduğunuz her şeye ne build ne de oku clean dokunur.
 
 ### Okuduğum sayfanın güncel olduğunu nereden bilirim? {#build-provenance}
 

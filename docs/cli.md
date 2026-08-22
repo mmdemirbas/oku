@@ -67,8 +67,8 @@ oku build
 > [!WARN] build stops on a check error
 > The doctree check runs first, and an error ends the build with exit code 1 — a schema error names a payload the renderer will draw wrong or not at all, so shipping it puts the broken page in front of the reader. The errors print either way. `--allow-errors` builds anyway, for a tree with a legacy page you are not ready to fix; it says on the console that it took that path.
 
-> [!WARN] build wipes its dist trees
-> build removes dist/standalone/ and dist/site/ before rebuilding (plus dist/markdown/ if an older build left one) so stale files don't accumulate. It also clears dist/_search/, the serve-time Pagefind index, which nothing else removed — a stale one keeps answering for pages the source no longer has. Anything else you've parked under dist/ is left alone, by build and by oku clean alike.
+> [!NEUTRAL] build replaces its dist trees, it does not empty them first
+> Every page is written into `dist/.build-<pid>/` and moved into place at the end, so a build that fails partway costs the new pages and nothing else — the previous dist/standalone/ and dist/site/ are still there, whole, and the error says so instead of raising a traceback. The swap is also where stale trees go: dist/markdown/ from an older version, and dist/_search/, the serve-time Pagefind index that nothing else removed — a stale one keeps answering for pages the source no longer has. Anything else you have parked under dist/ is left alone, by build and by oku clean alike.
 
 ### How do I know the page I am reading is current? {#build-provenance}
 
