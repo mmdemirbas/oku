@@ -557,6 +557,17 @@ var __okuI18n = (function () {
   return { t: t, load: load, localize: localize, lang: lang, table: function () { return table; } };
 })();
 
+/* One door for the TOC's fold state. The scroll-spy folds sections as
+ * the reader moves through the page, and the button's `aria-expanded`
+ * has to say what the class says — two call sites setting the class
+ * directly is how the two drift, and the one that drifts is the one
+ * nobody can see. */
+function __okuTocExpand(li, on) {
+  li.classList.toggle('expanded', on);
+  var chev = li.querySelector(':scope > .toc-head > .chevron');
+  if (chev && chev.tagName === 'BUTTON') chev.setAttribute('aria-expanded', String(!!on));
+}
+
 function okuT(en) {
   return __okuI18n.t.apply(null, arguments);
 }
@@ -2339,8 +2350,33 @@ function buildTOC(tocList) {
     // tag` became a live element in the sidebar while the body showed
     // it correctly as text. The h3 branch a few lines down was already
     // written this way; this one was the outlier.
-    var chev = document.createElement('span');
-    chev.className = 'chevron';
+    var h3s = sec.querySelectorAll('h3');
+    var subOl = document.createElement('ol');
+    subOl.className = 'toc-sub';
+    subOl.id = sec.id + '-toc-sub';
+    /* The fold control is a real button wherever there is something to
+       fold. It was a <span> with the click handler on the row, so the
+       only keyboard-reachable thing in a section header was the link,
+       and the link navigates: a reader on a keyboard could open a
+       section and never fold one, on a panel whose whole job is
+       choosing what to look at.
+
+       A section with no subsections gets a span, not a disabled
+       button. It keeps the column alignment (`visibility: hidden`
+       holds the 10px) without adding a tab stop that goes nowhere. */
+    var chev;
+    if (h3s.length > 0) {
+      chev = document.createElement('button');
+      chev.type = 'button';
+      chev.className = 'chevron';
+      chev.setAttribute('aria-expanded', 'false');
+      chev.setAttribute('aria-controls', subOl.id);
+      chev.setAttribute('aria-label', okuT('Subsections of {0}', title));
+    } else {
+      chev = document.createElement('span');
+      chev.className = 'chevron hidden';
+      chev.setAttribute('aria-hidden', 'true');
+    }
     chev.textContent = '▸';
     var numEl = document.createElement('span');
     numEl.className = 'num';
@@ -2353,9 +2389,6 @@ function buildTOC(tocList) {
     head.appendChild(headLink);
     li.appendChild(head);
 
-    var h3s = sec.querySelectorAll('h3');
-    var subOl = document.createElement('ol');
-    subOl.className = 'toc-sub';
     h3s.forEach(function (h3) {
       if (!h3.id) h3.id = sec.id + '-' + slugify(h3.textContent).slice(0, 40);
       appendPermalink(h3, h3.id);
@@ -2369,11 +2402,14 @@ function buildTOC(tocList) {
 
     if (h3s.length > 0) {
       li.appendChild(subOl);
+      // Enter and Space on a <button> fire click natively, and it
+      // bubbles here — so the keyboard path and the pointer path are
+      // one handler rather than two that can disagree.
       head.addEventListener('click', function (e) {
-        if (e.target.tagName !== 'A') { e.preventDefault(); li.classList.toggle('expanded'); }
+        if (e.target.tagName === 'A') return;
+        e.preventDefault();
+        __okuTocExpand(li, !li.classList.contains('expanded'));
       });
-    } else {
-      head.querySelector('.chevron').classList.add('hidden');
     }
 
     tocList.appendChild(li);
@@ -2414,8 +2450,9 @@ function buildTOC(tocList) {
     allSubLinks.forEach(function (a) { a.classList.remove('active'); });
     var item = idToItem[sectionId];
     if (item) {
-      item.classList.add('active', 'expanded');
-      tocItems.forEach(function (it) { if (it !== item) it.classList.remove('expanded'); });
+      item.classList.add('active');
+      __okuTocExpand(item, true);
+      tocItems.forEach(function (it) { if (it !== item) __okuTocExpand(it, false); });
     }
     var sub = h3Id && idToSubLink[h3Id];
     if (sub) sub.classList.add('active');
@@ -4888,7 +4925,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-22-r58';
+var __okuKitBuild = '2026-08-22-r59';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
