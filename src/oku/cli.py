@@ -1112,6 +1112,10 @@ _MIN_READ_MINUTES = 2
 
 _tree_defaults_cache: dict[Path, dict] = {}
 _git_date_cache: dict[tuple[str, int], str | None] = {}
+# One `git log` per directory instead of one per page. `None` marks a
+# directory git could not answer for, so the per-file path is tried
+# there and only there.
+_git_dir_dates: dict[str, dict[str, str] | None] = {}
 
 
 def _tree_defaults(source: Path) -> dict:
@@ -1195,7 +1199,64 @@ def _git_last_modified(p: Path) -> str | None:
         return None
     if key in _git_date_cache:
         return _git_date_cache[key]
-    out: str | None = None
+    dates = _git_dates_in(p.parent)
+    if dates is not None:
+        # The directory's whole history is in hand: a file missing from
+        # it is one git has never seen, and asking again per file is how
+        # the newest pages became the most expensive ones — `git log`
+        # walks the entire history before returning empty.
+        out = dates.get(p.name)
+    else:
+        out = _git_date_one(p)
+    _git_date_cache[key] = out
+    return out
+
+
+def _git_dates_in(directory: Path) -> dict[str, str] | None:
+    """Last commit date per file in one directory, from ONE `git log`.
+
+    Profiled on a 100-page tree: `_git_last_modified` was 9.0s of a
+    12.9s build (70%), 100 subprocesses at 78-90ms each, because the
+    cache key is per (path, mtime) and nothing batched. One
+    `git log --name-only` covering every page in this repo takes 0.09s.
+
+    `--relative` makes the paths relative to `cwd`, so the directory is
+    both the scope and the key. Newest-first, so the first sighting of a
+    name is its answer. None means git could not answer for this
+    directory at all — not a repository, or git is absent — and the
+    caller falls back to asking per file.
+    """
+    key = str(directory)
+    if key in _git_dir_dates:
+        return _git_dir_dates[key]
+    result: dict[str, str] | None = None
+    try:
+        r = subprocess.run(
+            ["git", "log", "--format=%cs", "--name-only", "--relative", "--", "."],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if r.returncode == 0:
+            result = {}
+            current = ""
+            for line in r.stdout.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                if re.fullmatch(r"\d{4}-\d{2}-\d{2}", line):
+                    current = line
+                elif current and line not in result:
+                    result[line] = current
+    except (OSError, subprocess.SubprocessError):
+        result = None
+    _git_dir_dates[key] = result
+    return result
+
+
+def _git_date_one(p: Path) -> str | None:
+    """The single-file question, for a directory git has no answer for."""
     try:
         r = subprocess.run(
             ["git", "log", "-1", "--format=%cs", "--", p.name],
@@ -1205,11 +1266,10 @@ def _git_last_modified(p: Path) -> str | None:
             timeout=5,
         )
         if r.returncode == 0 and re.fullmatch(r"\d{4}-\d{2}-\d{2}", r.stdout.strip()):
-            out = r.stdout.strip()
+            return r.stdout.strip()
     except (OSError, subprocess.SubprocessError):
-        out = None
-    _git_date_cache[key] = out
-    return out
+        return None
+    return None
 
 
 def _apply_meta_defaults(page: dict, source: Path) -> None:
