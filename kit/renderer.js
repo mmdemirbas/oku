@@ -2543,6 +2543,42 @@
     }
 
     _renderChart(block) {
+      /* A chart with nothing to plot draws its frame and its axes, so
+         the generic empty-block guard passes it: `_hasVisibleContent`
+         finds an `<svg>` and a wall of tick labels. What the reader
+         gets is a titled box with no marks in it, which reads as a
+         rendering failure and is really a payload with no data.
+
+         The same one rule `check_pages` applies — a chart with no
+         populated collection anywhere cannot draw, whatever its type,
+         and scalars alone are never enough because even a gauge carries
+         `zones`. It is repeated here rather than left to the check
+         because the check runs at build time and this runs wherever a
+         page is opened: a JSON page edited by hand, a tree built by an
+         older tool, a `.md` opened in the viewer.
+
+         BEFORE `_normaliseChartType`, which is the part that has to be
+         written down: normalising a `line` fills in `marks: ['line']`,
+         and a populated array is exactly what this looks for — so run
+         after it and every empty Cartesian chart reads as having data.
+         The check sees the authored block, so this does too. Held
+         against the CLI rule by test_chart_no_data_runtime.py, which
+         puts the same payloads through both. */
+      const populated = Object.keys(block || {}).some((key) => {
+        if (key === 'k' || key === 'type') return false;
+        const v = block[key];
+        if (Array.isArray(v)) return v.length > 0;
+        return !!v && typeof v === 'object' && Object.keys(v).length > 0;
+      });
+      if (!populated) {
+        this._warn(
+          'chart-no-data',
+          'chart with type:' + ((block && block.type) || 'scatter') +
+            ' carries no data — every collection in it is empty or absent, so it renders as an empty box.',
+          block
+        );
+        return this._blockError(block);
+      }
       block = this._normaliseChartType(block);
       const type = block.type || 'scatter';
       if (type === 'bar') return this._renderBars(block);
