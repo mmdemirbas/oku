@@ -4576,7 +4576,7 @@ footer {
    reader sees in flow). Different source kinds carry different colors so
    the page hints at WHAT kind of source backs each claim before the
    reader hovers. */
-.oku-extref[data-cite-type="paper"]   { border-bottom-color: #4338ca; }
+.oku-extref[data-cite-type="paper"]   { border-bottom-color: var(--series-3); }
 .oku-extref[data-cite-type="rfc"]     { border-bottom-color: var(--text-soft); }
 .oku-extref[data-cite-type="release"] { border-bottom-color: var(--success); }
 .oku-extref[data-cite-type="blog"]    { border-bottom-color: var(--warning); }
@@ -4665,8 +4665,11 @@ a.okt-cite-domain:focus-visible {
 }
 
 /* Each type colors the icon background distinctly so the card "feels" the
-   right kind even before reading the title. */
-.okt-cite[data-cite-type="paper"]   .okt-cite-icon { background: rgba(67, 56, 202, 0.12); color: #4338ca; }
+   right kind even before reading the title. Every one of these reads a
+   token: `paper` was the literal #4338ca, which is --series-3's LIGHT
+   value, so the one citation kind a research page uses most kept the
+   light palette on a dark page while its four siblings inverted. */
+.okt-cite[data-cite-type="paper"]   .okt-cite-icon { background: color-mix(in srgb, var(--series-3) 14%, var(--surface)); color: var(--series-3); }
 .okt-cite[data-cite-type="rfc"]     .okt-cite-icon { background: var(--surface-2); color: var(--text); }
 .okt-cite[data-cite-type="release"] .okt-cite-icon { background: var(--success-soft); color: var(--success); }
 .okt-cite[data-cite-type="blog"]    .okt-cite-icon { background: var(--warning-soft); color: var(--warning); }

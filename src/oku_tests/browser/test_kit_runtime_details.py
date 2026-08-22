@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from oku import cli
+from oku_tests.browser._colour import contrast
 
 pytestmark = pytest.mark.browser
 
@@ -117,23 +118,9 @@ def test_a_mindmap_root_node_is_not_black_on_a_dark_page(browser, served) -> Non
         if fills is None:
             pytest.skip("this mermaid build did not draw a mindmap node to measure")
         assert fills["root"] != "rgb(0, 0, 0)", "the root node is painted black on a dark page"
-        assert _contrast(fills["root"], fills["page"]) >= 1.6, f"root {fills['root']} on page {fills['page']}"
+        assert contrast(fills["root"], fills["page"]) >= 1.6, f"root {fills['root']} on page {fills['page']}"
     finally:
         pg.close()
-
-
-def _contrast(a: str, b: str) -> float:
-    def lum(css: str) -> float:
-        r, g, bl = (int(v) for v in css[css.index("(") + 1 : css.index(")")].split(",")[:3])
-
-        def chan(c: float) -> float:
-            c /= 255
-            return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
-
-        return 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(bl)
-
-    hi, lo = sorted((lum(a), lum(b)), reverse=True)
-    return (hi + 0.05) / (lo + 0.05)
 
 
 def test_a_rail_jump_does_not_animate_under_reduced_motion(browser, served) -> None:
