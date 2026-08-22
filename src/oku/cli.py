@@ -27,6 +27,7 @@ import datetime
 import difflib
 import hashlib
 import http.server
+import ipaddress
 import json
 import mimetypes
 import os
@@ -5912,6 +5913,21 @@ def _pick_open_target(htmls: list[Path], user_cwd: Path, root: Path) -> Path | N
     return htmls[0]
 
 
+def _is_loopback(host: str) -> bool:
+    """Whether an address reaches only this machine.
+
+    Kept as a function rather than a `host == "127.0.0.1"` comparison
+    because `::1`, `localhost` and the whole 127.0.0.0/8 block are all
+    loopback, and a warning that fires on `127.0.0.2` is one people
+    learn to ignore. An empty host is the WILDCARD, not loopback — that
+    conflation is the defect this replaces.
+    """
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     """Start an HTTP server at the project root and print HTTP URLs for every HTML.
 
@@ -5929,11 +5945,19 @@ def cmd_serve(args: argparse.Namespace) -> int:
     os.chdir(root)
     handler_cls = _make_serve_handler(root)
 
+    # Loopback by default. The previous bind was `("", port)` — every
+    # interface — while the line printed underneath said `localhost`,
+    # so the one place a reader could check said the opposite of what
+    # happened. What is published is not a doc tree: `_make_serve_handler`
+    # serves the PROJECT root, which is the working copy, `.env` and all,
+    # to anyone who can route to this machine. On a café or hotel network
+    # that is everyone on it.
+    host = getattr(args, "host", "127.0.0.1") or "127.0.0.1"
     port = 9876
     httpd = None
     while True:
         try:
-            httpd = http.server.ThreadingHTTPServer(("", port), handler_cls)
+            httpd = http.server.ThreadingHTTPServer((host, port), handler_cls)
             break
         except OSError:
             port += 1
@@ -5971,7 +5995,16 @@ def cmd_serve(args: argparse.Namespace) -> int:
         )
         watcher_thread.start()
 
-    print(f"✓ Serving {root} on http://localhost:{port}")
+    # Print what was actually bound, not a friendly constant.
+    bound_host, bound_port = httpd.server_address[0], httpd.server_address[1]
+    loopback = _is_loopback(bound_host)
+    display = "localhost" if loopback else bound_host
+    print(f"✓ Serving {root} on http://{display}:{bound_port}  (bound {bound_host})")
+    if not loopback:
+        print(
+            f"  ⚠ Reachable from the network. Everything under {root} is readable "
+            "by anyone who can route to this machine, with no password."
+        )
     if watch_enabled:
         print("  Live reload: on  (SSE at /__reload — disable with --no-watch)")
     else:
@@ -5984,9 +6017,9 @@ def cmd_serve(args: argparse.Namespace) -> int:
         for h in htmls:
             rel = h.relative_to(root)
             marker = "  ←" if target is not None and h == target else ""
-            print(f"    http://localhost:{port}/{rel}{marker}")
+            print(f"    http://{display}:{bound_port}/{rel}{marker}")
         if target is not None:
-            webbrowser.open(f"http://localhost:{port}/{target.relative_to(root)}")
+            webbrowser.open(f"http://{display}:{bound_port}/{target.relative_to(root)}")
     print()
     try:
         httpd.serve_forever()
@@ -6657,6 +6690,16 @@ def main() -> int:
         "--no-search",
         action="store_true",
         help="skip background Pagefind index generation at startup",
+    )
+    serve_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help=(
+            "address to bind (default 127.0.0.1 — this machine only). "
+            "Pass 0.0.0.0 to reach the preview from a phone or another "
+            "machine on the same network; everything under the project "
+            "root becomes readable to anyone who can route to this host."
+        ),
     )
 
     args = parser.parse_args()

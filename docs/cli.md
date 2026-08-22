@@ -270,7 +270,7 @@ oku serve
 > Browsers apply different rules to local files than HTTP — symlink resolution, fetch, and ES module imports fail silently or behave inconsistently on file://. The local HTTP server sidesteps that. On macOS, opening a file:// URL also disables some same-origin policies that matter for the iframe sandbox in <live-snippet>. Always serve.
 
 > [!NOTE] Optional flags
-> <strong>--no-watch</strong> disables the filesystem watcher + live-reload (serve static only).<br><strong>--no-search</strong> skips the background Pagefind index generation at startup. Both default to on so the dev loop is rich; opt out if you want a leaner serve.
+> <strong>--no-watch</strong> disables the filesystem watcher + live-reload (serve static only).<br><strong>--no-search</strong> skips the background Pagefind index generation at startup. Both default to on so the dev loop is rich; opt out if you want a leaner serve.<br><strong>--host</strong> is the address to bind, and it is <code>127.0.0.1</code> — this machine only. The server hands out the project root, working copy and all, so <code>--host 0.0.0.0</code> (to open the preview on a phone) makes every file under the root readable to anyone who can route to your machine, with no password. The startup line prints the address actually bound.
 
 ## Dependencies {#optional-deps}
 

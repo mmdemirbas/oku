@@ -271,7 +271,7 @@ oku serve
 > Tarayıcılar yerel dosyalara HTTP'den farklı kurallar uygular — sembolik bağ çözümü, fetch ve ES modül içe aktarmaları file:// üzerinde sessizce başarısız olur ya da tutarsız davranır. Yerel HTTP sunucusu bunu aşar. macOS'ta bir file:// adresi açmak ayrıca <live-snippet> içindeki iframe kum havuzu için önemli olan bazı aynı-kaynak kurallarını devre dışı bırakır. Her zaman sunucudan açın.
 
 > [!NOTE] İsteğe bağlı bayraklar
-> <strong>--no-watch</strong> dosya sistemi izleyicisini ve canlı yenilemeyi kapatır (yalnızca durağan sunum).<br><strong>--no-search</strong> başlangıçtaki arka plan Pagefind dizin üretimini atlar. İkisi de öntanımlı olarak açıktır, böylece geliştirme döngüsü zengin olur; daha hafif bir serve isterseniz kapatın.
+> <strong>--no-watch</strong> dosya sistemi izleyicisini ve canlı yenilemeyi kapatır (yalnızca durağan sunum).<br><strong>--no-search</strong> başlangıçtaki arka plan Pagefind dizin üretimini atlar. İkisi de öntanımlı olarak açıktır, böylece geliştirme döngüsü zengin olur; daha hafif bir serve isterseniz kapatın.<br><strong>--host</strong> bağlanılacak adrestir ve öntanımlı değeri <code>127.0.0.1</code>, yani yalnızca bu makine. Sunucu proje kökünü olduğu gibi paylaşır; bu yüzden <code>--host 0.0.0.0</code> (önizlemeyi telefonda açmak için) kökün altındaki her dosyayı, makinenize erişebilen herkese parolasız okunur kılar. Başlangıç satırı gerçekten bağlanılan adresi yazar.
 
 ## Bağımlılıklar {#optional-deps}
 
