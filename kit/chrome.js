@@ -1825,12 +1825,24 @@ function __okuRenderIfNeeded(pagePath, anchor) {
   return __okuFetchAndRender(pagePath, anchor);
 }
 
+// Which navigation is the current one. Two clicks in quick succession
+// raced: the URL is pushed synchronously by the click handler, the JSON
+// is fetched after, and whichever response landed LAST won the DOM.
+// Measured with a 1.2s delay on the first page and an 80ms gap between
+// clicks: the address bar said tables.html while the document title,
+// the <h1>, the TOC and the highlighted nav row all said architecture,
+// with no console error — and a refresh then showed a different page
+// than the one on screen.
+var __okuNavSeq = 0;
+
 function __okuFetchAndRender(pagePath, anchor) {
   var wa = (window.__okuWithAuth || function (u) { return u; });
   var jsonUrl = wa(__okuDocsRoot + pagePath.replace(/\.html$/, '.json'));
+  var token = ++__okuNavSeq;
   return fetch(jsonUrl, { cache: 'no-cache' })
     .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function (page) {
+      if (token !== __okuNavSeq) return;   // a later navigation owns the page now
       // Set BEFORE calling render so the oku:rendered handlers
       // (buildTOC, etc.) see the right "current page" when they fire
       // — they need it to namespace TOC hrefs.
@@ -2124,7 +2136,7 @@ class PageChrome extends HTMLElement {
 
     this.querySelector('.drawer-toggle').addEventListener('click', toggleTOC);
     this.querySelector('.back-to-top').addEventListener('click', function () {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: __okuScrollBehavior() });
     });
     // The button is written with aria-expanded="false", but a remembered
     // pinned state was restored before this element existed. Wire hover
@@ -2559,6 +2571,13 @@ var __okuMotionQuery =
     ? window.matchMedia('(prefers-reduced-motion: reduce)')
     : { matches: false, addEventListener: function () {} };
 function __okuReducedMotion() { return !!__okuMotionQuery.matches; }
+/* The scroll behaviour to ask for. `@media (prefers-reduced-motion)`
+   sets `scroll-behavior: auto !important` in the stylesheet, and per
+   CSSOM-View an explicit `behavior: 'smooth'` on the call OVERRIDES the
+   CSS property — so the CSS half was correct and every scripted jump
+   animated anyway. Measured under `reduce`: a rail click moved through
+   23 distinct positions in 24 frames. */
+function __okuScrollBehavior() { return __okuReducedMotion() ? 'auto' : 'smooth'; }
 
 // Set by buildRail so the existing rAF-throttled scroll handler can
 // light the current mark without registering a second listener.
@@ -2824,7 +2843,7 @@ function buildRail() {
     var top = btn._okuMark.el.getBoundingClientRect().top + window.scrollY;
     // 80px matches the `:target` scroll-margin, so a rail jump and an
     // anchor jump land the heading in the same place.
-    window.scrollTo({ top: Math.max(0, top - 80), behavior: 'smooth' });
+    window.scrollTo({ top: Math.max(0, top - 80), behavior: __okuScrollBehavior() });
   }
 
   // Each mark's centre in viewport coordinates, cached so the
@@ -3972,7 +3991,18 @@ function initReadingAids() {
         var k = groupKey(e);
         if (collapsedGroups.has(k)) collapsedGroups.delete(k);
         else collapsedGroups.add(k);
+        // `renderTable` detaches every <tr> and re-appends in visible
+        // order, and removing the ancestor of the focused element blurs
+        // it to <body>. A reader who collapsed a group with Enter then
+        // pressed Space to reopen it scrolled the page instead —
+        // measured, 860px — because the key reached the document.
+        var active = document.activeElement;
+        var keep = active && active.classList && active.classList.contains('okt-group-chevron')
+          ? active : null;
         render();
+        // The row element is re-appended, not rebuilt, so the chevron
+        // node survives the detach and can simply take focus back.
+        if (keep && keep.isConnected) keep.focus();
       }
 
       /* Chip state: per-column Set<value> of currently-active chips.
@@ -4802,7 +4832,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-22-r52';
+var __okuKitBuild = '2026-08-22-r53';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -5359,7 +5389,7 @@ function escapeHTML(s) {
       if (partners[i] === t) continue;
       var r = partners[i].getBoundingClientRect();
       if (r.top < 0 || r.bottom > window.innerHeight) {
-        partners[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        partners[i].scrollIntoView({ behavior: __okuScrollBehavior(), block: 'center' });
         break;
       }
     }
@@ -12897,6 +12927,14 @@ var __mermaidLoader = (function () {
     var surface2     = token('--surface-2',      '#f5f3ff');
     var border       = token('--border',         '#e6e2ef');
     var bg           = token('--bg',             '#fafaf9');
+    var danger       = token('--danger',         '#b91c1c');
+    var dangerSoft   = token('--danger-soft',    '#fee2e2');
+    var isDark       = document.documentElement.getAttribute('data-theme') === 'dark';
+    var series2      = token('--series-2',       '#b45309');
+    var series3      = token('--series-3',       '#4338ca');
+    var series5      = token('--series-5',       '#15803d');
+    var series6      = token('--series-6',       '#be185d');
+    var series7      = token('--series-7',       '#0369a1');
     return {
       startOnLoad: false,
       theme: 'base',
@@ -12911,6 +12949,14 @@ var __mermaidLoader = (function () {
       // less "boring boxes-and-lines" than the sharp default.
       flowchart: { curve: 'basis', useMaxWidth: true, padding: 14, nodeSpacing: 46, rankSpacing: 54, diagramPadding: 8 },
       themeVariables: {
+        /* Mermaid derives the colours it is not given by lightening or
+           darkening the ones it is, and `darkMode` is the flag that
+           decides which direction. Left at its default (false) on a
+           dark page, the mindmap root node computed to black — the one
+           node whose fill Mermaid derives rather than reads from
+           cScale0. Measured: rgb(0,0,0) on #1e1b29 before, the accent
+           after. */
+        darkMode: isDark,
         // Flowchart / generic
         background:       bg,
         primaryColor:     accentSoft,
@@ -12967,13 +13013,21 @@ var __mermaidLoader = (function () {
         classText:        text,
         relationColor:    textSoft,
         relationLabelColor: text,
-        // Mindmap / timeline / journey
+        // Mindmap / timeline / journey. Every other value here is
+        // resolved from a token; these five were literals, and the
+        // literals are the LIGHT theme's values — so a mindmap node
+        // stayed #b45309 after the reader switched to dark, on a page
+        // where everything around it had inverted. The re-render on
+        // `oku:theme-changed` was working the whole time; there was
+        // nothing theme-dependent left in these six lines for it to
+        // pick up. `--series-*` exists for exactly this and inverts
+        // per theme.
         cScale0: accent,
-        cScale1: '#b45309',
-        cScale2: '#4338ca',
-        cScale3: '#15803d',
-        cScale4: '#be185d',
-        cScale5: '#0369a1',
+        cScale1: series2,
+        cScale2: series3,
+        cScale3: series5,
+        cScale4: series6,
+        cScale5: series7,
         cScaleLabel0: text,
         cScaleLabel1: text,
         cScaleLabel2: text,
@@ -12994,8 +13048,8 @@ var __mermaidLoader = (function () {
         activeTaskBorderColor: accentStrong,
         doneTaskBkgColor: surface,
         doneTaskBorderColor: textFaint,
-        critBkgColor:     '#fee2e2',
-        critBorderColor:  '#dc2626',
+        critBkgColor:     dangerSoft,
+        critBorderColor:  danger,
       },
     };
   }
@@ -14413,7 +14467,7 @@ class OkuAnnotatedCode extends HTMLElement {
           var partner = el.classList.contains('okc-anno-marker')
             ? self.querySelector('.okc-anno-item[data-anno-id="' + id + '"]')
             : self.querySelector('.okc-anno-marker[data-anno-id="' + id + '"]');
-          if (partner) partner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          if (partner) partner.scrollIntoView({ behavior: __okuScrollBehavior(), block: 'nearest' });
         });
       });
     }
@@ -15278,7 +15332,7 @@ var __okuWarnings = (function () {
         var el = null;
         try { el = sel ? document.querySelector(sel) : null; } catch (e) { el = null; }
         if (!el) return;
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.scrollIntoView({ behavior: __okuScrollBehavior(), block: 'center' });
         // Brief flash so the eye locks onto the right element even
         // when several are visible after the scroll settles.
         el.classList.add('oku-flash');

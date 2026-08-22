@@ -500,11 +500,15 @@ class TestPayloadBudget:
     bought with the bytes.
     """
 
-    # 1,125 KB today. Raised from 1,150,000 by the copy-region
-    # primitive: the three clipboard serialisers, the word diff, and
-    # the styling for both. The gap is headroom for a feature, not
-    # for drift.
-    KIT_BUDGET_BYTES = 1_190_000
+    # 1,162 KB today. Raised from 1,150,000 by the copy-region
+    # primitive (the three clipboard serialisers, the word diff, and
+    # the styling for both), then from 1,190,000 by the theme-tracking
+    # pass on Mermaid: five cScale entries and the crit colours read
+    # from tokens instead of literals, plus `darkMode`, plus the
+    # navigation token and the scroll-behaviour helper. 1.6 KB, most
+    # of it the comments that say why. The gap is headroom for a
+    # feature, not for drift.
+    KIT_BUDGET_BYTES = 1_200_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
