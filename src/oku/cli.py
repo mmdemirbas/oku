@@ -768,8 +768,13 @@ def _coerce_front_matter_value(raw: str):
     concatenated onto one.
     """
     raw = raw.strip()
-    if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
-        raw = raw[1:-1]
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'":
+        # Quotes are how the emitter says "this one is a string" — an
+        # `order: "007"` that came back as the int 7, or a `flag: "true"`
+        # that came back as a bool, made the quoting decorative and the
+        # round trip lossy at the one moment `oku migrate` was about to
+        # delete the source.
+        return raw[1:-1]
     if raw.lower() in {"true", "false"}:
         return raw.lower() == "true"
     try:
@@ -1244,12 +1249,36 @@ def _front_matter_value(v) -> str:
     """Render one front-matter value the minimal parser reads back."""
     if isinstance(v, bool):
         return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        # A real number needs no quotes — and must not get them, or it
+        # comes back a string. Only a STRING that looks like a number
+        # does, which is the test two lines down.
+        return str(v)
     s = str(v)
     # The reader strips wrapping quotes; quote only when the raw form
     # would coerce or trim differently than intended.
-    if s != s.strip() or s.lower() in {"true", "false"}:
+    if s != s.strip() or s.lower() in {"true", "false"} or _looks_numeric(s) or not s:
         return '"' + s + '"'
     return s
+
+
+def _looks_numeric(s: str) -> bool:
+    """Whether the reader would hand this back as a number.
+
+    A version string (`order: "1.10"`) and a zero-padded id
+    (`ref: "007"`) are the cases: both are strings the author wrote and
+    both come back changed unless the emitter quotes them.
+    """
+    try:
+        int(s)
+        return True
+    except ValueError:
+        pass
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 
 def page_to_md(page: dict) -> str:
@@ -6040,7 +6069,29 @@ def _page_content_fingerprint(page: dict) -> tuple[str, str, str]:
     body = v2.get("b") or []
     typed = json.dumps([b for b in body if isinstance(b, dict)], sort_keys=True, ensure_ascii=False)
     prose = re.sub(r"\s+", " ", " ".join(b for b in body if isinstance(b, str))).strip()
-    return (str(v2.get("t") or ""), typed, prose)
+    return (str(v2.get("t") or ""), typed, prose, _comparable_meta(v2))
+
+
+def _comparable_meta(page: dict) -> str:
+    """The front-matter a migration must carry across, as one string.
+
+    The fingerprint used to be title + typed blocks + prose, and `m` was
+    not in it — so a value the emitter could not write came back missing
+    or changed, the round trip was declared lossless, and the source
+    JSON was deleted. Measured on a page carrying four ordinary keys:
+    a multi-line `summary` vanished, `tags: ["a","b"]` came back as the
+    literal string `"['a', 'b']"`, `order: "007"` as the int 7 and
+    `flag: "true"` as a bool. All four passed as lossless.
+
+    Private and derived keys are excluded because they are meant not to
+    survive: `_derived` names what the build works out again on the
+    next run, and re-emitting those into a source is what freezes them
+    stale.
+    """
+    meta = page.get("m") or {}
+    derived = set(meta.get("_derived") or ())
+    keep = {k: v for k, v in meta.items() if not k.startswith("_") and k not in derived}
+    return json.dumps(keep, sort_keys=True, ensure_ascii=False, default=str)
 
 
 # ---------- main ----------
@@ -6499,6 +6550,26 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+def _lossy_detail(before: tuple, after: tuple) -> str:
+    """Name the part that would not survive, so the message is a lead.
+
+    "Report this page" alone gives the author nothing to look at, and
+    the answer is usually one front-matter key they can rewrite in ten
+    seconds.
+    """
+    labels = ("title", "typed blocks", "prose", "front-matter")
+    changed = [labels[i] for i in range(min(len(before), len(after))) if before[i] != after[i]]
+    if changed == ["front-matter"]:
+        try:
+            was, now = json.loads(before[3]), json.loads(after[3])
+        except (json.JSONDecodeError, IndexError):
+            return " Front-matter would change."
+        keys = sorted(set(was) | set(now))
+        lost = [k for k in keys if was.get(k) != now.get(k)]
+        return " These front-matter keys would not survive: " + ", ".join(lost) + "."
+    return " Would change: " + ", ".join(changed) + "." if changed else " Report this page; the JSON still renders."
+
+
 def cmd_migrate(args: argparse.Namespace) -> int:
     """`oku migrate [path]` — convert page-JSON sources (v1 or v2) to
     v3 markdown.
@@ -6560,11 +6631,11 @@ def cmd_migrate(args: argparse.Namespace) -> int:
         # holding something the emitter cannot express keeps its JSON.
         md_text = page_to_md(data)
         back = md_to_v2_page(md_text, default_title=_page_title(data) or md_path.stem)
-        lossless = _page_content_fingerprint(back) == _page_content_fingerprint(data)
-        if not lossless:
+        before, after = _page_content_fingerprint(data), _page_content_fingerprint(back)
+        if before != after:
+            detail = _lossy_detail(before, after)
             print(
-                f"  skip {rel}: markdown round-trip is not lossless — source kept. "
-                f"Report this page; the JSON still renders.",
+                f"  skip {rel}: markdown round-trip is not lossless — source kept.{detail}",
                 file=sys.stderr,
             )
             continue
