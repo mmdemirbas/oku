@@ -3041,11 +3041,72 @@
 
   OkuRenderer.splitFrontMatter = splitFrontMatter;
 
+  /* ============ Inert rendering: a document is read, not run ============
+   *
+   * An HTML island is full-capability by design — the author wrote it
+   * into their own page, and `oku check` lints it as page content. The
+   * markdown viewer renders something else: a file the page merely
+   * LINKS to, into the page's own document. `../README.md`, a filepath
+   * chip's preview, any .md a reader can reach. Nobody reviewed those
+   * as page content, and the reader clicked expecting to read one.
+   *
+   * Measured before this existed, from a linked file: a `<script>` set
+   * a global on the host page, rewrote `document.title`, and wrote the
+   * kit's own `oku-theme-mode` key in localStorage — a setting the
+   * reader cannot see change and would not think to undo. An
+   * `<img onerror>` fired in the same pass.
+   *
+   * What goes is what could run: a script the browser would execute, an
+   * `on*` handler, a URL that executes on activation, and the elements
+   * that reach past their own subtree — see REMOVED_TAGS.
+   *
+   * A `<style>` in a viewed document is deliberately LEFT: it does not
+   * run, and taking it would break a document that legitimately styles
+   * itself. It does bleed into the host page, which is an open finding
+   * on the board rather than a decision made here in passing. What stays is everything the primitives need — the
+   * `text/x-mermaid`, `text/x-code`, `application/json` and
+   * `text/plain` holders the typed renderers emit are data, so a viewed
+   * file's diagrams, charts and snippets draw exactly as they do in a
+   * page. A live snippet still runs its code, in the same
+   * `sandbox="allow-scripts"` iframe it uses everywhere else.
+   *
+   * An author who wants a live island in a document makes that document
+   * a page. */
+  const EXECUTABLE_TYPE = /^(|text\/javascript|text\/ecmascript|application\/javascript|application\/ecmascript|module|text\/babel|text\/jsx|text\/typescript|application\/x-javascript)$/i;
+  // Framing carries a document of its own, which this pass cannot
+  // reach into; `base` and `meta` do not run anything themselves but
+  // change how the WHOLE page resolves and navigates, which is the same
+  // reach by another route.
+  const REMOVED_TAGS = 'iframe,frame,frameset,object,embed,base,meta';
+  const URL_ATTRS = ['href', 'src', 'xlink:href', 'formaction', 'action'];
+
+  function makeInert(root) {
+    let removed = 0;
+    root.querySelectorAll('script').forEach((el) => {
+      if (EXECUTABLE_TYPE.test((el.getAttribute('type') || '').trim())) { el.remove(); removed++; }
+    });
+    root.querySelectorAll(REMOVED_TAGS).forEach((el) => { el.remove(); removed++; });
+    root.querySelectorAll('*').forEach((el) => {
+      // Live list — removeAttribute during iteration would skip one.
+      for (const name of Array.prototype.map.call(el.attributes, (a) => a.name)) {
+        if (/^on/i.test(name)) { el.removeAttribute(name); removed++; continue; }
+        if (URL_ATTRS.indexOf(name.toLowerCase()) < 0) continue;
+        if (safeUrl(el.getAttribute(name), el.tagName === 'IMG') === null) {
+          el.removeAttribute(name);
+          removed++;
+        }
+      }
+    });
+    return removed;
+  }
+
   /* Render markdown source into `host`. opts:
    *   idPrefix — string prepended to every emitted id (required in a
    *              live document; defaults to '' for a bare host)
    *   base     — URL the file was loaded from; relative hrefs and image
    *              srcs resolve against it
+   *   inert    — strip everything that would execute before the result
+   *              reaches the live document (see makeInert)
    * Returns the warnings the typed-block renderers raised. */
   OkuRenderer.renderMarkdownInto = function (src, host, opts) {
     opts = opts || {};
@@ -3093,6 +3154,23 @@
       __footnoteDefs = savedFootnoteDefs;
       __footnoteUses = savedFootnoteUses;
       __renderTypedBlock = savedTyped;
+    }
+
+    // Before anything else touches the tree. Two reasons, and the
+    // second is the one that bites: a removed node needs no id prefix
+    // and no rebasing — and `safeUrl` refuses `file:`, so running this
+    // after the rebase would strip every link in a viewed document on
+    // a standalone page, where `opts.base` IS a file: URL.
+    if (opts.inert) {
+      const removed = makeInert(holder);
+      if (removed) {
+        inner.warnings.push({
+          code: 'inert-document',
+          msg: removed + ' item(s) that would have run were removed — a linked document is rendered, not executed',
+          payload: { removed: removed },
+          level: 'warn',
+        });
+      }
     }
 
     if (prefix) {

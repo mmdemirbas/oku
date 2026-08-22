@@ -1460,6 +1460,7 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 .okt-mdview-rendered > :first-child { margin-top: 0; }
 .okt-mdview-rendered > section:first-child > h2:first-child { margin-top: 0; }
 .okt-mdview-fail { margin: 0; }
+.okt-mdview-inert { margin: 0 0 16px; }
 
 @media (max-width: 640px) {
   /* The path and the actions cannot share one line at phone width, and

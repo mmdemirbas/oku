@@ -426,6 +426,30 @@ There is no check for a tag OUTSIDE the list, deliberately. Prose here
 writes `<name>`, `<rel-path>` and `<docs>` as metavariables, and a check
 cannot tell those from a typo'd tag without guessing.
 
+**A viewed document is read, not run.** An island in a PAGE keeps full
+capability — the author wrote it into their own page and `oku check`
+lints it as page content. The markdown viewer renders something else: a
+file the page merely LINKS to, into the page's own document. Measured
+from a linked `.md`: its `<script>` set a global on the host page,
+rewrote `document.title`, and wrote the kit's own `oku-theme-mode` key
+in localStorage — a setting the reader cannot see change and would not
+think to undo. An `<img onerror>` fired in the same pass. `makeInert`
+in renderer.js drops what could run (an executable `<script>`, an `on*`
+attribute, a URL `safeUrl` refuses, `iframe` / `frame` / `object` /
+`embed`) and the viewer says how many went, because a silent removal
+reads as a rendering bug to the author whose island stopped working.
+
+Two things about it are load-bearing. **Only executable scripts go**: a
+typed block carries its payload in a `text/x-mermaid`, `text/x-code`,
+`application/json` or `text/plain` holder, so a rule taking every
+script would gut every diagram and chart in the document. **It runs
+before the rebase**, not after — `safeUrl` refuses `file:`, and
+rebasing turns every relative href in a viewed document into a `file:`
+URL on a standalone page, so the later placement strips every link on
+the one delivery mode with no other way to reach the sibling. Held by
+`test_viewed_document_is_inert.py`, whose served and standalone halves
+each pin one of those.
+
 **A blank line ends an island's BLOCK, never its element.** That is
 CommonMark, and it is the whole reason an author can write markdown
 inside a `<div>` — the `<div>` / blank / `**bold**` / blank / `</div>`

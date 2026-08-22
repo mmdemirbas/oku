@@ -861,10 +861,13 @@ var __okuMdViewer = (function () {
     }
     wrap._idPrefix = ID_PREFIX + (++seq) + '-';
     try {
-      window.OkuRenderer.renderMarkdownInto(text, host, {
+      var warnings = window.OkuRenderer.renderMarkdownInto(text, host, {
         idPrefix: wrap._idPrefix,
         base: url,
+        // This file is not this page. See makeInert in renderer.js.
+        inert: true,
       });
+      noteInert(host, warnings);
     } catch (e) {
       show(wrap, 'source');
       return;
@@ -877,6 +880,27 @@ var __okuMdViewer = (function () {
     // rebuild the TOC or the rail: the viewed file's headings belong to
     // the file, not to the page the reader is on.
     if (typeof initReadingAids === 'function') initReadingAids();
+  }
+
+  /* Say where something was removed. An author whose island stopped
+     working needs to know it was a rule and not a bug, and a reader
+     deserves to know the document they were handed had a piece taken
+     out of it. Placed at the top of the rendered pane, and only when
+     something actually went — a notice on every file is one nobody
+     reads on the file that matters. */
+  function noteInert(host, warnings) {
+    var removed = 0;
+    (warnings || []).forEach(function (w) {
+      if (w && w.code === 'inert-document' && w.payload) removed += w.payload.removed || 0;
+    });
+    if (!removed) return;
+    var note = document.createElement('div');
+    note.className = 'callout warning okt-mdview-inert';
+    note.innerHTML =
+      '<p>' + removed + (removed === 1 ? ' item was' : ' items were') +
+      ' left out: a linked document is rendered, not run.' +
+      ' Switch to <strong>Source</strong> to read what they were.</p>';
+    host.insertBefore(note, host.firstChild);
   }
 
   function stripHash(s) {
@@ -4832,7 +4856,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-22-r54';
+var __okuKitBuild = '2026-08-22-r55';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
