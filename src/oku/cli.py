@@ -3017,6 +3017,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         code_spans: list[tuple[str, str, int | None]] = []
         extref_refs: list[tuple[str, str, int | None]] = []
         link_refs: list[tuple[str, str, int | None]] = []
+        asset_refs: list[tuple[str, str, int | None]] = []
         # Footnote / link-reference definitions resolve page-wide, so they
         # are collected before any string is linted.
         fn_defs, link_defs = _md_reference_definitions([b for b in body if isinstance(b, str)])
@@ -3044,6 +3045,14 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             def _abs(rel: int | None, _base: int | None = None) -> int | None:
                 _base = base if _base is None else _base
                 return _base + rel - 1 if (_base and rel) else None
+
+            # Through `_asset_hrefs` rather than a second set of regexes,
+            # so the check reports exactly what the build would publish.
+            # A page-level scan would lose the block, and the block is
+            # how an author finds the reference in a long file.
+            for href in _asset_hrefs(blk):
+                pos = blk.find(href) if isinstance(blk, str) else -1
+                asset_refs.append((where, href, _abs(blk[:pos].count("\n") + 1) if pos >= 0 else None))
 
             if isinstance(blk, str):
                 # 3. Markdown-string passes: strict-GFM subset, HTML
@@ -3292,6 +3301,33 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 "gets a preview on hover, the whole file on click and a button that copies the "
                 "path — instead of a string they have to go and find.",
                 line=span_line,
+            )
+
+        # 8d. An image the project does not own. A standalone page
+        # carries the BYTES of everything it shows, so a reference
+        # reaching past the project publishes a file from outside it to
+        # whoever the page is sent to — and the build did that in
+        # silence, because "above the tree being built" is a different
+        # question and a repo's `../screenshots/` is a legitimate
+        # answer to it. Same fence as `#f/`, same reason.
+        for where, href, ref_line in asset_refs:
+            if re.match(r"^[a-z][a-z0-9+.-]*:|^//|^#", href, re.I):
+                continue
+            href_base = root if href.startswith("/") else p.parent
+            target = (href_base / unquote(href.lstrip("/"))).resolve()
+            if not target.is_file() or asset_within_project(target, p):
+                continue
+            add(
+                p,
+                "warning",
+                "image-outside",
+                f"{where} {href}",
+                f"'{href}' resolves to {target}, outside the project root "
+                f"({project_root_for(p.parent)}). A standalone page carries the bytes of every "
+                "image it shows, so this one would hand a file from outside the project to "
+                "whoever the page is sent to. It is left as a reference no delivered page "
+                "resolves — copy the file into the project and point at it there.",
+                line=ref_line,
             )
 
         # 9. Page-level metadata sanity. The no-summary nudge applies
@@ -4610,9 +4646,15 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
             dest_asset.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(target, dest_asset)
         for href in outside_tree:
+            target = (src.parent / unquote(href)).resolve()
+            carried = target.is_file() and asset_within_project(target, src)
             print(
                 f"  ⚠ {src.relative_to(src_root)}: {href} is above the tree being built — "
-                f"not copied into dist/site (the standalone page inlines it)"
+                + (
+                    "not copied into dist/site (the standalone page inlines it)"
+                    if carried
+                    else "and outside the project; neither tree carries it"
+                )
             )
 
         # A stub `oku init` wrote carries the manifest of the day it was
@@ -4828,6 +4870,26 @@ def collect_page_assets(page_data, src: Path, src_root: Path) -> tuple[dict[str,
             continue
         assets[href] = target
     return assets, outside
+
+
+def asset_within_project(target: Path, src: Path) -> bool:
+    """Whether a page may publish the bytes of a file it points at.
+
+    The same fence a `#f/` reference answers to, for the same reason:
+    the build reads the file and copies its bytes into an artifact that
+    gets sent to people, so a reference reaching into another project —
+    or into a home directory — hands those bytes over with it. An image
+    had no fence at all. `collect_page_assets` reports anything above
+    the tree being BUILT, which is a different question: a repo whose
+    docs live in `docs/` legitimately shows `../screenshots/x.png`, and
+    a standalone page can carry it because it carries bytes rather than
+    paths. That is inside the project. `../../other-repo/x.png` is not.
+    """
+    try:
+        target.relative_to(project_root_for(src.parent))
+        return True
+    except ValueError:
+        return False
 
 
 def _data_uri(path: Path) -> str:
@@ -5282,10 +5344,21 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
             )
         # A file above the tree has no path the site could copy it to,
         # but a standalone page carries bytes, not paths, so it can
-        # simply hold it.
+        # simply hold it — as long as the project owns it. Past the
+        # project fence the page would publish somebody else's bytes to
+        # whoever it is sent to, and it did so without a word.
         for href in outside_tree:
             target = (src.parent / unquote(href)).resolve()
-            if target.is_file() and target.stat().st_size <= MAX_INLINE_ASSET_BYTES:
+            if not target.is_file():
+                continue
+            if not asset_within_project(target, src):
+                print(
+                    f"  ⚠ {src.relative_to(src_root)}: {href} resolves to {target}, outside the "
+                    f"project ({project_root_for(src.parent)}) — not carried into the standalone "
+                    "page. `oku check` reports it as image-outside."
+                )
+                continue
+            if target.stat().st_size <= MAX_INLINE_ASSET_BYTES:
                 uris[href] = _data_uri(target)
         data_text = None
         if uris and page is not None:

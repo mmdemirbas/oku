@@ -496,6 +496,35 @@ one — and a missing file is left to `unresolved-link` rather than reported
 twice. Held by `test_build_carries_assets.py` and
 `browser/test_image_delivery.py`.
 
+**And it travels only as far as the project owns it.** "Above the tree
+being built" and "outside the project" are two questions, and the build
+only ever asked the first — so `![x](../../other-repo/shot.png)` was
+base64'd into a standalone page in silence, past a clean `oku check`. A
+standalone page carries BYTES, which is what makes an image above the
+docs root legitimate (`../shots/x.png` in a repo that keeps screenshots
+beside its docs) and what makes one past the project fence a file handed
+to whoever the page is sent to. `asset_within_project` is the same fence
+`#f/` answers to — nearest `.git`, else `kit.json` — asked through the
+same `_asset_hrefs` scanner the build carries with, so the check reports
+exactly what the build would publish rather than approximating it with a
+second set of regexes. `oku check` says `image-outside`; the build says
+so on the line where it declines; and the reference stays in the page,
+because losing what the author wrote is never the better failure. Held
+by the fence section of `test_build_carries_assets.py`.
+
+**And a code the check emits is a code `docs/cli.md` explains.** The
+severity table is the eighth source of the kind
+`test_authority_agreement.py` exists for — three copies of one list
+(the CLI, `cli.md`, `cli.tr.md`), none able to see the others. Both
+directions are held: a code missing from the table is a warning whose
+only explanation is the message that fired, and a code in the table that
+nothing emits is a reader looking for behaviour that was renamed out
+from under them. Four call shapes reach an issue list (`add(...)`, a
+`(severity, code, ...)` tuple, the chart rule's local `bad(...)`, and a
+dict literal), and the reverse direction is what found the last two —
+a scan seeing only the first two reported `chart-*`, `json-parse-failed`
+and `shadowed-source` as documented-but-dead.
+
 **A Mermaid diagram gets its colour from the kit too, and the kit has
 to do the work.** Mermaid's `classDef` / `style` grammar takes CSS
 *values*, not CSS *functions* — there is no production for `(`, so

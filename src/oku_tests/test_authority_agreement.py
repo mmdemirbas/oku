@@ -198,3 +198,84 @@ def test_every_inline_prefix_the_renderer_dispatches_is_a_named_kind() -> None:
         # whether it gets used at all.
         assert cli._INLINE_KINDS[name] in (entry["markdown"] or ""), name
         assert (entry.get("note") or "").strip(), f"{name} has no note saying when to use it"
+
+
+# ---------- issue codes ----------
+#
+# An eighth source with the same shape. `oku check` emits a code per
+# issue and `docs/cli.md` prints the table a reader consults to find out
+# what one means — in two languages, so three copies of one list. A code
+# missing from the table is a warning whose only explanation is the
+# message that fired; a code IN the table that nothing emits is a reader
+# looking for behaviour that was renamed out from under them.
+#
+# Codes are read out of the source rather than provoked, because there
+# is no page that triggers all of them at once. The count is asserted so
+# a pattern that stops matching fails here instead of passing with an
+# empty set — the failure mode of every source-scraping check.
+
+CLI_SRC = Path(cli.__file__).read_text(encoding="utf-8")
+DOCS = Path(__file__).resolve().parents[2] / "docs"
+
+
+# Four call shapes reach an issue list, and the reverse direction of the
+# test below is what found the fourth: a scan that saw only two reported
+# `chart-*`, `json-parse-failed` and `shadowed-source` as documented-but-
+# dead, when all three are emitted through a helper or a dict literal.
+_EMIT_PATTERNS = (
+    r'add\(\s*\w+,\s*"[a-z]+",\s*"([a-z0-9-]+)"',  # add(p, severity, code, …)
+    r'\(\s*"(?:error|warning|info)",\s*\n?\s*"([a-z0-9-]+)",',  # (severity, code, …) tuples
+    r'\bbad\(\s*\n?\s*"([a-z0-9-]+)"',  # the chart rule's local helper
+    # An issue built as a dict. Anchored on the severity above it: a
+    # bare `"code": "…"` also matches a docstring showing the shape of
+    # the `languages` key, and `tr` is not an issue code.
+    r'"severity":\s*"[a-z]+",\s*\n\s*"code":\s*"([a-z0-9-]+)"',
+)
+
+
+def _emitted_codes() -> set[str]:
+    codes: set[str] = set()
+    for pattern in _EMIT_PATTERNS:
+        codes |= set(re.findall(pattern, CLI_SRC))
+    return codes
+
+
+def _documented_codes(page: str) -> set[str]:
+    """The code column of the severity table, not every backtick on the
+    page — the prose around it names flags and keys in the same way."""
+    text = (DOCS / page).read_text(encoding="utf-8")
+    out: set[str] = set()
+    for line in text.split("\n"):
+        if not line.startswith('{"headers":['):
+            continue
+        table = json.loads(line)
+        rows = table.get("rows") or []
+        if not any(isinstance(r[1], str) and "`schema`" in r[1] for r in rows):
+            continue
+        for row in rows:
+            out |= set(re.findall(r"`([a-z][a-z0-9-]*\*?)`", row[1]))
+    return out
+
+
+@pytest.mark.parametrize("page", ["cli.md", "cli.tr.md"])
+def test_every_issue_code_is_in_the_table_a_reader_consults(page: str) -> None:
+    emitted = _emitted_codes()
+    assert len(emitted) >= 40, f"only {len(emitted)} codes found in cli.py — the scan broke"
+    documented = _documented_codes(page)
+    assert documented, f"no severity table found in docs/{page}"
+    wildcards = {c[:-1] for c in documented if c.endswith("*")}
+    missing = sorted(
+        c for c in emitted if c not in documented and not any(c.startswith(w) for w in wildcards)
+    )
+    assert not missing, f"{page} does not explain: {missing}"
+
+
+@pytest.mark.parametrize("page", ["cli.md", "cli.tr.md"])
+def test_the_table_names_no_code_that_nothing_emits(page: str) -> None:
+    emitted = _emitted_codes()
+    stale = sorted(
+        c
+        for c in _documented_codes(page)
+        if c not in emitted and not (c.endswith("*") and any(e.startswith(c[:-1]) for e in emitted))
+    )
+    assert not stale, f"{page} documents codes `oku check` no longer emits: {stale}"
