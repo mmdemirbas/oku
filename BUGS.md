@@ -12,6 +12,74 @@ carries the record, including what was measured before and after.
 
 ---
 
+## The installed tool still binds every interface, and no version string says whether yours does
+
+**Version:** oku 0.6.5, `src 8cd13843bf28`, installed 2026-08-22 11:53.
+
+**Symptom.** `oku serve` listens on `*:PORT` rather than on loopback, and it
+hands out the **project root** — the working copy, not a built doc tree. On a
+repository with a `personal/`, a `config/secrets.json` and a `.git/`, running
+the preview publishes all three to everyone on the network. The line printed
+underneath says `http://localhost:9876`, so the one place a reader would check
+says the opposite of what happened.
+
+The code defect is already fixed. `f785d1d` (2026-08-22 16:38) makes the bind
+`("host", port)` with a `127.0.0.1` default and adds `src/oku_tests/
+test_serve_bind.py`. **What is still open is that a build made before it cannot
+be told apart from one made after it.**
+
+**Minimal reproduction.** Any project with a docs directory. Nothing is written.
+
+```
+cd ~/dev/mmdemirbas/html-doc/docs
+oku serve --no-watch --no-search &
+lsof -nP -iTCP -sTCP:LISTEN | grep 9876
+pkill -f "oku serve"
+```
+
+**Expected.** `TCP 127.0.0.1:9876 (LISTEN)` — reachable from this machine only,
+which is what the printed URL claims.
+
+**Actual.**
+
+```
+python3.1  9383  md  3u  IPv4  0xc3ca47f52785b0ea  0t0  TCP *:9876 (LISTEN)
+```
+
+Opening `http://127.0.0.1:9876/` returns a directory listing of the project
+root: `.git/`, `config/`, `personal/`, `catalog.db`, `node_modules/`.
+
+**Where the failure was localised.** In the INSTALLED package, not the source:
+
+- `~/.local/share/uv/tools/oku/lib/python3.13/site-packages/oku/cli.py:5811`
+  — `http.server.ThreadingHTTPServer(("", port), handler_cls)`
+- `src/oku/cli.py:6220-6225` in this repo — `host = getattr(args, "host",
+  "127.0.0.1") or "127.0.0.1"`, then `ThreadingHTTPServer((host, port), ...)`
+
+Both report `version = "0.6.5"`; `pyproject.toml` carried 0.6.5 at `f785d1d`
+and carries 0.6.5 now, so the package version did not move across a fix that
+changes who can reach the server.
+
+**Observed versus inferred.**
+
+*Observed, by running it:* the wildcard bind on a freshly started `oku serve`;
+the directory listing of the project root over HTTP; the two `cli.py` lines
+above, read in both trees; `f785d1d` being an ancestor of `HEAD`; the installed
+`dist-info` timestamp of 11:53 preceding the 16:38 fix; `git cat-file -t
+8cd13843bf28` answering `Not a valid object name`.
+
+*Inferred from reading source, not executed:* that `config/secrets.json`
+specifically would be served. The handler has no exclusion list and the
+directory holding it was listed, so it follows — but no request was made for
+that file.
+
+**Suggested fix.** The bind is done. What remains is identity: make
+`_tool_digest()` resolvable, or put the commit in the version line, so
+`oku --version` can answer "does this build have the loopback default?". Until
+then a reader has to grep `site-packages`. A release with a bumped version
+number would also do it, and is the smaller change.
+
+---
 ## An accent token the front-matter spec documents kills every diagram on the page
 
 **Version:** oku 0.6.5, kit 2026-08-20-r46.
