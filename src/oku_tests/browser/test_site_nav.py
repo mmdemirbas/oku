@@ -14,6 +14,8 @@ The fixture mirrors what `oku build` writes: `_oku/` and
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import threading
@@ -63,7 +65,7 @@ def site(tmp_path_factory):
 
 def test_site_tree_lists_pages_that_all_live_below_the_root(page, site):
     page.goto(f"{site}/docs/index.html")
-    page.wait_for_timeout(1200)
+    page_quiet(page)
     links = page.eval_on_selector_all(".page-nav-tree a", "els => els.map(e => e.textContent)")
     assert "Giriş" in links and "Derin" in links, links
     assert page.locator(".page-nav-empty").count() == 0
@@ -71,7 +73,7 @@ def test_site_tree_lists_pages_that_all_live_below_the_root(page, site):
 
 def test_site_tree_link_targets_are_reachable_paths(page, site):
     page.goto(f"{site}/docs/index.html")
-    page.wait_for_timeout(1200)
+    page_quiet(page)
     hrefs = page.eval_on_selector_all(".page-nav-tree a", "els => els.map(e => new URL(e.href).pathname)")
     assert "/docs/index.html" in hrefs
     assert "/docs/deep/nested.html" in hrefs
@@ -81,6 +83,6 @@ def test_deep_page_resolves_the_same_docs_root(page, site):
     """A page two levels down finds the same manifest — the docs root is
     wherever `_oku/` sits, not the page's own directory."""
     page.goto(f"{site}/docs/deep/nested.html")
-    page.wait_for_timeout(1200)
+    page_quiet(page)
     assert page.locator(".page-nav-empty").count() == 0
     assert page.locator(".page-nav-tree a").count() == len(PAGES)

@@ -25,6 +25,8 @@ as one, because a `<br>` carries no newline character.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import os
 from pathlib import Path
@@ -108,7 +110,7 @@ def island_page(tmp_path_factory):
 def opened(island_page, browser):
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     page.goto(island_page.as_uri(), wait_until="load")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
     yield page
     page.close()
 

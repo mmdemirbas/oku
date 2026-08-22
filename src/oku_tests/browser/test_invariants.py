@@ -8,6 +8,8 @@ kit-native SVG, so chart assertions DO require rendered <svg>.
 
 from __future__ import annotations
 
+from ._wait import box_stable, page_quiet, scroll_stable
+
 import math
 
 import pytest
@@ -27,6 +29,11 @@ def _goto(page, url: str) -> None:
     # yet — which is how a containment check fails on the heaviest page
     # at the narrowest width, on a loaded machine, and nowhere else.
     page.wait_for_function("() => window.__okuRendered === true", timeout=15000)
+    # …and the walk finishing is not the page finishing: charts size
+    # themselves, Prism rewrites a block when its grammar lands, the
+    # rail builds its marks. Every caller used to follow this with a
+    # fixed sleep of its own, between 400 ms and 1500 ms, guessing.
+    page_quiet(page)
 
 
 def _literal_tag_text_nodes(page) -> int:
@@ -82,7 +89,10 @@ def test_contents_drawer_is_off_canvas_until_asked_for(page, site_url, size):
     if size["width"] >= 900:
         assert "drawer-pinned" in state, state
         page.keyboard.press("Escape")
-        page.wait_for_timeout(200)
+        # A negative assertion needs the panel to have had time to go
+        # and be seen not going. Stability is that, and it is stronger
+        # than a blind sleep: a close that started would move the box.
+        box_stable(page, "page-nav")
         assert page.evaluate("() => document.body.classList.contains('drawer-open')"), (
             "Escape must not discard a pinned panel — it is not a dialog, and losing "
             "the state to a stray keypress costs more than it saves"
@@ -113,7 +123,6 @@ def test_the_top_right_chrome_never_overlaps(page, site_url, width):
     """
     page.set_viewport_size({"width": width, "height": 900})
     _goto(page, f"{site_url}/docs/architecture.html")
-    page.wait_for_timeout(600)
     got = page.evaluate(
         """() => {
         const vis = [...document.querySelectorAll('.ctrl-btn')].filter(b => {
@@ -163,7 +172,6 @@ def test_the_warning_count_sits_on_the_warning_button(page, site_url):
     """
     page.set_viewport_size({"width": 1280, "height": 900})
     _goto(page, f"{site_url}/docs/architecture.html")
-    page.wait_for_timeout(600)
     got = page.evaluate(
         """() => new Promise(resolve => {
             window.dispatchEvent(new CustomEvent('oku:warnings', {
@@ -207,13 +215,12 @@ def test_a_peek_moves_nothing(page, site_url, width):
     failure the overlay drawer was built to end, and it stays ended."""
     page.set_viewport_size({"width": width, "height": 900})
     _goto(page, f"{site_url}/docs/architecture.html")
-    page.wait_for_timeout(400)
     before = page.evaluate(_MAIN_BOX)
     assert abs(before[0] - before[2]) <= 1, f"main not centred: left {before[0]} vs right {before[2]}"
 
     page.hover(".ctrl-btn.drawer-toggle")
     page.wait_for_function("document.body.classList.contains('drawer-peek')")
-    page.wait_for_timeout(350)
+    box_stable(page, "page-nav", "main")
     assert page.locator("page-nav").bounding_box()["x"] >= -1, "peek must bring the panel on-canvas"
     assert page.evaluate(_MAIN_BOX) == before, "content moved on a hover"
 
@@ -221,7 +228,7 @@ def test_a_peek_moves_nothing(page, site_url, width):
     # past the panel's right edge. Horizontally: reading a list of
     # sections is vertical movement, which must not dismiss anything.
     page.mouse.move(150, 700)
-    page.wait_for_timeout(200)
+    box_stable(page, "page-nav")
     assert page.evaluate("() => document.body.classList.contains('drawer-peek')"), (
         "moving DOWN the panel dismissed it — that is how a reader reads it"
     )
@@ -242,12 +249,11 @@ def test_pinning_insets_the_column_rather_than_covering_it(page, site_url, width
     that one moved text as a side effect of a control nobody asked for."""
     page.set_viewport_size({"width": width, "height": 900})
     _goto(page, f"{site_url}/docs/architecture.html")
-    page.wait_for_timeout(400)
     before = page.evaluate(_MAIN_BOX)
 
     page.click(".ctrl-btn.drawer-toggle")
     page.wait_for_function("document.body.classList.contains('drawer-pinned')")
-    page.wait_for_timeout(350)
+    box_stable(page, "page-nav", "main")
     got = page.evaluate(
         """() => {
         const m = document.querySelector('main').getBoundingClientRect();
@@ -272,7 +278,7 @@ def test_pinning_insets_the_column_rather_than_covering_it(page, site_url, width
 
     page.click(".ctrl-btn.drawer-toggle")
     page.wait_for_function("!document.body.classList.contains('drawer-open')")
-    page.wait_for_timeout(350)
+    box_stable(page, "page-nav", "main")
     assert page.evaluate(_MAIN_BOX) == before, "unpinning must give the measure back exactly"
 
 
@@ -283,14 +289,13 @@ def test_a_pinned_panel_survives_the_click_that_used_to_close_it(page, site_url)
     panel stays — and the highlight moves to where the reader now is."""
     page.set_viewport_size(DESKTOP)
     _goto(page, f"{site_url}/docs/architecture.html")
-    page.wait_for_timeout(500)
     page.click(".ctrl-btn.drawer-toggle")
     page.wait_for_function("document.body.classList.contains('drawer-pinned')")
 
     links = page.locator("page-toc .toc-sub a, page-toc .toc-head a")
     assert links.count() >= 3, "the fixture page grew no TOC entries"
     links.nth(2).click()
-    page.wait_for_timeout(700)
+    scroll_stable(page)
     assert page.evaluate("() => document.body.classList.contains('drawer-pinned')"), (
         "clicking a heading closed the pinned panel"
     )
@@ -563,7 +568,6 @@ def test_inline_html_allowlist_renders(page, site_url):
     """Allow-listed inline tags (<kbd>, <sub>, …) render as elements;
     nothing in prose shows a raw tag."""
     _goto(page, f"{site_url}/docs/reference.html")
-    page.wait_for_timeout(1500)
     assert page.locator("main kbd").count() >= 2
     literal = page.evaluate(
         """() => {
@@ -602,7 +606,7 @@ def test_lightbox_uses_full_viewport_and_keeps_live_content(page, site_url):
     )
 
     page.click(".okt-lightbox-close")
-    page.wait_for_timeout(300)
+    box_stable(page, "main oku-diagram")
     assert page.evaluate("document.querySelector('main oku-diagram')?.__live") == 1, (
         "close must return the live host to its inline slot"
     )
@@ -827,7 +831,6 @@ def test_every_chart_clips_to_its_own_plot_rect(page, site_url):
     page order. Ids must be unique, and each chart's clip must point at a
     rect inside that same chart."""
     _goto(page, f"{site_url}/docs/charts.html")
-    page.wait_for_timeout(1500)
     result = page.evaluate(
         """() => {
             const ids = [...document.querySelectorAll('clipPath[id]')].map(c => c.id);
@@ -849,7 +852,6 @@ def test_no_duplicate_element_ids_on_a_chart_heavy_page(page, site_url):
     """Duplicate ids break getElementById for everything after the first
     one — deep links, the TOC and SVG references alike."""
     _goto(page, f"{site_url}/docs/charts.html")
-    page.wait_for_timeout(1500)
     dups = page.evaluate(
         """() => {
             const seen = new Set(), dup = [];
@@ -880,7 +882,6 @@ def test_no_horizontal_page_scroll_at_360(page, site_url, rel):
     paths did at 360px."""
     page.set_viewport_size(NARROW)
     _goto(page, f"{site_url}/{rel}")
-    page.wait_for_timeout(600)
     doc_w, win_w = page.evaluate("() => [document.documentElement.scrollWidth, window.innerWidth]")
     assert doc_w <= win_w, f"{rel}: document {doc_w}px wider than viewport {win_w}px"
 
@@ -944,7 +945,6 @@ def test_containment_holds_in_dark_theme(page, site_url):
     page.emulate_media(color_scheme="dark")
     page.set_viewport_size(DESKTOP)
     _goto(page, f"{site_url}/docs/charts.html")
-    page.wait_for_timeout(1500)
     assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
     assert page.evaluate(CONTAINMENT_PROBE) == []
 
@@ -954,7 +954,6 @@ def test_every_chart_on_the_charts_page_renders_a_visual(page, site_url):
     gap, invisible to a schema check. Every <oku-chart> must carry a
     non-trivial rendered surface (SVG or the DIV-based bar family)."""
     _goto(page, f"{site_url}/docs/charts.html")
-    page.wait_for_timeout(1800)
     empty = page.evaluate(
         """() => [...document.querySelectorAll('oku-chart')]
              .filter(c => {
@@ -1008,7 +1007,6 @@ def test_accessibility_baseline(page, site_url, rel):
     reader cannot see), every chart SVG is named, and the page has one
     main, one h1 and a language."""
     _goto(page, f"{site_url}/{rel}")
-    page.wait_for_timeout(1500)
     r = page.evaluate(A11Y_PROBE)
     assert r["unnamed"] == [], f"{rel}: unnamed controls {r['unnamed']}"
     assert r["focusableButHidden"] == [], f"{rel}: {r['focusableButHidden']}"
@@ -1022,7 +1020,6 @@ def test_pointer_targets_meet_the_minimum(page, site_url):
     Inline affordances inside prose or a code gutter are exempt — that
     is the documented exception, not an oversight."""
     _goto(page, f"{site_url}/docs/tables.html")
-    page.wait_for_timeout(1500)
     small = page.evaluate(
         """() => [...document.querySelectorAll(
              '.okt-chip, .okt-group-chevron, .okt-table-controls button, .copy-btn, .okt-wrap-btn')]
@@ -1038,7 +1035,6 @@ def test_code_fold_marker_is_a_named_button_when_active(page, site_url):
     button once a fold is attached. It used to keep aria-hidden while
     gaining tabindex — reachable by keyboard, invisible to a reader."""
     _goto(page, f"{site_url}/docs/reference.html")
-    page.wait_for_timeout(1500)
     state = page.evaluate(
         """() => [...document.querySelectorAll('.okt-fold-marker.okt-foldable')].slice(0, 3)
              .map(m => ({ hidden: m.getAttribute('aria-hidden'), label: m.getAttribute('aria-label'),
@@ -1065,11 +1061,13 @@ def test_theme_toggle_leaves_the_dom_where_it_started(page, site_url):
       theme: document.documentElement.dataset.theme,
     })"""
     _goto(page, f"{site_url}/docs/charts.html")
-    page.wait_for_timeout(1800)
     before = page.evaluate(snapshot)
     for _ in range(6):
         page.click(".theme-toggle, [data-theme-toggle], .ctrl-btn[title*='theme' i]")
-        page.wait_for_timeout(320)
-    page.wait_for_timeout(900)
+        # Each flip re-renders every diagram, so the element count is
+        # the signal that this flip is done and the next one is not
+        # landing on a half-rebuilt page.
+        page_quiet(page)
+    page_quiet(page)
     after = page.evaluate(snapshot)
     assert after == before, {k: (before[k], after[k]) for k in before if before[k] != after[k]}

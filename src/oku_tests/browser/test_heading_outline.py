@@ -19,6 +19,8 @@ document. So it is a `<p>`, and the box carries the name through
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import threading
 from pathlib import Path
@@ -102,7 +104,7 @@ def outline_url(tmp_path_factory):
 def outline(browser, outline_url):
     pg = browser.new_page(viewport={"width": 1280, "height": 900})
     pg.goto(f"{outline_url}/page.html")
-    pg.wait_for_timeout(2500)
+    page_quiet(pg)
     yield pg.evaluate(OUTLINE)
     pg.close()
 

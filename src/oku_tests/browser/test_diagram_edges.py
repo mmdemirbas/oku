@@ -18,6 +18,8 @@ Two properties, because only the pair is meaningful:
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import threading
@@ -106,7 +108,7 @@ def test_edges_touch_their_endpoints(page, served):
     """
     page.goto(served)
     page.wait_for_selector("oku-diagram .okd-render svg", timeout=15000)
-    page.wait_for_timeout(600)
+    page_quiet(page)
 
     gaps = page.evaluate(GAPS_JS)
     assert gaps, "no edges rendered"
@@ -119,7 +121,7 @@ def test_repair_is_a_no_op_on_healthy_geometry(page, served):
     """Mermaid routed these edges correctly, so nothing was rewritten."""
     page.goto(served)
     page.wait_for_selector("oku-diagram .okd-render svg", timeout=15000)
-    page.wait_for_timeout(600)
+    page_quiet(page)
 
     snapped = page.evaluate(
         "() => document.querySelector('oku-diagram .okd-render svg').getAttribute('data-okd-snapped')"
@@ -132,7 +134,7 @@ def test_repair_closes_a_detached_edge(page, served):
     cluster, then re-run the repair and check it reconnects."""
     page.goto(served)
     page.wait_for_selector("oku-diagram .okd-render svg", timeout=15000)
-    page.wait_for_timeout(600)
+    page_quiet(page)
 
     result = page.evaluate(
         """() => {
@@ -231,7 +233,7 @@ HOVER_JS = """async () => {
 def test_dimmed_elements_stay_readable(page, hover_served):
     page.goto(hover_served)
     page.wait_for_selector("oku-diagram .okd-render svg", timeout=15000)
-    page.wait_for_timeout(400)
+    page_quiet(page)
 
     r = page.evaluate(HOVER_JS)
     active = [n for n in r["nodes"] if n["active"]]
@@ -252,7 +254,7 @@ def test_hovered_edges_keep_their_labels_lit(page, hover_served):
     the rest — it is the reason to hover in the first place."""
     page.goto(hover_served)
     page.wait_for_selector("oku-diagram .okd-render svg", timeout=15000)
-    page.wait_for_timeout(400)
+    page_quiet(page)
 
     labels = {lb["text"]: lb for lb in page.evaluate(HOVER_JS)["labels"]}
     assert set(labels) == {"yes", "no"}, labels

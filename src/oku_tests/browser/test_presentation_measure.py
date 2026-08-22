@@ -22,6 +22,8 @@ The tests below are the guard against reopening this a third time.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import threading
 from pathlib import Path
@@ -94,7 +96,7 @@ def measure_url(tmp_path_factory):
 def rendered(measure_url, browser):
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     page.goto(f"{measure_url}/page.html")
-    page.wait_for_timeout(1800)
+    page_quiet(page)
     yield page
     page.close()
 

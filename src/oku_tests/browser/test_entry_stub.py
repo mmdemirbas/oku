@@ -16,6 +16,8 @@ along, one step earlier.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import functools
 import http.server
@@ -83,7 +85,7 @@ def _open(page, url):
     page.on("response", lambda r: missing.append(r.url) if r.status == 404 else None)
     page.on("console", lambda m: errors.append(m.text[:120]) if m.type == "error" else None)
     page.goto(url, wait_until="load")
-    page.wait_for_timeout(2000)
+    page_quiet(page)
     return missing, errors
 
 

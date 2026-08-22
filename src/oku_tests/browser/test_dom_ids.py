@@ -20,6 +20,8 @@ because the next source of a colliding id will not be a diagram.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import pytest
 
 PAGES = [
@@ -79,7 +81,7 @@ def _settle(page, site_url, name):
     page.wait_for_selector("main")
     # Diagrams arrive from a CDN-loaded Mermaid, so the ids that collide
     # do not exist until well after load.
-    page.wait_for_timeout(3200)
+    page_quiet(page)
     return page.evaluate(PROBE)
 
 

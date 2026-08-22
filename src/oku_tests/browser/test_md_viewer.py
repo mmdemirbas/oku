@@ -16,6 +16,8 @@ tested in both shapes here, and pinned on the build side by
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import pytest
 
 # A real file in this repo's docs tree, served raw by the dev handler.
@@ -162,7 +164,7 @@ def test_a_fragment_scrolls_within_the_viewed_file(page, site_url):
     page.evaluate(INJECT, f"{TARGET}#prose")
     page.click("#probe")
     page.wait_for_selector(".okt-mdview .okt-mdview-rendered *", timeout=5000)
-    page.wait_for_timeout(500)
+    page_quiet(page)
     out = page.evaluate("""() => {
       const w = document.querySelector('.okt-mdview');
       const body = w.querySelector('.okt-mdview-body');
@@ -192,7 +194,7 @@ def test_an_island_href_reaches_the_viewer_too(page, site_url):
     state = page.evaluate(INJECT, "reference.md") or None
     page.click("#probe")
     page.wait_for_selector(".okt-mdview .okt-mdview-rendered *", timeout=5000)
-    page.wait_for_timeout(300)
+    page_quiet(page)
     state = page.evaluate(STATE)
 
     assert state["open"] and not state["failed"], state
@@ -246,11 +248,11 @@ def test_the_bar_never_hides_behind_the_close_button(page, site_url):
         page.set_viewport_size({"width": width, "height": 900})
         page.goto(f"{site_url}/docs/index.html")
         page.wait_for_selector("main section")
-        page.wait_for_timeout(300)
+        page_quiet(page)
         page.evaluate(INJECT, TARGET)
         page.click("#probe")
         page.wait_for_selector(".okt-mdview .okt-mdview-rendered *", timeout=5000)
-        page.wait_for_timeout(300)
+        page_quiet(page)
         boxes = page.evaluate("""() => {
           const r = (s) => document.querySelector(s).getBoundingClientRect().toJSON();
           return {

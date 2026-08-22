@@ -13,6 +13,8 @@
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import re
@@ -68,7 +70,7 @@ def _page(browser, served, stem="alpha", **kw):
     pg = browser.new_page(viewport={"width": 1280, "height": 900}, **kw)
     pg.goto(f"{served}/{stem}.html")
     pg.wait_for_function("() => window.__okuRendered === true", timeout=60000)
-    pg.wait_for_timeout(900)
+    page_quiet(pg)
     return pg
 
 

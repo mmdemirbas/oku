@@ -18,6 +18,8 @@ file being touched.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import functools
 import http.server
@@ -157,7 +159,7 @@ def snapshots(browser, built, site_url):
         ):
             console.clear()
             page.goto(url, wait_until="load")
-            page.wait_for_timeout(2500)
+            page_quiet(page)
             snap = page.evaluate(TALLY)
             snap["console"] = [c for c in console if not any(k in c for k in CDN)]
             out.setdefault(rel, {})[mode] = snap

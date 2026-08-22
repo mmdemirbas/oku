@@ -14,6 +14,8 @@ size it was authored.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import base64
 import functools
@@ -87,7 +89,7 @@ def _open(page, url):
     missing = []
     page.on("response", lambda r: missing.append(r.url) if r.status == 404 else None)
     page.goto(url, wait_until="load")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
     return page.evaluate(MEASURE), missing
 
 

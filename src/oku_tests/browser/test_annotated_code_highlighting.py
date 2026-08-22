@@ -21,6 +21,8 @@ docs uses javascript, which is why the defect never showed up here.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import json
 
 import pytest
@@ -77,7 +79,7 @@ def _mount(page, site_url):
     page.wait_for_selector("#probe oku-annotated-code pre code")
     # Long enough for a CDN grammar fetch plus the autoloader's second
     # pass — the window the defect lived in.
-    page.wait_for_timeout(3000)
+    page_quiet(page)
     return page.evaluate(STATE)
 
 
@@ -171,7 +173,7 @@ def test_a_block_with_no_annotations_still_highlights(page, site_url):
         "def load(path):\n    return parse(read(path))\n",
     )
     page.wait_for_selector("#plain oku-annotated-code pre code")
-    page.wait_for_timeout(3000)
+    page_quiet(page)
     out = page.evaluate(
         """() => {
              const code = document.querySelector('#plain oku-annotated-code pre code');

@@ -19,6 +19,8 @@ browser, and every one must be rejected by both or accepted by both.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import threading
@@ -95,7 +97,7 @@ def rendered(browser, served) -> dict:
     try:
         pg.goto(f"{served}/page.html")
         pg.wait_for_function("() => window.__okuRendered === true", timeout=60000)
-        pg.wait_for_timeout(1200)
+        page_quiet(pg)
         return pg.evaluate(
             """(names) => {
           const out = {};

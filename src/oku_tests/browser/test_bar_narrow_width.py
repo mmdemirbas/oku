@@ -27,6 +27,8 @@ chart is shown at all.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import threading
@@ -117,7 +119,7 @@ def _at(browser, url, width):
     pg = browser.new_page(viewport={"width": width, "height": 1200})
     pg.goto(url + "/p.html")
     pg.wait_for_function("() => window.__okuRendered === true", timeout=30000)
-    pg.wait_for_timeout(250)
+    page_quiet(pg)
     charts = pg.evaluate(GEOMETRY)
     pg.close()
     return charts

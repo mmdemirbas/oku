@@ -20,6 +20,8 @@ own file, test_presentation_measure.py.
 
 from __future__ import annotations
 
+from ._wait import box_stable, page_quiet
+
 import http.server
 import threading
 from pathlib import Path
@@ -132,7 +134,7 @@ def afford_url(tmp_path_factory):
 def rendered(afford_url, browser):
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     page.goto(f"{afford_url}/page.html")
-    page.wait_for_timeout(1800)
+    page_quiet(page)
     yield page
     page.close()
 
@@ -437,7 +439,7 @@ def test_the_dimming_never_arms_without_a_pointer(afford_url, browser):
     page = ctx.new_page()
     try:
         page.goto(f"{afford_url}/page.html")
-        page.wait_for_timeout(1500)
+        page_quiet(page)
         page.tap(".drawer-toggle")
         page.wait_for_timeout(300)
         got = page.evaluate(
@@ -462,7 +464,7 @@ def test_touch_keeps_the_controls_reachable(afford_url, browser):
     page = ctx.new_page()
     try:
         page.goto(f"{afford_url}/page.html")
-        page.wait_for_timeout(1500)
+        page_quiet(page)
         got = page.evaluate(
             """() => {
             const c = document.querySelector('#big .okt-table-controls');
@@ -593,7 +595,7 @@ def timeline_page(tmp_path_factory, browser):
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     page.goto(f"http://127.0.0.1:{httpd.server_address[1]}/page.html")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
     yield page
     page.close()
     httpd.shutdown()
@@ -666,7 +668,9 @@ def test_a_narrow_timeline_keeps_its_dots_on_the_rail(timeline_page):
     offset. Moving one alone is the whole failure mode, and it only
     shows below 560px."""
     timeline_page.set_viewport_size({"width": 380, "height": 800})
-    timeline_page.wait_for_timeout(300)
+    # The reflow, not a guess at how long one takes. Both elements the
+    # assertion below measures have to have stopped moving.
+    box_stable(timeline_page, ".okt-timeline", ".okt-timeline-dot")
     got = timeline_page.evaluate(
         """() => {
         const l = document.querySelector('ol.okt-timeline');
@@ -680,6 +684,6 @@ def test_a_narrow_timeline_keeps_its_dots_on_the_rail(timeline_page):
     }"""
     )
     timeline_page.set_viewport_size({"width": 1440, "height": 900})
-    timeline_page.wait_for_timeout(200)
+    box_stable(timeline_page, ".okt-timeline")
     assert abs(got["dotMid"] - got["railMid"]) <= 0.5, got
     assert not got["overflows"], f"the timeline pushed the page sideways at 380px: {got}"

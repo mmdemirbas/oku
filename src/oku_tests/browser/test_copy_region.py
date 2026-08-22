@@ -19,6 +19,8 @@ follows from that job.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import json
 import os
@@ -113,7 +115,7 @@ def opened(built, browser):
     context.grant_permissions(["clipboard-read", "clipboard-write"])
     page = context.new_page()
     page.goto(built.as_uri(), wait_until="load")
-    page.wait_for_timeout(700)
+    page_quiet(page)
     yield page
     context.close()
 

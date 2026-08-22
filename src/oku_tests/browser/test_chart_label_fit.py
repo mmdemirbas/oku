@@ -30,6 +30,8 @@ Measurement notes, both load-bearing:
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import threading
@@ -148,7 +150,7 @@ def _measure(browser, served, variant):
         # measurement has to wait for the same things or it reads a page
         # mid-fit and fails on labels that are about to be corrected.
         pg.evaluate("() => document.fonts.ready")
-        pg.wait_for_timeout(1200)
+        page_quiet(pg)
         pg.evaluate(TAG_CHARTS)
         return pg.evaluate(MEASURE)
     finally:
@@ -184,7 +186,7 @@ def test_every_chart_type_in_the_example_set_renders(browser, served):
     try:
         pg.goto(f"{served}/plain.html")
         pg.wait_for_function("() => window.__okuRendered === true", timeout=60000)
-        pg.wait_for_timeout(600)
+        page_quiet(pg)
         drawn = dict(pg.evaluate(DREW_SOMETHING))
     finally:
         pg.close()
@@ -300,7 +302,7 @@ def _one_chart_page(browser, tmp_path_factory, payload, script):
         pg.goto(f"http://127.0.0.1:{httpd.server_address[1]}/p.html")
         pg.wait_for_function("() => window.__okuRendered === true", timeout=60000)
         pg.evaluate("() => document.fonts.ready")
-        pg.wait_for_timeout(1000)
+        page_quiet(pg)
         return pg.evaluate(script)
     finally:
         pg.close()

@@ -12,6 +12,8 @@ how it survived: nothing broke, it just said it did.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import os
 from pathlib import Path
@@ -65,7 +67,7 @@ def _errors_during(page, url, action):
     page.on("console", lambda m: errs.append(m.text[:160]) if m.type == "error" else None)
     page.on("pageerror", lambda e: errs.append(f"pageerror: {e}"[:160]))
     page.goto(url, wait_until="load")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
     errs.clear()
     action()
     page.wait_for_timeout(900)
@@ -93,7 +95,7 @@ def test_an_in_page_link_reaches_no_network(page, standalone_page):
 def test_the_anchor_still_scrolls(page, standalone_page):
     """The fix must not turn the error into a dead link."""
     page.goto(standalone_page.as_uri(), wait_until="load")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
     page.evaluate("window.scrollTo(0, 0)")
     page.evaluate("location.hash = '#third'")
     page.wait_for_timeout(800)

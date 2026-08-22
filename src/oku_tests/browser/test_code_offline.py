@@ -13,6 +13,8 @@ nothing if it changes what an online reader gets.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import threading
 from pathlib import Path
@@ -85,7 +87,7 @@ def _measure(browser, code_url, *, offline: bool):
     try:
         pg.goto(f"{code_url}/page.html")
         # Longer than PRISM_FALLBACK_MS so the timer path is covered too.
-        pg.wait_for_timeout(5000)
+        page_quiet(pg)
         return pg.evaluate(PROBE)
     finally:
         pg.close()
@@ -110,7 +112,7 @@ def test_the_vendored_copy_highlights_when_the_cdn_is_gone(browser, code_url):
     pg = ctx.new_page()
     try:
         pg.goto(f"{code_url}/page.html")
-        pg.wait_for_timeout(5000)
+        page_quiet(pg)
         got = pg.evaluate(PROBE)
     finally:
         pg.close()

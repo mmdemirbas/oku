@@ -22,6 +22,8 @@ outside the set still stays literal, and it must stay inert.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import re
@@ -115,7 +117,7 @@ def test_no_tag_is_typed_out_anywhere_on_the_page(page, served):
     accepts must never appear as characters. The one deliberate literal
     is inside a code span, which is excluded by construction."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     leaked = page.eval_on_selector_all(
         "main p, main .compare-card",
         "els => els.map(e => { const c = e.cloneNode(true);"
@@ -128,7 +130,7 @@ def test_no_tag_is_typed_out_anywhere_on_the_page(page, served):
 
 def test_bold_and_italic_render_mid_paragraph(page, served):
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     assert page.locator("main p > b").count() >= 1
     assert page.locator("main p > b").first.inner_text().strip() == "aynı kök, farklı ek"
     assert page.locator("main p > i").first.inner_text().strip() == "eğik"
@@ -138,14 +140,14 @@ def test_code_renders_mid_paragraph(page, served):
     """`code` was already declared inline by the island rule, so it never
     opened an island — and the inline parser did not render it either."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     texts = page.eval_on_selector_all("main p > code", "els => els.map(e => e.textContent)")
     assert "yıldızları→yıldızların" in texts
 
 
 def test_anchor_renders_with_its_href(page, served):
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     a = page.locator(f'main p > a[href="{HREF}"]')
     assert a.count() == 1
     assert a.inner_text().strip() == "bir bağlantı"
@@ -153,7 +155,7 @@ def test_anchor_renders_with_its_href(page, served):
 
 def test_strong_and_em_render(page, served):
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     assert page.locator("main p > strong").first.inner_text().strip() == "kalın"
     assert page.locator("main p > em").first.inner_text().strip() == "vurgu"
 
@@ -163,7 +165,7 @@ def test_a_typed_block_string_field_renders_the_same_html(page, served):
     Every typed renderer that takes markdown runs the same parser, so the
     card is the case that proves the fix reaches them."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     card = page.locator(".compare-card").first
     assert card.locator("b").count() == 1
     codes = card.locator("code")
@@ -175,14 +177,14 @@ def test_a_tag_outside_the_set_stays_literal(page, served):
     """The pass-through is an allow-list, not a parser. An unknown tag
     keeps the old behaviour — visible text, nothing constructed."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     assert "<blooper>" in _text(page)
     assert page.locator("blooper").count() == 0
 
 
 def test_a_code_span_still_protects_its_body(page, served):
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     codes = page.eval_on_selector_all("main code", "els => els.map(e => e.textContent)")
     assert "<b>literal</b>" in codes
     assert page.locator("main code b").count() == 0
@@ -193,7 +195,7 @@ def test_every_declared_inline_tag_renders_as_that_element(page, served, tag):
     """Declaring a tag inline and not drawing it is the defect this file
     exists for, so the case list comes from the declaration itself."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     el = page.locator(f"main p > {tag}").filter(has_text=f"gövde-{tag}")
     assert el.count() == 1, f"<{tag}> did not render as an element"
     assert el.inner_text().strip() == f"gövde-{tag}"
@@ -203,7 +205,7 @@ def test_br_renders_as_a_line_break(page, served):
     """The one inline tag held out of the pass-through, because a void
     element has no body to parse. Held out is not unsupported."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     assert page.locator("main p > br").count() == 1
 
 
@@ -211,6 +213,6 @@ def test_inline_html_does_not_swallow_the_rest_of_the_page(page, served):
     """A tag rendered mid-paragraph must not be mistaken for an island
     opening — the section after the compare-grid still stands alone."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     assert page.locator("#sonra").count() == 1
     assert "Bu paragraf kartın dışında kalmalı." in _text(page)

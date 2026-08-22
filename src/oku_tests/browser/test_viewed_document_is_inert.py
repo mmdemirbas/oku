@@ -23,6 +23,8 @@ no other way to show it.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import http.server
 import json
@@ -275,7 +277,7 @@ def opened_standalone(browser, standalone):
         # the build inlined rather than fetching them.
         pg.click("oku-filepath")
         pg.wait_for_selector(".okt-mdview-rendered", timeout=20000)
-        pg.wait_for_timeout(1200)
+        page_quiet(pg)
         yield pg.evaluate(PROBE)
     finally:
         pg.close()

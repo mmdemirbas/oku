@@ -11,6 +11,8 @@ construct so a failure names the construct, not "markdown broke".
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import threading
@@ -122,7 +124,7 @@ def rendered(served, browser):
     """Render once, hand every test the same page object."""
     page = browser.new_page(viewport={"width": 1280, "height": 900})
     page.goto(served)
-    page.wait_for_timeout(1200)
+    page_quiet(page)
     yield page
     page.close()
 

@@ -13,6 +13,8 @@ which rows those are.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import os
 from pathlib import Path
@@ -67,7 +69,7 @@ def opened(built, browser):
     context.grant_permissions(["clipboard-read", "clipboard-write"])
     page = context.new_page()
     page.goto(built.as_uri(), wait_until="load")
-    page.wait_for_timeout(700)
+    page_quiet(page)
     # The toolbar is quiet chrome: opacity 0 and pointer-events none
     # until the pointer is on the table. Nothing in it is clickable
     # before that, which is the design, so the test hovers like a reader.

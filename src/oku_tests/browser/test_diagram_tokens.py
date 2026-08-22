@@ -20,6 +20,8 @@ and the colour tracks the theme instead of freezing at first paint.
 
 from __future__ import annotations
 
+from ._wait import diagram_drawn, until_changed
+
 SRC = (
     "flowchart LR\\n"
     '  A["one"] --> B["two"]\\n'
@@ -55,7 +57,7 @@ def _mount(page, site_url):
     page.goto(f"{site_url}/docs/index.html")
     page.wait_for_selector("main section")
     page.evaluate(MOUNT, SRC.replace("\\n", "\n"))
-    page.wait_for_timeout(4000)
+    diagram_drawn(page, "#probe oku-diagram")
     return page.evaluate(STATE)
 
 
@@ -75,7 +77,7 @@ def test_the_resolved_colour_follows_the_theme(page, site_url):
     assert light["fill"], light
 
     page.evaluate("() => document.querySelector('.theme-toggle').click()")
-    page.wait_for_timeout(4000)
+    _await_reflip(page, light["fill"])
     dark = page.evaluate(STATE)
 
     assert not dark["failed"], dark
@@ -114,12 +116,25 @@ SOFT_STATE = """() => {
 }"""
 
 
+FILL = (
+    "() => { const n = document.querySelector('#probe oku-diagram svg .node rect,"
+    " #probe oku-diagram svg .node path'); return n ? getComputedStyle(n).fill : null; }"
+)
+
+
+def _await_reflip(page, before):
+    """A theme flip re-renders the diagram, and the selector is the
+    same before and after — so the question is not "is there an svg"
+    but "is it the other theme's svg yet"."""
+    until_changed(page, FILL, before, what="the diagram re-rendered in the other theme")
+
+
 def _mount_soft(page, site_url):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{site_url}/docs/index.html")
     page.wait_for_selector("main section")
     page.evaluate(MOUNT, SOFT_SRC)
-    page.wait_for_timeout(4000)
+    diagram_drawn(page, "#probe oku-diagram")
     return page.evaluate(SOFT_STATE)
 
 
@@ -133,7 +148,7 @@ def test_a_soft_plate_carries_its_label_in_both_themes(page, site_url):
     assert light["fill"] and light["label"], light
 
     page.evaluate("() => document.querySelector('.theme-toggle').click()")
-    page.wait_for_timeout(4000)
+    _await_reflip(page, light["fill"])
     dark = page.evaluate(SOFT_STATE)
     assert not dark["failed"], dark
     assert dark["fill"] and dark["label"], dark

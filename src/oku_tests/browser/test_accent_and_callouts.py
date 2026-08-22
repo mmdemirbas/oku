@@ -23,6 +23,8 @@ They have separate causes.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import re
 import threading
@@ -77,7 +79,7 @@ def accent_url(tmp_path_factory):
 def hexpage(accent_url, browser):
     page = browser.new_page(viewport={"width": 1280, "height": 900})
     page.goto(f"{accent_url}/hex.html")
-    page.wait_for_timeout(1200)
+    page_quiet(page)
     yield page
     page.close()
 
@@ -212,7 +214,7 @@ def test_a_named_palette_is_untouched(accent_url, browser):
     page = browser.new_page(viewport={"width": 1280, "height": 900})
     try:
         page.goto(f"{accent_url}/named.html")
-        page.wait_for_timeout(1200)
+        page_quiet(page)
         got = page.evaluate(
             """() => {
             const s = getComputedStyle(document.documentElement);

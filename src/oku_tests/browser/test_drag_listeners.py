@@ -28,6 +28,8 @@ aiming the column drag: the grab zone has to be inside its own cell.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import threading
@@ -205,7 +207,7 @@ def test_the_lightbox_still_pans(counted) -> None:
         "() => window.__okuLightbox.open(document.querySelector('svg').cloneNode(true), { title: 'probe' })"
     )
     stage = counted.wait_for_selector(".okt-lightbox-pz", timeout=10000)
-    counted.wait_for_timeout(120)
+    page_quiet(counted)
     inner = counted.query_selector(".okt-lightbox-pz-inner")
     before = counted.evaluate("el => getComputedStyle(el).transform", inner)
     box = stage.bounding_box()

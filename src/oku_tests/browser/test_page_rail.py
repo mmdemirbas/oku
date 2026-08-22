@@ -21,6 +21,8 @@ asserted rather than eyeballed.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import threading
 from pathlib import Path
@@ -115,7 +117,7 @@ def rail_url(tmp_path_factory):
 def rendered(rail_url, browser):
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     page.goto(f"{rail_url}/long.html")
-    page.wait_for_timeout(2200)
+    page_quiet(page)
     yield page
     page.close()
 
@@ -216,7 +218,7 @@ def test_a_page_that_fits_on_one_screen_has_no_rail(rail_url, browser):
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     try:
         page.goto(f"{rail_url}/short.html")
-        page.wait_for_timeout(1200)
+        page_quiet(page)
         got = page.evaluate(
             """() => {
             const rail = document.getElementById('oku-rail');
@@ -423,7 +425,7 @@ def test_marks_never_collide_at_any_width(rail_url, browser, width, expect_figur
     page = browser.new_page(viewport={"width": width, "height": 844})
     try:
         page.goto(f"{rail_url}/long.html")
-        page.wait_for_timeout(2200)
+        page_quiet(page)
         got = page.evaluate(
             """() => {
             const marks = [...document.querySelectorAll('.okt-rail-mark')];
@@ -689,7 +691,7 @@ def test_reduced_motion_flattens_the_swell(rail_url, browser):
     page = browser.new_page(viewport={"width": 1440, "height": 900}, reduced_motion="reduce")
     try:
         page.goto(f"{rail_url}/long.html")
-        page.wait_for_timeout(2200)
+        page_quiet(page)
         got = page.evaluate(
             """async () => {
             const rail = document.getElementById('oku-rail');

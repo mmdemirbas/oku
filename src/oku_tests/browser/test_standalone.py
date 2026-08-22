@@ -10,6 +10,8 @@ owning the layout's first grid track.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import functools
 import http.server
 import json
@@ -238,7 +240,7 @@ def test_standalone_renders_the_same_from_file_protocol(page, parity_urls):
     """No server at all — the file:// case the artifact exists for."""
     page.goto(parity_urls["file"])
     page.wait_for_selector("main section")
-    page.wait_for_timeout(1200)
+    page_quiet(page)
     shape = page.evaluate(_SHAPE)
     assert shape["sections"] == 2
     assert shape["barRows"] == 2

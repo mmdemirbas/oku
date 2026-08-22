@@ -17,6 +17,8 @@ manifest suffix match instead — the same one the language switch uses.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import os
 from pathlib import Path
@@ -82,7 +84,7 @@ def lone_out(tmp_path_factory):
 
 def _open(page, path: Path):
     page.goto(path.as_uri(), wait_until="load")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
     return page.evaluate(ROWS)
 
 
@@ -116,7 +118,7 @@ def test_clicking_a_row_opens_that_page(page, tree_out):
     """Each file is self-contained, so the browser's own navigation is
     the right one — no fetch of a JSON file:// will not serve."""
     page.goto((tree_out / "index.html").as_uri(), wait_until="load")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
     # The reader's path: the drawer is closed on load, so open it first —
     # the rows are off-canvas until they do.
     page.click(".ctrl-btn.drawer-toggle")

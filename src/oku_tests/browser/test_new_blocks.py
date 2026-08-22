@@ -16,6 +16,8 @@ tmp dir with an `_oku` symlink to the live kit/. Uses the pytest-playwright
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import threading
@@ -114,7 +116,7 @@ def served(tmp_path_factory):
 
 def test_new_blocks_render(page, served):
     page.goto(served)
-    page.wait_for_timeout(1200)
+    page_quiet(page)
 
     # danger callout — present and red border (not the neutral fallback)
     danger = page.locator(".callout.danger")
@@ -151,7 +153,7 @@ def test_a_bar_chart_prints_the_unit_it_was_given(page, served):
     property either draws or fails the check. Found on a real document
     (katip, 2026-08-05), where three bar charts carried their unit."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     unit = page.locator(".bar-chart .bar-chart-unit")
     assert unit.count() == 1, "the bar chart dropped its x_label"
     assert unit.inner_text().strip() == "saat", unit.inner_text()
@@ -173,7 +175,7 @@ def test_bar_chart_shares_origin(page, served):
     otherwise lengths are not visually comparable. Labels of very
     different widths previously pushed each bar to a different origin."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     lefts = page.eval_on_selector_all(
         ".bar-chart .bar-row .bar-track",
         "els => els.map(e => Math.round(e.getBoundingClientRect().left))",
@@ -188,7 +190,7 @@ def test_compare_grid_verdict_icons(page, served):
     The icon is coloured by verdict — good ≠ bad ≠ warn — and even a
     judgment-free `neutral` card carries a (quiet) marker."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     for verdict in ("good", "warn", "bad", "neutral"):
         sel = f".compare-card.{verdict} .compare-card-icon svg"
         assert page.locator(sel).count() == 1, sel
@@ -212,7 +214,7 @@ def test_kpi_grid_icons(page, served):
     (turns a wall of numbers into a scannable spec sheet); a tile without
     `icon` renders no glyph — back-compatible."""
     page.goto(served)
-    page.wait_for_timeout(800)
+    page_quiet(page)
     tiles = page.locator(".kpi-grid .kpi")
     assert tiles.count() == 3, tiles.count()
     # two tiles carry an icon, one (10 km) does not
@@ -228,7 +230,7 @@ def test_mermaid_fits_container(page, served):
     """A rendered diagram never overflows its host (it scales down to
     the column instead of clipping / horizontal-scrolling)."""
     page.goto(served)
-    page.wait_for_timeout(2500)
+    page_quiet(page)
     fit = page.eval_on_selector(
         "oku-diagram",
         """el => {
@@ -286,7 +288,7 @@ def test_wide_flowchart_is_never_cut_off(page, wide_diagram, width):
     without that, the right-hand nodes are painted past the clip."""
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(wide_diagram)
-    page.wait_for_timeout(3200)
+    page_quiet(page)
     r = page.evaluate(
         """() => {
             const el = document.querySelector('oku-diagram');

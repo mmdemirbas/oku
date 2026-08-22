@@ -15,6 +15,8 @@ their absence is a network condition, not a defect in the artifact.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import os
 import re
@@ -79,7 +81,7 @@ def _load(page, url):
     page.on("requestfailed", lambda r: failed.append(r.url))
     page.on("response", lambda r: failed.append(f"{r.status} {r.url}") if r.status >= 400 else None)
     page.goto(url, wait_until="load")
-    page.wait_for_timeout(2500)
+    page_quiet(page)
     return (
         [c for c in console if not CDN.search(c)],
         [f for f in failed if not CDN.search(f)],
@@ -94,7 +96,7 @@ def test_standalone_over_file_url_asks_for_nothing_it_cannot_get(page, standalon
 
 def test_standalone_renders_its_primitives_off_disk(page, standalone_file):
     page.goto(standalone_file.as_uri(), wait_until="load")
-    page.wait_for_timeout(2500)
+    page_quiet(page)
     got = page.evaluate(
         """() => ({
         sections:  document.querySelectorAll('section').length,
@@ -116,7 +118,7 @@ def test_standalone_search_falls_back_to_this_file(page, standalone_file):
     is page-scoped — and must say so as the normal state, not as a
     missing-index fault."""
     page.goto(standalone_file.as_uri(), wait_until="load")
-    page.wait_for_timeout(2000)
+    page_quiet(page)
     got = page.evaluate(
         """async () => {
         document.querySelector('.ctrl-btn[class*=search]').click();
@@ -179,7 +181,7 @@ def test_entry_stub_renders_the_page_list_off_disk(page, entry_tree):
     console = []
     page.on("console", lambda m: console.append(m.text) if m.type == "error" else None)
     page.goto((entry_tree / "index.html").as_uri(), wait_until="load")
-    page.wait_for_timeout(2000)
+    page_quiet(page)
 
     got = page.evaluate(
         """() => ({
@@ -204,7 +206,7 @@ def test_missing_page_source_still_reports_on_a_content_page(page, entry_tree):
     console = []
     page.on("console", lambda m: console.append(m.text) if m.type == "error" else None)
     page.goto(stray.as_uri(), wait_until="load")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
 
     reported = [c for c in console if "page-source-unreachable" in c]
     assert reported, f"a missing page source was not reported: {console}"

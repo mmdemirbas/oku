@@ -24,6 +24,8 @@ its own chips — because side by side leaves neither enough room.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import os
 from pathlib import Path
@@ -131,7 +133,7 @@ OVERFLOW = """() => {
 def test_a_long_token_does_not_widen_the_page(page, narrow_page, width):
     page.set_viewport_size({"width": width, "height": 800})
     page.goto(narrow_page.as_uri(), wait_until="load")
-    page.wait_for_timeout(2000)
+    page_quiet(page)
     got = page.evaluate(OVERFLOW)
 
     assert got["docWidth"] <= got["inner"] + 1, (
@@ -144,7 +146,7 @@ def test_nothing_escapes_its_column_at_360(page, narrow_page):
     one names the element, which is what an author needs to fix it."""
     page.set_viewport_size({"width": 360, "height": 800})
     page.goto(narrow_page.as_uri(), wait_until="load")
-    page.wait_for_timeout(2000)
+    page_quiet(page)
     got = page.evaluate(OVERFLOW)
 
     assert got["over"] == [], f"elements outside the viewport with no scroller: {got['over']}"

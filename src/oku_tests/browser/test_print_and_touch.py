@@ -24,6 +24,8 @@ phone and leaves a touch tablet at 1024px with neither button.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import threading
@@ -148,7 +150,7 @@ def test_the_reveal_controls_are_visible_without_a_hover(browser, served, width:
     try:
         pg.goto(f"{served}/page.html")
         pg.wait_for_function("() => window.__okuRendered === true", timeout=60000)
-        pg.wait_for_timeout(400)
+        page_quiet(pg)
         m = pg.evaluate("""() => {
           const op = e => +getComputedStyle(e).opacity;
           const w = [...document.querySelectorAll('.okt-wrap-btn')];

@@ -8,6 +8,8 @@ which is why all three survived.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import pytest
 
 
@@ -37,7 +39,7 @@ def test_copying_an_annotated_block_yields_the_program(clipboard_page, site_url)
     page = clipboard_page
     page.goto(f"{site_url}/docs/reference.html")
     page.wait_for_selector("oku-annotated-code")
-    page.wait_for_timeout(3000)
+    page_quiet(page)
     page.evaluate("() => document.querySelector('oku-annotated-code').scrollIntoView()")
     page.wait_for_timeout(300)
     page.hover("oku-annotated-code .okt-pre-host")
@@ -66,7 +68,7 @@ def test_no_column_grabber_reaches_a_view_without_columns(page, site_url, view):
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(f"{site_url}/docs/tables.html")
     page.wait_for_selector("main section")
-    page.wait_for_timeout(1800)
+    page_quiet(page)
 
     strays = page.evaluate(
         """(view) => {
@@ -93,7 +95,7 @@ def test_search_results_are_not_titled_with_the_permalink(page, site_url):
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(f"{site_url}/docs/reference.html")
     page.wait_for_selector("main section")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
     page.keyboard.press("Control+k")
     page.wait_for_timeout(400)
     page.keyboard.type("heading")
@@ -116,7 +118,7 @@ def test_the_heading_helper_strips_both_kinds_of_chrome(page, site_url):
     regex. One helper now, so the next consumer inherits the rule."""
     page.goto(f"{site_url}/docs/reference.html")
     page.wait_for_selector("main section")
-    page.wait_for_timeout(1200)
+    page_quiet(page)
 
     got = page.evaluate(
         """() => {

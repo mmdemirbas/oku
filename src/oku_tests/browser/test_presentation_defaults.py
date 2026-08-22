@@ -19,6 +19,8 @@ formatting work this suite exists to remove.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import threading
 from pathlib import Path
@@ -133,7 +135,7 @@ def defaults_url(tmp_path_factory):
 def rendered(defaults_url, browser):
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     page.goto(f"{defaults_url}/page.html")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
     yield page
     page.close()
 
@@ -183,7 +185,7 @@ def test_a_titled_tldr_still_shows_its_title(defaults_url, browser):
     page = browser.new_page(viewport={"width": 1280, "height": 900})
     try:
         page.goto(f"{defaults_url}/titled.html")
-        page.wait_for_timeout(1200)
+        page_quiet(page)
         got = page.evaluate(
             """() => {
             const h = document.querySelector('.tldr h2');
@@ -233,7 +235,7 @@ def test_a_title_only_cover_shrinks_to_fit(defaults_url, browser):
     page = browser.new_page(viewport={"width": 1440, "height": 900})
     try:
         page.goto(f"{defaults_url}/bare.html")
-        page.wait_for_timeout(1200)
+        page_quiet(page)
         got = page.evaluate(
             """() => {
             const c = document.querySelector('header.cover');

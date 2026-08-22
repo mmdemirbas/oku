@@ -24,6 +24,8 @@ arrives here as a failure rather than as an untested path.
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import argparse
 import os
 import re
@@ -129,7 +131,7 @@ def _load_with_storage(page, url, values: dict[str, str]):
         "vals => { for (const [k, v] of Object.entries(vals)) localStorage.setItem(k, v); }", values
     )
     page.goto(url, wait_until="load")
-    page.wait_for_timeout(1500)
+    page_quiet(page)
     return page.evaluate(CHROME)
 
 

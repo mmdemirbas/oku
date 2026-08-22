@@ -19,6 +19,8 @@ between projects — a glossary domain is meant to be shared — so a
 
 from __future__ import annotations
 
+from ._wait import page_quiet
+
 import http.server
 import json
 import threading
@@ -91,7 +93,7 @@ def measured(browser, served):
     try:
         pg.goto(f"{served}/page.html")
         pg.wait_for_function("() => window.__okuRendered === true", timeout=60000)
-        pg.wait_for_timeout(600)
+        page_quiet(pg)
         # Hovering is what builds both cards; without it the tooltip
         # HTML is never constructed and every assertion below passes for
         # the wrong reason.
