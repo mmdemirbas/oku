@@ -770,6 +770,46 @@ def iter_page_stubs(root: Path, json_pages: list | None = None):
 # producing invalid kit JSON.
 
 
+# The accent tokens the kit hand-tunes, in the order the schema names
+# them. `_applyAccent` in kit/renderer.js is the implementation and
+# `test_authority_agreement.py` holds the three lists — this one, the
+# palette map's keys, and the schema's own description — against each
+# other. They disagreed once, and the page that found it rendered every
+# diagram as an "Unsupported color format" card.
+_KIT_ACCENTS = ("teal", "amber", "indigo", "rose", "violet", "green", "slate")
+
+# The CSS named colours, so a bare word that is neither a kit token nor
+# one of these can be reported as a typo at build time instead of being
+# swallowed by a browser. Only bare words are judged: `#hex`, `rgb(...)`,
+# `color-mix(...)` and every other function form are the browser's to
+# parse, and a check that guesses at those is one authors learn to
+# ignore.
+_CSS_NAMED_COLOURS = frozenset(
+    """
+aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond
+blue blueviolet brown burlywood cadetblue chartreuse chocolate coral
+cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray
+darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid
+darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey
+darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue
+firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod
+gray grey greenyellow honeydew hotpink indianred indigo ivory khaki lavender
+lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan
+lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon
+lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue
+lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue
+mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen
+mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin
+navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod
+palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum
+powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon
+sandybrown seagreen seashell sienna silver skyblue slateblue slategray
+slategrey snow springgreen steelblue tan thistle tomato turquoise violet wheat
+white whitesmoke yellow yellowgreen transparent currentcolor
+""".split()
+)
+
+
 def _md_slug(text: str) -> str:
     """ATX-heading style id: lowercase, punctuation dropped, spaces → '-'.
 
@@ -3528,6 +3568,28 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                         f"Front-matter key '{key}' is not one the kit reads.{near} "
                         "`oku spec front-matter` lists them.",
                     )
+        accent = meta.get("accent")
+        if isinstance(accent, str) and accent.strip() and not is_materialised:
+            token = accent.strip()
+            # Letters only, so `#b45309`, `rgb(...)` and every other
+            # function form fall to the browser — a check that guesses at
+            # those is one authors learn to ignore. Unicode letters, not
+            # ASCII: `rosé` is as unparseable as `rose` was, and a rule
+            # that reads only ASCII is one that stops at the first
+            # accented typo.
+            if re.fullmatch(r"[^\W\d_]+", token) and token.lower() not in _CSS_NAMED_COLOURS:
+                if token.lower() not in _KIT_ACCENTS:
+                    near = _did_you_mean(token.lower(), list(_KIT_ACCENTS))
+                    add(
+                        p,
+                        "warning",
+                        "accent-unknown",
+                        "meta.accent",
+                        f"accent '{token}' is neither a kit token nor a CSS colour name.{near} "
+                        f"The kit tunes {', '.join(_KIT_ACCENTS)}; anything else has to be a "
+                        "colour the browser can parse (a hex, `rgb(...)`, `hsl(...)`). "
+                        "The page will keep the default accent.",
+                    )
         if not meta.get("summary") and not is_materialised:
             add(
                 p,
@@ -3550,7 +3612,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         # it that a tool can decide without judgement lives here, so the
         # briefing can be about content.
         if not is_materialised:
-            for issue in _presentation_issues(page, _tree_defaults(p)):
+            for issue in _presentation_issues(page, _tree_defaults(p), kit_dir):
                 add(p, *issue)
 
     # 11. Link destinations. Glossary and ext-ref ids were resolved
@@ -3782,7 +3844,31 @@ def _page_headings(page: dict) -> set[str]:
     return out
 
 
-def _presentation_issues(page: dict, tree_defaults: dict) -> list[tuple[str, str, str, str]]:
+_kit_token_cache: dict[str, frozenset[str]] = {}
+
+
+def _kit_css_tokens(kit_dir: Path) -> frozenset[str]:
+    """Every `--custom-property` the kit's own stylesheet defines.
+
+    Read from the kit being CHECKED, not from this repo: a globally
+    installed `oku` carries its own copy, and the whole point of the
+    check below is to catch a page written against a newer kit than the
+    tool holds.
+    """
+    key = str(kit_dir)
+    if key not in _kit_token_cache:
+        css = kit_dir / "chrome.css"
+        try:
+            text = css.read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+        _kit_token_cache[key] = frozenset(re.findall(r"(--[a-zA-Z0-9_-]+)\s*:", text))
+    return _kit_token_cache[key]
+
+
+def _presentation_issues(
+    page: dict, tree_defaults: dict, kit_dir: Path | None = None
+) -> list[tuple[str, str, str, str]]:
     """(severity, code, where, message) for the presentation rules.
 
     Each rule is decidable without judgement. Anything needing a reader
@@ -3906,6 +3992,41 @@ def _presentation_issues(page: dict, tree_defaults: dict) -> list[tuple[str, str
                         "color-mix() will not parse.",
                     )
                 )
+        if kind == "diagram":
+            # A `var(--x)` Mermaid can see is a diagram that does not
+            # draw. `__okuResolveCssVars` substitutes the computed value
+            # before Mermaid parses, and deliberately leaves a token that
+            # resolves to nothing exactly as written — so an undefined
+            # one reaches a grammar with no production for `(` and the
+            # whole figure becomes a parse-error card. Reported here
+            # because the browser's message names the punctuation and not
+            # the token, and because the usual cause is a page written
+            # against a newer kit than the installed tool carries.
+            defined = _kit_css_tokens(kit_dir or KIT_DIR)
+            if defined:
+                used = sorted(
+                    {
+                        name
+                        for ln in str(blk.get("src") or "").split("\n")
+                        if _MERMAID_STYLE_LINE_RE.match(ln)
+                        for name in re.findall(r"var\(\s*(--[a-zA-Z0-9_-]+)", ln)
+                    }
+                )
+                missing = [name for name in used if name not in defined]
+                if missing:
+                    out.append(
+                        (
+                            "warning",
+                            "diagram-unknown-token",
+                            f"b[{i}] diagram",
+                            f"mermaid style line(s) use {', '.join(missing)}, which this kit does "
+                            "not define. The kit substitutes a token's computed value before "
+                            "Mermaid parses and leaves an unresolvable one as written, so Mermaid "
+                            "meets `var(` — a grammar with no production for it — and the diagram "
+                            "renders as a parse-error card. Check `oku --version` against the kit "
+                            "you wrote the page for; `./run install` in the kit repo updates it.",
+                        )
+                    )
         if kind == "diagram" and headings:
             labels = {_normalise_label(x) for x in _MERMAID_LABEL_RE.findall(str(blk.get("src") or ""))}
             labels.discard("")

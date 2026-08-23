@@ -279,3 +279,47 @@ def test_the_table_names_no_code_that_nothing_emits(page: str) -> None:
         if c not in emitted and not (c.endswith("*") and any(e.startswith(c[:-1]) for e in emitted))
     )
     assert not stale, f"{page} documents codes `oku check` no longer emits: {stale}"
+
+
+# ---------------------------------------------------------------- accents
+
+# Three lists say which accent tokens exist, and none of them can see the
+# others: the palette map in `_applyAccent`, `_KIT_ACCENTS` in cli.py
+# (which decides what `oku check` calls a typo), and the schema's own
+# description, which is what `oku spec front-matter` prints at an author.
+# They disagreed — the schema named seven, the map held three — and the
+# four that fell through reached Mermaid as an unresolvable colour. Every
+# diagram on a page with `accent: rose` became an error card while
+# `oku check --strict` called the page clean.
+_ACCENT_MAP_RE = re.compile(r"const palettes = \{(.*?)\n      \};", re.S)
+_ACCENT_KEY_RE = re.compile(r"^\s*([a-z]+):\s*\{", re.M)
+_SCHEMA_ACCENT_RE = re.compile(r"Kit color token \(([^)]+)\)")
+
+
+def _renderer_accents() -> list[str]:
+    body = _ACCENT_MAP_RE.search(RENDERER)
+    assert body, "no palette map in renderer.js — the pattern moved"
+    return _ACCENT_KEY_RE.findall(body.group(1))
+
+
+def _schema_accents() -> list[str]:
+    desc = SCHEMA["$defs"]["meta"]["properties"]["accent"]["description"]
+    m = _SCHEMA_ACCENT_RE.search(desc)
+    assert m, f"the accent description no longer names its tokens: {desc}"
+    return m.group(1).split("/")
+
+
+def test_the_renderer_tunes_every_accent_the_schema_documents() -> None:
+    assert _renderer_accents() == _schema_accents()
+
+
+def test_the_check_knows_every_accent_the_renderer_tunes() -> None:
+    assert list(cli._KIT_ACCENTS) == _renderer_accents()
+
+
+def test_no_kit_accent_is_left_to_the_browser_to_recognise() -> None:
+    """A kit token that happens to also be a CSS colour name would work
+    by coincidence — `violet` and `green` did, with a mismatched soft and
+    strong and no dark variant, which is how the disagreement hid."""
+    tuned = set(_renderer_accents())
+    assert tuned == set(cli._KIT_ACCENTS), tuned ^ set(cli._KIT_ACCENTS)

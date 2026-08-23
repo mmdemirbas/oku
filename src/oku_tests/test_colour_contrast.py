@@ -211,3 +211,91 @@ def test_a_soft_plate_is_pale_in_light_and_deep_in_dark(softs: dict[str, list[st
     dark = _relative_luminance(softs["dark"][index - 1])
     assert light > 0.5, f"--series-{index}-soft light ({softs['light'][index - 1]}) is not a pale plate"
     assert dark < 0.2, f"--series-{index}-soft dark ({softs['dark'][index - 1]}) is not a deep plate"
+
+
+# ---------- the accent families ----------
+#
+# These live in renderer.js rather than chrome.css: the accent is
+# written as a stylesheet at render time, because a page picks it in its
+# own front-matter. The map held three families and was extended to the
+# seven `oku spec front-matter` documents — four palettes that had never
+# been drawn, let alone measured, and that had been reaching pages as an
+# unresolvable literal in `--accent`.
+#
+# The threshold here is 4.5:1, not the 3:1 the ramp above uses. The ramp
+# colours bars and slices, which are graphical objects; `--accent` and
+# `--accent-strong` are the link colour and the text on a callout, which
+# are TEXT and take SC 1.4.3.
+
+RENDERER = Path(__file__).resolve().parents[2] / "kit" / "renderer.js"
+
+MIN_TEXT_RATIO = 4.5
+
+ACCENT_THEMES = {
+    # theme → (accent key, plate key, strong key, index into the token lists)
+    "light": ("light", "soft", "strong", 0),
+    "dark": ("dark", "darkSoft", "darkStrong", 1),
+}
+
+
+@pytest.fixture(scope="module")
+def palettes() -> dict[str, dict[str, str]]:
+    """The `palettes` map, read out of renderer.js rather than copied.
+
+    A copy is what let the schema document seven tokens while the
+    renderer carried three.
+    """
+    js = RENDERER.read_text(encoding="utf-8")
+    block = re.search(r"const palettes = \{(.*?)\n      \};", js, re.S)
+    assert block, "the palettes map moved — this file reads it by shape"
+    out = {}
+    for name, body in re.findall(r"(\w+):\s*\{([^}]*)\}", block.group(1)):
+        out[name] = dict(re.findall(r"(\w+):\s*'(#[0-9a-fA-F]{6})'", body))
+    return out
+
+
+def test_the_map_carries_every_token_the_schema_documents(palettes) -> None:
+    """The guard: every assertion below is per-token, so a missing
+    family is measured as nothing rather than as a failure."""
+    documented = {"teal", "amber", "indigo", "rose", "violet", "green", "slate"}
+
+    assert set(palettes) == documented, set(palettes) ^ documented
+    for name, p in palettes.items():
+        assert set(p) == {"light", "soft", "strong", "dark", "darkSoft", "darkStrong"}, (name, p)
+
+
+@pytest.mark.parametrize("theme", list(ACCENT_THEMES))
+@pytest.mark.parametrize("token", ["teal", "amber", "indigo", "rose", "violet", "green", "slate"])
+def test_an_accent_is_readable_on_the_page(palettes, surfaces, theme, token) -> None:
+    """`--accent` is the link colour, so it is text."""
+    accent = palettes[token][ACCENT_THEMES[theme][0]]
+    ratio = contrast_ratio(accent, surfaces[theme]["--bg"])
+
+    assert ratio >= MIN_TEXT_RATIO, f"{token} {theme} accent on --bg is {ratio:.2f}:1"
+
+
+@pytest.mark.parametrize("theme", list(ACCENT_THEMES))
+@pytest.mark.parametrize("token", ["teal", "amber", "indigo", "rose", "violet", "green", "slate"])
+def test_accent_text_is_readable_on_its_own_plate(palettes, texts, theme, token) -> None:
+    """A callout paints `--accent-soft` behind `--accent-strong` and
+    behind ordinary body text, so both have to clear the plate. The
+    tightest measured is amber's strong-on-soft at 4.51:1 — it clears,
+    with nothing to spare, and a retune of amber will fail here."""
+    _, plate_key, strong_key, _ = ACCENT_THEMES[theme]
+    plate = palettes[token][plate_key]
+
+    strong = contrast_ratio(palettes[token][strong_key], plate)
+    body = contrast_ratio(texts[theme], plate)
+
+    assert strong >= MIN_TEXT_RATIO, f"{token} {theme} accent-strong on accent-soft is {strong:.2f}:1"
+    assert body >= MIN_TEXT_RATIO, f"{token} {theme} body text on accent-soft is {body:.2f}:1"
+
+
+@pytest.mark.parametrize("field", ["light", "soft", "strong", "dark", "darkSoft", "darkStrong"])
+def test_the_seven_families_share_no_colour(palettes, field) -> None:
+    """`violet` and `green` used to fall through to the fallback and
+    carry indigo's soft and strong, which is how a page rendered one hue
+    on a callout's rule and another on the surface behind it."""
+    values = {name: p[field] for name, p in palettes.items()}
+
+    assert len(set(values.values())) == len(values), f"{field} is shared: {values}"

@@ -124,3 +124,55 @@ def test_a_placeholder_left_in_prose_is_flagged(tmp_path: Path) -> None:
 
     assert len(issues) == 2, [i["message"] for i in issues]
     assert found == {"'{{ figure }}'", "'TODO'"}, found
+
+
+class TestAccentValue:
+    """A key spelled right whose VALUE the browser cannot parse.
+
+    `accent: rose` was documented, absent from the renderer's palette,
+    and not a CSS named colour — so the fallback wrote an invalid
+    declaration and `--accent` computed to the literal string `rose`.
+    `buildConfig` hands `--accent` to Mermaid's `themeVariables`, which
+    requires a concrete colour, so every diagram on the page became an
+    "Unsupported color format" card while `oku check --strict` called
+    the page clean.
+
+    The renderer keeps the default now rather than writing a token it
+    could not resolve, which turns a page of error cards into a page in
+    the wrong colour. That is the recoverable failure, and this check is
+    what makes it visible instead of silent.
+    """
+
+    @pytest.mark.parametrize("token", ["teal", "amber", "indigo", "rose", "violet", "green", "slate"])
+    def test_every_documented_token_is_accepted(self, token: str, tmp_path: Path) -> None:
+        issues = [
+            i for i in _check(tmp_path, f"summary: s\naccent: {token}") if i["code"] == "accent-unknown"
+        ]
+
+        assert issues == [], issues
+
+    @pytest.mark.parametrize("value", ["#b45309", "rgb(180 83 9)", "hsl(28 91% 37%)", "rebeccapurple"])
+    def test_a_colour_the_browser_can_read_is_accepted(self, value: str, tmp_path: Path) -> None:
+        """Only bare words are judged. A hex or a function form is the
+        browser's to parse, and a check that guesses at those is one
+        authors learn to ignore."""
+        issues = [
+            i for i in _check(tmp_path, f"summary: s\naccent: {value}") if i["code"] == "accent-unknown"
+        ]
+
+        assert issues == [], issues
+
+    def test_a_bare_word_that_is_no_colour_is_flagged(self, tmp_path: Path) -> None:
+        issues = [
+            i for i in _check(tmp_path, "summary: s\naccent: notacolour") if i["code"] == "accent-unknown"
+        ]
+
+        assert issues, "the value was accepted in silence"
+        assert issues[0]["severity"] == "warning", "info is hidden at default verbosity"
+        assert issues[0]["where"] == "meta.accent", issues[0]
+
+    def test_a_near_miss_names_the_token_meant(self, tmp_path: Path) -> None:
+        issues = [i for i in _check(tmp_path, "summary: s\naccent: rosé") if i["code"] == "accent-unknown"]
+
+        assert issues, "the value was accepted in silence"
+        assert "rose" in issues[0]["message"], issues[0]["message"]

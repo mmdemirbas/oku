@@ -1502,6 +1502,26 @@
      The lightness targets are read off the named palettes rather than
      invented — indigo's strong sits ~9 points below its accent, its
      soft near L 94, and its dark-theme accent up near L 79. */
+  /* A CSS colour of any spelling, as `#rrggbb`, or null when the
+     browser does not recognise it. Assigning an invalid value to a
+     style property is ignored, which is the validity test; the computed
+     value is what carries the resolved channels, and reading it needs
+     the element in the document. */
+  function resolveCssColour(value) {
+    if (typeof document === 'undefined' || !document.body) return null;
+    const probe = document.createElement('span');
+    probe.style.color = String(value == null ? '' : value);
+    if (!probe.style.color) return null;
+    probe.style.display = 'none';
+    document.body.appendChild(probe);
+    const computed = getComputedStyle(probe).color;
+    probe.remove();
+    const m = /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(computed || '');
+    if (!m) return null;
+    const hex = (n) => Math.max(0, Math.min(255, Math.round(parseFloat(n)))).toString(16).padStart(2, '0');
+    return '#' + hex(m[1]) + hex(m[2]) + hex(m[3]);
+  }
+
   function deriveAccent(color) {
     const hex = String(color).trim().replace(/^#/, '');
     const full = hex.length === 3 ? hex.split('').map(function (c) { return c + c; }).join('') : hex;
@@ -2908,10 +2928,25 @@
      * -------------------------------------------------------------- */
 
     _applyAccent(accent) {
+      /* All seven tokens the schema documents. It used to hold three,
+         and the other four fell through to the fallback below — where
+         `violet` and `green` got one hue on --accent and indigo on
+         --accent-soft, and `rose` and `slate`, which are not CSS named
+         colours, put an invalid literal in --accent. `buildConfig` then
+         handed that literal to Mermaid, which requires a concrete
+         colour: EVERY diagram on the page became an "Unsupported color
+         format" card while `oku check --strict` called the page clean.
+         Held against the schema by test_authority_agreement.py, and
+         against the light and dark backgrounds by
+         test_colour_contrast.py. */
       const palettes = {
         teal:   { light: '#0f766e', soft: '#ccfbf1', strong: '#115e59', dark: '#2dd4bf', darkSoft: '#042f2e', darkStrong: '#5eead4' },
         amber:  { light: '#b45309', soft: '#fef3c7', strong: '#b45309', dark: '#fbbf24', darkSoft: '#422006', darkStrong: '#fcd34d' },
-        indigo: { light: '#4338ca', soft: '#e0e7ff', strong: '#3730a3', dark: '#a5b4fc', darkSoft: '#1e1b4b', darkStrong: '#c7d2fe' }
+        indigo: { light: '#4338ca', soft: '#e0e7ff', strong: '#3730a3', dark: '#a5b4fc', darkSoft: '#1e1b4b', darkStrong: '#c7d2fe' },
+        rose:   { light: '#be123c', soft: '#ffe4e6', strong: '#9f1239', dark: '#fb7185', darkSoft: '#4c0519', darkStrong: '#fda4af' },
+        violet: { light: '#6d28d9', soft: '#ede9fe', strong: '#5b21b6', dark: '#a78bfa', darkSoft: '#2e1065', darkStrong: '#c4b5fd' },
+        green:  { light: '#15803d', soft: '#dcfce7', strong: '#166534', dark: '#4ade80', darkSoft: '#052e16', darkStrong: '#86efac' },
+        slate:  { light: '#334155', soft: '#f1f5f9', strong: '#1e293b', dark: '#94a3b8', darkSoft: '#020617', darkStrong: '#cbd5e1' }
       };
       const p = palettes[accent];
       // The dark half is wrapped in `@media not print` for the same
@@ -2934,20 +2969,32 @@
           darkRule('--accent: ' + p.dark + '; --accent-soft: ' + p.darkSoft + '; --accent-strong: ' + p.darkStrong + ';');
         return;
       }
-      // A custom colour used to set --accent and stop there, which left
-      // --accent-soft and --accent-strong on the indigo defaults. The
-      // page then rendered one hue on the borders and another on every
+      // Not one of the seven. A custom colour used to set --accent and
+      // stop there, which left --accent-soft and --accent-strong on the
+      // indigo defaults: one hue on the borders and another on every
       // tinted surface behind them — an orange callout rule around an
       // indigo body, an indigo icon inside it. It reads as two unrelated
       // light sources on one object, and it went unnoticed because the
       // default accent IS indigo, so the bug is invisible until someone
       // picks a colour. Dark mode was not derived at all.
-      const derived = deriveAccent(accent);
+      //
+      // So ask the browser what the value resolves to before anything is
+      // written. That answers "is this a colour at all" AND hands back
+      // the channels the rest of the family is derived from, so
+      // `rebeccapurple` and `hsl(280 60% 40%)` get a matched soft and
+      // strong and a dark variant rather than a lone hue.
+      const derived = deriveAccent(accent) || deriveAccent(resolveCssColour(accent));
       if (!derived) {
-        // Not a hex we can read (a named CSS colour, a gradient). Set
-        // what was asked for and leave the rest alone rather than
-        // guessing a family from something we cannot decompose.
-        style.textContent = ':root { --accent: ' + accent + '; }';
+        // The browser does not recognise it. Writing it anyway is what
+        // killed every diagram on a page with `accent: rose`, so the
+        // page keeps the default accent and says so — a wrong colour is
+        // recoverable, a page of error cards is not.
+        this._warn(
+          'accent-unresolved',
+          'accent "' + accent + '" is not one of ' + Object.keys(palettes).join(', ') +
+            ' and is not a colour this browser can parse — the page keeps the default accent.',
+          { accent: accent }
+        );
         return;
       }
       style.textContent =

@@ -532,8 +532,12 @@ class TestPayloadBudget:
     # comments saying which languages the old rules dropped. Then from
     # 1,215,000 by `__okuLowerWithMap`: 974 bytes, of which the two
     # functions are about 300 and the rest is the comment saying why an
-    # index into a lowercased copy is not an index into the text.
-    KIT_BUDGET_BYTES = 1_217_000
+    # index into a lowercased copy is not an index into the text. Then
+    # from 1,217,000 by the four accent palettes the schema documented
+    # and the renderer did not carry, `resolveCssColour`, and the
+    # comment naming what `accent: rose` did to every diagram on a page:
+    # 2,446 bytes, of which the four palette rows are about 460.
+    KIT_BUDGET_BYTES = 1_220_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

@@ -24,9 +24,11 @@ from oku import cli
 def _clear_caches():
     cli._tree_defaults_cache.clear()
     cli._git_date_cache.clear()
+    cli._kit_token_cache.clear()
     yield
     cli._tree_defaults_cache.clear()
     cli._git_date_cache.clear()
+    cli._kit_token_cache.clear()
 
 
 def _issues(tmp_path: Path, md: str, *, kit: dict | None = None, name: str = "page.md") -> list[dict]:
@@ -204,6 +206,105 @@ class TestIslandStyling:
 
 def _diagram(body: str) -> str:
     return "---\ntitle: T\n---\n\n## S {#s}\n\n```mermaid\n" + body + "\n```\n"
+
+
+class TestDiagramTokens:
+    """A `var(--token)` the kit does not define is a diagram that does
+    not draw at all.
+
+    `__okuResolveCssVars` substitutes a token's computed value before
+    Mermaid sees the source, and leaves an unresolvable one exactly as
+    written — deliberately, so the parse error names the token rather
+    than a silent substitution rendering the wrong colour. What reaches
+    Mermaid is then `var(`, and its grammar has no production for `(`:
+    the whole figure becomes a parse-error card.
+
+    The usual cause is not a typo. It is a page written against a newer
+    kit than the installed tool carries — reported from another project
+    as "the kit documents `--series-N-soft` and does not ship it", with
+    `oku --version` reading `kit 2026-08-20-r50` against a repo three
+    weeks ahead. So the check reads the kit being CHECKED rather than
+    this repo's, and says which one it read the tokens from.
+    """
+
+    def test_a_token_the_kit_defines_is_not_flagged(self, tmp_path):
+        issues = _issues(
+            tmp_path,
+            _diagram(
+                "flowchart TB\n  A --> B\n"
+                "  classDef x fill:var(--series-3-soft),stroke:var(--series-3),color:var(--text)\n"
+                "  class A x"
+            ),
+        )
+        assert "diagram-unknown-token" not in _codes(issues), issues
+
+    def test_a_token_the_kit_does_not_define_is_flagged(self, tmp_path):
+        issues = _issues(
+            tmp_path,
+            _diagram(
+                "flowchart TB\n  A --> B\n"
+                "  classDef x fill:var(--series-3-shoft),stroke:var(--nope)\n  class A x"
+            ),
+        )
+        hit = [i for i in issues if i["code"] == "diagram-unknown-token"]
+        assert hit and hit[0]["severity"] == "warning", issues
+        assert "--series-3-shoft" in hit[0]["message"], hit
+        assert "--nope" in hit[0]["message"], hit
+
+    def test_the_message_points_at_the_version_mismatch(self, tmp_path):
+        """The token is usually spelled correctly and the tool is old,
+        so a message that only says "unknown token" sends the author
+        looking for a typo that is not there."""
+        issues = _issues(tmp_path, _diagram("flowchart TB\n  A --> B\n  style A fill:var(--nope)"))
+        msg = [i for i in issues if i["code"] == "diagram-unknown-token"][0]["message"]
+        assert "oku --version" in msg, msg
+
+    def test_a_stale_kit_is_what_this_reports(self, tmp_path):
+        """The reproduction of the report: the SAME page, checked once
+        against a kit that defines the token and once against one that
+        does not."""
+        src = tmp_path / "page.md"
+        src.write_text(
+            _diagram(
+                "flowchart TB\n  A --> B\n"
+                "  classDef x fill:var(--series-3-soft),stroke:var(--series-3)\n  class A x"
+            ),
+            encoding="utf-8",
+        )
+        page = cli._page_from_source_file(src)
+        assert page is not None
+
+        stale = tmp_path / "stale-kit"
+        stale.mkdir()
+        (stale / "chrome.css").write_text(
+            ":root { --series-3: #b45309; --text: #1e1b29; }\n", encoding="utf-8"
+        )
+
+        current = {i["code"] for i in cli.check_pages([(src, page)], tmp_path, kit_dir=cli.KIT_DIR)}
+        old = {i["code"] for i in cli.check_pages([(src, page)], tmp_path, kit_dir=stale)}
+
+        assert "diagram-unknown-token" not in current, current
+        assert "diagram-unknown-token" in old, old
+
+    def test_a_kit_with_no_stylesheet_says_nothing(self, tmp_path):
+        """A check that cannot read the kit knows nothing about its
+        tokens, and reporting every one of them as unknown is a warning
+        nobody reads."""
+        src = tmp_path / "page.md"
+        src.write_text(_diagram("flowchart TB\n  A --> B\n  style A fill:var(--anything)"), encoding="utf-8")
+        page = cli._page_from_source_file(src)
+        empty = tmp_path / "no-kit"
+        empty.mkdir()
+
+        codes = {i["code"] for i in cli.check_pages([(src, page)], tmp_path, kit_dir=empty)}
+
+        assert "diagram-unknown-token" not in codes, codes
+
+    def test_a_var_outside_a_style_line_is_not_read(self, tmp_path):
+        """Only the lines that carry colour are walked, for the same
+        reason `#3` in a node label is left alone."""
+        issues = _issues(tmp_path, _diagram('flowchart TB\n  A["var(--nope) in prose"] --> B'))
+        assert "diagram-unknown-token" not in _codes(issues), issues
 
 
 class TestMermaidStyling:
