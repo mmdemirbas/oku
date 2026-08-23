@@ -126,6 +126,162 @@ def test_a_placeholder_left_in_prose_is_flagged(tmp_path: Path) -> None:
     assert found == {"'{{ figure }}'", "'TODO'"}, found
 
 
+class TestWherePlaceholdersAreLookedFor:
+    """The rule read paragraphs and nothing else.
+
+    `process-breadcrumb` walks prose nested inside typed payloads — a
+    step body, a card, a KPI label, a table cell — because that is prose
+    an author writes and a reader reads. `placeholder-text` sat beside
+    it in the same function and did not. Measured on one page carrying
+    the same `TODO` in a paragraph and in a step body: one warning, from
+    the paragraph. This repo's own `examples/iceberg.md` had carried
+    "still TODO in build sequence step 11" in a compare-grid card,
+    past `oku check --strict`, long enough for all three things the card
+    listed as future work to have shipped.
+
+    The other half is where it must NOT look. Naming the token is not
+    leaving one behind, and the kit's own severity table has to spell
+    the four it catches — which is how the gap surfaced: closing it made
+    `docs/cli.md` fail its own check.
+    """
+
+    def _check(self, tmp_path: Path, body: str) -> list[dict]:
+        docs = tmp_path / "docs"
+        docs.mkdir()
+        (docs / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+        (docs / "p.md").write_text(
+            f"---\ntitle: T\nsummary: s\n---\n\n## S {{#s}}\n\n{body}\n", encoding="utf-8"
+        )
+        return [
+            i for i in cli.check_pages(cli.find_json_pages(docs), docs) if i["code"] == "placeholder-text"
+        ]
+
+    def test_a_step_body_is_prose_too(self, tmp_path: Path) -> None:
+        issues = self._check(
+            tmp_path,
+            '```oku-step-flow\n{"steps":[{"t":"First","b":"A step body carrying TODO."},'
+            '{"t":"Second","b":"Another step."}]}\n```',
+        )
+
+        assert len(issues) == 1, [i["message"] for i in issues]
+        assert issues[0]["where"].endswith("k=step-flow"), issues[0]
+
+    def test_a_compare_card_is_prose_too(self, tmp_path: Path) -> None:
+        """The shape the repo's own example page carried."""
+        issues = self._check(
+            tmp_path,
+            '```oku-compare-grid\n{"cards":[{"t":"In","b":"- one\\n- two"},'
+            '{"t":"Out","b":"- Mermaid diagrams (still TODO in step 11)"}]}\n```',
+        )
+
+        assert len(issues) == 1, [i["message"] for i in issues]
+
+    def test_a_table_cell_is_prose_too(self, tmp_path: Path) -> None:
+        issues = self._check(
+            tmp_path,
+            '```oku-table\n{"headers":["name","note"],"rows":[["a","fine"],["b","TBD"]]}\n```',
+        )
+
+        assert len(issues) == 1, [i["message"] for i in issues]
+
+    def test_an_island_is_markup_the_reader_sees_through(self, tmp_path: Path) -> None:
+        """The content rules sat past three `continue`s, so a line inside
+        an island reached none of them.
+
+        No blank line inside the island, deliberately: a blank line ends
+        the html BLOCK, which is what lets an author write markdown
+        between the tags — and those lines were already reaching the
+        rules as ordinary prose. The gap was the lines the walker still
+        considers island markup."""
+        issues = self._check(
+            tmp_path,
+            '<div class="okt-card">\n  <p>A card built by hand, carrying TODO.</p>\n</div>',
+        )
+
+        assert len(issues) == 1, [i["message"] for i in issues]
+
+    def test_markdown_between_the_tags_was_never_the_gap(self, tmp_path: Path) -> None:
+        """The control for the case above. A blank line ends the block,
+        so this line is ordinary prose and always was."""
+        issues = self._check(
+            tmp_path,
+            '<div class="okt-card">\n\nA card built by hand, carrying TODO.\n\n</div>',
+        )
+
+        assert len(issues) == 1, [i["message"] for i in issues]
+
+    def test_the_breadcrumb_rule_moved_with_it(self, tmp_path: Path) -> None:
+        """Both content rules sat behind the same three `continue`s and
+        both now run ahead of them, so an island cannot be the one place
+        either of them stops looking."""
+        docs = tmp_path / "docs"
+        docs.mkdir()
+        (docs / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+        (docs / "p.md").write_text(
+            "---\ntitle: T\nsummary: s\n---\n\n## S {#s}\n\n"
+            '<div class="okt-card">\n  <p>Fixed in round 3, see the prior notes.</p>\n</div>\n',
+            encoding="utf-8",
+        )
+        codes = [
+            i["code"]
+            for i in cli.check_pages(cli.find_json_pages(docs), docs)
+            if i["code"] == "process-breadcrumb"
+        ]
+
+        assert codes == ["process-breadcrumb"], codes
+
+    def test_a_pre_body_is_code_and_stays_code(self, tmp_path: Path) -> None:
+        """A raw-text element holds a program. `// TODO` in a sample is
+        the sample, and flagging it would make the rule unusable in any
+        page that shows real code."""
+        issues = self._check(
+            tmp_path,
+            "<div>\n<pre><code>function f() {\n  // TODO: implement\n}\n</code></pre>\n</div>",
+        )
+
+        assert issues == [], [i["message"] for i in issues]
+
+    def test_a_token_in_a_code_span_is_being_named(self, tmp_path: Path) -> None:
+        """`TODO` in backticks is a citation of the token. Without this
+        the rule cannot be documented in a page the rule checks."""
+        issues = self._check(
+            tmp_path,
+            "The check catches `TODO`, `TBD`, `FIXME`, `XXX` and an unfilled `{{ }}` template.",
+        )
+
+        assert issues == [], [i["message"] for i in issues]
+
+    def test_a_token_in_a_payload_code_span_is_being_named_too(self, tmp_path: Path) -> None:
+        """Both paths, or the severity table fails in one spelling and
+        passes in the other."""
+        issues = self._check(
+            tmp_path,
+            '```oku-table\n{"headers":["Code","Catches"],'
+            '"rows":[["`placeholder-text`","A leftover `TODO` or `TBD`."]]}\n```',
+        )
+
+        assert issues == [], [i["message"] for i in issues]
+
+    def test_a_bare_token_beside_a_code_span_still_fires(self, tmp_path: Path) -> None:
+        """The guard: a rule that ignored the whole line whenever it held
+        any code span would pass every test above by measuring nothing."""
+        issues = self._check(tmp_path, "The `TODO` check exists. TODO: wire it up.")
+
+        assert len(issues) == 1, [i["message"] for i in issues]
+
+    def test_the_line_number_survives_the_masking(self, tmp_path: Path) -> None:
+        """Masked to spaces rather than deleted. Stripping a span moves
+        everything after it, so `file:line` would name a line the author
+        has to count to find — and every locator in the checker is a
+        line number into the source as written."""
+        body = "A first line with `code` in it.\n\nA second line.\n\nTODO: the fourth."
+        issues = self._check(tmp_path, body)
+
+        assert len(issues) == 1, [i["message"] for i in issues]
+        # front-matter is 4 lines, blank, `## S`, blank, then the body.
+        assert issues[0]["line"] == 12, issues[0]
+
+
 class TestAccentValue:
     """A key spelled right whose VALUE the browser cannot parse.
 

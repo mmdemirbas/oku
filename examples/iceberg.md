@@ -60,12 +60,12 @@ All major OLAP engines support Iceberg, but feature coverage varies. Bar chart b
 
 Numbers are illustrative — feature coverage shifts release-to-release. The point is the shape: Spark is the deepest integration; analytics engines have been catching up since 2024.
 
-## What's in v1 of this kit (vs. not) {#scope}
+## What the kit does, and what it leaves alone {#scope}
 
 Demonstrating compare-grid's in / out verdict variant: parallel columns with semantic borders.
 
 ```oku-compare-grid
-{"cards":[{"t":"In v1","b":"- JSON-source rendering at runtime (no build)\n- Glossary tooltips with bridge-hover + click-pin\n- Multi-domain, multi-language glossary architecture\n- Visual Viewport API pinch-zoom stability\n- Core primitives: paragraph, callout, insight, info-tip, kpi-grid, compare-grid, step-flow, chart\n- Theme cycler + sticky TOC + scroll-spy","verdict":"in"},{"t":"Out (later or never)","b":"- Markdown authoring path\n- Client-side routing / SPA navigation\n- Mermaid diagrams (still TODO in build sequence step 11)\n- Live-snippet primitive (build step 12)\n- Pagefind search (build step 13)\n- Server-side rendering","verdict":"out"}]}
+{"cards":[{"t":"In the kit","b":"- Markdown-first authoring: one `.md` source, rendered at load with no build step for content\n- Mermaid diagrams, hand-drawn SVG on the kit's own classes, and 53 chart render modes\n- Live-snippet and annotated-code, with Prism vendored so a page highlights offline\n- Pagefind search over the built site, and in-page search everywhere else\n- Glossary tooltips with bridge-hover + click-pin, multi-domain and multi-language\n- Theme cycler, Contents drawer, scroll-spy TOC, lightbox with pinch-zoom","verdict":"in"},{"t":"Left alone","b":"- Server-side rendering — a page is static and the kit runs in the reader's browser\n- A build step for content: `oku build` packages, it does not compile the body\n- Per-page stylesheets; the accent and both themes come from the kit's tokens\n- Calling home from a delivered page, which is why the build stamp is inlined","verdict":"out"}]}
 ```
 
 ## What's next {#next}

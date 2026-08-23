@@ -2283,6 +2283,17 @@ _FORBIDDEN_PROSE_PATTERNS = [
 ]
 
 
+def _placeholder_message(hit: str) -> str:
+    """Also two emitters. "Word-search for placeholders before
+    delivering" was a step in the skill's manual checklist, which is the
+    wrong place for anything a regex can do — a checklist step is
+    skipped silently and a check is not.
+    """
+    return (
+        f"Prose still carries the placeholder {hit!r}. Replace it or delete the sentence before delivering."
+    )
+
+
 def _process_breadcrumb_message(hit: str) -> str:
     """One message, two emitters — a b[] string and prose nested inside
     a typed payload both raise this, and the two copies had already
@@ -2404,6 +2415,18 @@ _INLINE_HTML_TAGS = {
 _INLINE_CODE_RE = re.compile(r"(`{1,10})(?:(?!\1)(?:[^\n]|\n(?![ \t]*\n)))*\1")
 
 
+def _mask_code_spans(text: str) -> str:
+    """Blank inline code spans, keeping every line break and every
+    column.
+
+    The other way to ignore a code span is to delete it, which is what
+    the reference collectors do — they report no position. A rule that
+    reports `file:line` cannot: dropping the span moves everything after
+    it, so the locator names a line the author has to count to find.
+    """
+    return _INLINE_CODE_RE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+
+
 def _md_island_tag(line: str) -> str | None:
     """Tag name when the line opens a block-level HTML island, else None."""
     m = _MD_HTML_ISLAND_RE.match(line)
@@ -2437,6 +2460,10 @@ _RAW_TEXT_TAGS = {"script", "style", "pre", "textarea"}
 _HTML_TAG_RE = re.compile(r"<(/?)([a-zA-Z][\w-]*)([^>]*)>")
 _HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
 _HTML_RAW_TEXT_RE = re.compile(r"<(script|style|textarea)\b[^>]*>.*?</\1\s*>", re.I | re.S)
+# Spliced from the set above rather than spelled again — a tag on one
+# list and not the other is a <pre> whose body is read as prose.
+_RAW_TEXT_OPEN_RE = re.compile(r"<(?:" + "|".join(sorted(_RAW_TEXT_TAGS)) + r")\b", re.I)
+_RAW_TEXT_CLOSE_RE = re.compile(r"</(?:" + "|".join(sorted(_RAW_TEXT_TAGS)) + r")\s*>", re.I)
 
 
 def _island_balance(src: str, stack: list[tuple[str, int]], lineno: int = 0) -> None:
@@ -2618,6 +2645,24 @@ def _lint_md_string(
             )
         open_els.clear()
 
+    # A `TODO` in backticks is the token being NAMED — the kit's own
+    # severity table has to spell the four it catches, and did, in a
+    # payload the rule did not reach — while a bare TODO is one left
+    # behind. Masked rather than stripped so `line {lineno}` still
+    # points at the line the author sees.
+    #
+    # The breadcrumb rule deliberately does NOT mask. `round-5` in a
+    # code span is still a citation of a round, which
+    # `test_round_breadcrumb_in_inline_text_flagged` pins, and a page
+    # whose subject IS that history has `documents_history` instead.
+    masked = dict(
+        zip(
+            [ln for ln, _ in prose],
+            _mask_code_spans("\n".join(line for _, line in prose)).split("\n"),
+        )
+    )
+
+    in_raw_text = False
     for lineno, line in prose:
         stripped = line.strip()
         if not stripped:
@@ -2661,6 +2706,49 @@ def _lint_md_string(
                 prev_nonblank = line
                 prev_blank = False
                 continue
+        # An island is markup the reader sees THROUGH, so what is
+        # written between its tags is prose. These two rules used to sit
+        # at the foot of this loop, past three `continue`s, so a `TODO`
+        # or a round citation inside a <div> was never looked at.
+        #
+        # A raw-text element is the exception, and NESTED raw text is
+        # why this is tracked here rather than left to the branches
+        # above: those arm only on an island's opening tag, so a <pre>
+        # inside a <div> — the idiom the kit documents for multi-line
+        # code in an island — is an ordinary island line to them. `//
+        # TODO: implement` in a code sample is the sample.
+        opens = len(_RAW_TEXT_OPEN_RE.findall(line))
+        closes = len(_RAW_TEXT_CLOSE_RE.findall(line))
+        line_is_code = in_raw_text or opens > 0
+        if opens > closes:
+            in_raw_text = True
+        elif closes > opens:
+            in_raw_text = False
+        if not skip_prose and not line_is_code:
+            if not skip_history:
+                for pat in _FORBIDDEN_PROSE_PATTERNS:
+                    m = pat.search(line)
+                    if m:
+                        issues.append(
+                            (
+                                "warning",
+                                "process-breadcrumb",
+                                f"line {lineno}",
+                                _process_breadcrumb_message(m.group(0)),
+                            )
+                        )
+                        break
+            ph = _PLACEHOLDER_RE.search(masked.get(lineno, line))
+            if ph:
+                issues.append(
+                    (
+                        "warning",
+                        "placeholder-text",
+                        f"line {lineno}",
+                        _placeholder_message(ph.group(0)),
+                    )
+                )
+
         if in_island:
             _island_balance(line, open_els, lineno)
             prev_nonblank = line
@@ -2723,35 +2811,6 @@ def _lint_md_string(
         hm = _MD_HEADING_LINE_RE.match(line)
         if hm:
             heading_ids.append((lineno, hm.group(3) or _md_slug(hm.group(2)) or "section"))
-        if not skip_prose:
-            if not skip_history:
-                for pat in _FORBIDDEN_PROSE_PATTERNS:
-                    m = pat.search(line)
-                    if m:
-                        issues.append(
-                            (
-                                "warning",
-                                "process-breadcrumb",
-                                f"line {lineno}",
-                                _process_breadcrumb_message(m.group(0)),
-                            )
-                        )
-                        break
-            # "Word-search for placeholders before delivering" was a step
-            # in the skill's manual checklist, which is the wrong place
-            # for anything a regex can do — a checklist step is skipped
-            # silently and a check is not.
-            ph = _PLACEHOLDER_RE.search(line)
-            if ph:
-                issues.append(
-                    (
-                        "warning",
-                        "placeholder-text",
-                        f"line {lineno}",
-                        f"Prose still carries the placeholder {ph.group(0)!r}. "
-                        "Replace it or delete the sentence before delivering.",
-                    )
-                )
         prev_nonblank = line
         prev_blank = False
 
@@ -3434,6 +3493,16 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 link_refs.extend((where, h, None) for h in _MD_LINK_TARGET_RE.findall(s_refs))
                 file_refs.extend((where, f, None) for f in _MD_FILE_REF_RE.findall(s_refs))
                 code_spans.extend((where, text, None) for _rel, text in _md_code_spans(s))
+                if not is_materialised:
+                    # `s_refs` already has the code spans out. Prose in a
+                    # step body, a card, a KPI label or a table cell is
+                    # prose an author writes and a reader reads, and it
+                    # was reached by every content rule but this one — so
+                    # a `TODO` left in a paragraph was reported and the
+                    # same `TODO` left in the card beside it shipped.
+                    ph = _PLACEHOLDER_RE.search(s_refs)
+                    if ph:
+                        add(p, "warning", "placeholder-text", where, _placeholder_message(ph.group(0)))
                 if not is_materialised and not documents_history:
                     for pat in _FORBIDDEN_PROSE_PATTERNS:
                         m = pat.search(s)
