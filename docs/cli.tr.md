@@ -104,6 +104,26 @@ Sayfanın size söyleyemeyeceği şey, kurulu kitin ne kadar gerisinde kaldığ�
   kit 2026-08-11-r33 → 2026-08-14-r37
 ```
 
+### `oku --version` neyi yanıtlar {#version-line}
+
+Aynı sorunun öbür ucu: "bu sayfa ne kadar eski" değil, "onu üreten araçta okuduğum düzeltme var mı".
+
+```
+oku 0.6.5 · kit 2026-08-23-r67 · src sha256:014095589d4b · as of 2026-08-23 09:15 · assets /Users/siz/.local/share/uv/tools/oku/...
+```
+
+| Alan | Neyi okur | Neyi yanıtlar |
+|---|---|---|
+| `oku` | paket sürümü | hangi sürüm |
+| `kit` | chrome.js içindeki elle artırılan damga | *kit* değişti mi |
+| `src` | tekerleğin gönderdiği her dosya üzerinden sha256 | bu yapı bir başkasıyla bayt bayt aynı mı |
+| `as of` | aynı dosyalar arasındaki en yeni değişiklik zamanı | bu yapı verilen bir tarihten eski mi yeni mi |
+| `assets` | kurulu kitin yeri | kitin hangi kopyası okunuyor |
+
+`src` karşılaştırır, sıralamaz. İki yapı ya eşleşir ya eşleşmez; bir özet hangisinin önce geldiğini söyleyemez — üstelik on iki çıplak onaltılık karakter olarak basıldığında kısaltılmış bir git commit'ine de benzer, nitekim bir okuyucu bunun üzerinde `git cat-file` çalıştırıp "Not a valid object name" yanıtını aldı. `sha256:` öneki bu yüzden değerin bir parçası; sıralayan alan ise `as of`: ayın 22'sinde 16:38'de inen bir düzeltme, aynı günün 11:53'ünde tarihlenen bir yapıda yoktur.
+
+`uv tool install` her dosyayı kurulum anında yazar; bu yüzden `as of`, kurulu bir araç için kurulum zamanı, bir çalışma kopyası için son düzenleme zamanıdır. İkisi de "şu ana kadarki kod" demektir, alanın adı da bundan gelir.
+
 ## oku clean {#clean}
 
 Derlemenin dist/ altına yazdığı ağaçları — standalone/, site/, _search/ ve eski bir derlemeden kalan markdown/ — kaldırır, başka hiçbir şeyi değil. Yinelenebilir; dist/ dizini ise ancak içinde bunlardan başka bir şey yoksa silinir. Kaynak dosyalara ve _oku sembolik bağına dokunulmaz.

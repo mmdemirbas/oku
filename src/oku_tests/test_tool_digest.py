@@ -31,7 +31,46 @@ from oku import cli
 def test_the_digest_is_stable_and_short() -> None:
     first = cli._tool_digest()
     assert first == cli._tool_digest(), "digest is not deterministic"
-    assert re.fullmatch(r"[0-9a-f]{12}", first), first
+    assert re.fullmatch(r"sha256:[0-9a-f]{12}", first), first
+
+
+def test_the_digest_cannot_be_mistaken_for_a_commit() -> None:
+    """Twelve bare hex characters in a version line is what an
+    abbreviated git commit looks like. A reader holding a rendering
+    defect ran `git cat-file -t` on one, got "Not a valid object name",
+    and still could not tell whether their build predated the fix."""
+    assert cli._tool_digest().startswith("sha256:"), cli._tool_digest()
+
+
+def test_the_version_line_carries_a_date_that_orders() -> None:
+    """A digest answers "same or different", never "older or newer".
+    Ordering is the question a reader in another project is actually
+    asking — "does this build have the fix that landed on the 22nd" —
+    and it is the half that was missing."""
+    before = cli._tool_dated()
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", before), before
+
+    out = subprocess.run(
+        [sys.executable, "-c", "from oku.cli import main; main()", "--version"],
+        capture_output=True,
+        text=True,
+        cwd=Path(__file__).resolve().parents[1],
+    )
+    printed = out.stdout + out.stderr
+    # Read after, too: the date is derived from file mtimes, so an edit
+    # landing between the two reads is a real difference and not a bug
+    # in either. Accepting both is what keeps this from failing on a
+    # working tree someone is still typing into.
+    assert any(f"as of {d}" in printed for d in (before, cli._tool_dated())), (before, printed)
+
+
+def test_the_date_and_the_digest_read_the_same_files() -> None:
+    """Two file lists is a version line whose halves can describe
+    different builds."""
+    files = cli._tool_files()
+    assert files, "the digest covers nothing"
+    assert cli.Path(cli.__file__) in files
+    assert not [f for f in files if "vendor" in f.parts], "vendor is a cache and does not ship"
 
 
 def test_the_version_string_carries_it() -> None:

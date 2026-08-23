@@ -258,8 +258,32 @@ def _tool_digest() -> str:
 
     Derived rather than declared, so it cannot be forgotten on the day it
     matters.
+
+    The `sha256:` prefix is part of the value, not decoration. Printed
+    bare it is twelve hex characters in a version line, which is what an
+    abbreviated git commit looks like — a reader holding a rendering
+    defect ran `git cat-file -t 8cd13843bf28`, got "Not a valid object
+    name", and had no way to tell whether the tool that built their page
+    predated the fix. A digest answers "same or different", never "older
+    or newer", and the prefix says so at the one place anyone reads it.
     """
     h = hashlib.sha256()
+    for f in _tool_files():
+        try:
+            h.update(f.name.encode())
+            h.update(f.read_bytes())
+        except OSError:
+            return "unknown"
+    return "sha256:" + h.hexdigest()[:12]
+
+
+def _tool_files() -> list[Path]:
+    """Every file the digest and the date are computed over.
+
+    One list rather than two, because a date covering a different set
+    than the digest is a version line whose two halves can disagree
+    about which build they describe.
+    """
     files = [Path(__file__)]
     assets = _kit_assets_dir()
     # `vendor/` is a fetched cache that deliberately does not ship, so a
@@ -272,13 +296,35 @@ def _tool_digest() -> str:
         for p in assets.rglob("*")
         if p.is_file() and "__pycache__" not in p.parts and "vendor" not in p.parts
     )
-    for f in files:
+    return files
+
+
+def _tool_dated() -> str:
+    """When this build's files were laid down, to the minute.
+
+    The half of the staleness question a digest cannot answer. A digest
+    compares; it does not order, so a reader who cannot run this repo's
+    `./run version` — which is everyone using the installed tool from
+    another project — can see that their build differs from something
+    and not whether it is the older one. A date orders against the date
+    a fix landed, which is the question actually being asked.
+
+    Derived from the files rather than stamped at build time, so it
+    needs neither git nor a build hook and cannot go stale on its own.
+    `uv tool install` writes every file at the moment it installs, so
+    for an installed tool this is the install time; for a checkout it is
+    the last edit. Both are "the code as of", which is why the version
+    line says exactly that and not "built".
+    """
+    newest = 0.0
+    for f in _tool_files():
         try:
-            h.update(f.name.encode())
-            h.update(f.read_bytes())
+            newest = max(newest, f.stat().st_mtime)
         except OSError:
             return "unknown"
-    return h.hexdigest()[:12]
+    if not newest:
+        return "unknown"
+    return datetime.datetime.fromtimestamp(newest).strftime("%Y-%m-%d %H:%M")
 
 
 def find_kit_json(root: Path) -> Path | None:
@@ -7194,7 +7240,7 @@ def main() -> int:
         action=_VersionAction,
         version=(
             f"oku {_PKG_VERSION} · kit {_kit_build_stamp()} · src {_tool_digest()}"
-            f" · assets {_kit_assets_dir()}"
+            f" · as of {_tool_dated()} · assets {_kit_assets_dir()}"
         ),
     )
     sub = parser.add_subparsers(dest="cmd")

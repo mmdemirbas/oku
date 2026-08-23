@@ -104,6 +104,26 @@ What the page cannot tell you is how far behind the installed kit it is. Learnin
   kit 2026-08-11-r33 → 2026-08-14-r37
 ```
 
+### What `oku --version` answers {#version-line}
+
+The other end of the same question: not "how old is this page" but "does the tool that built it have the fix I am reading about".
+
+```
+oku 0.6.5 · kit 2026-08-23-r67 · src sha256:014095589d4b · as of 2026-08-23 09:15 · assets /Users/you/.local/share/uv/tools/oku/...
+```
+
+| Field | Reads | Answers |
+|---|---|---|
+| `oku` | the package version | which release |
+| `kit` | the hand-bumped stamp in chrome.js | did the *kit* change |
+| `src` | a sha256 over every file the wheel ships | is this build byte-identical to another one |
+| `as of` | the newest mtime among those same files | is this build older or newer than a given date |
+| `assets` | where the installed kit lives | which copy of the kit is being read |
+
+`src` compares; it does not order. Two builds either match or they do not, and a digest cannot say which came first — printed as twelve bare hex characters it also reads as an abbreviated git commit, which is how a reader ended up running `git cat-file` on one and getting "Not a valid object name". The `sha256:` prefix is part of the value for that reason, and `as of` is the field that orders: a fix that landed on the 22nd at 16:38 is not in a build dated 11:53 the same day.
+
+`uv tool install` writes every file at the moment it installs, so `as of` is the install time for an installed tool and the last edit for a checkout. Both are "the code as of", which is what the field is called.
+
 ## oku clean {#clean}
 
 Remove the trees the build writes under dist/ — standalone/, site/, _search/ and a markdown/ left by an older build — and nothing else. Idempotent, and dist/ itself goes only when those were all it held. Source files and the _oku symlink are untouched.
