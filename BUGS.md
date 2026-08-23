@@ -121,3 +121,31 @@ reporting tool read `kit 2026-08-20-r50`. That is stale-tool drift, and
 `./run install` is the fix. `oku check` now says `diagram-unknown-token` and
 names `oku --version`, so the next one arrives as a build warning rather than
 as a parse-error card in a browser.
+
+A third was not a kit defect, and it is worth recording because the symptom
+looks alarming. A doctree of 31 pages reported **23 errors** and `oku build`
+refused the whole tree, including pages with no findings of their own. All 23
+were author-side, in three documents written months earlier: 12
+`fence-not-lifted` and 1 `shadowed-source` from a stale page-JSON left beside
+its migrated `.md` (the walkers prefer the `.json`, so it shadows the source —
+documented `--keep-json` behaviour), 7 `schema` from v1 block payloads whose
+keys the schema has since renamed (`title`/`content`/`num`/`meta` → `t`/`b`),
+2 `duplicate-anchor`, 1 `island-unclosed`.
+
+The kit's behaviour was correct at every stage, which is the part worth
+keeping: `oku check` named each one with `file:line` and the offending key;
+`oku build` refused and printed `Not building … or pass --allow-errors`,
+emitting **zero** `file:///` URLs and writing nothing, so a refused build
+cannot be misread as a successful one; and when forced through with
+`--allow-errors`, the renderer replaced each failed block with a visible
+`div.okd-error-card.okt-block-err` naming the missing field, plus a precise
+`block-contract` console warning. Verified in a browser on kit
+`2026-08-23-r67`: the failing block's payload sits only in the page's
+`display:none` source `<script>`, is not visible anywhere in the body, and the
+reader gets the error card instead — content degrades loudly, never silently.
+
+What this episode does suggest, as a **feature request rather than a defect**:
+`oku migrate` converts a page from JSON to markdown but does not migrate v1
+block payload keys to v2, so a document written against the old shape fails
+with no mechanical path forward. The failure is loud and specific, so nothing
+is lost — it is hand work that a codemod could do.
