@@ -61,13 +61,6 @@ whose `index.html` came from `oku init` builds correctly, in either order —
 `dist/site/index.json` both times, measured on r44. The trap was in reading
 the artifact, not in writing it.
 
-A third was verified and is not a defect. `oku build` refusing the whole tree
-when any page has errors is documented behaviour: it prints `Not building. Fix
-the errors above, or pass --allow-errors to ship anyway`, emits zero `file:///`
-URLs and writes nothing, so a refused build cannot be mistaken for a successful
-one. Measured on a three-page tree with one schema-invalid page — refused run
-exit 1 / 0 URLs / no `dist`; `--allow-errors` exit 0 / 9 URLs / 4 files.
-
 A second was not a kit defect either. `var(--series-N-soft)` in a mermaid
 `classDef`, reported as "the skill documents it and the kit does not ship
 it": the repo has shipped those tokens since kit `2026-08-14-r62`, and the
@@ -90,7 +83,10 @@ The kit's behaviour was correct at every stage, which is the part worth
 keeping: `oku check` named each one with `file:line` and the offending key;
 `oku build` refused and printed `Not building … or pass --allow-errors`,
 emitting **zero** `file:///` URLs and writing nothing, so a refused build
-cannot be misread as a successful one; and when forced through with
+cannot be misread as a successful one — independently measured on a
+three-page tree with one schema-invalid page, refused run exit 1 / 0 URLs / no
+`dist` against `--allow-errors` exit 0 / 9 URLs / 4 files; and when forced
+through with
 `--allow-errors`, the renderer replaced each failed block with a visible
 `div.okd-error-card.okt-block-err` naming the missing field, plus a precise
 `block-contract` console warning. Verified in a browser on kit
