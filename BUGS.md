@@ -12,75 +12,9 @@ carries the record, including what was measured before and after.
 
 ---
 
-## `process-breadcrumb` fires on a report that legitimately cites a dated prior round
+No open defects.
 
-**Symptom.** A hand-authored measurement report whose whole subject is
-correcting an earlier published round cannot cite that round by name. Every
-sentence naming it raises a warning, and `oku check --strict` exits 1. Observed
-on a real document at 29 warnings, all from the same rule, all on correct prose.
-
-**Minimal reproduction.** Two pages in an otherwise empty tree, identical
-except for four characters of prose:
-
-```markdown
----
-title: Breadcrumb repro
-summary: A measurement report citing a dated prior report by round number.
----
-
-## Findings {#f}
-
-The round 3 report measured 2.5x more compactions. This document corrects it.
-```
-
-```
-$ oku init && oku check --strict
-! 1 warning(s):
-  ! breadcrumb.md:14:b[0] line 14 [process-breadcrumb] Prose contains
-    process/history reference 'round 3'; the kit documents current behaviour only.
-✓ 2 page(s) — no errors (warnings present)
-$ echo $?
-1
-```
-
-The control page, differing only in `The 08-17 report measured …`, is clean.
-
-**Expected vs actual.** Expected: a document that is *about* the history of a
-measurement can name the rounds of that measurement. Actual: the only way to
-pass `--strict` is to rewrite every citation into a date, which loses the
-reference the reader needs.
-
-**Where it was localised.** `src/oku/cli.py:2704-2713` raises it. The scoping
-decision is at `src/oku/cli.py:3205-3210`, and its own comment states the
-intent:
-
-> Pages materialised from repo markdown without front-matter (README, CHANGELOG,
-> CLAUDE and friends) carry author-owned prose verbatim; the process-breadcrumb
-> rule is meant for **hand-authored kit pages**, so it is skipped for those.
-
-So the rule already knows it should not apply to every page — it just uses
-`_materialised_by == "oku-init"` as the test. A report, an audit or a review is
-hand-authored and is not a kit documentation page, and the skill lists exactly
-those as supported outputs, so it has no escape.
-
-**Observed vs inferred.** *Observed:* the reproduction above, the warning text,
-the `--strict` exit code, and the source lines quoted. *Inferred, not executed:*
-that `skip_prose=True` (exercised at `src/oku_tests/test_pure.py:355-356`) is the
-existing seam a fix would hang off — the flag was read, not traced to its
-callers, and no fix was attempted.
-
-**Not filed alongside it.** `oku build` refusing the whole tree when any page
-has errors is documented behaviour, not a defect: it prints `Not building. Fix
-the errors above, or pass --allow-errors to ship anyway`, emits **zero**
-`file:///` URLs and writes nothing, so a refused build cannot be mistaken for a
-successful one. Verified on a three-page tree (one schema-invalid page): refused
-run exit 1 / 0 URLs / no `dist`; `--allow-errors` exit 0 / 9 URLs / 4 files.
-
----
-
-No other open defects.
-
-The two that were here are closed:
+The three that were here are closed:
 
 - **`oku serve` bound every interface, and no version string said whether
   yours did.** The bind was fixed in `f785d1d`; what stayed open was that a
@@ -90,6 +24,19 @@ The two that were here are closed:
   mtime among the files the digest covers. A digest compares; a date orders,
   which is the question a reader in another project is actually asking. Held
   by `test_tool_digest.py`.
+
+- **`process-breadcrumb` fired on a report that legitimately cited a dated
+  prior round.** The rule scoped itself by who WROTE the prose — pages
+  materialised from repo markdown were exempt — which is the wrong question for
+  a hand-authored measurement report correcting an earlier round. Observed at 29
+  warnings on one document, all on correct prose, with `oku check --strict`
+  exiting 1 and no way past it but rewriting each citation into a date. Closed
+  in `3cfef3e` — `documents_history: true` in a page's front-matter exempts that
+  one rule on that one page. Deliberately not folded into `skip_prose`, which
+  would have taken `placeholder-text` with it, and deliberately not a kit.json
+  switch, which would exempt pages written later from a file nobody opens while
+  writing prose. Held by `test_check.py::TestAPageWhoseSubjectIsAHistory` (6
+  failed before, 8 pass after).
 
 - **An accent token the front-matter spec documents killed every diagram on
   the page.** Four of the seven documented tokens were missing from the
@@ -113,6 +60,13 @@ whose `index.html` came from `oku init` builds correctly, in either order —
 `oku build` carries the page body into `dist/standalone/index.html` and
 `dist/site/index.json` both times, measured on r44. The trap was in reading
 the artifact, not in writing it.
+
+A third was verified and is not a defect. `oku build` refusing the whole tree
+when any page has errors is documented behaviour: it prints `Not building. Fix
+the errors above, or pass --allow-errors to ship anyway`, emits zero `file:///`
+URLs and writes nothing, so a refused build cannot be mistaken for a successful
+one. Measured on a three-page tree with one schema-invalid page — refused run
+exit 1 / 0 URLs / no `dist`; `--allow-errors` exit 0 / 9 URLs / 4 files.
 
 A second was not a kit defect either. `var(--series-N-soft)` in a mermaid
 `classDef`, reported as "the skill documents it and the kit does not ship
