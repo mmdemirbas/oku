@@ -210,6 +210,22 @@ class TestWherePlaceholdersAreLookedFor:
 
         assert len(issues) == 1, [i["message"] for i in issues]
 
+    def test_writing_about_pre_does_not_silence_the_page(self, tmp_path: Path) -> None:
+        """The raw-text tracking counts tags on the masked line, or a
+        sentence ABOUT raw text opens an element that never closes and
+        silences every line after it in the block.
+
+        Found on this repo's own roadmap, whose entry for this very fix
+        says "a `<pre>` inside a `<div>`": the bare TODO two sentences
+        later went unreported, and the page passed `--strict`."""
+        issues = self._check(
+            tmp_path,
+            "A paragraph about a `<pre>` inside a `<div>`, and code samples.\n\n"
+            "TODO: the next paragraph is still owed.",
+        )
+
+        assert len(issues) == 1, [i["message"] for i in issues]
+
     def test_the_breadcrumb_rule_moved_with_it(self, tmp_path: Path) -> None:
         """Both content rules sat behind the same three `continue`s and
         both now run ahead of them, so an island cannot be the one place

@@ -2717,8 +2717,14 @@ def _lint_md_string(
         # inside a <div> — the idiom the kit documents for multi-line
         # code in an island — is an ordinary island line to them. `//
         # TODO: implement` in a code sample is the sample.
-        opens = len(_RAW_TEXT_OPEN_RE.findall(line))
-        closes = len(_RAW_TEXT_CLOSE_RE.findall(line))
+        # Counted on the MASKED line, or a sentence ABOUT raw text arms
+        # the suppression: this repo's own roadmap says "a `<pre>` inside
+        # a `<div>`", which opened a raw-text element that never closed
+        # and silenced both rules for every line after it in the block.
+        # A real `<pre>` is never written inside a code span.
+        code_line = masked.get(lineno, line)
+        opens = len(_RAW_TEXT_OPEN_RE.findall(code_line))
+        closes = len(_RAW_TEXT_CLOSE_RE.findall(code_line))
         line_is_code = in_raw_text or opens > 0
         if opens > closes:
             in_raw_text = True
