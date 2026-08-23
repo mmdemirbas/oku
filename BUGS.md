@@ -12,7 +12,68 @@ carries the record, including what was measured before and after.
 
 ---
 
-No open defects.
+## A typed fence inside an HTML island makes the island report as unclosed
+
+**Symptom.** A `<details>` island whose body contains a typed `oku-*` fence
+raises `island-unclosed` as an **error**, so `oku check` exits 1 and `oku build`
+refuses the whole tree. The island is correctly closed; the tags are balanced
+and both sit at column 0. Replacing the typed fence with a plain ```` ```bash ````
+fence and changing nothing else makes the page clean.
+
+**Minimal reproduction.** Two pages in an empty tree, differing only in the kind
+of fence inside the island:
+
+```markdown
+## S {#s}
+
+<details class="card"><summary>Open me</summary>
+
+Some prose inside the island.
+
+```oku-insight
+{"b":"A typed fence living inside an HTML island."}
+```
+
+</details>
+
+Text after the island.
+```
+
+```
+$ oku init && oku check
+✗ 1 error(s):
+  ✗ a-fence-in-island.md:8:b[0] line 8 [island-unclosed] HTML island <details>
+    is never closed in this page. …
+$ echo $?
+1
+```
+
+The control page — same island, ```` ```bash ```` inside instead — reports no
+error. Both have exactly one `<details>` and one `</details>`, at column 0.
+
+**Expected vs actual.** Expected: an island holding a typed fence closes like any
+other. Actual: it is reported unclosed, at error severity, which blocks the build
+of every other page in the tree as well.
+
+**Where it was localised.** `src/oku/cli.py:2606-2674`. `open_els` is per
+prose-block, and the finding names `b[0]` — the block the island *opens* in.
+
+**Observed vs inferred.** *Observed:* the two-page reproduction, the error and
+its `b[0]` label, the clean control, balanced column-0 tags, and the same failure
+on a real 200-line document. *Inferred from reading, not executed:* that lifting
+the typed fence splits the surrounding prose into separate blocks, so the
+`</details>` is scanned in a later block than the one holding `open_els`, and the
+close is therefore never balanced against the open. The fix shape is not
+attempted here — carrying island state across the blocks of one page, or
+balancing before the split, are both plausible and I have not tested either.
+
+**Impact seen in practice.** One 200-line document in an unrelated project; the
+document is correct and the workaround is to move the fence out of the island,
+which degrades a good page to satisfy a wrong check.
+
+---
+
+No other open defects.
 
 The three that were here are closed:
 
@@ -69,15 +130,18 @@ reporting tool read `kit 2026-08-20-r50`. That is stale-tool drift, and
 names `oku --version`, so the next one arrives as a build warning rather than
 as a parse-error card in a browser.
 
-A third was not a kit defect, and it is worth recording because the symptom
-looks alarming. A doctree of 31 pages reported **23 errors** and `oku build`
-refused the whole tree, including pages with no findings of their own. All 23
-were author-side, in three documents written months earlier: 12
+A third was **mostly** not a kit defect, and it is worth recording because the
+symptom looks alarming. A doctree of 31 pages reported **23 errors** and `oku
+build` refused the whole tree, including pages with no findings of their own.
+**22 of the 23** were author-side, in three documents written months earlier; the
+23rd, an `island-unclosed`, turned out to be the kit bug now open at the top of
+this file — this paragraph originally claimed all 23 were author-side and that
+was wrong. The 22: 12
 `fence-not-lifted` and 1 `shadowed-source` from a stale page-JSON left beside
 its migrated `.md` (the walkers prefer the `.json`, so it shadows the source —
 documented `--keep-json` behaviour), 7 `schema` from v1 block payloads whose
 keys the schema has since renamed (`title`/`content`/`num`/`meta` → `t`/`b`),
-2 `duplicate-anchor`, 1 `island-unclosed`.
+and 2 `duplicate-anchor`.
 
 The kit's behaviour was correct at every stage, which is the part worth
 keeping: `oku check` named each one with `file:line` and the offending key;
