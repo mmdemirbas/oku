@@ -82,6 +82,10 @@
         "parent": {
           "type": "string",
           "description": "Stem of the page this one nests under in the site tree."
+        },
+        "documents_history": {
+          "type": "boolean",
+          "description": "This page's subject IS a history — a measurement report citing an earlier round, an audit, a changelog. Turns off the process-breadcrumb rule for this page only; every other check still applies. Default false, because documentation describes current behaviour."
         }
       }
     },

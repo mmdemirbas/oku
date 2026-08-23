@@ -381,6 +381,144 @@ def test_round_breadcrumb_in_inline_text_flagged(tmp_path: Path) -> None:
     assert len(issues) == 1
 
 
+class TestAPageWhoseSubjectIsAHistory:
+    """The rule scoped itself by who WROTE the prose, which is the wrong
+    question for a report.
+
+    `process-breadcrumb` exempted pages materialised from repo markdown
+    (README, CHANGELOG and friends) because the kit does not own that
+    prose. A hand-authored measurement report correcting an earlier
+    round is owned by its author and is still not kit documentation, so
+    it had no escape: every sentence citing the round it corrects raised
+    a warning and `oku check --strict` exited 1. Observed at 29 warnings
+    on one document, all on correct prose, where the only way past the
+    gate was to rewrite each citation into a date and lose the reference
+    the reader needs.
+
+    `documents_history: true` says what the page IS. It exempts this one
+    rule on this one page — deliberately not folded into `skip_prose`,
+    which would have taken `placeholder-text` with it, and deliberately
+    not a kit.json switch, which would exempt pages written later from a
+    file nobody opens while writing prose.
+    """
+
+    REPORT = (
+        "---\ntitle: Breadcrumb repro\n"
+        "summary: A measurement report citing a dated prior report by round number.\n"
+        "{flag}---\n\n## Findings {{#f}}\n\n"
+        "The round 3 report measured 2.5x more compactions. This document corrects it.\n"
+    )
+
+    def _check(self, tmp_path: Path, body: str) -> list[dict]:
+        (tmp_path / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+        src = tmp_path / "report.md"
+        src.write_text(body, encoding="utf-8")
+        page = cli._page_from_source_file(src)
+        assert page is not None
+        return cli.check_pages([(src, page)], tmp_path)
+
+    def test_the_citation_is_flagged_without_the_flag(self, tmp_path: Path) -> None:
+        """The control. Every assertion below is an absence, and would
+        hold on a page the rule never looked at."""
+        issues = _issues_of(self._check(tmp_path, self.REPORT.format(flag="")), code="process-breadcrumb")
+
+        assert len(issues) == 1, issues
+        assert issues[0]["severity"] == "warning"
+
+    def test_the_flag_clears_it(self, tmp_path: Path) -> None:
+        issues = _issues_of(
+            self._check(tmp_path, self.REPORT.format(flag="documents_history: true\n")),
+            code="process-breadcrumb",
+        )
+
+        assert issues == [], issues
+
+    def test_the_message_names_the_way_out(self, tmp_path: Path) -> None:
+        """A warning on correct prose with no named escape is one the
+        author works around by deleting the citation."""
+        issues = _issues_of(self._check(tmp_path, self.REPORT.format(flag="")), code="process-breadcrumb")
+
+        assert "documents_history" in issues[0]["message"], issues[0]["message"]
+
+    def test_the_flag_is_a_key_the_kit_knows(self, tmp_path: Path) -> None:
+        """Front-matter keys come from the schema, so a key added to the
+        code and not to `$defs/meta` is one `oku check` calls a typo and
+        `oku spec front-matter` cannot print."""
+        codes = {
+            i["code"] for i in self._check(tmp_path, self.REPORT.format(flag="documents_history: true\n"))
+        }
+
+        assert "unknown-meta-key" not in codes, codes
+        assert "documents_history" in cli._known_meta_keys()
+
+    def test_a_placeholder_still_fires_under_the_flag(self, tmp_path: Path) -> None:
+        """The narrowness is the point. `skip_prose=True` — the seam that
+        looks like the fix — turns off every prose rule, and a report is
+        still a document someone is writing."""
+        body = self.REPORT.format(flag="documents_history: true\n").replace(
+            "This document corrects it.", "This document corrects it. TODO: add the second table."
+        )
+        codes = {i["code"] for i in self._check(tmp_path, body)}
+
+        assert "placeholder-text" in codes, codes
+        assert "process-breadcrumb" not in codes, codes
+
+    def test_prose_inside_a_typed_payload_honours_it_too(self, tmp_path: Path) -> None:
+        """Two emitters raise this code — a b[] string and prose nested
+        in a step body — and an exemption that reached one of them would
+        leave the report failing `--strict` for the same sentence in a
+        card."""
+        body = (
+            "---\ntitle: Nested\nsummary: A round citation inside a typed payload.\n"
+            "{flag}---\n\n## Findings {#f}\n\n"
+            '```oku-step-flow\n{"steps":[{"t":"Compare","b":"The round 3 report measured more."},'
+            '{"t":"Correct","b":"This supersedes it."}]}\n```\n'
+        )
+        before = {i["code"] for i in self._check(tmp_path, body.replace("{flag}", ""))}
+        after = {
+            i["code"] for i in self._check(tmp_path, body.replace("{flag}", "documents_history: true\n"))
+        }
+
+        assert "process-breadcrumb" in before, before
+        assert "process-breadcrumb" not in after, after
+
+    def test_strict_goes_from_one_to_zero(self, tmp_path: Path, monkeypatch, capsys) -> None:
+        """The statement the report was actually about: the gate."""
+
+        class _Args:
+            json = False
+            strict = True
+            verbose = False
+            errors_only = False
+
+        (tmp_path / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+        src = tmp_path / "report.md"
+        monkeypatch.chdir(tmp_path)
+
+        src.write_text(self.REPORT.format(flag=""), encoding="utf-8")
+        before = cli.cmd_check(_Args())
+        capsys.readouterr()
+
+        src.write_text(self.REPORT.format(flag="documents_history: true\n"), encoding="utf-8")
+        after = cli.cmd_check(_Args())
+        capsys.readouterr()
+
+        assert before == 1, "the reproduction stopped reproducing"
+        assert after == 0, "the exemption did not reach the gate"
+
+    def test_the_flag_survives_a_round_trip(self, tmp_path: Path) -> None:
+        """`oku migrate` deletes the source it converted, so a key the
+        emitter drops is a page that starts warning again with nothing
+        left to compare against."""
+        (tmp_path / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+        src = tmp_path / "report.md"
+        src.write_text(self.REPORT.format(flag="documents_history: true\n"), encoding="utf-8")
+        page = cli._page_from_source_file(src)
+
+        assert page["m"].get("documents_history") is True, page["m"]
+        assert "documents_history: true" in cli.page_to_md(page)
+
+
 # ---------- glossary / extref resolution ----------
 
 

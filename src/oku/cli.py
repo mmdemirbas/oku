@@ -2283,6 +2283,24 @@ _FORBIDDEN_PROSE_PATTERNS = [
 ]
 
 
+def _process_breadcrumb_message(hit: str) -> str:
+    """One message, two emitters — a b[] string and prose nested inside
+    a typed payload both raise this, and the two copies had already
+    drifted apart in punctuation.
+
+    It names the escape because the author reading it is usually right:
+    a report that corrects an earlier round has to be able to cite that
+    round, and without a named way out the only way past `--strict` is
+    to rewrite every citation into a date, which loses the reference.
+    """
+    return (
+        f"Prose contains process/history reference {hit!r}; the kit documents "
+        "current behaviour only. A page whose SUBJECT is a history — a report "
+        "citing an earlier round, an audit, a changelog — declares "
+        "`documents_history: true` in its front-matter and is exempt."
+    )
+
+
 def _load_registry(kit_dir: Path, kind: str) -> dict:
     """Load all glossary or extrefs JSON files under kit/{kind}/ and
     return a {term_key: {domain, langs}} index. Term keys are stored
@@ -2517,7 +2535,7 @@ def _split_md_fences(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, 
 
 
 def _lint_md_string(
-    text: str, *, skip_prose: bool
+    text: str, *, skip_prose: bool, skip_history: bool = False
 ) -> tuple[
     list[tuple[str, str, str, str]],
     list[tuple[int, str]],
@@ -2534,6 +2552,13 @@ def _lint_md_string(
     Covers the strict-GFM subset (setext headings, ambiguous `---`,
     indented code candidates, lazy blockquote continuation), the
     HTML-island audit, and oku-* fences that failed to lift.
+
+    `skip_prose` turns off every prose rule, for a page materialised
+    from repo markdown the kit does not own. `skip_history` turns off
+    ONE of them. They are separate because a page that legitimately
+    cites a prior round is still a page the author is writing, and a
+    `TODO` left in it is still a `TODO` — folding the exemption into
+    `skip_prose` would have taken `placeholder-text` with it.
     """
     issues: list[tuple[str, str, str, str]] = []
     heading_ids: list[tuple[int, str]] = []
@@ -2699,18 +2724,19 @@ def _lint_md_string(
         if hm:
             heading_ids.append((lineno, hm.group(3) or _md_slug(hm.group(2)) or "section"))
         if not skip_prose:
-            for pat in _FORBIDDEN_PROSE_PATTERNS:
-                m = pat.search(line)
-                if m:
-                    issues.append(
-                        (
-                            "warning",
-                            "process-breadcrumb",
-                            f"line {lineno}",
-                            f"Prose contains process/history reference {m.group(0)!r}; the kit documents current behaviour only.",
+            if not skip_history:
+                for pat in _FORBIDDEN_PROSE_PATTERNS:
+                    m = pat.search(line)
+                    if m:
+                        issues.append(
+                            (
+                                "warning",
+                                "process-breadcrumb",
+                                f"line {lineno}",
+                                _process_breadcrumb_message(m.group(0)),
+                            )
                         )
-                    )
-                    break
+                        break
             # "Word-search for placeholders before delivering" was a step
             # in the skill's manual checklist, which is the wrong place
             # for anything a regex can do — a checklist step is skipped
@@ -3209,6 +3235,21 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         # structural rules still apply.
         is_materialised = meta.get("_materialised_by") == "oku-init"
 
+        # And a page whose SUBJECT is a history says so. The rule above
+        # scopes itself by who wrote the prose, which is the wrong
+        # question for a hand-authored measurement report correcting an
+        # earlier round: every citation of that round raised a warning,
+        # `oku check --strict` exited 1, and the only way past it was to
+        # rewrite each citation into a date — losing the reference the
+        # reader needs. Observed at 29 warnings on one document, all on
+        # correct prose.
+        #
+        # Narrow on purpose. It exempts this rule on this page, and
+        # nothing else: `placeholder-text` still fires, and a tree-wide
+        # switch was not added because it would silently exempt pages
+        # written later, from a file nobody opens while writing prose.
+        documents_history = meta.get("documents_history") is True
+
         seen_ids: dict[str, int] = {}
         gloss_refs: list[tuple[str, str, int | None]] = []
         file_refs: list[tuple[str, str, int | None]] = []
@@ -3255,7 +3296,9 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             if isinstance(blk, str):
                 # 3. Markdown-string passes: strict-GFM subset, HTML
                 # island audit, unlifted fences, process prose.
-                str_issues, heading_ids, gloss, x_refs = _lint_md_string(blk, skip_prose=is_materialised)
+                str_issues, heading_ids, gloss, x_refs = _lint_md_string(
+                    blk, skip_prose=is_materialised, skip_history=documents_history
+                )
                 str_issues = str_issues + _lint_md_reference_forms(blk, fn_defs, link_defs)
                 for severity, code, loc, message in str_issues:
                     m_line = re.search(r"\bline (\d+)", loc or "")
@@ -3391,7 +3434,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 link_refs.extend((where, h, None) for h in _MD_LINK_TARGET_RE.findall(s_refs))
                 file_refs.extend((where, f, None) for f in _MD_FILE_REF_RE.findall(s_refs))
                 code_spans.extend((where, text, None) for _rel, text in _md_code_spans(s))
-                if not is_materialised:
+                if not is_materialised and not documents_history:
                     for pat in _FORBIDDEN_PROSE_PATTERNS:
                         m = pat.search(s)
                         if m:
@@ -3400,7 +3443,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                                 "warning",
                                 "process-breadcrumb",
                                 where,
-                                f"Prose contains process/history reference {m.group(0)!r}; the kit documents current behaviour only.",
+                                _process_breadcrumb_message(m.group(0)),
                             )
                             break
 

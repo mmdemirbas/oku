@@ -582,6 +582,15 @@ against the tool independently, and the tool is the one that is right.
 info-level nudges, `--errors-only` to hide warnings. Zero exit under
 `--strict` means the doctree is clean.
 
+One finding a correct document can earn: `process-breadcrumb`. This
+skill's own vocabulary is rounds, and a report that corrects an earlier
+round has to cite it by name. A page whose SUBJECT is a history — that
+report, an audit, a changelog — sets `documents_history: true` in its
+front-matter. It exempts that one rule on that one page; every other
+check, `placeholder-text` included, still applies. Do not reach for it
+to silence a breadcrumb in a page that documents current behaviour —
+there the warning is right and the sentence is the thing to fix.
+
 **Rendered (every artifact):**
 
 ```bash
