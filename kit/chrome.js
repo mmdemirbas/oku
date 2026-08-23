@@ -13678,18 +13678,26 @@ class OkuDiagram extends HTMLElement {
     // Best-effort source cleanup. The most common reason Mermaid
     // explodes ("Syntax error in text") is that HTML entities leaked
     // into the source during a markdown→DOM round-trip (`&lt;` instead
-    // of `<`, `&amp;` instead of `&`, smart quotes instead of plain
-    // ones). Decode them before parsing; if Mermaid still can't make
-    // sense of the result, our catch handler shows the source and the
-    // error rather than the framework's bomb.
+    // of `<`, `&amp;` instead of `&`). Decode them before parsing; if
+    // Mermaid still can't make sense of the result, our catch handler
+    // shows the source and the error rather than the framework's bomb.
+    //
+    // A curly quote is NOT one of those. It is an ordinary character to
+    // Mermaid's lexer, so `A["the “quoted” label"]` parses and draws —
+    // and this pass used to rewrite it to `A["the "quoted" label"]`,
+    // whose straight quotes close the string one word in. Measured on
+    // one diagram carrying six labels: every label was lost and the
+    // whole figure became a `Parse error on line 2` card, on a page
+    // whose author had done nothing but write typographic prose inside
+    // a node. The conversion could only ever turn a label Mermaid
+    // accepts into one it does not — curly quotes used AS delimiters
+    // (`A[“label”]`) already parse, as the label's own text.
     var cleanSrc = src
       .replace(/&lt;/g,   '<')
       .replace(/&gt;/g,   '>')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g,  "'")
       .replace(/&amp;/g,  '&')   // &amp; last — otherwise we'd double-decode
-      .replace(/[“”]/g, '"')   // smart double quotes → "
-      .replace(/[‘’]/g, "'")   // smart single quotes → '
       .replace(/ /g,         ' ');  // non-breaking space → regular space
     self._src = cleanSrc;
     __mermaidLoader.load()
