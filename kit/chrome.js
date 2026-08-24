@@ -8236,7 +8236,13 @@ class OkuChart extends HTMLElement {
     // inside a 42px row, so the cap costs a tail far less often.
     var labelFit = okuFitLabelGutter(tracks.map(function (t) { return t.label || ''; }),
                                      { width: W, fontPx: 12, maxLines: 2 });
-    var pad = { top: this._title ? 36 : 16, left: labelFit.gutter, right: 80 };
+    // Right gutter from the widest readout, not a constant: a wide value
+    // ran off the viewBox and the generic fit pass rescued it by
+    // SHORTENING a number, which reads as a different quantity.
+    var readoutFit = okuFitLabelGutter(tracks.map(function (t) {
+      return fmtNum(+t.value || 0);
+    }), { width: W, fontPx: 11, maxFrac: 0.28, minW: 80, pad: 20 });
+    var pad = { top: this._title ? 36 : 16, left: labelFit.gutter, right: readoutFit.gutter };
     var H = pad.top + tracks.length * rowH + 12;
     var plotW = W - pad.left - pad.right;
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
@@ -11126,7 +11132,13 @@ class OkuChart extends HTMLElement {
     var W = 640, H = Math.max(180, 60 + rows.length * 32);
     var labelFit = okuFitLabelGutter(rows.map(function (r) { return r.label || ''; }),
                                      { width: W, fontPx: 11.5 });
-    var pad = { top: this._title ? 40 : 16, bottom: 32, left: labelFit.gutter, right: 24 };
+    // The endpoint readout is anchored end, so its glyphs sit INSIDE the
+    // plot area, and the widest bar always reaches them — one row's two
+    // numbers were drawn across its own band. Reserve the column instead.
+    var readoutFit = okuFitLabelGutter(rows.map(function (r) {
+      return fmtNum(+r.low) + '\u2013' + fmtNum(+r.high);
+    }), { width: W, fontPx: 11.5, maxFrac: 0.28, minW: 32, pad: 16 });
+    var pad = { top: this._title ? 40 : 16, bottom: 32, left: labelFit.gutter, right: readoutFit.gutter };
     var plotW = W - pad.left - pad.right;
     var rowH = (H - pad.top - pad.bottom) / rows.length;
     var bandH = Math.min(rowH * 0.55, 18);
@@ -11179,7 +11191,7 @@ class OkuChart extends HTMLElement {
         parts.push('<line x1="' + mx.toFixed(1) + '" y1="' + (rowY - bandH / 2 - 3) + '" x2="' + mx.toFixed(1) + '" y2="' + (rowY + bandH / 2 + 3) + '" stroke="' + color + '" stroke-width="2" class="okc-range-mid"/>');
       }
       // Endpoint readout on the right.
-      parts.push('<text x="' + (W - pad.right) + '" y="' + (rowY + 4) + '" text-anchor="end" class="okc-range-readout">' + escapeXml(fmtNum(rl) + '–' + fmtNum(rh)) + '</text>');
+      parts.push('<text x="' + (W - 6) + '" y="' + (rowY + 4) + '" text-anchor="end" class="okc-range-readout">' + escapeXml(fmtNum(rl) + '–' + fmtNum(rh)) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));

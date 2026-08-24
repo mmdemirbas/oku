@@ -537,7 +537,14 @@ class TestPayloadBudget:
     # and the renderer did not carry, `resolveCssColour`, and the
     # comment naming what `accent: rose` did to every diagram on a page:
     # 2,446 bytes, of which the four palette rows are about 460.
-    KIT_BUDGET_BYTES = 1_220_000
+    # Then from 1,220,000 by the two readout gutters — range-bar and
+    # bullet — and the comments naming what a constant `pad.right` did:
+    # a row whose high IS the domain maximum had its "120-220" printed
+    # across its own band, and a wide bullet value was SHORTENED to
+    # `1234567…`, which reads as a different quantity rather than as a
+    # truncation. About 1,100 bytes, of which the two okuFitLabelGutter
+    # calls are roughly 330.
+    KIT_BUDGET_BYTES = 1_222_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
