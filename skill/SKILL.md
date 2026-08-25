@@ -6,13 +6,10 @@ description: >
   Use when the user has 5+ distinct points/questions, asks for "visually
   rich" or "well-designed" output, needs ~1500+ words, or wants a
   document to read alongside another file. Figures are the primary
-  communication medium and prose is the caption. A page is one markdown
-  file — front-matter plus a GFM body — where charts, tables, diagrams,
-  comparison grids and step flows are typed fences. The kit renders the
-  chrome: Contents drawer, light/dark theming, scroll-spy TOC, search,
-  lightbox and print stylesheet. There is no CSS to write; HTML islands
-  are the escape hatch and build on the kit's own classes and CSS
-  variables.
+  communication medium and prose is the caption. You write one markdown
+  file — charts, tables, diagrams, comparison grids and step flows are
+  typed fences — and the kit renders all the chrome, so there is no CSS
+  to write.
   Companion repo: https://github.com/mmdemirbas/html-doc (remote URL
   still on the legacy name).
 ---
@@ -20,12 +17,12 @@ description: >
 # oku Skill
 
 A pattern for producing standalone, readable HTML artifacts when an
-inline reply would be either too long or too flat.
+inline reply would be too long or too flat.
 
 ## When to fire this skill
 
 - 5+ distinct feedback points or questions in one message.
-- Response would naturally span multiple categories
+- Response would span multiple categories
   (corrections + explanations + proposals).
 - ~1500+ words of useful depth.
 - User is reading a long document and the reply needs to live alongside
@@ -43,8 +40,8 @@ down.
 
 `~/.claude/rules/design-principles.md` and `teaching-order.md` are
 loaded every session and carry the four principles, the three layers and
-the catalog-vs-teaching decision in full. Restating them here cost
-tokens on every invocation to say what was already in context.
+the catalog-vs-teaching decision in full; restating them here costs
+tokens on every invocation for what is already in context.
 
 Two things are specific to this skill and are NOT in those files:
 
@@ -65,13 +62,12 @@ After ANY edit to a `docs/*.md` page source (or any kit schema), run:
 oku check
 ```
 
-— from the repo root (the local directory name happens to be
-`html-doc/` because the GitHub remote is still on that URL; the
-project, CLI, and skill itself all read `oku`). `oku check`
-validates every
-page against `kit/schema/page.schema.json` and runs the structural /
-content lint. Exit code is the only signal that matters; parse the
-output for the offending file + path when non-zero.
+— from the repo root (the local directory is `html-doc/` because the
+GitHub remote is still on that URL; the project, CLI and skill all read
+`oku`). `oku check` validates every page against
+`kit/schema/page.schema.json` and runs the structural / content lint.
+Exit code is the only signal that matters; parse the output for the
+offending file + path when non-zero.
 
 This applies to:
 
@@ -186,8 +182,8 @@ entry to write.
      open questions → next steps.
 
 3. **Run `oku init` from the docs root.** Do this silently — don't
-   tell the user "run init"; just run it yourself from the directory
-   that contains (or will contain) the new page. Init is idempotent:
+   tell the user "run init"; run it yourself from the directory that
+   contains (or will contain) the new page. Init is idempotent:
    it confirms or refreshes the `_oku` symlink and refreshes
    `index.html` so the inline `window.__okuManifest` includes every
    page currently in the tree (including the one you just added). Run
@@ -392,8 +388,8 @@ scroll-spy, section permalinks, the top rail, back-to-top, code
 line numbers with a language pill and brace folds, glossary tooltips,
 the lightbox with pan and zoom, and the print stylesheet.
 
-The rail is worth knowing about because it changes what a heading
-costs you. It is the hairline strip across the top: read progress, plus
+The rail changes what a heading costs you. It is the hairline strip
+across the top: read progress, plus
 a tick for every heading — thicker the higher its level — and a mark for
 every figure, shaped by kind: a square is a table, a circle is a chart,
 a diamond is a diagram, a hollow square is any other figure. Each one
@@ -414,8 +410,8 @@ hand-rolled copy will not follow the accent or the theme.
 
 ## The primitive vocabulary — pick by the relationship
 
-This is the part worth knowing. Each primitive is a typed fence whose
-body is ONE compact JSON object. Pick by what the content *is*, not by
+Each primitive is a typed fence whose body is ONE compact JSON object.
+Pick by what the content *is*, not by
 what looks good — and within that, by what the primitive **encodes**
 (see the tier table above; the first three rows here are the ones to
 reach for first):
@@ -514,9 +510,9 @@ disguised markdown):
 - Don't repeat the same shape (table, KPI grid, comparison card) for
   every section. Vary the visual vocabulary so the reader's eye gets
   fresh information each scroll.
-- Don't ship a "diagram" that's just a fancier list. If your diagram
-  looks like the bullet list it replaced but with boxes, it isn't
-  pulling its weight. Cut it or replace with a real chart.
+- Don't ship a "diagram" that's just the bullet list it replaced with
+  boxes around it — it isn't pulling its weight. Cut it or replace with
+  a real chart.
 - Don't dump deep-dive content inline. A `<details>` island keeps the
   structure visible to a skim-reader and the depth available on click.
 - Don't ship a section with three or more paragraphs of prose without
