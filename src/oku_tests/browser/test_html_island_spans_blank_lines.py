@@ -50,6 +50,22 @@ summary: Islands with blank lines in them.
 <p>second paragraph</p>
 </div>
 
+## A typed fence inside {#typed}
+
+<details id="island-typed" class="okt-card"><summary>Open me</summary>
+
+Prose before the fence.
+
+```oku-insight
+{"b":"A typed fence living inside an HTML island."}
+```
+
+Prose after the fence.
+
+</details>
+
+Text that belongs to the page, not to the island.
+
 ## Markdown inside {#md}
 
 <div id="island-b" class="okt-card">
@@ -186,3 +202,41 @@ def test_the_copy_control_reaches_code_inside_an_island(opened):
            }"""
     )
     assert copied.count("\n") == 2, repr(copied)
+
+
+def test_a_typed_block_between_the_tags_lands_inside_the_island(opened):
+    """A typed fence is LIFTED to its own `b[]` entry, which is what gets
+    it validated, drawn and marked on the rail — and that cuts the
+    markdown around it in two. `emitMarkdown` used to start each half
+    with an empty open-element stack, so the `<details>` closed at the
+    end of the first half and the figure the author put inside it
+    rendered as its sibling. Nothing said so: the DOM was valid, the page
+    looked plausible, and the disclosure held one paragraph.
+
+    Held on the other side by
+    `test_check.py::TestATypedFenceInsideAnIsland`, which is what stopped
+    `oku check` reporting the island as never closed.
+    """
+    got = opened.evaluate("""() => {
+      const det = document.querySelector('#island-typed');
+      const fig = document.querySelector('#island-typed aside, #island-typed .insight');
+      const anyFig = document.querySelector('main aside, main .insight');
+      const tail = [...document.querySelectorAll('main p')]
+        .find(p => /Text that belongs to the page/.test(p.textContent));
+      return {
+        hasIsland: !!det,
+        figureInside: !!fig,
+        figureExistsAtAll: !!anyFig,
+        paragraphsInside: det ? det.querySelectorAll(':scope > p').length : 0,
+        tailOutside: tail ? !det.contains(tail) : null,
+      };
+    }""")
+    assert got["hasIsland"], got
+    assert got["figureExistsAtAll"], "the typed block did not render at all"
+    assert got["figureInside"], (
+        "the figure rendered as a SIBLING of the island the author put it in: " + repr(got)
+    )
+    # Both paragraphs, one on either side of the fence.
+    assert got["paragraphsInside"] == 2, got
+    # …and the island still ends where its closing tag says it does.
+    assert got["tailOutside"] is True, got

@@ -532,6 +532,26 @@ does, and `test_authority_agreement` holds the void and raw-text tag
 tables against each other: a tag in one and not the other is a lint
 reporting an island the renderer closed, or the reverse.
 
+**A typed fence inside an island splits the island's own block.**
+`md_to_v2_page` lifts an `oku-*` fence into its own `b[]` entry, so the
+prose around it becomes two strings with a typed object between them —
+and both the renderer's stack and the lint's were per-string, so the
+`</details>` was scanned in a later block than the `<details>` that
+opened it. One cause, two failures, and only one of them was reported.
+The lint said `island-unclosed` at error severity and refused every page
+in the tree, on a page whose tags are balanced at column 0. The renderer,
+measured before the fix, had already put the figure and every paragraph
+after it OUTSIDE the island — an island the author wrote a chart into
+rendered with the chart beside it, styled as though it had never
+belonged, which is the same silent loss the blank-line rule above exists
+to prevent. The stacks now outlive one block: the renderer carries
+`openIsland` across the page's blocks and appends a typed block into
+whatever is open, and `_lint_md_string` takes an `open_els` the caller
+owns and reports leftovers at the page end. Both reset at `##`, which is
+the boundary the renderer already resets on. Held by
+`test_check.py::TestATypedFenceInsideAnIsland` and by the `typed` case in
+`test_html_island_spans_blank_lines.py`.
+
 **Multi-line code inside an island is a `<pre>`, never `<br>`.** A `<br>`
 renders three lines and copies as one — it carries no newline character,
 so a SQL block pasted into another system arrives on one line. A `<pre>`

@@ -1046,3 +1046,105 @@ def test_heading_levels_in_order_pass(tmp_path: Path) -> None:
     page = {"k": "page", "t": "T", "b": ["## A {#a}\n\nx\n\n### B {#b}\n\ny\n\n#### C {#c}\n\nz\n"]}
     issues = cli.check_pages([(tmp_path / "p.json", page)], tmp_path)
     assert _issues_of(issues, code="heading-level-skip") == []
+
+
+class TestATypedFenceInsideAnIsland:
+    """An island holding a typed fence closes like any other one.
+
+    A typed fence is LIFTED to its own `b[]` entry — which is what gets
+    it validated, drawn by a typed renderer and marked on the rail — and
+    that cuts the surrounding markdown in two. The island audit walked
+    each `b[]` string from an empty stack, so a `<details>` opened before
+    the fence and closed after it was reported as never closed, at ERROR
+    severity, which refused to build every other page in the tree as
+    well. The tags were balanced and both sat at column 0; replacing the
+    typed fence with a ```bash fence and changing nothing else made the
+    page clean, which is what said the fence was the variable.
+
+    The renderer carries the same state across the same boundary
+    (`emitMarkdown`'s `carry`), and the two describe one document, so
+    they have to draw the line in the same place. `browser/
+    test_html_island_spans_blank_lines.py::test_a_typed_block_between_the
+    _tags_lands_inside_the_island` is the other half.
+    """
+
+    HEAD = "---\ntitle: Island\nsummary: An island with a fence in it.\n---\n\n"
+
+    def _check(self, tmp_path: Path, body: str) -> list[dict]:
+        (tmp_path / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+        src = tmp_path / "island.md"
+        src.write_text(self.HEAD + body, encoding="utf-8")
+        page = cli._page_from_source_file(src)
+        assert page is not None
+        return cli.check_pages([(src, page)], tmp_path)
+
+    CLOSED = (
+        "## S {#s}\n\n"
+        '<details class="card"><summary>Open me</summary>\n\n'
+        "Prose inside.\n\n"
+        '```oku-insight\n{"b":"A typed fence living inside an island."}\n```\n\n'
+        "</details>\n\n"
+        "After the island.\n"
+    )
+
+    def test_an_island_closed_after_the_fence_is_clean(self, tmp_path: Path) -> None:
+        assert _issues_of(self._check(tmp_path, self.CLOSED), code="island-unclosed") == []
+
+    def test_a_plain_fence_was_always_clean(self, tmp_path: Path) -> None:
+        """The control that isolated the defect: same island, a fence
+        that does not lift. It passed before the fix and must still."""
+        body = self.CLOSED.replace(
+            '```oku-insight\n{"b":"A typed fence living inside an island."}\n```',
+            "```bash\necho hi\n```",
+        )
+        assert _issues_of(self._check(tmp_path, body), code="island-unclosed") == []
+
+    def test_an_island_that_never_closes_is_still_an_error(self, tmp_path: Path) -> None:
+        """The half that must NOT be silenced. Carrying the stack across
+        blocks makes the check stop crying wolf; it must still bite when
+        the tag really is missing, and name the line that opened it."""
+        body = self.CLOSED.replace("</details>\n\n", "")
+        issues = _issues_of(self._check(tmp_path, body), code="island-unclosed")
+        assert len(issues) == 1, issues
+        assert issues[0]["severity"] == "error"
+        assert "details" in issues[0]["message"]
+
+        # The line must be the one that OPENED the island, and it must be
+        # the same line the check reports for the same island with no
+        # fence in it at all. Asserted against that control rather than
+        # against a literal, because the two differ only in whether the
+        # stack was carried — which is exactly what could shift the
+        # number without anyone noticing.
+        plain = self.CLOSED.replace(
+            '```oku-insight\n{"b":"A typed fence living inside an island."}\n```\n\n', ""
+        ).replace("</details>\n\n", "")
+        control = _issues_of(self._check(tmp_path, plain), code="island-unclosed")
+        assert len(control) == 1, control
+        assert issues[0]["line"] == control[0]["line"], (issues[0], control[0])
+
+    def test_an_island_open_across_a_heading_is_still_an_error(self, tmp_path: Path) -> None:
+        """`##` ends the run of blocks the renderer emits in one pass, so
+        an island still open there does not reach its own closing tag
+        either — and the renderer clears its stack at the same boundary."""
+        body = self.CLOSED.replace("</details>\n\n", "## T {#t}\n\n")
+        issues = _issues_of(self._check(tmp_path, body), code="island-unclosed")
+        assert len(issues) == 1, issues
+        assert issues[0]["severity"] == "error"
+        assert "## T" in issues[0]["message"]
+
+    def test_two_fences_and_a_nested_island_stay_clean(self, tmp_path: Path) -> None:
+        """The stack is a stack: an island inside an island, with a fence
+        on either side of the inner one's middle, closes in order."""
+        body = (
+            "## S {#s}\n\n"
+            '<div class="okt-card">\n\n'
+            "<details><summary>Inner</summary>\n\n"
+            "Prose.\n\n"
+            '```oku-insight\n{"b":"One."}\n```\n\n'
+            "Between.\n\n"
+            '```oku-insight\n{"b":"Two."}\n```\n\n'
+            "</details>\n\n"
+            "</div>\n\n"
+            "After everything.\n"
+        )
+        assert _issues_of(self._check(tmp_path, body), code="island-unclosed") == []

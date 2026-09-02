@@ -1216,7 +1216,7 @@
    * handles section-opening when heading nodes appear.
    * ================================================================ */
 
-  function emitMarkdown(host, blocks, openSection) {
+  function emitMarkdown(host, blocks, openSection, carry) {
     // An island that opens more tags than it closes stays OPEN. A blank
     // line ends the html *block* — that is CommonMark, and it is what
     // lets an author write markdown inside a `<div>` — but it does not
@@ -1226,7 +1226,22 @@
     // 82-line island rendered with 403 characters in it, everything
     // else outside, and `oku check --strict` clean. `stillOpen` is what
     // has not been closed yet; `into()` is where the next block goes.
-    const stillOpen = [];
+    //
+    // `carry` is that stack handed in from OUTSIDE, and it exists for
+    // one shape: a typed fence inside an island. The converter lifts
+    // such a fence to its own `b[]` entry — which is right, because that
+    // is what gets it validated, drawn by a typed renderer and marked on
+    // the rail — but it also cuts the markdown around it in two, and
+    // this function used to start each half with an empty stack. So the
+    // `<details>` closed at the end of the first half, the fence and
+    // everything after it rendered as siblings of it, and the author's
+    // disclosure held one paragraph instead of the figure they put in
+    // it. Nothing said so: the DOM was valid and the page looked
+    // plausible. The page walk owns one stack and hands it to every
+    // half; a nested call (a blockquote, a TL;DR, a list item) passes
+    // nothing and gets its own, because it is rendering a sub-document
+    // into a host of its own.
+    const stillOpen = carry || [];
     const into = () => (stillOpen.length ? stillOpen[stillOpen.length - 1] : host);
     for (const node of blocks) {
       switch (node.k) {
@@ -1725,6 +1740,17 @@
         return typeof b === 'string' ? extractDefinitions(b) : b;
       });
 
+      // One island stack for the whole walk, so an island that is still
+      // open when a block ends keeps taking what follows — including a
+      // typed block, which is the case that was silently wrong. `into()`
+      // is the open island or, when nothing is open, the current
+      // section. A section boundary clears it: `##` ends the run of
+      // blocks the renderer emits in one pass, which is also where
+      // `oku check` reports an island that never closed, and the two
+      // have to draw the line in the same place.
+      const openIsland = [];
+      const into = () => (openIsland.length ? openIsland[openIsland.length - 1] : target());
+
       for (const block of blocks) {
         if (typeof block === 'string') {
           const parsed = parseMarkdown(block);
@@ -1732,13 +1758,14 @@
           let buffer = [];
           const flush = () => {
             if (buffer.length) {
-              emitMarkdown(target(), buffer, null);
+              emitMarkdown(target(), buffer, null, openIsland);
               buffer = [];
             }
           };
           for (const node of parsed) {
             if (node.k === 'heading' && node.level === 2) {
               flush();
+              openIsland.length = 0;
               openSection(node);
             } else {
               buffer.push(node);
@@ -1747,7 +1774,7 @@
           flush();
         } else if (block && typeof block === 'object') {
           const el = this._renderTyped(block);
-          if (el) target().appendChild(el);
+          if (el) into().appendChild(el);
         }
       }
 

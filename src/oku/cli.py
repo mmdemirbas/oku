@@ -42,6 +42,7 @@ import textwrap
 import threading
 import time
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote, unquote
 
@@ -2562,7 +2563,12 @@ def _split_md_fences(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, 
 
 
 def _lint_md_string(
-    text: str, *, skip_prose: bool, skip_history: bool = False
+    text: str,
+    *,
+    skip_prose: bool,
+    skip_history: bool = False,
+    open_els: list[tuple[str, int]] | None = None,
+    abs_line: Callable[[int], int | None] | None = None,
 ) -> tuple[
     list[tuple[str, str, str, str]],
     list[tuple[int, str]],
@@ -2630,7 +2636,27 @@ def _lint_md_string(
     # keeps writing into them, so one that never closes swallows the
     # rest of the section — the same defect the truncation used to be,
     # from the other side, and equally silent.
-    open_els: list[tuple[str, int]] = []
+    #
+    # Handed in by the caller when the page has more than one markdown
+    # string, because a typed fence CUTS one document into several and
+    # the tags do not care where the cut fell: an island opened before an
+    # `oku-insight` fence is closed after it, in a different `b[]` entry.
+    # Scanning each entry from empty reported that island as never
+    # closed, at error severity, which refused to build every other page
+    # in the tree as well. The renderer carries the same state across the
+    # same boundary (`emitMarkdown`'s `carry`), and these two have to
+    # agree or one of them is lying about a page the other draws.
+    carried = open_els is not None
+    open_els = open_els if open_els is not None else []
+
+    def _open_line(lineno: int) -> int:
+        # An entry outlives the block that pushed it, so a line number
+        # relative to that block is meaningless by the time it is
+        # reported. When the caller carries the stack it also knows how
+        # to resolve a line against the whole page, and does it here —
+        # once, at push time — rather than the caller re-resolving a
+        # number whose origin block it can no longer identify.
+        return (abs_line(lineno) or lineno) if abs_line else lineno
 
     def _report_unclosed(boundary: str) -> None:
         for tag, opened_at in open_els:
@@ -2677,7 +2703,7 @@ def _lint_md_string(
             continue
         if raw_text_close is not None:
             if raw_text_close.search(line):
-                _island_balance(line, open_els, lineno)
+                _island_balance(line, open_els, _open_line(lineno))
                 raw_text_close = None
                 in_island = False
             prev_nonblank = line
@@ -2700,7 +2726,7 @@ def _lint_md_string(
             in_island = True
             if island_tag in _RAW_TEXT_TAGS:
                 closer = re.compile(r"</" + island_tag + r"\s*>", re.I)
-                _island_balance(line, open_els, lineno)
+                _island_balance(line, open_els, _open_line(lineno))
                 if not closer.search(line):
                     raw_text_close = closer
                 prev_nonblank = line
@@ -2756,7 +2782,7 @@ def _lint_md_string(
                 )
 
         if in_island:
-            _island_balance(line, open_els, lineno)
+            _island_balance(line, open_els, _open_line(lineno))
             prev_nonblank = line
             prev_blank = False
             continue
@@ -2820,7 +2846,11 @@ def _lint_md_string(
         prev_nonblank = line
         prev_blank = False
 
-    _report_unclosed("in this page")
+    # The end of a string is not the end of the document when the
+    # document was cut into several; the caller reports what is still
+    # open once the last one has been walked.
+    if not carried:
+        _report_unclosed("in this page")
 
     # Inline code spans hold convention samples (`[label](#g/term-id)`)
     # — never real references; strip before collecting.
@@ -3322,6 +3352,14 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         extref_refs: list[tuple[str, str, int | None]] = []
         link_refs: list[tuple[str, str, int | None]] = []
         asset_refs: list[tuple[str, str, int | None]] = []
+        # One island stack for the whole page, because a typed fence cuts
+        # one markdown document into several `b[]` strings and an island
+        # opened before the fence is closed after it. Scanning each string
+        # from empty reported that island as never closed, at error
+        # severity, which refused to build every other page in the tree
+        # too. The renderer carries the same state across the same
+        # boundary; these two describe one document and must agree.
+        island_open: list[tuple[str, int]] = []
         # Footnote / link-reference definitions resolve page-wide, so they
         # are collected before any string is linted.
         fn_defs, link_defs = _md_reference_definitions([b for b in body if isinstance(b, str)])
@@ -3362,13 +3400,26 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 # 3. Markdown-string passes: strict-GFM subset, HTML
                 # island audit, unlifted fences, process prose.
                 str_issues, heading_ids, gloss, x_refs = _lint_md_string(
-                    blk, skip_prose=is_materialised, skip_history=documents_history
+                    blk,
+                    skip_prose=is_materialised,
+                    skip_history=documents_history,
+                    open_els=island_open,
+                    abs_line=_abs,
                 )
                 str_issues = str_issues + _lint_md_reference_forms(blk, fn_defs, link_defs)
                 for severity, code, loc, message in str_issues:
                     m_line = re.search(r"\bline (\d+)", loc or "")
-                    absolute = _abs(int(m_line.group(1))) if m_line else None
-                    shown = re.sub(r"\bline \d+", f"line {absolute}", loc) if absolute else loc
+                    if code == "island-unclosed":
+                        # Already page-absolute. The island stack is
+                        # carried across blocks, so the line a tag opened
+                        # on belongs to whichever block that was, and it
+                        # was resolved there — re-resolving it here would
+                        # measure it from the wrong start.
+                        absolute = int(m_line.group(1)) if m_line else None
+                        shown = loc
+                    else:
+                        absolute = _abs(int(m_line.group(1))) if m_line else None
+                        shown = re.sub(r"\bline \d+", f"line {absolute}", loc) if absolute else loc
                     add(p, severity, code, f"{where} {shown}", message, line=absolute)
                 for lineno, hid in heading_ids:
                     if hid in seen_ids:
@@ -3521,6 +3572,21 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                                 _process_breadcrumb_message(m.group(0)),
                             )
                             break
+
+        # Every block walked: whatever an island still has open now is
+        # open at the end of the document, which is the one place the
+        # renderer cannot carry it any further either.
+        for tag, opened_at in island_open:
+            add(
+                p,
+                "error",
+                "island-unclosed",
+                f"b[0] line {opened_at}",
+                f"HTML island <{tag}> is never closed in this page. Everything after it is "
+                f"written inside it — add the matching </{tag}>.",
+                line=opened_at,
+            )
+        island_open.clear()
 
         anchors_by_page[p] = set(seen_ids)
         links_by_page[p] = link_refs
