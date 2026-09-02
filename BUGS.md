@@ -12,6 +12,65 @@ carries the record, including what was measured before and after.
 
 ---
 
+## Prism's autoloader asks for components the kit never vendors, one 404 per page
+
+**Symptom.** Every built page that highlights JavaScript, and every page holding
+an `oku-chart` fence, logs a failed request in the browser console:
+
+```
+net::ERR_FILE_NOT_FOUND .../_oku/vendor/prism/components/prism-regex.min.js
+net::ERR_FILE_NOT_FOUND .../_oku/vendor/prism/components/prism-oku-chart.min.js
+```
+
+The page renders and most code still highlights, so nothing about the build
+says anything is wrong. `regex` is a real Prism component that the kit does not
+vendor; `oku-chart` is not a Prism language at all — it is one of the kit's own
+fence names being handed to the autoloader as if it were one.
+
+**Minimal reproduction.** No new page needed; the kit's own docs already do it.
+
+```bash
+$ oku build
+$ node -e '(async()=>{const{chromium}=require("playwright");
+const b=await chromium.launch();const p=await b.newPage();
+p.on("requestfailed",r=>console.log(r.failure().errorText,r.url()));
+await p.goto("file://'"$PWD"'/docs/dist/standalone/reference.html");
+await p.waitForTimeout(6000);
+console.log(await p.evaluate(()=>Prism.plugins.autoloader.languages_path));
+await b.close()})()'
+net::ERR_FILE_NOT_FOUND file://…/_oku/vendor/prism/components/prism-oku-chart.min.js
+_oku/vendor/prism/components/
+```
+
+`docs/dist/standalone/architecture.html` and `cli.html` come up clean, so it is
+the page's content that decides it, not the build. A page with a JavaScript
+fence containing a regex literal produces the `prism-regex` line instead.
+
+**Expected vs actual.** Expected: the autoloader is only asked for languages the
+kit vendors, and kit fence names are never treated as Prism languages. Actual:
+`languages_path` is pointed at a directory holding 29 components, and the
+autoloader is left free to ask it for anything it finds in the DOM — including
+`oku-chart`, which can never exist there.
+
+**Where it was localised.** `kit/chrome.js:13434-13446` sets
+`languages_path` to the vendored directory and preloads
+`javascript, css, bash, json, yaml`; nothing after that constrains what the
+autoloader may request. `kit/vendor/prism/components/` holds 29 files and
+neither `prism-regex.min.js` nor `prism-oku-chart.min.js` is among them.
+
+**Observed vs inferred.** *Observed:* the two failed request URLs, in a real
+browser, on `docs/dist/standalone/reference.html` in this repo and on a
+standalone page built elsewhere; `languages_path` read from the live page;
+`language-oku-chart` present once in the built HTML of `reference.html`; the
+29-file component listing with both names absent; `architecture.html` and
+`cli.html` clean. *Inferred from reading, not executed:* that Prism's own
+`javascript` grammar is what names `regex` — the vendored autoloader's
+dependency map contains no `regex` entry, so the name has to be arriving from
+the highlighted DOM. Also not measured: whether a JavaScript regex literal is
+visibly less highlighted as a result, or only differently tokenised.
+
+---
+
 ## A typed fence inside an HTML island makes the island report as unclosed
 
 **Symptom.** A `<details>` island whose body contains a typed `oku-*` fence
