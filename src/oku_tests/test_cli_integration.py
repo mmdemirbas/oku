@@ -445,7 +445,7 @@ def test_version_reports_the_kit_build_stamp(tmp_path: Path, repo_root: Path) ->
     assert proc.returncode == 0, proc.stderr
     out = proc.stdout.strip()
     assert out.startswith("oku ")
-    # One line, whatever the terminal width. `./run install` reads the
+    # One line, whatever the terminal width. `./ctl deploy` reads the
     # `kit` and `src` fields back out of this with sed to decide whether
     # the global tool is stale; argparse's built-in version action wraps
     # at terminal width, and a wrap landing mid-field breaks that gate

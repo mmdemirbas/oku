@@ -1,6 +1,6 @@
 """The installed tool can be told apart from this repo's code.
 
-`./run install` used to verify one thing: the kit build stamp. That stamp
+`./ctl deploy` used to verify one thing: the kit build stamp. That stamp
 is hand-bumped and lives in chrome.js, so it answers "did the kit change"
 and nothing else. A change to cli.py moves neither the stamp nor the
 version string, and `uv tool install` reuses its cached wheel when the
@@ -74,7 +74,7 @@ def test_the_date_and_the_digest_read_the_same_files() -> None:
 
 
 def test_the_version_string_carries_it() -> None:
-    """`./run install` reads it back out of `oku --version`, so the shape
+    """`./ctl deploy` reads it back out of `oku --version`, so the shape
     of that line is load-bearing."""
     out = subprocess.run(
         [sys.executable, "-c", "from oku.cli import main; main()", "--version"],

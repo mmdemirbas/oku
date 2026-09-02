@@ -222,7 +222,7 @@ class _VersionAction(argparse.Action):
     """Print `--version` verbatim, on one line.
 
     argparse's built-in version action runs the text through
-    HelpFormatter, which wraps it at terminal width. `./run install`
+    HelpFormatter, which wraps it at terminal width. `./ctl deploy`
     reads the `kit` and `src` fields back out of this line with sed to
     decide whether the global tool is stale, so a wrap landing mid-field
     would silently break the staleness gate — the exact failure the
@@ -304,7 +304,7 @@ def _tool_dated() -> str:
 
     The half of the staleness question a digest cannot answer. A digest
     compares; it does not order, so a reader who cannot run this repo's
-    `./run version` — which is everyone using the installed tool from
+    `./ctl status` — which is everyone using the installed tool from
     another project — can see that their build differs from something
     and not whether it is the older one. A date orders against the date
     a fix landed, which is the question actually being asked.
@@ -4142,7 +4142,7 @@ def _presentation_issues(
                             "Mermaid parses and leaves an unresolvable one as written, so Mermaid "
                             "meets `var(` — a grammar with no production for it — and the diagram "
                             "renders as a parse-error card. Check `oku --version` against the kit "
-                            "you wrote the page for; `./run install` in the kit repo updates it.",
+                            "you wrote the page for; `./ctl deploy` in the kit repo updates it.",
                         )
                     )
         if kind == "diagram" and headings:

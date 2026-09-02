@@ -126,7 +126,7 @@ A second was not a kit defect either. `var(--series-N-soft)` in a mermaid
 `classDef`, reported as "the skill documents it and the kit does not ship
 it": the repo has shipped those tokens since kit `2026-08-14-r62`, and the
 reporting tool read `kit 2026-08-20-r50`. That is stale-tool drift, and
-`./run install` is the fix. `oku check` now says `diagram-unknown-token` and
+`./ctl deploy` is the fix. `oku check` now says `diagram-unknown-token` and
 names `oku --version`, so the next one arrives as a build warning rather than
 as a parse-error card in a browser.
 

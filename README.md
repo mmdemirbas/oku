@@ -69,13 +69,13 @@ rendering; `oku migrate` converts one when you want it converted.
 ```bash
 git clone git@github.com:mmdemirbas/html-doc.git    # repo URL still legacy upstream
 cd html-doc
-./run install                                       # `oku` on PATH
+./ctl deploy                                       # `oku` on PATH
 ```
 
-`./run install` is also how you push a kit change out to the projects
+`./ctl deploy` is also how you push a kit change out to the projects
 that use it: it forces a cache-free reinstall and then verifies the
 installed tool reports this repo's kit build, rather than leaving you to
-compare two version strings by eye. `./run` on its own lists everything
+compare two version strings by eye. `./ctl` on its own lists everything
 else.
 
 Or run in-tree without installing:

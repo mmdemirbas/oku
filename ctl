@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # One entry point for everything this repo does day to day.
 #
-#   ./run            list the subcommands
-#   ./run <cmd> ...  run one; extra args pass through
+#   ./ctl                  list the verbs
+#   ./ctl --list           the same, one `name<TAB>description` per line
+#   ./ctl <verb> --list    what that verb takes
+#   ./ctl <verb> ...       run one; extra args pass through
 #
 # Everything runs through `uv`, so no venv activation is needed.
 set -euo pipefail
@@ -15,46 +17,62 @@ green() { printf '\033[32m%s\033[0m\n' "$*"; }
 red() { printf '\033[31m%s\033[0m\n' "$*" >&2; }
 step() { blue "▸ $*"; }
 
+VERBS="dev	Dev server with live reload (default port 9876)
+check	Lint the doctree, or the Python
+build	Write dist/{standalone,site}/
+clean	Remove dist/
+test	pytest, whole or in halves
+fmt	ruff format, then ruff check --fix
+verify	Everything CI runs: lint, doctree, build, tests
+deploy	Ship this repo's kit to the global tool, and to projects
+status	Which kit is the global tool building with?
+setup	Dependencies, the test browser, and new docs roots"
+
+qualifiers() {
+  case "$1" in
+    check)  printf '%s\n' \
+      "docs	Lint the doctree; --strict fails on warnings too (default)" \
+      "code	ruff check + format --check" ;;
+    test)   printf '%s\n' \
+      "all	The whole suite (default) - add -k, paths, -x …" \
+      "fast	Without the browser suite" \
+      "browser	Only the headless-chromium suite" ;;
+    deploy) printf '%s\n' \
+      "tool	Reinstall the global \`oku\` from this repo, --no-cache (default)" \
+      "projects	Install, then \`oku build\` in each project directory given" ;;
+    setup)  printf '%s\n' \
+      "deps	uv sync --extra dev (default)" \
+      "browser	Install the chromium Playwright needs" \
+      "docs	Scaffold a docs root at <path> (init + starter page)" ;;
+    *)      return 1 ;;
+  esac
+}
+
+list_for() {
+  local verb="$1"
+  if [ -z "$verb" ]; then printf '%s\n' "$VERBS"; return 0; fi
+  qualifiers "$verb" || { red "no qualifiers: $verb"; exit 1; }
+}
+
 usage() {
+  echo "oku — ./ctl <verb> [qualifier]"
+  echo ""
+  printf '%s\n' "$VERBS" | while IFS="$(printf '\t')" read -r name why; do
+    printf '  %-8s %s\n' "$name" "$why"
+  done
   cat <<'EOF'
-oku — ./run <command>
 
-  Author
-    serve [args]      dev server with live reload (default port 9876)
-    check [args]      lint the doctree; --strict fails on warnings too
-    build             write dist/{standalone,site}/
-    clean             remove dist/
-    new <path>        scaffold a docs root at <path> (init + starter page)
+  What a verb takes:  ./ctl <verb> --list
 
-  Ship the kit to other projects
-    install           reinstall the global `oku` from this repo (--no-cache)
-    version           which kit is the global tool building with?
-    rebuild <dir>...  install, then `oku build` in each project directory
-
-  Develop
-    verify            everything CI runs: lint, doctree, build, tests
-    test [args]       pytest (add -k, paths, -x …)
-    test:fast         pytest without the browser suite
-    test:browser      only the headless-chromium suite
-    lint              ruff check + format --check
-    fmt               ruff format, then ruff check --fix
-    deps              uv sync --extra dev
-    browser           install the chromium Playwright needs
-
-Anything not listed is forwarded to the CLI, so `./run migrate --dry-run`
+Anything not listed is forwarded to the CLI, so `./ctl migrate --dry-run`
 works too.
 EOF
 }
 
 # --- author -----------------------------------------------------------------
 
-cmd_serve() { uv run bin/oku serve "$@"; }
-cmd_check() { uv run bin/oku check "$@"; }
-cmd_build() { uv run bin/oku build "$@"; }
-cmd_clean() { uv run bin/oku clean "$@"; }
-
 cmd_new() {
-  [ $# -ge 1 ] || { red "usage: ./run new <path>"; exit 2; }
+  [ $# -ge 1 ] || { red "usage: ./ctl setup docs <path>"; exit 2; }
   mkdir -p "$1"
   (cd "$1" && uv run --project "$REPO" "$REPO/bin/oku" init)
   green "✓ docs root ready at $1"
@@ -111,7 +129,7 @@ cmd_install() {
   fi
   if [ "$want" != "$have" ]; then
     red "✗ the global oku is still on kit $have, this repo is on $want."
-    red "  A cached wheel was reused. Try: uv cache clean && ./run install"
+    red "  A cached wheel was reused. Try: uv cache clean && ./ctl deploy"
     exit 1
   fi
   local want_src have_src
@@ -120,7 +138,7 @@ cmd_install() {
   if [ -n "$want_src" ] && [ "$want_src" != "$have_src" ]; then
     red "✗ the global oku ships different code: src $have_src, this repo is $want_src."
     red "  The kit stamp matches, so this is a CLI-only drift the stamp cannot see."
-    red "  Try: uv cache clean && ./run install"
+    red "  Try: uv cache clean && ./ctl deploy"
     exit 1
   fi
   green "✓ global oku is building with this repo's kit ($want) and code ($want_src)"
@@ -131,12 +149,12 @@ cmd_version() {
   if command -v oku >/dev/null 2>&1; then
     printf '  global %s\n' "$(oku --version 2>/dev/null | tr '\n' ' ')"
   else
-    printf '  global not installed — ./run install\n'
+    printf '  global not installed — ./ctl deploy\n'
   fi
 }
 
 cmd_rebuild() {
-  [ $# -ge 1 ] || { red "usage: ./run rebuild <project-dir>..."; exit 2; }
+  [ $# -ge 1 ] || { red "usage: ./ctl deploy projects <project-dir>..."; exit 2; }
   cmd_install
   for dir in "$@"; do
     step "building $dir"
@@ -146,20 +164,9 @@ cmd_rebuild() {
 
 # --- develop ----------------------------------------------------------------
 
-cmd_deps() { uv sync --extra dev; }
-cmd_browser() { uv run playwright install chromium; }
-cmd_test() { uv run pytest "$@"; }
-cmd_test_fast() { uv run pytest -q --ignore=src/oku_tests/browser "$@"; }
-cmd_test_browser() { uv run pytest -q src/oku_tests/browser "$@"; }
-
 cmd_lint() {
   uv run ruff check .
   uv run ruff format --check .
-}
-
-cmd_fmt() {
-  uv run ruff format .
-  uv run ruff check --fix .
 }
 
 cmd_verify() {
@@ -172,13 +179,56 @@ cmd_verify() {
 
 # --- dispatch ---------------------------------------------------------------
 
-[ $# -ge 1 ] || { usage; exit 0; }
-cmd="$1"; shift
+cmd="${1:-}"; shift || true
+
 case "$cmd" in
-  -h|--help|help) usage ;;
-  serve|check|build|clean|new|install|version|rebuild|deps|browser|lint|fmt|verify) "cmd_$cmd" "$@" ;;
-  test) cmd_test "$@" ;;
-  test:fast|fast) cmd_test_fast "$@" ;;
-  test:browser|browser-tests) cmd_test_browser "$@" ;;
+  ''|-h|--help|help) usage; exit 0 ;;
+  --list)            list_for ""; exit 0 ;;
+esac
+
+# Only in first position: further along, `--list` may be a flag of the tool
+# being forwarded to.
+[ "${1:-}" = "--list" ] && { list_for "$cmd"; exit 0; }
+
+case "$cmd" in
+  dev)   uv run bin/oku serve "$@" ;;
+  check)
+    case "${1:-docs}" in
+      docs) shift 2>/dev/null || true; uv run bin/oku check "$@" ;;
+      code) cmd_lint ;;
+      *)    uv run bin/oku check "$@" ;;   # a flag, not a qualifier
+    esac
+    ;;
+  build) uv run bin/oku build "$@" ;;
+  clean) uv run bin/oku clean "$@" ;;
+  test)
+    case "${1:-all}" in
+      all)     shift 2>/dev/null || true; uv run pytest "$@" ;;
+      fast)    shift; uv run pytest -q --ignore=src/oku_tests/browser "$@" ;;
+      browser) shift; uv run pytest -q src/oku_tests/browser "$@" ;;
+      *)       uv run pytest "$@" ;;       # a flag or a path, not a qualifier
+    esac
+    ;;
+  fmt)
+    uv run ruff format .
+    uv run ruff check --fix .
+    ;;
+  verify) cmd_verify ;;
+  deploy)
+    case "${1:-tool}" in
+      tool)     cmd_install ;;
+      projects) shift; cmd_rebuild "$@" ;;
+      *)        red "unknown: ./ctl deploy $1  (./ctl deploy --list)"; exit 1 ;;
+    esac
+    ;;
+  status) cmd_version ;;
+  setup)
+    case "${1:-deps}" in
+      deps)    uv sync --extra dev ;;
+      browser) uv run playwright install chromium ;;
+      docs)    shift; cmd_new "$@" ;;
+      *)       red "unknown: ./ctl setup $1  (./ctl setup --list)"; exit 1 ;;
+    esac
+    ;;
   *) uv run bin/oku "$cmd" "$@" ;;
 esac

@@ -136,22 +136,22 @@ carries its OWN COPY of `kit/` inside the wheel. Editing this repo does
 not change what those projects build with until the tool is reinstalled:
 
 ```bash
-./run install    # the whole procedure, and it verifies itself
+./ctl deploy    # the whole procedure, and it verifies itself
 ```
 
-**Use `./run install`. Do not hand anyone the raw `uv tool install`
+**Use `./ctl deploy`. Do not hand anyone the raw `uv tool install`
 line** — it has a trap in it, and a command with a trap is one nobody
 should be retyping from memory. `--force` alone is NOT enough: uv reuses
 the cached wheel when the version string in `pyproject.toml` has not
 changed, so the tool silently stays on the old kit while reporting a
-successful install. `./run install` passes `--no-cache`, then compares
+successful install. `./ctl deploy` passes `--no-cache`, then compares
 the repo's kit stamp against the one the installed tool reports and
 exits non-zero when they differ. That comparison is the point — a stale
 global tool reports success and then builds other projects with the old
 kit, so the symptom arrives later, somewhere else, as "the kit
 regressed".
 
-`./run version` answers the same question without reinstalling.
+`./ctl status` answers the same question without reinstalling.
 `oku --version` prints the kit build stamp (`__okuKitBuild` in
 chrome.js); standalone HTML files carry it inlined, so when a project
 reports a kit bug, check the stamp in the artifact first.
