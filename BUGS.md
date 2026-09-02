@@ -12,129 +12,43 @@ carries the record, including what was measured before and after.
 
 ---
 
-## Prism's autoloader asks for components the kit never vendors, one 404 per page
-
-**Symptom.** Every built page that highlights JavaScript, and every page holding
-an `oku-chart` fence, logs a failed request in the browser console:
-
-```
-net::ERR_FILE_NOT_FOUND .../_oku/vendor/prism/components/prism-regex.min.js
-net::ERR_FILE_NOT_FOUND .../_oku/vendor/prism/components/prism-oku-chart.min.js
-```
-
-The page renders and most code still highlights, so nothing about the build
-says anything is wrong. `regex` is a real Prism component that the kit does not
-vendor; `oku-chart` is not a Prism language at all — it is one of the kit's own
-fence names being handed to the autoloader as if it were one.
-
-**Minimal reproduction.** No new page needed; the kit's own docs already do it.
-
-```bash
-$ oku build
-$ node -e '(async()=>{const{chromium}=require("playwright");
-const b=await chromium.launch();const p=await b.newPage();
-p.on("requestfailed",r=>console.log(r.failure().errorText,r.url()));
-await p.goto("file://'"$PWD"'/docs/dist/standalone/reference.html");
-await p.waitForTimeout(6000);
-console.log(await p.evaluate(()=>Prism.plugins.autoloader.languages_path));
-await b.close()})()'
-net::ERR_FILE_NOT_FOUND file://…/_oku/vendor/prism/components/prism-oku-chart.min.js
-_oku/vendor/prism/components/
-```
-
-`docs/dist/standalone/architecture.html` and `cli.html` come up clean, so it is
-the page's content that decides it, not the build. A page with a JavaScript
-fence containing a regex literal produces the `prism-regex` line instead.
-
-**Expected vs actual.** Expected: the autoloader is only asked for languages the
-kit vendors, and kit fence names are never treated as Prism languages. Actual:
-`languages_path` is pointed at a directory holding 29 components, and the
-autoloader is left free to ask it for anything it finds in the DOM — including
-`oku-chart`, which can never exist there.
-
-**Where it was localised.** `kit/chrome.js:13434-13446` sets
-`languages_path` to the vendored directory and preloads
-`javascript, css, bash, json, yaml`; nothing after that constrains what the
-autoloader may request. `kit/vendor/prism/components/` holds 29 files and
-neither `prism-regex.min.js` nor `prism-oku-chart.min.js` is among them.
-
-**Observed vs inferred.** *Observed:* the two failed request URLs, in a real
-browser, on `docs/dist/standalone/reference.html` in this repo and on a
-standalone page built elsewhere; `languages_path` read from the live page;
-`language-oku-chart` present once in the built HTML of `reference.html`; the
-29-file component listing with both names absent; `architecture.html` and
-`cli.html` clean. *Inferred from reading, not executed:* that Prism's own
-`javascript` grammar is what names `regex` — the vendored autoloader's
-dependency map contains no `regex` entry, so the name has to be arriving from
-the highlighted DOM. Also not measured: whether a JavaScript regex literal is
-visibly less highlighted as a result, or only differently tokenised.
-
----
-
-## A typed fence inside an HTML island makes the island report as unclosed
-
-**Symptom.** A `<details>` island whose body contains a typed `oku-*` fence
-raises `island-unclosed` as an **error**, so `oku check` exits 1 and `oku build`
-refuses the whole tree. The island is correctly closed; the tags are balanced
-and both sit at column 0. Replacing the typed fence with a plain ```` ```bash ````
-fence and changing nothing else makes the page clean.
-
-**Minimal reproduction.** Two pages in an empty tree, differing only in the kind
-of fence inside the island:
-
-```markdown
-## S {#s}
-
-<details class="card"><summary>Open me</summary>
-
-Some prose inside the island.
-
-```oku-insight
-{"b":"A typed fence living inside an HTML island."}
-```
-
-</details>
-
-Text after the island.
-```
-
-```
-$ oku init && oku check
-✗ 1 error(s):
-  ✗ a-fence-in-island.md:8:b[0] line 8 [island-unclosed] HTML island <details>
-    is never closed in this page. …
-$ echo $?
-1
-```
-
-The control page — same island, ```` ```bash ```` inside instead — reports no
-error. Both have exactly one `<details>` and one `</details>`, at column 0.
-
-**Expected vs actual.** Expected: an island holding a typed fence closes like any
-other. Actual: it is reported unclosed, at error severity, which blocks the build
-of every other page in the tree as well.
-
-**Where it was localised.** `src/oku/cli.py:2606-2674`. `open_els` is per
-prose-block, and the finding names `b[0]` — the block the island *opens* in.
-
-**Observed vs inferred.** *Observed:* the two-page reproduction, the error and
-its `b[0]` label, the clean control, balanced column-0 tags, and the same failure
-on a real 200-line document. *Inferred from reading, not executed:* that lifting
-the typed fence splits the surrounding prose into separate blocks, so the
-`</details>` is scanned in a later block than the one holding `open_els`, and the
-close is therefore never balanced against the open. The fix shape is not
-attempted here — carrying island state across the blocks of one page, or
-balancing before the split, are both plausible and I have not tested either.
-
-**Impact seen in practice.** One 200-line document in an unrelated project; the
-document is correct and the workaround is to move the fence out of the island,
-which degrades a good page to satisfy a wrong check.
-
----
-
 No other open defects.
 
-The three that were here are closed:
+The five that were here are closed:
+
+- **A typed fence inside an HTML island made the island report as
+  unclosed — and the renderer had already dropped what it held.** One
+  cause, two failures, and the report named only the loud one. A lifted
+  `oku-*` fence splits the prose around it into two `b[]` strings, and
+  both the renderer's open-element stack and the lint's were per-string,
+  so the `</details>` was scanned in a later block than the `<details>`.
+  Closed in `2959d36`. The half nobody saw, measured before the fix on an
+  island holding a paragraph, an `oku-insight` fence and a second
+  paragraph: `{figureInside: false, paragraphsInside: 1, tailOutside:
+  true}` — the figure and everything after it rendered as siblings of the
+  island. After: `{figureInside: true, paragraphsInside: 2, tailOutside:
+  false}`. Both stacks now outlive one block and both reset at `##`, so an
+  island that genuinely never closes still errors and still names the line
+  that opened it. Held by `test_check.py::TestATypedFenceInsideAnIsland`
+  and the `typed` case in `browser/test_html_island_spans_blank_lines.py`.
+
+- **Prism's autoloader asked for components the kit never vendors, one
+  404 per page.** Closed in `6ddd373`. Both names come from a GRAMMAR
+  reading the document's own content, not from anything an author tagged,
+  and they get opposite fixes. `oku-chart` reached the autoloader because
+  Prism's markdown grammar calls `loadLanguages()` on a fence's info
+  string inside a markdown SAMPLE — refused now, by prefix, at the
+  property the grammar actually calls. `regex` reached it because Prism's
+  JavaScript grammar aliases a regex literal's source; that one is
+  vendored, so the request is served. The entry's own guess was half
+  right: it inferred the JavaScript grammar for `regex` and correctly
+  marked that as read rather than executed, but it read the `oku-chart`
+  request as the autoloader being "left free to ask for anything in the
+  DOM", which is one layer above the caller. Before: `failed:
+  ['prism-oku-chart.min.js']` with the wrap removed, `failed:
+  ['prism-regex.min.js']` with the component removed. After: `failed:
+  []`, seven components at 200. Held by
+  `browser/test_prism_asks_only_for_what_it_has.py`.
 
 - **`oku serve` bound every interface, and no version string said whether
   yours did.** The bind was fixed in `f785d1d`; what stayed open was that a
@@ -193,8 +107,8 @@ A third was **mostly** not a kit defect, and it is worth recording because the
 symptom looks alarming. A doctree of 31 pages reported **23 errors** and `oku
 build` refused the whole tree, including pages with no findings of their own.
 **22 of the 23** were author-side, in three documents written months earlier; the
-23rd, an `island-unclosed`, turned out to be the kit bug now open at the top of
-this file — this paragraph originally claimed all 23 were author-side and that
+23rd, an `island-unclosed`, turned out to be the kit bug closed above in
+`2959d36` — this paragraph originally claimed all 23 were author-side and that
 was wrong. The 22: 12
 `fence-not-lifted` and 1 `shadowed-source` from a stale page-JSON left beside
 its migrated `.md` (the walkers prefer the `.json`, so it shadows the source —
