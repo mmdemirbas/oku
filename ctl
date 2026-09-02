@@ -12,10 +12,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 REPO="$PWD"
 
-blue() { printf '\033[34m%s\033[0m\n' "$*"; }
 green() { printf '\033[32m%s\033[0m\n' "$*"; }
 red() { printf '\033[31m%s\033[0m\n' "$*" >&2; }
-step() { blue "▸ $*"; }
+
+# One glyph and one colour per level, the same five every driver here uses:
+# ▸ a step, ✓ it worked, ! worth knowing, ⏸ preconditions not met (exit 75),
+# ✗ it failed (exit 1). The contract is
+# ajans/docs/reports/driver-scripts-2026-09-02.md.
+step() { printf '\033[36m▸\033[0m %s\n' "$*"; }
 
 VERBS="dev	Dev server with live reload (default port 9876)
 check	Lint the doctree, or the Python
