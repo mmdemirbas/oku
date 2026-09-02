@@ -44,18 +44,21 @@ rendering; `oku migrate` converts one when you want it converted.
   theme tokens.
 - **Chrome:** single left sidebar with site-tree + on-page TOC
   stacked, opened by one button in three states (peek on hover,
-  pinned, modal below 900px), sticky section TOC with scroll-spy, two-state theme
-  toggle that follows the OS until overridden, three-mode
-  content-width cycler (narrow → comfortable →
-  max), full-text search (Pagefind), forward-compat warning
-  indicator, reader-side placeholder personalization.
+  pinned, modal below 900px), sticky section TOC with scroll-spy,
+  full-text search (Pagefind), forward-compat warning indicator, and
+  one presentation menu holding every reader preference — text size
+  (80% to 200%, and the charts and diagrams grow with the prose),
+  column width (narrow / comfortable / max), a two-stop theme that
+  follows the OS until overridden, the language switch, and
+  reader-side placeholder personalization.
 - **One column, one right edge.** Every block in a section — prose,
   callout, code, table, chart, diagram — ends at the same x, set by
   `--content-width`. Nothing caps a block below it. The reader changes
   the measure with the width control, which has three stops: `narrow`
   (860px), `comfortable` (the default, 1100 → 1240 → 1400 as the
-  screen grows) and `max` (the whole viewport, for wide tables and
-  matrices).
+  screen grows) and `max` (the full width of what is available, for wide
+  tables and matrices). The text-size control is orthogonal to it: it
+  magnifies the column's contents rather than re-flowing the measure.
 - **CLI:** `init` symlinks the kit + writes an index stub; `build`
   emits `dist/site/` (multi-page + manifest + `llms.txt` + Pagefind)
   and `dist/standalone/` (single file with inline page JSON); the
@@ -225,8 +228,8 @@ Declare keys in `kit.json`:
 ```
 
 Snippets that contain `{{apiKey}}` swap in the reader's value at render
-time. A gear icon in the top-right cluster opens the panel; values
-persist in `localStorage`. No server, no account.
+time. The Placeholders row in the presentation menu opens the panel;
+values persist in `localStorage`. No server, no account.
 
 ## Design principles
 

@@ -382,8 +382,9 @@ no linter will do it for you.
 
 None of the chrome is yours to write, style or position. The renderer
 emits it from the source: the cover, the Contents drawer carrying the
-site tree and the on-page TOC, light/dark theming that follows the OS
-until the reader overrides it, the content-width toggle, search,
+site tree and the on-page TOC, the presentation menu (text size, column
+width, light/dark theming that follows the OS until the reader overrides
+it, language, placeholders), search,
 scroll-spy, section permalinks, the top rail, back-to-top, code
 line numbers with a language pill and brace folds, glossary tooltips,
 the lightbox with pan and zoom, and the print stylesheet.

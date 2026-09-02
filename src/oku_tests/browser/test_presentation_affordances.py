@@ -395,17 +395,17 @@ def test_chrome_buttons_quiet_down_when_the_pointer_is_elsewhere(rendered):
     every scroll position, competing with the cover for the first thing
     the eye lands on. They fade to a hint when nothing is reaching for
     them and come back up on approach — per button, so walking toward
-    the theme cycler brings the theme cycler up.
+    the menu button brings the menu button up.
 
     The floor is not zero and the box does not change: a control the
     reader cannot see is a control the reader cannot find, and a control
     that resizes as you approach is one you have to chase."""
     rendered.mouse.move(700, 700)
     rendered.wait_for_timeout(300)
-    far = _ctrl(rendered, ".theme-toggle")
+    far = _ctrl(rendered, ".menu-toggle")
 
-    _approach(rendered, ".theme-toggle")
-    near = _ctrl(rendered, ".theme-toggle")
+    _approach(rendered, ".menu-toggle")
+    near = _ctrl(rendered, ".menu-toggle")
 
     rendered.mouse.move(700, 700)
     rendered.wait_for_timeout(300)
@@ -419,14 +419,14 @@ def test_approaching_one_cluster_leaves_the_other_alone(rendered):
     """Proximity is per button, measured to the button's BOX. A single
     top-of-page threshold would light the whole strip whenever the
     pointer crossed y=100, which is every scroll gesture."""
-    _approach(rendered, ".theme-toggle")
+    _approach(rendered, ".menu-toggle")
     got = {
-        "theme": _ctrl(rendered, ".theme-toggle")["opacity"],
+        "menu": _ctrl(rendered, ".menu-toggle")["opacity"],
         "drawer": _ctrl(rendered, ".drawer-toggle")["opacity"],
     }
     rendered.mouse.move(700, 700)
     rendered.wait_for_timeout(300)
-    assert got["theme"] > 0.98, got
+    assert got["menu"] > 0.98, got
     assert got["drawer"] < 0.5, f"the far cluster lit up too: {got}"
 
 
@@ -445,11 +445,11 @@ def test_the_dimming_never_arms_without_a_pointer(afford_url, browser):
         got = page.evaluate(
             """() => ({
             armed: document.body.getAttribute('data-ctrl-proximity'),
-            theme: parseFloat(getComputedStyle(document.querySelector('.theme-toggle')).opacity),
+            menu: parseFloat(getComputedStyle(document.querySelector('.menu-toggle')).opacity),
         })"""
         )
         assert got["armed"] is None, f"touch armed the proximity dimming: {got}"
-        assert got["theme"] > 0.98, got
+        assert got["menu"] > 0.98, got
     finally:
         page.close()
         ctx.close()

@@ -53,12 +53,7 @@ NOT_STRINGS = {
 # Passed to okuT() as a VARIABLE, so the literal never appears in the
 # source and no pattern can find it. Named here so the coverage test
 # still guards them instead of quietly losing them.
-DYNAMIC = {
-    # `okuT(mode)` inside _widthLabelFor — the three WIDTH_MODES.
-    "narrow",
-    "comfortable",
-    "max",
-}
+DYNAMIC: set[str] = set()
 
 # Emitted from a lookup keyed by something else — a copy format, a
 # region role — so the literal sits in a map declaration and never in
@@ -106,6 +101,29 @@ def _rail_kinds(source: str) -> set[str]:
     return {"rail:" + k for k in kinds}
 
 
+def _menu_words(source: str) -> set[str]:
+    """The presentation menu's vocabulary, under the keys it looks them up by.
+
+    Same hazard as the rail's, same answer. `Theme`, `Language`, `Light`,
+    `Dark`, `Narrow` and `Max` are words an author writes — this repo's
+    own docs write most of them in a table cell or a card title — and a
+    bare table key is matched against the leaf text of author content.
+    `menuWord` prefixes them with `menu:` and builds the key from a
+    variable, so the literal never appears at a call site.
+
+    Derived from the source, so a row added to the menu ships a word a
+    reader sees and fails here the day it is written. The width stops are
+    capitalised from WIDTH_MODES rather than written out, which is why
+    they are listed here: `menuWord(m.charAt(0)...)` carries no literal.
+    """
+    words = set(re.findall(r"menuWord\('([^']+)'\)", source))
+    if "menuWord(m.charAt(0).toUpperCase() + m.slice(1))" in source:
+        block = re.search(r"var WIDTH_MODES = \[(.*?)\];", source, re.S)
+        if block:
+            words |= {w.capitalize() for w in re.findall(r"'([^']+)'", block.group(1))}
+    return {"menu:" + w for w in words}
+
+
 def _file_kinds(source: str) -> set[str]:
     """The path chip's kind words, under the keys the kit looks them up by.
 
@@ -140,7 +158,7 @@ def kit_strings(kit_source: str) -> set[str]:
             if text in NOT_STRINGS:
                 continue
             found.add(text)
-    return found | _rail_kinds(source) | _file_kinds(source)
+    return found | _rail_kinds(source) | _file_kinds(source) | _menu_words(source)
 
 
 @pytest.fixture(scope="module")
@@ -184,16 +202,17 @@ def test_no_namespaced_word_is_a_key_in_its_own_right(kit_source, tables):
     rail word is a common noun — `Charts` matches 18 places in this
     repo's own docs, among them a page title in the tree, an `<h2>` and
     a `<tspan>` inside a diagram. Adding one as a bare key would rewrite
-    all of them. Held on the runtime side by
+    all of them. The presentation menu's `Theme` / `Language` / `Light` /
+    `Dark` are the same class of word and take the same prefix. Held on the runtime side by
     `browser/test_i18n_runtime.py::test_a_rail_word_in_author_content_survives_the_pass`."""
-    namespaced = _rail_kinds(kit_source) | _file_kinds(kit_source)
+    namespaced = _rail_kinds(kit_source) | _file_kinds(kit_source) | _menu_words(kit_source)
     bare = {k.split(":", 1)[1] for k in namespaced}
     assert bare, "no namespaced words were derived, so this asserts nothing"
     for code, table in tables.items():
         clash = sorted(w for w in bare if w in table)
         assert clash == [], (
-            f"{code} table keys {clash} are rail or file-kind words. A key is matched "
-            "against author content, so these must stay under their prefix."
+            f"{code} table keys {clash} are rail, file-kind or menu words. A key is "
+            "matched against author content, so these must stay under their prefix."
         )
 
 

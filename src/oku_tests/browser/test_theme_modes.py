@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import pytest
 
+from ._menu import MENU, open_menu
+
 DESKTOP = {"width": 1280, "height": 900}
 
 STATE = """() => ({
@@ -32,12 +34,16 @@ def _open(page, site_url, *, os_theme="light", pref=None):
     if pref is not None:
         page.add_init_script("try{localStorage.setItem('theme-pref',%r)}catch(e){}" % pref)
     page.goto(f"{site_url}/docs/index.html")
-    page.wait_for_selector(".theme-toggle")
+    # The control moved into the presentation menu, so reaching it is one
+    # click more. The policy it carries did not move.
+    open_menu(page)
     return page.evaluate(STATE)
 
 
 def _click(page):
-    page.click(".theme-toggle")
+    """What the corner cycler did in one click: go to the other stop."""
+    now = page.evaluate("() => document.documentElement.getAttribute('data-theme')")
+    page.click(f'{MENU} [data-theme-choice="{"light" if now == "dark" else "dark"}"]')
     page.wait_for_timeout(120)
     return page.evaluate(STATE)
 
@@ -126,34 +132,50 @@ def test_a_preference_from_an_older_kit_is_discarded_not_misread(page, site_url)
 
 
 @pytest.mark.parametrize("os_theme", ["light", "dark"])
-def test_the_icon_reports_the_theme_that_is_on(page, site_url, os_theme):
-    """Sun while light, moon while dark, exactly one of them rendered.
-    The icon answers "what am I looking at", not "what will the click
-    do" — the width toggle's segments set that convention."""
+def test_the_control_reports_the_theme_that_is_on(page, site_url, os_theme):
+    """The control answers "what am I looking at", not "what will the
+    click do".
+
+    In the corner that was one button showing one of two icons, and a
+    reader had to know the convention to read it. In the menu both stops
+    are drawn, each with its own glyph, and the one in force is pressed —
+    the same answer, given without a convention to know.
+    """
     _open(page, site_url, os_theme=os_theme)
     for expected in (os_theme, "light" if os_theme == "dark" else "dark"):
-        shown = page.evaluate(
-            """() => ['sun', 'moon'].filter(n => {
-                 const el = document.querySelector('.theme-toggle .icon-' + n);
-                 return el && getComputedStyle(el).display !== 'none';
-               })"""
+        pressed = page.eval_on_selector_all(
+            f"{MENU} [data-theme-choice]",
+            "els => els.filter(e => e.getAttribute('aria-pressed') === 'true')"
+            "        .map(e => e.dataset.themeChoice)",
         )
-        assert shown == (["sun"] if expected == "light" else ["moon"]), (
-            expected,
-            shown,
+        assert pressed == [expected], (expected, pressed)
+        glyphs = page.eval_on_selector_all(
+            f"{MENU} [data-theme-choice] .okt-menu-glyph svg",
+            "els => els.length",
         )
+        assert glyphs == 2, f"each stop carries its own glyph; found {glyphs}"
         _click(page)
 
 
 def test_the_auto_dot_marks_following_and_goes_out_when_pinned(page, site_url):
-    """The one mark that separates the two states the button cannot show
-    by icon. It is lit while the page follows the OS and out once the
-    reader has chosen against it — and it is paint only, so lighting it
-    cannot move the button under the pointer."""
+    """The one mark that separates the two states the control cannot
+    show by which stop is pressed. It is lit while the page follows the
+    OS and out once the reader has chosen against it — and it is paint
+    only, so lighting it cannot move the segment under the pointer.
+
+    It rides on the PRESSED segment, because that is the one making the
+    claim: this is where you are, and you are here because the OS put
+    you here."""
+    # The dot is read off whichever segment is pressed — that is where it
+    # sits. The BOX is read off a fixed one, because the pressed segment
+    # changes with the flip and comparing two different elements' boxes
+    # would measure the flip rather than the dot.
     dot = """() => {
-      const b = document.querySelector('.theme-toggle');
-      const s = getComputedStyle(b, '::after');
-      const r = b.getBoundingClientRect();
+      const row = document.querySelector('.okt-chrome-menu [data-row="theme"]');
+      const pressed = row.querySelector('[aria-pressed="true"]');
+      const anchor = row.querySelector('[data-theme-choice="light"]');
+      const s = getComputedStyle(pressed, '::after');
+      const r = anchor.getBoundingClientRect();
       return {opacity: parseFloat(s.opacity), w: parseFloat(s.width),
               box: [Math.round(r.x), Math.round(r.y), r.width, r.height]};
     }"""

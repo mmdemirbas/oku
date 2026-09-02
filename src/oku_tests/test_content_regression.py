@@ -900,21 +900,31 @@ class TestChromeKitMarkers:
         as a rendering fault rather than as a state. Three modes, three
         icon segments, every segment fully on or fully off.
 
+        The control is no longer a cycler in the corner. Three stops with
+        no room for words meant an icon that had to be hovered to be
+        read, announcing its stops in a `title` nobody opens; in the
+        presentation menu there is room for one labelled button per stop,
+        so the state is visible and the reader picks a stop instead of
+        cycling to it. The three stops themselves did not change, and
+        this is what holds them at three.
+
         Locks:
         - chrome.css declares `--content-width` and exactly the three
           body attribute overrides — a fourth fails here
         - a stored 'wide' migrates rather than silently reverting to the
           default, so a reader who had picked it keeps the nearest band
-        - chrome.js exposes `cycleContentWidth` and a boot-time restore
+        - chrome.js exposes `setContentWidth` and a boot-time restore
           path reading `localStorage['htmldoc-content-width']`
-        - PageChrome injects a `.width-toggle` button into the top-right
-          cluster, which lays the corner out as a flex row. The buttons
-          used to carry hand-computed `right:` offsets and a `:has()`
-          compaction rule; two of them ended up on the same 44px square.
-          Geometry is asserted in the browser now, not by grepping
-          offsets out of the stylesheet — see
-          test_invariants.py::test_the_top_right_chrome_never_overlaps.
-        - width sits hard right in the cluster, past the theme cycler
+        - the menu's width row builds one segment per WIDTH_MODES entry
+          rather than listing them again
+        - the corner is still a flex row with `order`, never a
+          hand-computed `right:` offset. The buttons used to carry those
+          plus a `:has()` compaction rule, and two of them ended up on
+          the same 44px square. Geometry is asserted in the browser —
+          see test_invariants.py::test_the_top_right_chrome_never_overlaps.
+        - the menu sits hard right, the position width used to hold and
+          for the same reason: it is the one that changes what the reader
+          is looking at rather than how it is lit.
         """
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
         assert "--content-width" in css, "missing --content-width CSS variable"
@@ -937,14 +947,20 @@ class TestChromeKitMarkers:
             m.group(1): int(m.group(2))
             for m in re.finditer(r"\.okt-chrome-cluster \.([a-z-]+)\s*\{\s*order:\s*(\d+)", declarations)
         }
-        assert order.get("width-toggle") and order.get("theme-toggle"), order
-        assert order["width-toggle"] == max(order.values()), (
-            f"width-toggle must be the rightmost button in the cluster, got {order}"
+        assert order.get("menu-toggle"), order
+        assert order["menu-toggle"] == max(order.values()), (
+            f"menu-toggle must be the rightmost button in the cluster, got {order}"
         )
-        assert order["width-toggle"] > order["theme-toggle"], order
+        # What is left in the corner is what a reader uses WHILE reading.
+        # Every preference lives behind the menu, so a button that is not
+        # one of these three is a preference that leaked back out.
+        assert set(order) == {"search-toggle", "warning-indicator", "menu-toggle"}, (
+            f"the corner carries {sorted(order)}; it holds search, the warning "
+            "indicator and the menu. A preference belongs in the menu."
+        )
 
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
-        assert "cycleContentWidth" in js, "cycleContentWidth handler missing"
+        assert "function setContentWidth" in js, "setContentWidth handler missing"
         assert "htmldoc-content-width" in js, "localStorage key for the width-mode preference missing"
         declared = re.search(r"var WIDTH_MODES = \[([^\]]*)\]", js)
         assert declared, "WIDTH_MODES list missing"
@@ -957,8 +973,10 @@ class TestChromeKitMarkers:
             "a reader with 'wide' in localStorage must be migrated to the nearest "
             "surviving band, not silently reset to the default"
         )
-        assert ".width-toggle" in js, "PageChrome must inject a .width-toggle button"
-        assert "ICON_WIDTH" in js, "width-toggle icon constant missing"
+        assert "WIDTH_MODES.map(" in js, (
+            "the menu's width row must build its segments from WIDTH_MODES; a "
+            "hand-written list is the second copy that goes stale"
+        )
 
     def test_layout_is_edge_anchored_not_centered(self, repo_root: Path) -> None:
         """The `.layout` grid must span the viewport edge-to-edge, with

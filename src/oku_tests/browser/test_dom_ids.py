@@ -20,9 +20,10 @@ because the next source of a colliding id will not be a diagram.
 
 from __future__ import annotations
 
-from ._wait import page_quiet
-
 import pytest
+
+from ._menu import flip_theme
+from ._wait import page_quiet
 
 PAGES = [
     "index",
@@ -110,7 +111,7 @@ def test_ids_stay_unique_after_a_theme_flip(page, site_url):
     before = _settle(page, site_url, "diagrams")
     assert before["duplicates"] == [], before["duplicates"]
 
-    page.evaluate("() => document.querySelector('.theme-toggle').click()")
+    flip_theme(page)
     page.wait_for_timeout(3200)
     after = page.evaluate(PROBE)
 

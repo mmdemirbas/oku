@@ -428,7 +428,7 @@ page-chrome, page-nav, page-toc are set in the HTML stub, not the page JSON. The
 </script>
 ```
 
-- `<page-chrome>` — system cluster top-right (search, warning, theme cycler). Edge tabs for sidebars. Visual Viewport pinch-zoom tracker.
+- `<page-chrome>` — system cluster top-right (search, warning, and the presentation menu that holds text size, column width, theme, language and placeholders). Edge tabs for sidebars. Visual Viewport pinch-zoom tracker.
 - `<page-nav>` — boxed site-tree at the top of the Contents drawer; reads site-manifest.json (or the inline window.__okuManifest in standalone builds). Marks the active page. The Contents button in the top-left chrome strip drives it, and what it does depends on how you use it: hover and the panel appears over the page until you pick a heading or move away, leaving the measure untouched; click and it pins, insetting the column so you can read with the outline beside you and the highlight following your position. Clicking a heading in a pinned panel navigates without closing it. Below 900px there is no room to inset, so a click opens it over the page as before. Footer at the bottom carries the kit version.
 - `<page-toc>` — section-TOC stacked under the site tree inside the same left sidebar. Heading reflects the current page title; the list is built from main > section > h2/h3 after the renderer fires oku:rendered.
 

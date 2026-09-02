@@ -20,6 +20,7 @@ and the colour tracks the theme instead of freezing at first paint.
 
 from __future__ import annotations
 
+from ._menu import flip_theme
 from ._wait import diagram_drawn, until_changed
 
 SRC = (
@@ -76,7 +77,7 @@ def test_the_resolved_colour_follows_the_theme(page, site_url):
     light = _mount(page, site_url)
     assert light["fill"], light
 
-    page.evaluate("() => document.querySelector('.theme-toggle').click()")
+    flip_theme(page)
     _await_reflip(page, light["fill"])
     dark = page.evaluate(STATE)
 
@@ -147,7 +148,7 @@ def test_a_soft_plate_carries_its_label_in_both_themes(page, site_url):
     assert not light["failed"], light
     assert light["fill"] and light["label"], light
 
-    page.evaluate("() => document.querySelector('.theme-toggle').click()")
+    flip_theme(page)
     _await_reflip(page, light["fill"])
     dark = page.evaluate(SOFT_STATE)
     assert not dark["failed"], dark

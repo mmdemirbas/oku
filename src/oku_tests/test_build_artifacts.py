@@ -544,7 +544,14 @@ class TestPayloadBudget:
     # `1234567…`, which reads as a different quantity rather than as a
     # truncation. About 1,100 bytes, of which the two okuFitLabelGutter
     # calls are roughly 330.
-    KIT_BUDGET_BYTES = 1_222_000
+    # Then from 1,222,000 by the reader's text scale and the presentation
+    # menu that holds it: `zoom` on the reading column, the ladder and
+    # its persistence, `__okuSetFixedPos` for the three tooltips that
+    # live inside the zoomed subtree, and five registered menu rows
+    # replacing four corner buttons. About 23,500 bytes across the two
+    # files, of which roughly 9,000 is the comment saying why it is
+    # `zoom` and not a font-size, and what that costs.
+    KIT_BUDGET_BYTES = 1_250_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

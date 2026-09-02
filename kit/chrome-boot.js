@@ -34,6 +34,23 @@
     document.documentElement.setAttribute('data-theme-mode', 'system');
   }
 
+  /* The reader's text scale, before first paint and for the same reason
+     the theme is here: `zoom` on the reading column reflows every line
+     on the page, so restoring it after the document has been drawn is a
+     visible re-layout on every load. The ladder is chrome.js's
+     (TEXT_SCALES) and is not repeated — an out-of-range value written by
+     hand is snapped there, and until then it is only a number in a
+     `zoom`, which cannot break the layout the way a bad theme name
+     would. Clamped anyway, because `zoom: 0` renders nothing at all. */
+  try {
+    var scale = parseFloat(localStorage.getItem('oku-text-scale'));
+    if (scale > 0) {
+      scale = Math.max(0.5, Math.min(3, scale));
+      document.documentElement.style.setProperty('--oku-text-scale', String(scale));
+      document.documentElement.setAttribute('data-text-scale', String(scale));
+    }
+  } catch (e) { /* ignore */ }
+
   /* IntelliJ's built-in server (localhost:63342) requires ?_ijt=<token>
      on every GET. The page URL carries it; sub-resource requests stripped
      of query strings get 404. Pluck it from location.search once and

@@ -22,11 +22,22 @@ import pytest
 # at /docs/reference.html. Faster and far more direct than building two
 # dist trees, and it targets the exact thing that broke.
 BUILD = """(manifest) => {
-  const old = document.querySelector('.ctrl-btn.lang-toggle');
-  if (old) old.remove();
+  // The switch is a row in the presentation menu now, and the menu
+  // rebuilds its panel whenever a row registers — so re-running build()
+  // is enough and there is no stale button to remove first. The panel is
+  // opened because it is built lazily: a page nobody opened the menu on
+  // has no rows in the DOM to read.
   __okuLangSwitch.build(manifest);
-  const b = document.querySelector('.ctrl-btn.lang-toggle');
-  return b ? { code: b.textContent.trim(), label: b.getAttribute('aria-label') } : null;
+  __okuChromeMenu.open();
+  const row = document.querySelector('.okt-chrome-menu [data-row="language"]');
+  if (!row) return null;
+  const here = row.querySelector('[aria-pressed="true"]');
+  const there = row.querySelector('[aria-pressed="false"]');
+  return there ? {
+    code: here ? here.textContent.trim() : null,
+    label: there.getAttribute('title'),
+    target: there.dataset.lang,
+  } : null;
 }"""
 
 
@@ -102,7 +113,7 @@ def test_the_target_is_built_from_the_matched_prefix(page, site_url, prefix):
     )
 
     page.evaluate(BUILD, _manifest(prefix))
-    page.click(".ctrl-btn.lang-toggle")
+    page.click('.okt-chrome-menu [data-row="language"] [aria-pressed="false"]')
     page.wait_for_load_state()
 
     from urllib.parse import urlparse

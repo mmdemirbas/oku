@@ -73,6 +73,10 @@
 
 /* ============ Tokens — light ============ */
 :root {
+  /* The reader's text scale. chrome-boot.js overwrites it before first
+     paint from localStorage; declared here so a page whose script never
+     ran still resolves every `zoom` below to 1 rather than to `normal`. */
+  --oku-text-scale: 1;
   --bg: #fafaf9;
   --surface: #ffffff;
   /* Quiet raised/recessed surface — table header band, chart tracks,
@@ -336,8 +340,41 @@ body.drawer-modal { overflow: hidden; }
    button; the name lives in `aria-label` and `title`, not in ink above
    the cover. */
 
+/* The reader's text scale, and the whole of it: `zoom` takes text,
+   inline SVG, Mermaid's output, images and rules together, and reflows
+   rather than stretching. The full reasoning — why not font-size, why
+   the column does not move, and the two things it breaks — is in the
+   "Reader text scale" comment in chrome.js.
+
+   `zoom` divides the available width, so main's rendered box stays the
+   physical width the layout gave it and the measure narrows instead.
+   The 44px chrome buttons, the rail and the sidebar's own width are
+   outside it on purpose: they are the frame, not the document. */
+main { zoom: var(--oku-text-scale, 1); }
+/* The tree and the table of contents are text a reader reads, so the
+   complaint covers them. The scroll region only — the build footer is a
+   stamp, not reading material, and page-nav itself owns the surface's
+   height contract (invariant 1), which a zoom would scale out of the
+   viewport. */
+.page-nav-scroll { zoom: var(--oku-text-scale, 1); }
+
 main {
-  padding: 56px 64px 120px 64px;
+  /* Divided by the scale, so the frame around the column is the same
+     number of PHYSICAL pixels at every scale. Magnifying the padding
+     with the text is what a browser's own zoom does, and on a phone it
+     is the thing that hurts: the column is already clamped to the
+     viewport, so every pixel the padding gains comes off the figure.
+     Measured at 360px, uncompensated: a chart went from 286px wide to
+     256px when the reader stepped the text up one notch — they asked
+     for more and the picture got smaller. Compensated it holds at 286.
+     Vertically it is the same argument plus one: the top padding is
+     what keeps the first heading clear of the 44px chrome buttons, and
+     that clearance is measured in physical pixels too. */
+  padding:
+    calc(56px  / var(--oku-text-scale, 1))
+    calc(64px  / var(--oku-text-scale, 1))
+    calc(120px / var(--oku-text-scale, 1))
+    calc(64px  / var(--oku-text-scale, 1));
   max-width: var(--content-width, var(--max-width));
   /* Centred, always. The sidebar overlays rather than occupying a
      column, so nothing competes for the horizontal space and the
@@ -507,23 +544,18 @@ body[data-ctrl-proximity="1"] .back-to-top:not(.visible) { opacity: 0; }
 }
 /* Visual order is fixed by `order`, so it does not depend on which
    button was created first — search and the warning indicator arrive
-   whenever their subsystem initialises. Width sits hard right: it is
-   the one that changes what the reader is looking at rather than how it
-   is lit, so it gets the corner they can hit without aiming. */
-/* Language sits with the other "how is this presented" controls, left
-   of theme and width. It changes which words the reader gets, not what
-   they are looking at, so it does not take the corner width owns. */
-.okt-chrome-cluster .lang-toggle { order: 25; }
-.lang-toggle .lang-code {
-  font: 600 12px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.04em;
-}
+   whenever their subsystem initialises.
 
-.okt-chrome-cluster .personalize-toggle { order: 10; }
+   Three things reach this row now. Theme, width, language and
+   personalize moved into the presentation menu, which is what the
+   `menu-toggle` opens; what is left is what a reader uses WHILE
+   reading. The menu sits hard right: it is the one that changes what
+   the reader is looking at rather than how it is lit, so it gets the
+   corner they can hit without aiming — the position the width cycler
+   used to hold, for the same reason. */
 .okt-chrome-cluster .search-toggle      { order: 20; }
 .okt-chrome-cluster .warning-indicator  { order: 30; }
-.okt-chrome-cluster .theme-toggle       { order: 40; }
-.okt-chrome-cluster .width-toggle       { order: 50; }
+.okt-chrome-cluster .menu-toggle        { order: 60; }
 
 /* Content-width modes (D3). The CSS variable wins because <main> reads
    it via max-width; the body attribute is the persisted source of truth. */
@@ -534,7 +566,14 @@ body[data-ctrl-proximity="1"] .back-to-top:not(.visible) { opacity: 0; }
    range of 45-75. Re-measure if the body font changes. */
 body[data-content-width="narrow"]      { --content-width: 860px;  --prose-width: 54ch; }
 body[data-content-width="comfortable"] { --content-width: 1100px; --prose-width: 62ch; }
-body[data-content-width="max"]         { --content-width: 100vw;  --prose-width: none; }
+/* `100%`, not `100vw`. A viewport unit resolves against the initial
+   containing block, which the reader's text scale (`zoom` on main) does
+   not touch, so at 1.25 this mode asked for 125% of the viewport and the
+   page scrolled sideways. A percentage resolves against main's own
+   containing block, which IS zoom-adjusted, so it means the same thing
+   at every scale — and the same thing it meant before, since main's
+   containing block was already the full width here. */
+body[data-content-width="max"]         { --content-width: 100%;   --prose-width: none; }
 /* Wide-screen bumps, so the default actually USES the room on a
    1600px+ monitor instead of leaving two hand-widths of margin. */
 @media (min-width: 1500px) {
@@ -544,20 +583,6 @@ body[data-content-width="max"]         { --content-width: 100vw;  --prose-width:
   body[data-content-width="comfortable"] { --content-width: 1400px; }
 }
 
-/* Width-toggle icon doubles as a state readout: three outline segments,
-   filled left-to-right, one per mode.
-     · narrow                → s1
-     · comfortable (default) → s1 + s2
-     · max                   → s1 + s2 + s3
-   Every segment is fully on or fully off. The four-mode version filled
-   s2 at 50% opacity to squeeze an extra level out of three boxes, and a
-   muted rectangle does not read as a level — it reads as a rendering
-   fault. Three modes, three segments, no partial states. */
-.width-toggle .w-seg { fill: none; }
-.width-toggle .w-seg.s1,
-body[data-content-width="comfortable"] .width-toggle .w-seg.s2,
-body[data-content-width="max"] .width-toggle .w-seg.s2,
-body[data-content-width="max"] .width-toggle .w-seg.s3 { fill: currentColor; }
 .back-to-top { bottom: 18px; right: 18px; opacity: 0; pointer-events: none; }
 .back-to-top.visible { opacity: 1; pointer-events: auto; }
 
@@ -644,41 +669,163 @@ body[data-content-width="max"] .width-toggle .w-seg.s3 { fill: currentColor; }
 }
 .okc-personalized:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 
-/* Theme icon: two states, and the icon reports the one that is ON —
-   sun while the page is light, moon while it is dark. Same convention
-   as the width toggle's segments, which read as a state and not as the
-   action the click will perform.
-   Keyed off data-theme (the theme in force), never data-theme-mode
-   (whether the reader pinned it) — those are different questions and
-   the icon answers the first. */
-.theme-toggle .icon-sun,
-.theme-toggle .icon-moon { display: none; }
-:root[data-theme="dark"]      .theme-toggle .icon-moon { display: inline-flex; }
-:root:not([data-theme="dark"]) .theme-toggle .icon-sun { display: inline-flex; }
+/* ============ The presentation menu ============ *
+ * The panel behind the corner's `menu-toggle`: one row per choice a
+ * reader makes about how the page is presented. See the module comment
+ * in chrome.js for why these five left the corner.
+ *
+ * It is a <body> child, not a child of the cluster: the cluster is a
+ * flex row of 44px boxes and a 300px panel inside it would size the row.
+ * Position is fixed and it carries the same visual-viewport translate
+ * the cluster does, so a pinch-zoomed page keeps the panel under the
+ * button that opened it.
+ *
+ * Every row is one grid with two tracks — label, control — so the
+ * controls line up down a single right edge whatever the labels say in
+ * whatever language. A flex row per line would pack each control against
+ * its own label and leave five different left edges.
+ * ---------------------------------------------------------------- */
+.okt-chrome-menu {
+  position: fixed;
+  top: 68px; right: 16px;
+  z-index: 209;
+  /* 340, not 320: at 320 the longest label the kit ships wrapped to two
+     lines while its neighbours sat on one, which makes the rows ragged
+     down the column the reader is scanning. Sized to the widest row the
+     kit can produce — label plus the three width stops — and capped to
+     the viewport so a phone gets a panel and not a scroll. */
+  width: min(340px, calc(100vw - 32px));
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--ctrl-bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px var(--shadow-strong), 0 0 0 1px var(--shadow-soft);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  transform: translate(var(--vv-left, 0), var(--vv-top, 0));
+}
+.okt-chrome-menu[hidden] { display: none; }
+.okt-chrome-menu:focus { outline: none; }
+.okt-menu-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 8px;
+  border-radius: 9px;
+}
+.okt-menu-row + .okt-menu-row { border-top: 1px solid var(--line); }
+.okt-menu-label {
+  font-size: 12.5px; font-weight: 600; color: var(--text-soft);
+  /* An author's language is not this kit's, so a label can be twice as
+     long as the English it was measured against. */
+  min-width: 0; overflow-wrap: anywhere;
+}
 
-/* The second question gets a dot, not a third icon. Lit while the page
-   is following the OS; out once the reader has chosen a theme against
-   it, and lit again on its own at the next OS flip (chrome.js).
-   `position: relative` needs the cluster's specificity to beat the
-   `position: static` rule above it; relative does not move the button,
-   it only gives the dot something to sit in. */
-.okt-chrome-cluster .theme-toggle { position: relative; }
-.theme-toggle::after {
+/* A segmented control: the stop the page is in is pressed, and the
+   others are one click away. This is the half the corner could not do —
+   an icon-only cycler has to be hovered to be read and announces its
+   stops in a tooltip nobody opens. */
+.okt-menu-seg {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.okt-menu-seg button {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 9px;
+  border: 0; background: none; cursor: pointer;
+  font: 600 11.5px/1.2 inherit; color: var(--text-soft);
+  white-space: nowrap;
+  transition: background .15s ease, color .15s ease;
+}
+.okt-menu-seg button + button { border-left: 1px solid var(--border); }
+.okt-menu-seg button:hover { background: var(--ctrl-bg-hover); color: var(--text); }
+.okt-menu-seg button[aria-pressed="true"] {
+  background: var(--accent-soft, var(--surface-2));
+  color: var(--accent);
+}
+.okt-menu-seg-code button {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+}
+.okt-menu-glyph { display: inline-flex; }
+.okt-menu-glyph svg { width: 13px; height: 13px; display: block; }
+
+/* The theme's second question gets a dot, not a third stop. Lit while
+   the page is FOLLOWING the OS; out once the reader has chosen a theme
+   against it, and lit again on its own at the next OS flip (chrome.js).
+   It sits on the pressed segment because that is the one making the
+   claim: this is where you are, and you are here because the OS put
+   you here. */
+.okt-menu-seg button[aria-pressed="true"] { position: relative; }
+.okt-menu-seg button[aria-pressed="true"]::after {
   content: "";
   position: absolute;
-  /* Pushed into the corner rather than tucked beside the glyph: at 8px
-     it landed against the sun's top-right ray and read as part of the
-     icon instead of as a mark about the button. 6px still sits inside
-     the 12px corner radius with room to spare. */
-  top: 6px; right: 6px;
-  width: 5px; height: 5px;
+  top: 3px; right: 3px;
+  width: 4px; height: 4px;
   border-radius: 50%;
   background: var(--accent);
   opacity: 0;
   transition: opacity .18s ease;
 }
-:root[data-theme-mode="system"] .theme-toggle::after,
-:root:not([data-theme-mode])    .theme-toggle::after { opacity: 1; }
+:root[data-theme-mode="system"] [data-row="theme"] .okt-menu-seg button[aria-pressed="true"]::after,
+:root:not([data-theme-mode])    [data-row="theme"] .okt-menu-seg button[aria-pressed="true"]::after {
+  opacity: 1;
+}
+
+/* The text-size stepper. The readout in the middle IS the reset — a
+   fourth box would crowd a row that is already three wide, and at 100%
+   a separate Reset is a control that does nothing, which is the
+   disabled state this kit does not ship. */
+.okt-menu-step {
+  display: flex; align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.okt-menu-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 26px;
+  border: 0; background: none; cursor: pointer; padding: 0;
+  color: var(--text-soft);
+  transition: background .15s ease, color .15s ease;
+}
+.okt-menu-btn:hover { background: var(--ctrl-bg-hover); color: var(--text); }
+.okt-menu-btn svg { width: 14px; height: 14px; display: block; }
+/* An end of the ladder is stated, not hidden: the button stays in place
+   and stays clickable, it just says that it has nothing left to give. */
+.okt-menu-btn[aria-disabled="true"] { opacity: 0.35; cursor: default; }
+.okt-menu-btn[aria-disabled="true"]:hover { background: none; color: var(--text-soft); }
+.okt-menu-readout {
+  /* One column track, sized to the widest reading the ladder can
+     produce, so the two step buttons do not move as the number changes
+     width — the thing you are clicking repeatedly must stay put. */
+  min-width: 46px;
+  padding: 0 4px;
+  border: 0; border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+  background: none; cursor: pointer;
+  font: 600 11.5px/26px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  text-align: center;
+}
+.okt-menu-readout:hover { background: var(--ctrl-bg-hover); }
+
+/* A row whose control opens something else — the personalize panel. */
+.okt-menu-open {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 26px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); cursor: pointer; padding: 0;
+  color: var(--text-soft);
+}
+.okt-menu-open:hover { background: var(--ctrl-bg-hover); color: var(--text); }
+.okt-menu-open svg { width: 14px; height: 14px; display: block; }
 
 /* ============ Reading aids ============ *
  * The rail: a 12px strip across the top that answers three questions
@@ -1460,6 +1607,12 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   min-height: 0;
   overflow: auto;
   padding: 28px 24px 64px;
+  /* A viewed file is a document being read, so the reader's text scale
+     applies to it. The BODY carries it rather than the frame: the frame
+     is chrome — the path, the Rendered/Source switch, the copy button —
+     and this region already scrolls, so a scale that outgrows it scrolls
+     rather than overflowing the overlay. */
+  zoom: var(--oku-text-scale, 1);
 }
 /* One reading column, same measure the page uses. The width control
    changes --content-width on <body>, so the viewer follows it. */
@@ -2486,9 +2639,18 @@ code:not(pre code) {
   border-radius: 10px;
   padding: 12px;
 }
+/* `min(Npx, 100%)`, never a bare `Npx`, as the floor of an auto-fill
+   track. A bare floor is a width the track REFUSES to go below, so a
+   container narrower than it overflows — and the container is now
+   narrower than it looks: the reader's text scale divides the available
+   width, so at 2x on a 360px phone a grid has 136px to lay out in.
+   Measured before the fix: eight compare cards each 400px wide inside a
+   360px viewport, and the page scrolled sideways.
+   `min(..., 100%)` keeps the intended floor everywhere it fits and
+   yields to the container everywhere it does not. */
 .okt-table-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 12px;
   /* Size each card to its own content. Stretching a row to its tallest
      member was invisible while the card edge was — but now that the
@@ -4152,7 +4314,7 @@ a.compare-card-link:hover {
 /* Tighter grid for the family picker — 5 columns on wide viewports,
    responsive auto-fit fallback. */
 .compare-grid:has(> a.compare-card-link) {
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
   gap: 14px;
 }
 
@@ -4348,7 +4510,13 @@ footer {
   /* The drawer, its scrim and the Contents button are base layout now;
      this width only tightens the reading surface. Top padding clears
      the Contents button (16px inset + 44px tall) before the cover. */
-  main { padding: 76px 22px 96px 22px; }
+  main {
+    padding:
+      calc(76px / var(--oku-text-scale, 1))
+      calc(22px / var(--oku-text-scale, 1))
+      calc(96px / var(--oku-text-scale, 1))
+      calc(22px / var(--oku-text-scale, 1));
+  }
   header.cover h1 { font-size: 30px; }
   header.cover .subtitle { font-size: 16px; }
   h2 { font-size: 24px; }
@@ -4380,6 +4548,7 @@ footer {
      table toolbar — filter box, stats counter, both copy buttons —
      printed onto paper, where none of them can be operated. */
   .okt-code-lang, .okt-fold-marker, .okt-col-resize,
+  .okt-chrome-menu,
   .okt-table-controls, .okt-chip-rack, .okt-view-switch { display: none !important; }
   .okt-sortable::after { content: none !important; }
   /* page-nav is listed because of the pinned state. Off-canvas it was
@@ -4388,7 +4557,11 @@ footer {
   nav.toc, page-toc, page-nav { display: none !important; }
   .layout { display: block; padding-left: 0 !important; }
   body { background: white; color: black; font-size: 11pt; }
-  main { padding: 0; max-width: none; }
+  /* The reader's text scale is about a screen they are sitting in front
+     of. Paper has a fixed page width and its own scale control in the
+     print dialog, and a page printed at 200% is four times the sheets
+     for the same words. */
+  main { padding: 0; max-width: none; zoom: 1; }
   header.cover { page-break-after: avoid; }
   h1, h2, h3, h4 { page-break-after: avoid; color: black; }
   pre, table, .callout, .compare-grid, .kpi-grid, .compare-card, details.card, .tldr,
@@ -5817,7 +5990,7 @@ oku-chart .okc-generic-cursor {
 .bar-chart-vertical {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(28px, 1fr);
+  grid-auto-columns: minmax(min(28px, 100%), 1fr);
   gap: 12px;
   align-items: end;
   min-height: 220px;
@@ -5916,16 +6089,31 @@ oku-chart .okc-heatmap .okc-heatmap-label {
 .okc-sparkline-row {
   display: inline-flex; align-items: center; gap: 6px;
   line-height: 1;
+  /* An inline-flex sizes to max-content, so a 120px sparkline plus its
+     end label is a width this box REFUSES to go below and the whole page
+     scrolls sideways behind it. Two declarations, and they go together:
+     the cap here, and a track below that is allowed to give. Found at
+     360px with the reader's text scale at 2x — 407px of content in a
+     360px viewport — but the same box overflows at 1x the moment the end
+     label is long enough, which is why the fix is the cap and not a
+     media query. */
+  max-width: 100%;
 }
 .okc-sparkline-row svg.okc-sparkline {
   width: 120px; height: 28px;
-  flex: 0 0 auto;
+  /* Shrinkable, not fixed: `0 0 auto` is what made the row's minimum the
+     full 120px. A sparkline is a shape, and a narrower one is still the
+     shape — an absent one is not. */
+  flex: 0 1 120px;
+  min-width: 0;
   /* sparkline inherits theme color; .okc-sparkline-* classes pick from it. */
   color: var(--accent);
 }
 .okc-sparkline-row .okc-sparkline-end-label {
   font: 500 12px 'Inter', sans-serif;
   color: var(--text-soft);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 oku-chart .okc-sparkline .okc-sparkline-line {
   fill: none;

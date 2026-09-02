@@ -65,13 +65,13 @@ SEED = {
     "oku-drawer-pinned": "1",
     "htmldoc-content-width": "narrow",
     "oku-personalization": '{"env":"prod"}',
+    "oku-text-scale": "1.5",
 }
 
 CHROME = """() => ({
     errors:  window.__testErrors || [],
     drawer:  !!document.querySelector('.ctrl-btn.drawer-toggle'),
-    theme:   !!document.querySelector('.ctrl-btn.theme-toggle'),
-    width:   !!document.querySelector('.ctrl-btn.width-toggle'),
+    menu:    !!document.querySelector('.ctrl-btn.menu-toggle'),
     search:  !!document.querySelector('.ctrl-btn[class*=search]'),
     nav:     !!document.querySelector('page-nav'),
     pinned:  document.body.classList.contains('drawer-pinned'),
@@ -138,7 +138,7 @@ def _load_with_storage(page, url, values: dict[str, str]):
 def test_a_pinned_drawer_does_not_take_the_chrome_with_it(page, standalone_file):
     got = _load_with_storage(page, standalone_file.as_uri(), {"oku-drawer-pinned": "1"})
     assert got["errors"] == [], f"the page threw on load: {got['errors']}"
-    assert got["drawer"] and got["theme"] and got["width"] and got["search"], got
+    assert got["drawer"] and got["menu"] and got["search"], got
     assert got["nav"], "the sidebar never got built"
     # And the state is honoured, not merely survived: a reader who pinned
     # the drawer gets it back.
@@ -148,7 +148,7 @@ def test_a_pinned_drawer_does_not_take_the_chrome_with_it(page, standalone_file)
 def test_no_persisted_value_can_stop_the_chrome_from_being_built(page, standalone_file):
     got = _load_with_storage(page, standalone_file.as_uri(), SEED)
     assert got["errors"] == [], f"the page threw on load: {got['errors']}"
-    assert got["drawer"] and got["theme"] and got["width"] and got["search"], got
+    assert got["drawer"] and got["menu"] and got["search"], got
     assert got["nav"], "the sidebar never got built"
     assert got["sections"] >= 2, got
 

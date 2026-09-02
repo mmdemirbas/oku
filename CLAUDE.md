@@ -119,7 +119,7 @@ AI/LLM surface.
 
 | File | Owns |
 |---|---|
-| `chrome.js` | Custom Elements (chart with 53 render modes, diagram, live-snippet, annotated-code, glossary-term, ext-ref, page-chrome / page-nav / page-toc), init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring, bar-chart hover/click-pin/legend toggle), Prism + Mermaid lazy loaders, glossary tooltip controller, lightbox with pan/zoom/pinch fullscreen, the top rail (progress + landmark minimap), the markdown viewer. ~13k LoC. |
+| `chrome.js` | Custom Elements (chart with 53 render modes, diagram, live-snippet, annotated-code, glossary-term, ext-ref, page-chrome / page-nav / page-toc), init-time DOM enhancement (table chrome, code fold, line numbers, sidebar wiring, bar-chart hover/click-pin/legend toggle), Prism + Mermaid lazy loaders, glossary tooltip controller, lightbox with pan/zoom/pinch fullscreen, the top rail (progress + landmark minimap), the presentation menu (text scale, width, theme, language, placeholders), the markdown viewer. ~13k LoC. |
 | `chrome.css` | All visual tokens (light/dark, --series-1..--series-10, --prose-width), layout grid (asymmetric bleed, three-mode content width), every primitive's styling. ~6.5k LoC. |
 | `renderer.js` | page JSON → DOM mapping. Walks `b[]`; strings parsed by the GFM block parser (headings → sections, paragraphs, lists, GFM tables, fences — `oku-*`/`mermaid` fences lift to typed blocks, def-lists, task-lists, HTML islands w/ executing scripts, admonitions); typed objects dispatched to typed renderers. v1→v2 shim keeps older pages rendering. ~2.6k LoC. |
 | `kit/schema/page.schema.json` | JSON-schema for page payloads. Every page (converted from .md) validates against it; the optional `jsonschema` dep makes the check active. Chart `type` enum here is the single source of truth for known chart types. |
@@ -206,8 +206,15 @@ whole below.
   not eleven — bar for a heading, square/circle/diamond for
   table/chart/diagram, hollow square for every other figure. → [why](PRESENTATION-RULES.md#shape-says-what-kind-of-thing-it-is)
 - **The top-right corner is one flex row, not five offsets.** Held by `test_invariants`. → [why](PRESENTATION-RULES.md#the-top-right-corner-is-one-flex-row-not-five-of)
-- **The width control has three stops, and the icon has three segments.** Held by `test_reader_can_cycle_content_width`. → [why](PRESENTATION-RULES.md#the-width-control-has-three-stops-and-the-icon-h)
-- **The theme button has two stops, and following the OS is not one of them.** Held by `test_the_auto_dot_marks_following_and_goes_out_when_pinned`. → [why](PRESENTATION-RULES.md#the-theme-button-has-two-stops-and-following-the)
+- **One button holds every presentation choice.** Text size, column
+  width, theme, language and placeholders are rows in the menu behind
+  `.menu-toggle`; the corner keeps search and the warning indicator.
+  Held by `test_chrome_menu.py`. → [why](PRESENTATION-RULES.md#one-button-holds-every-presentation-choice)
+- **The reader can make the document bigger, and the document is all of
+  it.** `zoom` on the reading column, so charts and diagrams grow with
+  the prose. Held by `test_text_scale.py`. → [why](PRESENTATION-RULES.md#the-reader-can-make-the-document-bigger)
+- **The width control has three stops, and you can see which one you are in.** Held by `test_reader_can_cycle_content_width`. → [why](PRESENTATION-RULES.md#the-width-control-has-three-stops-and-the-icon-h)
+- **The theme control has two stops, and following the OS is not one of them.** Held by `test_the_auto_dot_marks_following_and_goes_out_when_pinned`. → [why](PRESENTATION-RULES.md#the-theme-button-has-two-stops-and-following-the)
 - **A link to a .md file opens the kit's viewer, not the browser's raw text.** Held by `test_a_relative_prose_link_is_not_carried`. → [why](PRESENTATION-RULES.md#a-link-to-a-md-file-opens-the-kit-s-viewer-not-t)
 - **The kit's own strings follow the page's language.** Held by `test_i18n_coverage.py`. → [why](PRESENTATION-RULES.md#the-kit-s-own-strings-follow-the-page-s-language)
 - **Anything the kit hangs off content must never become content.** → [why](PRESENTATION-RULES.md#anything-the-kit-hangs-off-content-must-never-be)
@@ -346,12 +353,12 @@ guessing. The kit's own chrome (search, viewer, Contents) is still
 English on every page — localizing it is separate work.
 
 **The chrome buttons quiet down when nothing is reaching for them.**
-Four fixed 44px boxes float over the top of the reading column at every
+The fixed 44px boxes float over the top of the reading column at every
 scroll position. They sit at a 0.32 floor and rise to full on a cosine
 falloff over 190px of pointer distance, measured **to the button's box**
 (point-to-rect, zero inside) so a button you are about to click is not
-still dim. Per button, not per region: approaching the theme cycler
-does not light the Contents button. Three things keep it from becoming
+still dim. Per button, not per region: approaching the presentation
+menu does not light the Contents button. Three things keep it from becoming
 a hidden control — the floor is not zero, hover / focus-visible /
 `aria-expanded="true"` pin it to full, and the whole mechanism only
 arms once a non-touch pointer has actually moved

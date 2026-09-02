@@ -191,7 +191,7 @@ cloned from the rendered SVG. The clone's ids are rewritten;
 ## The top-right corner is one flex row, not five offsets. {#the-top-right-corner-is-one-flex-row-not-five-of}
 
 **The top-right corner is one flex row, not five offsets.** Every button
-that belongs there — personalize, search, warning, width, theme — is a
+that belongs there — search, warning, and the presentation menu — is a
 child of `.okt-chrome-cluster` and is positioned by it. Visual order is
 `order:`, so it does not depend on which subsystem initialised first.
 The cluster lives on `<body>`, deliberately **not** inside `page-chrome`:
@@ -210,38 +210,73 @@ A `display: none` child now takes no space and the row closes up on its
 own. `test_invariants.py::test_the_top_right_chrome_never_overlaps`
 asserts no two visible `.ctrl-btn` rects intersect, at four widths.
 
-Within that row, **width sits hard right**, past theme. It is the one
-button that changes what the reader is looking at rather than how it is
-lit, so it gets the corner they can hit without aiming. The order is
-`order:` values in one block — read them there, never re-derive.
+Within that row, **the menu sits hard right**. It is the one button that
+changes what the reader is looking at rather than how it is lit, so it
+gets the corner they can hit without aiming — the position the width
+cycler used to hold, for the same reason. The order is `order:` values in
+one block — read them there, never re-derive.
 
-## The width control has three stops, and the icon has three segments. {#the-width-control-has-three-stops-and-the-icon-h}
+The flex row fixed the corner's arithmetic. It did not fix the **count**,
+and the count is the second failure. Six buttons wanted this corner
+(personalize, search, language, warning, theme, width) and text size was
+the seventh; six 44px boxes floating over the top of the reading column
+is a toolbar the reader has to read before every click, and five sixths
+of it is set once and never touched again. So the corner now splits by
+FREQUENCY: what a reader uses **while reading** stays out — search, and
+the warning indicator, which is not a control at all but an alarm and
+must never hide itself — and everything they set once moves into the
+menu. See "One button holds every presentation choice" below.
 
-**The width control has three stops, and the icon has three segments.**
-`narrow` (860px, a prose measure) · `comfortable` (the default, 1100 →
-1240 → 1400 as the screen grows) · `max` (the whole viewport, for wide
-tables and matrices). One stop per thing a reader wants; each fills one
-more segment of `ICON_WIDTH`, every segment fully on or fully off.
+## The width control has three stops, and you can see which one you are in. {#the-width-control-has-three-stops-and-the-icon-h}
+
+**The width control has three stops, and you can see which one you are
+in.** `narrow` (860px, a prose measure) · `comfortable` (the default,
+1100 → 1240 → 1400 as the screen grows) · `max` (the full width of what
+is available, for wide tables and matrices). One stop per thing a reader
+wants.
+
+It was a cycler with a three-segment icon, filled left-to-right, because
+a 44px box in the corner has no room for words. That icon had to be
+hovered to be read and it announced its stops in a `title` nobody opens.
+In the presentation menu there is room for one labelled button per stop,
+so the state is **visible** rather than announced and the reader picks a
+stop instead of cycling to it. The segments are built from `WIDTH_MODES`
+rather than written out again — a hand-written list is the second copy
+that goes stale, and it already did once: the label named a `wide` stop
+that had been removed, so the button announced four stops and cycled
+three until the first click replaced the label.
+
+`max` is `--content-width: 100%`, not `100vw`. A viewport unit resolves
+against the initial containing block, which the reader's text scale does
+not touch, so at 1.25x it asked for 125% of the viewport and the page
+scrolled sideways in the one mode meant for wide tables.
 
 There were four. `wide` (1400 → 1560 → 1760) sat between comfortable and
 max and answered the same want as max — more room — so a reader cycling
 through could not say which of the two they had landed in without
 reading the icon, and the icon had to represent the extra level by
 filling a segment at 50% opacity, which reads as a rendering fault
-rather than as a state. A stored `wide` migrates through
+rather than as a state. Four labelled stops would not have that
+particular defect — but they answer the same want, and a control with
+two stops that mean nearly the same thing is one the reader has to think
+about. A stored `wide` migrates through
 `WIDTH_ALIASES` to comfortable, the nearest surviving band at every
 breakpoint; dropping a mode without that would silently reset the
 reader's choice. `test_reader_can_cycle_content_width` asserts the mode
 set is exactly the three, so adding a fourth fails rather than merely
-crowding the cycle.
+crowding the row.
 
-## The theme button has two stops, and following the OS is not one of them. {#the-theme-button-has-two-stops-and-following-the}
+## The theme control has two stops, and following the OS is not one of them. {#the-theme-button-has-two-stops-and-following-the}
 
-**The theme button has two stops, and following the OS is not one of
-them.** Sun while the page is light, moon while it is dark; the icon
-reports the theme in force, the same convention the width segments
-follow. Keyed off `data-theme`, never `data-theme-mode` — those answer
-different questions.
+**The theme control has two stops, and following the OS is not one of
+them.** Two segments in the presentation menu, Light and Dark, each
+carrying its own glyph, and the one in force is pressed. It answers "what
+am I looking at", not "what will the click do". Keyed off `data-theme`,
+never `data-theme-mode` — those answer different questions.
+
+It was one button showing one of two icons, which gives the same answer
+but only to a reader who knows the convention. Two drawn stops need no
+convention.
 
 There were three, and two of them rendered identically: with the OS on
 dark, `system` and `dark` are the same pixels, so the only way to know
@@ -270,15 +305,18 @@ cannot see, and the case that actually happens. A bare value from an
 older kit fails the format test and is discarded rather than honoured.
 `chrome-boot.js` applies the rule pre-paint; `chrome.js` writes it.
 
-The auto state is marked by a 5px accent dot at the button's corner and
-by nothing else — no third icon, no badge with a numeral, no word. It is
-lit while the page is following, out once the reader has chosen against
-the OS. Paint only: `test_the_auto_dot_marks_following_and_goes_out_when_pinned`
-asserts the button's box is identical in both states. It sits at
-`top/right: 6px`, not 8px — at 8px it landed against the sun's top-right
-ray and read as part of the glyph. The one thing the dot does not carry
-is a name for assistive tech; the accessible name stays the static
-`theme-label`, because the reader asked for no text on this control.
+The auto state is marked by a 4px accent dot and by nothing else — no
+third stop, no badge with a numeral, no word. It is lit while the page is
+following, out once the reader has chosen against the OS. It rides on the
+**pressed** segment, because that is the one making the claim: this is
+where you are, and you are here because the OS put you here. Paint only:
+`test_the_auto_dot_marks_following_and_goes_out_when_pinned` asserts a
+fixed segment's box is identical in both states — read off a fixed one
+rather than off the pressed one, since the pressed one changes with the
+flip and comparing two different elements' boxes would measure the flip
+instead of the dot. The one thing the dot does not carry is a name for
+assistive tech; the stops carry their own names, which is what a screen
+reader reads.
 
 Every path that changes the theme goes through `announceTheme()`,
 including the OS flip. A diagram left on the previous theme's palette is
@@ -287,6 +325,143 @@ listener set `data-theme` directly and skipped the event, so Mermaid
 diagrams kept the outgoing palette until something else re-rendered them.
 
 `test_theme_modes.py` pins the whole rule, expiry branches included.
+
+## One button holds every presentation choice. {#one-button-holds-every-presentation-choice}
+
+**One button holds every presentation choice.** Text size, column width,
+theme, language and snippet placeholders are rows in the panel behind
+`.menu-toggle`. The corner keeps search and the warning indicator, and
+nothing else.
+
+The split is by **frequency**, not by kind. Search is a thing a reader
+reaches for while reading; the warning indicator is not a control at all
+but an alarm, and an alarm that hides itself is a bug (it is also the one
+button the proximity dimming skips, for the same reason). Everything else
+here is set once and then read past for the rest of the session, and a
+44px box that is used once per session is a box the reader has to look at
+on every click that is not it.
+
+Moving them pays for itself twice, and the second time is the one worth
+stating. An icon-only cycler exists **because** the corner has no room
+for words — the width control's three-segment icon had to be hovered to
+be read, and it announced its stops in a `title` nobody opens. A menu row
+has room for a label and for one button per stop, so the state is visible
+instead of announced, and the reader picks a stop rather than cycling to
+it. The controls did not merely move; they stopped being ciphers.
+
+Three properties hold it together, and each is a decision:
+
+- **Rows register, they are not listed.** Language appears only where the
+  manifest offers a variant; personalize only where a snippet declared
+  placeholders. Neither knows what else is on the page, which is the same
+  problem the flex row solved for the corner and takes the same answer. A
+  row that never registers costs nothing and leaves no gap.
+  `unregister` exists for the other direction: a row is a claim about the
+  page ("there is somewhere to go"), and a manifest replaced at runtime
+  that no longer supports the claim must retract it rather than leave the
+  previous one pointing nowhere.
+- **The panel does not close when a control inside it is used.** Stepping
+  the text size is the one thing here a reader does repeatedly — three
+  clicks to find the size that suits them — and a menu that closed on the
+  first click would make that nine. It closes on Escape (focus returns to
+  the button), on a click outside, and on the button again.
+- **The button is created lazily and never at module scope.** The rows
+  register while the file is being evaluated, and a standalone page
+  inlines chrome.js into `<head>`, where `defer` means nothing and
+  `<body>` does not exist yet. `ensureButton` returns null rather than
+  reaching for a body that is not there; a readyState guard calls it
+  again. This is the trap CLAUDE.md already names, and it caught this
+  change on the first run of `test_standalone_stored_state.py` — a
+  top-level throw there takes the whole kit with it, and the reader who
+  sees it has no control left to undo it with.
+
+The panel is a `<body>` child, not a child of the cluster: the cluster is
+a flex row of 44px boxes and a 300px panel inside it would size the row.
+Each row is a two-track grid — label, control — so the controls line up
+down one right edge whatever the labels say in whatever language.
+
+`test_chrome_menu.py` pins the corner's contents, the three ways it
+closes, the way it does not, and that a row with nowhere to go is absent.
+
+## The reader can make the document bigger, and the document is all of it. {#the-reader-can-make-the-document-bigger}
+
+**The reader can make the document bigger, and the document is all of
+it.** A ladder of eight stops from 80% to 200%, stepped from the
+presentation menu, persisted in `oku-text-scale`, restored before first
+paint by chrome-boot.js.
+
+"The font size feels too small" is not a request about the body font. A
+reader who cannot read the prose cannot read a chart's axis labels
+either, so a control that grew the paragraphs and left every figure where
+it was would answer the easy half of the complaint and ship looking
+finished. The mechanism is therefore **`zoom` on the reading column**,
+not a font-size: `zoom` takes text, inline SVG (every chart the kit
+draws), Mermaid's output, images and rules together, and unlike
+`transform: scale` it reflows — a paragraph at 1.5 wraps at 1.5, it is
+not a stretched picture of a paragraph.
+
+Four things follow from that choice, and each is a decision:
+
+- **No chart is re-typeset.** A chart's label gutter is fitted to its own
+  labels at render time and shortened after paint (see "A label is fitted
+  to the space it has"). `zoom` scales the fitted result whole, so a
+  gutter measured at 1.0 is still right at 2.0. A font-size-based scale
+  would have invalidated every fit on the page at every step, and the
+  charts would have needed a re-render path that does not exist.
+- **`100vw` does not scale.** Viewport units resolve against the initial
+  containing block, which zoom does not touch. `max` mode is `100%`.
+- **A `position: fixed` descendant takes the zoom with it.** The viewport
+  coordinate written into `left` is multiplied before it lands, and the
+  coordinate came out of `getBoundingClientRect()`, which reports client
+  space. Measured before the fix: at 1.25x a chart tooltip landed 189px
+  from its bar, at 1.5x 360px. Three of the kit's tooltips live inside
+  `main` — chart, bar-chart enhancer, annotated-code — and they go
+  through `__okuSetFixedPos`, which divides by `currentCSSZoom`. Every
+  other overlay the kit builds is appended to `<body>` and is outside the
+  zoomed subtree by construction, which is what made `zoom` viable here.
+- **A grid floor must yield.** `minmax(200px, 1fr)` is a width the track
+  refuses to go below, and the container is now narrower than it looks —
+  the scale divides the available width, so at 2x on a 360px phone a grid
+  has 136px to lay out in. Measured: eight compare cards 400px wide in a
+  360px viewport. Every auto-fill floor is `minmax(min(Npx, 100%), 1fr)`.
+  The same pass found a sparkline row — an `inline-flex` with a fixed
+  120px chart in it — sizing to max-content with no `max-width: 100%`,
+  which is the defect CLAUDE.md's "every kit box that holds author text"
+  rule already names. It overflows at 1x too, given a long enough end
+  label; the scale is what made it show up.
+
+**The chrome is not in it, and the sidebar's text is.** The 44px buttons,
+the rail's 12px strip and the sidebar's own width are the frame the
+document sits in, and their geometry is asserted numerically across four
+test files. The sidebar's SCROLL region is in it, because the tree and
+the table of contents are text a reader reads; the build footer is not,
+so the surface's height contract (invariant 1) is untouched.
+
+**`main`'s padding is divided by the scale**, so the frame around the
+column is the same number of physical pixels at every stop. Magnifying
+the padding with the text is what a browser's own zoom does, and on a
+phone it is the part that hurts: the column is already clamped to the
+viewport, so every pixel the padding gains comes off the figure. Measured
+at 360px, uncompensated: a chart went from 286px wide to 256px when the
+reader stepped the text up one notch — they asked for more and the
+picture got smaller.
+
+The ladder has ends and says so. At 80% and 200% the stepper carries
+`aria-disabled="true"`, keeps its box and stays where it is; a step that
+silently does nothing reads as a broken control. The readout in the
+middle is the reset — a fourth box would crowd a three-wide row, and at
+100% a separate Reset is a control that does nothing, which is the
+disabled state this kit does not ship.
+
+Print resets it to 1. Paper has a fixed page width and its own scale
+control in the print dialog, and a page printed at 200% is four times the
+sheets for the same words.
+
+`test_text_scale.py` pins all of it: the factor, a chart growing, the
+chrome not moving, the sidebar's text scaling and its width not, no
+sideways scroll in any width mode at 1440px or 360px, the tooltip landing
+on the pointer at four scales, the ends of the ladder, and the choice
+surviving a reload.
 
 ## A link to a .md file opens the kit's viewer, not the browser's raw text. {#a-link-to-a-md-file-opens-the-kit-s-viewer-not-t}
 

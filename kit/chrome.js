@@ -64,7 +64,6 @@ const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
    3 = max. Segment count and mode count are the same number on purpose —
    a half-filled segment standing in for a fourth mode is what this
    replaced, and nobody reads a 50%-opacity rectangle as a state. */
-const ICON_WIDTH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect class="w-seg s1" x="3"    y="8" width="5" height="8" rx="1"/><rect class="w-seg s2" x="9.5"  y="8" width="5" height="8" rx="1"/><rect class="w-seg s3" x="16"   y="8" width="5" height="8" rx="1"/></svg>';
 const ICON_CLIPBOARD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>';
 const ICON_FILE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
 const ICON_FILE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="3" y1="3" x2="21" y2="21"/></svg>';
@@ -73,6 +72,7 @@ const ICON_CROSS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_BRACES = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2"/><path d="M16 3a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2"/></svg>';
 const ICON_CAMERA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
 const ICON_RESET = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15A9 9 0 1 0 6 5.3L1 10"/></svg>';
+const ICON_SLIDERS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/><circle cx="9" cy="7" r="2.2" fill="var(--ctrl-bg)"/><circle cx="15" cy="12" r="2.2" fill="var(--ctrl-bg)"/><circle cx="7" cy="17" r="2.2" fill="var(--ctrl-bg)"/></svg>';
 const ICON_GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
 /* Wrap toggle icon: horizontal line with a return arrow — visual cue
    that long lines wrap to the next line instead of scrolling. */
@@ -661,6 +661,11 @@ var __okuLangSwitch = (function () {
   }
 
   function build(manifest) {
+    // Cleared FIRST, before any of the reasons to give up below. The row
+    // is a claim about this page — "there is somewhere to go" — and a
+    // manifest that no longer supports the claim has to retract it, not
+    // leave the previous one standing.
+    __okuChromeMenu.unregister('language');
     var found = entryFor(manifest);
     if (!found) return;
     var entry = found.entry;
@@ -678,30 +683,45 @@ var __okuLangSwitch = (function () {
     }
     document.documentElement.setAttribute('data-lang', here);
 
-    var at = codes.indexOf(here);
-    var next = codes[(at + 1) % codes.length];
+    /* One segment per variant, in the presentation menu. The corner
+       version was a cycler showing the code of the page you were ON and
+       navigating to the next one, which reads backwards the moment
+       there are three languages: the button said EN and went to TR.
+       A row of stops has no such ambiguity — the pressed one is where
+       you are, the others are where you can go.
 
-    var existing = document.querySelector('.ctrl-btn.lang-toggle');
-    if (existing) existing.remove();
-    var btn = document.createElement('button');
-    btn.className = 'ctrl-btn lang-toggle';
-    btn.type = 'button';
-    var name = 'Read this page in ' + labelFor(next);
-    btn.setAttribute('aria-label', name);
-    btn.title = name;
-    // Two letters, not a flag and not a word: a flag names a country
-    // rather than a language, and a word would have to be translated
-    // into the language the reader has not chosen yet.
-    btn.innerHTML = '<span class="lang-code">' + labelFor(here) + '</span>';
-    okuChromeCluster().appendChild(btn);
-
-    btn.addEventListener('click', function () {
-      // The hash is the reader's position in the document. A
-      // translation keeps its anchors, so carrying it over lands them
-      // at the same section rather than at the top. The prefix comes
-      // from the suffix match, so the target is right whichever root
-      // the manifest was built from.
-      window.location.href = found.prefix + '/' + variants[next] + (window.location.hash || '');
+       Two letters per segment, never a flag (which names a country) and
+       never a word (which would have to be written in the language the
+       reader has not chosen). */
+    __okuChromeMenu.register({
+      id: 'language', order: 40,
+      html: function () {
+        return '<div class="okt-menu-row" data-row="language">' +
+          '<span class="okt-menu-label">' + menuWord('Language') + '</span>' +
+          '<div class="okt-menu-seg okt-menu-seg-code" role="group">' +
+            codes.map(function (c) {
+              return '<button type="button" data-lang="' + escapeHTML(c) + '"' +
+                     ' aria-pressed="' + (c === here ? 'true' : 'false') + '"' +
+                     ' title="' + escapeHTML(okuT('Read this page in {0}', labelFor(c))) + '">' +
+                     escapeXml(labelFor(c)) + '</button>';
+            }).join('') +
+          '</div>' +
+        '</div>';
+      },
+      wire: function (root) {
+        root.querySelectorAll('[data-lang]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var code = b.getAttribute('data-lang');
+            if (code === here) return;
+            // The hash is the reader's position in the document. A
+            // translation keeps its anchors, so carrying it over lands
+            // them at the same section rather than at the top. The
+            // prefix comes from the suffix match, so the target is right
+            // whichever root the manifest was built from.
+            window.location.href = found.prefix + '/' + variants[code] + (window.location.hash || '');
+          });
+        });
+      }
     });
   }
 
@@ -1670,11 +1690,6 @@ function announceTheme() {
     }
   }));
 }
-function cycleTheme() {
-  var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-  applyTheme(next === systemTheme() ? 'system' : next, true);
-  announceTheme();
-}
 /* The OS moved: the page follows it, and whatever the reader had
    chosen before is spent. */
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
@@ -2101,23 +2116,20 @@ var WIDTH_MODES = ['narrow', 'comfortable', 'max'];
 /* Retired modes → the surviving mode a reader who picked them meant. */
 var WIDTH_ALIASES = { wide: 'comfortable' };
 var DEFAULT_WIDTH = 'comfortable';
-function _widthLabelFor(mode) {
-  return okuT('Content width: {0} — click to cycle (narrow → comfortable → max)', okuT(mode));
+function contentWidth() {
+  return document.body.getAttribute('data-content-width') || DEFAULT_WIDTH;
 }
-function _syncWidthToggleLabel(mode) {
-  var btn = document.querySelector('.width-toggle');
-  if (!btn) return;
-  var lbl = _widthLabelFor(mode);
-  btn.setAttribute('title', lbl);
-  btn.setAttribute('aria-label', lbl);
-}
-function cycleContentWidth() {
-  var current = document.body.getAttribute('data-content-width') || DEFAULT_WIDTH;
-  var i = WIDTH_MODES.indexOf(current);
-  var next = WIDTH_MODES[(i + 1) % WIDTH_MODES.length];
-  document.body.setAttribute('data-content-width', next);
-  try { localStorage.setItem('htmldoc-content-width', next); } catch (e) {}
-  _syncWidthToggleLabel(next);
+/* Three stops, and the reader picks one rather than cycling to it. The
+ * control used to be a single button in the corner whose icon had three
+ * segments, because the corner had no room for words; in the
+ * presentation menu it has room, so the stop the page is in is the
+ * segment that is pressed. Nothing has to keep a button's label in step
+ * with the state any more — the label IS the state. */
+function setContentWidth(mode) {
+  if (WIDTH_MODES.indexOf(mode) === -1) return;
+  document.body.setAttribute('data-content-width', mode);
+  try { localStorage.setItem('htmldoc-content-width', mode); } catch (e) {}
+  window.dispatchEvent(new CustomEvent('oku:content-width-changed', { detail: { mode: mode } }));
 }
 try {
   var savedWidth = localStorage.getItem('htmldoc-content-width');
@@ -2125,19 +2137,105 @@ try {
     savedWidth = WIDTH_ALIASES[savedWidth];
     localStorage.setItem('htmldoc-content-width', savedWidth);
   }
-  if (savedWidth && WIDTH_MODES.indexOf(savedWidth) !== -1) {
-    document.addEventListener('DOMContentLoaded', function () {
+  document.addEventListener('DOMContentLoaded', function () {
+    if (savedWidth && WIDTH_MODES.indexOf(savedWidth) !== -1) {
       document.body.setAttribute('data-content-width', savedWidth);
-      _syncWidthToggleLabel(savedWidth);
-    });
-  } else {
-    document.addEventListener('DOMContentLoaded', function () {
-      if (!document.body.getAttribute('data-content-width')) {
-        document.body.setAttribute('data-content-width', DEFAULT_WIDTH);
-      }
-      _syncWidthToggleLabel(document.body.getAttribute('data-content-width'));
-    });
+    } else if (!document.body.getAttribute('data-content-width')) {
+      document.body.setAttribute('data-content-width', DEFAULT_WIDTH);
+    }
+  });
+} catch (e) {}
+
+/* ============ Reader text scale ============ *
+ * "The font size feels too small" is not a request for a bigger body
+ * font. It is a request for a bigger DOCUMENT: a reader who cannot read
+ * the prose cannot read a chart's axis labels either, and a control that
+ * grew the paragraphs and left every figure where it was would answer
+ * the half of the complaint that is easiest to answer.
+ *
+ * So the mechanism is `zoom` on the reading column, not `font-size`.
+ * `zoom` is the one thing that takes text, inline SVG (every chart the
+ * kit draws), Mermaid's output, images and rules together, and unlike
+ * `transform: scale` it REFLOWS — a paragraph at 1.5 wraps at 1.5, it is
+ * not a stretched picture of a paragraph.
+ *
+ * Four consequences, each of them a decision:
+ *
+ * - THE COLUMN KEEPS ITS PLACE. A zoomed element's available width is
+ *   the parent's divided by the zoom, so `main` renders at the same
+ *   physical width it had; the type inside is bigger and the measure
+ *   narrows. Nothing in the layout moves, which is why this control and
+ *   the width control do not fight over the same pixels.
+ * - NO CHART IS RE-TYPESET. A chart's label gutter is fitted to its own
+ *   labels at render time (okuFitLabelGutter) and then shortened after
+ *   paint; `zoom` scales that fitted result whole, so a gutter measured
+ *   at 1.0 is still right at 1.5. A font-size-based scale would have
+ *   invalidated every fit on the page at every step.
+ * - `100vw` DOES NOT SCALE. Viewport units resolve against the initial
+ *   containing block, which zoom does not touch, so the `max` width mode
+ *   is `100%` — a length that resolves against the zoom-adjusted
+ *   containing block and therefore means the same thing at every scale.
+ *   Left as `100vw` it rendered 125% of the viewport at 1.25 and the
+ *   page scrolled sideways.
+ * - A `position: fixed` DESCENDANT TAKES THE ZOOM WITH IT. The viewport
+ *   coordinate written into `left` is multiplied before it lands, so a
+ *   tooltip anchored to the pointer appears somewhere else. Three of the
+ *   kit's tooltips live inside `main` (chart, bar-chart enhancer,
+ *   annotated-code) and they go through `__okuSetFixedPos`, which
+ *   divides the coordinate back out. Every other overlay the kit builds
+ *   is appended to <body>, outside the zoomed subtree by construction —
+ *   which is what made `zoom` viable here at all.
+ *
+ * THE CHROME IS NOT IN IT. The 44px buttons, the rail's 12px strip and
+ * the sidebar's own width are the frame the document sits in, and their
+ * geometry is asserted numerically across four test files. The sidebar's
+ * SCROLL region IS in it, because the tree and the table of contents are
+ * text a reader reads and the complaint covers them; the build footer is
+ * not, so the sidebar surface's height contract is untouched.
+ * ---------------------------------------------------------------- */
+var TEXT_SCALES = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+var DEFAULT_TEXT_SCALE = 1;
+var TEXT_SCALE_KEY = 'oku-text-scale';
+
+function textScale() {
+  var v = parseFloat(document.documentElement.getAttribute('data-text-scale'));
+  return v > 0 ? v : DEFAULT_TEXT_SCALE;
+}
+/* Snap to the ladder rather than trust the input. The value arrives from
+   localStorage, where a reader with a console — or a kit old enough to
+   have used a different ladder — can have left anything at all. */
+function _nearestTextScale(v) {
+  var best = TEXT_SCALES.indexOf(DEFAULT_TEXT_SCALE), bestD = Infinity;
+  for (var i = 0; i < TEXT_SCALES.length; i++) {
+    var d = Math.abs(TEXT_SCALES[i] - v);
+    if (d < bestD) { bestD = d; best = i; }
   }
+  return best;
+}
+function applyTextScale(v, persist) {
+  var scale = TEXT_SCALES[_nearestTextScale(parseFloat(v))];
+  var root = document.documentElement;
+  root.style.setProperty('--oku-text-scale', String(scale));
+  root.setAttribute('data-text-scale', String(scale));
+  if (persist) {
+    try { localStorage.setItem(TEXT_SCALE_KEY, String(scale)); } catch (e) {}
+  }
+  window.dispatchEvent(new CustomEvent('oku:text-scale-changed', { detail: { scale: scale } }));
+  return scale;
+}
+function stepTextScale(dir) {
+  var i = _nearestTextScale(textScale());
+  return applyTextScale(TEXT_SCALES[Math.min(TEXT_SCALES.length - 1, Math.max(0, i + dir))], true);
+}
+/* Restored at module scope, not on DOMContentLoaded: it writes only to
+   <html>, which exists in every delivery mode including the standalone
+   page that runs this file inline in <head> with no <body> yet. The
+   pre-paint copy lives in chrome-boot.js so the column is never drawn at
+   one scale and re-drawn at another; this is the fallback for a page
+   that carries chrome.js without the boot script. */
+try {
+  var savedScale = parseFloat(localStorage.getItem(TEXT_SCALE_KEY));
+  if (savedScale > 0 && savedScale !== textScale()) applyTextScale(savedScale, false);
 } catch (e) {}
 
 /* Body skeleton injection. The per-page stub may carry as little as
@@ -2187,17 +2285,290 @@ function okuChromeCluster() {
   return el;
 }
 
+/* ============ The presentation menu ============ *
+ * One button in the corner, and every choice about how the page is
+ * presented behind it.
+ *
+ * The corner did not survive its own growth a second time. The flex row
+ * below fixed the arithmetic — a button that is absent takes no space —
+ * but it fixed the collisions, not the count: six buttons wanted that
+ * corner (personalize, search, language, warning, theme, width) and a
+ * seventh was about to. Six 44px boxes over the top of the reading
+ * column is not a control surface, it is a toolbar the reader has to
+ * read before every click, and five of the six are set once and never
+ * touched again.
+ *
+ * So the split is by FREQUENCY, not by kind. What stays in the corner is
+ * what a reader reaches for while reading — search, and the warning
+ * indicator, which is not a control at all but an alarm and must never
+ * hide itself. What moves in here is what a reader sets once: text size,
+ * column width, theme, language, snippet placeholders.
+ *
+ * Moving them pays for itself twice. An icon-only cycler exists because
+ * the corner has no room for words — the width control's three-segment
+ * icon had to be hovered to be read, and it announced its stops in a
+ * `title` nobody opens. A menu row has room for a label and for one
+ * button per stop, so the state is visible instead of announced and the
+ * reader picks a stop rather than cycling to it.
+ *
+ * Rows REGISTER rather than being listed here, for the same reason the
+ * cluster is a flex row: language appears only where there is a
+ * translation to go to, personalize only where a snippet declared
+ * placeholders, and neither knows what else is present. A row that never
+ * registers costs nothing and leaves no gap.
+ *
+ * The panel does not close when a control inside it is used. Stepping
+ * the text size is the one thing here a reader does repeatedly — three
+ * clicks to find the size that suits them — and a menu that closes on
+ * the first click makes that nine.
+ * ---------------------------------------------------------------- */
+var __okuChromeMenu = (function () {
+  var rows = [];
+  var btn = null, panel = null, isOpen = false;
+
+  /* Idempotent AND early-safe. The rows below register at module scope,
+     and a standalone page inlines this file into <head>, where `defer`
+     means nothing and <body> does not exist yet — appending there throws
+     at the top level and takes every statement after it with it, which
+     is the whole kit. So this returns null rather than reaching for a
+     body that is not there; the readyState guard at the foot of the
+     module calls it again once there is one, and PageChrome calls it a
+     third time, which costs nothing because of the first line. */
+  function ensureButton() {
+    if (btn) return btn;
+    if (!document.body) return null;
+    btn = document.createElement('button');
+    btn.className = 'ctrl-btn menu-toggle';
+    btn.type = 'button';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-haspopup', 'true');
+    btn.setAttribute('aria-controls', 'oku-chrome-menu');
+    var label = okuT('Display settings');
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    btn.innerHTML = ICON_SLIDERS;
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      toggle();
+    });
+    okuChromeCluster().appendChild(btn);
+    return btn;
+  }
+
+  function register(row) {
+    rows = rows.filter(function (r) { return r.id !== row.id; });
+    rows.push(row);
+    rows.sort(function (a, b) { return a.order - b.order; });
+    ensureButton();
+    if (panel) { build(); }
+  }
+
+  /* The other direction, and it is not symmetry for its own sake: a row
+     is registered from what a page turned out to have, and that answer
+     can change under it — a manifest replaced at runtime offers a
+     translation and then does not. Without this the row that has nowhere
+     left to go stays in the panel pointing at it. */
+  function unregister(id) {
+    var before = rows.length;
+    rows = rows.filter(function (r) { return r.id !== id; });
+    if (rows.length !== before && panel) build();
+  }
+
+  function build() {
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.className = 'okt-chrome-menu';
+      panel.id = 'oku-chrome-menu';
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-label', okuT('Display settings'));
+      panel.tabIndex = -1;
+      panel.hidden = true;
+      document.body.appendChild(panel);
+      // A click inside is a click on a control, not a dismissal. The
+      // document-level closer below sees every click; this one stops the
+      // ones that started in here from reaching it.
+      panel.addEventListener('click', function (e) { e.stopPropagation(); });
+    }
+    panel.innerHTML = rows.map(function (r) { return r.html(); }).join('');
+    rows.forEach(function (r) { if (r.wire) r.wire(panel); });
+    sync();
+  }
+
+  function sync() {
+    if (!panel) return;
+    rows.forEach(function (r) { if (r.sync) r.sync(panel); });
+  }
+
+  function open() {
+    build();
+    panel.hidden = false;
+    isOpen = true;
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    panel.focus();
+  }
+
+  function close(refocus) {
+    if (!panel) return;
+    panel.hidden = true;
+    isOpen = false;
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'false');
+      if (refocus) btn.focus();
+    }
+  }
+
+  function toggle() { if (isOpen) close(true); else open(); }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureButton);
+  } else {
+    ensureButton();
+  }
+
+  document.addEventListener('click', function () { if (isOpen) close(false); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && isOpen) { e.stopPropagation(); close(true); }
+  });
+
+  /* ---- the rows the kit always has ---- */
+
+  /* Text size. The readout is a button and resetting is what it does:
+     a separate "Reset" would be a fourth box in a row that is already
+     three, and at 100% it would be a control that does nothing, which
+     is the disabled state this kit does not ship. */
+  register({
+    id: 'text-scale', order: 10,
+    html: function () {
+      return '<div class="okt-menu-row" data-row="text-scale">' +
+        '<span class="okt-menu-label">' + menuWord('Text size') + '</span>' +
+        '<div class="okt-menu-step">' +
+          '<button type="button" class="okt-menu-btn text-scale-down" data-step="-1"' +
+            ' aria-label="' + escapeHTML(okuT('Smaller text')) + '" title="' + escapeHTML(okuT('Smaller text')) + '">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+          '</button>' +
+          '<button type="button" class="okt-menu-readout text-scale-reset"' +
+            ' aria-label="' + escapeHTML(okuT('Reset text size')) + '" title="' + escapeHTML(okuT('Reset text size')) + '"></button>' +
+          '<button type="button" class="okt-menu-btn text-scale-up" data-step="1"' +
+            ' aria-label="' + escapeHTML(okuT('Larger text')) + '" title="' + escapeHTML(okuT('Larger text')) + '">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><line x1="12" y1="5" x2="12" y2="19"/></svg>' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    },
+    wire: function (root) {
+      root.querySelectorAll('[data-step]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          stepTextScale(parseInt(b.getAttribute('data-step'), 10));
+          sync();
+        });
+      });
+      root.querySelector('.text-scale-reset').addEventListener('click', function () {
+        applyTextScale(DEFAULT_TEXT_SCALE, true);
+        sync();
+      });
+    },
+    sync: function (root) {
+      var scale = textScale();
+      var out = root.querySelector('.text-scale-reset');
+      if (out) out.textContent = Math.round(scale * 100) + '%';
+      var i = _nearestTextScale(scale);
+      var down = root.querySelector('.text-scale-down');
+      var up = root.querySelector('.text-scale-up');
+      // At an end of the ladder the button stops doing anything, and
+      // saying so is the honest version of a step that silently no-ops.
+      if (down) down.setAttribute('aria-disabled', i === 0 ? 'true' : 'false');
+      if (up) up.setAttribute('aria-disabled', i === TEXT_SCALES.length - 1 ? 'true' : 'false');
+    }
+  });
+
+  register({
+    id: 'width', order: 20,
+    html: function () {
+      return '<div class="okt-menu-row" data-row="width">' +
+        '<span class="okt-menu-label">' + menuWord('Column width') + '</span>' +
+        '<div class="okt-menu-seg" role="group">' +
+          WIDTH_MODES.map(function (m) {
+            return '<button type="button" data-width="' + m + '" aria-pressed="false">' +
+                   menuWord(m.charAt(0).toUpperCase() + m.slice(1)) + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+    },
+    wire: function (root) {
+      root.querySelectorAll('[data-width]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          setContentWidth(b.getAttribute('data-width'));
+          sync();
+        });
+      });
+    },
+    sync: function (root) {
+      var now = contentWidth();
+      root.querySelectorAll('[data-width]').forEach(function (b) {
+        b.setAttribute('aria-pressed', b.getAttribute('data-width') === now ? 'true' : 'false');
+      });
+    }
+  });
+
+  /* Theme. Still two stops, and following the OS is still not one of
+     them: picking the theme the OS is already in IS how a reader hands
+     the choice back, and the dot on the pressed segment says the page is
+     following rather than pinned. */
+  register({
+    id: 'theme', order: 30,
+    html: function () {
+      return '<div class="okt-menu-row" data-row="theme">' +
+        '<span class="okt-menu-label">' + menuWord('Theme') + '</span>' +
+        '<div class="okt-menu-seg" role="group">' +
+          '<button type="button" data-theme-choice="light" aria-pressed="false">' +
+            '<span class="okt-menu-glyph">' + ICON_SUN + '</span>' + menuWord('Light') + '</button>' +
+          '<button type="button" data-theme-choice="dark" aria-pressed="false">' +
+            '<span class="okt-menu-glyph">' + ICON_MOON + '</span>' + menuWord('Dark') + '</button>' +
+        '</div>' +
+      '</div>';
+    },
+    wire: function (root) {
+      root.querySelectorAll('[data-theme-choice]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var choice = b.getAttribute('data-theme-choice');
+          applyTheme(choice === systemTheme() ? 'system' : choice, true);
+          announceTheme();
+          sync();
+        });
+      });
+    },
+    sync: function (root) {
+      var now = document.documentElement.getAttribute('data-theme');
+      root.querySelectorAll('[data-theme-choice]').forEach(function (b) {
+        b.setAttribute('aria-pressed', b.getAttribute('data-theme-choice') === now ? 'true' : 'false');
+      });
+    }
+  });
+
+  // The OS can move the theme under an open panel, and a diagram
+  // re-renders on the same event; the pressed segment has to follow.
+  window.addEventListener('oku:theme-changed', sync);
+
+  /* Every word in here goes through okuT at BUILD time, so a panel built
+     before the table arrived is an English panel that no later localize
+     pass can reach — the walk matches table keys against leaf text, and
+     these leaves are `menu:`-prefixed lookups that have already resolved
+     to their fallback. Rebuilding is the only thing that re-runs them.
+     In practice the table lands long before the first click; this is
+     what makes that a fact rather than a bet. */
+  window.addEventListener('oku:rendered', function () {
+    __okuI18n.load().then(function () { if (panel) build(); });
+  });
+
+  return { register: register, unregister: unregister, open: open, close: close,
+           sync: sync, button: ensureButton };
+})();
+
 /* ============ <page-chrome> Web Component ============ */
 class PageChrome extends HTMLElement {
   connectedCallback() {
     var skipLabel = this.getAttribute('skip-label') || 'Skip to content';
     var drawerLabel = this.getAttribute('drawer-label') || 'Contents';
-    var themeLabel = this.getAttribute('theme-label') || 'Switch theme (light / dark)';
-    // Built from WIDTH_MODES, not written out again: the literal here
-    // still named a `wide` stop that was removed, so the button
-    // announced four stops and cycled three until the first click
-    // replaced the label.
-    var widthLabel = this.getAttribute('width-label') || _widthLabelFor(DEFAULT_WIDTH);
     var topLabel = this.getAttribute('top-label') || 'Back to top';
 
     // The Contents button is the sidebar's only affordance, at every
@@ -2227,21 +2598,12 @@ class PageChrome extends HTMLElement {
     initDrawerPeek();
     syncDrawerButton();
 
-    // Width and theme belong to the top-right cluster, which lives on
-    // <body> and survives this element's innerHTML rewrite. Guarded
-    // because connectedCallback fires again on reparent, and appending
-    // to a node outside `this` is not undone by that rewrite.
-    var cluster = okuChromeCluster();
-    if (!cluster.querySelector('.width-toggle')) {
-      cluster.insertAdjacentHTML('beforeend',
-        '<button class="ctrl-btn width-toggle" type="button" aria-label="' + widthLabel + '" title="' + widthLabel + '">' + ICON_WIDTH + '</button>' +
-        '<button class="ctrl-btn theme-toggle" type="button" aria-label="' + themeLabel + '" title="' + themeLabel + '">' +
-          '<span class="icon-sun">' + ICON_SUN + '</span>' +
-          '<span class="icon-moon">' + ICON_MOON + '</span>' +
-        '</button>');
-      cluster.querySelector('.width-toggle').addEventListener('click', cycleContentWidth);
-      cluster.querySelector('.theme-toggle').addEventListener('click', cycleTheme);
-    }
+    // Text size, width and theme live in the presentation menu, whose
+    // button belongs to the top-right cluster. The cluster is on <body>
+    // and survives this element's innerHTML rewrite; the menu's own
+    // ensureButton is idempotent, which is what makes this safe to call
+    // again when connectedCallback fires on a reparent.
+    __okuChromeMenu.button();
 
     initReadingAids();
   }
@@ -2635,6 +2997,20 @@ function buildTOC(tocList) {
    prefix is not itself a string anyone has to translate. */
 function railKind(en) {
   var key = 'rail:' + en;
+  var out = okuT(key);
+  return out === key ? en : out;
+}
+
+/* The presentation menu's vocabulary has the same hazard and takes the
+   same answer. `Theme`, `Language`, `Light`, `Dark`, `Narrow` and `Max`
+   are words an author writes — this repo's own docs write most of them
+   in a table cell or a card title — and a bare table key is matched
+   against the leaf text of author content. `menu:` is a prefix nobody
+   types, the English word is the fallback rather than the key, and the
+   lookup is built from a variable so the prefixed literal never appears
+   at a call site. */
+function menuWord(en) {
+  var key = 'menu:' + en;
   var out = okuT(key);
   return out === key ? en : out;
 }
@@ -3060,6 +3436,9 @@ function buildRail() {
   window.__okuRebuildRail = rebuild;
   window.addEventListener('resize', rebuild, { passive: true });
   window.addEventListener('oku:rendered', rebuild);
+  // A text-scale step reflows the whole column and fires no resize.
+  window.addEventListener('oku:text-scale-changed', rebuild);
+  window.addEventListener('oku:content-width-changed', rebuild);
   if (typeof ResizeObserver === 'function') {
     document.addEventListener('DOMContentLoaded', function () {
       new ResizeObserver(rebuild).observe(document.body);
@@ -4957,7 +5336,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-08-23-r67';
+var __okuKitBuild = '2026-09-02-r68';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -5977,7 +6356,6 @@ var __okuPersonalization = (function () {
   var STORAGE_KEY = 'oku-personalization';
   var keys = [];       // [{ key, label, default, type? }]
   var values = {};     // { key: currentValue }
-  var btn = null;
   var panel = null;
 
   function load() {
@@ -6045,16 +6423,31 @@ var __okuPersonalization = (function () {
     });
   }
 
+  /* A row rather than a corner button, and it registers rather than
+     being listed by the menu: placeholders are declared by a snippet, so
+     nothing knows whether this page has any until one is rendered. */
   function buildButton() {
-    var cluster = okuChromeCluster();
-    btn = document.createElement('button');
-    btn.className = 'ctrl-btn personalize-toggle';
-    btn.type = 'button';
-    btn.setAttribute('aria-label', 'Personalize snippet placeholders');
-    btn.title = 'Personalize snippet placeholders';
-    btn.innerHTML = ICON_GEAR;
-    btn.addEventListener('click', togglePanel);
-    cluster.appendChild(btn);
+    __okuChromeMenu.register({
+      id: 'personalize', order: 50,
+      html: function () {
+        return '<div class="okt-menu-row" data-row="personalize">' +
+          '<span class="okt-menu-label">' + menuWord('Placeholders') + '</span>' +
+          '<button type="button" class="okt-menu-open personalize-toggle"' +
+            ' aria-label="' + escapeHTML(okuT('Personalize snippet placeholders')) + '"' +
+            ' title="' + escapeHTML(okuT('Personalize snippet placeholders')) + '">' +
+            ICON_GEAR + '</button>' +
+        '</div>';
+      },
+      wire: function (root) {
+        var open = root.querySelector('.personalize-toggle');
+        if (open) open.addEventListener('click', function () {
+          // The panel is its own overlay with its own text inputs, so the
+          // menu steps out of the way rather than stacking on top of it.
+          __okuChromeMenu.close(false);
+          togglePanel();
+        });
+      }
+    });
   }
 
   function togglePanel() {
@@ -11591,8 +11984,7 @@ class OkuChart extends HTMLElement {
        anchors near the viewport's right / top edges push the
        tooltip off-screen — the user has reported both. */
     function placeTooltipAt(tip, anchorX, anchorY) {
-      tip.style.left = anchorX + 'px';
-      tip.style.top  = anchorY + 'px';
+      __okuSetFixedPos(tip, anchorX, anchorY);
       requestAnimationFrame(function () {
         var rect = tip.getBoundingClientRect();
         var vw = window.innerWidth, vh = window.innerHeight;
@@ -11605,8 +11997,7 @@ class OkuChart extends HTMLElement {
         // would render above the viewport (anchor near top).
         if (rect.top < pad) top += (rect.height + 16);
         else if (rect.bottom > vh - pad) top -= (rect.bottom - (vh - pad));
-        tip.style.left = left + 'px';
-        tip.style.top  = top  + 'px';
+        __okuSetFixedPos(tip, left, top);
       });
     }
     /* Reposition a tooltip to track its anchor's current viewport
@@ -12058,9 +12449,29 @@ if (!customElements.get('oku-chart')) customElements.define('oku-chart', OkuChar
    chart family) can use it without re-implementing the clamp math.
    The tooltip is `position: fixed`, so left/top are VIEWPORT coords,
    not document coords. */
+/* Write a VIEWPORT coordinate onto a `position: fixed` element.
+ *
+ * Fixed positioning is relative to the viewport, so the two are normally
+ * the same number and every site below used to assign it directly. They
+ * stop being the same number the moment the element sits inside a zoomed
+ * subtree: the reader's text scale is `zoom` on `main` (see "Reader text
+ * scale"), a length written into `left` is interpreted in the zoomed
+ * coordinate space, and the coordinate being written was read out of
+ * `getBoundingClientRect()` — which reports client space. At 1.5 a
+ * tooltip anchored to a bar 600px across the page landed 300px past it.
+ *
+ * `currentCSSZoom` is the effective zoom on the element itself, so
+ * dividing by it converts client space back to the space the style is
+ * read in. Outside a zoomed subtree it is 1 and this is the assignment
+ * it replaced. */
+function __okuSetFixedPos(el, x, y) {
+  var z = el && typeof el.currentCSSZoom === 'number' && el.currentCSSZoom > 0 ? el.currentCSSZoom : 1;
+  if (x !== null && x !== undefined) el.style.left = (x / z) + 'px';
+  if (y !== null && y !== undefined) el.style.top  = (y / z) + 'px';
+}
+
 function __okuPlaceTooltipAt(tip, anchorX, anchorY) {
-  tip.style.left = anchorX + 'px';
-  tip.style.top  = anchorY + 'px';
+  __okuSetFixedPos(tip, anchorX, anchorY);
   requestAnimationFrame(function () {
     var rect = tip.getBoundingClientRect();
     var vw = window.innerWidth, vh = window.innerHeight;
@@ -12070,8 +12481,7 @@ function __okuPlaceTooltipAt(tip, anchorX, anchorY) {
     else if (rect.right > vw - pad) left -= (rect.right - (vw - pad));
     if (rect.top < pad) top += (rect.height + 16);
     else if (rect.bottom > vh - pad) top -= (rect.bottom - (vh - pad));
-    tip.style.left = left + 'px';
-    tip.style.top  = top  + 'px';
+    __okuSetFixedPos(tip, left, top);
   });
 }
 
@@ -14669,14 +15079,13 @@ class OkuAnnotatedCode extends HTMLElement {
             // Render once to measure; reset transform / margin so
             // we can take a fresh box, then re-apply the flip rule.
             tip.style.display = 'block';
-            tip.style.left = anchorMidX + 'px';
-            tip.style.top = (anchorRect.top - 10) + 'px';
+            __okuSetFixedPos(tip, anchorMidX, anchorRect.top - 10);
             tip.style.transform = 'translate(-50%, -100%)';
             var tipBox = tip.getBoundingClientRect();
             // If the tooltip would render above the viewport top,
             // flip below the anchor block instead.
             if (tipBox.top < 8) {
-              tip.style.top = (anchorRect.bottom + 10) + 'px';
+              __okuSetFixedPos(tip, null, anchorRect.bottom + 10);
               tip.style.transform = 'translate(-50%, 0)';
             }
           } else {
@@ -15947,10 +16356,6 @@ window.addEventListener('oku:rendered', function () {
   // to wait on the promise rather than run beside it.
   __okuI18n.load().then(function () {
     __okuI18n.localize(document);
-    // The width label is COMPOSED through okuT rather than written out,
-    // so the finished string is not a table key and the pass above
-    // cannot see it. Rebuild it instead.
-    _syncWidthToggleLabel(document.body.getAttribute('data-content-width') || DEFAULT_WIDTH);
   });
 });
 

@@ -8,6 +8,7 @@ kit-native SVG, so chart assertions DO require rendered <svg>.
 
 from __future__ import annotations
 
+from ._menu import flip_theme
 from ._wait import box_stable, page_quiet, scroll_stable
 
 import math
@@ -146,10 +147,11 @@ def test_the_top_right_chrome_never_overlaps(page, site_url, width):
                  overlaps, count: vis.length, inView };
     }"""
     )
-    # The fixture page carries search + width + theme + contents, so the
-    # exact pair that collided is present and measured.
+    # The pair that collided was search and width. Width is a menu row
+    # now, so the measured pair is search and the button that holds it —
+    # the same corner, the same flex row, one fewer box to collide in.
     assert any("search-toggle" in n for n in got["names"]), f"no search button to collide with: {got}"
-    assert any("width-toggle" in n for n in got["names"]), got["names"]
+    assert any("menu-toggle" in n for n in got["names"]), got["names"]
     assert got["overlaps"] == [], f"chrome buttons overlap at {width}px: {got}"
     assert got["inView"] == got["count"], f"a chrome button sits outside the viewport at {width}px: {got}"
 
@@ -1063,7 +1065,7 @@ def test_theme_toggle_leaves_the_dom_where_it_started(page, site_url):
     _goto(page, f"{site_url}/docs/charts.html")
     before = page.evaluate(snapshot)
     for _ in range(6):
-        page.click(".theme-toggle, [data-theme-toggle], .ctrl-btn[title*='theme' i]")
+        flip_theme(page)
         # Each flip re-renders every diagram, so the element count is
         # the signal that this flip is done and the next one is not
         # landing on a half-rebuilt page.

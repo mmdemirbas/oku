@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import pytest
 
+from ._menu import open_menu
+
 PROBE = """() => {
   const attr = (s, a) => { const e = document.querySelector(s); return e ? e.getAttribute(a) : null; };
   const text = (s) => { const e = document.querySelector(s); return e ? e.textContent.trim() : null; };
@@ -19,8 +21,14 @@ PROBE = """() => {
     lang: document.documentElement.getAttribute('data-lang'),
     contents: attr('.ctrl-btn.drawer-toggle', 'aria-label'),
     search: attr('.ctrl-btn.search-toggle', 'aria-label'),
-    theme: attr('.ctrl-btn.theme-toggle', 'aria-label'),
-    width: attr('.ctrl-btn.width-toggle', 'aria-label'),
+    menu: attr('.ctrl-btn.menu-toggle', 'aria-label'),
+    // The two that moved into the panel. Read as row LABELS rather than
+    // as button aria-labels: in the corner the whole control was one
+    // button and its name had to carry the state; in a row the name is
+    // the name and the state is which segment is pressed.
+    theme: text('.okt-chrome-menu [data-row="theme"] .okt-menu-label'),
+    width: text('.okt-chrome-menu [data-row="width"] .okt-menu-label'),
+    textSize: text('.okt-chrome-menu [data-row="text-scale"] .okt-menu-label'),
     copy: attr('.copy-btn', 'aria-label'),
     updated: text('.meta-updated'),
     treeTitles: [...document.querySelectorAll('page-nav .page-nav-tree a')]
@@ -38,6 +46,10 @@ def _open(page, site_url, name):
     page.wait_for_function("() => document.querySelector('.ctrl-btn.drawer-toggle') !== null", timeout=8000)
     # The table is fetched, so the pass that applies it runs a turn later.
     page.wait_for_timeout(2200)
+    # The presentation menu builds its rows on first open, and each word
+    # in them goes through okuT at that moment — so its strings do not
+    # exist to be read until the panel has been opened once.
+    open_menu(page)
     return page.evaluate(PROBE)
 
 
@@ -57,8 +69,14 @@ def test_a_turkish_page_gets_turkish_chrome(page, site_url):
     assert got["lang"] == "tr", got
     assert got["contents"] == "İçindekiler", got
     assert got["search"].startswith("Ara"), got
-    assert got["theme"].startswith("Temayı"), got
     assert got["copy"] == "Kodu panoya kopyala", got
+    # The presentation menu's own vocabulary. These are `menu:`-prefixed
+    # keys rather than bare words, because `Theme` and `Language` are
+    # words an author writes and a bare key is matched against author
+    # content — the same hazard the rail's words have.
+    assert got["theme"] == "Tema", got
+    assert got["width"] == "Sütun genişliği", got
+    assert got["textSize"] == "Yazı boyutu", got
 
 
 def test_a_composed_string_is_rebuilt_not_left_half_translated(page, site_url):
@@ -69,7 +87,6 @@ def test_a_composed_string_is_rebuilt_not_left_half_translated(page, site_url):
 
     assert got["updated"].startswith("Son güncelleme"), got
     assert got["updated"].split()[-1].count("-") == 2, got  # the date survived
-    assert got["width"].startswith("İçerik genişliği"), got
 
 
 def test_the_site_tree_follows_the_page_language(page, site_url):
