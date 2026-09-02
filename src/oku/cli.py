@@ -6955,9 +6955,16 @@ _MERMAID_CDN = f"https://cdn.jsdelivr.net/npm/mermaid@{_MERMAID_VERSION}/dist/me
 # The five the loader preloads, plus the languages this kit's own pages
 # and its likely consumers actually use. An unlisted language falls back
 # to no highlighting offline, which is the same degradation as today.
+# `regex` is here for a reason the others are not: nothing tags a block
+# with it. Prism's own JavaScript grammar gives a regex literal's source
+# the alias `language-regex`, and the autoloader then goes looking for a
+# component the kit did not vendor — one 404 in the reader's console per
+# page carrying a JS regex, with the page otherwise fine. Vendoring it
+# turns that request into the highlighting it was asking for.
 _PRISM_LANGS = (
     "javascript css bash json yaml python typescript jsx tsx java go rust sql markup "
-    "diff toml ini docker kotlin scala c cpp csharp php ruby swift graphql markdown mermaid"
+    "diff toml ini docker kotlin scala c cpp csharp php ruby swift graphql markdown mermaid "
+    "regex"
 ).split()
 
 

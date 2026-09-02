@@ -1183,6 +1183,38 @@ actually write.
   matches the flattened text and splices with a Range — the same shape
   `markNeedleInScope` already used next to it.
 
+- **A Prism grammar asks for a language out of the DOCUMENT's content,
+  not out of what the author tagged.** Two 404s per page came from that,
+  and neither name is written anywhere in the source. Prism's markdown
+  grammar reads a fence's info string inside a markdown SAMPLE and calls
+  `autoloader.loadLanguages()` itself, from a `wrap` hook — so a page
+  documenting this kit fetched `prism-oku-chart.min.js`, which can never
+  exist. And Prism's JavaScript grammar gives a regex literal's source
+  the alias `language-regex`, so any page with a regex in a JS block
+  asked for a component the kit had not vendored. The page renders and
+  most code still highlights, so the only thing that says anything is
+  wrong is the reader's console.
+
+  The two get opposite fixes, and the asymmetry is the rule: a name the
+  kit CAN serve is served (`regex` is in `_PRISM_LANGS` now), and only a
+  name that never could is refused. The refusal wraps
+  `autoloader.loadLanguages`, because that is the property the markdown
+  grammar calls — neither the autoloader's `complete` hook nor the kit's
+  nested-language pass is on that path, and both were written and thrown
+  away before a `createElement` stack trace said so. It refuses the
+  `oku-` prefix only: that prefix can never be a Prism language, so
+  refusing it cannot lose highlighting, where an allow-list would
+  silently stop highlighting every alias nobody remembered to add. Held
+  by `browser/test_prism_asks_only_for_what_it_has.py`.
+
+  How that measurement went wrong first is worth as much as the fix.
+  Three "still 404" readings came from opening
+  `docs/dist/standalone/reference.html` while running `oku build` from
+  the REPO ROOT, which writes `./dist/` — so the artifact under the
+  microscope predated every fix being tested against it. That is the
+  defect the build-provenance footer exists for, arriving from the other
+  side. Build in the directory you are about to read from.
+
 - **CSS rules silently dropped by Chrome.** A multi-line comment
   inside a rule body, containing certain Unicode punctuation, has
   been observed to make Chrome's parser drop the trailing

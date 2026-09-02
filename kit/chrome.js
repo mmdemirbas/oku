@@ -5370,7 +5370,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-02-r69';
+var __okuKitBuild = '2026-09-02-r70';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -13430,6 +13430,43 @@ var __prismLoader = (function () {
           // its components are in the same directory by construction.
           window.Prism.plugins.autoloader.languages_path =
             (servedLocally ? __okuVendorPath() + 'prism/components/' : CDN + 'components/');
+
+          /* A grammar can ask for a component out of the DOCUMENT's own
+             content, and Prism's markdown grammar does: its `wrap` hook
+             reads a fence's info string and calls
+             `autoloader.loadLanguages(thatString)` directly. So a page
+             that DOCUMENTS this kit — one showing an `oku-chart` fence
+             inside a markdown sample — makes the reader's browser fetch
+             `prism-oku-chart.min.js`, which cannot exist. Measured on
+             this repo's own reference page: one net::ERR_FILE_NOT_FOUND
+             per load, the page otherwise correct, and nothing in the
+             build saying anything was wrong.
+
+             The call comes through this property, which is why the fix
+             sits here rather than in a hook: neither the autoloader's
+             own `complete` hook nor the kit's nested-language pass is on
+             that path, and both were tried before the stack trace said
+             so. Refusing is the whole of it — a name the kit cannot
+             serve leaves the block as text, which is what the 404 left
+             behind anyway, minus the request.
+
+             `oku-*` only. It is the one prefix that can never be a
+             grammar, so refusing it cannot lose highlighting; policing
+             every name would need a list of Prism's aliases, and a name
+             missing from that list is a block that silently stops being
+             highlighted. */
+          var _load = window.Prism.plugins.autoloader.loadLanguages;
+          if (typeof _load === 'function') {
+            window.Prism.plugins.autoloader.loadLanguages = function (langs, success, error) {
+              var want = typeof langs === 'string' ? [langs] : (langs || []);
+              var refused = want.filter(function (l) { return /^oku-/.test(String(l)); });
+              if (refused.length) {
+                if (typeof error === 'function') error(refused);
+                return;
+              }
+              return _load.apply(this, arguments);
+            };
+          }
         }
         // Eagerly preload the languages most commonly nested inside
         // other languages — JavaScript inside <script>, CSS inside
