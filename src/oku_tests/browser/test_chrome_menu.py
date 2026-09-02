@@ -82,6 +82,44 @@ def test_the_panel_opens_and_closes_the_three_ways(page, site_url):
     page.wait_for_selector(MENU, state="hidden")
 
 
+def test_escape_closes_the_menu_and_leaves_the_drawer_alone(page, site_url):
+    """One press, one dismissal — the topmost thing.
+
+    Both handlers live on `document`, and the drawer's was registered
+    first, so a bubble-phase listener here runs second and
+    `stopPropagation` cannot reach a sibling on the node it is already
+    on: Escape closed the menu AND the Contents drawer under it. The menu
+    listens in the CAPTURE phase, which runs before every bubble listener
+    on the same node, so stopping propagation there genuinely means "this
+    press was mine".
+    """
+    # Below 900px the drawer opens MODAL, which is the state Escape is
+    # supposed to close. Pinned is deliberately Escape-proof (a pinned
+    # panel is not a dialog), so it could not tell the two behaviours
+    # apart — a passing test there would prove nothing.
+    page.set_viewport_size({"width": 800, "height": 900})
+    page.goto(f"{site_url}/docs/index.html")
+    page.wait_for_selector("main")
+    _wait.page_quiet(page)
+    page.click(".ctrl-btn.drawer-toggle")
+    page.wait_for_timeout(300)
+    drawer_open = page.evaluate("() => document.body.className")
+    assert "drawer-modal" in drawer_open, f"the drawer did not open modal: {drawer_open!r}"
+
+    open_menu(page)
+    page.keyboard.press("Escape")
+    page.wait_for_selector(MENU, state="hidden")
+    assert page.evaluate("() => document.body.className") == drawer_open, (
+        "Escape took the drawer with the menu; the menu is the thing on top "
+        "and the only thing the reader aimed at"
+    )
+
+    # A second press, with the menu already closed, is the drawer's.
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(300)
+    assert "drawer-open" not in page.evaluate("() => document.body.className")
+
+
 def test_the_panel_stays_open_while_the_text_size_is_stepped(page, site_url):
     """The reason it is a panel and not five popovers. Finding the size
     that suits you is three clicks; a menu that closed on the first would

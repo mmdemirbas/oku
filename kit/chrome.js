@@ -2224,8 +2224,15 @@ function applyTextScale(v, persist) {
   return scale;
 }
 function stepTextScale(dir) {
-  var i = _nearestTextScale(textScale());
-  return applyTextScale(TEXT_SCALES[Math.min(TEXT_SCALES.length - 1, Math.max(0, i + dir))], true);
+  var now = textScale();
+  var i = _nearestTextScale(now);
+  var next = TEXT_SCALES[Math.min(TEXT_SCALES.length - 1, Math.max(0, i + dir))];
+  // `aria-disabled` is not a barrier to a real pointer, so a reader at
+  // an end of the ladder can keep clicking. Without this the no-op
+  // re-applies the same value, writes localStorage and fires the event
+  // that rebuilds every mark on the rail — work with nothing to show.
+  if (next === now) return now;
+  return applyTextScale(next, true);
 }
 /* Restored at module scope, not on DOMContentLoaded: it writes only to
    <html>, which exists in every delivery mode including the standalone
@@ -2235,7 +2242,22 @@ function stepTextScale(dir) {
    that carries chrome.js without the boot script. */
 try {
   var savedScale = parseFloat(localStorage.getItem(TEXT_SCALE_KEY));
-  if (savedScale > 0 && savedScale !== textScale()) applyTextScale(savedScale, false);
+  if (savedScale > 0) {
+    /* Snapped, never merely compared against what is already on the
+       element. chrome-boot.js has written the STORED value pre-paint —
+       clamped, but not snapped, because the ladder lives here and a
+       second copy of it there is a copy that drifts. So an off-ladder
+       value equals what the attribute already says, and a test of the
+       two lets it through: the page renders at `zoom: 1.37` while the
+       readout says 125%, forever. It is reachable without a console —
+       every reader's stored value goes off-ladder the day TEXT_SCALES
+       changes, which is the WIDTH_ALIASES lesson in another costume.
+       The correction is persisted so it converges in one load rather
+       than being re-derived on every one. */
+    var snapped = TEXT_SCALES[_nearestTextScale(savedScale)];
+    if (snapped !== savedScale) applyTextScale(snapped, true);
+    else if (snapped !== textScale()) applyTextScale(snapped, false);
+  }
 } catch (e) {}
 
 /* Body skeleton injection. The per-page stub may carry as little as
@@ -2341,7 +2363,10 @@ var __okuChromeMenu = (function () {
     btn.className = 'ctrl-btn menu-toggle';
     btn.type = 'button';
     btn.setAttribute('aria-expanded', 'false');
-    btn.setAttribute('aria-haspopup', 'true');
+    // `dialog`, not the bare `true` that means `menu`: what opens is a
+    // panel of controls the reader operates and leaves, not a list of
+    // commands one of which is chosen.
+    btn.setAttribute('aria-haspopup', 'dialog');
     btn.setAttribute('aria-controls', 'oku-chrome-menu');
     var label = okuT('Display settings');
     btn.setAttribute('aria-label', label);
@@ -2426,9 +2451,17 @@ var __okuChromeMenu = (function () {
   }
 
   document.addEventListener('click', function () { if (isOpen) close(false); });
+  /* CAPTURE, and that is the whole point of the option. The drawer's own
+     Escape handler is registered earlier in this file and on the same
+     node, so a bubble-phase listener here runs second and
+     `stopPropagation` cannot reach a sibling on the node it is already
+     on — Escape closed the menu AND the drawer under it, when the menu
+     is the thing on top and the only thing the reader meant. A capture
+     listener on `document` runs before every bubble listener on it, so
+     stopping propagation here genuinely means "this press was mine". */
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && isOpen) { e.stopPropagation(); close(true); }
-  });
+  }, true);
 
   /* ---- the rows the kit always has ---- */
 
@@ -2459,12 +2492,10 @@ var __okuChromeMenu = (function () {
       root.querySelectorAll('[data-step]').forEach(function (b) {
         b.addEventListener('click', function () {
           stepTextScale(parseInt(b.getAttribute('data-step'), 10));
-          sync();
         });
       });
       root.querySelector('.text-scale-reset').addEventListener('click', function () {
         applyTextScale(DEFAULT_TEXT_SCALE, true);
-        sync();
       });
     },
     sync: function (root) {
@@ -2498,7 +2529,6 @@ var __okuChromeMenu = (function () {
       root.querySelectorAll('[data-width]').forEach(function (b) {
         b.addEventListener('click', function () {
           setContentWidth(b.getAttribute('data-width'));
-          sync();
         });
       });
     },
@@ -2533,7 +2563,6 @@ var __okuChromeMenu = (function () {
           var choice = b.getAttribute('data-theme-choice');
           applyTheme(choice === systemTheme() ? 'system' : choice, true);
           announceTheme();
-          sync();
         });
       });
     },
@@ -2545,9 +2574,14 @@ var __okuChromeMenu = (function () {
     }
   });
 
-  // The OS can move the theme under an open panel, and a diagram
-  // re-renders on the same event; the pressed segment has to follow.
-  window.addEventListener('oku:theme-changed', sync);
+  /* The panel follows the state through the events the setters already
+     fire, and never through the click handler that happened to call
+     one. The theme case is the one that proves the rule — the OS can
+     move it under an open panel and no click was involved — but every
+     row has the same shape, and a handler that syncs itself is a panel
+     that goes stale the moment anything else sets what it displays. */
+  ['oku:theme-changed', 'oku:content-width-changed', 'oku:text-scale-changed']
+    .forEach(function (ev) { window.addEventListener(ev, sync); });
 
   /* Every word in here goes through okuT at BUILD time, so a panel built
      before the table arrived is an English panel that no later localize

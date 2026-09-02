@@ -556,6 +556,15 @@ body[data-ctrl-proximity="1"] .back-to-top:not(.visible) { opacity: 0; }
 .okt-chrome-cluster .search-toggle      { order: 20; }
 .okt-chrome-cluster .warning-indicator  { order: 30; }
 .okt-chrome-cluster .menu-toggle        { order: 60; }
+/* The sliders icon's knobs are holes punched in its lines, so they are
+   painted in the button's own background — which means they have to
+   follow it when it changes. The `fill` attribute on the icon is the
+   no-stylesheet fallback; at rest the two agree, and on hover they did
+   not: measured in dark, a knob at rgba(26,23,48,.78) sitting on a
+   button at rgba(46,42,74,.92), which reads as the page showing through
+   rather than as a knob on a slider. */
+.menu-toggle svg circle { fill: var(--ctrl-bg); }
+.menu-toggle:hover svg circle { fill: var(--ctrl-bg-hover); }
 
 /* Content-width modes (D3). The CSS variable wins because <main> reads
    it via max-width; the body attribute is the persisted source of truth. */

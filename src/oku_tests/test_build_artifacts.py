@@ -551,7 +551,14 @@ class TestPayloadBudget:
     # replacing four corner buttons. About 23,500 bytes across the two
     # files, of which roughly 9,000 is the comment saying why it is
     # `zoom` and not a font-size, and what that costs.
-    KIT_BUDGET_BYTES = 1_250_000
+    # Then from 1,250,000 by the review pass over that work: snapping a
+    # stored scale that chrome-boot had already written (an off-ladder
+    # value passed an equality test against itself and survived), the
+    # capture-phase Escape that stops the menu closing the drawer under
+    # it, one route to the panel's state through the events the setters
+    # fire, and the knob fill that follows its button. About 2,100
+    # bytes, nearly all of it the comments naming what each replaced.
+    KIT_BUDGET_BYTES = 1_256_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

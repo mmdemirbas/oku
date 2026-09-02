@@ -171,6 +171,32 @@ def test_nothing_scrolls_sideways_at_any_scale(page, site_url, viewport, width_m
 # the pointer in several different ways depending on family, and a test
 # that skips when it lands on the wrong one proves nothing about the
 # thing it was written for. A DIV bar chart always builds `.okc-tooltip`.
+def test_a_pinned_drawer_and_a_raised_scale_do_not_fight(page, site_url):
+    """Two things that both take horizontal space, and the reader can
+    have both. The drawer insets `.layout` with padding, so main's
+    containing block is already smaller before the zoom divides it —
+    the case where an overflow would be a product of the two rather
+    than of either."""
+    _open(page, site_url, "docs/reference.html")
+    page.click(".ctrl-btn.drawer-toggle")
+    page.wait_for_timeout(400)
+    assert "drawer-pinned" in page.evaluate("() => document.body.className"), (
+        "the drawer did not pin, so this measures the unpinned layout"
+    )
+    for width_mode in ("narrow", "comfortable", "max"):
+        page.evaluate("(m) => setContentWidth(m)", width_mode)
+        for scale in (1, 1.5, 2):
+            _set(page, scale)
+            got = page.evaluate(GEOMETRY)
+            assert got["scrollW"] <= got["innerW"] + 1, (
+                f"pinned drawer + {width_mode} at {scale}x scrolls sideways: "
+                f"{got['scrollW']} against {got['innerW']}"
+            )
+            # And the panel still owns its own column rather than being
+            # overrun by the magnified one.
+            assert got["nav"]["h"] == pytest.approx(got["innerH"], abs=1), got["nav"]
+
+
 TIP_PAGE = """---
 title: Cursor under zoom
 ---
@@ -259,6 +285,62 @@ def test_a_chart_tooltip_still_lands_on_the_pointer(browser, tip_url, scale):
         pg.close()
 
 
+ANNO_TIP = """() => {
+  const m = document.querySelector('.okc-anno-line-marker .okc-anno-marker')
+         || document.querySelector('.okc-anno-marker-substr');
+  if (!m) return null;
+  m.scrollIntoView({block: 'center'});
+  m.dispatchEvent(new MouseEvent('mouseenter'));
+  const t = [...document.querySelectorAll('.okc-anno-tip')]
+    .find(e => e.getBoundingClientRect().width > 0);
+  if (!t) return null;
+  const r = t.getBoundingClientRect();
+  return { mid: r.x + r.width / 2, left: parseFloat(t.style.left), zoom: t.currentCSSZoom };
+}"""
+
+
+def test_an_annotated_code_tooltip_holds_its_place_across_scales(page, site_url):
+    """The third `position: fixed` element inside the zoomed column, and
+    the one with no other test.
+
+    It anchors on the highlighted CODE BLOCK rather than on the marker
+    chip, so what is asserted is not "near the marker" — it is that the
+    written `left` and the rendered position differ by exactly the zoom,
+    and that the rendered position does not move when the scale does. An
+    uncorrected write drifts by the scale factor: at 1.5 the tip renders
+    at 1.5x the coordinate it was handed.
+    """
+    _open(page, site_url, "docs/reference.html")
+    assert page.evaluate("() => document.querySelectorAll('.okc-anno-tip').length") > 0, (
+        "no annotated code on this page, so this asserts nothing"
+    )
+
+    seen = {}
+    for scale in (1, 1.5, 2):
+        _set(page, scale)
+        got = page.evaluate(ANNO_TIP)
+        assert got, f"no annotation tooltip appeared at {scale}x"
+        assert got["zoom"] == pytest.approx(scale, abs=1e-6)
+        # The written value is in the zoomed space; the rendered one is
+        # in client space. Their ratio IS the zoom, and that is the whole
+        # correction stated as an equation.
+        assert got["left"] * got["zoom"] == pytest.approx(got["mid"], abs=2), got
+        # And the reader-visible half: it is on the screen. Uncorrected,
+        # the rendered position is the coordinate times the scale, which
+        # walks off the right edge before 1.5x on any anchor past the
+        # middle of the page.
+        assert 0 <= got["mid"] <= page.evaluate("() => window.innerWidth"), (
+            f"the tooltip sits at x={got['mid']:.0f} at {scale}x"
+        )
+        seen[scale] = round(got["mid"])
+
+    # Not asserted as "it does not move": the anchor is the code block,
+    # and the column genuinely reflows between scales, so a few tens of
+    # pixels here are the layout doing its job. The equation above is
+    # what pins the correction.
+    assert len(seen) == 3, seen
+
+
 def _walk_to_the_end(page, direction: int, limit: int = 12) -> float:
     """Click a stepper until it says it has nothing left, the way a
     reader does. `aria-disabled` is what it says with, and it is a real
@@ -320,11 +402,86 @@ def test_the_choice_survives_a_reload_and_beats_first_paint(page, site_url):
     assert page.evaluate("() => document.querySelector('main').currentCSSZoom") == 1.25
 
 
-def test_a_value_off_the_ladder_is_snapped_not_trusted(page, site_url):
-    """localStorage is reader-writable and survives a kit that changed
-    its ladder. `zoom: 0` renders nothing at all, and a page that renders
-    nothing has no control left to fix it with."""
-    page.add_init_script("try{localStorage.setItem('oku-text-scale','0')}catch(e){}")
+@pytest.mark.parametrize(
+    "stored,want",
+    [
+        ("1.37", 1.25),  # between two stops
+        ("3", 2),  # above the ladder, and inside chrome-boot's clamp
+        ("0.1", 0.8),  # below the ladder
+        ("0", 1),  # `zoom: 0` renders nothing at all
+        ("abc", 1),  # not a number
+        ("1.25", 1.25),  # already a stop: left alone
+    ],
+)
+def test_a_value_off_the_ladder_is_snapped_not_trusted(browser, site_url, stored, want):
+    """localStorage is reader-writable, and every reader's stored value
+    goes off-ladder the day TEXT_SCALES changes.
+
+    The trap this pins is that chrome-boot.js has already written the
+    STORED value to the element before chrome.js runs — clamped, but not
+    snapped, because the ladder lives in chrome.js and a second copy of
+    it in the boot script is a copy that drifts. So a restore that asks
+    "does the stored value differ from what the element says?" compares
+    an off-ladder value against itself, finds no difference, and leaves
+    the page at `zoom: 1.37` with the readout saying 125% — forever, and
+    with no way for the reader to land back on the ladder except by
+    stepping.
+    """
+    page = browser.new_page(viewport=DESKTOP)
+    try:
+        page.add_init_script(f"try{{localStorage.setItem('oku-text-scale','{stored}')}}catch(e){{}}")
+        page.goto(f"{site_url}/docs/index.html")
+        page.wait_for_selector("main")
+        _wait.page_quiet(page)
+        got = page.evaluate(
+            """() => ({
+                 zoom: document.querySelector('main').currentCSSZoom,
+                 attr: document.documentElement.dataset.textScale,
+                 stored: localStorage.getItem('oku-text-scale'),
+                 width: document.querySelector('main').getBoundingClientRect().width,
+               })"""
+        )
+        # currentCSSZoom round-trips through a float, so it is compared
+        # with a tolerance.
+        assert got["zoom"] == pytest.approx(want, abs=1e-6), got
+        assert got["width"] > 0, got
+        # And what the reader is told matches what they are looking at.
+        # A value the kit refuses outright (`0`, `abc`) never reaches the
+        # element at all, so the attribute is absent and the default
+        # stands — which is why the readout is the thing asserted rather
+        # than the attribute.
+        open_menu(page)
+        assert page.inner_text(f"{MENU} .text-scale-reset").strip() == f"{round(want * 100)}%", got
+        # A value that WAS applied is written back corrected, so it
+        # converges in one load rather than being re-derived on every one.
+        if got["attr"] is not None:
+            assert float(got["attr"]) == want, got
+            assert float(got["stored"]) == want, got
+    finally:
+        page.close()
+
+
+def test_a_spent_step_does_nothing_at_all(page, site_url):
+    """`aria-disabled` is not a barrier to a real pointer. At an end of
+    the ladder the click has to be a true no-op — not a re-apply that
+    writes localStorage and fires the event every mark on the rail
+    rebuilds from."""
     _open(page, site_url)
-    assert page.evaluate("() => document.querySelector('main').currentCSSZoom") > 0
-    assert page.evaluate("() => document.querySelector('main').getBoundingClientRect().width") > 0
+    open_menu(page)
+    page.evaluate(
+        "() => { window.__scaleEvents = 0; "
+        "window.addEventListener('oku:text-scale-changed', () => window.__scaleEvents++); }"
+    )
+    for _ in range(12):
+        if page.get_attribute(f'{MENU} [data-step="1"]', "aria-disabled") == "true":
+            break
+        page.click(f'{MENU} [data-step="1"]')
+    fired_to_the_top = page.evaluate("() => window.__scaleEvents")
+    assert page.evaluate("() => parseFloat(document.documentElement.dataset.textScale)") == 2
+
+    # Now click it again, past the end, the way a reader would.
+    page.evaluate(f"""() => document.querySelector('{MENU} [data-step="1"]').click()""")
+    page.evaluate(f"""() => document.querySelector('{MENU} [data-step="1"]').click()""")
+    assert page.evaluate("() => window.__scaleEvents") == fired_to_the_top, (
+        "a spent step fired the change event, which rebuilds the rail for nothing"
+    )

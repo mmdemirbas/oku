@@ -289,8 +289,9 @@ otherwise. It is where the page rests, it is re-entered without being
 clicked, and an explicit choice expires the next time the OS flips:
 
 - choosing the theme the OS already shows is not an override at all —
-  the key is dropped and control goes back, which makes two clicks the
-  way back to auto at any time;
+  the key is dropped and control goes back. On the cycler that took two
+  clicks; on the segmented control it is one, because the stop that
+  hands the choice back is drawn and can be aimed at directly;
 - a choice that contradicts the OS holds until the OS moves;
 - when the OS moves, the page follows it and the choice is spent.
 
