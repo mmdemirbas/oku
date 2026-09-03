@@ -101,26 +101,81 @@ def _rail_kinds(source: str) -> set[str]:
     return {"rail:" + k for k in kinds}
 
 
+def _call_arguments(source: str, fn: str) -> list[str]:
+    """Every argument text passed to `fn(...)`, paren-balanced.
+
+    A regex cannot do this: one of the call sites is
+    `menuWord(m.charAt(0).toUpperCase() + m.slice(1))`, and a
+    non-greedy `[^)]*` stops at the first inner `)` — which yielded
+    `m.charAt(0` and made the caller's own guard fire on a call it
+    already knew about.
+    """
+    out: list[str] = []
+    needle = fn + "("
+    i = source.find(needle)
+    while i != -1:
+        # The declaration is not a call — `function menuWord(en) {` would
+        # otherwise arrive as the argument `en`.
+        if source[max(0, i - 9) : i] == "function ":
+            i = source.find(needle, i + len(needle))
+            continue
+        j = i + len(needle)
+        depth = 1
+        while j < len(source) and depth:
+            if source[j] == "(":
+                depth += 1
+            elif source[j] == ")":
+                depth -= 1
+            j += 1
+        out.append(source[i + len(needle) : j - 1].strip())
+        i = source.find(needle, j)
+    return out
+
+
 def _menu_words(source: str) -> set[str]:
     """The presentation menu's vocabulary, under the keys it looks them up by.
 
     Same hazard as the rail's, same answer. `Theme`, `Language`, `Light`,
-    `Dark`, `Narrow` and `Max` are words an author writes — this repo's
-    own docs write most of them in a table cell or a card title — and a
-    bare table key is matched against the leaf text of author content.
-    `menuWord` prefixes them with `menu:` and builds the key from a
-    variable, so the literal never appears at a call site.
+    `Dark`, `System`, `Narrow` and `Max` are words an author writes — this
+    repo's own docs write most of them in a table cell or a card title —
+    and a bare table key is matched against the leaf text of author
+    content. `menuWord` prefixes them with `menu:` and builds the key from
+    a variable, so the literal never appears at a call site.
 
     Derived from the source, so a row added to the menu ships a word a
-    reader sees and fails here the day it is written. The width stops are
-    capitalised from WIDTH_MODES rather than written out, which is why
-    they are listed here: `menuWord(m.charAt(0)...)` carries no literal.
+    reader sees and fails here the day it is written.
+
+    Two rows build their words from a table rather than writing them at
+    the call site — the width stops from `WIDTH_MODES`, the theme stops
+    from `THEME_MODES` — so those tables are read too. A `menuWord(...)`
+    call whose argument is neither a literal nor one of those forms raises
+    here rather than contributing nothing: a deriver that silently stops
+    deriving is the hand-copied list this function exists to replace,
+    wearing the shape of a test that passes.
     """
     words = set(re.findall(r"menuWord\('([^']+)'\)", source))
-    if "menuWord(m.charAt(0).toUpperCase() + m.slice(1))" in source:
-        block = re.search(r"var WIDTH_MODES = \[(.*?)\];", source, re.S)
-        if block:
-            words |= {w.capitalize() for w in re.findall(r"'([^']+)'", block.group(1))}
+    handled = {
+        # The width row: menuWord(m.charAt(0).toUpperCase() + m.slice(1))
+        "m.charAt(0).toUpperCase() + m.slice(1)": ("WIDTH_MODES", str.capitalize, 0),
+        # The theme row: menuWord(m[2]), third field of each entry.
+        "m[2]": ("THEME_MODES", None, 2),
+    }
+    for arg in _call_arguments(source, "menuWord"):
+        if arg.startswith("'"):
+            continue
+        assert arg in handled, f"menuWord({arg}) — teach _menu_words where that word comes from"
+        table, transform, field = handled[arg]
+        block = re.search(r"var %s = \[(.*?)\];" % table, source, re.S)
+        assert block, f"{table} is gone; the {arg} call site now derives from nothing"
+        if field == 0:
+            found = re.findall(r"'([^']+)'", block.group(1))
+        else:
+            found = [
+                re.findall(r"'([^']+)'", entry)[field - 1]
+                for entry in re.findall(r"\[([^\]]*)\]", block.group(1))
+            ]
+        assert found, f"{table} yielded no words"
+        words |= {transform(w) if transform else w for w in found}
     return {"menu:" + w for w in words}
 
 

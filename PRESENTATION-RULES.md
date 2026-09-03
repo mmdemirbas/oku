@@ -266,66 +266,95 @@ reader's choice. `test_reader_can_cycle_content_width` asserts the mode
 set is exactly the three, so adding a fourth fails rather than merely
 crowding the row.
 
-## The theme control has two stops, and following the OS is not one of them. {#the-theme-button-has-two-stops-and-following-the}
+## The theme control has three stops, and System is the only auto there is. {#the-theme-control-has-three-stops-and-system-is-o}
 
-**The theme control has two stops, and following the OS is not one of
-them.** Two segments in the presentation menu, Light and Dark, each
-carrying its own glyph, and the one in force is pressed. It answers "what
-am I looking at", not "what will the click do". Keyed off `data-theme`,
-never `data-theme-mode` — those answer different questions.
+**The theme control has three stops, and System is the only auto there
+is.** System, Light, Dark, in that order — System first because it is
+where a reader starts and the other two are the departures from it. Each
+carries its own glyph and the one in force is pressed.
 
-It was one button showing one of two icons, which gives the same answer
-but only to a reader who knows the convention. Two drawn stops need no
-convention.
+Pressed is keyed off `data-theme-mode`, never `data-theme`. Those answer
+different questions: the first is the stop the reader chose, the second
+is what the page is painted in, and on System with a dark OS they are
+`system` and `dark`. A control keyed off the second lights Dark while the
+reader is on System, and looks correct in every light-OS test.
 
-There were three, and two of them rendered identically: with the OS on
-dark, `system` and `dark` are the same pixels, so the only way to know
-which one you were in was to read the icon. Same defect as the fourth
-width stop, and the same cut.
+### What it replaced, and why the replacement is smaller
 
-Following the OS survives as a **policy** rather than a stop, because it
-is not a value — it is what the page does when the reader has not said
-otherwise. It is where the page rests, it is re-entered without being
-clicked, and an explicit choice expires the next time the OS flips:
+Two stops, Light and Dark, with following the OS surviving as a **policy**
+rather than a stop. Three mechanisms held that up:
 
-- choosing the theme the OS already shows is not an override at all —
-  the key is dropped and control goes back. On the cycler that took two
-  clicks; on the segmented control it is one, because the stop that
-  hands the choice back is drawn and can be aimed at directly;
-- a choice that contradicts the OS holds until the OS moves;
-- when the OS moves, the page follows it and the choice is spent.
+- you re-entered auto by picking whichever theme the OS was already
+  showing, since that is not an override of anything;
+- a 4px accent dot on the pressed segment said you were in it;
+- an explicit choice **expired** at the next OS flip, and `theme-pref`
+  stored `"<chosen>@<os-at-choice>"` so a flip that happened with the tab
+  closed expired it too.
 
-The cost is deliberate and was chosen with it stated: "always dark"
-cannot be pinned past an OS flip, so a reader whose OS runs on a
-schedule re-picks it once a day. That is what the two-icon button buys.
+All three existed to fit the rule into one corner button that could show
+one of two icons. Before that there had been three stops on a cycler, and
+two of them rendered identically — with the OS on dark, `system` and
+`dark` are the same pixels, so the only way to know which one you were in
+was to read the icon. That is a real defect and it is what the cut was
+for; what fixes it is **drawing the stops**, not removing one. A
+segmented control shows all three at once with the chosen one pressed, so
+`system` and `dark` are two visibly different states even when the page
+is the same colour.
 
-`theme-pref` therefore stores `"<chosen>@<os-at-choice>"`, not a bare
-theme. The OS value is what expires the choice after a flip that
-happened **with the tab closed** — the half a `matchMedia` listener
-cannot see, and the case that actually happens. A bare value from an
-older kit fails the format test and is discarded rather than honoured.
-`chrome-boot.js` applies the rule pre-paint; `chrome.js` writes it.
+Both mechanisms cost the reader something, and neither cost is worth
+paying once there is room:
 
-The auto state is marked by a 4px accent dot and by nothing else — no
-third stop, no badge with a numeral, no word. It is lit while the page is
-following, out once the reader has chosen against the OS. It rides on the
-**pressed** segment, because that is the one making the claim: this is
-where you are, and you are here because the OS put you here. Paint only:
-`test_the_auto_dot_marks_following_and_goes_out_when_pinned` asserts a
-fixed segment's box is identical in both states — read off a fixed one
-rather than off the pressed one, since the pressed one changes with the
-flip and comparing two different elements' boxes would measure the flip
-instead of the dot. The one thing the dot does not carry is a name for
-assistive tech; the stops carry their own names, which is what a screen
-reader reads.
+- **The expiry meant "always dark" could not be pinned.** A reader whose
+  OS runs on a schedule re-picked it once a day. The trade was stated
+  when it was made and it was the right trade for a two-icon button.
+- **The hand-back gesture had to be known.** The way to auto was to
+  understand that clicking a theme you were already in did something
+  other than nothing. A drawn stop can be aimed at.
+- **The dot was the state, and a dot is not a name.** The stops carry
+  their own names, which is what a screen reader reads; the dot carried
+  the one distinction that had no name at all.
+
+So a choice holds until the reader changes it, `theme-pref` stores the
+bare mode, and the dot is gone with the policy it marked.
+
+### The absence of a key is System
+
+Not a stored `"system"`. A reader who has never touched the control and
+one who chose System back are then the same state rather than two that
+can drift, and there is no third value for a later branch to forget.
+Anything stored that does not name a theme falls back to System, so a junk
+value cannot pin a reader to a theme they did not choose and cannot get
+out of.
+
+A kit under the old rule stored `"dark@light"`. Under this rule there is
+nothing to expire that against, so the first field is simply that
+reader's pin: it is honoured, and rewritten to the bare form so the
+migration happens once rather than on every load.
+
+`chrome-boot.js` applies all of this pre-paint — the theme has to be on
+the element before the first paint or the page flashes the other one —
+and `chrome.js` writes it.
+
+### The OS listener moves a following page and only that
+
+`matchMedia`'s `change` handler returns early unless the mode is
+`system`. That early return IS the difference between the three stops and
+the two they replaced; without it the listener would spend the reader's
+pin exactly as the old rule did.
 
 Every path that changes the theme goes through `announceTheme()`,
 including the OS flip. A diagram left on the previous theme's palette is
 the same bug whether the reader or the clock caused it — the old OS
 listener set `data-theme` directly and skipped the event, so Mermaid
 diagrams kept the outgoing palette until something else re-rendered them.
+The panel syncs off that event too, never off the click handler that
+happened to fire it, and the OS flip is the case that proves the
+difference: the page moves under an open panel with no click involved.
 
-`test_theme_modes.py` pins the whole rule, expiry branches included.
+`test_theme_modes.py` pins the whole rule, including both reversals — a
+theme the OS already shows is now a real pin, and an OS flip no longer
+spends a choice — and `test_chrome_menu.py` pins that the row is drawn
+and operable where the reader now finds it.
 
 ## One button holds every presentation choice. {#one-button-holds-every-presentation-choice}
 

@@ -12,21 +12,20 @@
  */
 (function () {
   try {
-    /* The reader gets two states, sun and moon. Following the OS is not
-       a third one they click into — it is where the page rests, and an
-       explicit choice lives only until the OS next flips. So the stored
-       value carries the OS setting that was in force when the choice was
-       made ("dark@light"); once the OS has moved on, the choice has
-       expired and is dropped here. This is the half a matchMedia
-       listener cannot do: the flip usually happens with the tab closed. */
+    /* Three stops: system, light, dark. The absence of a key IS system,
+       so a reader who has never touched the control and one who chose
+       System back are the same state rather than two that can drift.
+
+       A kit before this rule stored `<theme>@<os-at-choice>` and expired
+       the choice when the OS moved on. Under this rule there is no
+       expiry, so the first field is simply that reader's pin and is
+       honoured — and rewritten to the bare form, so the migration
+       happens once rather than on every load. */
     var sys = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    var pref = (localStorage.getItem('theme-pref') || '').split('@');
-    /* pref[0] !== sys is not redundant with the pref[1] test — it is what
-       rejects a value written by a kit old enough to store a bare theme. */
-    var mode = (pref.length === 2 && pref[1] === sys
-                && (pref[0] === 'light' || pref[0] === 'dark') && pref[0] !== sys)
-      ? pref[0] : 'system';
+    var stored = (localStorage.getItem('theme-pref') || '').split('@')[0];
+    var mode = (stored === 'light' || stored === 'dark') ? stored : 'system';
     if (mode === 'system') localStorage.removeItem('theme-pref');
+    else localStorage.setItem('theme-pref', mode);
     document.documentElement.setAttribute('data-theme', mode === 'system' ? sys : mode);
     document.documentElement.setAttribute('data-theme-mode', mode);
   } catch (e) {

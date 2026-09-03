@@ -765,28 +765,6 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
 .okt-menu-glyph { display: inline-flex; }
 .okt-menu-glyph svg { width: 13px; height: 13px; display: block; }
 
-/* The theme's second question gets a dot, not a third stop. Lit while
-   the page is FOLLOWING the OS; out once the reader has chosen a theme
-   against it, and lit again on its own at the next OS flip (chrome.js).
-   It sits on the pressed segment because that is the one making the
-   claim: this is where you are, and you are here because the OS put
-   you here. */
-.okt-menu-seg button[aria-pressed="true"] { position: relative; }
-.okt-menu-seg button[aria-pressed="true"]::after {
-  content: "";
-  position: absolute;
-  top: 3px; right: 3px;
-  width: 4px; height: 4px;
-  border-radius: 50%;
-  background: var(--accent);
-  opacity: 0;
-  transition: opacity .18s ease;
-}
-:root[data-theme-mode="system"] [data-row="theme"] .okt-menu-seg button[aria-pressed="true"]::after,
-:root:not([data-theme-mode])    [data-row="theme"] .okt-menu-seg button[aria-pressed="true"]::after {
-  opacity: 1;
-}
-
 /* The text-size stepper. The readout in the middle IS the reset — a
    fourth box would crowd a row that is already three wide, and at 100%
    a separate Reset is a control that does nothing, which is the

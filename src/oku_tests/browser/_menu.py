@@ -30,14 +30,16 @@ def close_menu(page):
 
 
 def set_theme(page, choice: str):
-    """Pick `light` or `dark` in the menu's theme row."""
+    """Pick `system`, `light` or `dark` in the menu's theme row."""
     open_menu(page)
     page.click(f'{MENU} [data-theme-choice="{choice}"]')
 
 
 def flip_theme(page):
-    """Move to the theme the page is NOT in — what the old corner cycler
-    did in one click. Returns the theme landed on."""
+    """Pin the theme the page is NOT painted in. Returns the theme landed
+    on. Deliberately picks a pinned stop rather than System — a caller
+    that flips the theme wants the page to have flipped, and System is a
+    stop whose colour depends on the OS the test is emulating."""
     now = page.evaluate("() => document.documentElement.getAttribute('data-theme')")
     other = "light" if now == "dark" else "dark"
     set_theme(page, other)

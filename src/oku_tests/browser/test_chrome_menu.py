@@ -152,11 +152,13 @@ def test_the_width_control_still_has_three_stops_and_shows_which(page, site_url)
 
 
 @pytest.mark.parametrize("os_theme", ["light", "dark"])
-def test_the_theme_control_has_two_stops_and_the_dot_marks_following(page, site_url, os_theme):
-    """The rule the corner button held, in its new home. Two stops;
-    following the OS is not a third one you click into, it is where the
-    page rests — so picking the theme the OS is already in hands the
-    choice back, and the dot on the pressed segment says so."""
+def test_the_theme_control_has_three_stops_and_system_is_one_of_them(page, site_url, os_theme):
+    """The rule the corner could not hold. Three stops, System included,
+    and the one in force is pressed — keyed off `data-theme-mode`, so on
+    System with a dark OS it is System that is pressed and not Dark.
+
+    The full policy lives in `test_theme_modes.py`; what this pins is
+    that the row is drawn and operable where the reader now finds it."""
     page.emulate_media(color_scheme=os_theme)
     _open(page, site_url)
     open_menu(page)
@@ -164,31 +166,30 @@ def test_the_theme_control_has_two_stops_and_the_dot_marks_following(page, site_
     choices = page.eval_on_selector_all(
         f"{MENU} [data-theme-choice]", "els => els.map(e => e.dataset.themeChoice)"
     )
-    assert choices == ["light", "dark"], choices
+    assert choices == ["system", "light", "dark"], choices
 
-    def dot_opacity():
-        return page.eval_on_selector(
-            f'{MENU} [data-theme-choice][aria-pressed="true"]',
-            "el => parseFloat(getComputedStyle(el, '::after').opacity)",
+    def pressed():
+        return page.eval_on_selector_all(
+            f"{MENU} [data-theme-choice]",
+            "els => els.filter(e => e.getAttribute('aria-pressed') === 'true')"
+            "        .map(e => e.dataset.themeChoice)",
         )
 
-    # Fresh: following the OS, dot lit, and the pressed segment is the
-    # theme the OS put us in.
+    # Fresh, whatever the OS is showing: the reader has chosen System.
     assert page.evaluate("() => document.documentElement.dataset.theme") == os_theme
-    assert page.get_attribute(f'{MENU} [data-theme-choice="{os_theme}"]', "aria-pressed") == "true"
-    assert dot_opacity() == 1
+    assert pressed() == ["system"]
 
-    # Pinned against the OS: dot out.
+    # Pinned against the OS, and it is the pin that is pressed.
     other = "light" if os_theme == "dark" else "dark"
     page.click(f'{MENU} [data-theme-choice="{other}"]')
     assert page.evaluate("() => document.documentElement.dataset.theme") == other
-    assert page.get_attribute(f'{MENU} [data-theme-choice="{other}"]', "aria-pressed") == "true"
-    assert dot_opacity() == 0
+    assert pressed() == [other]
 
-    # Choosing the theme the OS is in is how a reader hands it back.
-    page.click(f'{MENU} [data-theme-choice="{os_theme}"]')
+    # And back, by a stop that is drawn rather than by a gesture.
+    page.click(f'{MENU} [data-theme-choice="system"]')
     assert page.evaluate("() => document.documentElement.dataset.themeMode") == "system"
-    assert dot_opacity() == 1
+    assert page.evaluate("() => document.documentElement.dataset.theme") == os_theme
+    assert pressed() == ["system"]
 
 
 PLAIN_PAGE = """---
@@ -280,3 +281,39 @@ def test_every_control_in_the_panel_is_reachable_by_keyboard(page, site_url):
         if hit:
             reached.add(hit)
     assert len(reached) >= controls - 1, f"Tab reached {len(reached)} of {controls} controls in the panel"
+
+
+@pytest.mark.parametrize("width", [320, 360, 1280])
+def test_the_panel_and_every_row_fit_the_viewport(page, site_url, width):
+    """A row gains a stop and the panel is the thing that has to absorb
+    it. Theme went from two segments to three, and the failure that would
+    make is a segmented control wider than its own row — which reads as a
+    clipped stop, or as a panel the reader has to scroll sideways.
+
+    Measured rather than eyeballed, and at 320px because that is where a
+    340px panel has to become narrower than its own maximum. At 320 the
+    theme control is 214px inside a 266px row, so the label keeps 52px."""
+    page.set_viewport_size({"width": width, "height": 800})
+    page.goto(f"{site_url}/docs/index.html")
+    page.wait_for_selector("main")
+    _wait.page_quiet(page)
+    open_menu(page)
+    got = page.evaluate("""() => {
+      const p = document.querySelector('.okt-chrome-menu');
+      const r = p.getBoundingClientRect();
+      const rows = [...p.querySelectorAll('.okt-menu-row')].map((row) => {
+        const inner = row.querySelector('.okt-menu-seg, .okt-menu-step, .okt-menu-btn');
+        const rr = row.getBoundingClientRect();
+        return {
+          row: row.dataset.row,
+          overflows: inner ? inner.getBoundingClientRect().right > rr.right + 1 : false,
+          wraps: row.scrollHeight > row.clientHeight + 1,
+        };
+      });
+      return {left: r.left, right: r.right, vw: innerWidth,
+              scroll: p.scrollWidth - p.clientWidth, rows};
+    }""")
+    assert got["left"] >= 0 and got["right"] <= got["vw"], got
+    assert got["scroll"] <= 0, f"the panel scrolls sideways at {width}px: {got}"
+    bad = [r for r in got["rows"] if r["overflows"] or r["wraps"]]
+    assert bad == [], f"at {width}px these rows do not fit their own box: {bad}"

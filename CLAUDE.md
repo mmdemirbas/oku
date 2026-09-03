@@ -214,7 +214,7 @@ whole below.
   it.** `zoom` on the reading column, so charts and diagrams grow with
   the prose. Held by `test_text_scale.py`. → [why](PRESENTATION-RULES.md#the-reader-can-make-the-document-bigger)
 - **The width control has three stops, and you can see which one you are in.** Held by `test_reader_can_cycle_content_width`. → [why](PRESENTATION-RULES.md#the-width-control-has-three-stops-and-the-icon-h)
-- **The theme control has two stops, and following the OS is not one of them.** Held by `test_the_auto_dot_marks_following_and_goes_out_when_pinned`. → [why](PRESENTATION-RULES.md#the-theme-button-has-two-stops-and-following-the)
+- **The theme control has three stops, and System is the only auto there is.** Held by `test_theme_modes.py`. → [why](PRESENTATION-RULES.md#the-theme-control-has-three-stops-and-system-is-o)
 - **A link to a .md file opens the kit's viewer, not the browser's raw text.** Held by `test_a_relative_prose_link_is_not_carried`. → [why](PRESENTATION-RULES.md#a-link-to-a-md-file-opens-the-kit-s-viewer-not-t)
 - **The kit's own strings follow the page's language.** Held by `test_i18n_coverage.py`. → [why](PRESENTATION-RULES.md#the-kit-s-own-strings-follow-the-page-s-language)
 - **Anything the kit hangs off content must never become content.** → [why](PRESENTATION-RULES.md#anything-the-kit-hangs-off-content-must-never-be)

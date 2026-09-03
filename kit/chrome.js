@@ -57,6 +57,7 @@
 const ICON_MENU = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>';
 const ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.5" y1="4.5" x2="6.6" y2="6.6"/><line x1="17.4" y1="17.4" x2="19.5" y2="19.5"/><line x1="4.5" y1="19.5" x2="6.6" y2="17.4"/><line x1="17.4" y1="6.6" x2="19.5" y2="4.5"/></svg>';
 const ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+const ICON_DISPLAY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
 const ICON_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
 /* Three-segment width indicator, one segment per mode. Outline boxes;
    CSS fills them left-to-right from body[data-content-width=...] so the
@@ -1619,28 +1620,27 @@ var __okuTableConfig = (function () {
   return { open: open, close: close, toggle: toggle };
 })();
 
-/* ============ Theme: two stops, and a policy that is not one ============ *
- * The button shows sun or moon and nothing else, because a third stop
- * that renders identically to one of the other two is a state the
- * reader can only identify by reading the icon — the same defect that
- * took the width cycler from four stops to three.
+/* ============ Theme: three stops, one of which is the OS ============ *
+ * System, Light, Dark. `data-theme-mode` is the stop the reader chose
+ * and `data-theme` is what the page is painted in; for System the
+ * second follows the first through `systemTheme()`, and for the other
+ * two they are the same word.
  *
- * Following the OS survives that cut as a POLICY rather than a stop.
- * It is where the page rests, it is re-entered without being clicked,
- * and an explicit choice expires the next time the OS flips. So:
+ * This replaces a two-stop control where following the OS was a policy
+ * rather than a stop, re-entered by picking whichever theme the OS was
+ * already showing, and where an explicit choice EXPIRED at the next OS
+ * flip. Both of those existed to fit the rule into one corner button
+ * that could show one of two icons; the panel has room to draw three,
+ * so neither is needed, and both cost the reader something real. The
+ * expiry meant "always dark" could not be pinned past an OS flip — a
+ * reader whose OS runs on a schedule re-picked it once a day. The
+ * hand-back gesture meant the way to auto was to know that clicking a
+ * theme you were already in did something other than nothing.
  *
- *   - choosing the theme the OS already shows is not an override at
- *     all — it clears the key and hands control straight back, which
- *     also makes two clicks the way back to auto at any time;
- *   - a choice that contradicts the OS holds until the OS moves;
- *   - when the OS moves, the page follows it and the choice is gone.
- *
- * The cost is that "always dark" cannot be pinned past an OS flip; a
- * reader whose OS runs on a schedule re-picks it once a day. That is
- * the trade the two-icon button buys, and it is deliberate.
- *
- * The dot at the button's corner is the only mark of which of the two
- * the page is in. It is lit while the page is following the OS.
+ * So a choice now holds until the reader changes it, and `theme-pref`
+ * stores the bare mode. The `<theme>@<os-at-choice>` form an older kit
+ * wrote is read for its first field and rewritten, because under this
+ * rule that reader's pin is simply still their pin.
  */
 function systemTheme() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -1671,10 +1671,11 @@ function applyTheme(mode, persist) {
   });
   if (persist) {
     try {
-      // The OS value travels with the choice so a flip that happens
-      // with the tab closed still expires it — see chrome-boot.js.
+      // System is the absence of a choice, so it is stored as the
+      // absence of a key — which is also what a reader who has never
+      // touched the control has, so the two states cannot diverge.
       if (mode === 'system') localStorage.removeItem('theme-pref');
-      else localStorage.setItem('theme-pref', mode + '@' + systemTheme());
+      else localStorage.setItem('theme-pref', mode);
     } catch (e) {}
   }
 }
@@ -1690,9 +1691,11 @@ function announceTheme() {
     }
   }));
 }
-/* The OS moved: the page follows it, and whatever the reader had
-   chosen before is spent. */
+/* The OS moved. A page on System follows it; a page the reader pinned
+   does not, which is the whole difference between the three stops and
+   the two they replaced. */
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+  if (getThemeMode() !== 'system') return;
   applyTheme('system', true);
   announceTheme();
 });
@@ -2540,34 +2543,40 @@ var __okuChromeMenu = (function () {
     }
   });
 
-  /* Theme. Still two stops, and following the OS is still not one of
-     them: picking the theme the OS is already in IS how a reader hands
-     the choice back, and the dot on the pressed segment says the page is
-     following rather than pinned. */
+  /* Theme: System, Light, Dark, in that order because System is where
+     a reader starts and the other two are the departures from it.
+     Pressed is keyed off `data-theme-mode` — the stop the reader chose —
+     and NOT off `data-theme`, which on System is whichever of the other
+     two words the OS happens to be showing and would light the wrong
+     segment. That is the one place these two attributes must not be
+     confused, and the two-stop control it replaced read the other one
+     for the same reason in reverse. */
+  var THEME_MODES = [['system', ICON_DISPLAY, 'System'],
+                     ['light', ICON_SUN, 'Light'],
+                     ['dark', ICON_MOON, 'Dark']];
   register({
     id: 'theme', order: 30,
     html: function () {
       return '<div class="okt-menu-row" data-row="theme">' +
         '<span class="okt-menu-label">' + menuWord('Theme') + '</span>' +
         '<div class="okt-menu-seg" role="group">' +
-          '<button type="button" data-theme-choice="light" aria-pressed="false">' +
-            '<span class="okt-menu-glyph">' + ICON_SUN + '</span>' + menuWord('Light') + '</button>' +
-          '<button type="button" data-theme-choice="dark" aria-pressed="false">' +
-            '<span class="okt-menu-glyph">' + ICON_MOON + '</span>' + menuWord('Dark') + '</button>' +
+          THEME_MODES.map(function (m) {
+            return '<button type="button" data-theme-choice="' + m[0] + '" aria-pressed="false">' +
+                   '<span class="okt-menu-glyph">' + m[1] + '</span>' + menuWord(m[2]) + '</button>';
+          }).join('') +
         '</div>' +
       '</div>';
     },
     wire: function (root) {
       root.querySelectorAll('[data-theme-choice]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var choice = b.getAttribute('data-theme-choice');
-          applyTheme(choice === systemTheme() ? 'system' : choice, true);
+          applyTheme(b.getAttribute('data-theme-choice'), true);
           announceTheme();
         });
       });
     },
     sync: function (root) {
-      var now = document.documentElement.getAttribute('data-theme');
+      var now = getThemeMode();
       root.querySelectorAll('[data-theme-choice]').forEach(function (b) {
         b.setAttribute('aria-pressed', b.getAttribute('data-theme-choice') === now ? 'true' : 'false');
       });
@@ -5370,7 +5379,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-02-r70';
+var __okuKitBuild = '2026-09-03-r71';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

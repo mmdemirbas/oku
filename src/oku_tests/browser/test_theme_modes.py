@@ -1,16 +1,22 @@
-"""The theme button has two stops, and following the OS is not one.
+"""Three stops — System, Light, Dark — and System is the only auto there is.
 
-The cycler used to have three — system, light, dark — and two of them
-rendered identically: with the OS on dark, `system` and `dark` are the
-same pixels, so the only way to tell which one you were in was to read
-the icon. That is the defect the width cycler shed when it went from
-four stops to three.
+The control had two, Light and Dark, with following the OS surviving as
+a *policy* rather than a stop: you re-entered it by picking whichever
+theme the OS was already showing, a 4px dot said you were in it, and an
+explicit choice EXPIRED at the next OS flip. All three of those existed
+to fit the rule into one corner button that could show one of two icons.
 
-Following the OS survives as a policy instead. It is where the page
-rests, it is re-entered without being clicked, and a choice against it
-expires the next time the OS flips. These tests pin the whole rule,
-including the branch a matchMedia listener cannot cover: a flip that
-happens while the tab is closed.
+The panel has room to draw three, so the reader gets the ordinary thing:
+a stop for each, System included, and a pin that holds until they change
+it. That reverses two behaviours, and both reversals are pinned here —
+picking the theme the OS is already in is now a real pin rather than a
+hand-back, and an OS flip no longer spends a choice.
+
+The distinction the whole file turns on is that `data-theme-mode` is the
+stop the reader chose and `data-theme` is what the page is painted in.
+On System with a dark OS those are `system` and `dark`, so a control
+keyed off the wrong one lights the wrong segment while looking correct
+in every light-OS test.
 """
 
 from __future__ import annotations
@@ -34,157 +40,154 @@ def _open(page, site_url, *, os_theme="light", pref=None):
     if pref is not None:
         page.add_init_script("try{localStorage.setItem('theme-pref',%r)}catch(e){}" % pref)
     page.goto(f"{site_url}/docs/index.html")
-    # The control moved into the presentation menu, so reaching it is one
-    # click more. The policy it carries did not move.
     open_menu(page)
     return page.evaluate(STATE)
 
 
-def _click(page):
-    """What the corner cycler did in one click: go to the other stop."""
-    now = page.evaluate("() => document.documentElement.getAttribute('data-theme')")
-    page.click(f'{MENU} [data-theme-choice="{"light" if now == "dark" else "dark"}"]')
+def _pick(page, stop):
+    page.click(f'{MENU} [data-theme-choice="{stop}"]')
     page.wait_for_timeout(120)
     return page.evaluate(STATE)
 
 
-@pytest.mark.parametrize("os_theme", ["light", "dark"])
-def test_a_fresh_reader_follows_the_os(page, site_url, os_theme):
-    """Nothing stored: the page is whatever the OS says, and it is in
-    the following state rather than pinned to that value."""
-    state = _open(page, site_url, os_theme=os_theme)
-    assert state["theme"] == os_theme
-    assert state["mode"] == "system"
-    assert state["pref"] is None
-
-
-@pytest.mark.parametrize("os_theme", ["light", "dark"])
-def test_the_cycle_has_exactly_two_stops(page, site_url, os_theme):
-    """Four clicks visit two themes, alternating. A third stop would
-    show up here as a repeat or a third value — which is what made the
-    old cycler unreadable, and what a future fourth would do again."""
-    _open(page, site_url, os_theme=os_theme)
-    seen = [_click(page)["theme"] for _ in range(4)]
-    other = "light" if os_theme == "dark" else "dark"
-    assert seen == [other, os_theme, other, os_theme], seen
-
-
-def test_choosing_against_the_os_is_an_override_that_is_stored(page, site_url):
-    """OS light, reader picks dark: that contradicts the OS, so it is a
-    real choice and it is written down with the OS value it was made
-    against."""
-    _open(page, site_url, os_theme="light")
-    state = _click(page)
-    assert state == {"theme": "dark", "mode": "dark", "pref": "dark@light"}
-
-
-def test_choosing_what_the_os_already_shows_hands_control_back(page, site_url):
-    """The second click lands on the OS's own theme. That is not an
-    override of anything, so the key is dropped and the page is
-    following again — which is also the route back to auto: two clicks,
-    no hidden gesture, no third stop."""
-    _open(page, site_url, os_theme="light")
-    _click(page)
-    state = _click(page)
-    assert state == {"theme": "light", "mode": "system", "pref": None}
-
-
-def test_an_override_expires_when_the_os_flips_under_a_live_tab(page, site_url):
-    """The reader pinned dark against a light OS. Evening comes, the OS
-    goes dark on its own, and the choice is spent — the page follows
-    from here rather than staying pinned to a value that now agrees with
-    the OS by accident."""
-    _open(page, site_url, os_theme="light")
-    assert _click(page)["mode"] == "dark"
-    page.emulate_media(color_scheme="dark")
-    # Wait for the listener to have run, not for a number of
-    # milliseconds. A fixed 200ms is long enough on an idle machine and
-    # not on a loaded one, which is the whole of what makes a browser
-    # suite flaky: this passed alone and failed inside a batch.
-    page.wait_for_function(
-        "() => localStorage.getItem('theme-pref') === null"
-        " && document.documentElement.getAttribute('data-theme') === 'dark'"
+def _pressed(page):
+    return page.eval_on_selector_all(
+        f"{MENU} [data-theme-choice]",
+        "els => els.filter(e => e.getAttribute('aria-pressed') === 'true')"
+        "        .map(e => e.dataset.themeChoice)",
     )
-    assert page.evaluate(STATE) == {"theme": "dark", "mode": "system", "pref": None}
-
-
-def test_an_override_expires_across_a_flip_the_tab_never_saw(page, site_url):
-    """The same rule, for the case that actually happens: the OS flips
-    with the tab closed, so no matchMedia event is ever delivered. The
-    stored OS value is what catches it at boot."""
-    state = _open(page, site_url, os_theme="dark", pref="dark@light")
-    assert state == {"theme": "dark", "mode": "system", "pref": None}
-
-
-def test_an_override_survives_a_reload_while_the_os_holds_still(page, site_url):
-    """The other half of the same test — expiry must be caused by the OS
-    moving, not by every page load."""
-    state = _open(page, site_url, os_theme="light", pref="dark@light")
-    assert state == {"theme": "dark", "mode": "dark", "pref": "dark@light"}
-
-
-def test_a_preference_from_an_older_kit_is_discarded_not_misread(page, site_url):
-    """Kits before this rule stored a bare theme. Read as the new format
-    it has no OS value to compare, so it cannot be honoured — it must be
-    dropped cleanly rather than pinning a reader forever."""
-    state = _open(page, site_url, os_theme="light", pref="dark")
-    assert state == {"theme": "light", "mode": "system", "pref": None}
 
 
 @pytest.mark.parametrize("os_theme", ["light", "dark"])
-def test_the_control_reports_the_theme_that_is_on(page, site_url, os_theme):
-    """The control answers "what am I looking at", not "what will the
-    click do".
+def test_a_fresh_reader_is_on_system(page, site_url, os_theme):
+    """Nothing stored: the page is whatever the OS says, the stop in
+    force is System, and there is no key — the absence of one IS System,
+    so a reader who has never touched the control and one who chose it
+    back are the same state rather than two that can drift."""
+    state = _open(page, site_url, os_theme=os_theme)
+    assert state == {"theme": os_theme, "mode": "system", "pref": None}
 
-    In the corner that was one button showing one of two icons, and a
-    reader had to know the convention to read it. In the menu both stops
-    are drawn, each with its own glyph, and the one in force is pressed —
-    the same answer, given without a convention to know.
-    """
+
+@pytest.mark.parametrize("os_theme", ["light", "dark"])
+def test_the_control_has_exactly_three_stops_each_with_a_glyph(page, site_url, os_theme):
+    """System first, because it is where a reader starts and the other
+    two are the departures from it."""
     _open(page, site_url, os_theme=os_theme)
-    for expected in (os_theme, "light" if os_theme == "dark" else "dark"):
-        pressed = page.eval_on_selector_all(
-            f"{MENU} [data-theme-choice]",
-            "els => els.filter(e => e.getAttribute('aria-pressed') === 'true')"
-            "        .map(e => e.dataset.themeChoice)",
-        )
-        assert pressed == [expected], (expected, pressed)
-        glyphs = page.eval_on_selector_all(
-            f"{MENU} [data-theme-choice] .okt-menu-glyph svg",
-            "els => els.length",
-        )
-        assert glyphs == 2, f"each stop carries its own glyph; found {glyphs}"
-        _click(page)
+    stops = page.eval_on_selector_all(
+        f"{MENU} [data-theme-choice]", "els => els.map(e => e.dataset.themeChoice)"
+    )
+    assert stops == ["system", "light", "dark"], stops
+    glyphs = page.eval_on_selector_all(f"{MENU} [data-theme-choice] .okt-menu-glyph svg", "els => els.length")
+    assert glyphs == 3, f"each stop carries its own glyph; found {glyphs}"
 
 
-def test_the_auto_dot_marks_following_and_goes_out_when_pinned(page, site_url):
-    """The one mark that separates the two states the control cannot
-    show by which stop is pressed. It is lit while the page follows the
-    OS and out once the reader has chosen against it — and it is paint
-    only, so lighting it cannot move the segment under the pointer.
+@pytest.mark.parametrize("os_theme", ["light", "dark"])
+def test_the_pressed_stop_is_the_one_the_reader_chose(page, site_url, os_theme):
+    """The discriminating case, and the reason it is parametrised over
+    the OS: on System the page is PAINTED light or dark, so a control
+    keyed off `data-theme` presses Light or Dark here and looks right
+    doing it. The reader has chosen System, so System is pressed."""
+    _open(page, site_url, os_theme=os_theme)
+    assert _pressed(page) == ["system"]
+    for stop in ("light", "dark", "system"):
+        _pick(page, stop)
+        assert _pressed(page) == [stop], (stop, _pressed(page))
 
-    It rides on the PRESSED segment, because that is the one making the
-    claim: this is where you are, and you are here because the OS put
-    you here."""
-    # The dot is read off whichever segment is pressed — that is where it
-    # sits. The BOX is read off a fixed one, because the pressed segment
-    # changes with the flip and comparing two different elements' boxes
-    # would measure the flip rather than the dot.
-    dot = """() => {
-      const row = document.querySelector('.okt-chrome-menu [data-row="theme"]');
-      const pressed = row.querySelector('[aria-pressed="true"]');
-      const anchor = row.querySelector('[data-theme-choice="light"]');
-      const s = getComputedStyle(pressed, '::after');
-      const r = anchor.getBoundingClientRect();
-      return {opacity: parseFloat(s.opacity), w: parseFloat(s.width),
-              box: [Math.round(r.x), Math.round(r.y), r.width, r.height]};
-    }"""
+
+def test_a_choice_is_stored_bare_and_a_pin_is_a_pin(page, site_url):
+    """Light against a dark OS is an override, and it is written down as
+    the mode itself — no OS value travelling with it, because nothing
+    expires any more."""
+    _open(page, site_url, os_theme="dark")
+    assert _pick(page, "light") == {"theme": "light", "mode": "light", "pref": "light"}
+
+
+def test_choosing_the_theme_the_os_already_shows_is_a_real_pin(page, site_url):
+    """The first of the two reversals. This used to be the gesture for
+    handing control back — the key was dropped and the page went to
+    following, which meant the way to auto was knowing that clicking a
+    theme you were already in did something other than nothing.
+
+    It now means what it says: the reader wants Light, whatever the OS
+    does next."""
     _open(page, site_url, os_theme="light")
-    following = page.evaluate(dot)
-    assert following["opacity"] == 1
-    assert following["w"] >= 4, following
+    assert _pick(page, "light") == {"theme": "light", "mode": "light", "pref": "light"}
 
-    _click(page)
-    pinned = page.evaluate(dot)
-    assert pinned["opacity"] == 0, pinned
-    assert pinned["box"] == following["box"], (following["box"], pinned["box"])
+
+def test_system_is_how_a_reader_hands_control_back(page, site_url):
+    """…and it is drawn, so it can be aimed at."""
+    _open(page, site_url, os_theme="light")
+    _pick(page, "dark")
+    assert _pick(page, "system") == {"theme": "light", "mode": "system", "pref": None}
+
+
+def test_a_pin_survives_an_os_flip_under_a_live_tab(page, site_url):
+    """The second reversal, and the one with a cost attached under the
+    old rule: "always dark" could not be pinned past an OS flip, so a
+    reader whose OS runs on a schedule re-picked it once a day."""
+    _open(page, site_url, os_theme="light")
+    assert _pick(page, "dark")["mode"] == "dark"
+    page.emulate_media(color_scheme="dark")
+    page.wait_for_timeout(300)
+    assert page.evaluate(STATE) == {"theme": "dark", "mode": "dark", "pref": "dark"}
+    # …and it holds when the OS moves back, which is the half that would
+    # pass by accident above: dark-pinned under a dark OS is the same
+    # pixels either way.
+    page.emulate_media(color_scheme="light")
+    page.wait_for_timeout(300)
+    assert page.evaluate(STATE) == {"theme": "dark", "mode": "dark", "pref": "dark"}
+
+
+def test_a_pin_survives_a_flip_the_tab_never_saw(page, site_url):
+    """The case that actually happens — the OS flips with the tab closed,
+    so no matchMedia event is ever delivered. Under the old rule the
+    stored OS value expired the choice here; there is nothing to expire
+    it against now, and nothing should."""
+    state = _open(page, site_url, os_theme="dark", pref="light")
+    assert state == {"theme": "light", "mode": "light", "pref": "light"}
+
+
+def test_system_follows_a_live_os_flip(page, site_url):
+    """The other side of the listener: a page that has NOT been pinned
+    moves with the OS, and `announceTheme` fires so a Mermaid diagram
+    re-renders on the incoming palette."""
+    _open(page, site_url, os_theme="light")
+    page.evaluate(
+        "() => { window.__themeEvents = 0;"
+        " window.addEventListener('oku:theme-changed', () => window.__themeEvents++); }"
+    )
+    page.emulate_media(color_scheme="dark")
+    page.wait_for_function("() => document.documentElement.dataset.theme === 'dark'")
+    assert page.evaluate(STATE) == {"theme": "dark", "mode": "system", "pref": None}
+    assert page.evaluate("() => window.__themeEvents") >= 1
+
+
+def test_a_preference_from_an_older_kit_is_honoured_and_rewritten(page, site_url):
+    """Kits under the two-stop rule stored `<theme>@<os-at-choice>` and
+    expired the choice once the OS moved on. There is no expiry now, so
+    the first field is simply that reader's pin — honoured, and rewritten
+    to the bare form so the migration happens once rather than on every
+    load."""
+    state = _open(page, site_url, os_theme="dark", pref="dark@light")
+    assert state == {"theme": "dark", "mode": "dark", "pref": "dark"}
+
+
+def test_a_stored_value_that_names_no_theme_falls_back_to_system(page, site_url):
+    """Anything the kit cannot read is System, which is the state that
+    needs no key — so a junk value cannot pin a reader to a theme they
+    did not choose and cannot get out of."""
+    state = _open(page, site_url, os_theme="light", pref="sepia")
+    assert state == {"theme": "light", "mode": "system", "pref": None}
+
+
+def test_the_stop_in_force_is_still_pressed_after_the_os_moves_it(page, site_url):
+    """A panel left open while the OS flips: the page moved, so the
+    control has to move with it. It syncs off `oku:theme-changed`, never
+    off the click handler that happened to fire it — and the OS flip is
+    the case that proves the difference, because no click was involved."""
+    _open(page, site_url, os_theme="light")
+    assert _pressed(page) == ["system"]
+    page.emulate_media(color_scheme="dark")
+    page.wait_for_function("() => document.documentElement.dataset.theme === 'dark'")
+    assert page.locator(MENU).is_visible(), "the panel closed on an OS flip"
+    assert _pressed(page) == ["system"], "System stopped being the pressed stop when the OS moved"
