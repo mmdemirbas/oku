@@ -236,14 +236,41 @@ def scroll_stable(page, *, timeout: int = DEFAULT_TIMEOUT) -> None:
     stable(page, "() => Math.round(window.scrollY)", timeout=timeout, what="the page stopped scrolling")
 
 
-def page_quiet(page, *, timeout: int = DEFAULT_TIMEOUT) -> None:
+def page_quiet(page, *, rendered: bool = True, timeout: int = DEFAULT_TIMEOUT) -> None:
     """The render pass stopped adding to the document.
 
     `window.__okuRendered` marks the end of the renderer's walk, not
     the end of the page: charts size themselves, Prism rewrites blocks
     when a grammar lands, and the rail builds its marks. The height and
     the element count together catch all three.
+
+    The flag is waited on FIRST, and it is not redundant with the poll
+    after it. A stability poll answers "nothing changed between two
+    samples", which a page that has not started rendering satisfies
+    perfectly — so on a loaded machine this returned while the document
+    was still the stub. Measured: a full run at load average 145 gave
+    `test_heading_outline.py` an outline with zero headings, zero
+    callouts and zero titles, which read as three assertion failures
+    about the kit's heading levels on a page the kit had not drawn yet.
+    Both halves are needed — the flag alone fires before the charts have
+    sized — and this is the shape the flag was added for: a waiter that
+    cannot observe the event it missed asks the state instead.
+
+    `rendered=False` is for a page that is MEANT not to render — the one
+    caller opens a stub whose page source is deliberately unreachable.
+    The renderer reports that on the console and returns without setting
+    the flag, so there is no "finished unsuccessfully" state to wait for;
+    waiting for success on a page under test for its failure would just
+    spend the timeout. Passing it is a claim about the fixture, which is
+    why it is a keyword and not a default.
     """
+    if rendered:
+        until(
+            page,
+            "() => window.__okuRendered === true",
+            timeout=timeout,
+            what="the renderer finished its walk",
+        )
     stable(
         page,
         "() => [document.body.scrollHeight, document.querySelectorAll('*').length]",

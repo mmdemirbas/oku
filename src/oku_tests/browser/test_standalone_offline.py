@@ -206,7 +206,10 @@ def test_missing_page_source_still_reports_on_a_content_page(page, entry_tree):
     console = []
     page.on("console", lambda m: console.append(m.text) if m.type == "error" else None)
     page.goto(stray.as_uri(), wait_until="load")
-    page_quiet(page)
+    # The renderer reports and returns here, so it never sets the flag
+    # `page_quiet` otherwise waits for: this page is under test for not
+    # rendering.
+    page_quiet(page, rendered=False)
 
     reported = [c for c in console if "page-source-unreachable" in c]
     assert reported, f"a missing page source was not reported: {console}"
