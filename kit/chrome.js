@@ -5379,7 +5379,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-06-r73';
+var __okuKitBuild = '2026-09-06-r74';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -7614,7 +7614,7 @@ class OkuChart extends HTMLElement {
         var rowY = lgY + 4 + i * lgRowH;
         parts.push(
           '<g class="okc-legend-chip" data-series-idx="' + (srcIdx >= 0 ? srcIdx : i) + '" tabindex="0" role="button" ' +
-          'aria-label="Toggle ' + escapeXml(s.label) + ' series">' +
+          'aria-label="' + escapeXml(okuT('Toggle {0} series', s.label)) + '">' +
             '<rect x="' + lgX + '" y="' + rowY + '" width="14" height="14" rx="2" fill="' + color + '" class="okc-legend-swatch"/>' +
             '<text x="' + (lgX + 18) + '" y="' + (rowY + 11) + '" class="okc-legend">' + escapeXml(s.label) + '</text>' +
           '</g>'
@@ -7702,7 +7702,9 @@ class OkuChart extends HTMLElement {
         cx = x0; cy += rowH;
       }
       var color = palette[i % palette.length];
-      html += '<g class="okc-legend-chip" tabindex="0" data-legend-hover="' + i + '" data-' + idxAttr + '="' + i + '">';
+      html += '<g class="okc-legend-chip" tabindex="0" role="button" aria-label="' +
+                 escapeXml(okuT('Toggle {0} series', label)) + '" data-legend-hover="' + i +
+                 '" data-' + idxAttr + '="' + i + '">';
       html +=   '<rect x="' + cx + '" y="' + (cy + 1) + '" width="' + swatch + '" height="' + swatch + '" rx="2" fill="' + color + '"/>';
       html +=   '<text x="' + (cx + swatch + 4) + '" y="' + (cy + 9) + '" class="okc-legend" font-size="' + fontPx + '">' + escapeXml(label) + '<title>' + escapeXml(full) + '</title></text>';
       html += '</g>';
@@ -10387,6 +10389,15 @@ class OkuChart extends HTMLElement {
     var legendSeries = (Array.isArray(rootNode.children) ? rootNode.children : [])
       .map(function (c) { return { label: c.label || '' }; })
       .filter(function (s) { return !!s.label; });
+    // A chip's index is a position in that FILTERED list, so it does not
+    // address `children` — an unlabelled top-level node shifts every
+    // index after it. This maps one to the other, and is -1 where a
+    // child has no chip.
+    var legendIdxOf = [];
+    var labelled = 0;
+    (Array.isArray(rootNode.children) ? rootNode.children : []).forEach(function (c) {
+      legendIdxOf.push(c && c.label ? labelled++ : -1);
+    });
     var legendH = 0;
     if (legendSeries.length) {
       // Same wrap heuristic as _renderSeriesLegend so the reserved
@@ -10446,12 +10457,20 @@ class OkuChart extends HTMLElement {
       if (!node.children || !node.children.length) return;
       var span = a1 - a0;
       var offset = 0;
-      node.children.forEach(function (c) {
+      node.children.forEach(function (c, ci) {
         var frac = node._value > 0 ? (c._value / node._value) : 0;
         var ca0 = a0 + offset * span;
         var ca1 = a0 + (offset + frac) * span;
         var childColor = d === 0 ? palette[paletteIdx++ % palette.length] : color;
+        // A ring-1 branch and every arc under it are one legend entry —
+        // the colour cascades down, so muting the chip has to mute the
+        // whole wedge and not just its innermost ring. One group is
+        // enough because the walk is depth-first, so a branch's arcs are
+        // emitted contiguously.
+        var li = d === 0 ? legendIdxOf[ci] : -1;
+        if (li >= 0) parts.push('<g class="okc-series" data-series-idx="' + li + '">');
         walk(c, d + 1, ca0, ca1, childColor);
+        if (li >= 0) parts.push('</g>');
         offset += frac;
       });
     }
@@ -10485,6 +10504,16 @@ class OkuChart extends HTMLElement {
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     parts.push(this._renderSeriesLegend(series, palette, { x: pad.left, y: legendY, width: plotW, idxAttr: 'series-idx' }));
     var xCursor = pad.left;
+    // A cell belongs to a column AND to a series, and the paint order is
+    // by column — so the cells of one series are scattered through the
+    // DOM. They are collected per series and emitted as one
+    // `.okc-series` group each, which is what the shared legend wiring
+    // mutes. Without it the chip above takes focus, reads as a button
+    // with a pressed state, and does nothing. Ticks are held back and
+    // emitted after every group so a column label is never inside one:
+    // muting a series must not take its category label with it.
+    var bySeries = series.map(function () { return []; });
+    var tickParts = [];
     categories.forEach(function (cat, ci) {
       var colW = (colTotals[ci] / grandTotal) * plotW;
       if (colW <= 0) return;
@@ -10501,14 +10530,19 @@ class OkuChart extends HTMLElement {
             { k: '% of col', v: Math.round((v / colTotal) * 100) + '%' }
           ]
         });
-        parts.push('<rect x="' + xCursor.toFixed(1) + '" y="' + yCursor.toFixed(1) + '" width="' + colW.toFixed(1) + '" height="' + segH.toFixed(1) + '" fill="' + color + '" stroke="var(--bg)" stroke-width="1" class="okc-marimekko-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((ser.label || '') + ' · ' + cat + ' · ' + fmtNum(v)) + '</title></rect>');
+        bySeries[si].push('<rect x="' + xCursor.toFixed(1) + '" y="' + yCursor.toFixed(1) + '" width="' + colW.toFixed(1) + '" height="' + segH.toFixed(1) + '" fill="' + color + '" stroke="var(--bg)" stroke-width="1" class="okc-marimekko-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((ser.label || '') + ' · ' + cat + ' · ' + fmtNum(v)) + '</title></rect>');
         yCursor += segH;
       });
       // Category label at the bottom of the column.
       var mkTickX = xCursor + colW / 2;
-      parts.push('<text x="' + mkTickX.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="' + okuTickAnchor(mkTickX, 0, W) + '" class="okc-tick">' + escapeXml(cat) + '</text>');
+      tickParts.push('<text x="' + mkTickX.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="' + okuTickAnchor(mkTickX, 0, W) + '" class="okc-tick">' + escapeXml(cat) + '</text>');
       xCursor += colW;
     });
+    bySeries.forEach(function (cells, si) {
+      if (!cells.length) return;
+      parts.push('<g class="okc-series" data-series-idx="' + si + '">' + cells.join('') + '</g>');
+    });
+    parts.push(tickParts.join(''));
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
   }
@@ -10565,7 +10599,13 @@ class OkuChart extends HTMLElement {
       }
       d += ' Z';
       var payload = JSON.stringify({ label: series[si].label || '', kv: [{ k: 'series', v: series[si].label || '' }] });
+      // Wrapped, so the legend chip above has something to mute. The
+      // shared wiring toggles `.okc-series[data-series-idx]`; a band
+      // that is not inside one leaves a chip that takes focus, reads
+      // as a pressed-state button and does nothing.
+      parts.push('<g class="okc-series" data-series-idx="' + si + '">');
       parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.78" stroke="var(--bg)" stroke-width="0.6" class="okc-stream-band" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(series[si].label || '') + '</title></path>');
+      parts.push('</g>');
     });
     // Category ticks at bottom.
     categories.forEach(function (c, i) {

@@ -956,11 +956,11 @@ made the focus branch `:focus-visible` only (a mouse click focuses too)
 and gave every `role="button"` chip a keydown handler, because Enter and
 Space fire click on a real `<button>` and on nothing else.
 
-**Focus is a promise, and the kit has broken it twice.** Anything the
-kit makes focusable — `tabindex="0"`, `role="button"`, a real `<button>`
-it draws — has told the reader there is something to do once they get
-there. Two elements took focus and did nothing with it, and neither
-failure is visible to anyone using a pointer:
+**Focus is a promise, and the kit has broken it three times.** Anything
+the kit makes focusable — `tabindex="0"`, `role="button"`, a real
+`<button>` it draws — has told the reader there is something to do once
+they get there. Three elements took focus and did nothing with it, and
+none of the failures is visible to anyone using a pointer:
 
 - the filepath chip carried `role="button"`, was reachable by Tab, and
   could not be opened, because Enter and Space fire click on a real
@@ -970,6 +970,20 @@ failure is visible to anyone using a pointer:
   version: dragging a node apart was the whole point of that figure and
   there was no other way to do it, so a reader on a keyboard could look
   at the tangle and nothing else.
+- every legend chip on a marimekko, a stream and a sunburst carried
+  `tabindex="0"` AND was handed `aria-pressed="false"` by the wiring
+  pass, so it announced itself as a toggle button with a state — and
+  moved nothing. The three use the shared `_renderSeriesLegend` row,
+  whose chips carry `data-series-idx`, and the wiring toggles
+  `.okc-series[data-series-idx]`, which none of the three emitted. The
+  fix is DOM shape rather than a fourth copy of the toggle: each
+  renderer wraps its shapes in the group and the existing wiring, CSS
+  and solo behaviour apply unchanged. Two consequences are decisions —
+  marimekko paints cells column-first, so its cells are collected per
+  series (a group built per column hides a third of a series), and its
+  category ticks stay OUTSIDE the groups, because a chart whose axis
+  labels fade as you mute is unreadable exactly when the reader is
+  comparing what is left.
 
 The check is mechanical and belongs in the browser suite: focus it, press
 the keys it implies, assert the same thing the pointer path asserts. Where
@@ -977,8 +991,13 @@ both paths exist they go through ONE function — the network's drag and
 its arrow-key nudge share a mover, because two copies of "write the
 transform, the two data attributes and every touching edge" is one rule
 that the second edit stops matching. Held by
-`browser/test_filepath.py::test_the_chip_opens_from_the_keyboard` and
-`browser/test_network_untangle.py`.
+`browser/test_filepath.py::test_the_chip_opens_from_the_keyboard`,
+`browser/test_network_untangle.py` and
+`browser/test_legend_is_a_control.py` — the last one a sweep derived
+from `kit/schema/examples.json`, so a chart type added tomorrow is
+covered on the day it lands. Measuring first is half the rule: the same
+sweep found that donut, pie, waffle and radar — the four the roadmap
+asked for — had shipped, and that box-plot has no legend to wire.
 
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never
