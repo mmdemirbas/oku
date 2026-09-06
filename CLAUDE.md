@@ -956,6 +956,30 @@ made the focus branch `:focus-visible` only (a mouse click focuses too)
 and gave every `role="button"` chip a keydown handler, because Enter and
 Space fire click on a real `<button>` and on nothing else.
 
+**Focus is a promise, and the kit has broken it twice.** Anything the
+kit makes focusable — `tabindex="0"`, `role="button"`, a real `<button>`
+it draws — has told the reader there is something to do once they get
+there. Two elements took focus and did nothing with it, and neither
+failure is visible to anyone using a pointer:
+
+- the filepath chip carried `role="button"`, was reachable by Tab, and
+  could not be opened, because Enter and Space fire click on a real
+  `<button>` and on nothing else;
+- every network node group carries `tabindex="0"`, so Tab reaches each
+  node in the graph, and every key did nothing. Worse than the chip's
+  version: dragging a node apart was the whole point of that figure and
+  there was no other way to do it, so a reader on a keyboard could look
+  at the tangle and nothing else.
+
+The check is mechanical and belongs in the browser suite: focus it, press
+the keys it implies, assert the same thing the pointer path asserts. Where
+both paths exist they go through ONE function — the network's drag and
+its arrow-key nudge share a mover, because two copies of "write the
+transform, the two data attributes and every touching edge" is one rule
+that the second edit stops matching. Held by
+`browser/test_filepath.py::test_the_chip_opens_from_the_keyboard` and
+`browser/test_network_untangle.py`.
+
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never
 English words. The page can flip to TR or EN without touching kit
