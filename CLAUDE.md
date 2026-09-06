@@ -985,6 +985,18 @@ none of the failures is visible to anyone using a pointer:
   labels fade as you mute is unreadable exactly when the reader is
   comparing what is left.
 
+Two near neighbours, from the lightbox, where the promise is broken
+without any element lying about itself. **A control's keys must be bound
+where focus actually lands**: the pan/zoom stage listens for `+`, `-`,
+`0` and the arrows, and `open()` focused the holder AROUND it, so every
+keydown bubbled up and away from the listener — expand a figure, press
+`+`, nothing. And **a dialog that says `aria-modal="true"` has to keep
+focus**: the close button is drawn before the content, so tabbing
+forward left the overlay for the page behind at 39 presses. Both are
+invisible to anyone using a pointer, and neither shows up as a control
+that does nothing when you press it. Held by
+`browser/test_lightbox_navigation.py`.
+
 The check is mechanical and belongs in the browser suite: focus it, press
 the keys it implies, assert the same thing the pointer path asserts. Where
 both paths exist they go through ONE function — the network's drag and

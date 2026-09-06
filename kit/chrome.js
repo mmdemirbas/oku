@@ -114,6 +114,26 @@ var __okuLightbox = (function () {
       if (!overlay.classList.contains('open')) return;
       if (e.key === 'Escape') { e.preventDefault(); close(); }
     });
+    // The dialog says `aria-modal="true"` and the comment at the top of
+    // this module says focus is trapped. It was not. The close button is
+    // drawn BEFORE the content inside the frame, so tabbing forward from
+    // anywhere in the content walked past the frame and into the page
+    // behind — measured at 39 presses on a 20-point chart, with the
+    // close button reachable only by Shift+Tab. Wrapping at both ends is
+    // the whole trap, and it is a trap only in name: Escape, the
+    // backdrop and the close button all still let go.
+    overlay.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' || !overlay.classList.contains('open')) return;
+      var items = Array.prototype.filter.call(
+        overlay.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+        function (n) { return !n.disabled && n.getClientRects().length; }
+      );
+      if (!items.length) return;
+      var first = items[0], last = items[items.length - 1];
+      var here = document.activeElement;
+      if (e.shiftKey && (here === first || !overlay.contains(here))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && here === last) { e.preventDefault(); first.focus(); }
+    });
     return overlay;
   }
 
@@ -124,6 +144,15 @@ var __okuLightbox = (function () {
     // (defensive — should not happen in normal flow).
     while (holder.firstChild) holder.removeChild(holder.firstChild);
     currentOpts = opts || {};
+    // Where focus lands on open. The holder unless there is a stage:
+    // the stage owns the zoom and pan keys, and they only fire while it
+    // has focus. Measured before the change — open a chart and press
+    // `+` and the transform stayed `scale(1)`, because focus was on the
+    // holder and a keydown there bubbles UP, away from the stage
+    // sitting inside it. The reader had to know to press Tab first,
+    // which nothing said. Escape is unaffected: it is bound on
+    // `document`, not on the holder.
+    var focusTarget = holder;
     // Pan/zoom wrapping — when caller asks for it, wrap the content
     // in a transformable stage with mouse / wheel / touch handlers
     // and a small inline toolbar (zoom in, zoom out, fit, 1:1). The
@@ -146,6 +175,7 @@ var __okuLightbox = (function () {
       stage.appendChild(toolbar);
       holder.appendChild(stage);
       __okuPanZoom.attach(stage, inner, toolbar);
+      focusTarget = stage;
     } else {
       if (content instanceof Node) holder.appendChild(content);
       else holder.innerHTML = String(content || '');
@@ -154,7 +184,7 @@ var __okuLightbox = (function () {
     lastFocus = document.activeElement;
     el.classList.add('open');
     document.documentElement.classList.add('okt-lightbox-open');
-    setTimeout(function () { holder.focus(); }, 0);
+    setTimeout(function () { focusTarget.focus(); }, 0);
   }
 
   function close() {
@@ -384,8 +414,14 @@ var __okuPanZoom = (function () {
       else if (act === 'out')   zoomAt(cx, cy, 1 / 1.2);
       else if (act === 'reset') reset();
     });
-    // Keyboard shortcuts while the stage is focused.
+    // Keyboard shortcuts while the stage is focused — which is on open,
+    // since `open()` sends focus here when a stage exists. A focusable
+    // element with no name is announced as nothing, so the label is
+    // also where the shortcuts are stated: they are not written
+    // anywhere else, and the toolbar's three buttons only cover zoom.
     stage.tabIndex = 0;
+    stage.setAttribute('role', 'group');
+    stage.setAttribute('aria-label', okuT('Zoomable figure. Arrow keys pan, + and - zoom, 0 resets.'));
     stage.addEventListener('keydown', function (ev) {
       var r = stage.getBoundingClientRect();
       var cx = r.left + r.width / 2;
@@ -5379,7 +5415,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-06-r74';
+var __okuKitBuild = '2026-09-06-r75';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

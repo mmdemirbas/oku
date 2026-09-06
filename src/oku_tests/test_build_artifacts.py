@@ -570,7 +570,14 @@ class TestPayloadBudget:
     # every shard it makes. About 2,900 bytes, most of it the comments
     # naming what `clone.textContent = seg` had been deleting and why
     # nothing had ever seen that id before the flattening stopped.
-    KIT_BUDGET_BYTES = 1_264_000
+    # Then from 1,264,000 by the lightbox's keyboard: focus lands on the
+    # pan/zoom stage that owns the keys instead of on the holder around
+    # it, the stage carries a name saying what those keys are, and the
+    # overlay's Tab wraps at both ends — it claimed a focus trap in a
+    # comment and in `aria-modal` and leaked to the page behind at 39
+    # presses. About 2,300 bytes, of which the trap is roughly 700 and
+    # the rest is the comments naming what each was measured doing.
+    KIT_BUDGET_BYTES = 1_267_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
