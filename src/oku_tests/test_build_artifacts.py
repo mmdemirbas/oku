@@ -558,7 +558,12 @@ class TestPayloadBudget:
     # it, one route to the panel's state through the events the setters
     # fire, and the knob fill that follows its button. About 2,100
     # bytes, nearly all of it the comments naming what each replaced.
-    KIT_BUDGET_BYTES = 1_256_000
+    # Then from 1,256,000 by the theme control's third stop, the display
+    # glyph beside it, and the network node's keyboard: one shared mover
+    # for the drag and the nudge, clamped to the viewBox, plus the
+    # comments naming what each replaced and why the `preventDefault`
+    # makes no claim about itself. About 2,500 bytes.
+    KIT_BUDGET_BYTES = 1_260_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

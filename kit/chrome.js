@@ -5379,7 +5379,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-03-r71';
+var __okuKitBuild = '2026-09-06-r72';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -9553,11 +9553,52 @@ class OkuChart extends HTMLElement {
      to clean up the view — pointer events on each node group update
      its transform AND every edge that touches it. Pinned positions
      persist for the lifetime of the chart instance (until the page
-     re-renders). */
+     re-renders).
+
+     The arrow keys do the same thing, and that is not a nicety. Each
+     node group carries `tabindex="0"`, so it takes focus — and a thing
+     that takes focus has promised the reader something to do with it.
+     Measured before this existed: Tab reached every node and every key
+     did nothing, which is the `role="button"` defect the filepath chip
+     had, wearing a different element. Untangling a graph was a
+     pointer-only capability, so a reader on a keyboard could not do it
+     at all.
+
+     One mover, used by both. A drag and a nudge that each wrote the
+     transform, the two data attributes and the edges would be two
+     copies of one rule, and the second one to change is the one that
+     stops matching. */
   _wireNetworkDrag() {
     var svg = this.querySelector('.okc-network');
     if (!svg) return;
-    var dragging = null;       // { node, edges, startCx, startCy, ptX, ptY }
+    var vb = (svg.getAttribute('viewBox') || '0 0 640 420').split(/\s+/).map(Number);
+    var minX = vb[0] + 12, maxX = vb[0] + vb[2] - 12;
+    var minY = vb[1] + 12, maxY = vb[1] + vb[3] - 12;
+
+    /* Clamped to the viewBox, for both paths. Neither had a bound
+       before, and off-canvas is worse for a nudge than for a drag —
+       a pointer is still holding the node it took away, where thirty
+       presses of one arrow key leave nothing on screen to aim at. */
+    function moveNodeTo(node, id, nx, ny) {
+      nx = Math.max(minX, Math.min(maxX, nx));
+      ny = Math.max(minY, Math.min(maxY, ny));
+      node.setAttribute('transform', 'translate(' + nx.toFixed(1) + ',' + ny.toFixed(1) + ')');
+      node.setAttribute('data-x', nx.toFixed(1));
+      node.setAttribute('data-y', ny.toFixed(1));
+      var edges = svg.querySelectorAll('line[data-source="' + CSS.escape(id) + '"], line[data-target="' + CSS.escape(id) + '"]');
+      for (var i = 0; i < edges.length; i++) {
+        var e = edges[i];
+        if (e.getAttribute('data-source') === id) {
+          e.setAttribute('x1', nx.toFixed(1));
+          e.setAttribute('y1', ny.toFixed(1));
+        } else {
+          e.setAttribute('x2', nx.toFixed(1));
+          e.setAttribute('y2', ny.toFixed(1));
+        }
+      }
+    }
+
+    var dragging = null;       // { node, id, startCx, startCy, ptX, ptY }
     function svgPoint(ev) {
       var pt = svg.createSVGPoint();
       pt.x = ev.clientX; pt.y = ev.clientY;
@@ -9571,12 +9612,10 @@ class OkuChart extends HTMLElement {
       if (!node || !svg.contains(node)) return;
       var id = node.getAttribute('data-node-id');
       if (!id) return;
-      var edges = svg.querySelectorAll('line[data-source="' + CSS.escape(id) + '"], line[data-target="' + CSS.escape(id) + '"]');
       var startPt = svgPoint(ev);
       dragging = {
         node: node,
         id: id,
-        edges: edges,
         startCx: +node.getAttribute('data-x'),
         startCy: +node.getAttribute('data-y'),
         ptX: startPt.x,
@@ -9589,22 +9628,12 @@ class OkuChart extends HTMLElement {
     svg.addEventListener('pointermove', function (ev) {
       if (!dragging) return;
       var pt = svgPoint(ev);
-      var nx = dragging.startCx + (pt.x - dragging.ptX);
-      var ny = dragging.startCy + (pt.y - dragging.ptY);
-      dragging.node.setAttribute('transform', 'translate(' + nx.toFixed(1) + ',' + ny.toFixed(1) + ')');
-      dragging.node.setAttribute('data-x', nx.toFixed(1));
-      dragging.node.setAttribute('data-y', ny.toFixed(1));
-      for (var i = 0; i < dragging.edges.length; i++) {
-        var e = dragging.edges[i];
-        var isSrc = e.getAttribute('data-source') === dragging.id;
-        if (isSrc) {
-          e.setAttribute('x1', nx.toFixed(1));
-          e.setAttribute('y1', ny.toFixed(1));
-        } else {
-          e.setAttribute('x2', nx.toFixed(1));
-          e.setAttribute('y2', ny.toFixed(1));
-        }
-      }
+      moveNodeTo(
+        dragging.node,
+        dragging.id,
+        dragging.startCx + (pt.x - dragging.ptX),
+        dragging.startCy + (pt.y - dragging.ptY)
+      );
     });
     function endDrag(ev) {
       if (!dragging) return;
@@ -9614,6 +9643,32 @@ class OkuChart extends HTMLElement {
     }
     svg.addEventListener('pointerup', endDrag);
     svg.addEventListener('pointercancel', endDrag);
+
+    /* The keyboard half. Delegated, because the nodes are rebuilt with
+       the chart and a listener per group would have to be rebuilt with
+       them. NUDGE is a tenth of the short side of the viewBox, so one
+       press is visible on any chart and a reader is not holding a key
+       down to cross the figure; Shift takes four of them at once, which
+       is the convention every canvas editor uses and the reason not to
+       invent a second modifier. */
+    var NUDGE = Math.max(6, Math.round(Math.min(vb[2], vb[3]) / 40));
+    var ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    svg.addEventListener('keydown', function (ev) {
+      var d = ARROWS[ev.key];
+      if (!d || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      var node = ev.target.closest && ev.target.closest('.okc-network-node');
+      if (!node || !svg.contains(node)) return;
+      var id = node.getAttribute('data-node-id');
+      if (!id) return;
+      var stepPx = NUDGE * (ev.shiftKey ? 4 : 1);
+      moveNodeTo(node, id, +node.getAttribute('data-x') + d[0] * stepPx, +node.getAttribute('data-y') + d[1] * stepPx);
+      // Defensive, and deliberately not claimed as measured: on a
+      // scrollable page in Chromium a focused `<g>` does not scroll the
+      // document on an arrow key with this call or without it. It is
+      // still the right thing to do — the key has been handled — and it
+      // costs nothing where the default never fires.
+      ev.preventDefault();
+    });
   }
 
   /* ---------------- Tier 3 — scatter-matrix ----------------
