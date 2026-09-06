@@ -105,7 +105,7 @@ Each project's docs/kit.json declares which domains are active and in what prior
 ```
 
 > [!TIP] Local entries always win on conflict
-> When the same term appears in both `kit.json`'s `glossary["data-platforms"]` AND in the central `_oku/glossary/data-platforms.json`, the project version is used. Merge happens after the central file loads, so a project override is never silently discarded by a later registry fetch.
+> When the same term appears in both `kit.json`'s `glossary["data-platforms"]` AND in the central [`_oku/glossary/data-platforms.json`](#f/_oku/glossary/data-platforms.json), the project version is used. Merge happens after the central file loads, so a project override is never silently discarded by a later registry fetch.
 
 ## Referencing an entry from a page {#usage}
 

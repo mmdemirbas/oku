@@ -105,7 +105,7 @@ Her projenin docs/kit.json dosyası hangi alanların hangi öncelik sırasıyla 
 ```
 
 > [!TIP] Çakışmada yerel kayıt her zaman kazanır
-> Aynı terim hem `kit.json` içindeki `glossary["data-platforms"]` altında hem de merkezî `_oku/glossary/data-platforms.json` dosyasında geçtiğinde projedeki sürüm kullanılır. Birleştirme merkezî dosya yüklendikten sonra yapıldığından, sonradan gelen bir kayıt defteri isteği proje değiştirmesini sessizce silmez.
+> Aynı terim hem `kit.json` içindeki `glossary["data-platforms"]` altında hem de merkezî [`_oku/glossary/data-platforms.json`](#f/_oku/glossary/data-platforms.json) dosyasında geçtiğinde projedeki sürüm kullanılır. Birleştirme merkezî dosya yüklendikten sonra yapıldığından, sonradan gelen bir kayıt defteri isteği proje değiştirmesini sessizce silmez.
 
 ## Bir kaydı sayfadan anmak {#usage}
 

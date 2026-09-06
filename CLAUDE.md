@@ -881,17 +881,43 @@ The fallback only runs where the answer was already `missing`, and a
 failure still reports the page-relative attempt, because that is what the
 author wrote.
 
-**A primitive nobody can discover is not a primitive.** Three surfaces
-tell an author this one exists, and only one of them used to: the skill
-briefing carries the decision rule (use it wherever you would have put a
-path in a code span), `oku spec` lists the three inline kinds beside the
-fences and `oku spec filepath` prints the syntax WITH a note on when to
-reach for it, and `oku check` says `path-in-code-span` at `info` when a
-code span names a file that is really there. Info, not warning: the check
-cannot tell "this file" from "a file of that name", so a page telling a
-reader to create a `kit.json` would be nagged by a warning. The report
-prints one line naming the info codes when `--verbose` is off, because a
-note nothing ever mentions is one nobody knows to ask for.
+**A primitive nobody can discover is not a primitive, and telling an
+author about one is only half of discovery.** Four surfaces now: the
+skill briefing carries the decision rule (use it wherever you would have
+put a path in a code span), `oku spec` lists the three inline kinds
+beside the fences and `oku spec filepath` prints the syntax WITH a note
+on when to reach for it, `oku check` says `path-in-code-span` when a code
+span names a file that is really there, and **`oku check --fix` does the
+rewrite**.
+
+That last one is what changed the third. The nudge was an `info`, on the
+reasoning that the check cannot tell "this file" from "a file of that
+name" — but the gate had already answered that: `_looks_like_a_path`
+requires a SEPARATOR, so a page telling a reader to create a `kit.json`
+is not judged at all, and the file must additionally resolve inside the
+project. What info bought instead was invisibility. An info note is one
+summary line naming the code, so the rule reached nobody: measured, this
+repo's own reference page named `src/oku/cli.py` in prose and five other
+pages did the same, ten spans that had survived every build. It is a
+`warning` now, printed by default and answerable by `--strict`.
+
+Raising a severity without a mechanical remedy is just nagging, which is
+why the two shipped together. `--fix` is defined as APPLYING WHAT THE
+REPORT SAID — it takes the issue list rather than walking the tree again,
+because which pages qualify has several answers already baked into the
+check (a materialised README is exempt, a reference outside the project
+does not resolve, a page behind `skip_gitignored` was never walked) and a
+second walk is a second set of answers waiting to diverge. It rewrites
+prose, GFM cells and `oku-*` payloads, leaves front matter, plain fences,
+island raw-text regions and existing links alone, re-parses any fence it
+touched, and is idempotent because a chip's label is a code span inside a
+link construct. Held by `test_filepath_refs.py`.
+
+**A materialised page is never nudged.** A README or a CLAUDE.md renders
+through the kit and is also read on GitHub, where `#f/…` is a link to an
+anchor that does not exist — the one place this rule would make the file
+worse.
+
 `_INLINE_KINDS` in cli.py is the authority for the set, held against
 renderer.js's own prefix dispatch by `test_authority_agreement`.
 

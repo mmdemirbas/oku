@@ -248,12 +248,18 @@ entry to write.
      (markdown in the kit's viewer, images and video inline, anything
      else as highlighted source) and copy the path from. **Use it
      wherever you would have put a path in a code span** — that is the
-     whole decision rule, and `oku check` says `path-in-code-span` when
-     it finds a span naming a file that is really there. The path
-     resolves against the page's directory first, then the project root,
-     so the root-relative spelling prose already uses works. The bytes
-     travel inside the page, so the file must be inside the project and
-     under the size cap; `oku check` reports both.
+     whole decision rule, and it holds *inside a table cell*, which is
+     where a path most often ends up as a bare span and where the dead
+     end costs the reader most: a table of files is a list of things to
+     go and find. `oku check` says `path-in-code-span` at **warning**
+     when it finds a span naming a file that is really there, and **`oku
+     check --fix` rewrites every one of them** — in prose, in GFM cells
+     and inside `oku-*` payloads alike. Reach for the chip while
+     writing; run `--fix` over a page you have converted from somewhere
+     else. The path resolves against the page's directory first, then
+     the project root, so the root-relative spelling prose already uses
+     works. The bytes travel inside the page, so the file must be inside
+     the project and under the size cap; `oku check` reports both.
    - `oku spec` lists the three inline kinds (`filepath`,
      `glossary-term`, `ext-ref`) beside the fences, and `oku spec
      filepath` prints the syntax with a note on when to reach for it.

@@ -2949,6 +2949,148 @@ def _looks_like_a_path(text: str) -> bool:
     return "/" in text
 
 
+def _chippable_path(text: str) -> bool:
+    """`_looks_like_a_path` decides whether to ASK the filesystem; this
+    decides whether the answer can be written as a link.
+
+    A `#f/` chip is `[`p`](#f/p)`, so a path holding a bracket or a
+    paren would end the label or the target early and leave the reader
+    with broken markdown where they had a working code span. Rare, and
+    the check reports those anyway — the nudge is still right, it is
+    only the mechanical rewrite that has to decline.
+    """
+    return not any(c in text for c in "[]()`")
+
+
+def _chip_link(path: str) -> str:
+    """The one spelling of a file reference, in one place.
+
+    The check's message, the rewrite and the briefing all quote this
+    form, and a second copy of it is how the message comes to recommend
+    something the rewrite does not produce.
+    """
+    return f"[`{path}`](#f/{path})"
+
+
+def _rewrite_code_span_paths(md: str, resolves) -> tuple[str, list[str]]:
+    """Turn every certain code-span path in one markdown source into a
+    chip, and say which paths moved.
+
+    `resolves(text)` is the caller's — it owns the filesystem question,
+    so this function is the same rewrite whether it is asked about a real
+    tree or a fixture, and the check and the fix cannot disagree about
+    which spans qualify by asking different questions.
+
+    Four places a backtick appears that this must not touch:
+
+    - **Front matter.** A backtick in a YAML scalar is not prose.
+    - **A plain fence.** ```` ```bash ```` holds a program, and a path in
+      a program is the program.
+    - **A raw-text island region.** Between `<pre>` and `</pre>` the
+      backticks are literal characters the reader sees, because the
+      renderer hands that region to the browser as markup.
+    - **A link construct.** The span is already clickable, and the label
+      of a chip sits inside one.
+
+    A TYPED fence is rewritten, and that is the case the whole thing is
+    for: an `oku-table` cell is prose an author wrote, and a table is
+    where a path most often ends up as a bare code span. The body is
+    JSON and the rewrite is textual, which is safe for one reason worth
+    stating — JSON's grammar has no backtick outside a string literal,
+    so a matched span is inside one by construction, and the replacement
+    introduces no character JSON escapes. The body is re-parsed anyway
+    before it is kept: a fence that stops being JSON is reverted whole
+    rather than written out broken.
+    """
+    lines = md.split("\n")
+    out: list[str] = []
+    rewritten: list[str] = []
+    i = 0
+
+    # Front matter, copied through untouched.
+    if lines and lines[0].strip() == "---":
+        out.append(lines[0])
+        i = 1
+        while i < len(lines) and lines[i].strip() != "---":
+            out.append(lines[i])
+            i += 1
+        if i < len(lines):
+            out.append(lines[i])
+            i += 1
+
+    def rewrite_line(line: str) -> str:
+        blocked = [(m.start(), m.end()) for m in _MD_LINK_CONSTRUCT_RE.finditer(line)]
+        pieces: list[str] = []
+        last = 0
+        for m in _MD_ONE_CODE_SPAN_RE.finditer(line):
+            if any(a <= m.start() < b for a, b in blocked):
+                continue
+            text = m.group(1).strip()
+            if not (_looks_like_a_path(text) and _chippable_path(text) and resolves(text)):
+                continue
+            pieces.append(line[last : m.start()])
+            pieces.append(_chip_link(text))
+            rewritten.append(text)
+            last = m.end()
+        if not pieces:
+            return line
+        pieces.append(line[last:])
+        return "".join(pieces)
+
+    fence: tuple[str, int, str] | None = None
+    body_new: list[str] = []
+    body_old: list[str] = []
+    mark = 0
+    raw_depth = 0
+    for line in lines[i:]:
+        m = _MD_FENCE_OPEN_RE.match(line)
+        if fence is None:
+            if m:
+                info = m.group(2).strip()
+                fence = (m.group(1)[0], len(m.group(1)), info)
+                body_new, body_old, mark = [], [], len(rewritten)
+                out.append(line)
+                continue
+            # A raw-text region inside an island is markup the reader
+            # sees, so its backticks are characters and not a span.
+            # Counted on the MASKED line, for the reason the island lint
+            # states next to the same two regexes: this repo's own prose
+            # writes "a `<pre>` inside a `<div>`", and counting that as
+            # an opening tag armed a suppression that never lifted —
+            # measured, it silenced 8 of the 10 rewrites on this repo's
+            # own docs, every one of them on a line of ordinary prose.
+            code_line = _mask_code_spans(_HTML_COMMENT_RE.sub("", line))
+            opened = len(_RAW_TEXT_OPEN_RE.findall(code_line))
+            closed = len(_RAW_TEXT_CLOSE_RE.findall(code_line))
+            out.append(line if (raw_depth or opened > closed) else rewrite_line(line))
+            raw_depth = max(0, raw_depth + opened - closed)
+            continue
+        closing = m and m.group(1)[0] == fence[0] and len(m.group(1)) >= fence[1] and not m.group(2).strip()
+        if not closing:
+            body_old.append(line)
+            body_new.append(rewrite_line(line) if fence[2].startswith("oku-") else line)
+            continue
+        if body_new != body_old:
+            try:
+                json.loads("\n".join(body_new))
+            except (ValueError, TypeError):
+                # The rewrite broke the payload, which it should not be
+                # able to do — so keep the fence the author wrote and
+                # report nothing for it, rather than writing out a page
+                # the renderer cannot read.
+                body_new = body_old
+                del rewritten[mark:]
+        out.extend(body_new)
+        out.append(line)
+        fence = None
+    if fence is not None:
+        # An unclosed fence is a page `oku check` already refuses; leave
+        # what the author wrote where the lint can name it.
+        out.extend(body_old)
+        del rewritten[mark:]
+    return "\n".join(out), rewritten
+
+
 _MD_FOOTNOTE_DEF_RE = re.compile(r"^ {0,3}\[\^([^\]]+)\]:")
 _MD_FOOTNOTE_REF_RE = re.compile(r"\[\^([^\]]+?)\]")
 _MD_LINK_DEF_RE = re.compile(r"^ {0,3}\[([^\]^][^\]]*)\]:\s*(\S+)")
@@ -3666,22 +3808,54 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         # is decidable, and only fires where it is certain: the span
         # names a file that is really there, inside the project, and
         # the author has not already made it a chip.
-        span_seen: set[str] = set()
+        #
+        # A WARNING, so it is printed without --verbose and `--strict`
+        # answers for it. It was an info note, and an info note is one
+        # line of summary naming the code — which is how a primitive
+        # ends up unused in the very pages that document it: this repo's
+        # own reference page named `src/oku/cli.py` in a table cell, and
+        # nothing that ran on every build ever said so out loud. Two
+        # things make the raise honest rather than nagging. The gate is
+        # already the certain case (`_looks_like_a_path` requires a
+        # separator, and the file must resolve inside the project), and
+        # `oku check --fix` does the rewrite, so the warning names a
+        # remedy that is one command rather than an afternoon.
+        #
+        # A materialised page is exempt. A README or a CLAUDE.md renders
+        # through the kit but is also read on GitHub, where `#f/…` is a
+        # link to an anchor that does not exist — so this is the one
+        # place the nudge would make the file worse.
+        span_counts: dict[str, int] = {}
+        span_first: dict[str, tuple[str, int | None]] = {}
         for where, text, span_line in code_spans:
-            if text in span_seen or not _looks_like_a_path(text):
+            if is_materialised or not _looks_like_a_path(text):
                 continue
-            _target, status = resolve_file_ref(text, p)
-            if status != "ok":
+            if text not in span_counts:
+                _target, status = resolve_file_ref(text, p)
+                if status != "ok":
+                    span_counts[text] = 0
+                    continue
+                span_first[text] = (where, span_line)
+            if text in span_first:
+                span_counts[text] = span_counts.get(text, 0) + 1
+        for text, n in span_counts.items():
+            if not n:
                 continue
-            span_seen.add(text)
+            where, span_line = span_first[text]
+            # One note per distinct path, and it carries the count: ten
+            # cells naming one file is one decision to make and ten
+            # edits to make it with, and a reader of the report should
+            # be told which number they are looking at.
+            times = "" if n == 1 else f" ({n} times on this page)"
             add(
                 p,
-                "info",
+                "warning",
                 "path-in-code-span",
                 f"{where} `{text}`",
-                f"'{text}' is a file that exists. Written as [`{text}`](#f/{text}) the reader "
+                f"'{text}' is a file that exists{times}. Written as {_chip_link(text)} the reader "
                 "gets a preview on hover, the whole file on click and a button that copies the "
-                "path — instead of a string they have to go and find.",
+                "path — instead of a string they have to go and find. `oku check --fix` rewrites "
+                "every one of these.",
                 line=span_line,
             )
 
@@ -4389,6 +4563,38 @@ def ignored_paths_note(root: Path) -> str | None:
     return f"· {len(names)} path(s) not walked — git ignores them ({shown}{more})"
 
 
+def apply_path_chip_fixes(issues: list[dict], root: Path) -> list[tuple[Path, list[str]]]:
+    """Rewrite the sources `path-in-code-span` named, and say what moved.
+
+    Defined as "apply what the check reported", not as a second walk of
+    the tree: which pages qualify is a question with several answers
+    already baked into the check — a materialised README is exempt, a
+    reference reaching outside the project does not resolve, a page
+    behind `skip_gitignored` was never walked — and a fix that asked
+    those questions again is a fix that eventually answers one of them
+    differently from the report the author is looking at.
+
+    One file is read, rewritten and written once, however many issues it
+    carried. Nothing is written when nothing changed, so a clean tree is
+    not restamped.
+    """
+    fixed: list[tuple[Path, list[str]]] = []
+    for page in sorted({i["path"] for i in issues if i["code"] == "path-in-code-span"}):
+        src, _line = _locate(page, None)
+        if src.suffix != ".md" or not src.is_file():
+            continue
+        try:
+            before = src.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        after, moved = _rewrite_code_span_paths(before, lambda t: resolve_file_ref(t, src)[1] == "ok")
+        if not moved or after == before:
+            continue
+        src.write_text(after, encoding="utf-8")
+        fixed.append((src, moved))
+    return fixed
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     """`oku check` — comprehensive doctree lint.
 
@@ -4422,6 +4628,30 @@ def cmd_check(args: argparse.Namespace) -> int:
                 "message": err,
             }
         )
+
+    if getattr(args, "fix", False):
+        # Rewrite first, then fall through and check the tree AS
+        # REWRITTEN — the report an author reads after `--fix` is the
+        # state of their files now, never the state that produced the
+        # edits. A second pass is cheap and a stale report is not.
+        moved = apply_path_chip_fixes(issues, root)
+        if moved:
+            total = sum(len(paths) for _src, paths in moved)
+            print(f"✎ rewrote {total} path(s) into #f/ chips in {len(moved)} file(s):")
+            for src, paths in moved:
+                shown = ", ".join(sorted(set(paths))[:3])
+                more = f", +{len(set(paths)) - 3} more" if len(set(paths)) > 3 else ""
+                try:
+                    rel = src.relative_to(root)
+                except ValueError:
+                    rel = src
+                print(f"  ✎ {rel} — {shown}{more}")
+            _PAGE_SOURCE_OF.clear()
+            _PAGE_BLOCK_LINES.clear()
+            pages = find_json_pages(root)
+            issues = check_pages(pages, root)
+        else:
+            print("✎ nothing to rewrite")
 
     # Shadowed sources — a real .json page next to a .md source
     # silently WINS in discovery and serving, so the
@@ -7634,6 +7864,11 @@ def main() -> int:
         "--verbose",
         action="store_true",
         help="show info-level nudges in addition to errors and warnings",
+    )
+    check_parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="rewrite what the check can fix mechanically (path-in-code-span → #f/ chips), then re-check",
     )
     check_parser.add_argument(
         "--errors-only",

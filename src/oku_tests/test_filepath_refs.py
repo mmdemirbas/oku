@@ -176,12 +176,66 @@ def test_a_path_in_a_code_span_is_named_once_with_the_link_to_write(tmp_path):
     """A path in a code span is a dead end: the reader leaves the page,
     finds the file, comes back. The note is how an author who has never
     heard of the chip finds out it exists, so it has to carry the exact
-    replacement rather than the name of a feature."""
+    replacement rather than the name of a feature — and, now that the
+    rewrite exists, the command that applies it."""
     root = _project(tmp_path)
     got = _spans(root, root / "docs" / "page.md", "The code is in `src/app.py`, see `src/app.py`.")
     assert len(got) == 1, got
     assert "#f/src/app.py" in got[0]["message"], got
-    assert got[0]["severity"] == "info", got
+    assert "oku check --fix" in got[0]["message"], got
+
+
+def test_the_nudge_is_a_warning_and_therefore_gets_read(tmp_path):
+    """It was an info note, and an info note is one summary line naming
+    the code — which is how a primitive goes unused in the pages that
+    document it. Measured before the raise: this repo's own reference
+    page named `src/oku/cli.py` in prose and its glossary page named a
+    registry file, ten spans across six pages, and nothing that ran on
+    every build said so out loud.
+
+    The raise is only honest because two other things are true. The gate
+    is already the certain case — a separator is required and the file
+    must resolve inside the project — and `oku check --fix` makes the
+    remedy one command. A warning naming an afternoon of hand edits is
+    a warning authors learn to pass `--errors-only` to.
+    """
+    root = _project(tmp_path)
+    got = _spans(root, root / "docs" / "page.md", "The code is in `src/app.py`.")
+    assert [i["severity"] for i in got] == ["warning"], got
+
+
+def test_one_note_per_path_carries_how_many_times_it_appears(tmp_path):
+    """Ten cells naming one file is one decision and ten edits. The note
+    stays single — a report with one line per cell is one nobody reads —
+    and says which number the reader is looking at."""
+    root = _project(tmp_path)
+    once = _spans(root, root / "docs" / "page.md", "Only `src/app.py` here.")
+    assert "times on this page" not in once[0]["message"], once
+
+    thrice = _spans(
+        root,
+        root / "docs" / "page.md",
+        "`src/app.py`, then `src/app.py`, and again `src/app.py`.",
+    )
+    assert len(thrice) == 1, thrice
+    assert "(3 times on this page)" in thrice[0]["message"], thrice
+
+
+def test_a_page_the_kit_only_materialised_is_never_nudged(tmp_path):
+    """A README or a CLAUDE.md renders through the kit and is also read
+    on GitHub, where `#f/…` is a link to an anchor that does not exist.
+    This is the one place the nudge would make the file worse, so it is
+    the one place it does not fire — the same exemption the prose rules
+    already take for author-owned repo markdown."""
+    root = _project(tmp_path)
+    page = {
+        "k": "doc",
+        "t": "Readme",
+        "m": {"summary": "s", "_materialised_by": "oku-init"},
+        "b": ["## S {#s}", "The code is in `src/app.py`."],
+    }
+    issues = cli.check_pages([(root / "README.md", page)], root)
+    assert [i for i in issues if i["code"] == "path-in-code-span"] == []
 
 
 def test_a_span_that_is_already_a_chip_is_not_reported(tmp_path):
@@ -236,3 +290,190 @@ def test_a_span_that_is_already_a_link_label_is_left_alone(tmp_path):
     to its source."""
     root = _project(tmp_path)
     assert _spans(root, root / "docs" / "page.md", "See [`src/app.py`](notes.md) for it.") == []
+
+
+# ---------- the rewrite the nudge names ----------
+#
+# Telling an author about a primitive is half of it. The other half is
+# that converting forty code spans by hand is an afternoon, and an
+# afternoon is what a nudge loses to. `oku check --fix` is what makes
+# the warning above proportionate.
+
+
+def _fix(root: Path, md: str, *, name: str = "page.md") -> tuple[str, list[str]]:
+    src = root / "docs" / name
+    src.write_text(md, encoding="utf-8")
+    return cli._rewrite_code_span_paths(md, lambda t: cli.resolve_file_ref(t, src)[1] == "ok")
+
+
+def test_prose_a_gfm_cell_and_a_typed_payload_are_all_rewritten(tmp_path):
+    """The three places a path is written, in one page, because they take
+    three different routes through the rewriter: a prose line, a table
+    row that is also a prose line, and a JSON string inside a fence.
+
+    The typed one is why the reported complaint is about tables — a
+    table is where a path most often ends up as a bare code span, and a
+    fix that stopped at prose would leave the case that prompted it.
+    """
+    root = _project(tmp_path)
+    out, moved = _fix(
+        root,
+        "---\ntitle: T\n---\n\n## S {#s}\n\n"
+        "The code is in `src/app.py`.\n\n"
+        "| What | Where |\n|---|---|\n| The app | `src/app.py` |\n\n"
+        '```oku-table\n{"headers":["What","Where"],"rows":[["The app","`src/app.py`"]]}\n```\n',
+    )
+    assert moved == ["src/app.py"] * 3, moved
+    assert out.count("[`src/app.py`](#f/src/app.py)") == 3, out
+    assert "`src/app.py`," not in out.replace("[`src/app.py`]", ""), out
+
+
+def test_the_rewritten_typed_fence_is_still_the_json_it_was(tmp_path):
+    """The rewrite inside a fence is textual, and it is safe for one
+    reason: JSON has no backtick outside a string literal, so a matched
+    span is inside one by construction and the replacement introduces no
+    character JSON escapes. Asserted rather than argued."""
+    import json
+
+    root = _project(tmp_path)
+    out, _moved = _fix(
+        root,
+        "---\ntitle: T\n---\n\n## S {#s}\n\n"
+        '```oku-table\n{"headers":["A"],"rows":[["see `src/app.py` now"]]}\n```\n',
+    )
+    body = out.split("```oku-table\n", 1)[1].split("\n```", 1)[0]
+    assert json.loads(body)["rows"][0][0] == "see [`src/app.py`](#f/src/app.py) now"
+
+
+def test_a_fence_whose_body_is_not_json_is_left_exactly_as_written(tmp_path):
+    """A page with a malformed payload is one `oku check` already
+    refuses, and `--fix` still runs on it. Rewriting inside a body that
+    does not parse would turn one broken page into a differently broken
+    one an author no longer recognises."""
+    root = _project(tmp_path)
+    md = (
+        "---\ntitle: T\n---\n\n## S {#s}\n\n"
+        '```oku-table\n{"headers":["A"],"rows":[["see `src/app.py`"],]}\n```\n'
+    )
+    out, moved = _fix(root, md)
+    assert out == md, out
+    assert moved == [], moved
+
+
+def test_the_four_places_a_backtick_is_not_a_span_to_rewrite(tmp_path):
+    """Front matter is YAML, a plain fence is a program, a raw-text
+    island region is markup the reader sees, and a link construct is
+    already clickable. Each on its own line so a failure names which."""
+    root = _project(tmp_path)
+    md = (
+        "---\ntitle: A `src/app.py` title\n---\n\n## S {#s}\n\n"
+        "```bash\ncat `src/app.py`\n```\n\n"
+        '<div class="okt-card">\n\n<pre>\nrun `src/app.py`\n</pre>\n\n</div>\n\n'
+        "Already done: [`src/app.py`](#f/src/app.py).\n"
+    )
+    out, moved = _fix(root, md)
+    assert moved == [], moved
+    assert out == md, out
+
+
+def test_a_sentence_about_pre_does_not_silence_the_rest_of_the_page(tmp_path):
+    """The raw-text suppression is counted on the MASKED line, for the
+    reason the island lint states beside the same two regexes: prose
+    writes "a `<pre>` inside a `<div>`" and that is a sentence, not an
+    open tag.
+
+    Measured while this was being built: counting the unmasked line
+    armed a suppression that never lifted and silenced 8 of the 10
+    rewrites on this repo's own docs, every one of them on a line of
+    ordinary prose several paragraphs later.
+    """
+    root = _project(tmp_path)
+    out, moved = _fix(
+        root,
+        "---\ntitle: T\n---\n\n## S {#s}\n\n"
+        "Multi-line code in an island is a `<pre>`, never a `<br>`.\n\n"
+        "The code is in `src/app.py`.\n",
+    )
+    assert moved == ["src/app.py"], moved
+    assert "[`src/app.py`](#f/src/app.py)" in out
+
+
+def test_only_a_path_that_resolves_is_rewritten(tmp_path):
+    """The same predicate the check uses, injected rather than
+    reimplemented — the fix is defined as applying what the report said,
+    so the two cannot come to disagree about which spans qualify."""
+    root = _project(tmp_path)
+    out, moved = _fix(
+        root,
+        "---\ntitle: T\n---\n\n## S {#s}\n\n"
+        "Real: `src/app.py`. Invented: `src/nope.py`. Bare: `kit.json`. Flag: `--dry-run`.\n",
+    )
+    assert moved == ["src/app.py"], moved
+    assert "`src/nope.py`" in out and "`kit.json`" in out and "`--dry-run`" in out
+
+
+def test_a_path_that_cannot_be_written_as_a_link_is_reported_and_not_rewritten(tmp_path):
+    """`[`p`](#f/p)` ends at the first `)`, so a path holding one would
+    leave the reader with broken markdown where they had a working code
+    span. The nudge is still right about the file; only the mechanical
+    rewrite declines."""
+    root = _project(tmp_path)
+    odd = root / "src" / "a(1).py"
+    odd.write_text("x\n", encoding="utf-8")
+    assert cli._looks_like_a_path("src/a(1).py")
+    assert not cli._chippable_path("src/a(1).py")
+    out, moved = _fix(root, "---\ntitle: T\n---\n\n## S {#s}\n\nSee `src/a(1).py`.\n")
+    assert moved == [], moved
+    assert "`src/a(1).py`" in out
+
+
+def test_running_it_twice_changes_nothing_the_second_time(tmp_path):
+    """A chip's label is a code span inside a link construct, so the
+    rewrite's own output is a shape it declines to touch. Idempotence is
+    what makes `--fix` safe to put in a pre-commit hook."""
+    root = _project(tmp_path)
+    once, first = _fix(root, "---\ntitle: T\n---\n\n## S {#s}\n\nIn `src/app.py`.\n")
+    twice, second = _fix(root, once)
+    assert first == ["src/app.py"]
+    assert second == []
+    assert twice == once
+
+
+def test_the_command_writes_the_files_and_re_checks_the_tree(tmp_path, capsys, monkeypatch):
+    """The wiring, not the rewrite: `--fix` edits on disk and then reports
+    the tree AS REWRITTEN.
+
+    That second pass is the point. A report printed from the issue list
+    that produced the edits would name warnings the author has already
+    had fixed for them, and they would go looking for spans that are no
+    longer there.
+    """
+    import argparse
+
+    root = _project(tmp_path)
+    docs = root / "docs"
+    # No kit.json beside the page: the project fence is the nearest
+    # ancestor holding one, so a second copy here would move the root to
+    # `docs/` and put the file the page names outside the project.
+    (docs / "page.md").write_text(
+        "---\ntitle: T\nsummary: s\n---\n\n## S {#s}\n\nThe code is in `src/app.py`.\n",
+        encoding="utf-8",
+    )
+    (docs / "page.html").write_text(cli._stub_for("T"), encoding="utf-8")
+    monkeypatch.chdir(docs)
+    cli._project_root_cache.clear()
+    cli._PAGE_SOURCE_OF.clear()
+    cli._PAGE_BLOCK_LINES.clear()
+
+    args = argparse.Namespace(strict=True, json=False, verbose=False, errors_only=False, fix=True)
+    rc = cli.cmd_check(args)
+    out = capsys.readouterr().out
+    assert "rewrote 1 path(s)" in out, out
+    assert "path-in-code-span" not in out, "the report still names what it just fixed"
+    assert rc == 0, out
+    assert "[`src/app.py`](#f/src/app.py)" in (docs / "page.md").read_text(encoding="utf-8")
+
+    cli._PAGE_SOURCE_OF.clear()
+    cli._PAGE_BLOCK_LINES.clear()
+    assert cli.cmd_check(args) == 0
+    assert "nothing to rewrite" in capsys.readouterr().out
