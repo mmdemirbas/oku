@@ -19,6 +19,7 @@ follows from that job.
 
 from __future__ import annotations
 
+from . import _wait
 from ._wait import page_quiet
 
 import argparse
@@ -229,11 +230,22 @@ def test_a_copy_reports_whether_it_worked(opened):
     """The failure is silent by construction — the clipboard is not
     visible — so the button has to say something."""
     btn = _button(opened, 0, "plain").last
+    sel = ".okt-copy .okt-copy-btn[data-copy-format='plain']"
     btn.click()
-    opened.wait_for_timeout(150)
-    assert "is-copied" in (btn.get_attribute("class") or "")
-    # And it goes back, or the next copy has no signal left to give.
-    opened.wait_for_timeout(1500)
+    # Both halves are conditions, and the second one is the assertion:
+    # the flag has to come back OFF, or the next copy has no signal left
+    # to give. A fixed 1.5 s here was a guess at a CSS timeout — it
+    # passes on an idle machine whatever the timeout actually is.
+    _wait.until(
+        opened,
+        f"() => [...document.querySelectorAll({sel!r})].some((b) => b.classList.contains('is-copied'))",
+        what="the copy button said it had copied",
+    )
+    _wait.until(
+        opened,
+        f"() => [...document.querySelectorAll({sel!r})].every((b) => !b.classList.contains('is-copied'))",
+        what="the copy button's flag went back off",
+    )
     assert "is-copied" not in (btn.get_attribute("class") or "")
 
 

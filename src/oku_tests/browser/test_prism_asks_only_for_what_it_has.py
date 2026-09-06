@@ -42,6 +42,8 @@ import pytest
 
 from oku import cli
 
+from . import _wait
+
 pytestmark = pytest.mark.browser
 
 # One page carrying both triggers: a markdown sample whose inner fence is
@@ -99,11 +101,24 @@ def traffic(built, browser):
         lambda r: served.append((r.url.split("/")[-1], r.status)) if "/components/" in r.url else None,
     )
     page.goto(built.as_uri(), wait_until="load")
-    # The autoloader fetches after the first highlight pass, and the
-    # markdown grammar's wrap hook fires later still. There is no event
-    # for "nothing more will be requested", so this waits out the window
-    # the reported 404s appeared in.
-    page.wait_for_timeout(6000)
+    # There is no event for "nothing more will be requested", which is
+    # why this was a 6 s sleep — the longest in the suite, paid on every
+    # run to catch a request that arrives in about 300 ms.
+    #
+    # Both triggers ARE observable, so the wait is on them and not on a
+    # clock. The markdown grammar's `wrap` hook is what asks for a fence
+    # name, and it cannot have run before the sample is highlighted; the
+    # JavaScript grammar's regex alias is asked for in the same pass.
+    # Once both blocks carry tokens, every request this test is about has
+    # been made — and then the traffic itself has to stop moving, since
+    # the assertion is about a set of requests rather than about the DOM.
+    _wait.until(
+        page,
+        "() => !!document.querySelector('code.language-markdown .token')"
+        " && !!document.querySelector('code.language-javascript .token')",
+        what="Prism highlighted both the markdown sample and the JS block",
+    )
+    _wait.settled(lambda: (len(served), len(failed)), what="the component requests stopped arriving")
     yield page, failed, served
     page.close()
 

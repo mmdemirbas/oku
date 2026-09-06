@@ -20,6 +20,7 @@ own file, test_presentation_measure.py.
 
 from __future__ import annotations
 
+from . import _wait
 from ._wait import box_stable, page_quiet
 
 import http.server
@@ -234,7 +235,10 @@ def test_a_plain_row_does_not_light_up_under_the_pointer(rendered):
     """`table tr:hover td` tinted every row on every table. Nothing
     handled the click, so the reader learned to distrust the tint."""
     rendered.hover("#big tbody tr:nth-child(2) td:first-child")
-    rendered.wait_for_timeout(200)
+    _wait.stable(
+        rendered,
+        "() => getComputedStyle(document.querySelector('#big tbody tr:nth-child(2) td:first-child')).backgroundColor",
+    )
     got = rendered.evaluate(
         """() => {
         const td = document.querySelector('#big tbody tr:nth-child(2) td');
@@ -252,7 +256,10 @@ def test_a_row_that_does_go_somewhere_still_says_so(rendered):
     """The fix is scoped, not a deletion: a row carrying `data-href`
     keeps both the tint and the pointer."""
     rendered.hover("#links tbody tr:nth-child(2) td:first-child")
-    rendered.wait_for_timeout(200)
+    _wait.stable(
+        rendered,
+        "() => getComputedStyle(document.querySelector('#links tbody tr:nth-child(2) td:first-child')).backgroundColor",
+    )
     got = rendered.evaluate(
         """() => {
         const td = document.querySelector('#links tbody tr:nth-child(2) td');
@@ -294,7 +301,11 @@ def test_cards_sit_on_a_field_darker_than_the_cards(rendered):
     """Both were --surface, which left a 1px hairline as the only thing
     separating a card from the space around it."""
     rendered.evaluate("() => document.querySelector('#big [data-view=cards]').click()")
-    rendered.wait_for_timeout(250)
+    _wait.until(
+        rendered,
+        "() => !!document.querySelector('#big .okt-card')",
+        what="the cards view rendered",
+    )
     got = rendered.evaluate(
         """() => {
         const field = document.querySelector('#big .okt-table-cards');
@@ -336,15 +347,20 @@ def test_a_card_does_not_lift_under_a_pointer_that_cannot_click_it(rendered):
     )
     assert got["cursor"] in ("auto", "default"), got
     rendered.hover("#big .okt-card")
-    rendered.wait_for_timeout(250)
-    after = rendered.evaluate("() => getComputedStyle(document.querySelector('#big .okt-card')).transform")
+    after = _wait.measured(
+        rendered, "() => getComputedStyle(document.querySelector('#big .okt-card')).transform"
+    )
     assert after in ("none", got["transform"]), f"the card moved on hover: {after}"
 
 
 def test_list_cards_carry_the_same_edge(rendered):
     """The list view has the same job and had the same defect."""
     rendered.evaluate("() => document.querySelector('#big [data-view=list]').click()")
-    rendered.wait_for_timeout(250)
+    _wait.until(
+        rendered,
+        "() => !!document.querySelector('#big .okt-list-card')",
+        what="the list view rendered",
+    )
     got = rendered.evaluate(
         """() => {
         const field = document.querySelector('#big .okt-table-list');
@@ -360,6 +376,20 @@ def test_list_cards_carry_the_same_edge(rendered):
 
 
 # ---------- chrome buttons ----------
+
+
+# The two expressions the moves above share. Named once, because a wait
+# and the assertion after it watching different things is the defect
+# these conversions exist to remove.
+_CLUSTER_OPACITY = (
+    "() => [...document.querySelectorAll('#oku-chrome-cluster .ctrl-btn')]"
+    "  .map((b) => getComputedStyle(b).opacity)"
+)
+_ROW_BOX = (
+    "() => { const a = document.querySelector('page-nav .page-nav-item > a');"
+    "  const r = a.getBoundingClientRect();"
+    "  return [Math.round(r.x), Math.round(r.width)]; }"
+)
 
 
 def _ctrl(page, sel):
@@ -387,7 +417,9 @@ def _approach(page, sel, gap=20):
     the proximity path can produce that."""
     box = _ctrl(page, sel)["box"]
     page.mouse.move(box[0] + box[2] / 2, box[1] + box[3] + gap)
-    page.wait_for_timeout(300)
+    # The falloff is a transition on opacity, so the number this whole
+    # module asserts on is mid-flight until it stops moving.
+    _wait.stable(page, f"() => getComputedStyle(document.querySelector({sel!r})).opacity")
 
 
 def test_chrome_buttons_quiet_down_when_the_pointer_is_elsewhere(rendered):
@@ -401,14 +433,14 @@ def test_chrome_buttons_quiet_down_when_the_pointer_is_elsewhere(rendered):
     reader cannot see is a control the reader cannot find, and a control
     that resizes as you approach is one you have to chase."""
     rendered.mouse.move(700, 700)
-    rendered.wait_for_timeout(300)
+    _wait.stable(rendered, _CLUSTER_OPACITY)
     far = _ctrl(rendered, ".menu-toggle")
 
     _approach(rendered, ".menu-toggle")
     near = _ctrl(rendered, ".menu-toggle")
 
     rendered.mouse.move(700, 700)
-    rendered.wait_for_timeout(300)
+    _wait.stable(rendered, _CLUSTER_OPACITY)
 
     assert 0.2 < far["opacity"] < 0.5, f"dimmed out of existence, or not dimmed: {far}"
     assert near["opacity"] > 0.98, f"the button did not come back on approach: {near}"
@@ -425,7 +457,7 @@ def test_approaching_one_cluster_leaves_the_other_alone(rendered):
         "drawer": _ctrl(rendered, ".drawer-toggle")["opacity"],
     }
     rendered.mouse.move(700, 700)
-    rendered.wait_for_timeout(300)
+    _wait.stable(rendered, _CLUSTER_OPACITY)
     assert got["menu"] > 0.98, got
     assert got["drawer"] < 0.5, f"the far cluster lit up too: {got}"
 
@@ -441,7 +473,7 @@ def test_the_dimming_never_arms_without_a_pointer(afford_url, browser):
         page.goto(f"{afford_url}/page.html")
         page_quiet(page)
         page.tap(".drawer-toggle")
-        page.wait_for_timeout(300)
+        _wait.box_stable(page, "page-nav")
         got = page.evaluate(
             """() => ({
             armed: document.body.getAttribute('data-ctrl-proximity'),
@@ -510,7 +542,6 @@ def test_hovering_a_card_does_not_move_what_is_written_on_it(rendered, card, inn
     # x=2 is left of the reading column at every width, so parking there
     # is off every card whatever scrolled into view.
     rendered.mouse.move(2, 450)
-    rendered.wait_for_timeout(300)
     probe = """([card, inner]) => {
         const el = document.querySelector(card);
         const t = el.querySelector(inner) || el;
@@ -518,14 +549,13 @@ def test_hovering_a_card_does_not_move_what_is_written_on_it(rendered, card, inn
                          return [b.x, b.y, b.width, b.height].map(v => Math.round(v * 100) / 100); };
         return { card: r(el), text: r(t), shadow: getComputedStyle(el).boxShadow };
     }"""
-    before = rendered.evaluate(probe, [card, inner])
+    before = _wait.measured(rendered, probe, [card, inner])
 
     rendered.hover(card)
-    rendered.wait_for_timeout(400)
-    during = rendered.evaluate(probe, [card, inner])
+    during = _wait.measured(rendered, probe, [card, inner])
 
     rendered.mouse.move(2, 450)
-    rendered.wait_for_timeout(250)
+    _wait.stable(rendered, probe, arg=[card, inner])
 
     assert during["card"] == before["card"], f"{card} moved or resized under the pointer: {before} → {during}"
     assert during["text"] == before["text"], (
@@ -542,17 +572,17 @@ def test_hovering_a_contents_entry_does_not_slide_its_label(rendered):
     hover, so every label the reader passed over on the way down the
     panel stepped right and back."""
     rendered.evaluate("() => document.querySelector('.drawer-toggle').click()")
-    rendered.wait_for_timeout(400)
+    _wait.box_stable(rendered, "page-nav", "page-nav .page-nav-item > a")
     link = rendered.locator("page-nav .page-nav-item > a").first
     before = link.bounding_box()
     link.hover()
-    rendered.wait_for_timeout(300)
+    _wait.stable(rendered, _ROW_BOX)
     during = link.bounding_box()
     got = rendered.evaluate(
         "() => getComputedStyle(document.querySelector('page-nav .page-nav-item > a')).backgroundColor"
     )
     rendered.keyboard.press("Escape")
-    rendered.wait_for_timeout(300)
+    _wait.box_stable(rendered, "page-nav")
     assert before and during
     assert during["x"] == before["x"] and during["width"] == before["width"], (
         f"the tree label slid under the pointer: {before} → {during}"

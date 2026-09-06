@@ -24,6 +24,8 @@ from pathlib import Path
 
 import pytest
 
+from . import _wait
+
 from oku import cli
 
 
@@ -217,7 +219,12 @@ def site_offline_state(browser, site_tree):
         "        return [...d].every((x) => x._rendered || /Parse error/.test(x.textContent)); }",
         timeout=30000,
     )
-    pg.wait_for_timeout(1500)
+    # The diagram wait above says Mermaid is done; STATE also counts
+    # Prism's tokens and the line-number spans, which land on their own
+    # schedule when the grammar arrives. Waiting for the whole tuple to
+    # stop moving is the condition — a fixed 1.5 s was a guess at how
+    # long the slowest of the three takes.
+    _wait.stable(pg, STATE, what="the offline page finished drawing and highlighting")
     state = pg.evaluate(STATE)
     pg.close()
     httpd.shutdown()

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import pytest
 
+from . import _wait
 from ._menu import flip_theme
 from ._wait import page_quiet
 
@@ -111,8 +112,7 @@ def test_ids_stay_unique_after_a_theme_flip(page, site_url):
     before = _settle(page, site_url, "diagrams")
     assert before["duplicates"] == [], before["duplicates"]
 
-    flip_theme(page)
-    page.wait_for_timeout(3200)
+    _wait.after_rerender(page, lambda: flip_theme(page))
     after = page.evaluate(PROBE)
 
     assert after["duplicates"] == [], after["duplicates"]

@@ -21,6 +21,7 @@ still renders a chip, and that chip still copies.
 
 from __future__ import annotations
 
+from . import _wait
 from ._wait import page_quiet
 
 import argparse
@@ -116,7 +117,15 @@ def _open(page, path):
     not an element that comes and goes — so `.okt-lightbox` alone is
     always there and asserting on its presence would assert nothing."""
     page.click(f'oku-filepath[path="{path}"] .okt-fp-label')
-    page.wait_for_timeout(600)
+    # Two outcomes, and the wait has to admit both: a chip with a file
+    # behind it opens the frame, one with nothing pins its card instead.
+    # Waiting only for the frame would hang the whole ceiling on the
+    # missing-file case, which is a test this file has.
+    _wait.until(
+        page,
+        "() => !!document.querySelector('.okt-lightbox.open') || !!document.querySelector('.oku-tooltip')",
+        what="the chip opened the frame or pinned its card",
+    )
 
 
 def _close(page):
@@ -125,18 +134,42 @@ def _close(page):
     which is the right behaviour and would otherwise sit over the next
     chip a test reaches for."""
     page.keyboard.press("Escape")
-    page.wait_for_timeout(350)
+    _wait.until(
+        page,
+        "() => !document.querySelector('.okt-lightbox.open') && !document.querySelector('.oku-tooltip')",
+        what="Escape closed both the frame and any pinned card",
+    )
     assert page.locator(".okt-lightbox.open").count() == 0
     assert page.locator(".oku-tooltip").count() == 0
 
 
 def _card(page, path):
     """Hover a chip and return the tooltip's text, then leave."""
+    # Clear whatever is up first. "Is there a card" answers yes while
+    # the PREVIOUS chip's card is still on screen, so a wait on presence
+    # alone reads the last test's tooltip and passes — which is what this
+    # helper did the moment its fixed sleep came out, on a module where
+    # the test before it hovers and never leaves.
+    page.mouse.move(2, 2)
+    _wait.until(
+        page,
+        "() => !document.querySelector('.oku-tooltip')",
+        what="any card left by an earlier hover went away",
+    )
     page.hover(f'oku-filepath[path="{path}"] .okt-fp-label')
-    page.wait_for_timeout(350)
+    _wait.until(
+        page,
+        "() => { const t = document.querySelector('.oku-tooltip');"
+        " return !!t && t.textContent.trim().length > 0; }",
+        what="the chip's card appeared with something written on it",
+    )
     text = page.locator(".oku-tooltip").inner_text()
     page.mouse.move(2, 2)
-    page.wait_for_timeout(400)
+    _wait.until(
+        page,
+        "() => !document.querySelector('.oku-tooltip')",
+        what="the card went away when the pointer left",
+    )
     return text
 
 
@@ -203,7 +236,14 @@ def test_hovering_a_program_shows_the_top_of_it(opened):
 
 def test_hovering_an_image_shows_the_image(opened):
     opened.hover('oku-filepath[path="tiny.png"] .okt-fp-label')
-    opened.wait_for_timeout(350)
+    # The image has to have DECODED, not just been inserted — the
+    # assertion below reads naturalWidth, which is 0 until it has.
+    _wait.until(
+        opened,
+        "() => { const i = document.querySelector('.oku-tooltip img.okt-fp-media');"
+        " return !!i && i.naturalWidth > 0; }",
+        what="the card's image loaded",
+    )
     shown = opened.evaluate(
         """() => {
              const img = document.querySelector('.oku-tooltip img.okt-fp-media');
@@ -276,11 +316,19 @@ def test_the_copy_button_copies_the_path_and_nothing_opens(opened):
     that does not open the file."""
     btn = chip(opened, "../src/hello.py").locator(".okt-fp-copy")
     btn.click()
-    opened.wait_for_timeout(250)
+    flash = ".okt-fp-copy"
+    _wait.until(
+        opened,
+        f"() => [...document.querySelectorAll({flash!r})].some((b) => b.classList.contains('okt-flash-ok'))",
+        what="the copy button flashed",
+    )
     assert opened.evaluate("() => navigator.clipboard.readText()") == "../src/hello.py"
     assert opened.locator(".okt-lightbox.open").count() == 0
-    assert "okt-flash-ok" in (btn.get_attribute("class") or "")
-    opened.wait_for_timeout(1300)
+    _wait.until(
+        opened,
+        f"() => [...document.querySelectorAll({flash!r})].every((b) => !b.classList.contains('okt-flash-ok'))",
+        what="the flash went back off",
+    )
     assert "okt-flash-ok" not in (btn.get_attribute("class") or "")
 
 
@@ -294,8 +342,12 @@ def test_closing_the_popup_leaves_nothing_under_the_cursor(opened):
     _open(opened, "tiny.png")
     assert opened.locator(".okt-lightbox.open").count() == 1
     opened.keyboard.press("Escape")
-    # Past the show delay and the hide delay both, without moving the
-    # mouse — which is the whole point.
+    # The one fixed wait in this file that has to stay one. Everything
+    # else here waits for something to APPEAR; this waits to prove
+    # something never does, and an absence cannot be waited for — a
+    # stability poll starting at zero returns while the show delay is
+    # still running and passes without testing anything. Outlasting both
+    # delays is the assertion.
     opened.wait_for_timeout(700)
     assert opened.locator(".oku-tooltip").count() == 0
 
@@ -307,7 +359,11 @@ def test_the_chip_opens_from_the_keyboard(opened):
     reachable by Tab and could not be opened."""
     opened.focus('oku-filepath[path="../src/hello.py"] .okt-fp-label')
     opened.keyboard.press("Enter")
-    opened.wait_for_timeout(600)
+    _wait.until(
+        opened,
+        "() => !!document.querySelector('.okt-lightbox.open .okt-fp-view-pre')",
+        what="Enter opened the file the way a click does",
+    )
     assert opened.locator(".okt-lightbox.open .okt-fp-view-pre").count() == 1
     _close(opened)
 

@@ -17,6 +17,7 @@ manifest suffix match instead — the same one the language switch uses.
 
 from __future__ import annotations
 
+from . import _wait
 from ._wait import page_quiet
 
 import argparse
@@ -122,10 +123,17 @@ def test_clicking_a_row_opens_that_page(page, tree_out):
     # The reader's path: the drawer is closed on load, so open it first —
     # the rows are off-canvas until they do.
     page.click(".ctrl-btn.drawer-toggle")
-    page.wait_for_timeout(600)
+    # The rows are off-canvas until the drawer has finished sliding, and
+    # clicking a row that is still moving is how this test failed inside
+    # a batch and nowhere else.
+    _wait.box_stable(page, ".page-nav-tree")
     page.click(".page-nav-tree a[href$='two.html']")
     page.wait_for_load_state("load")
-    page.wait_for_timeout(1500)
+    _wait.until(
+        page,
+        "() => window.__okuRendered === true && /two\\.html$/.test(location.pathname)",
+        what="the second page finished rendering",
+    )
     assert page.url.endswith("two.html"), page.url
     assert "Text for Two." in page.inner_text("main")
 

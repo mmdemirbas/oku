@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+from . import _wait
 from ._menu import flip_theme
 from ._wait import page_quiet
 
@@ -100,8 +101,7 @@ def test_a_mindmap_changes_colour_with_the_theme(browser, served) -> None:
         # `announceTheme` is what tells the diagram to re-render, and only
         # the path a reader takes does both. That path is a segment in the
         # presentation menu now, which is what `flip_theme` clicks.
-        flip_theme(pg)
-        pg.wait_for_timeout(1500)
+        _wait.after_rerender(pg, lambda: flip_theme(pg))
         assert pg.evaluate("() => document.documentElement.getAttribute('data-theme')") == "dark"
         dark = _mindmap_fills(pg)
         assert dark["branch"] != light["branch"], f"branch node is {light['branch']} in both themes"
@@ -116,8 +116,7 @@ def test_a_mindmap_root_node_is_not_black_on_a_dark_page(browser, served) -> Non
     #1e1b29 page: the one node in the figure that had disappeared."""
     pg = _page(browser, served)
     try:
-        flip_theme(pg)
-        pg.wait_for_timeout(1500)
+        _wait.after_rerender(pg, lambda: flip_theme(pg))
         fills = _mindmap_fills(pg)
         if fills is None:
             pytest.skip("this mermaid build did not draw a mindmap node to measure")

@@ -223,11 +223,11 @@ def test_standalone_matches_the_served_page(page, parity_urls):
     rows, same text — or "send the HTML" quietly ships something else
     than what the author reviewed."""
     _goto(page, parity_urls["served"])
-    page.wait_for_timeout(1200)
+    page_quiet(page)
     served = page.evaluate(_SHAPE)
 
     _goto(page, parity_urls["standalone"])
-    page.wait_for_timeout(1200)
+    page_quiet(page)
     standalone = page.evaluate(_SHAPE)
 
     assert standalone == served, {k: (served[k], standalone[k]) for k in served if served[k] != standalone[k]}
