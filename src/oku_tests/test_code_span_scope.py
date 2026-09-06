@@ -186,3 +186,86 @@ def test_a_tilde_fence_is_not_closed_by_backticks():
     md = "~~~\n```\nstill inside\n~~~\nout\n"
     assert "still inside" not in cli._md_fence_mask(md)
     assert "out" in cli._md_fence_mask(md)
+
+
+# ---------- the other region where a backtick is not a span ----------
+
+ISLAND = """---
+title: An island holding a program
+summary: The kit's documented idiom for multi-line code inside a card.
+---
+
+## S {#s}
+
+Multi-line code in an island is a `<pre>`, never a `<br>`.
+
+<div class="okt-card">
+
+<pre>
+python src/app.py --once
+see `src/inner.py` for the flags
+</pre>
+
+</div>
+
+The program is `src/app.py`.
+"""
+
+
+def _island_project(tmp_path: Path) -> Path:
+    root = tmp_path / "proj"
+    (root / "docs").mkdir(parents=True)
+    (root / "kit.json").write_text('{"name": "probe"}', encoding="utf-8")
+    (root / "src").mkdir()
+    (root / "src" / "app.py").write_text("print('hi')\n", encoding="utf-8")
+    # A DIFFERENT real file inside the <pre>, so the two regions cannot
+    # be told apart by a count alone: the nudge dedups per path, and with
+    # the same path on both sides a scanner that suppressed nothing would
+    # still report exactly one.
+    (root / "src" / "inner.py").write_text("print('inner')\n", encoding="utf-8")
+    (root / "docs" / "note.md").write_text(ISLAND, encoding="utf-8")
+    cli._project_root_cache.clear()
+    return root
+
+
+def _island_nudges(root: Path):
+    src = root / "docs" / "note.md"
+    page = cli._page_from_source_file(src)
+    return [i for i in cli.check_pages([(src, page)], root) if i["code"] == "path-in-code-span"]
+
+
+def test_the_island_pre_is_skipped_and_the_prose_below_it_is_not(tmp_path):
+    """One assertion, because the fixture is built so that exactly one
+    answer is right and each way of being wrong gives a different one.
+
+    Between `<pre>` and `</pre>` the renderer hands the region to the
+    browser as markup, so a backtick there is something the reader SEES:
+    there is no span to convert, and a chip could not render inside a
+    `<pre>` anyway. It matters more since the nudge became a warning —
+    `oku check --fix` declines to rewrite inside a raw-text region, so a
+    report naming one would be a warning with no remedy behind it, which
+    is the shape that teaches an author to stop reading the report.
+
+    The three outcomes, measured:
+
+    - correct → `['src/app.py']`, the paragraph below the island;
+    - no suppression → `src/inner.py` as well, the one inside the `<pre>`
+      (two different files, because the nudge dedups per path and the
+      same path on both sides would report once either way);
+    - the suppression armed by the SENTENCE above the island → nothing at
+      all, since it would never close.
+    """
+    got = _island_nudges(_island_project(tmp_path))
+    assert sorted(i["message"].split("'")[1] for i in got) == ["src/app.py"], [i["message"] for i in got]
+
+
+def test_a_sentence_naming_pre_does_not_arm_the_suppression(tmp_path):
+    """The line above the island writes "a `<pre>`, never a `<br>`" — a
+    sentence, not an open tag. Counting it unmasked opens a region that
+    never closes, and everything after it goes unread; measured while
+    this was built, that silenced 8 of 10 rewrites on this repo's own
+    docs. The test above would pass anyway if the suppression started at
+    the island, so this one names the cause."""
+    spans = [t for _line, t in cli._md_code_spans(ISLAND)]
+    assert "src/app.py" in spans, spans
+    assert "<pre>" in spans, "the sentence's own span is prose and still read"

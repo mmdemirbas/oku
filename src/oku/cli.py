@@ -2914,15 +2914,34 @@ def _md_code_spans(md: str):
     throw code spans away. This one keeps them, because a path written
     in one is the thing `path-in-code-span` is looking for.
 
-    Two exclusions, both about not reporting an author who already did
-    the right thing. A fenced block is a program, not prose about a
-    file. And a code span inside a link label is already clickable: the
+    Three exclusions. Two are about not reporting an author who already
+    did the right thing: a fenced block is a program, not prose about a
+    file, and a code span inside a link label is already clickable — the
     label of a `#f/` link sits inside the chip the nudge would
     recommend, and ``[`docs/charts.md`](charts.md)`` — a real line in
     this repo — points the reader at the rendered page, which is a
     better destination than a preview of its source.
+
+    The third is about not reporting a span that is not one. Between an
+    island's `<pre>` and its `</pre>` the renderer hands the region to
+    the browser as markup, so a backtick there is a character the reader
+    SEES and there is no span to convert; a chip could not render inside
+    a `<pre>` either. `oku check --fix` declined to rewrite those from
+    the day it landed, which left the check naming a warning with no
+    remedy behind it — the shape that teaches an author to stop reading
+    the report. Counted on the MASKED line, for the reason the island
+    lint states beside the same two regexes: prose writes "a `<pre>`
+    inside a `<div>`", and that sentence is not an open tag.
     """
+    raw_depth = 0
     for lineno, line in enumerate(_md_fence_mask(md).splitlines(), 1):
+        code_line = _mask_code_spans(_HTML_COMMENT_RE.sub("", line))
+        opened = len(_RAW_TEXT_OPEN_RE.findall(code_line))
+        closed = len(_RAW_TEXT_CLOSE_RE.findall(code_line))
+        inside = raw_depth or opened > closed
+        raw_depth = max(0, raw_depth + opened - closed)
+        if inside:
+            continue
         for m in _MD_ONE_CODE_SPAN_RE.finditer(_MD_LINK_CONSTRUCT_RE.sub("", line)):
             yield lineno, m.group(1).strip()
 
