@@ -563,7 +563,14 @@ class TestPayloadBudget:
     # for the drag and the nudge, clamped to the viewBox, plus the
     # comments naming what each replaced and why the `preventDefault`
     # makes no claim about itself. About 2,500 bytes.
-    KIT_BUDGET_BYTES = 1_260_000
+    # Then from 1,260,000 by the line splitter's recursion: an element
+    # straddling a newline is rebuilt per line rather than flattened to
+    # text, so a sub-language inside a fenced block survives to the
+    # reader, plus the id strip that keeps Prism's per-block handle off
+    # every shard it makes. About 2,900 bytes, most of it the comments
+    # naming what `clone.textContent = seg` had been deleting and why
+    # nothing had ever seen that id before the flattening stopped.
+    KIT_BUDGET_BYTES = 1_264_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

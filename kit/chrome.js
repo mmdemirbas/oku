@@ -5379,7 +5379,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-06-r72';
+var __okuKitBuild = '2026-09-06-r73';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -5451,13 +5451,14 @@ function _hdtAfterPrismHighlight(env) {
   if (!pre.classList.contains('okt-line-numbered')) return;
   if (code.querySelector(':scope > .okt-code-line')) return; // already wrapped, intact
   _hdtWrapCodeLines(code);
-  // After line wrap, walk each per-line `.token.script` /
-  // `.token.style` shard and re-tokenise its text contents with the
-  // embedded language. The wrap reduces multi-line elements to one
-  // plain-text clone per line, so each shard is single-line and can
-  // be tokenised independently. Running before wrap would lose the
-  // nested tokens — the multi-line-clone path uses `textContent =`
-  // which strips descendant spans.
+  // After line wrap, tokenise the embedded languages Prism left plain:
+  // a `.token.script` / `.token.style` shard, which carries no
+  // `language-*` class for the lazy autoloader to see, and any
+  // `language-*` span holding no tokens — what a nested grammar that
+  // had not loaded when the outer block was highlighted leaves behind.
+  // It is not rebuilding what the wrap destroyed any more: the wrap
+  // recurses now, so Prism's own nested tokens arrive intact and every
+  // branch below skips what already has them.
   _hdtHighlightNestedLanguages(code);
   pre.setAttribute('data-okt-lines-wrapped', '1');
   // Clear any stale fold-marker state inside per-line cells so a fresh
@@ -5638,14 +5639,54 @@ function _hdtWrapCodeLines(code) {
   // Avoids a querySelector per text-segment / token append — which on
   // a 200-line Prism-tokenised block runs into the thousands of calls.
   var activeContent = lines[0].lastChild; // the .okt-code-content node
-  function pushChar(s) { activeContent.appendChild(document.createTextNode(s)); }
+  // The token clones currently open across a line break, outermost
+  // first. `host()` is where the next thing emitted belongs: the
+  // innermost open clone, or the line itself when nothing is open.
+  var open = [];
+  function host() { return open.length ? open[open.length - 1].node : activeContent; }
+  // A clone carries no id. Prism's markdown grammar stamps
+  // `md-<time>-<rand>` on a `code-block` span whose language the
+  // autoloader has not loaded, so its callback can find the element
+  // again — and a shard is not that element: copied per line, one id
+  // lands on every line and getElementById answers with the first.
+  // Nothing is lost — `_hdtHighlightNestedLanguages` loads the same
+  // grammar and re-highlights EVERY shard — and a viewed document stops
+  // carrying an id its reader's page never authored, which is what the
+  // viewer's `okv-` prefix exists for. Wholesale is safe: the wrap runs
+  // on Prism's output, before `injectMarkers` adds anything of ours.
+  function shard(node, deep) {
+    var c = node.cloneNode(!!deep);
+    c.removeAttribute('id');
+    if (deep) {
+      var kids = c.querySelectorAll('[id]');
+      for (var k = 0; k < kids.length; k++) kids[k].removeAttribute('id');
+    }
+    return c;
+  }
+  function pushChar(s) { host().appendChild(document.createTextNode(s)); }
   function newline() {
     // Trailing newline lives in the CURRENT line so display:none also
     // hides the blank that would otherwise remain.
+    // An element that straddles the break is closed here and reopened
+    // on the next line, innermost last, so each line holds a complete
+    // little tree of its own. A clone that ended up with nothing in it
+    // — the break fell on the element's own edge — is dropped rather
+    // than left as an empty span the fold pass would have to skip.
+    for (var c = open.length - 1; c >= 0; c--) {
+      var spent = open[c].node;
+      if (spent && !spent.childNodes.length && spent.parentNode) spent.parentNode.removeChild(spent);
+    }
     activeContent.appendChild(document.createTextNode('\n'));
     var nextLine = makeLine(lines.length + 1);
     lines.push(nextLine);
     activeContent = nextLine.lastChild;
+    var parent = activeContent;
+    for (var r = 0; r < open.length; r++) {
+      var fresh = shard(open[r].src);
+      parent.appendChild(fresh);
+      open[r].node = fresh;
+      parent = fresh;
+    }
   }
 
   function emit(node) {
@@ -5664,22 +5705,32 @@ function _hdtWrapCodeLines(code) {
       if (full.indexOf('\n') === -1) {
         // Whole element fits one line — move it intact, preserving any
         // descendant tokens Prism created.
-        activeContent.appendChild(node.cloneNode(true));
-      } else {
-        // Multi-line element — split into per-line clones at the same
-        // className. The descendants are reduced to plain text in each
-        // clone (sufficient for strings / comments; complex nested
-        // tokens across newlines are very rare).
-        var segs = full.split('\n');
-        for (var s = 0; s < segs.length; s++) {
-          if (s > 0) newline();
-          if (segs[s].length) {
-            var clone = node.cloneNode(false);
-            clone.textContent = segs[s];
-            activeContent.appendChild(clone);
-          }
-        }
+        host().appendChild(shard(node, true));
+        return;
       }
+      // Multi-line element. Open a shallow clone, walk the children
+      // through here, and let `newline` close and reopen the whole open
+      // stack on each line — so nesting survives to any depth.
+      //
+      // This used to be `clone.textContent = segs[s]` per line, under a
+      // comment calling nested tokens across newlines "very rare". They
+      // are the common case here: Prism's markdown grammar wraps a
+      // fenced block in one `token code` spanning every line and puts
+      // `token code-block language-bash` inside, so flattening the
+      // outer token deleted the inner language and every token in it —
+      // nested highlighting read as a missing feature and was this
+      // deletion. CLAUDE.md carries the measurement.
+      var clone = shard(node);
+      host().appendChild(clone);
+      var rec = { src: node, node: clone };
+      open.push(rec);
+      Array.prototype.slice.call(node.childNodes).forEach(emit);
+      open.pop();
+      // Content that ENDED on a break left `newline` reopening a clone
+      // nothing was emitted into, and its pruning only reaches a clone a
+      // LATER break arrives at. Prism makes the shape constantly: a
+      // `<script>` body's span starts and ends with a newline.
+      if (!rec.node.childNodes.length && rec.node.parentNode) rec.node.parentNode.removeChild(rec.node);
     }
   }
   Array.prototype.slice.call(code.childNodes).forEach(emit);

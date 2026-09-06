@@ -1265,6 +1265,23 @@ actually write.
   defect the build-provenance footer exists for, arriving from the other
   side. Build in the directory you are about to read from.
 
+- **The line splitter rebuilds a block, so it has to rebuild the whole
+  tree.** Prism highlights a nested language by itself: its markdown
+  grammar puts `token code-block language-bash` inside the single
+  `token code` that spans a fenced block, and its markup grammar hands a
+  `<script>` / `<style>` body to JavaScript and CSS. The kit's per-line
+  pass then threw it away — an element straddling a newline was cloned
+  per line with `clone.textContent = seg`, which drops every descendant,
+  under a comment calling nested tokens across newlines "very rare". A
+  fenced block inside a markdown sample is exactly that, and this repo's
+  docs are made of them, so nested highlighting read as a missing
+  feature and was a deletion. `emit` recurses now and `newline()` closes
+  and reopens the open stack per line. An element whose content ENDS on
+  a break prunes at its own close the clone it reopened and never used:
+  the per-break pruning only reaches a clone a LATER break arrives at,
+  and Prism's `<script>` body span starts and ends with a newline every
+  time. Held by `browser/test_nested_code_highlighting.py`.
+
 - **CSS rules silently dropped by Chrome.** A multi-line comment
   inside a rule body, containing certain Unicode punctuation, has
   been observed to make Chrome's parser drop the trailing
