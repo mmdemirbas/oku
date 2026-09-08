@@ -8,7 +8,7 @@ which is why all three survived.
 
 from __future__ import annotations
 
-from ._wait import page_quiet
+from ._wait import measured, page_quiet, scroll_stable, until
 
 import pytest
 
@@ -41,10 +41,25 @@ def test_copying_an_annotated_block_yields_the_program(clipboard_page, site_url)
     page.wait_for_selector("oku-annotated-code")
     page_quiet(page)
     page.evaluate("() => document.querySelector('oku-annotated-code').scrollIntoView()")
-    page.wait_for_timeout(300)
+    scroll_stable(page)
     page.hover("oku-annotated-code .okt-pre-host")
     page.click("oku-annotated-code .okt-pre-host .copy-btn")
-    page.wait_for_timeout(500)
+    # The write is async and the button says when it landed: this one
+    # marks itself `copied` or `error` (the copy-REGION button next to it
+    # in the same file uses `is-copied` / `is-failed` — two mechanisms,
+    # and the first guess here waited for the other one's class).
+    # Waiting for either outcome means a refused clipboard fails as a
+    # refused clipboard rather than as an empty paste.
+    until(
+        page,
+        "() => { const b = document.querySelector('oku-annotated-code .okt-pre-host .copy-btn');"
+        "        return b.classList.contains('copied') || b.classList.contains('error'); }",
+        what="the copy button reported an outcome",
+    )
+    assert page.evaluate(
+        "() => document.querySelector('oku-annotated-code .okt-pre-host .copy-btn')"
+        ".classList.contains('copied')"
+    ), "the copy failed rather than landing"
 
     text = page.evaluate("() => navigator.clipboard.readText()")
 
@@ -97,15 +112,26 @@ def test_search_results_are_not_titled_with_the_permalink(page, site_url):
     page.wait_for_selector("main section")
     page_quiet(page)
     page.keyboard.press("Control+k")
-    page.wait_for_timeout(400)
+    # The panel is built on first open, so the type below has nowhere to
+    # go until its input exists and holds focus.
+    until(
+        page,
+        "() => { const i = document.querySelector('.search-input');"
+        "        return !!i && document.activeElement === i; }",
+        what="the search panel opened and took focus",
+    )
     page.keyboard.type("heading")
-    page.wait_for_timeout(700)
 
-    trailing = page.evaluate(
+    # The query is debounced and the results are rendered in a pass of
+    # their own, so the wait and the assertion read ONE expression: a
+    # test that settled on the panel and measured the results could
+    # measure them empty.
+    trailing = measured(
+        page,
         """() => [...document.querySelectorAll('[class*=search] *')]
              .map(e => e.textContent.trim())
              .filter(s => s && s.length < 60 && s.endsWith('#'))
-             .slice(0, 6)"""
+             .slice(0, 6)""",
     )
 
     assert trailing == [], trailing

@@ -21,7 +21,7 @@ asserted rather than eyeballed.
 
 from __future__ import annotations
 
-from ._wait import page_quiet
+from ._wait import measured, page_quiet, stable
 
 import http.server
 import threading
@@ -128,7 +128,13 @@ def _pointer_parked(rendered):
     test that leaves the pointer on the strip changes the state the next
     test measures. Park it over the document before each one."""
     rendered.mouse.move(700, 600)
-    rendered.wait_for_timeout(250)
+    # The strip closes on a transition, and the next test measures it at
+    # rest. Its height is the transition: 12 closed, 32 open.
+    stable(
+        rendered,
+        "() => Math.round(document.querySelector('.okt-rail').getBoundingClientRect().height)",
+        what="the rail settled at rest",
+    )
 
 
 BOXES = """() => {
@@ -269,8 +275,8 @@ def test_the_label_appears_on_hover_and_cannot_push_anything(rendered):
     assert got["restOpacity"] == "0", got
 
     rendered.hover('.okt-rail-mark[data-kind="figure"] >> nth=0')
-    rendered.wait_for_timeout(300)
-    shown = rendered.evaluate(
+    shown = measured(
+        rendered,
         """() => {
         const tip = document.querySelector('.okt-rail-tip');
         const r = tip.getBoundingClientRect();
@@ -279,7 +285,7 @@ def test_the_label_appears_on_hover_and_cannot_push_anything(rendered):
                  text: tip.textContent.trim(),
                  left: Math.round(r.left), right: Math.round(r.right),
                  vw: window.innerWidth };
-    }"""
+    }""",
     )
     assert shown["visible"] and shown["opacity"] == "1", shown
     assert shown["text"], "the label rendered empty"
@@ -331,8 +337,7 @@ def test_nothing_moves_on_hover(rendered):
         """() => Math.round(document.querySelector('main').getBoundingClientRect().top)"""
     )
     rendered.hover(".okt-rail-mark >> nth=2")
-    rendered.wait_for_timeout(350)
-    after = rendered.evaluate(BOXES)
+    after = measured(rendered, BOXES)
     after_main = rendered.evaluate(
         """() => Math.round(document.querySelector('main').getBoundingClientRect().top)"""
     )
@@ -353,10 +358,15 @@ def test_nothing_moves_on_focus(rendered):
     target, so focus opens the rail too — and moves nothing."""
     before = rendered.evaluate(BOXES)
     rendered.evaluate("""() => document.querySelectorAll('.okt-rail-mark')[2].focus()""")
-    rendered.wait_for_timeout(350)
-    after = rendered.evaluate(BOXES)
+    after = measured(rendered, BOXES)
     rendered.evaluate("""() => document.activeElement.blur()""")
-    rendered.wait_for_timeout(300)
+    # Left closed for whatever runs next, and the autouse fixture parks
+    # the pointer but cannot blur anything.
+    stable(
+        rendered,
+        "() => Math.round(document.querySelector('.okt-rail').getBoundingClientRect().height)",
+        what="the rail closed again",
+    )
     assert [b[:3] for b in before["marks"]] == [a[:3] for a in after["marks"]], (
         "a mark moved or changed width on focus"
     )
@@ -650,7 +660,11 @@ def test_a_swollen_mark_stays_inside_the_strip(rendered):
     assert at_rest["worst"] <= at_rest["railH"] + 1, at_rest
 
     rendered.hover(".okt-rail-mark >> nth=2")
-    rendered.wait_for_timeout(350)
+    stable(
+        rendered,
+        "() => Math.round(document.querySelector('.okt-rail').getBoundingClientRect().height)",
+        what="the rail finished opening",
+    )
     hovered = _worst_reach(rendered, 1.6)
     assert hovered["scale"] > 1, "the rail did not open on hover"
     assert hovered["railH"] == 32, hovered

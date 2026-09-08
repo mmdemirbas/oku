@@ -141,7 +141,12 @@ def _press(page, chart: str, nth: int, *, key: str | None = None, modifier: str 
         item.press(f"{modifier}+{key}" if modifier else key)
     else:
         item.click(modifiers=[modifier] if modifier else [])
-    page.wait_for_timeout(80)
+    # No wait: every way this state can move is a synchronous classList
+    # or attribute write inside the click handler, so it has already
+    # happened when the dispatch returns. A sleep here would also be the
+    # wrong shape — this reads state that may legitimately NOT change,
+    # which is how a dead legend is detected, and there is no condition
+    # to wait for in that case.
     return before, page.evaluate(STATE, chart)
 
 

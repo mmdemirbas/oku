@@ -13,6 +13,7 @@ from __future__ import annotations
 import pytest
 
 from ._menu import open_menu
+from ._wait import measured
 
 PROBE = """() => {
   const attr = (s, a) => { const e = document.querySelector(s); return e ? e.getAttribute(a) : null; };
@@ -44,13 +45,24 @@ def _open(page, site_url, name):
     page.goto(f"{site_url}/docs/{name}")
     page.wait_for_selector("main section")
     page.wait_for_function("() => document.querySelector('.ctrl-btn.drawer-toggle') !== null", timeout=8000)
-    # The table is fetched, so the pass that applies it runs a turn later.
-    page.wait_for_timeout(2200)
+    # The table is FETCHED, so the pass that applies it runs a turn
+    # later. It cannot be waited for by looking for a translated string:
+    # half these cases are English pages, where there is no table, no
+    # fetch and nothing to change — and the other half assert on exactly
+    # the strings a wait like that would have to read first.
+    #
+    # `load()` is the promise the kit's own localize callback is chained
+    # to, and Playwright awaits a promise an `evaluate` returns, so this
+    # resolves after that callback rather than after a guessed 2200 ms.
+    page.evaluate("() => window.__okuI18n.load()")
     # The presentation menu builds its rows on first open, and each word
     # in them goes through okuT at that moment — so its strings do not
     # exist to be read until the panel has been opened once.
     open_menu(page)
-    return page.evaluate(PROBE)
+    # Several passes localize: boot, the menu build, and the manifest
+    # arriving. The probe settling is the one condition that covers all
+    # of them without naming any.
+    return measured(page, PROBE)
 
 
 def test_an_english_page_stays_english(page, site_url):
@@ -170,8 +182,10 @@ def _rail(page, site_url, name):
     # The rail places its marks off measured geometry, so it needs a laid
     # out page — and the marks are rebuilt when the table lands.
     page.wait_for_function("() => document.querySelectorAll('.okt-rail-mark').length > 3", timeout=8000)
-    page.wait_for_timeout(400)
-    return page.evaluate(RAIL)
+    # More than three marks is the rail having started, not finished —
+    # it rebuilds them when the table lands, so what is waited for is
+    # the set holding still.
+    return measured(page, RAIL)
 
 
 def test_the_rail_names_its_landmarks_in_the_page_language(page, site_url):

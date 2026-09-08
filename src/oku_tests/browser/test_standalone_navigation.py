@@ -12,7 +12,7 @@ how it survived: nothing broke, it just said it did.
 
 from __future__ import annotations
 
-from ._wait import page_quiet
+from ._wait import page_quiet, scroll_stable, settled
 
 import argparse
 import os
@@ -70,7 +70,11 @@ def _errors_during(page, url, action):
     page_quiet(page)
     errs.clear()
     action()
-    page.wait_for_timeout(900)
+    # The list this returns is built by Playwright handlers in PYTHON, so
+    # the page cannot be asked about it — what is waited for is the list
+    # itself holding still. An error that arrives late still lands in it;
+    # a fixed delay only decides how late is too late, without saying so.
+    settled(lambda: len(errs), what="the console stopped reporting")
     cdn = ("jsdelivr", "googleapis", "gstatic", "fonts.")
     return [e for e in errs if not any(k in e for k in cdn)]
 
@@ -98,5 +102,7 @@ def test_the_anchor_still_scrolls(page, standalone_page):
     page_quiet(page)
     page.evaluate("window.scrollTo(0, 0)")
     page.evaluate("location.hash = '#third'")
-    page.wait_for_timeout(800)
+    # The kit scrolls smoothly, so the position right after the hash is
+    # set is the start of the animation and not the answer.
+    scroll_stable(page)
     assert page.evaluate("window.scrollY") > 100, "the anchor did not scroll anywhere"

@@ -13,7 +13,7 @@ which rows those are.
 
 from __future__ import annotations
 
-from ._wait import page_quiet
+from ._wait import measured, page_quiet, until
 
 import argparse
 import os
@@ -74,7 +74,14 @@ def opened(built, browser):
     # until the pointer is on the table. Nothing in it is clickable
     # before that, which is the design, so the test hovers like a reader.
     page.hover(".okt-table-wrap")
-    page.wait_for_timeout(300)
+    # The toolbar fades in, and a button mid-fade is one Playwright will
+    # decline to click. Its opacity settling is the end of that
+    # transition, which has no event of its own.
+    measured(
+        page,
+        "() => { const b = document.querySelector('.okt-table-wrap [data-copy=\"md\"]');"
+        "        return b ? getComputedStyle(b).opacity : null; }",
+    )
     yield page
     context.close()
 
@@ -83,9 +90,48 @@ TSV = '[data-copy="tsv"]'
 MD = '[data-copy="md"]'
 
 
+def _rows_settle(page, expected: int) -> None:
+    """The filter runs on input and re-lays the table, so what a copy is
+    about to read is the row set the filter left behind. Waiting for the
+    COUNT rather than for a delay: the assertion that follows is about
+    which rows reached the clipboard, and a copy taken mid-filter is the
+    exact bug it would otherwise pass over.
+
+    Two things about the count, both measured rather than assumed after
+    two wrong guesses. The filter REMOVES rows from the DOM — it does not
+    hide them — so a `:not(.okt-row-hidden)` count never changes. And
+    `.okt-table-wrap` holds four renderings of the same rows (the table,
+    a card stack, a list and a board), so ten rows are forty `tr`s; the
+    scope is the table view, which is the one the copy path reads. The
+    three exclusions are kept because they are how that path spells
+    "visible", and a test with its own definition agrees with the button
+    only by accident."""
+    until(
+        page,
+        "() => [...document.querySelectorAll('.okt-table-wrap .okt-table-scroll tbody tr')]"
+        ".filter((tr) => !tr.classList.contains('group-header')"
+        "             && !tr.classList.contains('okt-row-hidden')"
+        "             && !tr.hidden).length === " + str(expected),
+        what=f"the table settled at {expected} row(s) on screen",
+    )
+
+
 def _copy(page, selector):
+    """Click a copy button and hand back what actually reached the
+    clipboard.
+
+    The write is async, so the read has to wait for it — and the button
+    says when it lands: the kit flashes `okt-flash-ok` on success. That
+    is the same signal a reader gets, which makes it the honest thing to
+    wait for; a fixed delay here would read the PREVIOUS format's text
+    on a slow machine and pass, because both formats are plausible
+    strings."""
     page.click(f".okt-table-wrap {selector}")
-    page.wait_for_timeout(200)
+    until(
+        page,
+        f"() => document.querySelector('.okt-table-wrap {selector}').classList.contains('okt-flash-ok')",
+        what=f"the {selector} button reported the copy landed",
+    )
     return page.evaluate("() => navigator.clipboard.readText()")
 
 
@@ -156,13 +202,13 @@ def test_a_filtered_table_copies_what_is_on_screen(opened):
     quietly included the rows they had just filtered away would be
     discovered in the document they pasted it into."""
     opened.fill(".okt-table-wrap .okt-filter input", "row3")
-    opened.wait_for_timeout(400)
+    _rows_settle(opened, 1)
 
     assert _copy(opened, MD) == f"{HEAD}\n| row3 | 3 | a \\| b |"
     assert _copy(opened, TSV) == "Name\tCount\tNote\nrow3\t3\ta | b"
 
     opened.fill(".okt-table-wrap .okt-filter input", "")
-    opened.wait_for_timeout(400)
+    _rows_settle(opened, 10)
 
 
 def test_the_button_says_whether_it_worked(opened):
@@ -170,7 +216,19 @@ def test_the_button_says_whether_it_worked(opened):
     would leave the reader clicking again to find out."""
     btn = opened.locator(f".okt-table-wrap {MD}")
     btn.click()
-    opened.wait_for_timeout(150)
+    until(
+        opened,
+        f"() => document.querySelector('.okt-table-wrap {MD}').classList.contains('okt-flash-ok')",
+        what="the button flashed to say the copy landed",
+    )
     assert "okt-flash-ok" in (btn.get_attribute("class") or "")
-    opened.wait_for_timeout(1300)
+    # And it goes again on its own. The flash is a timed state, so this
+    # half was 1300 ms of dead time on every run — the condition is the
+    # class leaving, which is the same thing stated as a fact rather
+    # than as a duration.
+    until(
+        opened,
+        f"() => !document.querySelector('.okt-table-wrap {MD}').classList.contains('okt-flash-ok')",
+        what="the flash cleared itself",
+    )
     assert "okt-flash-ok" not in (btn.get_attribute("class") or "")

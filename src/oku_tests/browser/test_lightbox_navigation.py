@@ -45,7 +45,7 @@ import pytest
 
 from oku import cli
 
-from ._wait import page_quiet
+from ._wait import page_quiet, until, until_changed
 
 pytestmark = pytest.mark.browser
 
@@ -98,6 +98,26 @@ STATE = """() => {
   };
 }"""
 
+# The stage writes its own transform inline, so what a key press produces
+# is readable the moment the handler returns — there is no animation to
+# wait out and no computed style to sample.
+TRANSFORM = "() => { const i = document.querySelector('.okt-lightbox-pz-inner'); return i ? i.style.transform : null; }"
+
+
+def _press_moving(page, key: str) -> None:
+    """Press a key that must move the stage, then wait for the transform
+    it writes rather than for a clock.
+
+    A press that moves nothing waits out the ceiling and fails naming the
+    key. That is the right failure: it IS the defect this file exists
+    for, and a fixed sleep in its place turns it into a passing test that
+    read the same value twice. The direction of the move is left to the
+    caller's assertion — this only establishes that something happened.
+    """
+    before = page.evaluate(TRANSFORM)
+    page.keyboard.press(key)
+    until_changed(page, TRANSFORM, before, what=f"the stage transform after pressing {key}")
+
 
 @pytest.fixture
 def opened(built, browser):
@@ -110,7 +130,16 @@ def opened(built, browser):
     page.hover("#chart oku-chart")
     page.click("#chart [aria-label='Expand to fullscreen']")
     page.wait_for_selector(".okt-lightbox.open .okt-lightbox-pz")
-    page.wait_for_timeout(150)
+    # `open()` moves focus in a `setTimeout`, so the stage exists before
+    # anything is focused. Waiting for focus to be INSIDE the overlay and
+    # not for where it landed: one of these tests is about which element
+    # gets it, and a fixture that waited for the stage would answer that
+    # test's question for it.
+    until(
+        page,
+        "() => !!(document.activeElement && document.activeElement.closest('.okt-lightbox'))",
+        what="open() moved focus into the dialog",
+    )
     yield page
     page.close()
 
@@ -121,8 +150,7 @@ def test_the_first_zoom_key_zooms(opened):
     every chart, on every page."""
     before = opened.evaluate(STATE)
     assert before["scale"] == 1, before
-    opened.keyboard.press("+")
-    opened.wait_for_timeout(200)
+    _press_moving(opened, "+")
     after = opened.evaluate(STATE)
     assert after["scale"] > before["scale"], (before, after)
 
@@ -132,12 +160,10 @@ def test_the_first_arrow_key_pans(opened):
     more: zoom has three toolbar buttons, and panning has no button at
     all. Without the keys a reader who cannot drag has no way to reach
     the part of the figure they zoomed in for."""
-    opened.keyboard.press("+")
-    opened.keyboard.press("+")
-    opened.wait_for_timeout(200)
+    _press_moving(opened, "+")
+    _press_moving(opened, "+")
     before = opened.evaluate(STATE)
-    opened.keyboard.press("ArrowRight")
-    opened.wait_for_timeout(200)
+    _press_moving(opened, "ArrowRight")
     after = opened.evaluate(STATE)
     assert after["tx"] < before["tx"], (before, after)
     assert after["ty"] == before["ty"], (before, after)
@@ -161,7 +187,11 @@ def test_escape_still_closes(opened):
     modal the reader cannot dismiss is worse than one whose keys need a
     Tab."""
     opened.keyboard.press("Escape")
-    opened.wait_for_timeout(250)
+    until(
+        opened,
+        "() => !document.querySelector('.okt-lightbox.open')",
+        what="Escape closed the lightbox",
+    )
     assert opened.evaluate(STATE)["open"] is False
 
 
@@ -207,8 +237,7 @@ def test_the_minimap_appears_only_once_there_is_something_to_navigate(opened):
     saying "all of it"."""
     assert opened.evaluate(STATE)["pipVisible"] is False
     for _ in range(4):
-        opened.keyboard.press("+")
-        opened.wait_for_timeout(80)
+        _press_moving(opened, "+")
     got = opened.evaluate(STATE)
     assert got["pipVisible"], got
     assert got["pipThumb"], "the minimap is an empty box — no thumbnail of the figure"
@@ -219,11 +248,9 @@ def test_the_minimap_says_where_the_reader_is_and_takes_them_elsewhere(opened):
     control. The rect tracks the transform, and dragging it moves the
     stage under it."""
     for _ in range(5):
-        opened.keyboard.press("+")
-        opened.wait_for_timeout(80)
+        _press_moving(opened, "+")
     before = opened.evaluate(STATE)
-    opened.keyboard.press("ArrowRight")
-    opened.wait_for_timeout(150)
+    _press_moving(opened, "ArrowRight")
     tracked = opened.evaluate(STATE)
     assert float(tracked["vpLeft"].rstrip("%")) > float(before["vpLeft"].rstrip("%")), (before, tracked)
     assert tracked["vpWidth"] == before["vpWidth"], (before, tracked)
@@ -233,10 +260,11 @@ def test_the_minimap_says_where_the_reader_is_and_takes_them_elsewhere(opened):
                    const r = v.getBoundingClientRect();
                    return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }"""
     )
+    held = opened.evaluate(TRANSFORM)
     opened.mouse.move(box["x"], box["y"])
     opened.mouse.down()
     opened.mouse.move(box["x"] + 20, box["y"] + 10, steps=6)
     opened.mouse.up()
-    opened.wait_for_timeout(200)
+    until_changed(opened, TRANSFORM, held, what="the stage moved under the dragged minimap rect")
     dragged = opened.evaluate(STATE)
     assert (dragged["tx"], dragged["ty"]) != (tracked["tx"], tracked["ty"]), (tracked, dragged)

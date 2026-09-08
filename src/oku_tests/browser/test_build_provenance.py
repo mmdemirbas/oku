@@ -37,6 +37,8 @@ from pathlib import Path
 
 import pytest
 
+from ._wait import box_stable, measured
+
 pytestmark = pytest.mark.browser
 
 KIT = Path(__file__).resolve().parents[3] / "kit"
@@ -186,10 +188,11 @@ def test_the_rebuild_button_hands_over_a_command_that_names_the_source(built, pa
     clipboard — so it is the half asserted here."""
     _open(page, built[mode])
     page.click(".ctrl-btn.drawer-toggle")  # pin the drawer; the footer lives in it
-    page.wait_for_timeout(350)
+    # `drawer-open` is on the body the moment the handler runs; the panel
+    # is still sliding, and everything read below lives inside it.
+    box_stable(page, "page-nav")
     page.click(".page-nav-rebuild")
-    page.wait_for_timeout(200)
-    foot = page.evaluate(FOOTER)
+    foot = measured(page, FOOTER)
     assert foot["cmdShown"] is True, f"{mode}: clicking Rebuild revealed nothing"
     assert foot["cmd"] == f"cd {built['root']} && oku build", (
         f"{mode}: the command is {foot['cmd']!r} — it must name the source tree, "
@@ -243,15 +246,16 @@ def test_every_fact_in_the_build_block_clears_the_contrast_floor(built, page, th
     _open(page, built["site"])
     page.evaluate(f"() => document.documentElement.setAttribute('data-theme','{theme}')")
     page.click(".ctrl-btn.drawer-toggle")
-    page.wait_for_timeout(350)
+    box_stable(page, "page-nav")
     page.click(".page-nav-rebuild")
     # The drift line only exists on a real mismatch; put one in the DOM
     # so its colour is measured on the same surface as the rest.
     page.evaluate("""() => { const d = document.createElement('div');
       d.className = 'page-nav-drift'; d.textContent = 'x';
       document.querySelector('.page-nav-freshness').appendChild(d); }""")
-    page.wait_for_timeout(250)
-    ratios = page.evaluate(CONTRAST, READABLE)
+    # The theme was flipped above and every colour here is mid-transition
+    # until it lands, so the wait and the assertion read one expression.
+    ratios = measured(page, CONTRAST, READABLE)
     under = {k: v for k, v in ratios.items() if v is None or v < 4.5}
     assert not under, f"{theme}: below the 4.5:1 floor — {under} (all: {ratios})"
 
@@ -294,15 +298,17 @@ def test_the_footer_never_leaves_the_sidebar(built, page):
     it, so the measurement is taken with the command revealed."""
     _open(page, built["standalone"])
     page.click(".ctrl-btn.drawer-toggle")
-    page.wait_for_timeout(350)
+    box_stable(page, "page-nav")
     page.click(".page-nav-rebuild")
-    page.wait_for_timeout(200)
-    box = page.evaluate("""() => {
+    box = measured(
+        page,
+        """() => {
       const nav = document.querySelector('page-nav');
       const foot = nav.querySelector('.page-nav-footer');
       return {nav: nav.getBoundingClientRect(), foot: foot.getBoundingClientRect(),
               vh: window.innerHeight};
-    }""")
+    }""",
+    )
     assert abs(box["nav"]["height"] - box["vh"]) <= 1, (
         f"sidebar is {box['nav']['height']:.0f}px against a {box['vh']}px viewport"
     )

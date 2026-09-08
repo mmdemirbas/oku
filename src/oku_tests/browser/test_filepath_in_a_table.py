@@ -27,7 +27,7 @@ import pytest
 
 from oku import cli
 
-from ._wait import page_quiet
+from ._wait import page_quiet, until
 
 pytestmark = pytest.mark.browser
 
@@ -122,14 +122,24 @@ def test_hovering_a_cell_chip_shows_the_file(opened, section):
     inside a scroll container with its own stacking and overflow, which
     is exactly where a popup anchored to the pointer goes wrong."""
     opened.hover(f"section#{section} td oku-filepath .okt-fp-label")
-    opened.wait_for_timeout(400)
+    # The card is built after a show delay, so what is waited for is the
+    # card carrying the file's TEXT — not merely a `.oku-tooltip` node,
+    # which the previous case's card also satisfies.
+    until(
+        opened,
+        "() => { const t = document.querySelector('.oku-tooltip');"
+        "        return !!t && /hello\\.py/.test(t.textContent || ''); }",
+        what="the chip's preview card carried the file",
+    )
     tip = opened.locator(".oku-tooltip")
     assert tip.count() == 1
     text = tip.first.inner_text()
     assert "hello.py" in text, text
     assert "return f'hi {name}'" in text, text
+    # Leave the page as it was found: a card still up is what the next
+    # case would read instead of its own.
     opened.mouse.move(2, 2)
-    opened.wait_for_timeout(400)
+    until(opened, "() => !document.querySelector('.oku-tooltip')", what="the card closed")
 
 
 @pytest.mark.parametrize("section", ["gfm", "typed"])
