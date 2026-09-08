@@ -759,6 +759,34 @@ whose cases are derived from `kit/schema/examples.json` rather than
 listed: every shipped example mutated four ways, so a chart type added
 tomorrow is covered on the day it lands.
 
+**A figure that takes the pointer answers it, and the answer describes
+the picture.** Every chart type must produce a reading for a reader who
+points at it — from the mark if it draws marks, and from the cursor if
+it does not. `browser/test_hover_shows_a_reading.py` is a sweep derived
+from `kit/schema/examples.json` and it no longer skips: a chart with no
+mark falls through to its own cursor and must read out there. Two shapes
+had neither. A violin drew a median line and an IQR box and named
+neither, in two renderers that share nothing — the value runs along x in
+one and up y in the other, and the vertical one wired no cursor at all,
+so it answered with nothing. A density plot is one curve with no mark to
+hover, and its cursor swept the plot reporting silence.
+
+**What the reading contains is the other half.** It says what the reader
+is looking at, in the units the picture is drawn in. Density reports its
+height as a share of its own peak, because the plotted height IS
+`d / maxDensity` — a raw KDE density in units of 1/x answers a question
+nobody asked, and `fmtNum` renders 0.0043 as `0.00`, so the honest
+number is also the unformattable one. Where two renderers give the same
+reading it is built ONCE (`okuDistributionPayload`): two copies of a
+chart's reading is how two orientations stop agreeing about what the
+chart says.
+
+A chart may legitimately have both paths — marks that read and a cursor
+that only aligns. Beeswarm is the pattern: the dots carry the payload
+and the line is an alignment aid. That only works because the tooltip
+has an owner (see the single-owner pitfall below); before that, wiring
+both meant the cursor deleted the mark's reading.
+
 **Timeline is not step-flow, and the difference is the point.** A
 step-flow is a procedure the reader is meant to follow, so every step
 is equally true. A timeline is a record of what happened, and an entry

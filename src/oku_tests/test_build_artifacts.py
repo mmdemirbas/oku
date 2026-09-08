@@ -584,7 +584,14 @@ class TestPayloadBudget:
     # the rest is the comment naming what the cursor's out-of-band branch
     # was deleting: a reading the chart had already built correctly and
     # never showed.
-    KIT_BUDGET_BYTES = 1_269_000
+    # Then from 1,269,000 by the two charts that answered the pointer
+    # with a line and no numbers: a violin's five-number summary on both
+    # orientations (one shared builder, because the two renderers share
+    # nothing else and two copies of a chart's reading is how they stop
+    # agreeing), and a density cursor that reads out the curve as a share
+    # of its own peak and the share of observations at or below.
+    # About 3,800 bytes, of which the two readings are roughly 1,400.
+    KIT_BUDGET_BYTES = 1_273_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

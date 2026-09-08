@@ -5415,7 +5415,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-08-r76';
+var __okuKitBuild = '2026-09-08-r77';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -10255,7 +10255,44 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
-    this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
+    // A density plot draws one curve and no marks, so there is nothing
+    // to hover — the cursor is the only reading it can have, and it had
+    // none: a line swept the plot and reported nothing.
+    //
+    // Both numbers describe what the reader is looking at rather than
+    // the KDE's own units. The height is a share of the peak because
+    // that IS the drawn height (`yOf` divides by `maxDensity`), and a
+    // raw density in units of 1/x formats badly and answers a question
+    // nobody asked — `fmtNum` renders 0.0043 as "0.00". The share at or
+    // below is the reading a distribution is usually consulted for, and
+    // it comes off `values`, which is already sorted ascending.
+    this._wireGenericVerticalCursor(
+      { top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right },
+      {
+        seriesLookup: function (svgX) {
+          var v = vMin + ((svgX - pad.left) / plotW) * (vMax - vMin);
+          var nearest = samples[0], best = Math.abs(samples[0].x - v);
+          for (var i = 1; i < samples.length; i++) {
+            var delta = Math.abs(samples[i].x - v);
+            if (delta < best) { best = delta; nearest = samples[i]; }
+          }
+          // Upper bound by bisection rather than a scan: this runs on
+          // every mousemove and `values` is the author's whole dataset.
+          var lo = 0, hi = values.length;
+          while (lo < hi) {
+            var mid = (lo + hi) >> 1;
+            if (values[mid] <= v) lo = mid + 1; else hi = mid;
+          }
+          return {
+            label: fmtNum(v),
+            kv: [
+              { k: 'density', v: Math.round((nearest.d / maxDensity) * 100) + '% of peak' },
+              { k: 'at or below', v: Math.round((lo / values.length) * 100) + '%' }
+            ]
+          };
+        }
+      }
+    );
   }
 
   /* ---------------- Candlestick ----------------
@@ -10737,8 +10774,8 @@ class OkuChart extends HTMLElement {
         var y = rowMid + (samples[j].d / maxD) * halfH;
         bottomPath += ' L ' + xOf(samples[j].x).toFixed(1) + ' ' + y.toFixed(1);
       }
-      parts.push('<path d="' + topPath + bottomPath + ' Z" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-violin-body"/>');
-      // Quartile + median markers.
+      // Quartiles first: the body below carries them as its reading,
+      // so they have to exist before the path string is built.
       function quantile(p) {
         var pos = (values.length - 1) * p;
         var i = Math.floor(pos);
@@ -10746,6 +10783,13 @@ class OkuChart extends HTMLElement {
         return values[i] + frac * ((values[i + 1] || values[i]) - values[i]);
       }
       var q1 = quantile(0.25), median = quantile(0.5), q3 = quantile(0.75);
+      // What the shape encodes and never names. The vertical cursor over
+      // these rows is an alignment aid with no reading of its own, so
+      // until this the chart answered the pointer with a line and no
+      // numbers. `tabindex` because the same payload is the keyboard's
+      // only way in — `rich()` binds focus and blur beside the pointer.
+      var vRead = okuDistributionPayload(dist.label || '', values, q1, median, q3);
+      parts.push('<path d="' + topPath + bottomPath + ' Z" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-violin-body" tabindex="0" data-hover-payload="' + escapeXml(vRead.json) + '"><title>' + escapeXml(vRead.title) + '</title></path>');
       // IQR box.
       var vIqr = markSpan(xOf(q1), xOf(q3), 0);
       parts.push('<rect x="' + vIqr.start.toFixed(1) + '" y="' + (rowMid - 5).toFixed(1) + '" width="' + vIqr.size.toFixed(1) + '" height="10" fill="' + color + '" fill-opacity="0.7" stroke="none"/>');
@@ -10831,8 +10875,7 @@ class OkuChart extends HTMLElement {
         var xx = colMid + (samples[j].d / maxD) * halfW;
         rightPath += ' L ' + xx.toFixed(1) + ' ' + yOf(samples[j].v).toFixed(1);
       }
-      parts.push('<path d="' + leftPath + rightPath + ' Z" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-violin-body"/>');
-      // Quartile + median markers.
+      // Quartiles first — the body carries them as its reading.
       function quantile(p) {
         var pos = (values.length - 1) * p;
         var i = Math.floor(pos);
@@ -10840,6 +10883,11 @@ class OkuChart extends HTMLElement {
         return values[i] + frac * ((values[i + 1] || values[i]) - values[i]);
       }
       var q1 = quantile(0.25), median = quantile(0.5), q3 = quantile(0.75);
+      // This orientation had no cursor either — see the note at the end
+      // of this method — so before this it answered the pointer with
+      // nothing whatsoever.
+      var vRead = okuDistributionPayload(dist.label || '', values, q1, median, q3);
+      parts.push('<path d="' + leftPath + rightPath + ' Z" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-violin-body" tabindex="0" data-hover-payload="' + escapeXml(vRead.json) + '"><title>' + escapeXml(vRead.title) + '</title></path>');
       // IQR box (vertical).
       var vIqr = markSpan(yOf(q3), yOf(q1), 0);
       parts.push('<rect x="' + (colMid - 5).toFixed(1) + '" y="' + vIqr.start.toFixed(1) + '" width="10" height="' + vIqr.size.toFixed(1) + '" fill="' + color + '" fill-opacity="0.7" stroke="none"/>');
@@ -10850,8 +10898,11 @@ class OkuChart extends HTMLElement {
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
-    // Horizontal cursor would be the right affordance here but
-    // we don't have a generic helper for that orientation yet.
+    // A HORIZONTAL cursor would be the right sweep here — value runs up
+    // the y axis in this orientation — and there is no generic helper
+    // for that direction. It is an alignment aid rather than the
+    // chart's reading, which the bodies above now carry, so its absence
+    // no longer leaves the chart silent.
   }
 
   /* ---------------- Beeswarm ----------------
@@ -13413,6 +13464,33 @@ function fmtNum(n) {
   if (abs >= 10) return n.toFixed(0);
   if (abs >= 1) return n.toFixed(1).replace(/\.0$/, '');
   return n.toFixed(2);
+}
+
+/* The five-number summary a violin's shape encodes and never names.
+ *
+ * Written once because there are two violin renderers — the value runs
+ * along x in one and up y in the other — and they share nothing else.
+ * Two copies of a chart's reading is how the two orientations stop
+ * agreeing about what the chart says.
+ *
+ * `sorted` is ascending; both callers have already sorted to compute
+ * their quantiles, so this does not sort again and does not check.
+ */
+function okuDistributionPayload(label, sorted, q1, median, q3) {
+  return {
+    json: JSON.stringify({
+      label: label,
+      kv: [
+        { k: 'n',      v: String(sorted.length) },
+        { k: 'min',    v: fmtNum(sorted[0]) },
+        { k: 'q1',     v: fmtNum(q1) },
+        { k: 'median', v: fmtNum(median) },
+        { k: 'q3',     v: fmtNum(q3) },
+        { k: 'max',    v: fmtNum(sorted[sorted.length - 1]) }
+      ]
+    }),
+    title: label + ' · median ' + fmtNum(median) + ' · IQR ' + fmtNum(q1) + '–' + fmtNum(q3)
+  };
 }
 
 /* ============ Visual-tools toolbar (diagrams + charts) ============ *
