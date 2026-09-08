@@ -1313,6 +1313,25 @@ actually write.
   and Prism's `<script>` body span starts and ends with a newline every
   time. Held by `browser/test_nested_code_highlighting.py`.
 
+- **One element with several writers needs a single-owner rule, and the
+  hide is where it bites.** A chart has ONE `.okc-tooltip` and three
+  things write it: the Cartesian `.okc-dot` path's `showTip`, the
+  per-mark anchors' `showRich`, and the vertical cursor's
+  `_showCursorTip`. Each hide cleared it unconditionally, so the last
+  writer to hide won regardless of who had shown. The cursor's guard
+  calls `_hideCursorTip()` on every mousemove landing outside its plot
+  band — and a data mark can sit outside the band its own chart
+  declares, which is not an edge case: beeswarm's leftmost dot is at
+  viewBox x=22 against a band starting at `pad.left`, and bump's top dot
+  at y=34 against a band top of 36. Hovering those marks built the right
+  tooltip and deleted it in the same gesture. Whoever showed it owns it;
+  only the owner may hide it. **All the writers must claim, not the two
+  that showed up in the bug** — a rule covering two of three is the same
+  defect with a smaller blast radius. The symptom gives nothing away:
+  the content is correct, the anchor's events all fire, and the only
+  thing missing is a class. Held by
+  `browser/test_hover_shows_a_reading.py`.
+
 - **CSS rules silently dropped by Chrome.** A multi-line comment
   inside a rule body, containing certain Unicode punctuation, has
   been observed to make Chrome's parser drop the trailing

@@ -577,7 +577,14 @@ class TestPayloadBudget:
     # comment and in `aria-modal` and leaked to the page behind at 39
     # presses. About 2,300 bytes, of which the trap is roughly 700 and
     # the rest is the comments naming what each was measured doing.
-    KIT_BUDGET_BYTES = 1_267_000
+    # Then from 1,267,000 by the tooltip's single-owner rule: one element
+    # per chart with three writers — the Cartesian dot path, the per-mark
+    # anchors and the vertical cursor — and only the one that showed it
+    # may hide it. About 1,500 bytes, of which the rule is four lines and
+    # the rest is the comment naming what the cursor's out-of-band branch
+    # was deleting: a reading the chart had already built correctly and
+    # never showed.
+    KIT_BUDGET_BYTES = 1_269_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

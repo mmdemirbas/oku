@@ -5415,7 +5415,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-06-r75';
+var __okuKitBuild = '2026-09-08-r76';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -12271,7 +12271,35 @@ class OkuChart extends HTMLElement {
       }
       body.innerHTML = innerHtml;
     }
+    // One tooltip element, three writers: the Cartesian dot path just
+    // below, the per-mark anchors further down, and the vertical cursor a
+    // dozen renderers wire. Whoever showed it owns it, and only its owner
+    // may hide it.
+    //
+    // Without the rule the cursor's own guard deleted readings it never
+    // wrote. Measured on beeswarm, bump and horizon: hovering a mark
+    // built the right tooltip — "Berlin · 2020 rank #1 value 80" — and
+    // it never became visible, because `_wireGenericVerticalCursor`
+    // calls `_hideCursorTip()` on the same branch where it hides its own
+    // line: the mousemove that falls outside the plot band, on either
+    // axis. A data mark can sit outside the band its own chart declares.
+    // Measured in viewBox units, against the band the cursor line spans:
+    // beeswarm's leftmost dot at x=22 and horizon's first hit rect at
+    // x=65 are left of `pad.left`, and bump's top dot at y=34 is above a
+    // band top of 36 — the cursor line is `hidden` at each of those three
+    // points and `visible` at the middle of the same plot.
+    //
+    // Whether the renderer registered a `seriesLookup` does not enter
+    // into it: that is read on the IN-band branch, so bump and horizon
+    // have one and still never got to use it here.
+    //
+    // The dot path claims ownership too, and it is the reason this is
+    // declared here rather than beside the anchors that found the bug: a
+    // rule covering two of three writers is a rule with a new asymmetry
+    // in it, where a `.okc-dot` reading is still the cursor's to delete.
+    var tipOwner = null;
     function showTip(dot) {
+      tipOwner = 'anchor';
       var tip = ensureTip();
       var seriesLbl = dot.getAttribute('data-series-label') || '';
       var pointLbl  = dot.getAttribute('data-point-label')  || '';
@@ -12295,6 +12323,7 @@ class OkuChart extends HTMLElement {
       tip.classList.add('visible');
     }
     function hideTip() {
+      tipOwner = null;
       var tip = self.querySelector(':scope > .okc-tooltip');
       if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
     }
@@ -12501,6 +12530,7 @@ class OkuChart extends HTMLElement {
     // coordinates (clientX/Y) without binding to a DOM anchor.
     self._showCursorTip = function (payload, sx, sy) {
       if (pinnedAnchor) return;
+      tipOwner = 'cursor';
       var tip = ensureTip();
       var html = '';
       if (payload.label) html += '<div class="okc-tt-label">' + escapeXml(payload.label) + '</div>';
@@ -12520,6 +12550,11 @@ class OkuChart extends HTMLElement {
     };
     self._hideCursorTip = function () {
       if (pinnedAnchor) return;
+      // Not the cursor's to hide. The anchor path clears the owner from
+      // its own mouseleave, so this is not sticky: move off the mark and
+      // `hideRich` takes the tooltip down.
+      if (tipOwner !== 'cursor') return;
+      tipOwner = null;
       var tip = self.querySelector(':scope > .okc-tooltip');
       if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
     };
@@ -12548,6 +12583,7 @@ class OkuChart extends HTMLElement {
       tip.__okuAnchor = anchor;
       tip.__okuAnchorOffset = 8;
       tip.classList.add('visible');
+      tipOwner = 'anchor';
     }
     function hideRich(force) {
       if (pinnedAnchor && !force) return;
@@ -12556,6 +12592,7 @@ class OkuChart extends HTMLElement {
         tip.classList.remove('visible', 'pinned');
         tip.setAttribute('aria-hidden', 'true');
       }
+      tipOwner = null;
     }
     function pinRich(anchor, payload) {
       // Drop the pinned-marker from any previous pin before applying
