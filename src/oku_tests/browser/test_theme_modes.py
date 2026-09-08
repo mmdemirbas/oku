@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import pytest
 
+from ._wait import until
+
 from ._menu import MENU, open_menu
 
 DESKTOP = {"width": 1280, "height": 900}
@@ -46,7 +48,11 @@ def _open(page, site_url, *, os_theme="light", pref=None):
 
 def _pick(page, stop):
     page.click(f'{MENU} [data-theme-choice="{stop}"]')
-    page.wait_for_timeout(120)
+    until(
+        page,
+        f"() => document.documentElement.dataset.themeMode === '{stop}'",
+        what=f"the control moved to the {stop} stop",
+    )
     return page.evaluate(STATE)
 
 
@@ -128,13 +134,25 @@ def test_a_pin_survives_an_os_flip_under_a_live_tab(page, site_url):
     _open(page, site_url, os_theme="light")
     assert _pick(page, "dark")["mode"] == "dark"
     page.emulate_media(color_scheme="dark")
-    page.wait_for_timeout(300)
+    # The assertion below is that nothing moved, so what has to be
+    # established first is that there was something to move FOR: the page
+    # itself reporting the OS is dark now. A sleep never checked that —
+    # an emulation that silently failed would have passed it.
+    until(
+        page,
+        "() => window.matchMedia('(prefers-color-scheme: dark)').matches",
+        what="the page saw the OS turn dark",
+    )
     assert page.evaluate(STATE) == {"theme": "dark", "mode": "dark", "pref": "dark"}
     # …and it holds when the OS moves back, which is the half that would
     # pass by accident above: dark-pinned under a dark OS is the same
     # pixels either way.
     page.emulate_media(color_scheme="light")
-    page.wait_for_timeout(300)
+    until(
+        page,
+        "() => window.matchMedia('(prefers-color-scheme: light)').matches",
+        what="the page saw the OS turn light",
+    )
     assert page.evaluate(STATE) == {"theme": "dark", "mode": "dark", "pref": "dark"}
 
 

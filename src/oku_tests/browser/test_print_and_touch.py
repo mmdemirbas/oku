@@ -24,7 +24,7 @@ phone and leaves a touch tablet at 1024px with neither button.
 
 from __future__ import annotations
 
-from ._wait import page_quiet
+from ._wait import measured, page_quiet, stable
 
 import http.server
 import json
@@ -115,10 +115,16 @@ def printed_dark(browser, served):
         pg.goto(f"{served}/page.html")
         pg.wait_for_function("() => window.__okuRendered === true", timeout=60000)
         pg.evaluate("() => document.documentElement.setAttribute('data-theme', 'dark')")
-        pg.wait_for_timeout(300)
+        # Two settles, and they are different things: the dark theme
+        # painting, then the print stylesheet replacing it. Both are
+        # transitions on the colours this fixture is about to measure.
+        stable(
+            pg,
+            "() => getComputedStyle(document.body).backgroundColor",
+            what="the dark theme finished painting",
+        )
         pg.emulate_media(media="print")
-        pg.wait_for_timeout(200)
-        return pg.evaluate(PRINT_MEASURE, LUM)
+        return measured(pg, PRINT_MEASURE, LUM)
     finally:
         pg.close()
 

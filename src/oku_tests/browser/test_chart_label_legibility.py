@@ -29,6 +29,8 @@ from pathlib import Path
 
 import pytest
 
+from ._wait import stable
+
 from oku import cli
 
 pytestmark = pytest.mark.browser
@@ -206,7 +208,14 @@ def page(served, browser):
 
 def _theme(pg, name):
     pg.evaluate(f"() => document.documentElement.setAttribute('data-theme', '{name}')")
-    pg.wait_for_timeout(150)
+    # Every colour this file measures is mid-transition until the theme
+    # lands, and a ratio computed halfway is a real number for a page
+    # that does not exist.
+    stable(
+        pg,
+        "() => getComputedStyle(document.body).backgroundColor",
+        what=f"the {name} theme finished painting",
+    )
 
 
 @pytest.mark.parametrize("theme", ["dark", "light"])

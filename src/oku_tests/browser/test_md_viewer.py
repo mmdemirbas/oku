@@ -16,7 +16,7 @@ tested in both shapes here, and pinned on the build side by
 
 from __future__ import annotations
 
-from ._wait import page_quiet
+from ._wait import page_quiet, until
 
 import pytest
 
@@ -125,7 +125,11 @@ def test_the_source_view_is_the_bytes(page, site_url):
 def test_switching_views_swaps_exactly_one_pane(page, site_url):
     _open_viewer(page, site_url)
     page.click(".okt-mdview-view[data-view='source']")
-    page.wait_for_timeout(200)
+    until(
+        page,
+        "() => document.querySelector('.okt-mdview').getAttribute('data-view') === 'source'",
+        what="the viewer switched to the source pane",
+    )
     after = page.evaluate("""() => {
       const w = document.querySelector('.okt-mdview');
       return {

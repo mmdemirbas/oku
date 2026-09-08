@@ -25,6 +25,8 @@ from pathlib import Path
 
 import pytest
 
+from ._wait import stable, until
+
 from oku import cli
 
 pytestmark = pytest.mark.browser
@@ -156,7 +158,11 @@ def _hover_at(page, sel: str, x: float, row_index: int):
     rects = page.evaluate(FILL_RECTS, sel)
     r = rects[row_index]
     page.mouse.move(x, (r["top"] + r["bottom"]) / 2)
-    page.wait_for_timeout(120)
+    # The read is rebuilt as the pointer crosses bars, so what the
+    # caller is about to evaluate is this expression holding still —
+    # the same one, so the wait and the assertion cannot watch
+    # different things.
+    stable(page, TIP, what="the cursor read settled")
 
 
 def test_the_tooltip_lists_every_bar_the_cursor_crosses(chart_page) -> None:
@@ -195,7 +201,14 @@ def test_the_set_shrinks_as_the_cursor_moves_right(chart_page) -> None:
     # Past the longest bar nothing is crossed, and a tooltip listing
     # nothing is worse than none.
     chart_page.mouse.move(rects[0]["right"] + 6, (rects[0]["top"] + rects[0]["bottom"]) / 2)
-    chart_page.wait_for_timeout(120)
+    # An absence, but not one polled from zero: the loop above left a
+    # read on screen, so this is a transition away from it and there is
+    # something to wait for.
+    until(
+        chart_page,
+        "() => !document.querySelector('.okc-tooltip.visible')",
+        what="the read went away past the last bar",
+    )
     assert chart_page.evaluate(TIP) is None, "a cursor past every bar must show no read"
 
 
@@ -233,7 +246,7 @@ def test_a_stacked_row_contributes_the_segment_the_line_falls_inside(chart_page)
     row_left, row_right = rects[0]["left"], rects[1]["right"]
     x = row_left + (row_right - row_left) * 0.5
     chart_page.mouse.move(x, (rects[0]["top"] + rects[0]["bottom"]) / 2)
-    chart_page.wait_for_timeout(120)
+    stable(chart_page, TIP, what="the cursor read settled")
 
     tip = chart_page.evaluate(TIP)
     assert tip, "no tooltip on the stacked chart"
@@ -252,21 +265,31 @@ def test_clicking_pins_the_read_and_escape_releases_it(chart_page) -> None:
     x = rects[3]["right"] - 2
     y = (rects[3]["top"] + rects[3]["bottom"]) / 2
     chart_page.mouse.move(x, y)
-    chart_page.wait_for_timeout(120)
+    stable(chart_page, TIP, what="the cursor read settled")
     chart_page.mouse.click(x, y)
-    chart_page.wait_for_timeout(120)
+    until(
+        chart_page,
+        "() => !!document.querySelector('.okc-tooltip.visible.pinned')",
+        what="the click pinned the read",
+    )
 
     pinned = chart_page.evaluate(TIP)
     assert pinned and pinned["pinned"], "click did not pin the read"
 
     # Moving away leaves a pinned read alone — that is what pinning is.
     chart_page.mouse.move(rects[0]["right"] + 40, y)
-    chart_page.wait_for_timeout(150)
+    # The claim is that nothing happens, so the wait is for the read to
+    # be given every chance to change and not do so.
+    stable(chart_page, TIP, what="the pinned read stayed put")
     still = chart_page.evaluate(TIP)
     assert still and still["names"] == pinned["names"], "a pinned read followed the pointer"
 
     chart_page.keyboard.press("Escape")
-    chart_page.wait_for_timeout(150)
+    until(
+        chart_page,
+        "() => !document.querySelector('.okc-tooltip.visible')",
+        what="Escape released the pin",
+    )
     assert chart_page.evaluate(TIP) is None, "Escape did not release the pin"
 
 

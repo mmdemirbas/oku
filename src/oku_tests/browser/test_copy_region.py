@@ -20,7 +20,7 @@ follows from that job.
 from __future__ import annotations
 
 from . import _wait
-from ._wait import page_quiet
+from ._wait import page_quiet, until
 
 import argparse
 import json
@@ -193,15 +193,37 @@ def _button(page, region, fmt):
     return page.locator(".okt-copy").nth(region).locator(f".okt-copy-btn[data-copy-format='{fmt}']")
 
 
+def _copied(page, fmt: str) -> None:
+    """The write is async, and the button reports the outcome: the copy
+    handler adds `is-copied` on success and `is-failed` otherwise.
+
+    Waiting for EITHER is what keeps a refused clipboard honest — it
+    fails here, naming the refusal, instead of arriving at the assertion
+    below as a stale string from the previous case. Three of these tests
+    read the clipboard one after another, and every format is a
+    plausible value for the next one to find."""
+    until(
+        page,
+        "() => [...document.querySelectorAll("
+        f"  '.okt-copy .okt-copy-btn[data-copy-format=\\'{fmt}\\']')]"
+        "  .some((b) => b.classList.contains('is-copied')"
+        "            || b.classList.contains('is-failed'))",
+        # ANY button of this format, not the first: one case clicks the
+        # LAST of two, and a check pinned to the first waits out the
+        # ceiling on a copy that worked.
+        what=f"a {fmt} button reported the copy landed",
+    )
+
+
 def test_markdown_is_the_source_verbatim(opened):
     _button(opened, 0, "markdown").click()
-    opened.wait_for_timeout(250)
+    _copied(opened, "markdown")
     assert opened.evaluate("() => navigator.clipboard.readText()") == BODY
 
 
 def test_plain_text_is_the_syntax_gone(opened):
     _button(opened, 0, "plain").last.click()
-    opened.wait_for_timeout(250)
+    _copied(opened, "plain")
     text = opened.evaluate("() => navigator.clipboard.readText()")
     assert text == (
         "The fix landed in Apache main.\n\n- see the ticket (https://example.org/x)\n- rerun the job"
@@ -214,7 +236,7 @@ def test_plain_text_is_the_syntax_gone(opened):
 
 def test_rich_text_carries_structure_and_none_of_this_page(opened):
     _button(opened, 0, "rich").click()
-    opened.wait_for_timeout(250)
+    _copied(opened, "rich")
     html = opened.evaluate(READ_HTML)
     assert html is not None, "nothing on the clipboard offered text/html"
     assert "<ul>" in html and "<li>" in html

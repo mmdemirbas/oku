@@ -28,7 +28,7 @@ aiming the column drag: the grab zone has to be inside its own cell.
 
 from __future__ import annotations
 
-from ._wait import page_quiet
+from ._wait import page_quiet, scroll_stable, stable
 
 import http.server
 import json
@@ -140,9 +140,23 @@ def counted(browser, served):
         ctx.close()
 
 
+# What every wait in this file is waiting for: a teardown handler has
+# run and the global listener count has come back down. Reading it as a
+# JSON-able signature so `stable` can watch it in the page.
+LIVE_COUNTS = "() => window.__okuListenerCount()"
+
+
 def counts(pg) -> dict:
-    live = pg.evaluate("() => window.__okuListenerCount()")
+    live = pg.evaluate(LIVE_COUNTS)
     return {k: live.get(k, 0) for k in WATCHED}
+
+
+def _counts_settle(pg) -> None:
+    """A release handler removes its listeners synchronously, but the
+    thing that TRIGGERS it — a lightbox close, an Escape, a mouseup —
+    runs its own teardown across a frame or two. The count settling is
+    that finishing, and it is the number every assertion here reads."""
+    stable(pg, LIVE_COUNTS, what="the live listener count settled")
 
 
 def test_the_counter_is_actually_wrapping_something(counted) -> None:
@@ -177,7 +191,7 @@ def test_opening_the_lightbox_ten_times_leaves_nothing_behind(counted) -> None:
         )
         counted.wait_for_selector(".okt-lightbox-pz", timeout=10000)
         counted.evaluate("() => window.__okuLightbox.close()")
-        counted.wait_for_timeout(60)
+        _counts_settle(counted)
     assert counts(counted) == before
 
 
@@ -197,7 +211,7 @@ def test_a_lightbox_drag_interrupted_by_close_still_releases(counted) -> None:
         "the drag never bound anything"
     )
     counted.keyboard.press("Escape")
-    counted.wait_for_timeout(150)
+    _counts_settle(counted)
     counted.mouse.up()
     assert counts(counted) == before
 
@@ -223,7 +237,7 @@ def test_the_lightbox_still_pans(counted) -> None:
 def test_a_column_still_resizes_and_gives_its_handlers_back(counted) -> None:
     handle = counted.query_selector("table th .okt-col-resize")
     handle.scroll_into_view_if_needed()
-    counted.wait_for_timeout(120)
+    scroll_stable(counted)
     before = counts(counted)
     box = handle.bounding_box()
     y = box["y"] + box["height"] / 2
@@ -233,7 +247,7 @@ def test_a_column_still_resizes_and_gives_its_handlers_back(counted) -> None:
     during = counts(counted)
     width = counted.evaluate("() => document.querySelector('table colgroup col').style.width")
     counted.mouse.up()
-    counted.wait_for_timeout(60)
+    _counts_settle(counted)
 
     assert during["window:mousemove"] == before["window:mousemove"] + 1, during
     assert width, "the column took no width — the drag did nothing"
@@ -243,7 +257,7 @@ def test_a_column_still_resizes_and_gives_its_handlers_back(counted) -> None:
 def test_a_chart_still_pans_and_gives_its_handlers_back(counted) -> None:
     chart = counted.query_selector("oku-chart svg")
     chart.scroll_into_view_if_needed()
-    counted.wait_for_timeout(120)
+    scroll_stable(counted)
     before = counts(counted)
     view_before = counted.evaluate("() => JSON.stringify(document.querySelector('oku-chart')._view)")
     box = chart.bounding_box()
@@ -253,7 +267,7 @@ def test_a_chart_still_pans_and_gives_its_handlers_back(counted) -> None:
     counted.mouse.move(cx - 70, cy, steps=4)
     during = counts(counted)
     counted.mouse.up()
-    counted.wait_for_timeout(60)
+    _counts_settle(counted)
     view_after = counted.evaluate("() => JSON.stringify(document.querySelector('oku-chart')._view)")
 
     assert during["document:mousemove"] == before["document:mousemove"] + 1, during
@@ -274,7 +288,7 @@ def test_the_whole_resize_handle_answers_the_pointer(counted) -> None:
     """
     handle = counted.query_selector("table th .okt-col-resize")
     handle.scroll_into_view_if_needed()
-    counted.wait_for_timeout(120)
+    scroll_stable(counted)
     measured = counted.evaluate("""() => {
       const h = document.querySelector('table th .okt-col-resize');
       const own = h.parentElement;

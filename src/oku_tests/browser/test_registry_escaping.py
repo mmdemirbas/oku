@@ -19,7 +19,7 @@ between projects — a glossary domain is meant to be shared — so a
 
 from __future__ import annotations
 
-from ._wait import page_quiet
+from ._wait import page_quiet, until
 
 import http.server
 import json
@@ -103,7 +103,17 @@ def measured(browser, served):
                 box = el.bounding_box()
                 if box:
                     pg.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-                    pg.wait_for_timeout(700)
+                    # The card is what every assertion below reads, and
+                    # it is built on a show delay. Waiting for it to
+                    # carry text rather than merely exist: an empty card
+                    # would pass the escaping checks for the wrong
+                    # reason.
+                    until(
+                        pg,
+                        "() => { const t = document.querySelector('.oku-tooltip');"
+                        "        return !!t && (t.textContent || '').trim().length > 0; }",
+                        what="the hover built a card",
+                    )
         return pg.evaluate("""() => {
           const toc = document.querySelector('.toc-head');
           const tip = document.querySelector('.oku-tooltip');

@@ -102,7 +102,9 @@ def test_escape_closes_the_menu_and_leaves_the_drawer_alone(page, site_url):
     page.wait_for_selector("main")
     _wait.page_quiet(page)
     page.click(".ctrl-btn.drawer-toggle")
-    page.wait_for_timeout(300)
+    # The class lands with the click; the panel is still sliding, and
+    # what follows measures where things are.
+    _wait.box_stable(page, "page-nav")
     drawer_open = page.evaluate("() => document.body.className")
     assert "drawer-modal" in drawer_open, f"the drawer did not open modal: {drawer_open!r}"
 
@@ -116,7 +118,7 @@ def test_escape_closes_the_menu_and_leaves_the_drawer_alone(page, site_url):
 
     # A second press, with the menu already closed, is the drawer's.
     page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
+    _wait.box_stable(page, "page-nav")
     assert "drawer-open" not in page.evaluate("() => document.body.className")
 
 

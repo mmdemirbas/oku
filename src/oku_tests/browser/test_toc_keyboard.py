@@ -22,6 +22,8 @@ from pathlib import Path
 
 import pytest
 
+from ._wait import measured, scroll_stable
+
 from oku import cli
 
 pytestmark = pytest.mark.browser
@@ -178,8 +180,9 @@ def test_the_fold_control_answers_enter_and_space(page, key) -> None:
       '.toc-list li.toc-h2[data-target="deep"] .toc-head > .chevron').focus()""")
     before = page.evaluate(read)
     page.keyboard.press(key)
-    page.wait_for_timeout(120)
-    after = page.evaluate(read)
+    # The fold animates, and `expanded` is what the assertion reads — so
+    # the wait reads it too rather than watching a clock beside it.
+    after = measured(page, read)
 
     assert after["expandedClass"] != before["expandedClass"], (key, before, after)
     assert after["aria"] == str(after["expandedClass"]).lower(), (key, after)
@@ -190,15 +193,21 @@ def test_the_state_the_button_reports_is_the_state_the_page_is_in(page) -> None:
     set the class directly. Two writers, one of them silent, is how the
     announced state and the real one drift."""
     page.evaluate("() => document.getElementById('deep2').scrollIntoView()")
-    page.wait_for_timeout(700)
-    state = page.evaluate("""() => [...document.querySelectorAll('.toc-list li.toc-h2')].map(li => {
+    # Two things follow the scroll and only the first has an end of its
+    # own: the smooth scroll, and then the scroll-spy folding sections as
+    # it passes them.
+    scroll_stable(page)
+    state = measured(
+        page,
+        """() => [...document.querySelectorAll('.toc-list li.toc-h2')].map(li => {
       const chev = li.querySelector('.toc-head > .chevron');
       return {
         section: li.dataset.target,
         cls: li.classList.contains('expanded'),
         aria: chev.tagName === 'BUTTON' ? chev.getAttribute('aria-expanded') : null,
       };
-    })""")
+    })""",
+    )
     for row in state:
         if row["aria"] is None:
             continue

@@ -22,7 +22,7 @@ The tests below are the guard against reopening this a third time.
 
 from __future__ import annotations
 
-from ._wait import page_quiet
+from ._wait import measured, page_quiet
 
 import http.server
 import threading
@@ -147,8 +147,10 @@ def test_one_edge_holds_at_every_width(rendered, mode):
     """The width toggle moves the column. It must not open a gap
     between the block kinds inside it."""
     rendered.evaluate("(m) => document.body.setAttribute('data-content-width', m)", mode)
-    rendered.wait_for_timeout(200)
-    blocks = rendered.evaluate(EDGES)
+    # The column animates to its new width, and the right edges are the
+    # measurement — so the wait reads the same expression the assertion
+    # does rather than a clock beside it.
+    blocks = measured(rendered, EDGES)
     rendered.evaluate("() => document.body.setAttribute('data-content-width', 'comfortable')")
     edges = {b["right"] for b in blocks}
     assert max(edges) - min(edges) <= 1, f"{mode}: " + ", ".join(f"{b['tag']}@{b['right']}" for b in blocks)
@@ -187,7 +189,7 @@ def test_the_width_toggle_still_moves_the_measure(rendered):
     seen = {}
     for mode in ("narrow", "comfortable", "max"):
         rendered.evaluate("(m) => document.body.setAttribute('data-content-width', m)", mode)
-        rendered.wait_for_timeout(200)
+        measured(rendered, EDGES)
         seen[mode] = rendered.evaluate(
             """() => {
             const p = document.querySelector('main > section > p');

@@ -31,6 +31,8 @@ from pathlib import Path
 
 import pytest
 
+from ._wait import box_stable
+
 from . import _wait
 from ._menu import MENU, open_menu, step_text_scale
 
@@ -179,7 +181,7 @@ def test_a_pinned_drawer_and_a_raised_scale_do_not_fight(page, site_url):
     than of either."""
     _open(page, site_url, "docs/reference.html")
     page.click(".ctrl-btn.drawer-toggle")
-    page.wait_for_timeout(400)
+    box_stable(page, "page-nav")
     assert "drawer-pinned" in page.evaluate("() => document.body.className"), (
         "the drawer did not pin, so this measures the unpinned layout"
     )
