@@ -33,6 +33,18 @@ The two cases at the bottom pin what a single-owner rule can break in
 the other direction: leaving a mark must still take its reading away,
 and the cursor must still hide what the cursor itself showed.
 
+The file's second subject is what the reading OFFERS. Every tooltip in
+the kit prints "click to pin", from three writers — `rich()` for the
+anchors, `_showCursorTip` for the SVG cursors, and `showCrossing` for
+the DIV-rendered bar charts — and only two of them had a click bound.
+Measured on density and bump: the hint rendered, a click pinned nothing,
+and moving the pointer away took the reading down. There is one case per
+writer rather than one per chart, because that is the shape the failures
+came in, and because the 53-case version was flaky — it hovers whichever
+mark it can reach on a 53-chart page, and on `arc` that answer moved
+between runs while arc pinned correctly three times out of three on a
+page of its own.
+
 The sweep skips nothing. It used to skip two, and the skip is what
 found them: `density` and `violin` tagged no mark with a reading at all
 and wired a line-only cursor — measured, density had 0 payloads and 0
@@ -59,7 +71,7 @@ import pytest
 
 from oku import cli
 
-from ._wait import page_quiet, scroll_stable, until
+from ._wait import page_quiet, scroll_stable, stable, until
 
 pytestmark = pytest.mark.browser
 
@@ -210,11 +222,33 @@ CURSOR_ONLY_POINT = """([id, sel]) => {
 }"""
 
 
-def _hover_a_mark(page, chart: str):
+def _settle(page, chart: str) -> None:
+    """The scroll has come to rest AND the chart has stopped moving
+    under it.
+
+    Two separate motions, and only the first is obvious. The kit scrolls
+    smoothly, so a rect read mid-flight names a point the pointer will
+    never be at. The second one cost a whole test: `network` runs a
+    force layout, and a node picked while it was still relaxing had
+    drifted out from under the pointer by the time the click landed —
+    measured, the click's `composedPath` began at `svg.okc-svg`, with
+    the node nowhere in it. That read as "the network refuses to pin"
+    and was the mark walking away.
+    """
     page.evaluate("(id) => document.getElementById(id).scrollIntoView({block: 'center'})", chart)
-    # The kit scrolls smoothly, and a rect read mid-flight names a point
-    # the pointer will never be at.
     scroll_stable(page)
+    stable(
+        page,
+        "(id) => [...document.getElementById(id).querySelectorAll('svg *')].slice(0, 40)"
+        ".map((e) => { const r = e.getBoundingClientRect();"
+        "              return [Math.round(r.x), Math.round(r.y)]; })",
+        arg=chart,
+        what=f"{chart} stopped moving",
+    )
+
+
+def _hover_a_mark(page, chart: str):
+    _settle(page, chart)
     pt = page.evaluate(FIND_POINT, [chart, MARKS])
     if not pt["marks"]:
         # Not this function's call what that means — a chart with no
@@ -274,8 +308,7 @@ def test_the_cursor_still_hides_what_the_cursor_showed(page):
     writes a reading of its own at any x inside the band — and that one
     is still the cursor's to take down when the pointer leaves. A rule
     that only ever protected the anchor would strand it on screen."""
-    page.evaluate("(id) => document.getElementById(id).scrollIntoView({block: 'center'})", "bump")
-    scroll_stable(page)
+    _settle(page, "bump")
     pt = page.evaluate(CURSOR_ONLY_POINT, ["bump", MARKS])
     assert pt, "no point inside bump's cursor band that is off every mark"
     page.mouse.move(pt["x"], pt["y"], steps=4)
@@ -408,8 +441,7 @@ def test_a_density_plot_reads_out_the_curve_under_the_cursor(page):
     argument returns the same thing everywhere and would pass a
     single-point check.
     """
-    page.evaluate("(id) => document.getElementById(id).scrollIntoView({block: 'center'})", "density")
-    scroll_stable(page)
+    _settle(page, "density")
     box = page.evaluate(
         """() => { const r = document.querySelector('#density svg.okc-svg').getBoundingClientRect();
                    const l = document.querySelector('#density .okc-generic-cursor');
@@ -431,3 +463,188 @@ def test_a_density_plot_reads_out_the_curve_under_the_cursor(page):
     # inverted the axis would still differ at two points and be wrong.
     shares = [int(t.split("at or below")[1].split("%")[0].strip()) for t in readings]
     assert shares[0] < shares[1], (shares, readings)
+
+
+PIN_STATE = """(id) => {
+  const t = [...document.getElementById(id).querySelectorAll('.okc-tooltip')]
+    .find((e) => e.classList.contains('visible'));
+  return t ? { hint: /click to pin/.test(t.textContent), pinned: t.classList.contains('pinned') }
+           : { hint: null, pinned: false };
+}"""
+
+
+def _pin_state(page, chart: str) -> dict:
+    return page.evaluate(
+        """(id) => {
+             const t = [...document.getElementById(id).querySelectorAll('.okc-tooltip')]
+               .find((e) => e.classList.contains('visible'));
+             return t ? { hint: /click to pin/.test(t.textContent),
+                          pinned: t.classList.contains('pinned'),
+                          text: (t.textContent || '').trim() }
+                      : { hint: false, pinned: false, text: null };
+           }""",
+        chart,
+    )
+
+
+def _pin_holds(page, chart: str, x: float, y: float) -> None:
+    """Click, and require the reading to outlive the pointer.
+
+    "Gained a class" is not the promise. The pin exists so a reader can
+    select the text or hold a value while looking somewhere else, so
+    what is asserted is that the reading survives the pointer leaving —
+    which is the half that was broken twice here, in two different
+    places, after the click itself already worked.
+    """
+    page.mouse.click(x, y)
+    until(
+        page,
+        f"() => [...document.getElementById('{chart}').querySelectorAll('.okc-tooltip')]"
+        ".some((t) => t.classList.contains('visible') && t.classList.contains('pinned'))",
+        what=f"{chart} pinned the reading its tooltip offered to pin",
+    )
+    page.mouse.move(4, 4)
+    assert _pin_state(page, chart)["pinned"], f"{chart} lost the pin when the pointer left"
+    page.mouse.click(x, y)
+    until(page, _visible(chart, negate=True), what=f"{chart} let the pin go on a second click")
+    page.mouse.move(4, 4)
+
+
+# One case per writer of that string, not one per chart type. `rich()`
+# prints it for every anchor, `_showCursorTip` for every SVG cursor, and
+# the div bar chart's `showCrossing` for the three DIV-rendered types --
+# three implementations, and the sweep that found the defect showed the
+# failures cluster by writer rather than by chart. A 53-case version of
+# this existed first and was flaky: it picks whichever mark it can reach
+# on a 53-chart page, and on `arc` that answer moved between runs while
+# arc pinned correctly 3 times out of 3 on a page of its own. A flaky
+# test is worse than no test, and the rule being asserted is about the
+# writers anyway.
+def test_a_mark_reading_pins(page):
+    """`rich()` -- the path that already worked, pinned here so it keeps
+    working now that three writers share the element and a pin."""
+    pt = _hover_a_mark(page, "donut")
+    until(page, _visible("donut"), what="the slice showed its reading")
+    assert _pin_state(page, "donut")["hint"], "the slice's reading makes no pin offer"
+    _pin_holds(page, "donut", pt["x"], pt["y"])
+
+
+def test_the_cursor_reading_pins(page):
+    """`_showCursorTip` -- the writer that printed the offer into five
+    call sites with no click bound anywhere. Density is the honest
+    subject: it draws one curve and no marks, so the cursor's reading is
+    the only one it has and there is no anchor to fall back on."""
+    _settle(page, "density")
+    pt = page.evaluate(CURSOR_ONLY_POINT, ["density", MARKS])
+    assert pt, "no point inside density's cursor band"
+    page.mouse.move(pt["x"] - 14, pt["y"] - 14)
+    page.mouse.move(pt["x"], pt["y"], steps=6)
+    until(page, _visible("density"), what="the density cursor showed a reading")
+    assert _pin_state(page, "density")["hint"], "the cursor's reading makes no pin offer"
+    _pin_holds(page, "density", pt["x"], pt["y"])
+
+
+def test_a_bar_chart_reading_pins(page):
+    """`showCrossing` -- the third writer. Bar, stacked-bar and
+    grouped-bar are DIV-rendered outside the `oku-chart` element
+    lifecycle and carry their own tooltip, their own cursor and their
+    own pin, so nothing the other two writers do covers them."""
+    pt = _hover_a_mark(page, "bar")
+    until(page, _visible("bar"), what="the bar showed a reading")
+    assert _pin_state(page, "bar")["hint"], "the bar's reading makes no pin offer"
+    _pin_holds(page, "bar", pt["x"], pt["y"])
+
+
+def test_a_cursor_reading_survives_the_dot_under_the_pointer(page):
+    """The case that took two fixes, and neither is visible from the
+    outside.
+
+    On a Cartesian chart the reading under the pointer is the CURSOR's
+    cross-series readout, and the pointer is sitting on a dot while it
+    reads. Clicking focused that dot, whose `focus` handler replaced the
+    readout with the single point's coordinates -- measured on scatter,
+    'Engineering cost \u2248 4 / Showstoppers + High 9' became
+    'Showstoppers + High / H3 / (4, 9)' between the mouse going down and
+    coming up -- so the click found a tooltip nobody had offered to pin.
+    With that fixed the click pinned and then leaving the dot took the
+    pin down, because the dot's `hideTip` hid whatever was there.
+    """
+    pt = _hover_a_mark(page, "scatter")
+    until(page, _visible("scatter"), what="scatter showed a reading")
+    before = _pin_state(page, "scatter")
+    assert before["hint"], "the reading under the pointer makes no pin offer"
+    page.mouse.click(pt["x"], pt["y"])
+    until(
+        page,
+        "() => [...document.getElementById('scatter').querySelectorAll('.okc-tooltip')]"
+        ".some((t) => t.classList.contains('visible') && t.classList.contains('pinned'))",
+        what="the click pinned the reading it was offered",
+    )
+    # The content is the one that was on screen when the offer was made.
+    assert _pin_state(page, "scatter")["text"] == before["text"]
+    page.mouse.move(4, 4)
+    assert _pin_state(page, "scatter")["pinned"], "leaving the dot took the pinned reading with it"
+    page.mouse.click(pt["x"], pt["y"])
+    until(page, _visible("scatter", negate=True), what="the second click let go")
+    page.mouse.move(4, 4)
+
+
+def test_a_draggable_mark_makes_no_offer_it_cannot_keep(page):
+    """A network node is dragged, and the drag calls
+    `svg.setPointerCapture` on pointerdown -- so every event after that
+    goes to the SVG and the node never sees a mousedown, a mouseup or a
+    click. Measured: `elementFromPoint` names the node's own `<circle>`
+    and the click arrives at `svg.okc-svg`, with capture-phase listeners
+    on the node group recording nothing at all.
+
+    So the pin could never fire there, and the answer is not to bolt one
+    on -- the gesture is spoken for -- but to stop printing an offer the
+    interaction cannot keep. Asserted rather than skipped, because "this
+    tooltip makes no offer" is the fix.
+    """
+    _hover_a_mark(page, "network")
+    until(page, _visible("network"), what="the node showed its reading")
+    got = _pin_state(page, "network")
+    assert got["text"], got
+    assert not got["hint"], f"a node that cannot be clicked still offers a pin: {got['text']!r}"
+    page.mouse.move(4, 4)
+
+
+def test_a_dot_still_shows_its_reading_to_the_keyboard(page):
+    """The guard on narrowing the dot's focus handler to
+    `:focus-visible`.
+
+    A mouse click focuses a dot, which is why the handler had to stop
+    answering plain `focus` — but Tab focuses it too, and that is a
+    reader with no other way in. Reached by pressing Tab rather than by
+    calling `.focus()`, because the two are not the same question:
+    Chromium matches `:focus-visible` on keyboard navigation and a
+    programmatic focus after mouse activity does not match, so a test
+    that called `.focus()` would fail against a kit that works.
+    """
+    _settle(page, "scatter")
+    # Start from a known place inside the section, then walk in.
+    page.evaluate(
+        "() => document.getElementById('scatter').querySelector('h2').setAttribute('tabindex', '-1')"
+    )
+    page.evaluate("() => document.getElementById('scatter').querySelector('h2').focus()")
+    landed = None
+    for _ in range(60):
+        page.keyboard.press("Tab")
+        where = page.evaluate(
+            """() => { const a = document.activeElement;
+                       return a && a.classList && a.classList.contains('okc-dot')
+                              ? (a.getAttribute('data-point-key') || 'dot') : null; }"""
+        )
+        if where:
+            landed = where
+            break
+    assert landed, "Tab never reached a data point on the scatter"
+    until(
+        page,
+        "() => [...document.getElementById('scatter').querySelectorAll('.okc-tooltip')]"
+        ".some((t) => t.classList.contains('visible') && (t.textContent || '').trim())",
+        what="a dot reached by Tab showed its reading",
+    )
+    page.keyboard.press("Escape")
+    page.mouse.move(4, 4)

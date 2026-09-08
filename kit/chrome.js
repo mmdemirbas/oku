@@ -5415,7 +5415,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-08-r77';
+var __okuKitBuild = '2026-09-08-r78';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -9625,7 +9625,7 @@ class OkuChart extends HTMLElement {
       var color = palette[n.color] || palette.accent;
       var deg = adj[n.id].length;
       var r = 6 + Math.min(8, deg);
-      parts.push('<g class="okc-network-node" tabindex="0" data-node-id="' + escapeXml(String(n.id)) + '" data-x="' + n._x.toFixed(1) + '" data-y="' + n._y.toFixed(1) + '" transform="translate(' + n._x.toFixed(1) + ',' + n._y.toFixed(1) + ')" data-hover-payload="' + escapeXml(JSON.stringify({label: n.label || n.id, kv: [{k: 'degree', v: String(deg)}]})) + '">' +
+      parts.push('<g class="okc-network-node" tabindex="0" data-node-id="' + escapeXml(String(n.id)) + '" data-x="' + n._x.toFixed(1) + '" data-y="' + n._y.toFixed(1) + '" transform="translate(' + n._x.toFixed(1) + ',' + n._y.toFixed(1) + ')" data-hover-payload="' + escapeXml(JSON.stringify({label: n.label || n.id, kv: [{k: 'degree', v: String(deg)}], pinnable: false})) + '">' +
         '<circle cx="0" cy="0" r="' + r + '" fill="' + color + '"/>' +
         '<text x="0" y="' + (-r - 4).toFixed(1) + '" text-anchor="middle" class="okc-network-label">' + escapeXml(n.label || n.id) + '</text>' +
         '<title>' + escapeXml((n.label || n.id) + ' · degree ' + deg) + '</title>' +
@@ -12350,6 +12350,12 @@ class OkuChart extends HTMLElement {
     // in it, where a `.okc-dot` reading is still the cursor's to delete.
     var tipOwner = null;
     function showTip(dot) {
+      // A pinned reading is the reader's. The dot path predates pinning
+      // entirely — dots could not pin, so nothing it did could disturb a
+      // pin — and that stopped being true once the cursor's reading
+      // became pinnable, because the pointer sits ON a dot while the
+      // cursor's cross-series readout is what the reader pinned.
+      if (pinnedAnchor || pinnedCursor) return;
       tipOwner = 'anchor';
       var tip = ensureTip();
       var seriesLbl = dot.getAttribute('data-series-label') || '';
@@ -12374,6 +12380,11 @@ class OkuChart extends HTMLElement {
       tip.classList.add('visible');
     }
     function hideTip() {
+      // The half that was actually losing the pin: leaving a dot hid
+      // the tooltip whoever owned it. Measured on scatter — the click
+      // pinned, and moving the pointer off the dot took the pinned
+      // reading down with it.
+      if (pinnedAnchor || pinnedCursor) return;
       tipOwner = null;
       var tip = self.querySelector(':scope > .okc-tooltip');
       if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
@@ -12388,11 +12399,27 @@ class OkuChart extends HTMLElement {
         el.classList.toggle('hovered', on);
       });
     }
+    // `:focus-visible`, not `focus`. A mouse click focuses a dot too,
+    // and on a Cartesian chart the tooltip the reader is looking at when
+    // they click is the CURSOR's cross-series readout — which says
+    // "click to pin". Showing the dot's own reading from the click's
+    // focus event swapped that readout for a single point's coordinates
+    // and left `tipOwner` on the anchor, so the click that followed
+    // found a tooltip nobody had offered to pin and pinned nothing.
+    // Measured on scatter: 'Engineering cost ≈ 4 / Showstoppers + High
+    // 9' became 'Showstoppers + High / H3 / (4, 9)' between the mouse
+    // going down and coming up. Keyboard focus still shows the dot —
+    // that is what `:focus-visible` is for, and it is the same rule the
+    // filepath chip's card controller already follows.
+    function focusShowsTip(el) { return !el.matches || el.matches(':focus-visible'); }
     this.querySelectorAll('.okc-dot').forEach(function (dot) {
       var key = dot.getAttribute('data-point-key');
       dot.addEventListener('mouseenter', function () { setHover(key, true);  showTip(dot); });
       dot.addEventListener('mouseleave', function () { setHover(key, false); hideTip();   });
-      dot.addEventListener('focus',      function () { setHover(key, true);  showTip(dot); });
+      dot.addEventListener('focus',      function () {
+        if (!focusShowsTip(dot)) return;
+        setHover(key, true); showTip(dot);
+      });
       dot.addEventListener('blur',       function () { setHover(key, false); hideTip();   });
     });
     this.querySelectorAll('.okc-point-label').forEach(function (label) {
@@ -12404,6 +12431,7 @@ class OkuChart extends HTMLElement {
       });
       label.addEventListener('mouseleave', function () { setHover(key, false); hideTip(); });
       label.addEventListener('focus', function () {
+        if (!focusShowsTip(label)) return;
         setHover(key, true);
         var dot = self.querySelector('.okc-dot[data-point-key="' + key + '"]');
         if (dot) showTip(dot);
@@ -12568,20 +12596,41 @@ class OkuChart extends HTMLElement {
     // anywhere outside) unpins it. Lets readers select tooltip
     // text or follow values without the popup auto-closing.
     var pinnedAnchor = null;
+    // The cursor's reading can be pinned too, and it needs its own flag
+    // because it has no anchor: `_showCursorTip` places the tooltip at a
+    // coordinate rather than against an element, so there is nothing for
+    // `pinnedAnchor` to hold and nothing to carry `.okc-pinned`. The
+    // frozen cursor line is the indicator instead — pinning makes
+    // `_tipPinned` true, and every cursor already returns early on that,
+    // so the line stops tracking at the same moment the reading does.
+    //
+    // Measured before this: the cursor's tooltip renders "click to pin"
+    // like every other tooltip in the kit, and on density and bump a
+    // click pinned nothing and moving the pointer away took the reading
+    // down. Two of the three writers that print that hint honoured it —
+    // the anchor path through `rich()`, and the div bar chart through
+    // its own handler — and this one printed it into five call sites
+    // with no click bound anywhere.
+    var pinnedCursor = false;
+    var cursorReading = null;
     // Expose tip-pinned state to other methods on the instance —
     // cursor-driven charts (ridgeline, sparkline) check this before
     // overwriting the pinned tooltip content with the cursor's
     // payload.
     Object.defineProperty(self, '_tipPinned', {
       configurable: true,
-      get: function () { return !!pinnedAnchor; }
+      get: function () { return !!pinnedAnchor || pinnedCursor; }
     });
     // Cursor-driven update path used by _wireRidgelineCursor /
     // _wireSparklineCursor — render a payload near the screen
     // coordinates (clientX/Y) without binding to a DOM anchor.
     self._showCursorTip = function (payload, sx, sy) {
-      if (pinnedAnchor) return;
+      if (pinnedAnchor || pinnedCursor) return;
       tipOwner = 'cursor';
+      // Kept so the host's click has something to pin. Guarding here as
+      // well as at the call sites is deliberate: five renderers reach
+      // this and only some of them test `_tipPinned` first.
+      cursorReading = payload;
       var tip = ensureTip();
       var html = '';
       if (payload.label) html += '<div class="okc-tt-label">' + escapeXml(payload.label) + '</div>';
@@ -12600,7 +12649,7 @@ class OkuChart extends HTMLElement {
       tip.classList.add('visible');
     };
     self._hideCursorTip = function () {
-      if (pinnedAnchor) return;
+      if (pinnedAnchor || pinnedCursor) return;
       // Not the cursor's to hide. The anchor path clears the owner from
       // its own mouseleave, so this is not sticky: move off the mark and
       // `hideRich` takes the tooltip down.
@@ -12610,6 +12659,10 @@ class OkuChart extends HTMLElement {
       if (tip) { tip.classList.remove('visible'); tip.setAttribute('aria-hidden', 'true'); }
     };
     function showRich(anchor, payload) {
+      // A pinned reading is the reader's, whichever path pinned it.
+      // Without this, hovering any mark overwrote a pinned cursor
+      // reading in place while the cursor line stayed frozen elsewhere.
+      if (pinnedCursor) return;
       var tip = ensureTip();
       var html = '';
       if (payload.series) html += '<div class="okc-tt-series">' + escapeXml(payload.series) + '</div>';
@@ -12622,7 +12675,17 @@ class OkuChart extends HTMLElement {
         html += '</dl>';
       }
       if (payload.footer) html += '<div class="okc-tt-coords">' + escapeXml(payload.footer) + '</div>';
-      html += '<span class="okc-tt-pin-hint">click to pin</span>';
+      // A mark whose gesture is already spoken for makes no pin offer.
+      // A network node is DRAGGED, and the drag takes the pointer with
+      // it: `_wireNetworkDrag` calls `svg.setPointerCapture` on
+      // pointerdown, so every event after that goes to the SVG and the
+      // node never sees a mousedown, a mouseup or a click. Measured —
+      // `elementFromPoint` names the node's own `<circle>` and the click
+      // arrives at `svg.okc-svg`, with capture-phase listeners on the
+      // node group recording nothing at all. The pin could never fire,
+      // and printing the offer anyway is the kit telling a reader to do
+      // something that does nothing.
+      if (payload.pinnable !== false) html += '<span class="okc-tt-pin-hint">click to pin</span>';
       rebuildTipBody(tip, html);
       tip.setAttribute('aria-hidden', 'false');
       // Viewport-relative + clamped position (tooltip is
@@ -12646,6 +12709,10 @@ class OkuChart extends HTMLElement {
       tipOwner = null;
     }
     function pinRich(anchor, payload) {
+      // Pinning is exclusive — one reading is held at a time, so taking
+      // a mark releases the cursor's. This runs BEFORE showRich's guard
+      // above would refuse the call.
+      pinnedCursor = false;
       // Drop the pinned-marker from any previous pin before applying
       // the new one — keeps a single "selected" indicator across the
       // chart at any time.
@@ -12660,6 +12727,20 @@ class OkuChart extends HTMLElement {
       self.querySelectorAll('.okc-pinned').forEach(function (el) { el.classList.remove('okc-pinned'); });
       pinnedAnchor = null;
       hideRich(true);
+    }
+    function pinCursor() {
+      pinnedCursor = true;
+      var tip = self.querySelector(':scope > .okc-tooltip');
+      if (tip) tip.classList.add('pinned');
+    }
+    function unpinCursor() {
+      // Clear the flag first: `_hideCursorTip` declines while it is set,
+      // which is what keeps a pinned reading alive through the mousemove
+      // that follows every click.
+      pinnedCursor = false;
+      var tip = self.querySelector(':scope > .okc-tooltip');
+      if (tip) tip.classList.remove('pinned');
+      if (self._hideCursorTip) self._hideCursorTip();
     }
     function rich(selector, payloadFn) {
       self.querySelectorAll(selector).forEach(function (el) {
@@ -12688,14 +12769,24 @@ class OkuChart extends HTMLElement {
     }
     // Outside-click + Escape unpin handlers (host-scoped).
     self.addEventListener('click', function (ev) {
-      if (!pinnedAnchor) return;
-      // Bubble guard — only unpin when the click landed somewhere
-      // OTHER than the pinned anchor (the rich handler already
-      // stops the anchor's own click from reaching here).
-      if (!pinnedAnchor.contains(ev.target)) unpinRich();
+      if (pinnedCursor) { unpinCursor(); return; }
+      if (pinnedAnchor) {
+        // Bubble guard — only unpin when the click landed somewhere
+        // OTHER than the pinned anchor (the rich handler already
+        // stops the anchor's own click from reaching here).
+        if (!pinnedAnchor.contains(ev.target)) unpinRich();
+        return;
+      }
+      // Nothing pinned, and the tooltip on screen is the cursor's. It
+      // has no anchor of its own to take the click, so the host takes
+      // it — a mark's click never arrives here, because `rich()` stops
+      // propagation before it can.
+      if (tipOwner === 'cursor' && cursorReading) pinCursor();
     });
     self.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Escape' && pinnedAnchor) unpinRich();
+      if (ev.key !== 'Escape') return;
+      if (pinnedCursor) unpinCursor();
+      else if (pinnedAnchor) unpinRich();
     });
     // Donut slices — label, value, share-of-total.
     rich('.okc-slice', function (el) {

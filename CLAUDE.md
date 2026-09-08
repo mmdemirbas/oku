@@ -1360,6 +1360,38 @@ actually write.
   thing missing is a class. Held by
   `browser/test_hover_shows_a_reading.py`.
 
+- **A tooltip that prints an offer has to be able to keep it.** Every
+  tooltip in the kit renders `click to pin`, and three writers render
+  it: `rich()` for the per-mark anchors, `_showCursorTip` for the SVG
+  cursors, and `showCrossing` for the DIV bar charts. Only two bound a
+  click. The cursor has no anchor to take one — it places the tooltip at
+  a coordinate rather than against an element — so the HOST takes the
+  click and the frozen cursor line stands in for the `.okc-pinned`
+  marker a mark would carry. One flag covers all five call sites,
+  because `_tipPinned` is what every cursor already tests before it
+  redraws.
+
+  Two things only surfaced once the click worked, and both are the same
+  shape: **a path written before pinning existed does not know to leave
+  a pin alone.** The dot path's `hideTip` hid whatever was on screen, so
+  leaving the dot took a pinned cursor reading with it. And a mouse
+  click FOCUSES a dot, whose `focus` handler replaced the cursor readout
+  the reader was about to pin with that one point's coordinates —
+  `:focus-visible`, not `focus`, which is the same rule the filepath
+  chip's card controller already follows, and Tab still shows a dot its
+  reading.
+
+  **Where the gesture is already spoken for, do not print the offer.** A
+  network node is dragged and `_wireNetworkDrag` calls
+  `svg.setPointerCapture` on pointerdown, so the node never sees a
+  mousedown, a mouseup or a click — `elementFromPoint` names its own
+  `<circle>` and the click arrives at `svg.okc-svg`. Its payload carries
+  `pinnable: false` and `showRich` omits the hint. Bolting a click onto
+  a drag would be the wrong repair. Held by
+  `browser/test_hover_shows_a_reading.py`, one case per WRITER — the
+  53-chart version of that test was flaky, because it hovers whichever
+  mark it can reach on a crowded page.
+
 - **CSS rules silently dropped by Chrome.** A multi-line comment
   inside a rule body, containing certain Unicode punctuation, has
   been observed to make Chrome's parser drop the trailing

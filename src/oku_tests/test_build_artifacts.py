@@ -591,7 +591,15 @@ class TestPayloadBudget:
     # agreeing), and a density cursor that reads out the curve as a share
     # of its own peak and the share of observations at or below.
     # About 3,800 bytes, of which the two readings are roughly 1,400.
-    KIT_BUDGET_BYTES = 1_273_000
+    # Then from 1,273,000 by the pin the cursor's tooltip had been
+    # offering and not honouring: one flag and one host click handler
+    # covering all five call sites, the dot path's focus narrowed to
+    # `:focus-visible` so a mouse click stops swapping the reading it is
+    # about to pin, and a `pinnable: false` for a mark whose gesture is
+    # already a drag. About 4,200 bytes, of which the mechanism is
+    # roughly 900 and the rest is the comments naming what each was
+    # measured doing.
+    KIT_BUDGET_BYTES = 1_278_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
