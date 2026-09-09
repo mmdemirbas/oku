@@ -648,3 +648,78 @@ def test_a_dot_still_shows_its_reading_to_the_keyboard(page):
     )
     page.keyboard.press("Escape")
     page.mouse.move(4, 4)
+
+
+def _pin_the_cursor(page, chart: str) -> dict:
+    _settle(page, chart)
+    pt = page.evaluate(CURSOR_ONLY_POINT, [chart, MARKS])
+    assert pt, f"no point inside {chart}'s cursor band"
+    page.mouse.move(pt["x"] - 14, pt["y"] - 14)
+    page.mouse.move(pt["x"], pt["y"], steps=6)
+    until(page, _visible(chart), what=f"{chart} showed a cursor reading")
+    page.mouse.click(pt["x"], pt["y"])
+    until(
+        page,
+        f"() => [...document.getElementById('{chart}').querySelectorAll('.okc-tooltip')]"
+        ".some((t) => t.classList.contains('visible') && t.classList.contains('pinned'))",
+        what=f"{chart} pinned the cursor's reading",
+    )
+    return pt
+
+
+def _still_reads(page, chart: str, pt: dict) -> bool:
+    """The chart answers the pointer again — which is the thing a stuck
+    pin flag silently takes away, since every cursor returns early on
+    `_tipPinned` and nothing on screen says why."""
+    page.mouse.move(4, 4)
+    page.mouse.move(pt["x"] - 40, pt["y"], steps=4)
+    page.mouse.move(pt["x"] - 20, pt["y"], steps=4)
+    try:
+        until(page, _visible(chart), timeout=4000, what=f"{chart} read out again")
+        return True
+    except AssertionError:
+        return False
+
+
+@pytest.mark.parametrize("release", ["close-button", "escape"])
+def test_a_pinned_cursor_reading_can_be_let_go(page, release):
+    """Both advertised ways out, and both were broken by the pin itself.
+
+    The close button called `unpinRich`, which clears the ANCHOR pin and
+    not the cursor's — so it hid the tooltip and left `_tipPinned` true
+    forever. Measured on density: click the ×, and the chart never
+    answers the pointer again, with nothing on screen saying why. That is
+    worse than a control that does nothing.
+
+    Escape did nothing at all. The host's keydown only fires with focus
+    inside the host; the anchor path gets that free because a click
+    focuses the mark, and an `<svg>` is not focusable, so a cursor pin
+    focused nothing. The button's own title says `Close (Esc)`.
+    """
+    pt = _pin_the_cursor(page, "density")
+    if release == "close-button":
+        page.click("#density .okc-tt-close")
+    else:
+        page.keyboard.press("Escape")
+    until(page, _visible("density", negate=True), what=f"{release} let the pinned reading go")
+    assert _still_reads(page, "density", pt), f"{release} left the chart unable to read out"
+
+
+def test_the_close_button_still_releases_an_anchor_pin(page):
+    """The path `unpinAny` had to keep working. It is the older of the
+    two and the one with a `.okc-pinned` marker on the mark itself, so
+    the assertion covers the marker as well as the tooltip."""
+    pt = _hover_a_mark(page, "donut")
+    until(page, _visible("donut"), what="the slice showed its reading")
+    page.mouse.click(pt["x"], pt["y"])
+    until(
+        page,
+        "() => [...document.getElementById('donut').querySelectorAll('.okc-tooltip')]"
+        ".some((t) => t.classList.contains('visible') && t.classList.contains('pinned'))",
+        what="the slice pinned",
+    )
+    assert page.evaluate("() => document.querySelectorAll('#donut .okc-pinned').length") == 1
+    page.click("#donut .okc-tt-close")
+    until(page, _visible("donut", negate=True), what="the close button let the slice go")
+    assert page.evaluate("() => document.querySelectorAll('#donut .okc-pinned').length") == 0
+    page.mouse.move(4, 4)

@@ -5415,7 +5415,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-08-r78';
+var __okuKitBuild = '2026-09-09-r79';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -12245,7 +12245,7 @@ class OkuChart extends HTMLElement {
       closeBtn.textContent = '×'; // ×
       closeBtn.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        unpinRich();
+        unpinAny();
       });
       t.appendChild(closeBtn);
       self.appendChild(t);
@@ -12731,7 +12731,28 @@ class OkuChart extends HTMLElement {
     function pinCursor() {
       pinnedCursor = true;
       var tip = self.querySelector(':scope > .okc-tooltip');
-      if (tip) tip.classList.add('pinned');
+      if (!tip) return;
+      tip.classList.add('pinned');
+      // The pin takes focus, because Escape is advertised on the close
+      // button's own title and the host's keydown only fires when focus
+      // is inside the host. The anchor path gets that for free — a click
+      // focuses the mark, which carries `tabindex` — and a cursor pin
+      // has no anchor: an `<svg>` is not focusable, so the click focused
+      // nothing and Escape went to the document. Measured: the reading
+      // stayed pinned and the key did nothing.
+      var close = tip.querySelector('.okc-tt-close');
+      if (close) close.focus({ preventScroll: true });
+    }
+    function unpinAny() {
+      // Whichever pin is up. The close button used to call `unpinRich`
+      // unconditionally, which clears `pinnedAnchor` and not
+      // `pinnedCursor` — so on a cursor pin it hid the tooltip and left
+      // `_tipPinned` true forever, and every cursor returns early on
+      // that. Measured: click the ×, and the chart never answers the
+      // pointer again. A control that silently stops the figure is worse
+      // than one that does nothing.
+      if (pinnedCursor) unpinCursor();
+      else if (pinnedAnchor) unpinRich();
     }
     function unpinCursor() {
       // Clear the flag first: `_hideCursorTip` declines while it is set,
@@ -12784,9 +12805,7 @@ class OkuChart extends HTMLElement {
       if (tipOwner === 'cursor' && cursorReading) pinCursor();
     });
     self.addEventListener('keydown', function (ev) {
-      if (ev.key !== 'Escape') return;
-      if (pinnedCursor) unpinCursor();
-      else if (pinnedAnchor) unpinRich();
+      if (ev.key === 'Escape') unpinAny();
     });
     // Donut slices — label, value, share-of-total.
     rich('.okc-slice', function (el) {

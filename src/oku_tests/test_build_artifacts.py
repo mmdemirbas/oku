@@ -599,7 +599,13 @@ class TestPayloadBudget:
     # already a drag. About 4,200 bytes, of which the mechanism is
     # roughly 900 and the rest is the comments naming what each was
     # measured doing.
-    KIT_BUDGET_BYTES = 1_278_000
+    # Then from 1,278,000 by the two ways out of a pin the pin itself
+    # had broken: one `unpinAny` so the close button releases whichever
+    # kind is held, and the cursor pin taking focus so the Escape its own
+    # button advertises actually fires. 1,110 bytes, of which the code is
+    # about 200 and the rest names what each was measured doing --
+    # clicking the × left the chart unable to answer the pointer at all.
+    KIT_BUDGET_BYTES = 1_280_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
