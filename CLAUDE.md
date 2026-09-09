@@ -1215,6 +1215,33 @@ reported ridgeline, sparkline, gauge and the DIV bar charts as having no
 cursor — the very charts the old footnote called the sweep-axis ones,
 which is what made the error visible.
 
+A tenth is `kit/schema/project-kit.schema.json`, which is the strangest
+of them: it ships in the wheel, an editor autocompletes from the URL a
+`kit.json` names in its first line, and until now **nothing in this tool
+ever opened it**. It said `additionalProperties: false` over eleven
+properties while `cli.py` read five more — `languages`,
+`defaultLanguage`, `skip_dirs`, `skip_gitignored`, `rebuild_command` —
+so the published contract refused three keys this repo's OWN
+`docs/kit.json` sets, and the file naming the contract was invalid
+against it.
+
+The drift is only half of it. Every reader of a `kit.json` is a
+`data.get("key")` with a default behind it, which is the right shape for
+a file whose keys are all optional and the wrong shape for one nobody
+validates: `personalisation` for `personalization` is not an error
+anywhere — not in the CLI, not in the browser console, not under
+`oku check --strict` — it is every reader placeholder in the tree
+silently going unfilled. `oku check` reads the file now
+(`kit-invalid`, warning, with the nearest key it does know), a malformed
+one is an error rather than a silent revert to defaults (it came off
+`find_unparseable_json`'s exclusion list, which exists so a stray
+`package.json` cannot break a build and had taken the kit's own config
+with it), and `oku spec kit` prints the keys — because raising a
+complaint without somewhere to look up the answer is nagging. Both
+directions are held by `test_kit_config.py`, and the forward one is
+derived from the AST rather than listed: a hand-written list is exactly
+what the schema was.
+
 **`info-tip` is a fence now.** It was drawn by the renderer, documented
 in the briefing as the canonical wrong-but-valid example, and reachable
 from nowhere: no fence, no `$defs`, and the v1 shim turns legacy ones

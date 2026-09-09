@@ -44,6 +44,38 @@
       },
       "description": "Ordered fallback languages, tried when the preferred lang has no entry for a term. Typical value: ['en']."
     },
+    "languages": {
+      "type": "array",
+      "description": "Language codes this tree is authored in, as bare codes or objects carrying a label for the switch: [\"en\", \"tr\"] or [{\"code\": \"tr\", \"label\": \"Türkçe\"}]. A page is paired with its translation by filename suffix (reference.md + reference.tr.md), and only a code listed here counts as a suffix — without that, `format-comparison.md` would read as a `comparison` translation of `format`. Fewer than two codes means monolingual and the whole feature stands down.",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "code"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "The language code, as it appears in a filename suffix."
+              },
+              "label": {
+                "type": "string",
+                "description": "What the switch says. Written in the language it names — a reader looking for Turkish is looking for 'Türkçe'."
+              }
+            }
+          }
+        ]
+      }
+    },
+    "defaultLanguage": {
+      "type": "string",
+      "description": "Which of `languages` a page carrying no suffix is written in. Defaults to the first code listed. A value not in `languages` is ignored rather than honoured."
+    },
     "glossary": {
       "type": "object",
       "description": "Project-local glossary additions / overrides. Map of domain → { term → { lang → langEntry } }. Local entries always win against the kit's central registries for the same key.",
@@ -128,6 +160,21 @@
           }
         }
       }
+    },
+    "skip_dirs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Directory NAMES pruned from the walk, on top of the kit's own list. Names rather than paths, so one entry covers every depth. The names that matter differ per project — tmp, build, out, target, a scratch copy of the file being edited — which is why the kit's built-in list cannot be the whole answer."
+    },
+    "skip_gitignored": {
+      "type": "boolean",
+      "description": "Add everything git ignores to the walk's skip set. Off by default, and that is the load-bearing part: gitignore is a version-control policy and this is a publication policy, so plenty of projects ignore generated pages they fully intend to publish, and with the flag on, editing .gitignore silently changes what the site contains. Switched on, it stands down where it cannot know better — no git, no repository, or a root that is itself ignored — and prints one line naming what it pruned."
+    },
+    "rebuild_command": {
+      "type": "boolean",
+      "description": "Set false to drop the `cd <source> && oku build` line from the sidebar footer, taking its Rebuild button with it. The command names a path on the machine that built the page, so a project that ships pages off that machine turns it off. Everything about the ARTIFACT — version, kit stamp, build age, drift warning — stays, because the defect the footer exists for is a page that could not say how old it was, and this is the only field that names a machine. On by default."
     }
   }
 }

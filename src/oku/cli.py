@@ -2093,6 +2093,39 @@ def _load_schema():
     return _schema_cache
 
 
+_kit_schema_cache = None
+
+
+def _load_kit_schema() -> dict:
+    """Lazy-load and cache the schema for a project's `kit.json`.
+
+    Separate from `_load_schema`, which is the PAGE schema. They are two
+    files describing two things, and the kit.json one had no reader at
+    all until now: it shipped in the wheel, an editor pointed at it by
+    the `$schema` key in a kit.json, and nothing in this tool ever
+    opened it.
+    """
+    global _kit_schema_cache
+    if _kit_schema_cache is not None:
+        return _kit_schema_cache
+    schema_path = KIT_DIR / "schema" / "project-kit.schema.json"
+    try:
+        _kit_schema_cache = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        _kit_schema_cache = {}
+    return _kit_schema_cache
+
+
+def _known_kit_keys() -> list[str]:
+    """The kit.json keys the kit reads, from the schema rather than a
+    second list that would drift from it — which is the failure the
+    schema itself had: it declared eleven keys and refused every other
+    one (`additionalProperties: false`), while the tool read five more
+    that were named nowhere in it. This repo's own `docs/kit.json` was
+    invalid against the URL it carries in its first line."""
+    return sorted(_load_kit_schema().get("properties") or {})
+
+
 _validator_cache = None
 
 
@@ -3398,6 +3431,114 @@ def _chart_shape_issues(blk: dict) -> list[tuple[str, str]]:
     return out
 
 
+def _nearest_kit_json(start: Path, root: Path) -> Path | None:
+    """The `kit.json` a page sitting in `start` reads, bounded by `root`.
+
+    Bounded deliberately. `_tree_defaults` walks to the filesystem root
+    because a page has to build wherever it sits, but a CHECK that
+    reports a file above the tree it was pointed at is reporting on a
+    project nobody asked it about — and on a machine where the home
+    directory happens to carry one, on a file the author has never seen.
+    """
+    try:
+        start = start.resolve()
+        stop = root.resolve()
+    except OSError:
+        return None
+    if start != stop and stop not in start.parents:
+        here = start / "kit.json"
+        return here if here.is_file() else None
+    for d in (start, *start.parents):
+        candidate = d / "kit.json"
+        if candidate.is_file():
+            return candidate
+        if d == stop:
+            break
+    return None
+
+
+def _kit_json_issues(path: Path) -> list[tuple[str, str]]:
+    """Every way a `kit.json` disagrees with the schema describing it,
+    as `(where, message)` pairs for the caller to file under one code.
+
+    This is the one file in a tree that nothing validated. It is not a
+    page, so the schema pass never reached it, and it sits on the
+    exclusion list `find_json_pages` keeps so that a stray
+    `package.json` beside a docs tree cannot break a build — an
+    exclusion that took the kit's own config with it.
+
+    What that costs is silence rather than a crash: every reader of this
+    file in this module is a `data.get("key")` with a default behind it,
+    so a misspelled key is not an error anywhere. `personalisation` for
+    `personalization` leaves every `{{placeholder}}` on every page of
+    the tree unfilled, and says nothing — not in the CLI, not in the
+    browser console, not under `oku check --strict`.
+
+    Unknown keys are reported here rather than left to the schema's own
+    `additionalProperties: false`, because jsonschema words that as
+    "Additional properties are not allowed ('personalisation' was
+    unexpected)", which names the typo without naming the spelling that
+    would have worked. Everything else IS left to the schema: a second
+    hand-written set of type rules is a second authority waiting to
+    disagree with the first.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        # `json-parse-failed` reports this one, at error severity, and
+        # reporting it twice would put the same file on two lines under
+        # two codes.
+        return []
+    if not isinstance(data, dict):
+        return [
+            (
+                "(file)",
+                f"kit.json holds a {type(data).__name__}, not an object. Every setting is read "
+                "off a JSON object, so the whole file is ignored and the tree builds on "
+                "defaults.",
+            )
+        ]
+
+    known = _known_kit_keys()
+    if not known:  # no schema in this install; nothing to check against
+        return []
+    out: list[tuple[str, str]] = []
+    for key in sorted(data):
+        if key in known:
+            continue
+        near = _did_you_mean(key, known)
+        out.append(
+            (
+                key,
+                f"kit.json key '{key}' is not one the kit reads.{near} Every key in this file "
+                "is read with a default behind it, so a misspelling is not an error — it is "
+                "the setting silently not applying. `oku spec kit` lists them.",
+            )
+        )
+
+    try:
+        import jsonschema as _js  # type: ignore
+    except ImportError:
+        return out  # same soft-fail as the page schema pass
+    schema = _load_kit_schema()
+    try:
+        validator = _js.validators.validator_for(schema)(schema)
+    except _js.SchemaError:
+        return out
+    for err in sorted(validator.iter_errors(data), key=lambda e: list(e.path)):
+        if err.validator == "additionalProperties" and not err.path:
+            continue  # named above, with the spelling that would have worked
+        where = ".".join(str(part) for part in err.path) or "(file)"
+        out.append(
+            (
+                where,
+                f"kit.json: {err.message} The kit reads this key with a fallback behind it, so "
+                "a value of the wrong shape is dropped in silence rather than refused.",
+            )
+        )
+    return out
+
+
 def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[dict]:
     """Run the full lint pass and return a list of issue dicts.
 
@@ -4136,6 +4277,19 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     "genuinely differs.",
                 )
 
+    # 14. kit.json itself. Cross-page like the accent rule above, and
+    # checked once per distinct file rather than once per page under it:
+    # a tree of forty pages sharing one config would otherwise print the
+    # same typo forty times.
+    seen_kits: list[Path] = []
+    for p, _page in pages:
+        kit_json = _nearest_kit_json(p.parent, root)
+        if kit_json is not None and kit_json not in seen_kits:
+            seen_kits.append(kit_json)
+    for kit_json in seen_kits:
+        for where, message in _kit_json_issues(kit_json):
+            add(kit_json, "warning", "kit-invalid", where, message)
+
     # Point every issue at the file the author edits, and at the line
     # inside it. Done once here rather than at each of the ~40 `add`
     # sites: the locator formats differ per check, the mapping does not.
@@ -4535,13 +4689,21 @@ def find_unparseable_json(root: Path) -> list[tuple[Path, str]]:
     `package.json` sibling — but for the lint surface, an authored
     page that no longer parses is exactly the bug to surface.
 
-    Excludes the same well-known sidecars that find_json_pages
-    excludes (kit.json, site-manifest.json, package.json, tsconfig).
+    Excludes the well-known sidecars find_json_pages excludes
+    (site-manifest.json, package.json, tsconfig) but NOT kit.json — see
+    the comment at the exclusion.
     """
     bad: list[tuple[Path, str]] = []
     extra = project_skip_dirs(root)
     for p in iter_repo_files(root, (".json",), extra_skip=extra):
-        if p.name in ("kit.json", "site-manifest.json", "package.json", "tsconfig.json"):
+        # `kit.json` is NOT excluded here, though `find_json_pages`
+        # excludes it: the exclusion list exists so a stray sidecar
+        # beside a docs tree cannot break a build, and the kit's own
+        # config is not a stray sidecar. Every reader of it catches
+        # JSONDecodeError and returns a default, so a trailing comma in
+        # it silently reverts the accent, the domains, the languages and
+        # the reader placeholders for the whole tree.
+        if p.name in ("site-manifest.json", "package.json", "tsconfig.json"):
             continue
         try:
             json.loads(p.read_text(encoding="utf-8"))
@@ -7426,6 +7588,7 @@ def cmd_spec(args: argparse.Namespace) -> int:
         # Listed with the rest, because a discoverability feature nobody
         # can discover is the failure this command exists to fix.
         print("\nalso: front-matter — every page-level key, with what it does")
+        print("      kit          — every kit.json key, with what it does")
         print("\noku spec <name>   one ready-to-paste payload")
         return 0
 
@@ -7448,6 +7611,47 @@ def cmd_spec(args: argparse.Namespace) -> int:
             print(f"{key}: <{kind}>{mark or ((' # ' + note) if note else '')}")
         print("---")
         print("\nAny other key is accepted and ignored; one that resembles these is flagged.")
+        return 0
+
+    # The other file every tree has, and the one with the least to go
+    # on: kit.json is not a page, so `oku spec` could not answer for it
+    # and `oku check` did not read it. Sixteen keys, five of which were
+    # not even in the schema an editor autocompletes from.
+    if args.name in ("kit", "kit.json", "project-kit"):
+        props = _load_kit_schema().get("properties") or {}
+        if not props:
+            print(
+                f"! no kit schema at {KIT_DIR / 'schema' / 'project-kit.schema.json'}",
+                file=sys.stderr,
+            )
+            return 1
+        if args.json:
+            print(json.dumps(props, ensure_ascii=False))
+            return 0
+        print("kit.json — tree-wide configuration, one per docs root\n")
+        # Aligned in three columns rather than run together, because
+        # this is read by scanning down for the key you half-remember;
+        # the descriptions are paragraphs and a ragged left edge buries
+        # the names inside them.
+        width = max(len(k) for k in props)
+        # The type column is sized from the longest TYPE, not from a
+        # constant: `<boolean>` is a character wider than `<string>`, and
+        # a hardcoded stop puts the two shipped booleans hard against
+        # their own descriptions with no space between them.
+        kinds = max(len(str(s.get("type", "string"))) for s in props.values()) + 2
+        lead = " " * (width + kinds + 6)
+        for key, spec in props.items():
+            kind = spec.get("type", "string")
+            note = spec.get("description", "")
+            head = f"  {key.ljust(width)}  {f'<{kind}>'.ljust(kinds)}  "
+            print(
+                textwrap.fill(note, width=88, initial_indent=head, subsequent_indent=lead).rstrip()
+                if note
+                else head.rstrip()
+            )
+        print("\nAny other key is refused: `oku check` says kit-invalid and names the")
+        print("nearest key it does know, because every reader of this file has a default")
+        print("behind it and a misspelling is the setting silently not applying.")
         return 0
 
     entry = _spec_entry(args.name)

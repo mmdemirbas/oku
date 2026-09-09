@@ -714,18 +714,31 @@ def test_find_unparseable_json_returns_bad_file(tmp_path: Path) -> None:
 
 
 def test_find_unparseable_json_skips_sidecars(tmp_path: Path) -> None:
-    """kit.json / site-manifest.json / package.json / tsconfig.json
-    are NOT page sources; the scanner must not surface parse errors
-    in those well-known sidecars — find_json_pages already skips them,
-    so they never reach the check pipeline. (User-authored pages
-    fail loud; framework sidecars stay quiet.)"""
-    (tmp_path / "kit.json").write_text("{ bad json", encoding="utf-8")
+    """site-manifest.json / package.json / tsconfig.json are NOT page
+    sources and belong to other tools; the scanner must not surface
+    parse errors in them. (User-authored pages fail loud; a framework
+    sidecar that happens to sit beside a docs tree stays quiet.)
+
+    `kit.json` is the exception, and it is on the other side of the
+    line: it is the kit's OWN config, every reader of it catches
+    JSONDecodeError and returns a default, so a trailing comma in it
+    silently reverts the accent, the domains, the languages and the
+    reader placeholders for the whole tree. See the case below.
+    """
     (tmp_path / "package.json").write_text("{ bad", encoding="utf-8")
+    (tmp_path / "tsconfig.json").write_text("{ bad", encoding="utf-8")
+    (tmp_path / "site-manifest.json").write_text("{ bad", encoding="utf-8")
     (tmp_path / "real-page.json").write_text(
         '{"kind": "page", "title": "ok", "blocks": []}', encoding="utf-8"
     )
     out = cli.find_unparseable_json(tmp_path)
     assert out == [], f"Expected no findings for sidecars, got: {out}"
+
+
+def test_find_unparseable_json_reports_a_malformed_kit_json(tmp_path: Path) -> None:
+    """The one sidecar that is not somebody else's file."""
+    (tmp_path / "kit.json").write_text("{ bad json", encoding="utf-8")
+    assert [p.name for p, _ in cli.find_unparseable_json(tmp_path)] == ["kit.json"]
 
 
 def test_find_unparseable_json_returns_empty_when_clean(tmp_path: Path) -> None:
