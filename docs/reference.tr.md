@@ -464,6 +464,27 @@ Satır içi örnek — bu paragrafın üzerine gelin ya da odaklanın, aşağıd
 {"code":{"k":"code","src":"{\n  \"kind\": \"page\",\n  \"title\": \"Notum\",\n  \"meta\": {\n    \"date\": \"2026-05-10\",\n    \"updated\": \"2026-05-18\",\n    \"read_time\": \"~3 dk\"\n  },\n  \"blocks\": [ ... ]\n}","lang":"json"},"output":"<div style=\"padding:14px 16px; background:var(--surface-2); border:1px solid var(--border-soft); border-radius:10px; line-height:1.5;\"><div style=\"font:600 22px Inter,sans-serif; color:var(--text); margin-bottom:6px;\">Notum</div><div style=\"font-size:12.5px; color:var(--text-soft); letter-spacing:0.02em;\">~3 dk okuma · 2026-05-10</div><div style=\"margin-top:4px; font-size:11.5px; color:var(--text-faint); font-style:italic; letter-spacing:0.02em;\">Son güncelleme 2026-05-18</div></div>"}
 ```
 
+### Okuyucu yer tutucuları · `{{key}}` {#personalization}
+
+Bir proje anahtarları `kit.json` içinde bir kez bildirir; okuyucu bunları sunum menüsünden doldurur ve her sayfa onun değerlerine geçer.
+
+```json
+{"personalization": [
+  {"key": "apiKey",    "label": "API Key",    "default": "sk_test_...", "type": "password"},
+  {"key": "projectId", "label": "Project ID", "default": "proj_demo"}
+]}
+```
+
+Hiçbir şey bildirmezseniz hiçbiri çalışmaz — Yer tutucular satırı yalnızca projenin anahtarı olduğu yerde görünür, ki bu dil düğmesinin izlediği kuralın aynısı. Değerler `localStorage` içinde `oku-personalization` altında kalır: hesap yok, sunucu yok, derleme adımı da yok; yani değiştirme, önceden gömülmek yerine okuma anında olur.
+
+Değiştirme `<pre>`, `<code>` ve `<kbd>` öğelerine kendiliğinden ulaşır, dolayısıyla bir kod örneği için katılım gerekmez — içine `{{apiKey}}` yazmak yeterlidir. Akan düzyazı ise katılıma bağlıdır, çünkü bir sayfa yazarın şablon olarak kastetmediği sözcüklerle doludur: paragrafı `okc-personalize-target` taşıyan bir adacığa sarın. Düzyazıda değiştirilen her değer, üzerine gelindiğinde anahtarını söyleyen bir span içinde görünür; böylece okuyucu hangi metnin kendisine, hangisinin belgeye ait olduğunu ayırt edebilir. Vurgulanmış bir kod bloğunun içinde ise değer yerleşir ama span korunmaz — Prism bir bloğu kendi metninden yeniden kurar, dolayısıyla kod olmayan hiçbir şey orada hayatta kalmaz.
+
+<div class="okc-personalize-target">
+
+İsteği `{{projectId}}` projesine `{{apiKey}}` ile gönderin — bu projenin o anahtarları bildirdiği her yerde ikisi de okuyucunun kendi değerleridir.
+
+</div>
+
 ### Uyarı kutusu eşadları {#admonition-aliases}
 
 Callout `type` alanı hem kitin özgün adlarını (`warn / warning / danger / success / neutral`) hem de sektörde yerleşik eşadları (`note / tip / info / caution`) kabul eder. Aşağıdaki her satır, iki ayrı sözcük dağarcığından ulaşılan aynı asıl biçimlendirmedir.

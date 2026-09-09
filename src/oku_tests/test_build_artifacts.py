@@ -605,7 +605,13 @@ class TestPayloadBudget:
     # button advertises actually fires. 1,110 bytes, of which the code is
     # about 200 and the rest names what each was measured doing --
     # clicking the × left the chart unable to answer the pointer at all.
-    KIT_BUDGET_BYTES = 1_280_000
+    # Then from 1,280,000 by making reader personalization actually run:
+    # a `registered` flag replacing a reference to an undeclared `btn`,
+    # and one exit from the kit loader so every branch hands off to it
+    # rather than only the fetching one. About 2,200 bytes, of which the
+    # mechanism is roughly 400 — the rest names three defects that hid
+    # each other, and the silent `catch` that kept all three invisible.
+    KIT_BUDGET_BYTES = 1_282_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

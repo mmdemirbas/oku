@@ -1413,6 +1413,31 @@ actually write.
   53-chart version of that test was flaky, because it hovers whichever
   mark it can reach on a crowded page.
 
+- **A silent `catch` around a hand-off hides a throw that happens every
+  time.** Reader personalization — `kit.json` declares keys, the menu
+  grows a Placeholders row, `{{key}}` is swapped at read time — had
+  never run in any delivery mode, and three defects were stacked so each
+  hid the next. `init` read `if (!btn) buildButton();` against a `btn`
+  that was never declared, a leftover from when the control was a corner
+  button rather than a row it registers, so it threw on its first
+  statement. The served modes DID call it, inside
+  `catch (e) { /* ignore */ }` — a swallow over a guaranteed throw, and
+  the reason nobody noticed for the life of the feature. And the
+  standalone branch of the kit loader never called `init` at all: it
+  hydrated the keys from the inlined bundle, marked the kit loaded and
+  notified its waiters, so fixing the first two would still have left
+  the mode readers are handed a file of doing nothing.
+
+  Three rules out of it. **A `catch` around a subsystem's start-up says
+  what failed** — the console line is the only thing standing between a
+  dead feature and a bug report years later. **Every branch of a loader
+  leaves through one exit**, because the branch that forgets is always
+  the one nobody serves; `load()` has a single `settle()` now.
+  And **documenting a feature is a test of it**: this was found by
+  writing the reference-page section for it and building a page that
+  used it. Held by `browser/test_reader_placeholders.py`, which covers
+  both trees on purpose.
+
 - **CSS rules silently dropped by Chrome.** A multi-line comment
   inside a rule body, containing certain Unicode punctuation, has
   been observed to make Chrome's parser drop the trailing

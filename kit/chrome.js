@@ -5415,7 +5415,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-09-r80';
+var __okuKitBuild = '2026-09-09-r81';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -6280,6 +6280,30 @@ var __okuKit = (function () {
   var loaded = false;
   var waiters = [];
 
+  // Every branch of `load()` ends here, and that is the point. The
+  // standalone one used to end differently — marking the kit loaded and
+  // notifying waiters without handing off to personalization — so
+  // `{{key}}` substitution never ran on the delivery mode a reader is
+  // most often handed a file of. One exit means a fourth branch cannot
+  // forget it.
+  function settle(fetched) {
+    loaded = true;
+    if (typeof __okuPersonalization !== 'undefined') {
+      try {
+        __okuPersonalization.init((fetched && fetched.personalization) || kit.personalization || []);
+      } catch (e) {
+        // Loud. A silent `catch` here is what hid a ReferenceError
+        // inside `init` for as long as the feature has existed: the
+        // served modes DID call it, it threw on its first statement,
+        // and nothing anywhere said so.
+        if (window.console && console.error) console.error('[oku] personalization failed to start:', e);
+      }
+    }
+    waiters.forEach(function (w) { w(kit); });
+    waiters = [];
+    return kit;
+  }
+
   function load() {
     if (loaded) return Promise.resolve(kit);
     // Standalone build — if the build inlined a kit bundle, hydrate from it.
@@ -6308,10 +6332,7 @@ var __okuKit = (function () {
       } catch (e) {
         // Malformed bundle — fall through to empty kit.
       }
-      loaded = true;
-      waiters.forEach(function (w) { w(kit); });
-      waiters = [];
-      return Promise.resolve(kit);
+      return Promise.resolve(settle());
     }
     // Standalone without a kit bundle, or ANY page opened over file://
     // (an opaque origin, so every fetch below is blocked before it can
@@ -6320,10 +6341,7 @@ var __okuKit = (function () {
     // which beats a console full of scheme errors on the path readers
     // actually use — opening the file off disk.
     if (document.getElementById('__oku_page__') || window.location.protocol === 'file:') {
-      loaded = true;
-      waiters.forEach(function (w) { w(kit); });
-      waiters = [];
-      return Promise.resolve(kit);
+      return Promise.resolve(settle());
     }
     // Project config lives at the docs root; domain files live in _oku/.
     var wa = (window.__okuWithAuth || function (u) { return u; });
@@ -6369,18 +6387,10 @@ var __okuKit = (function () {
               kit.extrefs[d] = Object.assign({}, kit.extrefs[d] || {}, data.extrefs[d]);
             });
           }
-          loaded = true;
-          // Personalization is a kit-level concept: kit.json declares the
-          // keys, chrome.js renders the gear button + swaps {{key}} at
-          // runtime. Hand-off to the personalization module so it can
-          // attach its UI once the kit data is settled.
-          if (typeof __okuPersonalization !== 'undefined') {
-            try { __okuPersonalization.init((data && data.personalization) || kit.personalization || []); }
-            catch (e) { /* ignore */ }
-          }
-          waiters.forEach(function (w) { w(kit); });
-          waiters = [];
-          return kit;
+          // Personalization is a kit-level concept: kit.json declares
+          // the keys, chrome.js renders the row and swaps `{{key}}` at
+          // runtime. `settle` does the hand-off for every branch.
+          return settle(data);
         });
       });
   }
@@ -6487,6 +6497,7 @@ var __okuPersonalization = (function () {
   var keys = [];       // [{ key, label, default, type? }]
   var values = {};     // { key: currentValue }
   var panel = null;
+  var registered = false;  // the menu row is registered once per page
 
   function load() {
     try { values = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
@@ -6626,7 +6637,13 @@ var __okuPersonalization = (function () {
     keys.forEach(function (k) {
       if (values[k.key] === undefined && k.default !== undefined) values[k.key] = k.default;
     });
-    if (!btn) buildButton();
+    // `registered`, not `btn`. This read `if (!btn) buildButton();` and
+    // no `btn` was ever declared — a leftover from when the control was
+    // a corner button rather than a row this module registers with the
+    // presentation menu. So `init` threw a ReferenceError on its first
+    // call, before `applyAll()`, and the whole feature was dead: no
+    // menu row, no substitution, `{{key}}` left on the page as written.
+    if (!registered) { buildButton(); registered = true; }
     applyAll();
     window.addEventListener('oku:rendered', applyAll);
   }

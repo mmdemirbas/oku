@@ -464,6 +464,27 @@ Inline sample — hover or focus this paragraph and the callout below tints in s
 {"code":{"k":"code","src":"{\n  \"kind\": \"page\",\n  \"title\": \"My note\",\n  \"meta\": {\n    \"date\": \"2026-05-10\",\n    \"updated\": \"2026-05-18\",\n    \"read_time\": \"~3 min\"\n  },\n  \"blocks\": [ ... ]\n}","lang":"json"},"output":"<div style=\"padding:14px 16px; background:var(--surface-2); border:1px solid var(--border-soft); border-radius:10px; line-height:1.5;\"><div style=\"font:600 22px Inter,sans-serif; color:var(--text); margin-bottom:6px;\">My note</div><div style=\"font-size:12.5px; color:var(--text-soft); letter-spacing:0.02em;\">~3 min read · 2026-05-10</div><div style=\"margin-top:4px; font-size:11.5px; color:var(--text-faint); font-style:italic; letter-spacing:0.02em;\">Last updated 2026-05-18</div></div>"}
 ```
 
+### Reader placeholders · `{{key}}` {#personalization}
+
+A project declares the keys once in `kit.json`; the reader fills them in from the presentation menu, and every page swaps to their values.
+
+```json
+{"personalization": [
+  {"key": "apiKey",    "label": "API Key",    "default": "sk_test_...", "type": "password"},
+  {"key": "projectId", "label": "Project ID", "default": "proj_demo"}
+]}
+```
+
+Declare nothing and none of it runs — the Placeholders row appears only where a project has keys, which is the same rule the language switch follows. Values persist in `localStorage` under `oku-personalization`: no account, no server, and no build step, so the substitution happens at read time rather than being baked in.
+
+Substitution reaches `<pre>`, `<code>` and `<kbd>` on its own, so a code sample needs no opt-in — writing `{{apiKey}}` in it is enough. Running prose is opt-in, because a page is full of words an author did not mean as a template: wrap the passage in an island carrying `okc-personalize-target`. In prose every swapped value renders inside a span that names its key on hover, so a reader can tell which text is theirs and which is the document's. Inside a highlighted code block the value is substituted and the span is not kept — Prism rewrites a block from its own text, so nothing that is not code survives there.
+
+<div class="okc-personalize-target">
+
+Send the request to project `{{projectId}}` using `{{apiKey}}` — both of these are the reader's own values wherever this project declares those keys.
+
+</div>
+
 ### Admonition vocab aliases {#admonition-aliases}
 
 Callout `type` accepts both the kit's original names (`warn / warning / danger / success / neutral`) and the industry-standard aliases (`note / tip / info / caution`). Each row below is the same canonical styling reached from two different vocabularies.
