@@ -323,3 +323,47 @@ def test_no_kit_accent_is_left_to_the_browser_to_recognise() -> None:
     strong and no dark variant, which is how the disagreement hid."""
     tuned = set(_renderer_accents())
     assert tuned == set(cli._KIT_ACCENTS), tuned ^ set(cli._KIT_ACCENTS)
+
+
+# ---------------------------------------------------------------------
+# The interactivity table and the chart types the kit actually ships.
+#
+# A ninth source of the kind this file exists for, and it had already
+# drifted: the table recorded 28 variants against a kit shipping 53, so
+# a reader who took it for the catalog saw about half of one. Nothing
+# failed — a hand-maintained table beside a growing enum never does.
+#
+# Only ROW COVERAGE is held here, deliberately. Whether a given chart
+# fades its siblings on hover is a browser measurement and belongs in
+# the browser suite; whether the table has a row for every chart the kit
+# draws is a set comparison, and it is the half that actually rotted.
+# ---------------------------------------------------------------------
+
+_TABLE_RE = re.compile(r'\{"headers":\["(?:Variant|Tür)".*?\]\]\}', re.S)
+
+
+def _interactivity_rows(page: str) -> list[list]:
+    src = (DOCS / page).read_text(encoding="utf-8")
+    m = _TABLE_RE.search(src)
+    assert m, f"{page} no longer carries an interactivity table"
+    return json.loads(m.group(0))["rows"]
+
+
+@pytest.mark.parametrize("page", ["roadmap.md", "roadmap.tr.md"])
+def test_the_interactivity_table_records_every_chart_the_kit_draws(page: str) -> None:
+    listed = [r[0] for r in _interactivity_rows(page)]
+    shipped = sorted(json.loads((KIT / "schema" / "examples.json").read_text(encoding="utf-8"))["charts"])
+    assert listed == shipped, {
+        "missing from the table": sorted(set(shipped) - set(listed)),
+        "in the table and not shipped": sorted(set(listed) - set(shipped)),
+    }
+
+
+def test_both_languages_record_the_same_capabilities() -> None:
+    """The rows carry marks, not prose, so a translation has nothing to
+    translate in them — which makes divergence pure drift. Only the
+    headers differ, and those are compared by shape rather than by
+    text."""
+    en = _interactivity_rows("roadmap.md")
+    tr = _interactivity_rows("roadmap.tr.md")
+    assert en == tr, [(a[0], a[2:], b[2:]) for a, b in zip(en, tr, strict=True) if a != b]

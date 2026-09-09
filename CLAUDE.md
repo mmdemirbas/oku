@@ -1194,6 +1194,27 @@ renderer) and `oku-tldr` (documented fence, validated by nothing).
 `oku spec`.** Adding a primitive means adding it in all of them — the
 tests name which one you missed.
 
+A ninth source is the interactivity table in `docs/roadmap.md`, and it
+had already rotted: 28 variants recorded against a kit shipping 53, so a
+reader who took it for the catalog saw about half of one, with three
+stale footnotes under it. A hand-maintained list beside a growing enum
+never fails on its own. Only ROW COVERAGE is held by a test — the rows
+must be the chart types the kit ships, and the two language files must
+carry the same marks — because that is a set comparison and it is the
+half that rots. The CELL values are a browser measurement and come from
+`tools/chart_capabilities.py`, which is committed for exactly that
+reason: a number nobody can reproduce is a number nobody should trust.
+Two things about that script are load-bearing and were both learned by
+getting them wrong. **One chart per page and one page LOAD per chart** —
+measuring on a shared 53-chart page returns different answers on
+different runs, because an earlier hover, pin or focus is still in
+effect. And **a detector must match what the kit draws, not what one
+helper happens to use**: reading only `.okc-generic-cursor` and
+`.okc-cartesian-cursor`, two of the seven cursor classes that exist,
+reported ridgeline, sparkline, gauge and the DIV bar charts as having no
+cursor — the very charts the old footnote called the sweep-axis ones,
+which is what made the error visible.
+
 **`info-tip` is a fence now.** It was drawn by the renderer, documented
 in the briefing as the canonical wrong-but-valid example, and reachable
 from nowhere: no fence, no `$defs`, and the v1 shim turns legacy ones
