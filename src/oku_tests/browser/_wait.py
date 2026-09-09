@@ -40,9 +40,16 @@ def until_changed(page, expression: str, before, *, timeout: int = DEFAULT_TIMEO
     only "is it different" is the question being asked.
 
     The comparison is baked into the expression rather than passed as
-    an argument: Playwright serialises arguments as data, so a function
-    cannot travel that way, and rebuilding one with `eval` inside the
-    page is refused by the CSP a built page carries.
+    an argument, because Playwright serialises arguments as data and a
+    function cannot travel that way.
+
+    This used to give a second reason — that rebuilding one with `eval`
+    inside the page is refused by the CSP a built page carries — and
+    that reason was not true. There is no CSP anywhere in the kit or the
+    CLI, and measured on a built standalone page opened over `file://`,
+    `new Function('return 6*7')()` returns 42 and so does `eval`. The
+    first reason is sufficient on its own; a comment asserting a
+    mechanism the code does not have is worse than a shorter one.
     """
     until(
         page,
