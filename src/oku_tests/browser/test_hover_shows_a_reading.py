@@ -589,6 +589,25 @@ def test_a_cursor_reading_survives_the_dot_under_the_pointer(page):
     page.mouse.move(4, 4)
 
 
+def test_a_dot_chart_with_no_cursor_can_hold_its_reading(page):
+    """`quadrant` was the one chart in the kit with a reading a reader
+    could see and no way to keep. It draws dots and wires no cursor, so
+    the reading on screen is the dot path's own — and that path predates
+    pinning entirely: it printed no offer and bound no click.
+
+    The generalisation is small, because a pin with no anchor element
+    already existed for the cursor. What is new is that the dot is a
+    distinct tooltip owner, so the host can tell "the dot wrote this"
+    from "an anchor wrote this" — an anchor's click never reaches the
+    host, and pinning one from a click on empty plot would be a
+    surprise.
+    """
+    pt = _hover_a_mark(page, "quadrant")
+    until(page, _visible("quadrant"), what="the quadrant dot showed its reading")
+    assert _pin_state(page, "quadrant")["hint"], "the dot's reading still makes no pin offer"
+    _pin_holds(page, "quadrant", pt["x"], pt["y"])
+
+
 def test_a_draggable_mark_makes_no_offer_it_cannot_keep(page):
     """A network node is dragged, and the drag calls
     `svg.setPointerCapture` on pointerdown -- so every event after that
