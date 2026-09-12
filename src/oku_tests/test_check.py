@@ -549,7 +549,8 @@ def test_unresolved_glossary_term_flagged(tmp_path: Path, monkeypatch: pytest.Mo
     assert len(unresolved) == 1
 
 
-def test_known_glossary_term_passes(tmp_path: Path) -> None:
+def _registry_fixture(tmp_path: Path) -> Path:
+    """One central domain, `test`, holding one term."""
     fixture = tmp_path / "kit"
     (fixture / "glossary").mkdir(parents=True)
     (fixture / "extrefs").mkdir(parents=True)
@@ -562,6 +563,36 @@ def test_known_glossary_term_passes(tmp_path: Path) -> None:
             }
         )
     )
+    return fixture
+
+
+def _term_page(*terms: str) -> dict:
+    return {
+        "kind": "page",
+        "title": "T",
+        "blocks": [
+            {
+                "kind": "section",
+                "id": "s",
+                "title": "S",
+                "blocks": [
+                    {
+                        "kind": "paragraph",
+                        "content": [{"kind": "glossary-term", "term": t} for t in terms],
+                    },
+                ],
+            },
+        ],
+    }
+
+
+def test_known_glossary_term_passes(tmp_path: Path) -> None:
+    """A term resolves when its domain is ACTIVE. The kit.json is the
+    part that used to be missing from this test: without it the check
+    resolved against every file on disk while the runtime, which walks
+    `kit.domains`, resolved nothing at all."""
+    fixture = _registry_fixture(tmp_path)
+    (tmp_path / "kit.json").write_text(json.dumps({"domains": ["test"]}), encoding="utf-8")
     page = {
         "kind": "page",
         "title": "T",
@@ -581,6 +612,87 @@ def test_known_glossary_term_passes(tmp_path: Path) -> None:
     }
     issues = cli.check_pages([(tmp_path / "page.json", page)], tmp_path, kit_dir=fixture)
     assert _issues_of(issues, code="unresolved-glossary") == []
+
+
+def test_a_project_local_entry_resolves(tmp_path: Path) -> None:
+    """The documented way to add a term — `docs/glossary.md` shows
+    `"glossary": {"data-platforms": {"OurInternalTerm": …}}` in kit.json
+    — was reported `unresolved-glossary` by the check and failed
+    `--strict`. The runtime merges those entries over the central file;
+    the check never opened kit.json."""
+    fixture = _registry_fixture(tmp_path)
+    (tmp_path / "kit.json").write_text(
+        json.dumps(
+            {
+                "domains": ["test"],
+                "glossary": {"test": {"OurInternalTerm": {"en": {"def": "Defined in this project only."}}}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    issues = cli.check_pages(
+        [(tmp_path / "page.json", _term_page("OurInternalTerm", "Iceberg"))], tmp_path, kit_dir=fixture
+    )
+    assert _issues_of(issues, code="unresolved-glossary") == []
+
+
+def test_a_term_from_an_inactive_domain_is_named_with_its_domain(tmp_path: Path) -> None:
+    """The opposite direction. `resolveGlossary` walks `kit.domains` and
+    nothing else, so a term from a domain the project never activated
+    renders as an unknown-entry card — and the check used to pass it.
+    The message names the domain rather than suggesting a respelling of
+    a reference that is spelled right."""
+    fixture = _registry_fixture(tmp_path)
+    (tmp_path / "kit.json").write_text(json.dumps({"domains": ["other"]}), encoding="utf-8")
+    issues = _issues_of(
+        cli.check_pages([(tmp_path / "page.json", _term_page("Iceberg"))], tmp_path, kit_dir=fixture),
+        code="unresolved-glossary",
+    )
+    assert len(issues) == 1, issues
+    assert "`test` registry" in issues[0]["message"]
+    assert "does not activate" in issues[0]["message"]
+    assert "Did you mean" not in issues[0]["message"]
+
+
+def test_a_local_entry_in_an_inactive_domain_is_still_unreachable(tmp_path: Path) -> None:
+    """The merge in chrome.js puts a local entry into `kit.glossary[d]`
+    whatever `d` is, and the lookup then never visits `d`. The check
+    mirrors the lookup, not the merge."""
+    fixture = _registry_fixture(tmp_path)
+    (tmp_path / "kit.json").write_text(
+        json.dumps(
+            {
+                "domains": ["test"],
+                "glossary": {"dormant": {"Sleeper": {"en": {"def": "in a domain nobody activated"}}}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    issues = _issues_of(
+        cli.check_pages([(tmp_path / "page.json", _term_page("Sleeper"))], tmp_path, kit_dir=fixture),
+        code="unresolved-glossary",
+    )
+    assert len(issues) == 1, issues
+
+
+def test_without_a_kit_json_nothing_resolves_and_the_message_says_why(tmp_path: Path) -> None:
+    """`kit.domains` defaults to an empty list, so a project that never
+    wrote a kit.json has every glossary reference render as an
+    unknown-entry card under `oku serve`. The check saying "resolved"
+    there was the check lying in the direction that hides a broken
+    page. It names the cause and, where the term exists somewhere, the
+    domain to activate."""
+    fixture = _registry_fixture(tmp_path)
+    issues = _issues_of(
+        cli.check_pages(
+            [(tmp_path / "page.json", _term_page("Iceberg", "Nonesuch"))], tmp_path, kit_dir=fixture
+        ),
+        code="unresolved-glossary",
+    )
+    assert [i["where"].split("#g/")[1] for i in issues] == ["Iceberg", "Nonesuch"], issues
+    assert "no kit.json declares `domains`" in issues[0]["message"]
+    assert "It is in the `test` registry" in issues[0]["message"]
+    assert "It is in" not in issues[1]["message"]
 
 
 def test_multi_word_markdown_refs_are_collected(tmp_path: Path) -> None:

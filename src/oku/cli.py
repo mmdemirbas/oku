@@ -2369,6 +2369,78 @@ def _load_registry(kit_dir: Path, kind: str) -> dict:
     return out
 
 
+def _active_registry(full: dict, kind: str, kit_json: Path | None) -> tuple[dict, list[str] | None]:
+    """The slice of a registry the RUNTIME would search for a page under
+    `kit_json`, with the project's own additions merged in — as
+    `(index, active_domains)`, `active_domains` being None when nothing
+    is active.
+
+    `resolveGlossary` in chrome.js walks `kit.domains` and nothing else,
+    and `kit.domains` is whatever kit.json declared — an empty list when
+    it declared nothing. The check used to resolve against every file
+    under kit/glossary/ and never opened kit.json, so it was wrong in
+    both directions at once: a term the docs say to add locally
+    (`"glossary": {"web": {"OurInternalTerm": …}}` in kit.json) was
+    reported unresolved and failed `--strict`, while a term from a
+    domain the project never activated passed and rendered as
+    `Unknown term` on hover.
+
+    A local entry in a domain the project does not activate is filtered
+    out here for the same reason: the merge in chrome.js puts it into
+    `kit.glossary[d]`, and the lookup never visits `d`.
+    """
+    data: dict = {}
+    if kit_json is not None:
+        try:
+            loaded = json.loads(kit_json.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                data = loaded
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    domains = data.get("domains")
+    if not isinstance(domains, list) or not domains:
+        return {}, None
+    active = {key: entry for key, entry in full.items() if entry["domain"] in domains}
+    local = data.get(kind)
+    if isinstance(local, dict):
+        for domain, entries in local.items():
+            if domain not in domains or not isinstance(entries, dict):
+                continue
+            for term, langs in entries.items():
+                entry = active.setdefault(term.lower(), {"domain": domain, "term": term, "langs": set()})
+                if isinstance(langs, dict):
+                    entry["langs"].update(langs)
+    return active, [str(d) for d in domains]
+
+
+def _why_unresolved(kind: str, name: str, full: dict, active_domains: list[str] | None) -> str:
+    """One sentence saying what the reader will see and what to change,
+    for the three ways a registry reference misses: no registry is
+    active at all, the entry exists in a domain the project does not
+    activate, or it is nowhere.
+
+    The middle one is the message worth having. `#g/ACID` in a project
+    whose kit.json activates `web` is not a typo, and "not found"
+    followed by "did you mean: acid?" sends the author to rename a
+    reference that is spelled right.
+    """
+    noun = "Glossary term" if kind == "glossary" else "External reference"
+    elsewhere = full.get(name.lower())
+    if active_domains is None:
+        where = f" It is in the `{elsewhere['domain']}` registry." if elsewhere else ""
+        return (
+            f"{noun} '{name}' cannot resolve: no kit.json declares `domains`, so no registry is "
+            f"active and the reader sees an unknown-entry card on hover.{where} Declare `domains` in "
+            "kit.json."
+        )
+    if elsewhere:
+        return (
+            f"{noun} '{name}' is in the `{elsewhere['domain']}` registry, which this project does "
+            f"not activate (active: {', '.join(active_domains)}). Add it to `domains` in kit.json."
+        )
+    return f"{noun} '{name}' not found in any active registry (domains: {', '.join(active_domains)})."
+
+
 _MD_HEADING_LINE_RE = re.compile(r"^(#{1,6})\s+(.*?)(?:\s*\{#([\w-]+)\})?\s*$")
 # Registry ids are human-readable keys, spaces included ("Iceberg paper",
 # "Time travel") — a \w-only id silently skipped most real references,
@@ -3570,9 +3642,12 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         for p, err in validate_pages(pages):
             add(p, "error", "schema", "(root)", err)
 
-    # Load glossary + extref registries once.
+    # Load glossary + extref registries once — every domain, which is
+    # the haystack for "it is in a domain you did not activate". The
+    # slice a page can actually reach is cut per kit.json below.
     glossary = _load_registry(kit_dir, "glossary")
     extrefs = _load_registry(kit_dir, "extrefs")
+    active_by_kit: dict[Path | None, tuple] = {}
 
     # 2. Stray demo pages — `<thing>-demo.{html,json}` is forbidden;
     # primitive examples live inline in reference.json.
@@ -3894,27 +3969,37 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         links_by_page[p] = link_refs
 
         # 8. Glossary + ext-ref resolution — every inline reference
-        # must land on an entry the kit knows about.
+        # must land on an entry the RUNTIME will find, which is the
+        # project's active domains plus its own additions, not every
+        # file under kit/glossary/. The same kit.json the standalone
+        # bundle is built from (`find_kit_json`), unless a nearer one
+        # sits above the page.
+        page_kit = _nearest_kit_json(p.parent, root) or find_kit_json(root)
+        if page_kit not in active_by_kit:
+            active_by_kit[page_kit] = (
+                _active_registry(glossary, "glossary", page_kit),
+                _active_registry(extrefs, "extrefs", page_kit),
+            )
+        (active_gloss, gloss_domains), (active_x, x_domains) = active_by_kit[page_kit]
         for where, term, ref_line in gloss_refs:
-            if term.lower() not in glossary:
+            if term.lower() not in active_gloss:
                 add(
                     p,
                     "warning",
                     "unresolved-glossary",
                     f"{where} #g/{term}",
-                    f"Glossary term '{term}' not found in any kit/glossary/*.json registry."
-                    + _did_you_mean(term, glossary),
+                    _why_unresolved("glossary", term, glossary, gloss_domains)
+                    + _did_you_mean(term, active_gloss),
                     line=ref_line,
                 )
         for where, name, ref_line in extref_refs:
-            if name.lower() not in extrefs:
+            if name.lower() not in active_x:
                 add(
                     p,
                     "warning",
                     "unresolved-extref",
                     f"{where} #x/{name}",
-                    f"External reference '{name}' not found in any kit/extrefs/*.json registry."
-                    + _did_you_mean(name, extrefs),
+                    _why_unresolved("extrefs", name, extrefs, x_domains) + _did_you_mean(name, active_x),
                     line=ref_line,
                 )
 

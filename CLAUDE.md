@@ -1242,6 +1242,29 @@ directions are held by `test_kit_config.py`, and the forward one is
 derived from the AST rather than listed: a hand-written list is exactly
 what the schema was.
 
+**The check resolves a registry reference the way the runtime does, or
+it is checking a different page.** `resolveGlossary` walks
+`kit.domains` — the list `kit.json` activates, empty when it activates
+nothing — and searches the central file for each plus the project's own
+entries merged over it. `oku check` used to index every file under
+`kit/glossary/` and never open `kit.json`, which was wrong in both
+directions at once: the documented way to add a project term
+(`"glossary": {"web": {"OurInternalTerm": …}}`, the example
+`docs/glossary.md` prints) was reported `unresolved-glossary` and failed
+`--strict`, while a term from a domain the project never activated
+passed and rendered as an unknown-entry card on hover. A project with
+no `kit.json` at all resolves NOTHING at runtime, and the check said
+every reference was fine. `_active_registry` cuts the slice the lookup
+would see, and the message says which of three things happened — no
+domains declared, the entry lives in a domain you did not activate
+(named, so the author adds a domain rather than respelling a reference
+that is spelled right), or it is nowhere. Held by the glossary section
+of `test_check.py`; the runtime's own four documented rules — domain
+order, `lang` then `lang_fallback` then any, local-over-central, the
+same for ext-refs — are held in both delivery modes by
+`browser/test_registry_resolution.py`, and the two modes are required to
+agree.
+
 **`info-tip` is a fence now.** It was drawn by the renderer, documented
 in the briefing as the canonical wrong-but-valid example, and reachable
 from nowhere: no fence, no `$defs`, and the v1 shim turns legacy ones
