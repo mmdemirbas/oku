@@ -1265,6 +1265,26 @@ same for ext-refs — are held in both delivery modes by
 `browser/test_registry_resolution.py`, and the two modes are required to
 agree.
 
+The element form is the second half of the same rule. The link form
+carries the id alone, so a QUALIFIED reference — `in="…"` to pin one
+domain — is written as `<glossary-term term="…" in="…">` inside an HTML
+island, which is what `docs/glossary.md` shows and the only way to write
+it. The check read the link form and nothing else, so an island naming
+a term that exists nowhere, or restricting the lookup to a domain the
+project never activated, passed `--strict` and rendered as an
+unknown-entry card in both delivery modes. `_lint_md_string` collects
+the element form on island lines — on the MASKED line, so a tag inside a
+code span is the tag being named, and never inside a raw-text body,
+where it is a sample — and returns it beside the link-form lists, with
+the line it was on. `in` is mirrored the way the runtime reads it:
+`kit.glossary[in]` holds the central file if the domain is active plus
+the project's local entries whatever `domains` says, so an `in` naming
+a domain reachable by neither is reported as that, not as "not found".
+And the severity + code lead each row of the table that drives the
+loop, because `test_authority_agreement` reads emitted codes out of the
+source — a code reached only through a loop variable is one the docs
+table is then told nothing emits.
+
 **`info-tip` is a fence now.** It was drawn by the renderer, documented
 in the briefing as the canonical wrong-but-valid example, and reachable
 from nowhere: no fence, no `$defs`, and the v1 shim turns legacy ones

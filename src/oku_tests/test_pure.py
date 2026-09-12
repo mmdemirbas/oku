@@ -263,7 +263,7 @@ class TestMdStringLint:
     islands; glossary / ext-ref ids are collected for resolution."""
 
     def _codes(self, text: str, skip_prose: bool = False) -> list:
-        issues, _, _, _ = cli._lint_md_string(text, skip_prose=skip_prose)
+        issues, _, _, _, _ = cli._lint_md_string(text, skip_prose=skip_prose)
         return [c for _, c, _, _ in issues]
 
     def test_setext_heading_flagged(self) -> None:
@@ -338,16 +338,16 @@ class TestMdStringLint:
         assert "code-no-language" in self._codes("```\nplain\n```")
 
     def test_glossary_and_extref_collected(self) -> None:
-        _, _, gloss, xrefs = cli._lint_md_string("see [x](#g/iceberg) and [y](#x/spec)", skip_prose=False)
+        _, _, gloss, xrefs, _ = cli._lint_md_string("see [x](#g/iceberg) and [y](#x/spec)", skip_prose=False)
         assert gloss == ["iceberg"]
         assert xrefs == ["spec"]
 
     def test_refs_inside_fences_ignored(self) -> None:
-        _, _, gloss, _ = cli._lint_md_string("```md\n[x](#g/iceberg)\n```", skip_prose=False)
+        _, _, gloss, _, _ = cli._lint_md_string("```md\n[x](#g/iceberg)\n```", skip_prose=False)
         assert gloss == []
 
     def test_heading_ids_explicit_and_slugged(self) -> None:
-        _, ids, _, _ = cli._lint_md_string("## A {#aa}\n\n### B C", skip_prose=False)
+        _, ids, _, _, _ = cli._lint_md_string("## A {#aa}\n\n### B C", skip_prose=False)
         assert [h for _, h in ids] == ["aa", "b-c"]
 
     def test_skip_prose_suppresses_breadcrumb(self) -> None:

@@ -2369,11 +2369,22 @@ def _load_registry(kit_dir: Path, kind: str) -> dict:
     return out
 
 
-def _active_registry(full: dict, kind: str, kit_json: Path | None) -> tuple[dict, list[str] | None]:
+def _active_registry(
+    full: dict, kind: str, kit_json: Path | None, only: str | None = None
+) -> tuple[dict, list[str] | None]:
     """The slice of a registry the RUNTIME would search for a page under
     `kit_json`, with the project's own additions merged in — as
     `(index, active_domains)`, `active_domains` being None when nothing
     is active.
+
+    `only` is the element form's `in="…"`: the lookup visits that one
+    domain and ignores `kit.domains`. What it finds there is the central
+    file IF the domain is active (an inactive one was never fetched or
+    bundled) plus the project's local entries for it, which the loader
+    merges in whatever `domains` says. `(index, [only])` when either
+    half exists, `({}, None)` when the domain is reachable by neither —
+    the caller words that one differently, because "not found" is not
+    what happened.
 
     `resolveGlossary` in chrome.js walks `kit.domains` and nothing else,
     and `kit.domains` is whatever kit.json declared — an empty list when
@@ -2398,22 +2409,34 @@ def _active_registry(full: dict, kind: str, kit_json: Path | None) -> tuple[dict
         except (json.JSONDecodeError, OSError):
             data = {}
     domains = data.get("domains")
-    if not isinstance(domains, list) or not domains:
-        return {}, None
-    active = {key: entry for key, entry in full.items() if entry["domain"] in domains}
+    if not isinstance(domains, list):
+        domains = []
     local = data.get(kind)
-    if isinstance(local, dict):
-        for domain, entries in local.items():
-            if domain not in domains or not isinstance(entries, dict):
-                continue
-            for term, langs in entries.items():
-                entry = active.setdefault(term.lower(), {"domain": domain, "term": term, "langs": set()})
-                if isinstance(langs, dict):
-                    entry["langs"].update(langs)
-    return active, [str(d) for d in domains]
+    local = local if isinstance(local, dict) else {}
+    if only is not None:
+        if only not in domains and not isinstance(local.get(only), dict):
+            return {}, None
+        reach = [only] if only in domains else []
+        visit = [only]
+    else:
+        if not domains:
+            return {}, None
+        reach = domains
+        visit = domains
+    active = {key: entry for key, entry in full.items() if entry["domain"] in reach}
+    for domain, entries in local.items():
+        if domain not in visit or not isinstance(entries, dict):
+            continue
+        for term, langs in entries.items():
+            entry = active.setdefault(term.lower(), {"domain": domain, "term": term, "langs": set()})
+            if isinstance(langs, dict):
+                entry["langs"].update(langs)
+    return active, [str(d) for d in visit]
 
 
-def _why_unresolved(kind: str, name: str, full: dict, active_domains: list[str] | None) -> str:
+def _why_unresolved(
+    kind: str, name: str, full: dict, active_domains: list[str] | None, only: str | None = None
+) -> str:
     """One sentence saying what the reader will see and what to change,
     for the three ways a registry reference misses: no registry is
     active at all, the entry exists in a domain the project does not
@@ -2426,6 +2449,22 @@ def _why_unresolved(kind: str, name: str, full: dict, active_domains: list[str] 
     """
     noun = "Glossary term" if kind == "glossary" else "External reference"
     elsewhere = full.get(name.lower())
+    if only is not None:
+        if active_domains is None:
+            return (
+                f"{noun} '{name}': `in=\"{only}\"` restricts the lookup to a domain this project "
+                f"neither activates nor adds entries to, so nothing can resolve there. Add `{only}` "
+                "to `domains` in kit.json, or drop the qualifier."
+            )
+        where = (
+            f" It is in the `{elsewhere['domain']}` registry."
+            if elsewhere and elsewhere["domain"] != only
+            else ""
+        )
+        return (
+            f"{noun} '{name}' is not in the `{only}` registry, which `in=\"{only}\"` restricts the "
+            f"lookup to.{where}"
+        )
     if active_domains is None:
         where = f" It is in the `{elsewhere['domain']}` registry." if elsewhere else ""
         return (
@@ -2447,6 +2486,15 @@ _MD_HEADING_LINE_RE = re.compile(r"^(#{1,6})\s+(.*?)(?:\s*\{#([\w-]+)\})?\s*$")
 # so unresolved ones were never reported.
 _MD_GLOSS_REF_RE = re.compile(r"\]\(#g/([^)\n]+?)\)")
 _MD_EXTREF_REF_RE = re.compile(r"\]\(#x/([^)\n]+?)\)")
+# The element form, which is how a QUALIFIED reference is written — the
+# link form carries the id alone, so `in="…"` (one domain) and
+# `lang="…"` go on the element inside an HTML island, exactly as
+# docs/glossary.md shows. The check read the link form and nothing
+# else, so an island naming a term that exists nowhere, or restricting
+# the lookup to a domain the project never activated, passed clean and
+# rendered as an unknown-entry card.
+_MD_ELEMENT_REF_RE = re.compile(r"<(glossary-term|ext-ref)\b([^>]*)>", re.I)
+_HTML_ATTR_RE = re.compile(r"""([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
 # Every inline-link destination, with the optional title dropped. Images
 # share the syntax and are collected too: a src that resolves nowhere is
 # the same defect wearing a different tag.
@@ -2679,6 +2727,7 @@ def _lint_md_string(
     list[tuple[int, str]],
     list[str],
     list[str],
+    list[tuple[str, str, str | None, int]],
 ]:
     """Lint one markdown b[] string.
 
@@ -2794,6 +2843,10 @@ def _lint_md_string(
     )
 
     in_raw_text = False
+    # (kind, id, in-domain or None, line) for every element-form
+    # reference in an island. Kept apart from the link-form lists,
+    # which carry no domain and no line of their own.
+    element_refs: list[tuple[str, str, str | None, int]] = []
     for lineno, line in prose:
         stripped = line.strip()
         if not stripped:
@@ -2887,6 +2940,20 @@ def _lint_md_string(
                 )
 
         if in_island:
+            # Scanned on the masked line, so a `<glossary-term>` written
+            # inside a code span is the tag being NAMED — this repo's
+            # own glossary page does that — and a raw-text body is a
+            # sample.
+            if not line_is_code:
+                for m in _MD_ELEMENT_REF_RE.finditer(code_line):
+                    attrs = {
+                        k.lower(): (v if v is not None else w)
+                        for k, v, w in _HTML_ATTR_RE.findall(m.group(2))
+                    }
+                    kind = "glossary" if m.group(1).lower() == "glossary-term" else "extrefs"
+                    ident = attrs.get("term" if kind == "glossary" else "name")
+                    if ident:
+                        element_refs.append((kind, ident, attrs.get("in") or None, lineno))
             _island_balance(line, open_els, _open_line(lineno))
             prev_nonblank = line
             prev_blank = False
@@ -2962,7 +3029,7 @@ def _lint_md_string(
     prose_text = _INLINE_CODE_RE.sub("", "\n".join(line for _, line in prose))
     gloss = _MD_GLOSS_REF_RE.findall(prose_text)
     x_refs = _MD_EXTREF_REF_RE.findall(prose_text)
-    return issues, heading_ids, gloss, x_refs
+    return issues, heading_ids, gloss, x_refs, element_refs
 
 
 _MD_ONE_CODE_SPAN_RE = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
@@ -3723,10 +3790,12 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         documents_history = meta.get("documents_history") is True
 
         seen_ids: dict[str, int] = {}
-        gloss_refs: list[tuple[str, str, int | None]] = []
+        # (where, id, line, `in` domain) — the last two are None for the
+        # link form, which has no line of its own and cannot be qualified.
+        gloss_refs: list[tuple[str, str, int | None, str | None]] = []
         file_refs: list[tuple[str, str, int | None]] = []
         code_spans: list[tuple[str, str, int | None]] = []
-        extref_refs: list[tuple[str, str, int | None]] = []
+        extref_refs: list[tuple[str, str, int | None, str | None]] = []
         link_refs: list[tuple[str, str, int | None]] = []
         asset_refs: list[tuple[str, str, int | None]] = []
         # One island stack for the whole page, because a typed fence cuts
@@ -3776,7 +3845,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             if isinstance(blk, str):
                 # 3. Markdown-string passes: strict-GFM subset, HTML
                 # island audit, unlifted fences, process prose.
-                str_issues, heading_ids, gloss, x_refs = _lint_md_string(
+                str_issues, heading_ids, gloss, x_refs, element_refs = _lint_md_string(
                     blk,
                     skip_prose=is_materialised,
                     skip_history=documents_history,
@@ -3811,8 +3880,12 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                             line=_abs(lineno),
                         )
                     seen_ids[hid] = seen_ids.get(hid, 0) + 1
-                gloss_refs.extend((where, t, None) for t in gloss)
-                extref_refs.extend((where, x, None) for x in x_refs)
+                gloss_refs.extend((where, t, None, None) for t in gloss)
+                extref_refs.extend((where, x, None, None) for x in x_refs)
+                for kind, ident, in_dom, lineno in element_refs:
+                    (gloss_refs if kind == "glossary" else extref_refs).append(
+                        (where, ident, _abs(lineno), in_dom)
+                    )
                 # Exact line per link: a prose block runs from one typed
                 # fence to the next, so on a page with few fences it can
                 # be the whole document, and the block's own line would
@@ -3922,8 +3995,8 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             link_refs.extend((where, h, None) for h in _iter_block_hrefs(blk))
             for s in _iter_block_strings(blk):
                 s_refs = _INLINE_CODE_RE.sub("", s)
-                gloss_refs.extend((where, t, None) for t in _MD_GLOSS_REF_RE.findall(s_refs))
-                extref_refs.extend((where, x, None) for x in _MD_EXTREF_REF_RE.findall(s_refs))
+                gloss_refs.extend((where, t, None, None) for t in _MD_GLOSS_REF_RE.findall(s_refs))
+                extref_refs.extend((where, x, None, None) for x in _MD_EXTREF_REF_RE.findall(s_refs))
                 link_refs.extend((where, h, None) for h in _MD_LINK_TARGET_RE.findall(s_refs))
                 file_refs.extend((where, f, None) for f in _MD_FILE_REF_RE.findall(s_refs))
                 code_spans.extend((where, text, None) for _rel, text in _md_code_spans(s))
@@ -3981,25 +4054,34 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 _active_registry(extrefs, "extrefs", page_kit),
             )
         (active_gloss, gloss_domains), (active_x, x_domains) = active_by_kit[page_kit]
-        for where, term, ref_line in gloss_refs:
-            if term.lower() not in active_gloss:
-                add(
-                    p,
-                    "warning",
-                    "unresolved-glossary",
-                    f"{where} #g/{term}",
-                    _why_unresolved("glossary", term, glossary, gloss_domains)
-                    + _did_you_mean(term, active_gloss),
-                    line=ref_line,
+        # Severity and code lead each row, because that is the shape
+        # `test_authority_agreement` reads an emitted code out of: a code
+        # reached only through a loop variable is one the severity table
+        # in docs/cli.md is then told nothing emits.
+        for severity, code, kind, prefix, refs, full, unqualified in (
+            (
+                "warning",
+                "unresolved-glossary",
+                "glossary",
+                "#g/",
+                gloss_refs,
+                glossary,
+                (active_gloss, gloss_domains),
+            ),
+            ("warning", "unresolved-extref", "extrefs", "#x/", extref_refs, extrefs, (active_x, x_domains)),
+        ):
+            for where, ident, ref_line, in_dom in refs:
+                index, domains = (
+                    _active_registry(full, kind, page_kit, only=in_dom) if in_dom else unqualified
                 )
-        for where, name, ref_line in extref_refs:
-            if name.lower() not in active_x:
+                if ident.lower() in index:
+                    continue
                 add(
                     p,
-                    "warning",
-                    "unresolved-extref",
-                    f"{where} #x/{name}",
-                    _why_unresolved("extrefs", name, extrefs, x_domains) + _did_you_mean(name, active_x),
+                    severity,
+                    code,
+                    f"{where} {prefix}{ident}" + (f' in="{in_dom}"' if in_dom else ""),
+                    _why_unresolved(kind, ident, full, domains, only=in_dom) + _did_you_mean(ident, index),
                     line=ref_line,
                 )
 

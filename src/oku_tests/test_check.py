@@ -675,6 +675,151 @@ def test_a_local_entry_in_an_inactive_domain_is_still_unreachable(tmp_path: Path
     assert len(issues) == 1, issues
 
 
+def _island_page(*lines: str) -> dict:
+    """A markdown page whose body is one HTML island holding `lines` —
+    the form docs/glossary.md prints for a qualified reference."""
+    return {
+        "k": "page",
+        "t": "T",
+        "m": {"summary": "s"},
+        "b": ["## S {#s}", "<p>\n" + "\n".join(lines) + "\n</p>"],
+    }
+
+
+def _two_domain_fixture(tmp_path: Path) -> Path:
+    """Central `test` holds Iceberg; central `other` holds Spark."""
+    fixture = _registry_fixture(tmp_path)
+    (fixture / "glossary" / "other.json").write_text(
+        json.dumps({"domain": "other", "version": 1, "entries": {"Spark": {"en": {"summary": "..."}}}})
+    )
+    return fixture
+
+
+class TestTheElementFormInsideAnIsland:
+    """The link form carries the id alone, so a QUALIFIED reference —
+    `in="…"` to pin one domain — is written as the element itself inside
+    an HTML island, which is what docs/glossary.md shows. The check read
+    the link form and nothing else: an island naming a term that exists
+    nowhere, or restricting the lookup to a domain the project never
+    activated, passed `--strict` and rendered as an unknown-entry card.
+    Measured before the fix, in both delivery modes."""
+
+    def test_an_unknown_term_in_an_island_is_reported_on_its_line(self, tmp_path: Path) -> None:
+        """A file-backed page rather than a dict, because the line is the
+        point: a link-form reference is found again in the source after
+        the fact, an element in an island is reported from the line the
+        walk was on. An in-memory page has no line map to convert."""
+        fixture = _registry_fixture(tmp_path)
+        (tmp_path / "kit.json").write_text(json.dumps({"domains": ["test"]}), encoding="utf-8")
+        src = tmp_path / "page.md"
+        src.write_text(
+            "---\ntitle: T\nsummary: s\n---\n\n## S {#s}\n\n<p>\n"
+            'Two: <glossary-term term="Iceberg">Iceberg</glossary-term> and\n'
+            '<glossary-term term="Nonesuch">Nonesuch</glossary-term>.\n</p>\n',
+            encoding="utf-8",
+        )
+        page = cli._page_from_source_file(src)
+        # Under the virtual `.json` path the walker uses: the block line
+        # map is keyed by it, and `_locate` maps it back to the `.md`.
+        issues = _issues_of(
+            cli.check_pages([(cli._synth_json_path(src), page)], tmp_path, kit_dir=fixture),
+            code="unresolved-glossary",
+        )
+        assert [i["where"].split("#g/")[1] for i in issues] == ["Nonesuch"], issues
+        assert issues[0]["path"] == src
+        assert issues[0]["line"] == 10, issues
+
+    def test_in_restricts_the_lookup_to_one_domain(self, tmp_path: Path) -> None:
+        """Both domains are active, so the unqualified lookup finds Spark
+        in the second. `in="test"` pins the first, where Spark is not,
+        and the message names where it IS rather than respelling it."""
+        fixture = _two_domain_fixture(tmp_path)
+        (tmp_path / "kit.json").write_text(json.dumps({"domains": ["test", "other"]}), encoding="utf-8")
+        page = _island_page(
+            '<glossary-term term="Spark" in="other">ok</glossary-term>',
+            '<glossary-term term="Spark" in="test">pinned wrong</glossary-term>',
+            '<glossary-term term="Spark">unqualified</glossary-term>',
+        )
+        issues = _issues_of(
+            cli.check_pages([(tmp_path / "page.json", page)], tmp_path, kit_dir=fixture),
+            code="unresolved-glossary",
+        )
+        assert len(issues) == 1, issues
+        assert issues[0]["where"].endswith('#g/Spark in="test"'), issues
+        assert "It is in the `other` registry" in issues[0]["message"]
+        assert "Did you mean" not in issues[0]["message"]
+
+    def test_in_naming_a_domain_nothing_reaches_says_so(self, tmp_path: Path) -> None:
+        """`resolveGlossary` visits `kit.glossary[in]`, which is empty for
+        a domain that was never fetched, never bundled and never added to
+        locally. That is a different failure from "not found", and the
+        message says which."""
+        fixture = _registry_fixture(tmp_path)
+        (tmp_path / "kit.json").write_text(json.dumps({"domains": ["test"]}), encoding="utf-8")
+        page = _island_page('<glossary-term term="Iceberg" in="chemistry">x</glossary-term>')
+        issues = _issues_of(
+            cli.check_pages([(tmp_path / "page.json", page)], tmp_path, kit_dir=fixture),
+            code="unresolved-glossary",
+        )
+        assert len(issues) == 1, issues
+        assert "neither activates nor adds entries to" in issues[0]["message"]
+
+    def test_in_reaches_a_local_entry_in_a_domain_the_project_does_not_activate(self, tmp_path: Path) -> None:
+        """The loader merges kit.json's own entries into `kit.glossary[d]`
+        whatever `domains` says, and `in` bypasses `domains`. So this
+        resolves at runtime, and the check mirrors the lookup — the
+        mirror is the rule, not an opinion about whether it should."""
+        fixture = _registry_fixture(tmp_path)
+        (tmp_path / "kit.json").write_text(
+            json.dumps(
+                {
+                    "domains": ["test"],
+                    "glossary": {"dormant": {"Sleeper": {"en": {"def": "reachable only by name"}}}},
+                }
+            ),
+            encoding="utf-8",
+        )
+        page = _island_page('<glossary-term term="Sleeper" in="dormant">x</glossary-term>')
+        issues = cli.check_pages([(tmp_path / "page.json", page)], tmp_path, kit_dir=fixture)
+        assert _issues_of(issues, code="unresolved-glossary") == []
+
+    def test_a_tag_that_is_code_is_a_sample(self, tmp_path: Path) -> None:
+        """This repo's own glossary page names `<glossary-term …>` inside
+        a code span, and a `<pre>` in an island is the documented way to
+        show one. Neither is a reference."""
+        fixture = _registry_fixture(tmp_path)
+        (tmp_path / "kit.json").write_text(json.dumps({"domains": ["test"]}), encoding="utf-8")
+        page = _island_page(
+            'Write `<glossary-term term="Nonesuch">` for a term, or',
+            "<pre>",
+            '<glossary-term term="Nonesuch" in="chemistry">sample</glossary-term>',
+            "</pre>",
+        )
+        issues = cli.check_pages([(tmp_path / "page.json", page)], tmp_path, kit_dir=fixture)
+        assert _issues_of(issues, code="unresolved-glossary") == [], issues
+
+    def test_an_ext_ref_element_is_read_the_same_way(self, tmp_path: Path) -> None:
+        fixture = _registry_fixture(tmp_path)
+        (fixture / "extrefs" / "test.json").write_text(
+            json.dumps(
+                {
+                    "domain": "test",
+                    "version": 1,
+                    "entries": {"Spec": {"en": {"name": "Spec", "summary": "s", "link": "https://x.test"}}},
+                }
+            )
+        )
+        (tmp_path / "kit.json").write_text(json.dumps({"domains": ["test"]}), encoding="utf-8")
+        page = _island_page(
+            '<ext-ref name="Spec">ok</ext-ref> <ext-ref name="Nowhere" in="test">gone</ext-ref>',
+        )
+        issues = _issues_of(
+            cli.check_pages([(tmp_path / "page.json", page)], tmp_path, kit_dir=fixture),
+            code="unresolved-extref",
+        )
+        assert [i["where"].split("#x/")[1] for i in issues] == ['Nowhere in="test"'], issues
+
+
 def test_without_a_kit_json_nothing_resolves_and_the_message_says_why(tmp_path: Path) -> None:
     """`kit.domains` defaults to an empty list, so a project that never
     wrote a kit.json has every glossary reference render as an

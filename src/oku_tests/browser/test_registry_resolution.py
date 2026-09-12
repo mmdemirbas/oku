@@ -73,9 +73,17 @@ KIT_JSON = {
 TERMS = ["ACID", "Chain", "OnlyEn", "OnlyFr", "Native", "Shared"]
 REFS = ["Apache Iceberg", "Both"]
 
+# The element form, which is how a QUALIFIED reference is written: the
+# link form carries the id alone, so `in="…"` goes on the element
+# inside an HTML island. `Shared` is in both domains and the unqualified
+# lookup takes the first; `in="web"` has to reach the second.
+ISLAND = '<p><glossary-term term="Shared" in="web">Shared</glossary-term></p>'
+
 PAGE = (
     "---\ntitle: Resolution\nsummary: One reference per rule.\n---\n\n## Terms {#terms}\n\n"
     + " ".join(f"[{t}](#g/{t})" for t in TERMS)
+    + "\n\n"
+    + ISLAND
     + "\n\n## Refs {#refs}\n\n"
     + " ".join(f"[{r}](#x/{r})" for r in REFS)
     + "\n"
@@ -133,10 +141,13 @@ def standalone(tree) -> str:
 # after a hover — the card is built from these, and reading the source
 # of the card is one step closer to the lookup than reading the card.
 READ = """() => __okuKit.whenReady().then(() => ({
-  terms: Object.fromEntries([...document.querySelectorAll('glossary-term')].map((e) => [
+  terms: Object.fromEntries([...document.querySelectorAll('glossary-term:not([in])')].map((e) => [
     e.getAttribute('term'),
     [e.getAttribute('data-def'), e.getAttribute('data-lang-shown'), e.classList.contains('unknown')],
   ])),
+  qualified: [...document.querySelectorAll('glossary-term[in]')].map((e) => [
+    e.getAttribute('term'), e.getAttribute('in'), e.getAttribute('data-def'), e.classList.contains('unknown'),
+  ]),
   // An ext-ref records the whole citation card in `data-def`, so the
   // summary is read out of the card's markup rather than off its own
   // attribute — which is one step FURTHER from the lookup than the
@@ -195,6 +206,16 @@ def test_an_ext_ref_follows_the_same_rules(results, mode, ref):
     got_summary, unknown = results[mode]["refs"][ref]
     assert not unknown, (ref, mode)
     assert got_summary == EXPECTED_REFS[ref], (ref, mode, results[mode]["refs"][ref])
+
+
+@pytest.mark.parametrize("mode", ["served", "standalone"])
+def test_in_wins_over_domain_order(results, mode):
+    """The one claim the link form cannot make. Unqualified `Shared` is
+    `data-platforms first` above; the same term with `in="web"` has to
+    come back with the second domain's definition — from an element the
+    author wrote by hand inside an island, which is the documented way
+    and the only way to write it."""
+    assert results[mode]["qualified"] == [["Shared", "web", "web second", False]], results[mode]["qualified"]
 
 
 def test_the_two_delivery_modes_agree(results):
