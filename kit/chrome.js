@@ -5415,7 +5415,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-09-r81';
+var __okuKitBuild = '2026-09-12-r82';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -15764,24 +15764,24 @@ class OkuSnippet extends HTMLElement {
     // Prism token: html-css-js → markup (handles <style>/<script> embedded).
     var prismLang = language === 'html-css-js' ? 'markup' : language;
 
-    this.classList.add('hds-wrap');
+    this.classList.add('okt-snippet-wrap');
     this.innerHTML =
-      '<div class="hds-header">' +
-        '<span class="hds-label">' + escapeXml(label) + '</span>' +
-        '<button type="button" class="hds-reset" aria-label="Reset to original">Reset</button>' +
+      '<div class="okt-snippet-header">' +
+        '<span class="okt-snippet-label">' + escapeXml(label) + '</span>' +
+        '<button type="button" class="okt-snippet-reset" aria-label="Reset to original">Reset</button>' +
       '</div>' +
-      '<div class="hds-body">' +
-        '<div class="hds-editor-wrap">' +
-          '<pre class="hds-editor-shadow" aria-hidden="true"><code class="language-' + prismLang + '"></code></pre>' +
-          '<textarea class="hds-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Code"></textarea>' +
+      '<div class="okt-snippet-body">' +
+        '<div class="okt-snippet-editor-wrap">' +
+          '<pre class="okt-snippet-editor-shadow" aria-hidden="true"><code class="language-' + prismLang + '"></code></pre>' +
+          '<textarea class="okt-snippet-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Code"></textarea>' +
         '</div>' +
-        '<iframe class="hds-preview" sandbox="allow-scripts" aria-label="Preview"></iframe>' +
+        '<iframe class="okt-snippet-preview" sandbox="allow-scripts" aria-label="Preview"></iframe>' +
       '</div>';
-    var editor = this.querySelector('.hds-editor');
-    var shadow = this.querySelector('.hds-editor-shadow');
+    var editor = this.querySelector('.okt-snippet-editor');
+    var shadow = this.querySelector('.okt-snippet-editor-shadow');
     var shadowCode = shadow.querySelector('code');
-    var preview = this.querySelector('.hds-preview');
-    var reset = this.querySelector('.hds-reset');
+    var preview = this.querySelector('.okt-snippet-preview');
+    var reset = this.querySelector('.okt-snippet-reset');
     var original = source;
     editor.value = source;
 

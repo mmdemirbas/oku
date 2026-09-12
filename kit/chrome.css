@@ -6806,7 +6806,7 @@ oku-snippet {
   border-radius: 12px;
   overflow: hidden;
 }
-oku-snippet .hds-header {
+oku-snippet .okt-snippet-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -6816,13 +6816,13 @@ oku-snippet .hds-header {
   font-size: 12px;
   color: var(--text-soft);
 }
-oku-snippet .hds-label {
+oku-snippet .okt-snippet-label {
   font-weight: 600;
   color: var(--text);
   min-width: 0;
   overflow-wrap: anywhere;
 }
-oku-snippet .hds-reset {
+oku-snippet .okt-snippet-reset {
   /* The label is the elastic half of this header; the button is not.
      Without this the button is the thing pushed off the right edge. */
   flex: none;
@@ -6836,8 +6836,8 @@ oku-snippet .hds-reset {
   cursor: pointer;
   font-family: inherit;
 }
-oku-snippet .hds-reset:hover { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
-oku-snippet .hds-body {
+oku-snippet .okt-snippet-reset:hover { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
+oku-snippet .okt-snippet-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   min-height: 320px;
@@ -6845,12 +6845,12 @@ oku-snippet .hds-body {
 /* When nested inside the example-pair render column, the grid is
    tight (~half content-width). Stack editor + preview unconditionally
    in that context so neither gets squashed to a sliver. */
-.example-output oku-snippet .hds-body {
+.example-output oku-snippet .okt-snippet-body {
   grid-template-columns: minmax(0, 1fr);
   min-height: 400px;
 }
-.example-output oku-snippet .hds-editor,
-.example-output oku-snippet .hds-preview {
+.example-output oku-snippet .okt-snippet-editor,
+.example-output oku-snippet .okt-snippet-preview {
   min-height: 200px;
 }
 /* Editor pane: a `<textarea>` overlaid on top of a Prism-highlighted
@@ -6860,14 +6860,14 @@ oku-snippet .hds-body {
    per-pixel with what the user types. The textarea drives layout
    (so resize: vertical works); the shadow is absolutely positioned
    over the wrap and scroll-synced from the textarea. */
-oku-snippet .hds-editor-wrap {
+oku-snippet .okt-snippet-editor-wrap {
   position: relative;
   background: var(--surface);
   border-right: 1px solid var(--border);
   overflow: hidden;
 }
-oku-snippet .hds-editor,
-oku-snippet .hds-editor-shadow {
+oku-snippet .okt-snippet-editor,
+oku-snippet .okt-snippet-editor-shadow {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12.5px;
   line-height: 1.55;
@@ -6879,7 +6879,7 @@ oku-snippet .hds-editor-shadow {
   white-space: pre;
   word-spacing: normal;
 }
-oku-snippet .hds-editor {
+oku-snippet .okt-snippet-editor {
   display: block;
   width: 100%;
   min-height: 200px;
@@ -6893,8 +6893,8 @@ oku-snippet .hds-editor {
   /* Selection stays visible even with transparent text. */
   -webkit-text-fill-color: transparent;
 }
-oku-snippet .hds-editor::selection { background: var(--accent-soft); color: transparent; }
-oku-snippet .hds-editor-shadow {
+oku-snippet .okt-snippet-editor::selection { background: var(--accent-soft); color: transparent; }
+oku-snippet .okt-snippet-editor-shadow {
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -6903,7 +6903,7 @@ oku-snippet .hds-editor-shadow {
   background: transparent;
   color: var(--text);
 }
-oku-snippet .hds-editor-shadow code {
+oku-snippet .okt-snippet-editor-shadow code {
   display: block;
   background: transparent;
   font: inherit;
@@ -6911,16 +6911,16 @@ oku-snippet .hds-editor-shadow code {
   line-height: inherit;
   white-space: pre;
 }
-oku-snippet .hds-editor-wrap:focus-within { background: var(--surface-2); }
-oku-snippet .hds-preview {
+oku-snippet .okt-snippet-editor-wrap:focus-within { background: var(--surface-2); }
+oku-snippet .okt-snippet-preview {
   background: white;
   border: 0;
   width: 100%;
   min-height: 200px;
 }
 @media (max-width: 700px) {
-  oku-snippet .hds-body { grid-template-columns: minmax(0, 1fr); }
-  oku-snippet .hds-editor-wrap { border-right: 0; border-bottom: 1px solid var(--border); }
+  oku-snippet .okt-snippet-body { grid-template-columns: minmax(0, 1fr); }
+  oku-snippet .okt-snippet-editor-wrap { border-right: 0; border-bottom: 1px solid var(--border); }
 }
 
 /* ============================================================

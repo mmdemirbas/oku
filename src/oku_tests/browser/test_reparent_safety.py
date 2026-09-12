@@ -157,7 +157,7 @@ def test_source_consuming_hosts_survive_a_move(page, served):
     hits the same re-init path.
     """
     page.goto(served)
-    page.wait_for_selector("oku-snippet .hds-editor", timeout=15000)
+    page.wait_for_selector("oku-snippet .okt-snippet-editor", timeout=15000)
     page.wait_for_selector("oku-annotated-code .okc-anno-list", timeout=15000)
 
     result = page.evaluate(
@@ -168,7 +168,7 @@ def test_source_consuming_hosts_survive_a_move(page, served):
         const probes = {
           snippet: () => {
             const el = document.querySelector('oku-snippet');
-            const ta = el.querySelector('.hds-editor');
+            const ta = el.querySelector('.okt-snippet-editor');
             return (ta && ta.value.trim().length) || 0;
           },
           annotated: () => {

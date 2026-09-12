@@ -2407,8 +2407,14 @@
       }
       const codeCol = document.createElement('div');
       codeCol.className = 'example-code';
+      // `data-oku-t` is what puts a kit-composed word inside the
+      // localize walk when its element carries none of the kit's class
+      // prefixes — this pair sat outside it, so a Turkish reference page
+      // headed all 84 of its example columns in English with the table
+      // holding both words the whole time.
       const codeLbl = document.createElement('div');
       codeLbl.className = 'example-col-label';
+      codeLbl.setAttribute('data-oku-t', 'Code');
       codeLbl.textContent = 'Code';
       codeCol.appendChild(codeLbl);
       if (block.code) codeCol.appendChild(this._renderCode(block.code));
@@ -2416,6 +2422,7 @@
       outputCol.className = 'example-output';
       const outputLbl = document.createElement('div');
       outputLbl.className = 'example-col-label';
+      outputLbl.setAttribute('data-oku-t', 'Output');
       outputLbl.textContent = 'Output';
       outputCol.appendChild(outputLbl);
       if (typeof block.output === 'string') {

@@ -1508,6 +1508,30 @@ actually write.
   used it. Held by `browser/test_reader_placeholders.py`, which covers
   both trees on purpose.
 
+- **The string table is applied by a walk, and the walk is scoped by
+  class prefix — so a string can be translated in the table and English
+  on the page.** `localize()` visits `.okt-*` / `.okc-*` / `.okd-*`
+  hosts, the chrome elements by tag, and `[data-oku-t]`, and rewrites
+  exact-match text and three attributes underneath them. Anything built
+  outside those is never visited. Two things were: `<oku-snippet>`, the
+  one element in the kit still carrying a prefix of its own (`hds-`,
+  from before the rename), whose every control read English on a
+  Turkish page that had fetched the table; and the `example` block's
+  column labels, plain `example-col-label` divs, which put `Code` /
+  `Output` on a Turkish reference page 84 times. `test_i18n_coverage.py`
+  was green throughout — it holds the TABLE, and every one of those
+  words was in it. Two fixes, one each: the snippet's classes are
+  `okt-snippet-*` now, and the renderer marks the two labels
+  `data-oku-t`, which is the mechanism it already used for `Footnotes`
+  and `Last updated {0}`. Held at the DOM by
+  `test_i18n_runtime.py::test_no_table_key_survives_in_english_on_a_turkish_page`,
+  a sweep over this repo's own Turkish pages: every table key whose
+  translation differs from itself must be absent from text and
+  attributes outside code and verbatim regions. The docs rather than a
+  fixture, because they use every primitive; a fixture covers the ones
+  somebody remembered. `browser/test_live_snippet.py` holds the
+  playground's own four documented claims beside it, in both modes.
+
 - **CSS rules silently dropped by Chrome.** A multi-line comment
   inside a rule body, containing certain Unicode punctuation, has
   been observed to make Chrome's parser drop the trailing

@@ -10,6 +10,9 @@ asserted rather than eyeballed.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from ._menu import open_menu
@@ -243,3 +246,57 @@ def test_a_rail_word_in_author_content_survives_the_pass(page, site_url):
     # wrong reason. The one thing this test must not do is agree quietly.
     assert got["hasTable"], "no tr table was loaded, so the pass did nothing"
     assert got["after"] == got["before"], got
+
+
+# ---------- the DOM, not the table ----------
+
+# Every key with a translation that differs from the key. An identity
+# entry (`TL;DR` → `TL;DR`) is a word the kit keeps in every language,
+# and it cannot be told apart from an untranslated one by reading the
+# page.
+_TABLE = json.loads(
+    (Path(__file__).resolve().parents[3] / "kit" / "i18n" / "tr.json").read_text(encoding="utf-8")
+)
+_KEYS = sorted(k for k, v in _TABLE.items() if v != k and "{0}" not in k)
+
+SURVIVORS = """(keys) => {
+  const set = new Set(keys); const out = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+  let el;
+  while ((el = walker.nextNode())) {
+    // Quoted content and code are the author's words, whatever they say.
+    if (el.closest('[data-oku-verbatim], pre, code, script, style')) continue;
+    const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join('');
+    const cls = typeof el.className === 'string' ? el.className.split(' ')[0] : '';
+    if (set.has(own)) out.push(`${el.tagName.toLowerCase()}.${cls} text=${JSON.stringify(own)}`);
+    for (const a of ['aria-label', 'title', 'placeholder']) {
+      const v = el.getAttribute(a);
+      if (v && set.has(v)) out.push(`${el.tagName.toLowerCase()}.${cls} ${a}=${JSON.stringify(v)}`);
+    }
+  }
+  return out;
+}"""
+
+
+@pytest.mark.parametrize("name", ["reference.tr.html", "charts.tr.html", "cli.tr.html"])
+def test_no_table_key_survives_in_english_on_a_turkish_page(page, site_url, name):
+    """`test_i18n_coverage.py` holds the TABLE: every string the kit
+    composes has a Turkish entry. This holds the DOM: every one of those
+    entries was applied. The two can disagree, and did — an element
+    built under a class outside the kit's prefixes is outside the
+    localize walk, and its words sit in the table, translated, unused.
+    Measured before the fix on this repo's own reference page: 84
+    example-column labels reading `Code` / `Output`, and a playground
+    whose every control was English, on a page that had fetched the
+    Turkish table.
+
+    A sweep over the kit's own documentation rather than a fixture,
+    because the documentation is the one page that uses every primitive
+    — a fixture would cover the primitives somebody remembered."""
+    got = _open(page, site_url, name)
+    assert got["lang"] == "tr", got
+    # Vacuity guard: the pass has to have RUN for an empty survivor list
+    # to mean anything. The drawer button is localized at boot.
+    assert got["contents"] == _TABLE["Contents"], got
+    survivors = page.evaluate(SURVIVORS, _KEYS)
+    assert survivors == [], "\n".join(survivors[:40])
