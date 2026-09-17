@@ -4206,6 +4206,132 @@ function initReadingAids() {
     });
   }, 0);
 
+  /* A long table keeps its column labels in view. Every thead th is
+     `position: sticky`, and a sticky element sticks to its nearest
+     SCROLL CONTAINER — which `.okt-table-scroll` is, since
+     `overflow-x: auto` makes y a scroll axis too. So the header was
+     pinned to a box that grows with the table and never scrolls, and
+     the labels left with the first row. Two answers, by width:
+
+     - A table that fits its column does not need the scroll container.
+       `data-fit="1"` lifts it (CSS) and the header sticks to the
+       viewport natively. Nothing else runs.
+     - A wider table keeps the container, because the rows still have to
+       scroll sideways, and gets a GHOST: a clone of the thead placed
+       before the box, sticky on its own, sized cell by cell from the
+       real one and scrolled in step with the box, both ways. It is hidden
+       and untouchable until it is measured stuck above the real header,
+       so at rest the author's header takes the pointer. A click on the
+       stuck ghost is forwarded to the real cell, which is what sorts.
+
+     Widths are copied from computed style rather than from rects: the
+     reading column is `zoom`ed by the text-scale control, and a rect is
+     in viewport px while a style width is in the zoomed box's own px.
+     Held by browser/test_sticky_table_header.py. */
+  function wireStickyHead(wrap, scroll, table) {
+    if (!table.tHead || typeof ResizeObserver !== 'function') return;
+    var ghost = document.createElement('div');
+    ghost.className = 'okt-table-ghost';
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.hidden = true;
+    // A `display: table` div, not a <table>: a second table in the wrap
+    // is the one every `querySelector('table')` finds first.
+    var ghostTable = document.createElement('div');
+    ghost.appendChild(ghostTable);
+    wrap.insertBefore(ghost, scroll);
+
+    function syncGhost() {
+      if (ghost.hidden) return;
+      var head = table.tHead;
+      if (!head) return;
+      var clone = head.cloneNode(true);
+      Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function (el) { el.removeAttribute('id'); });
+      Array.prototype.forEach.call(clone.querySelectorAll('[tabindex]'), function (el) { el.setAttribute('tabindex', '-1'); });
+      ghostTable.innerHTML = '';
+      ghostTable.appendChild(clone);
+      var real = head.querySelectorAll('th, td');
+      var copy = clone.querySelectorAll('th, td');
+      for (var i = 0; i < real.length && i < copy.length; i++) {
+        var cs = getComputedStyle(real[i]);
+        copy[i].style.width = cs.width;
+        copy[i].style.height = cs.height;
+        // Auto layout sized the real column from this very label, so
+        // the copied width is the label's width to the last fraction,
+        // and a fraction lost in the copy wraps the label onto a second
+        // line. A cell that rendered on one line is told not to wrap;
+        // one that already wraps keeps the same width and wraps alike.
+        var lines = (real[i].clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) / parseFloat(cs.lineHeight);
+        if (lines < 1.5) copy[i].style.whiteSpace = 'nowrap';
+      }
+      ghostTable.style.width = getComputedStyle(table).width;
+      var h = getComputedStyle(head).height;
+      ghost.style.height = h;
+      ghost.style.marginBottom = '-' + h;
+      ghost.scrollLeft = scroll.scrollLeft;
+      syncStuck();
+    }
+    function syncStuck() {
+      // A table in a viewed markdown file goes away with the file, and a
+      // listener on the document would not. Released on the first scroll
+      // after — the same rule the column grabber follows for its pair.
+      if (!wrap.isConnected) { release(); return; }
+      if (ghost.hidden) return;
+      // In flow the ghost sits exactly over the real thead; stuck, it
+      // is below it. No offset or zoom to know — works in any scrollport.
+      var stuck = ghost.getBoundingClientRect().top > table.tHead.getBoundingClientRect().top + 0.5;
+      if (stuck) ghost.dataset.stuck = '1'; else delete ghost.dataset.stuck;
+    }
+    var queued = false;
+    function queueSync() {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () { queued = false; syncGhost(); });
+    }
+    function measureFit() {
+      var fits = table.getBoundingClientRect().width <= scroll.getBoundingClientRect().width + 1;
+      scroll.dataset.fit = fits ? '1' : '0';
+      if (ghost.hidden !== fits) {
+        ghost.hidden = fits;
+        if (!fits) syncGhost();
+      } else if (!fits) {
+        queueSync();
+      }
+    }
+    var ro = new ResizeObserver(measureFit);
+    ro.observe(scroll);
+    ro.observe(table);
+    var mo = null;
+    if (typeof MutationObserver === 'function') {
+      // Sort arrows, rank badges, dragged column widths, re-rendered rows
+      // — anything that changes what the header says or how wide it is.
+      mo = new MutationObserver(queueSync);
+      mo.observe(table, { attributes: true, childList: true, characterData: true, subtree: true });
+    }
+    function release() {
+      ro.disconnect();
+      if (mo) mo.disconnect();
+      document.removeEventListener('scroll', syncStuck, { capture: true });
+    }
+    // Each follows the other; assigning a scrollLeft it already has fires
+    // no event, so the pair settles rather than ping-pongs.
+    scroll.addEventListener('scroll', function () {
+      if (!ghost.hidden) ghost.scrollLeft = scroll.scrollLeft;
+    }, { passive: true });
+    ghost.addEventListener('scroll', function () {
+      scroll.scrollLeft = ghost.scrollLeft;
+    }, { passive: true });
+    // Capture: the page scrolls on the document, the markdown viewer
+    // on its own box, and a scroll event does not bubble.
+    document.addEventListener('scroll', syncStuck, { capture: true, passive: true });
+    ghost.addEventListener('click', function (e) {
+      var cell = e.target.closest('th');
+      if (!cell) return;
+      var idx = Array.prototype.indexOf.call(ghost.querySelectorAll('th'), cell);
+      var real = table.tHead.querySelectorAll('th')[idx];
+      if (real) real.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: e.shiftKey }));
+    });
+  }
+
   /* Wide-table support: every plain <table> gets a scrollable wrapper,
      a "Table | Cards | List" view toggle, and a full-width expand button.
      Wrapper is idempotent — re-running initReadingAids leaves bound tables
@@ -4518,6 +4644,7 @@ function initReadingAids() {
     scroll.appendChild(table);
     wrap.appendChild(ctrl);
     wrap.appendChild(scroll);
+    wireStickyHead(wrap, scroll, table);
 
     if (canPivot) {
       function applyRowInteractivity(el, iv) {

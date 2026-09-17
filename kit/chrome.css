@@ -259,6 +259,14 @@ html {
      any Mac set to "Show scroll bars: Always". Ignored by browsers that
      do not support it, which leaves them exactly where they were. */
   scrollbar-gutter: stable;
+  /* The top rail's height at rest. Declared here rather than on
+     `.okt-rail` because it is not only the rail's business: the rail
+     is opaque and fixed, so anything else that pins itself to the top
+     of the viewport — a sticky table header — starts this far down.
+     The rail's hover grows it in its own scope; nothing else follows
+     that, on purpose (a header that jumps when the pointer nears the
+     rail is a header that moves). */
+  --okt-rail-h: 12px;
 }
 body {
   margin: 0; padding: 0;
@@ -837,8 +845,7 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
      had to hang below the strip onto whatever text was scrolling under
      it, where a 2px tick is a speck. Painted --bg, so the effect is
      that page content ends 12px early — what any fixed header does, at
-     a fraction of the height. */
-  --okt-rail-h: 12px;
+     a fraction of the height. Rest height inherited from :root. */
   /* One multiplier drives every mark's size, so at rest the strip is a
      hairline and under the pointer it is a legible map. It composes with
      the per-mark dock swell (`--okt-mag`) rather than replacing it: the
@@ -876,7 +883,7 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
 /* A touch pointer has no hover. Expanding on tap would grow the strip
    under the finger that just committed to a target. */
 @media (hover: none) {
-  .okt-rail:hover { --okt-rail-h: 12px; --okt-rail-scale: 1; background: var(--bg); box-shadow: none; }
+  .okt-rail:hover { --okt-rail-h: inherit; --okt-rail-scale: 1; background: var(--bg); box-shadow: none; }
 }
 /* The track. It has to be visible or the ticks read as a row of
    floating marks with nothing joining them — and the line joining them
@@ -2375,15 +2382,14 @@ code:not(pre code) {
 .okt-filter input::placeholder { color: var(--text-faint); }
 
 /* Sort indicators on <thead th> when the cell is bound as sortable.
-   Sticky is preserved here — `position: sticky` is also a containing
-   block for the absolutely-positioned sort indicator, so it doubles
-   for both jobs and the header stays pinned during vertical scroll. */
+   Position comes from `table thead th` — every sortable cell is one —
+   and `position: sticky` is also a containing block for the
+   absolutely-positioned rank badge, so it doubles for both jobs. It
+   used to be restated here with `top: 0`, a second copy of the offset
+   that the rail rule above would then have had to be told about. */
 .okt-sortable {
   cursor: pointer;
   user-select: none;
-  position: sticky;
-  top: 0;
-  z-index: 2;
   transition: background 0.12s ease, color 0.12s ease;
 }
 .okt-sortable:hover { background: var(--accent-soft) !important; color: var(--accent-strong) !important; }
@@ -2577,13 +2583,62 @@ code:not(pre code) {
      exceeds the container. Cells still word-wrap inside their column
      (white-space: normal + overflow-wrap: anywhere on td); the scroll
      only kicks in when even the minimum column widths can't fit.
-     Trade-off: this scroll context contains `position: sticky` thead
-     to the wrapper, not the viewport — acceptable since the wrapper
-     itself is tall enough that thead still feels sticky while scrolling. */
+     This box is a SCROLL CONTAINER, and that is what a sticky header
+     sticks to — `overflow-x: auto` makes the y axis a scroll axis
+     too, so the `position: sticky` on every thead th pinned it to a
+     box that grows with the table and never scrolls. It used to say
+     this was acceptable "since the wrapper is tall enough that thead
+     still feels sticky"; measured, the labels left with the first
+     row. So a table that FITS its column gives the container up:
+     chrome.js measures and sets `data-fit`, the box stops clipping,
+     and the header sticks to the viewport natively. A wider table
+     keeps it and gets `.okt-table-ghost` below instead. */
   overflow-x: auto;
   border-radius: 8px;
   background: var(--surface);
 }
+/* The header a wide table shows while its own has scrolled away. A
+   clone of the thead, OUTSIDE the scroll container so it can stick to
+   the viewport, sized cell by cell from the real one and scrolled in
+   step with the box — a scroller of its own with the bar hidden, not a
+   clipped box with a transform, so a wheel over the stuck header moves
+   the rows under it and nothing in it is out of the reader's reach. It sits
+   in flow over the real thead (own height, pulled back by the same
+   margin) and is invisible and untouchable there — the author's header
+   answers the pointer at rest; the ghost only shows once chrome.js
+   sees it stuck above the real one. The lightbox and the alternate
+   views have no page scroll under them, so no ghost there.
+
+   It is a `display: table` div, not a `<table>`. A second table in the
+   wrap is the first one every `querySelector('table')` finds — the
+   rail's thumbnail read "0 × 0" off it — and a `role` cannot take an
+   element out of a selector. The thead is cloned into it as-is, so
+   the cell rules below name both hosts. */
+.okt-table-ghost {
+  position: sticky;
+  top: calc(var(--okt-rail-h) / var(--oku-text-scale, 1));
+  z-index: 3;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  visibility: hidden;
+  pointer-events: none;
+  background: var(--bg);
+}
+.okt-table-ghost::-webkit-scrollbar { display: none; }
+.okt-table-ghost[data-stuck="1"] { visibility: visible; pointer-events: auto; }
+.okt-table-ghost[hidden],
+.okt-table-wrap[data-view]:not([data-view="table"]) > .okt-table-ghost,
+.okt-lightbox-content > .okt-table-wrap > .okt-table-ghost { display: none; }
+.okt-table-ghost > div {
+  display: table; table-layout: fixed; border-collapse: collapse;
+  font-size: 14.5px; line-height: 1.5;
+}
+/* `relative`, not `static`: the multi-sort rank badge is absolutely
+   positioned against its cell. Not `sticky`: this box clips, so a
+   sticky cell would climb inside it. */
+.okt-table-ghost th { position: relative; top: auto; }
+.okt-table-ghost .okt-col-resize { display: none; }
 .okt-table-scroll:has(> table.okt-nowrap) {
   overflow-x: auto;
   /* Edge fade shadows hint at horizontal overflow on opt-in tables. */
@@ -2597,6 +2652,10 @@ code:not(pre code) {
   background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
   background-attachment: local, local, scroll, scroll;
 }
+/* After the nowrap rule: it re-declares `overflow-x: auto` at the
+   same specificity, and a nowrap table that happens to fit is still a
+   table that fits. */
+.okt-table-scroll[data-fit="1"] { overflow-x: visible; }
 .okt-table-scroll > table {
   margin: 0;
   /* Default: fit the wrap container so cell content wraps inside its
@@ -3853,7 +3912,7 @@ table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5p
    without an opaque fill the rows scroll THROUGH the label. It is the
    scroll area's own colour, so it reads as no fill at rest and only
    does its job once the reader scrolls a long table. */
-table th {
+:is(table, .okt-table-ghost) th {
   text-align: left; background: var(--bg);
   padding: 10px 14px; border-bottom: 2px solid var(--border);
   font-weight: 650; color: var(--text-soft); font-size: 12.5px;
@@ -3864,9 +3923,16 @@ table th {
    inherit sticky positioning, which would scramble that layout. */
 table thead th {
   position: sticky;
-  top: 0;
+  /* Under the rail, which is opaque and fixed. The reading column is
+     `zoom`ed by the text-scale control and `top` scales with it, so
+     the rail's height is divided back out. */
+  top: calc(var(--okt-rail-h) / var(--oku-text-scale, 1));
   z-index: 2;
 }
+/* Inside the lightbox — a fullscreened table, the markdown viewer —
+   the scrollport is the lightbox's own box and the rail is under it. */
+.okt-lightbox-content table thead th { top: 0; }
+.okt-lightbox-content .okt-table-ghost { top: 0; }
 table td {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border-soft);
@@ -3900,7 +3966,7 @@ table tbody tr:last-child td { border-bottom: none; }
    table had to spare. */
 table td > code,
 table td > a > code { white-space: nowrap; }
-table th {
+:is(table, .okt-table-ghost) th {
   /* Headers earn the same readable floor so labelled columns don't
      collapse below the label length. */
   min-width: 9ch;

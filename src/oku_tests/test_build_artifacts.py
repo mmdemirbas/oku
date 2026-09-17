@@ -611,7 +611,13 @@ class TestPayloadBudget:
     # rather than only the fetching one. About 2,200 bytes, of which the
     # mechanism is roughly 400 — the rest names three defects that hid
     # each other, and the silent `catch` that kept all three invisible.
-    KIT_BUDGET_BYTES = 1_282_000
+    # Then from 1,282,000 by a table header that stays in view: the
+    # measured fit that lifts the scroll container, and for a table too
+    # wide to lift it, a ghost of the thead that sticks outside the box
+    # and scrolls in step with it. About 9,000 bytes, roughly half of it
+    # naming why the header stuck to the wrong thing for as long as it
+    # did and why the wide case needs a second mechanism at all.
+    KIT_BUDGET_BYTES = 1_292_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

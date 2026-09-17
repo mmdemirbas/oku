@@ -1055,6 +1055,35 @@ Refer to current behaviour, not how it got here. Past sessions left
 this kind of breadcrumb in many places; `git grep -i round docs/`
 should return nothing relevant.
 
+**A long table keeps its column labels in view.** Every `thead th` had
+`position: sticky` and it stuck to the wrong thing: a sticky element
+sticks to its nearest SCROLL CONTAINER, and `.okt-table-scroll` is one
+— `overflow-x: auto` makes y a scroll axis too — so the header was
+pinned to a box that grows with the table and never scrolls, and the
+labels left with the first row. The old comment called that acceptable
+"since the wrapper is tall enough that thead still feels sticky"; it
+was not. Two answers, by width, because one does not cover both. A
+table that FITS its column gives the container up (`data-fit="1"`,
+measured by a ResizeObserver) and the header sticks to the viewport
+natively — nothing else runs. A wider table keeps it, since the rows
+still have to scroll sideways, and gets `.okt-table-ghost`: a clone of
+the thead placed BEFORE the box, sticky on its own, sized cell by cell
+from the real one's computed style (not rects — the reading column is
+`zoom`ed and a rect is in viewport px), a scroller of its own with the
+bar hidden and kept in step with the box both ways — so a wheel over
+the stuck header moves the rows under it, and nothing in it is clipped
+out of reach. It is a `display: table` div, not a second `<table>`: the
+rail's thumbnail read `0 × 0` off the first table it found in the wrap.
+Hidden and untouchable until it measures stuck above the
+real header, so at rest the author's header takes the pointer; a click
+on the stuck ghost is forwarded to the real cell. Both park under the
+rail (`--okt-rail-h`, now on `:root` because it is no longer only the
+rail's business), and inside the lightbox at 0, where the scrollport is
+the lightbox's own box. Held by `browser/test_sticky_table_header.py`,
+which asks from the reader's side — under the rail, in this column,
+is there a cell with this label — so it does not care which mechanism
+answered.
+
 **Tables read as one card.** `.okt-table-wrap` carries a border +
 padding so two consecutive tables don't bleed into each other. The
 filter input + stats counter sit together on the left; chip rack is
