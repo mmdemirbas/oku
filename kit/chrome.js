@@ -826,7 +826,7 @@ var __okuMdViewer = (function () {
   }
 
   /* The path as the reader thinks of it: what the author typed, not the
-     resolved URL. `/Users/md/dev/x/docs/notes/plan.md` is the same file
+     resolved URL. `/Users/you/dev/x/docs/notes/plan.md` is the same file
      as `notes/plan.md` and says less about where it sits in the tree. */
   function displayPath(href, url) {
     if (href && !/^[a-z][a-z0-9+.-]*:/i.test(href)) return href;

@@ -9,7 +9,7 @@ import ast
 import re
 from pathlib import Path
 
-ROOT = Path("/Users/md/dev/mmdemirbas/html-doc")
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def py_report(path: Path):

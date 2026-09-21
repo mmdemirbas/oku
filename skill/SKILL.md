@@ -285,7 +285,7 @@ entry to write.
 6. **Run sanity checks** (see below).
 
 7. **Run `oku build`, then report the standalone file by absolute path** —
-   e.g. `/Users/md/dev/proj/docs/reports/dist/standalone/foo.html`. No
+   e.g. `/Users/you/dev/proj/docs/reports/dist/standalone/foo.html`. No
    `file://` prefix; the bare absolute path is clickable.
 
    `dist/standalone/` inlines its assets, so it opens in a browser tab
