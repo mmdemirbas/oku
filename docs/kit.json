@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/project-kit.schema.json",
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/oku/main/kit/schema/project-kit.schema.json",
   "name": "oku",
   "skip_gitignored": true,
   "description": "Interactive knowledge platform for AI-emitted documentation, learning notes, and reviews.",

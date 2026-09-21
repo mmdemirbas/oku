@@ -147,14 +147,14 @@ Highlights shipped in the current cycle. Full per-commit history lives in git lo
 - Mermaid trim mitigation: `.okd-render` now overflow:hidden, aspect-fit caps tall portrait diagrams at 70vh, font-size clamped to 13px for all SVG text.
 - Compare-grid cards gain optional `href` — whole-tile clickable. Used by Pick-by-family.
 - Tables `wrap: true` per-column for multi-line cell content.
-- All html-doc surface references removed (only the GitHub URL remains on the legacy name).
+- All html-doc surface references removed; the GitHub repo and the local clone are `oku` too.
 
 ## Locked decisions {#decisions}
 
 Each was an open question once; collected here so future contributors don't relitigate.
 
 - Project name = oku (Turkish 'read!'). Every layer reads `oku`: package (src/oku/), kit CSS prefixes (okt- / okc- / okd-), JS globals (__oku*), event names (oku:*), data-attrs (data-oku-*), and custom-element tag names.
-- GitHub remote URL stays at github.com/mmdemirbas/html-doc — the schema $id, the git-clone example, and the jsdelivr CDN URL all point there. The local repo directory name follows the remote.
+- GitHub repo renamed to github.com/mmdemirbas/oku; the schema `$id`, the git-clone example and the CDN URL follow it.
 - Code / output columns inside example-pair MUST align at the top edge of the box. No 24px spacer for non-code outputs — the visible top edges of the code and output columns line up regardless of the output kind.
 - Tooltip width is stable across pin states. Pinned vs unpinned switches the footer text + close-button visibility, NEVER the bounding box.
 - ext-ref host is NOT a navigation link. Clicking pins the tooltip; the destination URL lives as a clickable domain anchor inside the citation card. One affordance per element.

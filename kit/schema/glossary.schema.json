@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/glossary.schema.json",
+  "$id": "https://raw.githubusercontent.com/mmdemirbas/oku/main/kit/schema/glossary.schema.json",
   "title": "oku glossary registry",
   "description": "One domain-scoped glossary registry. Lives under kit/glossary/<domain>.json (or a project's kit.json override). Loaded at runtime by chrome.js and consulted whenever a <glossary-term> inline is rendered.",
   "type": "object",

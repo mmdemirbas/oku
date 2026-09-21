@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/project-kit.schema.json",
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/oku/main/kit/schema/project-kit.schema.json",
   "domains": ["data-platforms", "web", "ai-llm"],
   "lang": "en",
   "lang_fallback": ["en"]

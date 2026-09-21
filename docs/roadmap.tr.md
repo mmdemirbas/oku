@@ -147,14 +147,14 @@ Bu döngüde yayımlanan öne çıkanlar. İşleme başına tam geçmiş git log
 - Mermaid kırpılma önlemi: `.okd-render` artık overflow:hidden, en-boy uyumu uzun dikey şemaları 70vh ile sınırlıyor, tüm SVG metinlerinde yazı boyutu 13px'e sabitlendi.
 - Compare-grid kartları isteğe bağlı `href` kazandı — kartın tamamı tıklanabilir. Aileye göre seçim bunu kullanıyor.
 - Tablolarda çok satırlı hücre içeriği için sütun başına `wrap: true`.
-- Yüzeydeki bütün html-doc göndermeleri kaldırıldı (eski ad yalnızca GitHub URL'sinde kaldı).
+- Yüzeydeki bütün html-doc göndermeleri kaldırıldı; GitHub deposu ve yerel kopya da artık `oku`.
 
 ## Kilitlenmiş kararlar {#decisions}
 
 Her biri bir zamanlar açık bir soruydu; gelecekteki katkıcılar yeniden tartışmasın diye burada toplandı.
 
 - Proje adı = oku (Türkçe buyrum kipi). Her katman `oku` okur: paket (src/oku/), kit CSS önekleri (okt- / okc- / okd-), JS küresel değişkenleri (__oku*), olay adları (oku:*), veri öznitelikleri (data-oku-*) ve custom element etiket adları.
-- GitHub uzak adresi github.com/mmdemirbas/html-doc olarak kalıyor — şema $id'si, git-clone örneği ve jsdelivr CDN adresi hep oraya bakıyor. Yerel depo dizininin adı uzak adresi izliyor.
+- GitHub deposu github.com/mmdemirbas/oku adını aldı; şema `$id`si, git-clone örneği ve CDN adresi onu izliyor.
 - Örnek çifti içindeki kod / çıktı sütunları kutunun üst kenarında hizalanmak ZORUNDA. Kod olmayan çıktılar için 24px'lik boşluk yok — kod ve çıktı sütunlarının görünen üst kenarları, çıktının türü ne olursa olsun aynı hizada durur.
 - Bilgi balonunun genişliği sabitleme durumları arasında değişmez. Sabitli ile sabitsiz arasındaki fark alt yazı metni ve kapatma düğmesinin görünürlüğüdür, ASLA sınır kutusu değil.
 - ext-ref sunucu adı bir gezinme bağlantısı DEĞİLDİR. Tıklamak bilgi balonunu sabitler; hedef adres, kaynak kartının içinde tıklanabilir bir alan adı bağlantısı olarak durur. Öğe başına tek işlev.

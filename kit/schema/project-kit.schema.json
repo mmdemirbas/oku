@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/project-kit.schema.json",
+  "$id": "https://raw.githubusercontent.com/mmdemirbas/oku/main/kit/schema/project-kit.schema.json",
   "title": "oku project kit.json",
   "description": "Per-project configuration for the oku kit. Lives at docs/kit.json (or wherever the project's docs root is). Declares which glossary / ext-ref domains are active, in what priority order, the preferred reading language, the language fallback chain, project-local glossary / extref overrides, and optional reader personalization keys.",
   "type": "object",

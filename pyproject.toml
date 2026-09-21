@@ -42,7 +42,7 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/mmdemirbas/html-doc"
+Homepage = "https://github.com/mmdemirbas/oku"
 
 # `uv tool install .` (or `pip install .`) installs this as a console
 # script — `oku` becomes available on PATH globally.

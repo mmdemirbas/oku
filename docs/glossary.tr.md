@@ -53,7 +53,7 @@ Her kayıt, dil → { def, link } eşlemesidir. def alanı satır içi HTML'i (s
 ```json
 // _oku/glossary/data-platforms.json
 {
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/glossary.schema.json",
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/oku/main/kit/schema/glossary.schema.json",
   "domain": "data-platforms",
   "version": 1,
   "entries": {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/page.schema.json",
+  "$id": "https://raw.githubusercontent.com/mmdemirbas/oku/main/kit/schema/page.schema.json",
   "title": "oku page v2",
   "description": "Compact authoring shape. A page is { k:'page', t, m?, b }. The b array carries markdown strings interleaved with typed primitive objects. Sections are implicit from heading levels inside markdown.",
   "type": "object",

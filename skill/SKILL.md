@@ -10,8 +10,7 @@ description: >
   file — charts, tables, diagrams, comparison grids and step flows are
   typed fences — and the kit renders all the chrome, so there is no CSS
   to write.
-  Companion repo: https://github.com/mmdemirbas/html-doc (remote URL
-  still on the legacy name).
+  Companion repo: https://github.com/mmdemirbas/oku.
 ---
 
 # oku Skill
@@ -62,9 +61,8 @@ After ANY edit to a `docs/*.md` page source (or any kit schema), run:
 oku check
 ```
 
-— from the repo root (the local directory is `html-doc/` because the
-GitHub remote is still on that URL; the project, CLI and skill all read
-`oku`). `oku check` validates every page against
+— from the repo root (`~/dev/mmdemirbas/oku`). `oku check` validates
+every page against
 `kit/schema/page.schema.json` and runs the structural / content lint.
 Exit code is the only signal that matters; parse the output for the
 offending file + path when non-zero.
@@ -152,12 +150,12 @@ measurement error until a minimal reproduction says otherwise.
 
 ### Reporting an oku defect
 
-Confirmed defects go to `~/dev/mmdemirbas/html-doc/BUGS.md`, newest
+Confirmed defects go to `~/dev/mmdemirbas/oku/BUGS.md`, newest
 first, in the schema its header states: symptom, minimal reproduction,
 expected vs actual, where the failure was localised, and - kept separate
 - what was *observed* versus what was *inferred from reading source*.
 
-Build the minimal reproduction inside `html-doc` first and confirm the
+Build the minimal reproduction inside `oku` first and confirm the
 failure there. A defect that only appears in a large page is not
 localised yet, and an entry written from a large page usually describes
 the wrong thing. If the reproduction renders correctly, there is no

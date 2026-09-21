@@ -53,7 +53,7 @@ Each entry is a dict of language → { def, link }. def supports inline HTML (st
 ```json
 // _oku/glossary/data-platforms.json
 {
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/glossary.schema.json",
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/oku/main/kit/schema/glossary.schema.json",
   "domain": "data-platforms",
   "version": 1,
   "entries": {

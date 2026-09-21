@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/mmdemirbas/html-doc/main/kit/schema/extrefs.schema.json",
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/oku/main/kit/schema/extrefs.schema.json",
   "domain": "data-platforms",
   "version": 1,
   "entries": {

@@ -11,7 +11,7 @@ accent: teal
 ---
 
 > [!TLDR]
-> This page is rendered entirely from JSON by html-doc's runtime renderer. Glossary tooltips resolve against per-domain registries; the chrome buttons stay anchored during pinch-zoom; visual richness comes from kit primitives, not authored HTML.
+> This page is rendered entirely from JSON by oku's runtime renderer. Glossary tooltips resolve against per-domain registries; the chrome buttons stay anchored during pinch-zoom; visual richness comes from kit primitives, not authored HTML.
 >
 > - Authoring source = JSON. The file you'd hand to an AI to read, modify, or extend.
 > - Renderer = chrome.js + renderer.js running in the browser. No build step for content.

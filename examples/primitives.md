@@ -58,7 +58,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    A[*.json pages] --> B(html-doc build)
+    A[*.json pages] --> B(oku build)
     K[kit.json] --> B
     B --> M[site-manifest.json]
     B --> L[llms.txt]
@@ -68,7 +68,7 @@ flowchart LR
     L -.-> P[AI consumers]
 ```
 
-*Build outputs from html-doc build.*
+*Build outputs from oku build.*
 
 ## Live snippet — editable HTML/CSS/JS {#live-snippet}
 

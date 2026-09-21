@@ -28,7 +28,7 @@ with search, and a single-file copy of every page that opens from
 ## Quick start
 
 ```bash
-git clone git@github.com:mmdemirbas/html-doc.git && cd html-doc
+git clone git@github.com:mmdemirbas/oku.git && cd oku
 ./ctl deploy                     # `oku` on PATH; verifies the installed kit build
 
 mkdir docs && cd docs

@@ -11,11 +11,9 @@ names (oku:*), the data-attrs (data-oku-*), and the custom-element
 tag names (oku-chart, oku-snippet, oku-diagram, oku-annotated-code,
 oku-cite).
 
-The only remaining mention of the legacy name "html-doc" is the
-GitHub remote URL itself (`github.com/mmdemirbas/html-doc`) — used
-by the schema `$id`, the `git clone` example, and the jsdelivr CDN
-URL. Rename the GitHub repo and flip those when convenient; this
-file is the catalog of the one exception.
+The repository was once called `html-doc`; the GitHub repo, the
+local clone and every URL now say `oku`. Nothing should mention the
+old name except this sentence.
 
 ## What this repo is
 
