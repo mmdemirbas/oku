@@ -1,0 +1,56 @@
+name: pages
+
+# Builds docs/ with the kit itself and publishes docs/dist/site to GitHub
+# Pages at https://mmdemirbas.github.io/oku/. Independent of ci.yml on
+# purpose: a red browser test must not take the published docs down.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies (with the search extra, so Pagefind indexes the site)
+        run: uv sync --extra search
+
+      - name: Build the docs tree from inside docs/
+        # From the repo root the build writes ./dist and walks the whole
+        # tree; the site lives in docs/dist/site only when built from docs/.
+        working-directory: docs
+        run: uv run oku build
+
+      - name: Keep every _oku/ asset (Pages skips underscore paths only under Jekyll; this makes it explicit)
+        run: touch docs/dist/site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/dist/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
