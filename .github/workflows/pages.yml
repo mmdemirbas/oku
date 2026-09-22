@@ -58,7 +58,16 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     steps:
+      # The action's first move is to exchange the job's OIDC token, and that
+      # request times out on the runner every so often ("Failed to get ID
+      # Token ... Request timeout"), which fails the deploy while the build is
+      # perfectly good. Nothing is published before the token, so a second
+      # attempt is safe; it runs only when the first one failed.
       - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
