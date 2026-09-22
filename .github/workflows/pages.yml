@@ -1,8 +1,11 @@
 name: pages
 
-# Builds docs/ with the kit itself and publishes docs/dist/site to GitHub
-# Pages at https://mmdemirbas.github.io/oku/. Independent of ci.yml on
-# purpose: a red browser test must not take the published docs down.
+# Publishes two things to https://mmdemirbas.github.io/oku/: the landing page
+# in site/ at the root (plain static HTML, generated from a spec by
+# atolye/bin/web/landing/build.py and committed, plus one redirect stub per
+# documentation page at its old root address), and the documentation built by
+# the kit itself under docs/. Independent of ci.yml on purpose: a red browser
+# test must not take the published docs down.
 
 on:
   push:
@@ -36,14 +39,19 @@ jobs:
         working-directory: docs
         run: uv run oku build
 
-      - name: Keep every _oku/ asset (Pages skips underscore paths only under Jekyll; this makes it explicit)
-        run: touch docs/dist/site/.nojekyll
+      - name: Assemble the site — landing at the root, documentation under docs/
+        run: |
+          mkdir -p out/docs
+          cp -R site/. out/
+          cp -R docs/dist/site/. out/docs/
+          # Keep every _oku/ asset (Pages skips underscore paths only under Jekyll; this makes it explicit)
+          touch out/.nojekyll
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/dist/site
+          path: out
 
   deploy:
     needs: build

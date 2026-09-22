@@ -105,8 +105,10 @@ reasoning behind each is in [PRESENTATION-RULES.md](PRESENTATION-RULES.md).
 
 ## Docs
 
-The kit documents itself with itself: [`docs/`](docs/) is an oku tree.
-Start with the [reference](docs/reference.md), then
+The kit documents itself with itself: [`docs/`](docs/) is an oku tree,
+published at [mmdemirbas.github.io/oku/docs/](https://mmdemirbas.github.io/oku/docs/)
+behind the [landing page](https://mmdemirbas.github.io/oku/) (`site/`, plain
+static HTML). Start with the [reference](docs/reference.md), then
 [charts](docs/charts.md), [tables](docs/tables.md),
 [diagrams](docs/diagrams.md), the [CLI](docs/cli.md) and the
 [architecture](docs/architecture.md).

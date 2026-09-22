@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>oku — Markdown in, self-contained visual HTML out</title>
+<meta name="description" content="Charts, tables, diagrams and step flows as typed fences in ordinary Markdown. The browser renders them with Custom Elements; one command builds a multi-page site with search, and a single-file copy of every page that opens from file://.">
+<meta property="og:title" content="oku — Markdown in, self-contained visual HTML out">
+<meta property="og:description" content="Charts, tables, diagrams and step flows as typed fences in ordinary Markdown. The browser renders them with Custom Elements; one command builds a multi-page site with search, and a single-file copy of every page that opens from file://.">
+<meta property="og:image" content="https://mmdemirbas.github.io/oku/assets/readme-light.png">
+<link rel="canonical" href="https://mmdemirbas.github.io/oku/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&display=swap">
+<link rel="stylesheet" href="style.css">
+<style>
+:root { --accent: #4f46e5; --accent-2: #a5b4fc; --accent-on: #ffffff; --accent-ink-on-paper: #3730a3; }
+@media (prefers-color-scheme: dark) { :root { --accent-ink-on-paper: #a5b4fc; } }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="#"><span class="mark" aria-hidden="true"></span>oku</a>
+  <nav><a href="#features" class="">Features</a><a href="#how" class="">How</a><a href="docs/" class="">Docs</a><a href="#install" class="hide-sm">Install</a><a class="gh" href="https://github.com/mmdemirbas/oku" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a></nav>
+</div></header>
+
+<main>
+<section class="hero"><div class="wrap">
+  <p class="eyebrow">Python CLI · Custom Elements · one HTML file per page · MIT</p>
+  <h1>Markdown in. One visual HTML file out.</h1>
+  <p class="lead">Charts, tables, diagrams and step flows are typed fences in an ordinary Markdown file. The browser renders them with Custom Elements; one command builds a multi-page site with search — and a single-file copy of every page that opens from <code>file://</code>, follows the OS theme and loads nothing from a CDN.</p>
+  <div class="cta"><a class="btn btn-solid" href="docs/">Read the documentation</a><a class="btn btn-quiet" href="https://github.com/mmdemirbas/oku" rel=noopener><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>Source on GitHub</a></div>
+  <div class="stats"><div><b>14</b><span>block kinds, from chart to annotated code</span></div><div><b>53</b><span>chart types behind one primitive</span></div><div><b>1</b><span>file per page — theme, fonts, Mermaid and Prism inside</span></div></div>
+  <div class="visual"><figure class="hero-fig frame window"><div class="bar"><i></i><i></i><i></i></div><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme-dark.png"><img src="assets/readme-light.png" alt="The charts reference rendered by oku: the Contents drawer pinned on the left with the site tree and the on-page TOC, a grid of pie, donut, waffle, treemap and polar-area previews in the reading column, and the display menu open at the top right with text size, column width, theme and language" loading="eager" width="2880" height="1800"></picture></figure></div>
+</div></section>
+
+<section id="why"><div class="wrap">
+  <p class="pitch">Documentation tooling usually makes you choose: a static-site generator that needs a build and a server before anyone can read a chart, or a document that travels as a file and cannot show one. oku keeps the source an ordinary Markdown file — GitHub, Obsidian and VS Code still render the prose, the tables and the Mermaid, and an <code>oku-*</code> fence shows there as readable JSON — and makes the rendered page self-contained, so the reader gets one file that opens from a mail attachment and looks the same next year.</p>
+  <div class="features" style="margin-top: clamp(1.5rem, 4vw, 2.5rem)"><div class="feature"><div class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 10 5-10 5L2 7l10-5z"/><path d="m2 12 10 5 10-5"/><path d="m2 17 10 5 10-5"/></svg></div><h3>Typed fences, one JSON object each</h3><p><code>chart</code>, <code>table</code>, <code>diagram</code>, <code>step-flow</code>, <code>compare-grid</code>, <code>kpi-grid</code>, <code>timeline</code>, <code>annotated-code</code>, <code>live-snippet</code>, <code>example</code>, <code>insight</code>, <code>info-tip</code>, <code>copy</code>, <code>chart-grid</code>. Every payload shape is printed by <code>oku spec</code>, read from the code.</p></div><div class="feature"><div class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8L19 17z"/></svg></div><h3>53 chart types, grouped by intent</h3><p>Cartesian, categorical, part-to-whole, distribution, trend, flow, network, multivariate, goal, geographic. One primitive, a shared tooltip with click-to-pin, labels fitted after the font lands, colours from tokens so light and dark both hold.</p></div><div class="feature"><div class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 2v6h6"/></svg></div><h3>The reader gets one file</h3><p><code>dist/standalone/</code> holds a self-contained HTML per page: theme, fonts, Mermaid and Prism are inside, nothing loads from a CDN. It opens from <code>file://</code>, from a mail attachment, from a USB stick.</p></div><div class="feature"><div class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><h3>A site, with search and a reading rail</h3><p><code>dist/site/</code> is the multi-page build: one drawer for the site tree and the on-page TOC, full-text search (Pagefind), a landmark minimap, one menu for text size, column width, theme and language — and an <code>llms.txt</code> for the readers that are models.</p></div><div class="feature"><div class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></div><h3>Checks that catch what a reviewer would</h3><p><code>oku check</code> runs schema, structure and presentation rules — every block in a section ends at the same right edge, nothing waits for a click, colour comes from tokens — and the build refuses a page that fails them. Each rule is a browser test.</p></div><div class="feature"><div class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z"/></svg></div><h3>Translations side by side</h3><p><code>page.md</code> and <code>page.tr.md</code> live next to each other; the manifest pairs them and the language switch appears only where there is somewhere to go. Tables sort, filter and copy as TSV or Markdown in every locale.</p></div></div>
+</div></section>
+
+<section id="how"><div class="wrap">
+  <div class="section-head"><h2>From a fence to a page</h2><p>A table is fifteen lines of JSON in a <code>```oku-table</code> fence. The same file reads as plain Markdown on GitHub; built, it is the table on the right — sortable, filterable, with the author's own status words mapped to colour.</p></div>
+  <div class="how wide"><div><figure class="fig frame window"><div class="bar"><i></i><i></i><i></i></div><img src="assets/landing-table.png" alt="The tables reference: on the left the JSON of a table fence with headers, a status map and four rows; on the right the rendered table with sortable columns and done, in-progress and queued as coloured chips" loading="lazy" width="2160" height="1350"></figure></div><ol class="steps"><li><div><b>Write the fence</b><p>Front-matter, a GFM body, and one compact JSON object per <code>oku-*</code> fence. <code>[term](#g/id)</code> is a glossary tooltip, <code>[label](#f/path)</code> a file chip with a preview.</p></div></li><li><div><b>oku check</b><p>Schema, structure and presentation lint; <code>--strict</code> fails on warnings, <code>--fix</code> applies the mechanical rewrites. What passes here renders finished.</p></div></li><li><div><b>oku build</b><p><code>dist/standalone/</code> — one self-contained HTML per page; <code>dist/site/</code> — the multi-page site with its search index and <code>llms.txt</code>. <code>oku serve</code> is the same with live reload.</p></div></li><li><div><b>Ship either</b><p>Attach the single file, or publish the site folder anywhere static — this documentation is <code>docs/</code> of the repository, built by the kit itself on every push.</p></div></li></ol></div>
+  
+</div></section>
+<section id="install"><div class="wrap">
+  <div class="section-head"><h2>Install</h2><p>Python 3.12 and <a href="https://docs.astral.sh/uv/">uv</a>. The repository is the package; <code>./ctl deploy</code> puts <code>oku</code> on the PATH and verifies the installed kit build.</p></div>
+  <div class="install two"><div><h3>Install</h3><pre class="code"><code>git clone git@github.com:mmdemirbas/oku.git &amp;&amp; cd oku
+./ctl deploy      <span class="c"># `oku` on PATH</span></code></pre><p class=note>Or run it in place: <code>uv run bin/oku serve</code> from the repository root.</p></div><div><h3>A docs tree</h3><pre class="code"><code>mkdir docs &amp;&amp; cd docs
+oku init          <span class="c"># this directory becomes the docs root</span>
+oku serve         <span class="c"># http://localhost:9876, live reload</span>
+oku build         <span class="c"># dist/standalone/ + dist/site/</span></code></pre><p class=note>Pages written as JSON before the Markdown format existed keep rendering; <code>oku migrate</code> converts them.</p></div></div>
+</div></section>
+<section id="gallery"><div class="wrap">
+  <div class="section-head"><h2>What it looks like</h2><p>The kit documents itself with itself: every screen below is a page of the documentation, rendered by oku.</p></div>
+  <div class="gallery"><figure class="fig frame window"><div class="bar"><i></i><i></i><i></i></div><img src="assets/landing-diagrams-dark.png" alt="The diagrams reference in the dark theme: a Mermaid flowchart fence on the left and the rendered build pipeline on the right" loading="lazy" width="2160" height="1350"><figcaption>Dark follows the OS; Mermaid re-renders on a theme toggle so its colours track the page.</figcaption></figure><figure class="fig frame window"><div class="bar"><i></i><i></i><i></i></div><img src="assets/landing-search.png" alt="Full-text search open over the reference page, thirteen results for “chart” across English and Turkish pages, matches highlighted" loading="lazy" width="2160" height="1350"><figcaption>Search across every page and language, indexed at build time, no service behind it.</figcaption></figure><figure class="fig frame window"><div class="bar"><i></i><i></i><i></i></div><img src="assets/landing-charts-mobile.png" alt="The charts reference on a phone: the page header, the reading column at full width, the drawer and search as buttons" loading="lazy" width="780" height="1688"><figcaption>The same page on a phone: one column, the drawer behind a button, every chart at the width it has.</figcaption></figure></div>
+</div></section><section id="cli"><div class="wrap">
+  <div class="section-head"><h2>Command line</h2><p>One executable, eight verbs. Without installing, <code>uv run bin/oku</code> from the repository does the same.</p></div>
+  <pre class="code"><code>oku init             <span class="c"># _oku symlink + index.html stub in the current directory</span>
+oku check            <span class="c"># schema + structural + presentation lint</span>
+oku check --strict   <span class="c"># exit 1 on warnings too;  --fix applies the mechanical rewrites</span>
+oku build            <span class="c"># dist/standalone/ + dist/site/ + search index</span>
+oku serve            <span class="c"># local HTTP with live reload</span>
+oku spec [kind]      <span class="c"># print a fence&#x27;s payload shape, read from the code</span>
+oku migrate [path]   <span class="c"># convert page-JSON (v1/v2) sources to .md</span>
+oku clean            <span class="c"># remove dist/</span></code></pre>
+</div></section><section id="rules"><div class="wrap">
+  <div class="section-head"><h2>Rules the kit enforces</h2></div>
+  <p>Every block in a section ends at the same right edge. The default renders finished; nothing waits for a click. Opening the drawer moves nothing on the page. A label is fitted to the space it has, measured after the font lands. Colour comes from tokens, so a hand-styled Mermaid node or SVG is a lint warning. Each rule is a browser test; the reasoning behind each is in <a href="https://github.com/mmdemirbas/oku/blob/main/PRESENTATION-RULES.md">PRESENTATION-RULES.md</a>.</p>
+</div></section>
+
+<section id="more"><div class="wrap">
+  <div class="section-head"><h2>Go deeper</h2></div>
+  <div class="links"><a class="link-card" href="docs/"><b>Documentation</b><span>The reference, then charts, tables and diagrams — an oku tree, built by the kit on every push.</span><small>This site</small></a><a class="link-card" href="https://github.com/mmdemirbas/oku#readme" rel=noopener><b>README</b><span>Why, a page, what is in the box, the CLI, tests.</span><small>GitHub</small></a><a class="link-card" href="https://github.com/mmdemirbas/oku/blob/main/PRESENTATION-RULES.md" rel=noopener><b>Presentation rules</b><span>The rules the checks enforce and the reasoning behind each, one browser test per rule.</span><small>Design</small></a></div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>oku</span>
+  <span class="spacer"></span>
+  <a href="https://github.com/mmdemirbas/oku" rel="noopener">GitHub</a>
+  <a href="https://mdemirbas.com/en/projects/oku/" rel="noopener">Muhammed Demirbaş</a>
+  <a href="https://mdemirbas.com/" rel="noopener">Other projects</a>
+</div></footer>
+</body>
+</html>
