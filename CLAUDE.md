@@ -244,6 +244,33 @@ Touch pointers are
 ignored — there is no hover to respond to, and a swell on tap moves the
 target out from under the finger.
 
+**A code block shows the characters that are in the code.** JetBrains
+Mono ligates `!=` into `≠`, `->` into `→`, `>=` into `≥`, `===` into a
+triple bar. The kit switched that ON deliberately, with a comment
+saying ligatures "make code read closer to how it reasons" — true in an
+editor, where the author knows what they typed, and wrong in a document
+about code, which a reader retypes from what they see. `≠` is not an
+operator in any language the kit highlights, and the copy button hands
+over the real text, so the page showed one thing and the clipboard held
+another; a paragraph explaining the difference between `!=` and `!==`
+drew both as one glyph. Measured on two delivered documents: a Kotlin
+guide drawing 118 `->`, 14 `!=`, 12 `?:`, 6 `>=` and 3 `===`, and an
+Iceberg guide drawing 36 `->` and 3 `=>`.
+
+`font-variant-ligatures: none` AND `font-feature-settings: 'zero'`,
+because they are two switches over one feature: a bare feature-settings
+list leaves `calt` at its default on, and `font-variant-ligatures` alone
+loses to an explicit `'calt'`. `zero` stays — a slashed zero
+distinguishes 0 from O without changing which character is on the page.
+
+Held at the PIXEL level by `browser/test_code_shows_the_characters.py`,
+because every cheaper assertion is blind to it: the face is monospaced
+and its ligatures keep the advance, so the box never changed width, and
+`textContent` was always right. The first case in that file forces the
+ligatures back on and requires the two drawings to differ — without it
+the whole file would pass on a machine that never loaded the face,
+asserting nothing.
+
 **A page says which language it is written in, and the browser is
 told.** `renderer.js` has always carried
 `document.documentElement.lang = meta.lang`, and that line had never

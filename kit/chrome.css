@@ -289,11 +289,29 @@ body {
 code, pre, .mono {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
-  /* JetBrains Mono ligatures (->, =>, !=, ===, etc.) make code read
-     closer to how it reasons. zero gives a slashed/dotted 0 so it's
-     distinct from O at small sizes. */
-  font-feature-settings: 'calt', 'zero';
-  font-variant-ligatures: contextual;
+  /* NO ligatures. JetBrains Mono draws `!=` as `≠`, `->` as `→`,
+     `>=` as `≥`, `===` as a triple bar — and this kit's whole job is
+     documentation ABOUT code, which a reader retypes from what they
+     see. `≠` is not an operator in any language the kit highlights.
+     Measured on two delivered documents: a Kotlin guide showing 118
+     `->`, 14 `!=`, 12 `?:` and 6 `>=`, and an Iceberg guide showing 36
+     `->` and 3 `=>`, none of those characters being what the source
+     says. The copy button hands over the real text, so the page showed
+     one thing and the clipboard held another; a paragraph explaining
+     the difference between `!=` and `!==` drew both as one glyph.
+     This was on deliberately, with a comment saying ligatures "make
+     code read closer to how it reasons" — true in an editor, where the
+     author knows what they typed, and wrong in a document.
+
+     `zero` stays: a slashed zero distinguishes 0 from O without
+     changing which character is on the page. Both properties are set
+     because they are two switches over the same feature — a bare
+     `font-feature-settings: 'zero'` leaves `calt` at its default on,
+     and `font-variant-ligatures: none` alone is overridden by an
+     explicit `'calt'` in feature-settings. Held by
+     browser/test_code_shows_the_characters.py. */
+  font-feature-settings: 'zero';
+  font-variant-ligatures: none;
 }
 /* Tabular numerics across all table cells so numbers align column-wise
    without depending on the cell padding. */
