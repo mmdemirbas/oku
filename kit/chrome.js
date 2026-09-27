@@ -13970,10 +13970,21 @@ var __prismLoader = (function () {
   // where languages_path is set.
   var servedLocally = false;
 
-  function ensureVendored(rel, cdnUrl) {
+  /* `marksSource` says whether this file's outcome is the answer to
+     "where did Prism come from". Only the core and the autoloader are:
+     they decide what `languages_path` points at. Every later fetch used
+     to write the flag too, so ONE optional preload failing flipped it to
+     false long after the base was set — and the refusal below, which
+     reads it, quietly stopped applying. Measured on a cold vendor
+     directory: two preloads 404, and whether a third fence's grammar was
+     refused depended on which promise settled first. */
+  function ensureVendored(rel, cdnUrl, marksSource) {
     return ensureScript(__okuVendorPath() + rel).then(
-      function () { servedLocally = true; },
-      function () { servedLocally = false; return ensureScript(cdnUrl); }
+      function () { if (marksSource) servedLocally = true; },
+      function () {
+        if (marksSource) servedLocally = false;
+        return ensureScript(cdnUrl);
+      }
     );
   }
 
@@ -13984,11 +13995,12 @@ var __prismLoader = (function () {
     window.Prism = window.Prism || {};
     window.Prism.manual = true;
 
-    loadPromise = ensureVendored('prism/prism.min.js', CDN + 'prism.min.js')
+    loadPromise = ensureVendored('prism/prism.min.js', CDN + 'prism.min.js', true)
       .then(function () {
         return ensureVendored(
           'prism/plugins/autoloader/prism-autoloader.min.js',
-          CDN + 'plugins/autoloader/prism-autoloader.min.js'
+          CDN + 'plugins/autoloader/prism-autoloader.min.js',
+          true
         );
       })
       .then(function () {
@@ -14082,16 +14094,24 @@ var __prismLoader = (function () {
           }
         }
         // Eagerly preload the languages most commonly nested inside
-        // other languages — JavaScript inside <script>, CSS inside
-        // <style>, bash inside Markdown fences, JSON inside fences.
-        // Prism's markup grammar inlines <script> / <style> contents
-        // as `language-javascript` / `language-css` ONLY when the
-        // embedded grammar is already loaded at first-highlight time.
-        // Without this preload the script body shows as raw text
-        // until the autoloader's second pass — which we can't safely
-        // re-trigger because our line-wrap mutation invalidates the
-        // anchor. Cheap: ~5 small CDN fetches once per page.
-        return Promise.all(['javascript', 'css', 'bash', 'json', 'yaml'].map(function (lang) {
+        // other languages — bash inside Markdown fences, JSON and YAML
+        // inside fences. Prism's markup grammar inlines a <script> /
+        // <style> body ONLY when the embedded grammar is already loaded
+        // at first-highlight time. Without this preload the body shows
+        // as raw text until the autoloader's second pass — which we
+        // can't safely re-trigger because our line-wrap mutation
+        // invalidates the anchor.
+        //
+        // javascript and css were on this list and are NOT here now:
+        // both are compiled into prism.min.js, so their grammars are
+        // registered before this runs and there is no component file to
+        // fetch. Asking for one was two 404s per page on any vendor
+        // directory built from the component list as resolved — visible
+        // only after that list stopped fetching what the core already
+        // had, and silent before it because the request happened to
+        // succeed. Nested <script> / <style> highlighting is held by
+        // browser/test_nested_code_highlighting.py.
+        return Promise.all(['bash', 'json', 'yaml'].map(function (lang) {
           return ensureVendored(
             'prism/components/prism-' + lang + '.min.js',
             CDN + 'components/prism-' + lang + '.min.js'
