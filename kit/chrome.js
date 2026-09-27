@@ -474,6 +474,14 @@ var __okuI18n = (function () {
   function lang() {
     var attr = document.documentElement.getAttribute('data-lang');
     if (attr) return attr;
+    /* The build stamps the page's own language on <html>, which is the
+       only source that answers for a MONOLINGUAL document: a Turkish
+       page in a project with one language has no `.tr` in its name and
+       no manifest variant to read. Skipped when it is the language the
+       table keys are already written in, since an `en` table could only
+       be an identity map. */
+    var html = (document.documentElement.lang || '').toLowerCase().split('-')[0];
+    if (html && html !== KIT_SOURCE_LANG) return html;
     var m = (window.location.pathname.split('/').pop() || '').match(/\.([a-z]{2})\.html$/i);
     return m ? m[1].toLowerCase() : '';
   }
@@ -5591,7 +5599,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-27-r84';
+var __okuKitBuild = '2026-09-27-r85';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

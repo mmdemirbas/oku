@@ -244,6 +244,42 @@ Touch pointers are
 ignored — there is no hover to respond to, and a swell on tap moves the
 target out from under the finger.
 
+**A page says which language it is written in, and the browser is
+told.** `renderer.js` has always carried
+`document.documentElement.lang = meta.lang`, and that line had never
+run: nothing set `m.lang`. Every page this kit has built, including this
+repo's own Turkish documentation, shipped as `<html lang="en">`. What
+the browser decides from that attribute is invisible to a test that only
+reads text — which hyphenation dictionary breaks a word at the end of a
+justified line, how `text-transform: uppercase` maps a letter (Turkish
+`i` is `İ` under `tr` and `I` under anything else), which voice a screen
+reader uses, which `:lang()` rules apply. Measured on a delivered 134 KB
+Turkish document: English hyphenation breaking Turkish words
+mid-syllable, `~61 min read` over Turkish prose, `Last updated`,
+`Filter…`.
+
+`_page_language` reads front-matter `lang:` first and the filename
+second. The filename answers for a TRANSLATION and only where `kit.json`
+declares the codes, so a project with ONE language and no `kit.json` had
+no way to say which language that was — the common case for a single
+delivered document. The value lands in `m.lang` (derived when the author
+does not write it, so `en` is stated rather than assumed) and both build
+trees stamp it on `<html>` through `_with_html_lang`. At build time, not
+only at runtime: the first layout is the one that hyphenates, and a
+language arriving after it re-breaks every paragraph on the page.
+
+Three consequences are decisions. **The schema refuses a value that is
+not a language tag** — `lang: Turkish` is an error rather than a silent
+revert to English, which is the same rule `kit.json` validation exists
+for, and it costs no new code because the schema pattern reports it as
+`schema`. **`lang()` in chrome.js reads `<html lang>`** after `data-lang`
+and before the filename, because a monolingual page has neither of the
+other two. And **the inlined string table is chosen from the page**, not
+from the filename: that call asked the filename, so the table was never
+inlined for such a page and its chrome stayed English while its reading
+estimate came out in Turkish. Held by `browser/test_page_language.py`,
+both trees.
+
 **A translation is the same page, not another page.** Authoring is
 `<page>.md` + `<page>.<lang>.md` side by side — no new syntax, each file
 a complete markdown document that still renders on GitHub. `kit.json`

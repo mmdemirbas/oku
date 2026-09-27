@@ -3436,11 +3436,20 @@ details.info-tip summary {
   font-size: 14px;
 }
 details.info-tip summary::-webkit-details-marker { display: none; }
+/* The gap is a margin, not the space inside the content string: an
+   inline-block trims a trailing space at its own edge, so `'▸ '` drew
+   the marker hard against the first letter. The width is fixed so the
+   rotated state does not shift the label sideways, and the rotation
+   turns about the glyph's own centre rather than the box corner. */
 details.info-tip summary::before {
-  content: '▸ ';
+  content: '▸';
   color: var(--accent);
   transition: transform 0.2s ease;
   display: inline-block;
+  width: 0.9em;
+  margin-right: 0.15em;
+  text-align: center;
+  transform-origin: 50% 50%;
 }
 details.info-tip[open] summary::before { transform: rotate(90deg); }
 details.info-tip[open] summary { margin-bottom: 10px; }

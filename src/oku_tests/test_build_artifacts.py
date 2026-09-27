@@ -628,7 +628,11 @@ class TestPayloadBudget:
     # depends on a column width the reader sets. About 1,900 bytes, of
     # which the mechanism is roughly 500; the rest is the measurement
     # that showed it is most window widths and not a phone case.
-    KIT_BUDGET_BYTES = 1_298_000
+    # Then from 1,298,000 by a page declaring the language it is written
+    # in: the kit reads <html lang> when no filename or manifest can
+    # answer, and the info-tip marker takes its gap from a margin rather
+    # than a space an inline-block trims. Under 1,000 bytes of kit.
+    KIT_BUDGET_BYTES = 1_299_500
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

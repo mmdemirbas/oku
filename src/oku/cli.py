@@ -747,7 +747,7 @@ def iter_page_stubs(root: Path, json_pages: list | None = None):
                 stubs[stub_path] = (existing_html, page)
             continue
         title = page.get("title") or json_path.stem
-        stubs[stub_path] = (_stub_for(title), page)
+        stubs[stub_path] = (_stub_for(title, lang=_lang_of_page(page)), page)
     return sorted(
         [(p, h, d) for p, (h, d) in stubs.items()],
         key=lambda x: str(x[0]).lower(),
@@ -1306,17 +1306,79 @@ _READ_TIME_PHRASE = {
 }
 
 
-def _page_language(source: Path) -> str:
-    """The language a source file is written in, from its name suffix.
+# A language tag, loosely: two or three letters and any number of
+# subtags. Anything else is not a code, and `<html lang="Turkish">` is
+# worse than no declaration — the schema refuses it there so the author
+# is told rather than silently left in English.
+_LANG_CODE_RE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
 
-    Only a code the tree DECLARES counts, so `format-comparison.md` is
-    not read as language `comparison`.
+
+def _page_language(source: Path, meta: dict | None = None) -> str:
+    """The language a page is written in.
+
+    Front-matter first, then the filename. The filename answers for a
+    TRANSLATION — `reference.tr.md` beside `reference.md` — and it can
+    only answer where `kit.json` declares the codes, so a project with
+    one language and no kit.json had no way to say which language that
+    was. Measured on a delivered document: a 134 KB Turkish page built
+    with `<html lang="en">`, an English reading estimate over Turkish
+    prose, English chrome, and English hyphenation patterns breaking
+    Turkish words mid-syllable. `lang:` in front-matter is the sentence
+    the author can write, and it wins over the filename because it is
+    the explicit one.
+
+    Only a code the tree DECLARES counts on the filename path, so
+    `format-comparison.md` is not read as language `comparison`.
     """
+    if meta:
+        declared = meta.get("lang")
+        if isinstance(declared, str) and _LANG_CODE_RE.match(declared.strip()):
+            return declared.strip()
     codes, default = declared_languages(source.parent)
     if not codes:
         return "en"
     _, lang = split_language_suffix(source.stem, codes)
     return lang or default
+
+
+_HTML_OPEN_RE = re.compile(r"<html\b[^>]*>", re.I)
+_HTML_LANG_ATTR_RE = re.compile(r"""\blang\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)""", re.I)
+
+
+def _lang_of_page(page) -> str:
+    """The language a built page dict declares, defaulting to English.
+
+    v1 pages keep their meta under `meta`; both shapes are read here so
+    the three writers of a page's HTML ask one question once.
+    """
+    if not isinstance(page, dict):
+        return "en"
+    meta = page.get("m") if isinstance(page.get("m"), dict) else page.get("meta")
+    lang = (meta or {}).get("lang") if isinstance(meta, dict) else None
+    return lang if isinstance(lang, str) and _LANG_CODE_RE.match(lang) else "en"
+
+
+def _with_html_lang(html: str, lang: str) -> str:
+    """Stamp the page's language on its `<html>` element.
+
+    At BUILD time rather than only at runtime. The renderer already
+    assigns `document.documentElement.lang` from `m.lang` and that line
+    had never run, because nothing set `m.lang`; even once it does, the
+    first layout is the one that hyphenates, and a language arriving
+    after it re-breaks every paragraph on the page. The stub is written
+    once and copied into both trees, so the rewrite happens where each
+    tree writes its page.
+    """
+    if not lang or not _LANG_CODE_RE.match(lang):
+        return html
+
+    def sub(m: re.Match) -> str:
+        tag = m.group(0)
+        if _HTML_LANG_ATTR_RE.search(tag):
+            return _HTML_LANG_ATTR_RE.sub(f'lang="{lang}"', tag, count=1)
+        return tag[:-1].rstrip() + f' lang="{lang}">'
+
+    return _HTML_OPEN_RE.sub(sub, html, count=1)
 
 
 def _read_time_for(page: dict, lang: str = "en") -> str | None:
@@ -1439,8 +1501,17 @@ def _apply_meta_defaults(page: dict, source: Path) -> None:
             meta[key] = value
             derived.append(key)
 
+    # One reading of the language, used for both the words below and the
+    # `lang` the page carries into `<html>`. Recorded in `m` even when it
+    # is the default, because that attribute is what decides hyphenation
+    # and casing, and "en" stated is the same fact as "en" assumed.
+    page_lang = _page_language(source, meta)
+    if not meta.get("lang"):
+        meta["lang"] = page_lang
+        derived.append("lang")
+
     if not meta.get("read_time"):
-        rt = _read_time_for(page, _page_language(source))
+        rt = _read_time_for(page, page_lang)
         if rt:
             meta["read_time"] = rt
             derived.append("read_time")
@@ -1608,7 +1679,7 @@ def find_markdown_pages(root: Path) -> list[tuple[Path, dict]]:
     return sorted(out, key=lambda x: str(x[0]).lower())
 
 
-def _stub_for(title: str, *, inline_manifest: dict | None = None) -> str:
+def _stub_for(title: str, *, inline_manifest: dict | None = None, lang: str = "en") -> str:
     """Minimal HTML stub for a page. Authored on disk by `oku init`
     (for the entry stub), synthesized in-memory by the dev server, and
     written to dist/ by the build.
@@ -1631,7 +1702,7 @@ def _stub_for(title: str, *, inline_manifest: dict | None = None) -> str:
         manifest_block = f"<script>window.__okuManifest={manifest_json};</script>\n"
     return (
         "<!DOCTYPE html>\n"
-        '<html lang="en">\n<head>\n'
+        f'<html lang="{html_escape(lang)}">\n<head>\n'
         '<meta charset="UTF-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
         f"<title>{html_escape(title)}</title>\n"
@@ -5815,7 +5886,7 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
                 "</script", "<\\/script"
             )
             html = _INLINE_MANIFEST_RE.sub(lambda m: f"window.__okuManifest={fresh};</script>", html, count=1)
-        dest_html.write_text(_mark_built(html), encoding="utf-8")
+        dest_html.write_text(_with_html_lang(_mark_built(html), _lang_of_page(page_data)), encoding="utf-8")
 
 
 _BUILT_MARKER = "<script>window.__okuBuilt=1;</script>"
@@ -6616,7 +6687,14 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
         # The kit's own strings for THIS page's language. A page on
         # a file:// origin cannot fetch the table, and its chrome
         # would otherwise be English inside a translated document.
-        page_lang = _page_language(src.with_suffix(".md"))
+        #
+        # From the page rather than from the filename: a monolingual
+        # Turkish document has no `.tr` in its name and no kit.json to
+        # declare one, so the filename answered "en" and the table was
+        # never inlined — the reading estimate came out in Turkish and
+        # the Contents button, the table filter and `Last updated` did
+        # not.
+        page_lang = _lang_of_page(page_data)
         i18n_path = KIT_DIR / "i18n" / f"{page_lang}.json"
         if page_lang and i18n_path.is_file():
             safe_i18n = i18n_path.read_text(encoding="utf-8").replace("</script", "<\\/script")
@@ -6659,7 +6737,7 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
         rel = src.relative_to(src_root)
         dest = out_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(html, encoding="utf-8")
+        dest.write_text(_with_html_lang(html, _lang_of_page(page_data)), encoding="utf-8")
 
 
 def cmd_build(args: argparse.Namespace) -> int:
@@ -7280,8 +7358,8 @@ def _make_serve_handler(root: Path):
             body: bytes | None = None
             content_type: str | None = None
 
-            def _synth_stub(title: str) -> bytes:
-                stub = _stub_for(title)
+            def _synth_stub(title: str, page_lang: str = "en") -> bytes:
+                stub = _stub_for(title, lang=page_lang)
                 # Nested pages need their _oku/ references walked back
                 # up — to the NEAREST ancestor that holds the _oku kit
                 # dir (dev layouts carry the symlink per docs root,
@@ -7307,7 +7385,7 @@ def _make_serve_handler(root: Path):
                     body = json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8")
                     content_type = "application/json; charset=utf-8"
                 else:
-                    body = _synth_stub(_page_title(page) or fs.stem)
+                    body = _synth_stub(_page_title(page) or fs.stem, _lang_of_page(page))
                     content_type = "text/html; charset=utf-8"
             elif url_path.endswith(".html") and json_path.exists():
                 # The .json file IS on disk; only the .html shell is missing.
@@ -7318,7 +7396,7 @@ def _make_serve_handler(root: Path):
                     return False
                 if not _is_page(page):
                     return False
-                body = _synth_stub(_page_title(page) or json_path.stem)
+                body = _synth_stub(_page_title(page) or json_path.stem, _lang_of_page(page))
                 content_type = "text/html; charset=utf-8"
             else:
                 return False

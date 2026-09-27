@@ -69,7 +69,8 @@
         },
         "lang": {
           "type": "string",
-          "description": "BCP-47 code for this page. Usually set by the `.<code>.md` filename instead."
+          "description": "BCP-47 code for this page. Set it when the document is written in one language and its filename does not say so; a `.<code>.md` filename sets it for a translation. It reaches <html lang>, so it decides hyphenation patterns, the casing `text-transform` applies, the voice a screen reader uses, and which string table the kit's own chrome reads.",
+          "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
         },
         "order": {
           "type": "number",
