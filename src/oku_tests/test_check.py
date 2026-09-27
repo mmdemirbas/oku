@@ -1530,3 +1530,107 @@ class TestACodeFenceNamesAGrammarTheKitCarries:
         }
         issues = cli.check_pages([(tmp_path / "typed.json", page)], tmp_path)
         assert len(_issues_of(issues, code="code-lang-missing")) == 1
+
+
+class TestAFenceThatNeverCloses:
+    """A stray ``` run in prose swallows the rest of the page.
+
+    It is legal CommonMark — an unterminated fence runs to the end of the
+    document — and it is almost never what the author meant. Measured
+    while writing this repo's own CLI page: one triple-backtick run
+    inside a sentence took the `## oku migrate` section whole, the page
+    built, `oku check` said nothing, and the only thing that fired was a
+    `translation-anchor-drift` warning on the OTHER language file,
+    because the two stopped agreeing about which ids exist. On a
+    monolingual page, or with the same slip in both languages, nothing
+    would have said anything at all.
+    """
+
+    HEAD = "---\ntitle: Fences\nsummary: A page with a stray fence.\n---\n\n"
+
+    def _check(self, tmp_path: Path, body: str) -> list[dict]:
+        (tmp_path / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+        src = tmp_path / "stray.md"
+        src.write_text(self.HEAD + body, encoding="utf-8")
+        page = cli._page_from_source_file(src)
+        assert page is not None
+        return cli.check_pages([(src.with_suffix(".json"), page)], tmp_path)
+
+    # The shape that did it, kept verbatim: a sentence wrapped so that
+    # the next line BEGINS with the run. Mid-line it is nothing — a
+    # fence opener has to start its line — which is why the slip is easy
+    # to make and hard to see in a paragraph of prose.
+    STRAY = "## One {#one}\n\nA name that is no grammar at all —\n```text, ```console — costs nothing.\n\n## Two {#two}\n\nMore prose.\n"
+
+    def test_an_unclosed_fence_is_an_error(self, tmp_path: Path) -> None:
+        hits = _issues_of(self._check(tmp_path, self.STRAY), code="fence-unclosed")
+        assert len(hits) == 1
+        assert hits[0]["severity"] == "error"
+        assert "line 9" in hits[0]["where"], hits[0]["where"]
+
+    def test_a_run_inside_a_line_is_not_a_fence(self, tmp_path: Path) -> None:
+        """A fence opener starts its own line. Prose naming ```hcl in
+        the middle of a sentence opens nothing, and a rule that fired on
+        it would fire on half this repo's own documentation."""
+        body = "## One {#one}\n\nA sentence naming ```hcl in the middle of it.\n\n## Two {#two}\n\nProse.\n"
+        assert _issues_of(self._check(tmp_path, body), code="fence-unclosed") == []
+
+    def test_the_swallowed_headings_are_the_damage(self, tmp_path: Path) -> None:
+        """What makes it worth an error rather than a warning: the
+        section after the stray run is not mis-styled, it is inside a
+        code block. The heading it carried is not an id on the page any
+        more, so every link to it lands nowhere."""
+        src = tmp_path / "stray.md"
+        src.write_text(self.HEAD + self.STRAY, encoding="utf-8")
+        (tmp_path / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+        page = cli._page_from_source_file(src)
+        ids = [
+            hid
+            for blk in page["b"]
+            if isinstance(blk, str)
+            for _l, hid in cli._lint_md_string(blk, skip_prose=True)[1]
+        ]
+        assert "one" in ids and "two" not in ids
+
+    def test_a_closed_fence_says_nothing(self, tmp_path: Path) -> None:
+        body = '## One {#one}\n\n```hcl\nresource "x" "y" {}\n```\n\n## Two {#two}\n\nProse.\n'
+        assert _issues_of(self._check(tmp_path, body), code="fence-unclosed") == []
+
+    def test_a_backtick_run_inside_a_code_span_is_not_a_fence(self, tmp_path: Path) -> None:
+        """The remedy the message names has to be clean itself: `` ``` ``
+        writes a literal triple-backtick run in prose."""
+        body = "## One {#one}\n\nWrite it as `` ``` `` when you mean the characters.\n\n## Two {#two}\n\nProse.\n"
+        issues = self._check(tmp_path, body)
+        assert _issues_of(issues, code="fence-unclosed") == []
+        assert _issues_of(issues, severity="error") == []
+
+
+class TestAnIslandThatNamesAGrammar:
+    """`<pre><code class="language-hcl">` in an HTML island is highlighted
+    by the same page-level sweep a fence goes through, so it needs the
+    same vendored grammar — and it is the one spelling the fence scanner
+    could not see."""
+
+    HEAD = "---\ntitle: Island\nsummary: An island with code in it.\n---\n\n"
+
+    def _langs(self, body: str, tmp_path: Path) -> list[str]:
+        src = tmp_path / "island.md"
+        src.write_text(self.HEAD + body, encoding="utf-8")
+        page = cli._page_from_source_file(src)
+        assert page is not None
+        return cli.page_code_langs(page)
+
+    def test_the_class_is_read(self, tmp_path: Path) -> None:
+        body = '## S {#s}\n\n<div class="okt-card">\n<pre><code class="language-hcl">x = 1</code></pre>\n</div>\n'
+        assert "hcl" in self._langs(body, tmp_path)
+
+    def test_a_sample_in_a_fence_is_not_read(self, tmp_path: Path) -> None:
+        """A page documenting islands shows that attribute inside a
+        fence. Reporting it would fire on the documentation of the
+        feature — which is how this repo's own reference page is written."""
+        body = '## S {#s}\n\n```html\n<pre><code class="language-nim">x</code></pre>\n```\n'
+        assert self._langs(body, tmp_path) == ["html"]
+
+    def test_a_sample_in_a_code_span_is_not_read(self, tmp_path: Path) -> None:
+        body = '## S {#s}\n\nWrite `<code class="language-nim">` to tag a block.\n'
+        assert self._langs(body, tmp_path) == []

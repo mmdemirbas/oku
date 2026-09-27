@@ -4287,7 +4287,48 @@ function initReadingAids() {
       queued = true;
       requestAnimationFrame(function () { queued = false; syncGhost(); });
     }
+    /* Where a stuck header has to park so nothing of it is covered.
+       The 44px chrome buttons are fixed to the viewport and float over
+       the top of the reading column; a line of prose passing under one
+       is gone in a moment, but a sticky header parked under one is a
+       column label the reader never sees. Measured on this repo's own
+       table page: at 1100px the search button covers the last column,
+       and at 760px and below the Contents button covers the first and
+       the search and menu buttons cover the last.
+
+       Measured rather than answered with a breakpoint, because which
+       buttons overlap depends on the column's width, which the reader
+       sets. The loop runs a few times because dropping below one box
+       can land under another; four passes is more than the one row of
+       chrome this kit draws will ever need. */
+    function chromeFloor() {
+      var box = scroll.getBoundingClientRect();
+      var rail = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--okt-rail-h')) || 0;
+      var floor = rail;
+      var chrome = document.querySelectorAll('.ctrl-btn, .okt-chrome-cluster');
+      for (var pass = 0; pass < 4; pass++) {
+        var moved = false;
+        for (var i = 0; i < chrome.length; i++) {
+          var cs = getComputedStyle(chrome[i]);
+          if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') continue;
+          var r = chrome[i].getBoundingClientRect();
+          // Zero-sized, off to one side, or below where the header
+          // parks — none of those can cover a label.
+          if (r.width <= 0 || r.right <= box.left || r.left >= box.right) continue;
+          if (r.bottom <= floor || r.top > floor + headHeight()) continue;
+          floor = r.bottom + 4;
+          moved = true;
+        }
+        if (!moved) break;
+      }
+      return floor;
+    }
+    function headHeight() {
+      var head = table.tHead;
+      return head ? head.getBoundingClientRect().height : 0;
+    }
     function measureFit() {
+      wrap.style.setProperty('--okt-sticky-top', chromeFloor() + 'px');
       var fits = table.getBoundingClientRect().width <= scroll.getBoundingClientRect().width + 1;
       scroll.dataset.fit = fits ? '1' : '0';
       if (ghost.hidden !== fits) {
@@ -4300,6 +4341,12 @@ function initReadingAids() {
     var ro = new ResizeObserver(measureFit);
     ro.observe(scroll);
     ro.observe(table);
+    // The chrome cluster is assembled while the page renders — search
+    // arrives when its subsystem initialises — so the boxes the floor
+    // is measured against are not all there at wiring time, and adding
+    // one resizes nothing this observer watches.
+    document.addEventListener('oku:rendered', measureFit);
+    window.addEventListener('load', measureFit);
     var mo = null;
     if (typeof MutationObserver === 'function') {
       // Sort arrows, rank badges, dragged column widths, re-rendered rows
@@ -4311,6 +4358,8 @@ function initReadingAids() {
       ro.disconnect();
       if (mo) mo.disconnect();
       document.removeEventListener('scroll', syncStuck, { capture: true });
+      document.removeEventListener('oku:rendered', measureFit);
+      window.removeEventListener('load', measureFit);
     }
     // Each follows the other; assigning a scrollLeft it already has fires
     // no event, so the pair settles rather than ping-pongs.
@@ -5542,7 +5591,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-27-r83';
+var __okuKitBuild = '2026-09-27-r84';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

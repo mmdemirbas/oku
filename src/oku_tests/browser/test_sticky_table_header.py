@@ -122,17 +122,19 @@ def _header_js(sel: str) -> str:
           const box = wrap.querySelector('.okt-table-scroll').getBoundingClientRect();
           const ths = [...wrap.querySelectorAll('.okt-table-scroll thead th')];
           const h = ths[0].getBoundingClientRect().height;
+          // Where the header actually parks. Not a constant: it clears
+          // the rail, and it clears any fixed chrome button standing
+          // over this table's columns — which is most window widths,
+          // not just a phone.
+          const ghost = wrap.querySelector('.okt-table-ghost');
+          const shown = (ghost && ghost.dataset.stuck === '1') ? ghost : ths[0];
+          const top = shown.getBoundingClientRect().top;
           return ths.map((th) => {{
             const r = th.getBoundingClientRect();
             // A column the box clips is not on screen, whatever the viewport says.
             if (r.left < Math.max(0, box.left) || r.right > Math.min(innerWidth, box.right)) return null;
-            const x = r.left + 6, y = {RAIL_H} + h / 2;
-            // The fixed chrome buttons float over the column at phone
-            // width, at the same y a stuck header parks at. That is their
-            // rule — they float over every line that scrolls under them —
-            // so a probe one of them takes says nothing about the header.
+            const x = r.left + 6, y = top + h / 2;
             const el = document.elementFromPoint(x, y);
-            if (el && el.closest('.ctrl-btn, .okt-chrome-cluster')) return null;
             const cell = el && el.closest('th');
             const cr = cell && cell.getBoundingClientRect();
             return {{ label: th.textContent.trim(), left: r.left, top: r.top,
@@ -147,6 +149,35 @@ def _header_at_top(page, sel: str):
     return page.evaluate(_header_js(sel))
 
 
+def _chrome_over_header(page, sel: str):
+    """Fixed chrome buttons whose box intersects the parked header.
+
+    The 44px buttons float over the top of the reading column at every
+    scroll position, which is their rule and is fine for prose — a line
+    passing under one is gone in a moment. A sticky header parked under
+    one is a column label the reader never sees, at any scroll position.
+    Measured before the header learned to clear them: at 1100px the
+    search button covered the last column, and at 760px and below the
+    Contents button covered the first while search and the menu covered
+    the last."""
+    return page.evaluate(
+        f"""() => {{
+          const wrap = {_wrap(sel)};
+          const ghost = wrap.querySelector('.okt-table-ghost');
+          const th = wrap.querySelector('.okt-table-scroll thead th');
+          const shown = (ghost && ghost.dataset.stuck === '1') ? ghost : th;
+          const hdr = shown.getBoundingClientRect();
+          return [...document.querySelectorAll('.ctrl-btn, .okt-chrome-cluster')].filter((b) => {{
+            const cs = getComputedStyle(b);
+            if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') return false;
+            const r = b.getBoundingClientRect();
+            return r.width > 0 && r.right > hdr.left && r.left < hdr.right
+                && r.bottom > hdr.top && r.top < hdr.bottom;
+          }}).map((b) => b.className.trim().split(/\s+/).pop() + '@' + Math.round(b.getBoundingClientRect().left));
+        }}"""
+    )
+
+
 def _assert_header_in_view(page, sel: str, cells) -> None:
     # The first row of data has scrolled away, so a header at the top
     # is one that stayed behind rather than one that has not left yet.
@@ -157,6 +188,9 @@ def _assert_header_in_view(page, sel: str, cells) -> None:
         < 0
     )
     assert cells, "no column of the table is on screen"
+    assert _chrome_over_header(page, sel) == [], (
+        f"a fixed chrome button covers the parked header: {_chrome_over_header(page, sel)}"
+    )
     for c in cells:
         assert c["found"] == c["label"], (
             f"column {c['label']!r}: found {c['found']!r} at the top of the viewport"

@@ -1077,7 +1077,27 @@ real header, so at rest the author's header takes the pointer; a click
 on the stuck ghost is forwarded to the real cell. Both park under the
 rail (`--okt-rail-h`, now on `:root` because it is no longer only the
 rail's business), and inside the lightbox at 0, where the scrollport is
-the lightbox's own box. Held by `browser/test_sticky_table_header.py`,
+the lightbox's own box.
+
+**And both park under the chrome buttons that stand over their own
+columns.** The fixed 44px boxes float over the top of the reading column
+at every scroll position, which is their rule and costs prose nothing —
+a line passing under one is gone in a moment. A sticky header parked
+under one is a column label the reader never sees, at any scroll
+position. Measured on this repo's own table page: at 1100px the search
+button covers the last column, and at 760px and below the Contents
+button covers the first while search and the menu cover the last — so
+this is most window widths, not a phone case. `chromeFloor()` measures
+the fixed boxes that actually intersect this table's columns and sets
+`--okt-sticky-top` in viewport pixels; the CSS divides by the text scale
+once, for both mechanisms. A breakpoint would have been a guess: which
+buttons overlap depends on the column's width, and the reader sets that
+with the width control. It is re-measured on `oku:rendered` and on
+`load` as well as on resize, because the cluster is assembled while the
+page renders — search arrives when its subsystem initialises, and adding
+a button resizes nothing the observer watches. Held by
+`browser/test_sticky_table_header.py`, which asserts no fixed chrome box
+intersects the parked header at desktop, 1.25 text scale and 360px. Held by `browser/test_sticky_table_header.py`,
 which asks from the reader's side — under the rail, in this column,
 is there a cell with this label — so it does not care which mechanism
 answered.
@@ -1205,6 +1225,31 @@ comes from the CDN and nothing is missing. Held by
 `test_prism_catalog.py`, the `TestACodeFenceNamesAGrammarTheKitCarries`
 section of `test_check.py`, and `browser/test_code_language_carried.py`
 in both delivery modes.
+
+Four spellings reach Prism and `_code_langs` reads all four: a fence's
+info string, a `code` / `annotated-code` / `live-snippet` block's `lang`,
+and an HTML island writing `class="language-x"` — that last one is
+highlighted by the same page-level sweep, so it needs the same grammar.
+It is judged on the text with fences and code spans blanked, which is
+where every SAMPLE of that attribute lives; a page documenting islands
+shows it inside a fence and the rule never sees that one.
+
+**An unclosed code fence takes the rest of the page with it, and now
+says so.** A fence opener has to start its line, so a ``` run named
+mid-sentence is nothing — which is what makes the slip easy: wrap a
+paragraph so the next line BEGINS with one and CommonMark opens a block
+that runs to the end of the document. Every heading, paragraph and
+figure after it is inside a code block and the ids they carried are gone
+from the page. It happened while writing the vendor paragraph on
+`docs/cli.md`: `## oku migrate` disappeared, the page built, `oku check`
+was clean, and the only thing that fired was `translation-anchor-drift`
+on the OTHER language, because the two files stopped agreeing about
+which ids exist — on a monolingual page nothing would have said
+anything. `_split_md_fences` records whether each fence closed (the
+record was emitted either way before, so no reader of that function
+could tell) and `fence-unclosed` is an error, for the reason
+`island-unclosed` is one: the content after it is not mis-styled, it is
+gone. Held by `TestAFenceThatNeverCloses` in `test_check.py`.
 
 **They are deliberately NOT inlined.** mermaid is 3.3 MB against a 1.1 MB
 standalone page, and a tree would carry one copy per page that draws

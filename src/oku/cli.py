@@ -2680,12 +2680,19 @@ def _iter_block_hrefs(obj):
                 yield from _iter_block_hrefs(v)
 
 
-def _split_md_fences(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, str, str]]]:
+def _split_md_fences(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, str, str, bool]]]:
     """Split a markdown string into prose lines and fence records.
 
     Returns (prose_lines, fences) where prose_lines is [(lineno, line)]
-    OUTSIDE fenced code, and fences is [(lineno, lang, body)] for every
-    fenced block. Line numbers are 1-based within the string.
+    OUTSIDE fenced code, and fences is [(lineno, lang, body, closed)]
+    for every fenced block. Line numbers are 1-based within the string.
+
+    `closed` is False for a fence that never met its closing run. That is
+    legal CommonMark — the block simply runs to the end of the document —
+    and it is almost always a stray ``` in prose, which swallows every
+    heading, paragraph and figure after it into one code block. The
+    record used to be emitted without saying which kind it was, so the
+    swallowing was invisible to every reader of this function.
     """
     lines = text.split("\n")
     prose: list[tuple[int, str]] = []
@@ -2697,7 +2704,7 @@ def _split_md_fences(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, 
     for i, line in enumerate(lines, start=1):
         if close_re is not None:
             if close_re.match(line):
-                fences.append((fence_start, fence_lang, "\n".join(fence_body)))
+                fences.append((fence_start, fence_lang, "\n".join(fence_body), True))
                 close_re = None
                 fence_body = []
             else:
@@ -2711,7 +2718,7 @@ def _split_md_fences(text: str) -> tuple[list[tuple[int, str]], list[tuple[int, 
             continue
         prose.append((i, line))
     if close_re is not None:
-        fences.append((fence_start, fence_lang, "\n".join(fence_body)))
+        fences.append((fence_start, fence_lang, "\n".join(fence_body), False))
     return prose, fences
 
 
@@ -2751,7 +2758,31 @@ def _lint_md_string(
     heading_ids: list[tuple[int, str]] = []
     prose, fences = _split_md_fences(text)
 
-    for lineno, lang, _body in fences:
+    for lineno, lang, _body, closed in fences:
+        if not closed:
+            # Legal CommonMark and almost never what the author meant: a
+            # stray ``` run in prose opens a block that takes every
+            # heading, paragraph and figure after it. Measured while
+            # writing this repo's own CLI page — one ```hcl in a
+            # sentence swallowed the `## oku migrate` section whole, the
+            # page built, and the only thing that fired was a
+            # translation-anchor warning on the OTHER language, because
+            # the two files stopped agreeing about which ids exist. With
+            # one language, or with the same slip in both, nothing at
+            # all would have said so.
+            #
+            # An error rather than a warning, for the reason
+            # `island-unclosed` is one: the content after it is not
+            # mis-styled, it is gone from the document as prose.
+            issues.append(
+                (
+                    "error",
+                    "fence-unclosed",
+                    f"line {lineno}",
+                    f"```{lang or '(no language)'} code fence is never closed, so everything after it on "
+                    "this page is inside it. Close it, or write an inline ``` run as `` ``` ``.",
+                )
+            )
         if lang.startswith("oku-"):
             # A kind that has a markdown form is not a missing feature —
             # it is the same feature spelled the one way that works. Say
@@ -5914,11 +5945,15 @@ _HTML_SRCSET_RE = re.compile(r"""\bsrcset\s*=\s*["']([^"']+)["']""", re.I)
 MAX_INLINE_ASSET_BYTES = 2 * 1024 * 1024
 
 
-# The three block kinds that hand a language to Prism. An island's own
-# `class="language-x"` is deliberately not scanned: this repo's prose
-# shows that attribute inside samples, and nothing tells the sample from
-# the island without guessing.
+# The three block kinds that hand a language to Prism.
 _LANG_BLOCK_KINDS = ("code", "annotated-code", "live-snippet")
+# The fourth spelling: an HTML island writing the class Prism looks for.
+# `<pre><code class="language-hcl">` in an island is highlighted by the
+# page-level sweep exactly like a fence, so it needs the same grammar.
+# Judged on the text with fences and code spans blanked, which is where
+# every sample of this attribute lives — a page documenting islands
+# shows it inside a fence, and this rule never sees that.
+_HTML_LANG_CLASS_RE = re.compile(r"""class\s*=\s*["'][^"']*\blanguage-([A-Za-z0-9_+#.-]+)""")
 
 
 def _code_langs(block) -> list[tuple[str, int | None]]:
@@ -5932,7 +5967,12 @@ def _code_langs(block) -> list[tuple[str, int | None]]:
     out: list[tuple[str, int | None]] = []
     if isinstance(block, str):
         _prose, fences = _split_md_fences(block)
-        out += [(lang, lineno) for lineno, lang, _body in fences if lang]
+        out += [(lang, lineno) for lineno, lang, _body, _closed in fences if lang]
+        scrubbed = _INLINE_CODE_RE.sub("", _md_fence_mask(block))
+        out += [
+            (m.group(1), scrubbed[: m.start()].count("\n") + 1)
+            for m in _HTML_LANG_CLASS_RE.finditer(scrubbed)
+        ]
     elif isinstance(block, dict) and block.get("k") in _LANG_BLOCK_KINDS:
         lang = block.get("lang")
         if isinstance(lang, str) and lang.strip():

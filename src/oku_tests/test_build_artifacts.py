@@ -622,7 +622,13 @@ class TestPayloadBudget:
     # alias-aware refusal, and the note on what it measured — 16 ```text
     # fences in this repo's own docs, one failed request each. About
     # 2,500 bytes, of which the mechanism is roughly 400.
-    KIT_BUDGET_BYTES = 1_296_000
+    # Then from 1,296,000 by a sticky table header that clears the fixed
+    # chrome buttons standing over its own columns — measured rather
+    # than answered with a breakpoint, because which buttons overlap
+    # depends on a column width the reader sets. About 1,900 bytes, of
+    # which the mechanism is roughly 500; the rest is the measurement
+    # that showed it is most window widths and not a phone case.
+    KIT_BUDGET_BYTES = 1_298_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
