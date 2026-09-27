@@ -13992,6 +13992,19 @@ var __prismLoader = (function () {
         );
       })
       .then(function () {
+        /* What the vendored directory can actually serve, declared by
+           the directory itself — `oku vendor` writes carried.js beside
+           the components. A script rather than JSON because a
+           standalone page is opened over file://, where fetch is
+           refused before a request is made.
+
+           Absent (no vendor, or a kit from before this) leaves
+           `__okuPrismCarried` undefined and the refusal below stands
+           down, which is the behaviour every page had until now. */
+        if (!servedLocally || window.__okuPrismCarried) return null;
+        return ensureScript(__okuVendorPath() + 'prism/carried.js').catch(function () {});
+      })
+      .then(function () {
         if (window.Prism && window.Prism.plugins && window.Prism.plugins.autoloader) {
           // The autoloader takes ONE base, so a language outside the
           // vendored set cannot fall back to the CDN per-language. It
@@ -14031,16 +14044,35 @@ var __prismLoader = (function () {
              serve leaves the block as text, which is what the 404 left
              behind anyway, minus the request.
 
-             `oku-*` only. It is the one prefix that can never be a
-             grammar, so refusing it cannot lose highlighting; policing
-             every name would need a list of Prism's aliases, and a name
-             missing from that list is a block that silently stops being
-             highlighted. */
+             The `oku-` prefix is refused wherever Prism came from: it
+             can never be a grammar. Everything else is judged against
+             what the LOCAL directory says it carries, which is a fact
+             rather than a guess — a component that is not there answers
+             404 and leaves the block as text, so refusing it loses
+             nothing and costs no request. Measured on this repo's own
+             docs before the rule existed: 16 ```text fences, one failed
+             request each, plus one per ```hcl or any other grammar the
+             baseline list had not thought of.
+
+             Two things keep it from silently dropping highlighting.
+             It only applies when the core was served locally — from the
+             CDN every real grammar is reachable and none of this
+             applies. And the alias map comes with the list, resolved
+             the way the autoloader resolves it (```rb is ruby,
+             ```adoc is asciidoc), because a rule reading ids alone
+             refuses every alias of a language it is carrying. */
           var _load = window.Prism.plugins.autoloader.loadLanguages;
           if (typeof _load === 'function') {
             window.Prism.plugins.autoloader.loadLanguages = function (langs, success, error) {
               var want = typeof langs === 'string' ? [langs] : (langs || []);
-              var refused = want.filter(function (l) { return /^oku-/.test(String(l)); });
+              var have = servedLocally ? window.__okuPrismCarried : null;
+              var refused = want.filter(function (l) {
+                var name = String(l);
+                if (/^oku-/.test(name)) return true;
+                if (!have || !have.ids) return false;
+                var id = (have.aliases && have.aliases[name.toLowerCase()]) || name.toLowerCase();
+                return have.ids.indexOf(id) < 0;
+              });
               if (refused.length) {
                 if (typeof error === 'function') error(refused);
                 return;

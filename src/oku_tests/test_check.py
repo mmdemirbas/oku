@@ -1418,3 +1418,115 @@ class TestATypedFenceInsideAnIsland:
             "After everything.\n"
         )
         assert _issues_of(self._check(tmp_path, body), code="island-unclosed") == []
+
+
+class TestACodeFenceNamesAGrammarTheKitCarries:
+    """`oku check` says when a code block will render as plain text.
+
+    The kit vendors Prism's grammars and points the autoloader at that
+    directory, which takes ONE base — so a grammar that is not there
+    cannot fall back to the CDN per language. Measured before this rule
+    existed: a ```hcl fence produced one `net::ERR_FILE_NOT_FOUND` in the
+    reader's console, a block with zero syntax tokens, and a clean
+    `oku check`.
+
+    The vendor directory is a fixture here rather than the machine's.
+    Whether `hcl` happens to be cached is a property of whoever built
+    what last, and a rule about what a page will do must not depend on
+    it.
+    """
+
+    HEAD = "---\ntitle: Fences\nsummary: A page with code blocks.\n---\n\n"
+
+    def _check(self, tmp_path: Path, body: str, *, vendored: list[str] | None, monkeypatch) -> list[dict]:
+        vendor = tmp_path / "vendor"
+        if vendored is not None:
+            (vendor / "prism" / "components").mkdir(parents=True)
+            (vendor / "prism" / "prism.min.js").write_text("/* core */", encoding="utf-8")
+            for ident in vendored:
+                (vendor / "prism" / "components" / f"prism-{ident}.min.js").write_text(
+                    "/**/", encoding="utf-8"
+                )
+        monkeypatch.setattr(cli, "vendor_dir", lambda: vendor)
+        (tmp_path / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+        src = tmp_path / "fences.md"
+        src.write_text(self.HEAD + body, encoding="utf-8")
+        page = cli._page_from_source_file(src)
+        assert page is not None
+        # The VIRTUAL .json path, which is the key the source-line map is
+        # registered under and the one the CLI reports with — pass the
+        # .md and every issue loses its line.
+        return cli.check_pages([(src.with_suffix(".json"), page)], tmp_path)
+
+    def test_a_grammar_the_kit_does_not_carry_is_reported(self, tmp_path: Path, monkeypatch) -> None:
+        body = '## S {#s}\n\n```hcl\nresource "x" "y" { a = 1 }\n```\n'
+        issues = _issues_of(self._check(tmp_path, body, vendored=[], monkeypatch=monkeypatch))
+        hits = _issues_of(issues, code="code-lang-missing")
+        assert len(hits) == 1
+        assert hits[0]["severity"] == "warning"
+        assert "hcl" in hits[0]["message"]
+        # The line, because a page can carry fifty fences and the author
+        # needs the one that will not highlight.
+        assert "line 8" in hits[0]["where"], hits[0]["where"]
+
+    def test_a_grammar_the_kit_carries_is_not_reported(self, tmp_path: Path, monkeypatch) -> None:
+        body = '## S {#s}\n\n```hcl\nresource "x" "y" { a = 1 }\n```\n'
+        issues = self._check(tmp_path, body, vendored=["hcl"], monkeypatch=monkeypatch)
+        assert _issues_of(issues, code="code-lang-missing") == []
+
+    def test_a_name_that_is_not_a_grammar_is_left_alone(self, tmp_path: Path, monkeypatch) -> None:
+        """```text, ```console and a pseudocode label are not Prism
+        grammars, so there is nothing to vendor and nothing to say. This
+        repo's own docs carry sixteen ```text fences; a rule that named
+        them would fire on correct prose on every page."""
+        body = "## S {#s}\n\n```text\nplain\n```\n\n```console\n$ ls\n```\n\n```pseudocode\ndo it\n```\n"
+        issues = self._check(tmp_path, body, vendored=[], monkeypatch=monkeypatch)
+        assert _issues_of(issues, code="code-lang-missing") == []
+
+    def test_an_alias_is_judged_by_what_it_resolves_to(self, tmp_path: Path, monkeypatch) -> None:
+        """The autoloader resolves ```rb to ruby before it builds a URL,
+        so a rule reading the directory for a file called `prism-rb` would
+        report a language that highlights perfectly well."""
+        body = "## S {#s}\n\n```rb\nputs 1\n```\n"
+        assert (
+            _issues_of(
+                self._check(tmp_path, body, vendored=["ruby"], monkeypatch=monkeypatch),
+                code="code-lang-missing",
+            )
+            == []
+        )
+
+    def test_a_dependency_counts_as_missing(self, tmp_path: Path, monkeypatch) -> None:
+        """cpp is on disk and c is not, so Prism loads neither — the
+        block renders as plain text with the grammar it names sitting
+        right there in the directory."""
+        body = "## S {#s}\n\n```cpp\nint main() { return 0; }\n```\n"
+        hits = _issues_of(
+            self._check(tmp_path, body, vendored=["cpp"], monkeypatch=monkeypatch), code="code-lang-missing"
+        )
+        assert len(hits) == 1 and "needs c" in hits[0]["message"]
+
+    def test_nothing_is_reported_where_there_is_no_vendored_prism(self, tmp_path: Path, monkeypatch) -> None:
+        """With no local copy the pages load every component from the
+        CDN, so every grammar resolves and there is nothing to warn
+        about. A rule reading the empty directory would report every
+        fence on the page — including bash and python."""
+        body = '## S {#s}\n\n```hcl\nresource "x" "y" { a = 1 }\n```\n\n```bash\nls\n```\n'
+        issues = self._check(tmp_path, body, vendored=None, monkeypatch=monkeypatch)
+        assert _issues_of(issues, code="code-lang-missing") == []
+
+    def test_a_typed_code_block_is_read_too(self, tmp_path: Path, monkeypatch) -> None:
+        """A JSON page spells a code block as a typed object with `lang`,
+        and it reaches Prism by the same path a fence does."""
+        vendor = tmp_path / "vendor"
+        (vendor / "prism" / "components").mkdir(parents=True)
+        (vendor / "prism" / "prism.min.js").write_text("/* core */", encoding="utf-8")
+        monkeypatch.setattr(cli, "vendor_dir", lambda: vendor)
+        page = {
+            "v": 2,
+            "t": "Typed",
+            "m": {"summary": "A typed code block."},
+            "b": [{"k": "code", "lang": "hcl", "src": 'resource "x" "y" {}'}],
+        }
+        issues = cli.check_pages([(tmp_path / "typed.json", page)], tmp_path)
+        assert len(_issues_of(issues, code="code-lang-missing")) == 1

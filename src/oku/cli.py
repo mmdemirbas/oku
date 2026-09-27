@@ -42,7 +42,7 @@ import textwrap
 import threading
 import time
 import webbrowser
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote, unquote
 
@@ -3714,6 +3714,12 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
     # slice a page can actually reach is cut per kit.json below.
     glossary = _load_registry(kit_dir, "glossary")
     extrefs = _load_registry(kit_dir, "extrefs")
+    # Whether a missing grammar is worth saying anything about. With no
+    # vendored Prism the pages load every component from the CDN, so
+    # nothing is missing and a rule reading the empty directory would
+    # report every fence on the page — the same stand-down the gitignore
+    # walk makes where it cannot know better.
+    local_prism = (vendor_dir() / "prism" / "prism.min.js").exists()
     active_by_kit: dict[Path | None, tuple] = {}
 
     # 2. Stray demo pages — `<thing>-demo.{html,json}` is forbidden;
@@ -3841,6 +3847,30 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             for href in _asset_hrefs(blk):
                 pos = blk.find(href) if isinstance(blk, str) else -1
                 asset_refs.append((where, href, _abs(blk[:pos].count("\n") + 1) if pos >= 0 else None))
+
+            # A grammar the kit does not carry is a failed request in the
+            # reader's console and a block that renders as plain text —
+            # the autoloader points at the vendored components and cannot
+            # fall back to the CDN per language. Only a real Prism
+            # grammar is reported: ```text asks for nothing the kit could
+            # have carried, and a rule that named it would fire on
+            # correct prose. The build fetches what it finds here, so
+            # this fires where that could not happen — no network, or a
+            # tree checked before it was built.
+            for lang, rel in _code_langs(blk) if local_prism else []:
+                missing = [i for i in prism_components_needed([lang]) if not prism_component_path(i).exists()]
+                if not missing:
+                    continue
+                need = "" if missing == [lang.strip().lower()] else f" (needs {', '.join(missing)})"
+                add(
+                    p,
+                    "warning",
+                    "code-lang-missing",
+                    f"{where} line {_abs(rel)}" if _abs(rel) else where,
+                    f"```{lang} is a Prism grammar the kit does not carry{need}, so the block renders "
+                    "as plain text. `oku build` or `oku vendor` fetches it once, with a network.",
+                    line=_abs(rel),
+                )
 
             if isinstance(blk, str):
                 # 3. Markdown-string passes: strict-GFM subset, HTML
@@ -5651,6 +5681,10 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
     # the standalone tree of the same pages had all 6 and 598. The loader
     # falls back to the CDN, so the failure only appears where nobody is
     # watching, which is the point of vendoring in the first place.
+    # Refreshed at every copy rather than only after a fetch: the file
+    # describes the directory, and a directory that gained a grammar
+    # from another project's build would otherwise ship a stale list.
+    _write_prism_carried()
     src_vendor = vendor_dir()
     if src_vendor.is_dir():
         shutil.copytree(src_vendor, kit_out / "vendor", dirs_exist_ok=True)
@@ -5878,6 +5912,46 @@ _HTML_SRCSET_RE = re.compile(r"""\bsrcset\s*=\s*["']([^"']+)["']""", re.I)
 # that shows it; one file you can send is the point of that tree, and a
 # file nobody can mail is not one.
 MAX_INLINE_ASSET_BYTES = 2 * 1024 * 1024
+
+
+# The three block kinds that hand a language to Prism. An island's own
+# `class="language-x"` is deliberately not scanned: this repo's prose
+# shows that attribute inside samples, and nothing tells the sample from
+# the island without guessing.
+_LANG_BLOCK_KINDS = ("code", "annotated-code", "live-snippet")
+
+
+def _code_langs(block) -> list[tuple[str, int | None]]:
+    """Every code-fence language this block hands to Prism, with the
+    line inside the block it was written on.
+
+    One scanner for both readers — `oku check` reports what it finds and
+    the build vendors it, so the warning and the fetch cannot disagree
+    about which languages a page uses.
+    """
+    out: list[tuple[str, int | None]] = []
+    if isinstance(block, str):
+        _prose, fences = _split_md_fences(block)
+        out += [(lang, lineno) for lineno, lang, _body in fences if lang]
+    elif isinstance(block, dict) and block.get("k") in _LANG_BLOCK_KINDS:
+        lang = block.get("lang")
+        if isinstance(lang, str) and lang.strip():
+            out.append((lang, None))
+    return out
+
+
+def page_code_langs(page: dict) -> list[str]:
+    """Every code-fence language in one page dict, deduped.
+
+    v1 pages go through the same shim the check and the renderer use, so
+    a legacy page's `code` blocks are found where a v2 page's are.
+    """
+    if page.get("kind") == "page" and "blocks" in page:
+        page = _v1_to_v2(page)
+    out: list[str] = []
+    for blk in page.get("b") or []:
+        out += [lang for lang, _line in _code_langs(blk)]
+    return list(dict.fromkeys(out))
 
 
 def _asset_hrefs(page_data) -> list[str]:
@@ -6373,6 +6447,10 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
     # One shared copy of the runtime dependencies beside the pages, not a
     # copy inside each of them. Offline does not require a single file —
     # it requires the bytes to be reachable without a network.
+    # Refreshed at every copy rather than only after a fetch: the file
+    # describes the directory, and a directory that gained a grammar
+    # from another project's build would otherwise ship a stale list.
+    _write_prism_carried()
     src_vendor = vendor_dir()
     if src_vendor.is_dir():
         shutil.copytree(src_vendor, out_dir / "_oku" / "vendor", dirs_exist_ok=True)
@@ -6568,6 +6646,25 @@ def cmd_build(args: argparse.Namespace) -> int:
     if not srcs and not json_pages:
         print(f"✗ No .html or page-JSON files found in {root}", file=sys.stderr)
         return 1
+
+    # The tree says which grammars it needs. The baseline list can only
+    # hold the languages somebody thought of, and an author writing
+    # ```hcl gets a failed request in the reader's console and a block
+    # of plain text — so the ones this tree actually uses are fetched
+    # into the shared cache before the check runs — a
+    # warning about a grammar this same run is about to fetch is noise.
+    if not getattr(args, "no_vendor", False):
+        langs: list[str] = []
+        for _path, data in json_pages:
+            langs += page_code_langs(data)
+        fetched, failed = fetch_prism_langs(langs, quiet=True)
+        if fetched:
+            print(f"  ✓ vendored {len(fetched)} more Prism grammar(s): {', '.join(fetched)}")
+        if failed:
+            print(
+                f"  ! no grammar for {', '.join(failed)} — those blocks render as plain text "
+                "(the fetch needs a network; `oku vendor` retries)"
+            )
 
     # Schema validation + structural lint — runs the same checks as
     # `oku check` so the build never produces a doctree that the
@@ -7387,6 +7484,11 @@ def cmd_serve(args: argparse.Namespace) -> int:
     """
     cwd = Path.cwd()
     root = find_project_root(cwd)
+    # Serve reads the kit in place rather than copying it, so the
+    # carried-grammar list is refreshed here the way the two build trees
+    # refresh it on the way out — three delivery modes, one statement of
+    # what the vendor directory holds.
+    _write_prism_carried()
     user_cwd = cwd  # capture before chdir so we can prefer pages near where the user was
     os.chdir(root)
     handler_cls = _make_serve_handler(root)
@@ -7546,6 +7648,99 @@ _PRISM_LANGS = (
 ).split()
 
 
+# Prism's own catalog for the release pinned above — ids, aliases, what
+# each grammar requires, and the twelve names compiled into
+# prism.min.js. Generated by tools/prism_catalog.py and committed, so
+# `oku check` answers the same on a fresh clone with no vendor directory
+# and no network.
+#
+# It carries what the vendor directory cannot answer. The autoloader
+# resolves an alias ITSELF before it builds a URL — measured, a ```adoc
+# fence fetches prism-asciidoc.min.js — so a rule reading the directory
+# alone calls every alias missing. It also tells a grammar from a word:
+# `hcl` is one and `text` is not, and only the first is worth reporting.
+# And a component without its dependencies is a file that still cannot
+# highlight, because cpp needs c and tsx needs jsx and typescript.
+_prism_catalog_cache: dict | None = None
+
+
+def prism_catalog() -> dict:
+    """The committed catalog, with the membership sets derived once."""
+    global _prism_catalog_cache
+    if _prism_catalog_cache is None:
+        path = Path(__file__).resolve().parent / "prism_catalog.json"
+        try:
+            cat = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            cat = {"prism": "", "ids": [], "bundled": [], "aliases": {}, "requires": {}}
+        cat["ids"] = set(cat["ids"])
+        cat["bundled"] = set(cat["bundled"])
+        _prism_catalog_cache = cat
+    return _prism_catalog_cache
+
+
+def prism_components_needed(names: Iterable[str]) -> list[str]:
+    """Every component file the vendor directory must hold for these
+    fence languages to highlight, dependencies first.
+
+    A name contributes nothing in two different cases, and the caller
+    wants neither: it is not a Prism grammar at all (`text`, an
+    `oku-chart` fence, a typo), or its grammar is already inside
+    prism.min.js (`js`, `html`, `css`). The autoloader asks for a file
+    only in the remaining case.
+    """
+    cat = prism_catalog()
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def want(ident: str) -> None:
+        if ident in seen or ident in cat["bundled"] or ident not in cat["ids"]:
+            return
+        seen.add(ident)
+        for dep in cat["requires"].get(ident, []):
+            want(dep)
+        out.append(ident)
+
+    for name in names:
+        n = str(name).strip().lower()
+        if n:
+            want(cat["aliases"].get(n, n))
+    return out
+
+
+def prism_component_path(ident: str) -> Path:
+    return vendor_dir() / "prism" / "components" / f"prism-{ident}.min.js"
+
+
+def _write_prism_carried() -> None:
+    """Declare, beside the components, which languages this vendor
+    directory can actually serve.
+
+    The loader needs it to stop asking for what is not there. It is a
+    script rather than a JSON file because a standalone page is opened
+    over file://, where fetch is refused before a request is made, and
+    every other vendored dependency is already loaded with a script tag.
+
+    Written from the DIRECTORY, not from `_PRISM_LANGS`: the list is
+    what the reader's page can load, and a project that pulled hcl in
+    for its own fences has one the baseline does not name. Aliases are
+    carried for the ids that are here, so the loader resolves `rb` the
+    way the autoloader would before deciding.
+    """
+    root = vendor_dir() / "prism"
+    if not (root / "prism.min.js").exists():
+        return
+    cat = prism_catalog()
+    ids = sorted(
+        {p.name[len("prism-") : -len(".min.js")] for p in (root / "components").glob("prism-*.min.js")}
+        | cat["bundled"]
+    )
+    carried = set(ids)
+    aliases = {a: t for a, t in cat["aliases"].items() if t in carried}
+    payload = json.dumps({"ids": ids, "aliases": aliases}, separators=(",", ":"), sort_keys=True)
+    (root / "carried.js").write_text(f"window.__okuPrismCarried={payload};\n", encoding="utf-8")
+
+
 # The two families chrome.css asks for, as variable woff2 — one file per
 # family per subset, every weight inside. Fontsource publishes the same
 # files Google Fonts serves, under the same OFL-1.1 licence, at a URL
@@ -7584,9 +7779,16 @@ def _vendor_files() -> list[tuple[str, str]]:
             _PRISM_CDN + "plugins/autoloader/prism-autoloader.min.js",
         ),
     ]
+    # Through the catalog rather than straight off the list: a grammar
+    # without its dependencies is a vendored file that still cannot
+    # highlight, and the hand-written list had that — `php` was on it
+    # and `markup-templating`, which php requires, was not, so an
+    # offline page with a PHP block loaded neither. Resolving here means
+    # the list stays a statement of what the kit wants and cannot be
+    # dependency-incomplete again.
     out += [
-        (f"prism/components/prism-{lang}.min.js", f"{_PRISM_CDN}components/prism-{lang}.min.js")
-        for lang in _PRISM_LANGS
+        (f"prism/components/prism-{ident}.min.js", f"{_PRISM_CDN}components/prism-{ident}.min.js")
+        for ident in prism_components_needed(_PRISM_LANGS)
     ]
     out += [(f"fonts/{name}", f"{_FONTSOURCE}{pkg}/files/{name}") for name, pkg in _VENDOR_FONTS]
     return out
@@ -7626,13 +7828,65 @@ def fetch_vendor(*, update: bool = False, quiet: bool = False) -> tuple[int, int
             continue
         dest.write_bytes(data)
         fetched += 1
+    if fetched:
+        _write_prism_carried()
     return fetched, skipped
+
+
+def fetch_prism_langs(names: Iterable[str], *, quiet: bool = False) -> tuple[list[str], list[str]]:
+    """Fetch the grammars these fence languages need and are missing.
+
+    Returns (fetched, still missing). The baseline in `_PRISM_LANGS` can
+    only hold the languages somebody thought of; what a project writes is
+    open, and an unvendored grammar is a failed request in the reader's
+    console and a code block that renders as plain text. So the tree
+    being built says which ones it needs, and they are fetched into the
+    same shared cache — once per installation, per language.
+    """
+    import urllib.error
+    import urllib.request
+
+    need = [i for i in prism_components_needed(names) if not prism_component_path(i).exists()]
+    fetched: list[str] = []
+    failed: list[str] = []
+    for ident in need:
+        dest = prism_component_path(ident)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        url = f"{_PRISM_CDN}components/prism-{ident}.min.js"
+        try:
+            with urllib.request.urlopen(url, timeout=30) as r:  # noqa: S310 - pinned https CDN
+                data = r.read()
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            failed.append(ident)
+            if not quiet:
+                print(f"  ! prism-{ident}: {e}", file=sys.stderr)
+            continue
+        dest.write_bytes(data)
+        fetched.append(ident)
+    if fetched:
+        _write_prism_carried()
+    return fetched, failed
 
 
 def cmd_vendor(args: argparse.Namespace) -> int:
     """`oku vendor` — fetch the shared runtime dependencies once."""
     root = vendor_dir()
     fetched, skipped = fetch_vendor(update=args.update)
+    # Run inside a project, `oku vendor` fetches what that project
+    # writes as well as the baseline — the same collector the build
+    # uses, so the two cannot disagree about which languages a tree has.
+    # Only when the cwd IS a doc tree. `oku vendor` is also the command
+    # you run to warm the cache from anywhere, and a recursive walk of a
+    # home directory is not something it should do on the way.
+    tree = Path.cwd()
+    if (tree / "kit.json").exists() or any(tree.glob("*.md")) or any(tree.glob("*.html")):
+        langs: list[str] = []
+        for _path, data in find_json_pages(tree):
+            langs += page_code_langs(data)
+        extra, _failed = fetch_prism_langs(langs)
+        if extra:
+            print(f"  ✓ {len(extra)} grammar(s) this tree uses: {', '.join(extra)}")
+        fetched += len(extra)
     total = sum(f.stat().st_size for f in root.rglob("*") if f.is_file()) if root.exists() else 0
     print(f"✓ vendor: {fetched} fetched, {skipped} already present — {total / 1_000_000:.1f} MB in {root}")
     if not vendor_is_complete():

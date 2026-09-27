@@ -1160,6 +1160,52 @@ does it automatically the first time, and the build copies one shared
 back to the CDN, so a page that travels away from its vendor directory
 still works with a network.
 
+**A page asks for the grammars it uses, and only for those.** The
+autoloader takes ONE base, so once Prism is served locally a component
+that is not in the vendor directory cannot fall back to the CDN — it
+404s and the block renders as plain text, with the reader's console the
+only place that says so. Two halves, because there were two failures.
+
+**The tree says which grammars it needs.** `_PRISM_LANGS` is a hand
+list, so it holds the languages somebody thought of; an author writing
+an `hcl` fence got a failed request and an unhighlighted block past a clean
+`oku check`. `oku build` now collects the languages its pages actually
+use — through `_code_langs`, the one scanner the check also reads, so
+the warning and the fetch cannot disagree — and fetches the missing ones
+into the shared cache before the check runs. `oku vendor` does the same
+for the tree it is run in, when the cwd is one. The baseline itself is
+resolved through the catalog on the way out: it named `php` and not
+`markup-templating`, which php requires, so an offline page with a PHP
+block loaded neither — a hand list cannot be dependency-complete and is
+no longer asked to be.
+
+**The kit stops asking for what it cannot serve.** `oku vendor` writes
+`vendor/prism/carried.js` — the directory declaring its own contents,
+loaded with a script tag because a standalone page is opened over
+`file://` where fetch is refused before a request is made — and the
+loader refuses any name outside it. That used to be declined for want
+of an alias list, and the note said so; the list exists now. A refusal
+loses nothing, because the request it replaces returns 404: measured on
+this repo's own docs, 16 `text` fences at one failed request each,
+plus one per grammar the baseline had not thought of. Two things keep it
+honest — it applies only when the core was served locally, since from
+the CDN every grammar is reachable, and it resolves aliases the way the
+autoloader does (`rb` is ruby, `adoc` is asciidoc), because a rule
+reading ids alone refuses every alias of a language it is carrying.
+
+**`src/oku/prism_catalog.json` is what makes both decidable**, generated
+from Prism's own components.json by `tools/prism_catalog.py` and
+committed so `oku check` answers the same on a fresh clone with no
+vendor directory and no network. It carries the three facts the
+directory cannot: which names are grammars (`hcl` is, `text` is not, and
+only the first is worth a warning), what an alias resolves to, and what
+each grammar requires. `code-lang-missing` is the warning; it stands
+down entirely where no Prism is vendored, because then every component
+comes from the CDN and nothing is missing. Held by
+`test_prism_catalog.py`, the `TestACodeFenceNamesAGrammarTheKitCarries`
+section of `test_check.py`, and `browser/test_code_language_carried.py`
+in both delivery modes.
+
 **They are deliberately NOT inlined.** mermaid is 3.3 MB against a 1.1 MB
 standalone page, and a tree would carry one copy per page that draws
 anything. Offline does not require a single file — it requires the bytes

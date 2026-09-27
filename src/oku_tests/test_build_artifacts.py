@@ -617,7 +617,12 @@ class TestPayloadBudget:
     # and scrolls in step with it. About 9,000 bytes, roughly half of it
     # naming why the header stuck to the wrong thing for as long as it
     # did and why the wide case needs a second mechanism at all.
-    KIT_BUDGET_BYTES = 1_292_000
+    # Then from 1,292,000 by the loader refusing to ask for a grammar
+    # the vendor directory does not carry: the carried-list script, the
+    # alias-aware refusal, and the note on what it measured — 16 ```text
+    # fences in this repo's own docs, one failed request each. About
+    # 2,500 bytes, of which the mechanism is roughly 400.
+    KIT_BUDGET_BYTES = 1_296_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
