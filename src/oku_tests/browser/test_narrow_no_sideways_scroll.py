@@ -36,6 +36,9 @@ above would both have passed while a desktop reader scrolled sideways.
 
 from __future__ import annotations
 
+from .._examples import ENUM_KEYS, FENCE_OF
+from .._examples import LONG as _SHARED_LONG
+from .._examples import longify
 from ._wait import page_quiet
 
 import argparse
@@ -50,7 +53,7 @@ from oku import cli
 pytestmark = pytest.mark.browser
 
 # One long unbreakable token, in every primitive that lays out a grid.
-LONG = "BatchDataScanGroupReaderDeduplicateMergeFunctionFactory"
+LONG = _SHARED_LONG
 
 PAGE_MD = f"""---
 title: Narrow
@@ -165,58 +168,13 @@ def test_nothing_escapes_its_column_at_360(page, narrow_page):
     assert got["over"] == [], f"elements outside the viewport with no scroller: {got['over']}"
 
 
-# Keys whose value is an enum the schema pins, so appending to them
-# produces a page the build rejects rather than a page to measure.
-_ENUM_KEYS = {
-    "k",
-    "type",
-    "lang",
-    "kind",
-    "mode",
-    "src",
-    "id",
-    "color",
-    "status",
-    "tone",
-    "accent",
-    "severity",
-    "variant",
-    "align",
-    "filter",
-    "view",
-    "orientation",
-    "position",
-    "boardOrder",
-    "values",
-}
-
-_FENCE_OF = {
-    "chart": "oku-chart",
-    "chart-grid": "oku-chart-grid",
-    "compare-grid": "oku-compare-grid",
-    "copy": "oku-copy",
-    "diagram": "oku-diagram",
-    "example": "oku-example",
-    "info-tip": "oku-info-tip",
-    "insight": "oku-insight",
-    "kpi-grid": "oku-kpi-grid",
-    "live-snippet": "oku-live-snippet",
-    "step-flow": "oku-step-flow",
-    "table": "oku-table",
-    "timeline": "oku-timeline",
-    "annotated-code": "oku-annotated-code",
-}
-
-
-def _longify(obj):
-    """The long token appended to every string the example carries."""
-    if isinstance(obj, str):
-        return f"{obj} {LONG}" if obj else obj
-    if isinstance(obj, list):
-        return [_longify(v) for v in obj]
-    if isinstance(obj, dict):
-        return {k: (v if k in _ENUM_KEYS else _longify(v)) for k, v in obj.items()}
-    return obj
+# The example catalogue, the long token and the enum skip list live in
+# `_examples.py`: this suite and `tools/text_fit_audit.py` both derive
+# pages from them, and two copies of "which keys are enums" is a list
+# that stops matching the schema on the second edit.
+_ENUM_KEYS = ENUM_KEYS
+_FENCE_OF = FENCE_OF
+_longify = longify
 
 
 def _every_primitive_md() -> str:
