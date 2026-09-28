@@ -24,10 +24,10 @@ from oku import cli
 
 @pytest.fixture(autouse=True)
 def _clear_caches():
-    cli._tree_defaults_cache.clear()
+    cli._tree_kit_cache.clear()
     cli._git_date_cache.clear()
     yield
-    cli._tree_defaults_cache.clear()
+    cli._tree_kit_cache.clear()
     cli._git_date_cache.clear()
 
 

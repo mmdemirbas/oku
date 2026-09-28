@@ -307,6 +307,32 @@ inlined for such a page and its chrome stayed English while its reading
 estimate came out in Turkish. Held by `browser/test_page_language.py`,
 both trees.
 
+**A kit.json governs its whole tree, and the language was the one
+thing reading it that asked the page's own directory.** `_tree_defaults`
+has always walked up from a page for `accent` and `audience`, and the
+runtime says the same thing by fetching `__okuDocsRoot + 'kit.json'`
+once per site — but `_page_language` called
+`declared_languages(source.parent)`, which looks in two places and
+neither of them is up. Measured on a research tree of 73 Turkish pages
+with a kit.json at its root: the 17 pages beside it built in the
+declared language and the 56 in subfolders were stamped
+`<html lang="en">` — English hyphenation breaking Turkish words
+mid-syllable, and `i` uppercasing to `I` instead of `İ`, on pages whose
+own tree states plainly which language they are in. Nothing failed. The
+pages built and only the attribute was wrong, which is this rule's
+whole family.
+
+One walk now serves both: `_nearest_kit_data` reads the nearest
+kit.json once per directory and `_tree_defaults` and `_tree_languages`
+are two readers of it, rather than a second walk that can disagree with
+the first. `declared_languages(root)` stays as it is for the MANIFEST,
+which is handed the build root and should read the config at it —
+`find_kit_json` is deliberately not a walk, because `oku check` is
+pointed at a tree and must not report a file above the one it was
+given. Held by
+`test_languages.py::TestTheLanguageIsTheTreesNotTheDirectorys`, whose
+last case reads the attribute off a built page at depth.
+
 **A translation is the same page, not another page.** Authoring is
 `<page>.md` + `<page>.<lang>.md` side by side — no new syntax, each file
 a complete markdown document that still renders on GitHub. `kit.json`

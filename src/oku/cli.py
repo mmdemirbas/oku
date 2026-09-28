@@ -1262,12 +1262,39 @@ _WORDS_PER_MINUTE = 220
 # read the estimate than to skim the page.
 _MIN_READ_MINUTES = 2
 
-_tree_defaults_cache: dict[Path, dict] = {}
+_tree_kit_cache: dict[Path, dict] = {}
 _git_date_cache: dict[tuple[str, int], str | None] = {}
 # One `git log` per directory instead of one per page. `None` marks a
 # directory git could not answer for, so the per-file path is tried
 # there and only there.
 _git_dir_dates: dict[str, dict[str, str] | None] = {}
+
+
+def _nearest_kit_data(source: Path) -> dict:
+    """The kit.json in force for a page, as data.
+
+    Walks up from the page. A kit.json is one file for a whole tree —
+    the runtime says so by fetching `__okuDocsRoot + 'kit.json'` once
+    per site — so a page three directories down is governed by the one
+    at the top, exactly as it is for `accent`.
+    """
+    start = source.parent if source.is_file() else source
+    for d in (start, *start.parents):
+        cached = _tree_kit_cache.get(d)
+        if cached is not None:
+            return cached
+        kit_json = d / "kit.json"
+        if not kit_json.is_file():
+            continue
+        try:
+            data = json.loads(kit_json.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        _tree_kit_cache[d] = data
+        return data
+    return {}
 
 
 def _tree_defaults(source: Path) -> dict:
@@ -1278,22 +1305,35 @@ def _tree_defaults(source: Path) -> dict:
     are the same kind of fact: a tree with a different accent on every
     page is not a design, and `oku check` warns about exactly that.
     """
-    start = source.parent if source.is_file() else source
-    for d in (start, *start.parents):
-        cached = _tree_defaults_cache.get(d)
-        if cached is not None:
-            return cached
-        kit_json = d / "kit.json"
-        if not kit_json.is_file():
-            continue
-        try:
-            data = json.loads(kit_json.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            data = {}
-        defaults = {k: data[k] for k in ("accent", "audience") if isinstance(data.get(k), str)}
-        _tree_defaults_cache[d] = defaults
-        return defaults
-    return {}
+    data = _nearest_kit_data(source)
+    return {k: data[k] for k in ("accent", "audience") if isinstance(data.get(k), str)}
+
+
+def _tree_languages(source: Path) -> tuple[list[str], str]:
+    """The language codes in force for a page, and the default.
+
+    The same walk `accent` takes, for the same reason, and it was the
+    one thing reading kit.json that did NOT take it: `_page_language`
+    asked `declared_languages(source.parent)`, which only ever looks in
+    the page's own directory. Measured on a research tree of 73 Turkish
+    pages with a kit.json at its root: the 17 beside it built in the
+    declared language and the 56 in subfolders were stamped
+    `<html lang="en">` — English hyphenation breaking Turkish words
+    mid-syllable, on pages whose tree says plainly which language it is
+    written in. Nothing failed; the pages built.
+
+    `declared_languages(root)` stays for the manifest, which is handed
+    the build root and should read the config AT it rather than the
+    nearest one above some page.
+    """
+    data = _nearest_kit_data(source)
+    raw = data.get("languages") or []
+    codes = [item.get("code") if isinstance(item, dict) else item for item in raw]
+    codes = [c for c in codes if isinstance(c, str) and c]
+    if len(codes) < 2:
+        return [], ""
+    default = data.get("defaultLanguage") or codes[0]
+    return codes, (default if default in codes else codes[0])
 
 
 # The one derived value that is WORDS rather than a number or a date,
@@ -1334,7 +1374,7 @@ def _page_language(source: Path, meta: dict | None = None) -> str:
         declared = meta.get("lang")
         if isinstance(declared, str) and _LANG_CODE_RE.match(declared.strip()):
             return declared.strip()
-    codes, default = declared_languages(source.parent)
+    codes, default = _tree_languages(source)
     if not codes:
         return "en"
     _, lang = split_language_suffix(source.stem, codes)
@@ -4515,7 +4555,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
     # exactly the kind of manual step that is right on the day it is
     # written and wrong two edits later.
     for p, anchors in anchors_by_page.items():
-        codes, default = declared_languages(p.parent)
+        codes, default = _tree_languages(p)
         if not codes:
             continue  # monolingual tree: nothing to pair with
         base_stem, lang = split_language_suffix(p.stem, codes)

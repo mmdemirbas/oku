@@ -270,3 +270,62 @@ class TestStandaloneCarriesTheManifest:
 
         built = (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
         assert "window.__okuManifest=" not in built
+
+
+class TestTheLanguageIsTheTreesNotTheDirectorys:
+    """A kit.json governs the whole tree, and the language was the one
+    thing reading it that asked the page's own directory instead.
+
+    Measured on a research tree of 73 Turkish pages with a kit.json at
+    its root: the 17 pages beside it built in the declared language and
+    the 56 in subfolders were stamped `<html lang="en">`, which is
+    English hyphenation over Turkish prose and English casing rules for
+    `i`. Nothing failed — the pages built, and only the attribute was
+    wrong.
+    """
+
+    @staticmethod
+    def _tree(tmp_path: Path) -> Path:
+        cli._tree_kit_cache.clear()
+        (tmp_path / "kit.json").write_text(
+            json.dumps({"languages": ["tr", "en"], "defaultLanguage": "tr"}), encoding="utf-8"
+        )
+        deep = tmp_path / "a" / "b" / "c"
+        deep.mkdir(parents=True)
+        return deep
+
+    def test_a_page_beside_the_config_takes_the_declared_default(self, tmp_path: Path) -> None:
+        self._tree(tmp_path)
+        (tmp_path / "p.md").write_text("---\ntitle: T\n---\n\nprose\n", encoding="utf-8")
+        assert cli._page_language(tmp_path / "p.md", {"title": "T"}) == "tr"
+
+    def test_a_page_three_directories_down_takes_it_too(self, tmp_path: Path) -> None:
+        deep = self._tree(tmp_path)
+        (deep / "p.md").write_text("---\ntitle: T\n---\n\nprose\n", encoding="utf-8")
+        assert cli._page_language(deep / "p.md", {"title": "T"}) == "tr"
+
+    def test_front_matter_still_wins_over_the_tree(self, tmp_path: Path) -> None:
+        deep = self._tree(tmp_path)
+        (deep / "p.md").write_text("---\ntitle: T\nlang: en\n---\n\nprose\n", encoding="utf-8")
+        assert cli._page_language(deep / "p.md", {"title": "T", "lang": "en"}) == "en"
+
+    def test_a_filename_suffix_still_answers_in_a_subfolder(self, tmp_path: Path) -> None:
+        deep = self._tree(tmp_path)
+        (deep / "p.en.md").write_text("---\ntitle: T\n---\n\nprose\n", encoding="utf-8")
+        assert cli._page_language(deep / "p.en.md", {"title": "T"}) == "en"
+
+    def test_a_tree_that_declares_nothing_is_english_at_every_depth(self, tmp_path: Path) -> None:
+        cli._tree_kit_cache.clear()
+        deep = tmp_path / "a" / "b"
+        deep.mkdir(parents=True)
+        (deep / "p.md").write_text("---\ntitle: T\n---\n\nprose\n", encoding="utf-8")
+        assert cli._page_language(deep / "p.md", {"title": "T"}) == "en"
+
+    def test_the_built_page_carries_it_at_depth(self, tmp_path: Path) -> None:
+        """The wiring, end to end: the attribute a browser reads."""
+        deep = self._tree(tmp_path)
+        (deep / "p.md").write_text("---\ntitle: Başlık\n---\n\nTürkçe bir paragraf.\n", encoding="utf-8")
+        page = cli._page_from_source_file(deep / "p.md")
+        assert page is not None
+        assert page["m"]["lang"] == "tr"
+        assert 'lang="tr"' in cli._with_html_lang(cli._stub_for("Başlık"), "tr")

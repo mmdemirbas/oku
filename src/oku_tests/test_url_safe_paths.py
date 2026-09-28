@@ -36,7 +36,7 @@ AWKWARD = ["notes#1.md", "what?.md", "a b.md", "100%.md", "one&two.md"]
 @pytest.fixture
 def tree(tmp_path: Path) -> Path:
     cli._project_root_cache.clear()
-    cli._tree_defaults_cache.clear()
+    cli._tree_kit_cache.clear()
     docs = tmp_path / "docs"
     (docs / "sub#dir").mkdir(parents=True)
     (docs / "kit.json").write_text('{"name": "probe"}', encoding="utf-8")
@@ -92,7 +92,7 @@ def test_an_author_pinned_parent_is_encoded_once(tmp_path: Path) -> None:
     `parent` is not. Running both through the encoder is how `sub#dir`
     became `sub%2523dir` and took every row under it out of the tree."""
     cli._project_root_cache.clear()
-    cli._tree_defaults_cache.clear()
+    cli._tree_kit_cache.clear()
     docs = tmp_path / "docs"
     (docs / "sub#dir").mkdir(parents=True)
     (docs / "kit.json").write_text('{"name": "probe"}', encoding="utf-8")

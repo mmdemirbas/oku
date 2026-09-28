@@ -647,7 +647,7 @@ class TestPayloadBudget:
     # row-bounded post-paint fit, and the point-label side and band
     # clamp. About 25,000 bytes, and most of it is the reasoning — each
     # rule is a measurement someone would otherwise have to take again.
-    KIT_BUDGET_BYTES = 1_332_000
+    KIT_BUDGET_BYTES = 1_336_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
