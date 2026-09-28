@@ -31,6 +31,7 @@ LONG = "BatchDataScanGroupReaderDeduplicateMergeFunctionFactory"
 # read once it fits.
 WORDY = "Kullanıcı oturum açma gecikmesi p99 (ms, bölge başına)"
 
+
 def _schema_enum_keys() -> set[str]:
     """Every property the page schema pins to a fixed set of values.
 
@@ -97,17 +98,30 @@ def examples() -> dict:
 
 
 def _ids(obj, out: set[str] | None = None) -> set[str]:
-    """Every value a payload uses as an `id`.
+    """Every string a payload uses to name something else in itself.
 
-    A sankey names its nodes by id and its links point at them by that
-    same string under `source` and `target`; a treemap points at a
-    `parent`. Lengthening one side of that pair and not the other
-    breaks the reference, and the figure then draws whatever is left —
-    which measures the test helper, not the kit.
+    Two shapes, and each was found by a false finding rather than by
+    reading the schema. A sankey names its nodes by `id` and its links
+    point at them by that same string under `source` and `target`; a
+    treemap points at a `parent`. And a scatter-matrix or a
+    parallel-coordinates payload names its variables by `key`, which
+    is a FIELD NAME of every record object beside it — lengthen that
+    and `record[key]` is undefined, so a matrix that draws 64 marks
+    with the shipped labels drew 16 with long ones and the audit
+    reported it as the figure collapsing.
+
+    So: a value under `id`, and any string that is also a key
+    somewhere in the payload. The second rule is deliberately broader
+    than the case that prompted it — naming the keys one at a time is
+    how the first version of this function was written, and it is why
+    there was a second case. Its cost is that a label which happens to
+    spell a field name is not lengthened, which loses a little
+    coverage and cannot invent a finding.
     """
     out = set() if out is None else out
     if isinstance(obj, dict):
         for k, v in obj.items():
+            out.add(k)
             if k == "id" and isinstance(v, str):
                 out.add(v)
             else:

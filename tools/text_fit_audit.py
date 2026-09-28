@@ -92,14 +92,33 @@ AUDIT = r"""(sel) => {
       || (holder.parentElement && holder.parentElement.querySelector(':scope > title'));
     return t ? (t.textContent || '').replace(/\s+/g, ' ').trim() : '';
   };
+  // Visibility is INHERITED in effect, so the element's own three
+  // properties do not answer it: an annotated-code tooltip is
+  // `display: none` at rest and every token inside it computes
+  // `display: inline`, `visibility: visible`, `opacity: 1`. Reading
+  // only the element reported three tooltips' worth of text as cut by
+  // the code block they hang off, which is text no reader can see.
   const shown = (e) => {
-    const cs = getComputedStyle(e);
-    if (cs.display === 'none' || cs.visibility === 'hidden') return false;
-    return parseFloat(cs.opacity) !== 0;
+    for (let n = e; n && n.nodeType === 1; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+      if (parseFloat(cs.opacity) === 0) return false;
+    }
+    return true;
   };
   const clips = (e) => {
     const cs = getComputedStyle(e);
     return /hidden|clip/.test(cs.overflow + cs.overflowX + cs.overflowY);
+  };
+  // A box the reader can scroll is not a box that cuts: the text is
+  // off screen and reachable, which is the difference between a
+  // defect and a scrollbar. Both axes, because either one alone makes
+  // the content reachable in that direction.
+  const scrolls = (e) => {
+    const cs = getComputedStyle(e);
+    const way = (v) => v === 'auto' || v === 'scroll';
+    return (way(cs.overflowX) && e.scrollWidth > e.clientWidth + 1)
+        || (way(cs.overflowY) && e.scrollHeight > e.clientHeight + 1);
   };
   const near = (e) => {
     for (let n = e; n && n !== host; n = n.parentElement) {
@@ -274,6 +293,12 @@ AUDIT = r"""(sel) => {
     // The box that would cut it: itself or the nearest clipping parent.
     let cut = null;
     for (let n = e; n && n !== host.parentElement; n = n.parentElement) {
+      // A scroller reached before any clipping box means the text is
+      // off screen, not lost. The live-snippet editor is exactly that
+      // shape: a `pre` at `overflow: auto` inside a wrap at
+      // `overflow: hidden`, so a walk looking only for `hidden` sailed
+      // past the scrollbar and called 54 Prism tokens clipped.
+      if (scrolls(n)) break;
       if (clips(n)) { cut = n; break; }
     }
     const over = e.scrollWidth - e.clientWidth;
@@ -334,14 +359,20 @@ def build_pages(kinds: list[str], out: pathlib.Path) -> dict:
         if kinds and kind not in kinds:
             continue
         pages[f"chart-{kind}"] = ("oku-chart", json.dumps(payload, separators=(",", ":")))
-        pages[f"chart-{kind}~wordy"] = ("oku-chart", json.dumps(longify(payload, WORDY), separators=(",", ":")))
+        pages[f"chart-{kind}~wordy"] = (
+            "oku-chart",
+            json.dumps(longify(payload, WORDY), separators=(",", ":")),
+        )
     for kind, payload in sorted(ex["blocks"].items()):
         if kind in SKIP_BLOCKS or kind not in FENCE_OF:
             continue
         if kinds and kind not in kinds:
             continue
         pages[f"block-{kind}"] = (FENCE_OF[kind], json.dumps(payload, separators=(",", ":")))
-        pages[f"block-{kind}~wordy"] = (FENCE_OF[kind], json.dumps(longify(payload, WORDY), separators=(",", ":")))
+        pages[f"block-{kind}~wordy"] = (
+            FENCE_OF[kind],
+            json.dumps(longify(payload, WORDY), separators=(",", ":")),
+        )
     for name, (fence, body) in pages.items():
         (docs / f"{_slug(name)}.md").write_text(
             f"---\ntitle: {name}\nsummary: One {name}.\n---\n\n## figure " + "{#c}" + "\n\n"
@@ -439,11 +470,17 @@ def lost_marks(drawn: dict) -> list[dict]:
         other = drawn.get((f"{name}~wordy", width, scale))
         if other is None or marks == 0 or other[0] >= marks:
             continue
-        out.append({
-            "figure": f"{name}~wordy", "width": width, "scale": scale,
-            "cls": "lost-marks", "where": "figure", "px": marks - other[0],
-            "text": f"{other[0]} marks with long labels, {marks} with the shipped ones",
-        })
+        out.append(
+            {
+                "figure": f"{name}~wordy",
+                "width": width,
+                "scale": scale,
+                "cls": "lost-marks",
+                "where": "figure",
+                "px": marks - other[0],
+                "text": f"{other[0]} marks with long labels, {marks} with the shipped ones",
+            }
+        )
     return out
 
 
@@ -452,9 +489,20 @@ def report(rows, pages, widths, scales) -> None:
     for r in rows:
         by_fig[r["figure"]][r["cls"]] += 1
     print(f"\n{len(pages)} figures x {len(widths)} widths x {len(scales)} scales")
-    print(f"{sum(len(v.values()) and sum(v.values()) for v in by_fig.values())} findings "
-          f"in {len(by_fig)} figures\n")
-    order = ["lost-marks", "plot-starved", "clipped-clip", "clipped-svg", "spill-svg", "clipped-html", "overlap", "ellipsis"]
+    print(
+        f"{sum(len(v.values()) and sum(v.values()) for v in by_fig.values())} findings "
+        f"in {len(by_fig)} figures\n"
+    )
+    order = [
+        "lost-marks",
+        "plot-starved",
+        "clipped-clip",
+        "clipped-svg",
+        "spill-svg",
+        "clipped-html",
+        "overlap",
+        "ellipsis",
+    ]
     print(f"{'figure':<30} " + " ".join(f"{c[:9]:>10}" for c in order))
     for fig in sorted(by_fig, key=lambda f: -sum(by_fig[f][c] for c in order[:7])):
         c = by_fig[fig]
@@ -464,7 +512,11 @@ def report(rows, pages, widths, scales) -> None:
     print("\nby class:")
     for cls, n in Counter(r["cls"] for r in rows).most_common():
         worst = max((r for r in rows if r["cls"] == cls), key=lambda r: r.get("px", 0), default=None)
-        extra = f"  worst {worst.get('px')}px in {worst['figure']} ({worst['where']})" if worst and worst.get("px") else ""
+        extra = (
+            f"  worst {worst.get('px')}px in {worst['figure']} ({worst['where']})"
+            if worst and worst.get("px")
+            else ""
+        )
         print(f"  {cls:<14} {n:>5}{extra}")
 
 

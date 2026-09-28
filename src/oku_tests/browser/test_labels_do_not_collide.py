@@ -34,7 +34,30 @@ _spec.loader.exec_module(_audit)
 # Every figure the audit reported a collision, a clip or a collapse in,
 # and which was then fixed. A name comes off this list only with a
 # measurement saying the defect is gone for a different reason.
-FIXED = ["stream", "bump", "horizon", "waterfall", "marimekko", "heatmap", "radar", "slope", "sankey", "geo"]
+FIXED = [
+    "stream",
+    "bump",
+    "horizon",
+    "waterfall",
+    "marimekko",
+    "heatmap",
+    "radar",
+    "slope",
+    "sankey",
+    "geo",
+    "quadrant",
+    "bubble",
+    "scatter",
+    "plot",
+    "parallel-coordinates",
+    "population-pyramid",
+    "scatter-matrix",
+    "connected-scatter",
+    "dumbbell",
+    "network",
+    "gauge",
+    "treemap",
+]
 
 # Findings that mean the reader cannot read something. `ellipsis` is
 # not among them: shortening with the full string in a <title> is the
@@ -62,8 +85,10 @@ def test_no_label_is_hidden_by_another_or_by_the_frame(swept, browser, width):
                 continue
             page = context.new_page()
             try:
-                page.goto((out / "docs" / "dist" / "standalone" / f"{_audit._slug(name)}.html").as_uri(),
-                          wait_until="load")
+                page.goto(
+                    (out / "docs" / "dist" / "standalone" / f"{_audit._slug(name)}.html").as_uri(),
+                    wait_until="load",
+                )
                 page.wait_for_function("() => window.__okuRendered === true", timeout=30000)
                 page.wait_for_timeout(600)
                 got = page.evaluate(_audit.AUDIT, "#c")
@@ -81,5 +106,7 @@ def test_no_label_is_hidden_by_another_or_by_the_frame(swept, browser, width):
     assert findings == [], (
         f"{len(findings)} unreadable labels at {width}px: "
         f"{Counter((f['figure'], f['cls']) for f in findings).most_common(6)}\n"
-        + "\n".join(f"  {f['figure']} {f['cls']} {f.get('where')} :: {f.get('text', '')[:60]}" for f in findings[:8])
+        + "\n".join(
+            f"  {f['figure']} {f['cls']} {f.get('where')} :: {f.get('text', '')[:60]}" for f in findings[:8]
+        )
     )

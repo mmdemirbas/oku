@@ -1308,6 +1308,109 @@ detector from `tools/text_fit_audit.py` rather than copying it: two
 implementations of "is this label cut" drift, and the copy in the test
 is the one that stops matching what the audit reports.
 
+**A label that is cut is cut by the nearest box, not by the outermost
+one.** The post-paint fit measured against the viewBox, which is the
+outer box and for most labels the only one — but every Cartesian
+renderer clips its plot, so points panned past the axes do not leak,
+and a label beside a dot near an edge is cut at a rect well inside the
+viewBox. Measured on the SHIPPED bubble and quadrant examples, with
+nothing long involved: a one-character point label sat 16.9 units past
+the clip and the fit reported nothing to do. It walks to the nearest
+clip in force and intersects now.
+
+Which side a point label sits on is decided from the dot alone
+(`px < plotMidX`), and that is right for a short label and wrong for a
+long one — a dot just left of the middle sends a 40-character label off
+the right edge. The side is re-decided once the labels are in the
+document and can be measured, and only where the other side is
+genuinely roomier, so a short label keeps the placement the reader
+expects. The same question on the other axis had no answer at all: a
+label's baseline is its dot's centre plus 4, so a dot ON the top of the
+plot puts the label's ascender above the clip. Both are clamped in one
+measured pass, which is also why the pass ORDER is now explicit —
+`_deconflictLabels` then `_fitTextToViewBox`, because the side decides
+the room and the fit shortens to the room it finds.
+
+**Where a label stops is its neighbour's business, and only a
+measurement knows where that is.** Every gutter and tick in the kit is
+sized from a character count, which is all that is available before the
+string is in the DOM — and a character count cannot see what CSS does
+to the glyphs. `.okc-parcoord-label` is `600 10.5px Inter` with
+`text-transform: uppercase` and `letter-spacing: 0.06em`, so a
+lowercase label is drawn in capitals about 40% wider than the count
+predicts: four axis names ran 279 units into each other with the fitter
+reporting them fitted. Tuning a per-class `emPerChar` is the fragile
+version — it fixes the class somebody measured and leaves the next one.
+`__okuTextRowBounds` takes the bound from the NEIGHBOURS instead and
+hands it to the post-paint fit, which measures real glyphs. Same class
+only: two different classes at one baseline is a spacing question for
+the renderer, and shortening one of them answers a question nobody
+asked. Rotated labels sit it out, because their box is not their row.
+
+Two things about it were wrong first, and both destroyed labels that
+had been fine. **Only a pair that ACTUALLY runs together is bounded**,
+and the bound splits the gap the two are contesting. Bounding every row
+at the midpoint of its anchors is wrong wherever the anchors are packed
+to CONTENT rather than spaced along an axis — a legend puts the next
+chip's anchor just past this chip's text, so halfway is inside the
+word: measured, a 3-character marimekko series name went to one letter
+with nothing colliding, and stream and gauge did the same. And **a row
+is a row in SCREEN space**, not in the `y` attribute: a network's node
+labels each sit in their own translated group, so two unrelated nodes
+shared a `y` of 0, were read as neighbours and cut each other to single
+letters. Everything is measured through `getBoundingClientRect` now,
+which accounts for a translated ancestor; a rotated one still opts out,
+because the axis-aligned bounds of a turned label are neither a row nor
+a width.
+
+**And the fit's safety margin is in screen pixels, so it has to scale
+with the drawing.** `__OKU_FIT_SLACK` is -2px: a label counts as fitted
+only once it clears the edge, because glyph advances round to device
+pixels. But an SVG is drawn at whatever size its column gives it, so
+the same 2px costs a chart at 286px two and a half times as much of its
+own drawing as it costs one at 720 — a y-axis label reading `Value`,
+anchored 14 units from the edge of a 640-unit viewBox and sitting 1.3px
+inside the frame at 360px wide, came out as `V…`. It was not over the
+edge; it was inside the margin. `__okuFitSlack` scales the demand with
+the drawing and never asks for more than the 2px, so a full-size chart
+is unchanged.
+
+That last exclusion is why two more were renderer fixes rather than
+rule fixes. An **axis label** is centred on its axis and grows both
+ways with nothing telling it the axis is the limit; rotated, it grows
+UPWARD into the title. And the parallel-coordinates **title row** was
+budgeted for two rows where three live — title, each axis's max tick,
+each axis's name — so the tick row began 6 units inside the title's
+box. Title descent plus tick ascent is the number that decides that,
+not the title's baseline.
+
+One renderer was hand-rolling a legend and had the same defect the
+shared one had: the dumbbell's two chips sat at constant offsets, so
+`to` was 86 units after `from` whatever `from` said, and any label past
+a word was drawn under the next swatch. Each chip takes half the row
+now and the second starts where the first ends.
+
+Held by `browser/test_labels_do_not_collide.py`, whose figure list
+grew by seven, and by `browser/test_the_detector_can_still_see.py`,
+which pairs each of the audit's two "stay quiet" rules with the shape
+it must still report — a scroller between the text and a clipping box
+means off screen and reachable, and visibility is inherited in effect,
+so an element's own three properties do not decide it.
+
+**A test helper that lengthens every string breaks every reference.**
+The audit's `longify` is how a figure gets measured with labels as long
+as author text really is, and twice it reported a defect it had caused.
+A sankey drew four nodes in one column with no links, because `source`
+and `target` had stopped matching the `id` they point at. Then a
+scatter-matrix drew 16 marks where the shipped payload draws 64,
+because `variables[].key` is a FIELD NAME of every record beside it and
+`record[key]` had become undefined. The rule is a value under `id`, and
+any string that is also a key somewhere in the payload — deliberately
+broader than the case that prompted it, since naming the keys one at a
+time is what produced the second case. Its cost is that a label
+spelling a field name is not lengthened, which loses a little coverage
+and cannot invent a finding.
+
 **Tables read as one card.** `.okt-table-wrap` carries a border +
 padding so two consecutive tables don't bleed into each other. The
 filter input + stats counter sit together on the left; chip rack is

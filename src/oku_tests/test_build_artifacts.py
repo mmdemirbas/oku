@@ -640,7 +640,14 @@ class TestPayloadBudget:
     # the mechanism is roughly 900; the rest is the reasoning, because
     # both rules are about what NOT to do and a deleted line leaves
     # nothing for the next reader to find.
-    KIT_BUDGET_BYTES = 1_304_000
+    # Then from 1,304,000 by the text-fit work a reader asked for:
+    # labels that are cut or drawn over each other, measured across
+    # every figure with labels as long as author text really is. Nine
+    # renderers changed, plus okuFitAxisTicks, the clip-aware and
+    # row-bounded post-paint fit, and the point-label side and band
+    # clamp. About 25,000 bytes, and most of it is the reasoning — each
+    # rule is a measurement someone would otherwise have to take again.
+    KIT_BUDGET_BYTES = 1_332_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

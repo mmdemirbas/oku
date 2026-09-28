@@ -479,12 +479,17 @@ def test_the_header_is_a_different_surface_from_its_rows(page, theme):
 def test_the_stuck_header_raises_a_shadow_and_the_resting_one_does_not(page):
     wrap = "#fits .okt-table-wrap"
     assert page.evaluate(f"() => document.querySelector({wrap!r}).dataset.stuck") is None
-    at_rest = page.evaluate("() => getComputedStyle(document.querySelector('#fits table thead th')).boxShadow")
+    at_rest = page.evaluate(
+        "() => getComputedStyle(document.querySelector('#fits table thead th')).boxShadow"
+    )
     assert at_rest == "none", f"a header in its place is already raised: {at_rest}"
 
     _scroll_table_top_to(page, "#fits", -1500)
-    until(page, f"() => document.querySelector({wrap!r}).dataset.stuck === '1'",
-          what="the header stuck and nothing said so")
+    until(
+        page,
+        f"() => document.querySelector({wrap!r}).dataset.stuck === '1'",
+        what="the header stuck and nothing said so",
+    )
     stuck = page.evaluate("() => getComputedStyle(document.querySelector('#fits table thead th')).boxShadow")
     assert stuck != "none", "a header floating over the rows has no shadow to separate it"
 
@@ -492,7 +497,12 @@ def test_the_stuck_header_raises_a_shadow_and_the_resting_one_does_not(page):
 def test_the_wide_table_ghost_raises_the_same_shadow(page):
     wrap = "#wide .okt-table-wrap"
     _scroll_table_top_to(page, "#wide", -1500)
-    until(page, f"() => document.querySelector({wrap!r}).dataset.stuck === '1'",
-          what="the ghost stuck and the wrap did not say so")
-    stuck = page.evaluate("() => getComputedStyle(document.querySelector('#wide .okt-table-ghost th')).boxShadow")
+    until(
+        page,
+        f"() => document.querySelector({wrap!r}).dataset.stuck === '1'",
+        what="the ghost stuck and the wrap did not say so",
+    )
+    stuck = page.evaluate(
+        "() => getComputedStyle(document.querySelector('#wide .okt-table-ghost th')).boxShadow"
+    )
     assert stuck != "none"
