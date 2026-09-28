@@ -5053,6 +5053,72 @@ def find_unparseable_json(root: Path) -> list[tuple[Path, str]]:
     return bad
 
 
+def unparseable_json_issues(root: Path) -> list[dict]:
+    """`find_unparseable_json` as issue rows, for every surface.
+
+    There were two surfaces and only one of them scanned. `oku check`
+    called `find_unparseable_json`; `oku build` called `check_pages`
+    over whatever `find_json_pages` returned, and `find_json_pages`
+    catches JSONDecodeError and moves on. So a legacy page JSON with a
+    trailing comma, with its own `.html` stub sitting beside it, was
+    dropped from the site, the nav, the manifest and the search index,
+    and the build printed `Doctree check: 1 page(s) clean` and exited
+    0. The build's own comment said it "runs the same checks as
+    `oku check` so the build never produces a doctree that the
+    standalone linter would have rejected"; it did not run this one.
+
+    Severity is decided by what can be KNOWN, which is the hard part:
+    a file that will not parse cannot be shape-tested, and `_is_page`
+    is the rule that decides page-ness. Two facts survive that:
+
+      - `kit.json` is a page-ness question answered by the NAME. A
+        malformed one silently reverts the accent, the domains, the
+        languages and the reader placeholders for a whole tree, which
+        is why it is already an error.
+      - a sibling `.html` of the same stem is the authoring pairing the
+        kit documents — the stub fetches exactly this `.json` — so the
+        file IS a page and a broken one is an error.
+
+    Everything else is a warning. A tree may hold any number of `.json`
+    files that were never pages: measured on a research tree of 73
+    markdown pages, 104 of them, three being saved HTTP error responses
+    an author had deliberately kept as evidence. Calling those errors
+    is the tool asserting something it cannot support, and it would
+    refuse to build a site over files that are not in it. A warning is
+    printed by default and `--strict` still fails on it.
+    """
+    out: list[dict] = []
+    for path, err in find_unparseable_json(root):
+        stub = path.with_suffix(".html")
+        # The severity and the code lead each branch as literals, which
+        # is the convention `test_authority_agreement` needs: it reads
+        # emitted codes out of this source, and a code reached only
+        # through a variable is one the docs table is then told nothing
+        # emits.
+        if path.name == "kit.json":
+            sev, code, tail = (
+                "error",
+                "json-parse-failed",
+                "the tree's accent, domains, languages and placeholders all fall back to defaults",
+            )
+        elif stub.is_file():
+            sev, code, tail = (
+                "error",
+                "json-parse-failed",
+                f"{stub.name} loads this page, so the page is missing from the build",
+            )
+        else:
+            sev, code, tail = (
+                "warning",
+                "json-parse-failed",
+                "not read as a page; if it is one, it is missing from the build",
+            )
+        out.append(
+            {"path": path, "severity": sev, "code": code, "where": "(file)", "message": f"{err} — {tail}"}
+        )
+    return out
+
+
 def ignored_paths_note(root: Path) -> str | None:
     """One line naming what git kept out of the walk, or None.
 
@@ -5131,23 +5197,13 @@ def cmd_check(args: argparse.Namespace) -> int:
     # Unparseable JSON has to be surfaced BEFORE find_json_pages drops
     # it — otherwise an authored page with a misplaced comma silently
     # disappears from the nav and check still reports "all clean".
-    bad_json = find_unparseable_json(root)
+    bad_json = unparseable_json_issues(root)
     pages = find_json_pages(root)
     if not pages:
         print(f"✗ No page-JSON files found under {root}", file=sys.stderr)
         return 1
 
-    issues = check_pages(pages, root)
-    for p, err in bad_json:
-        issues.append(
-            {
-                "path": p,
-                "severity": "error",
-                "code": "json-parse-failed",
-                "where": "(file)",
-                "message": err,
-            }
-        )
+    issues = check_pages(pages, root) + bad_json
 
     if getattr(args, "fix", False):
         # Rewrite first, then fall through and check the tree AS
@@ -6829,7 +6885,12 @@ def cmd_build(args: argparse.Namespace) -> int:
     # standalone linter would have rejected. Soft-fails without
     # jsonschema (the structural checks still run).
     if json_pages:
-        check_issues = check_pages(json_pages, root)
+        # The same scan `oku check` runs, and for the reason the build
+        # needs it more: `find_json_pages` has already dropped anything
+        # that would not parse, so without this the build's report is
+        # taken over the pages that survived and says nothing about the
+        # one that did not.
+        check_issues = check_pages(json_pages, root) + unparseable_json_issues(root)
         errors = [i for i in check_issues if i["severity"] == "error"]
         warnings = [i for i in check_issues if i["severity"] == "warning"]
         if errors:

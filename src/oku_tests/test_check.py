@@ -8,6 +8,7 @@ the project's own docs/.
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -1003,32 +1004,114 @@ def test_find_unparseable_json_returns_empty_when_clean(tmp_path: Path) -> None:
     assert cli.find_unparseable_json(tmp_path) == []
 
 
-def test_cmd_check_promotes_parse_failure_to_error(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """cmd_check must surface json-parse-failed as an error so the
-    user sees the file in the report instead of having it silently
-    drop from the page list. Before the fix this test would run with
-    one valid page, report '1 page(s) clean', and exit 0 — hiding the
-    broken sibling."""
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "good.json").write_text('{"kind": "page", "title": "T", "blocks": []}', encoding="utf-8")
-    (tmp_path / "design-review.json").write_text(
-        '{"kind": "page", "title": "T", "blocks": [] "extra": "bad"}',
-        encoding="utf-8",
-    )
+class TestAJsonThatWillNotParse:
+    """A `.json` that will not parse is reported everywhere, and its
+    severity follows what can be KNOWN.
+
+    Two defects, and the second is why the first could not simply be
+    fixed. `oku build` never ran this scan: `find_json_pages` catches
+    JSONDecodeError and moves on, so a legacy page with a trailing
+    comma — with its own `.html` stub beside it — was dropped from the
+    site, the nav, the manifest and the search index, and the build
+    printed `Doctree check: 1 page(s) clean` and exited 0. And the
+    severity was `error` for EVERY unparseable `.json`, which a real
+    tree is full of: measured on a research tree of 73 markdown pages,
+    104 `.json` files, three of them saved HTTP error responses kept
+    deliberately as evidence. Making the build honour the scan without
+    fixing the severity would have refused to build that site over
+    files that were never in it.
+
+    A file that will not parse cannot be shape-tested, and shape is
+    what `_is_page` decides page-ness by. Two facts survive that: the
+    name `kit.json`, and an `.html` stub of the same stem.
+    """
 
     class _Args:
         json = False
         strict = False
         verbose = False
         errors_only = False
+        fix = False
 
-    rc = cli.cmd_check(_Args())
-    out = capsys.readouterr().out
-    assert rc == 1, "cmd_check must exit non-zero when a page-shaped JSON fails to parse"
-    assert "design-review.json" in out
-    assert "json-parse-failed" in out
+    @staticmethod
+    def _page(dirpath: Path, stem: str = "good") -> None:
+        (dirpath / f"{stem}.md").write_text(
+            f"---\ntitle: {stem}\nsummary: Fine.\n---\n\n## Bir {{#bir}}\n\nProse.\n", encoding="utf-8"
+        )
+
+    @staticmethod
+    def _broken(dirpath: Path, name: str) -> Path:
+        p = dirpath / name
+        p.write_text('{"kind": "page", "title": "T", "blocks": [] "extra": "bad"}', encoding="utf-8")
+        return p
+
+    def test_a_broken_page_beside_its_stub_is_an_error(self, tmp_path, capsys, monkeypatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        self._page(tmp_path)
+        self._broken(tmp_path, "legacy.json")
+        (tmp_path / "legacy.html").write_text("<!doctype html><html></html>", encoding="utf-8")
+        rc = cli.cmd_check(self._Args())
+        out = capsys.readouterr().out
+        assert rc == 1, "a stub names this file as a page, so a page is missing from the build"
+        assert "json-parse-failed" in out and "legacy.json" in out
+        assert "legacy.html" in out, "the message has to say which page went"
+
+    def test_a_json_nothing_claims_as_a_page_is_a_warning(self, tmp_path, capsys, monkeypatch) -> None:
+        """An evidence file, a fixture, a saved response. The tool
+        cannot know it was meant to be a page, so it does not say so —
+        and it does not refuse to build a site over it."""
+        monkeypatch.chdir(tmp_path)
+        self._page(tmp_path)
+        self._broken(tmp_path, "saved-response.json")
+        rc = cli.cmd_check(self._Args())
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "json-parse-failed" in out and "saved-response.json" in out
+
+    def test_and_strict_still_fails_on_it(self, tmp_path, capsys, monkeypatch) -> None:
+        monkeypatch.chdir(tmp_path)
+        self._page(tmp_path)
+        self._broken(tmp_path, "saved-response.json")
+        args = self._Args()
+        args.strict = True
+        assert cli.cmd_check(args) == 1
+        assert "json-parse-failed" in capsys.readouterr().out
+
+    def test_a_broken_kit_json_is_an_error_by_its_name(self, tmp_path, capsys, monkeypatch) -> None:
+        """No stub can vouch for kit.json and it needs none: a
+        malformed one reverts the accent, the domains, the languages
+        and the reader placeholders for the whole tree, in silence."""
+        monkeypatch.chdir(tmp_path)
+        self._page(tmp_path)
+        (tmp_path / "kit.json").write_text('{"languages": ["tr","en"],}', encoding="utf-8")
+        assert cli.cmd_check(self._Args()) == 1
+        assert "json-parse-failed" in capsys.readouterr().out
+
+    def test_the_build_runs_the_same_scan_and_refuses(self, tmp_path, capsys, monkeypatch) -> None:
+        """The defect itself. Before this, the build reported the
+        pages that SURVIVED discovery and said nothing about the one
+        that did not."""
+        monkeypatch.chdir(tmp_path)
+        self._page(tmp_path)
+        self._broken(tmp_path, "legacy.json")
+        (tmp_path / "legacy.html").write_text("<!doctype html><html></html>", encoding="utf-8")
+        rc = cli.cmd_build(argparse.Namespace(no_search=True, no_vendor=True))
+        out = capsys.readouterr().out
+        assert rc != 0, "the build shipped a tree with a page missing from it"
+        assert "json-parse-failed" in out
+        assert not (tmp_path / "dist" / "standalone" / "legacy.html").exists()
+
+    def test_the_build_still_ships_over_a_json_that_is_not_a_page(
+        self, tmp_path, capsys, monkeypatch
+    ) -> None:
+        """The other half, and the reason the severity rule exists: a
+        tree that keeps data beside its pages still builds."""
+        monkeypatch.chdir(tmp_path)
+        self._page(tmp_path)
+        self._broken(tmp_path, "saved-response.json")
+        rc = cli.cmd_build(argparse.Namespace(no_search=True, no_vendor=True))
+        assert rc == 0, capsys.readouterr().out
+        assert (tmp_path / "dist" / "standalone" / "good.html").exists()
 
 
 # ---------- find_kit_json placement priority ----------

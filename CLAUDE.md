@@ -928,6 +928,47 @@ attribute name: the toolbar sizes and orders its icons through
 in that list — a 22x10 box around a 0x0 icon. Held by
 `test_table_copy_formats.py`.
 
+**`oku build` runs the checks `oku check` runs — it did not, and the
+gap was the whole point of one of them.** `find_unparseable_json`
+exists because `find_json_pages` catches `JSONDecodeError` and moves
+on, so a page whose JSON stops parsing disappears from discovery
+without a word. Only `cmd_check` ever called it. `cmd_build` called
+`check_pages` over whatever discovery RETURNED — which is the set that
+parsed — under a comment saying it "runs the same checks as `oku check`
+so the build never produces a doctree that the standalone linter would
+have rejected". Reproduced: a legacy page JSON with a trailing comma,
+its own `.html` stub sitting beside it, and `oku build` printed
+`✓ Doctree check: 1 page(s) clean`, exited 0, and wrote a site with the
+page gone from the tree, the manifest and the search index. The refusal
+path was already there and had nothing to refuse. Both surfaces call
+`unparseable_json_issues` now, so there is one scan rather than two
+lists that can disagree.
+
+**And its severity follows what can be known, which is the reason it
+could not just be switched on.** Every unparseable `.json` was an
+`error`, and a real tree is full of `.json` that was never a page:
+measured on a research tree of 73 markdown pages, 104 of them, three
+being saved HTTP error responses an author had deliberately kept as
+evidence and annotated as such. Honouring the scan in the build without
+touching the severity would have refused to build that site over files
+that are not in it. A file that will not parse cannot be shape-tested,
+and shape is what `_is_page` decides page-ness by — so two facts
+survive and the rest is a warning: **`kit.json`**, where the NAME is
+the contract and a malformed one silently reverts the accent, the
+domains, the languages and the placeholders for a whole tree; and **an
+`.html` stub of the same stem**, which is the authoring pairing the kit
+documents, so the file IS a page and the message says which page went.
+A warning is printed by default and `--strict` still fails on it.
+
+The severity and the code lead each branch as literals, which is the
+convention `test_authority_agreement` needs — it reads emitted codes
+out of the source, and a code reached only through a variable is one
+the docs table is then told nothing emits. Held by
+`test_check.py::TestAJsonThatWillNotParse`, six cases: the stub case
+errors, the unclaimed case warns, `--strict` fails on the warning,
+`kit.json` errors by its name, the build refuses and the page is
+absent, and the build still ships over a `.json` that is not a page.
+
 **A project may declare .gitignore its skip list, and must ask for
 it.** `kit.json`'s `skip_gitignored: true` adds everything git ignores to
 the walk's prune set — one `git ls-files -o -i --exclude-standard
