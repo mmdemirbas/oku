@@ -1201,6 +1201,35 @@ with its opposite — an error the page can name, and a warning the kit's
 own subsystems push, must still badge, or the file would pass on an
 indicator that never fires at all.
 
+**The column labels are a band, and while they float they cast a
+shadow.** `th` and `td` shared one background — the rows sit on `--bg`
+and so did the header — so the only thing between a label and the data
+under it was a 2px rule. It is worst exactly where the sticky header
+earns its keep: pinned, the header floats over rows that look identical
+to it, and a reader scrolling a long table loses which is which.
+`--table-head` is a lightness step from the rows (L* 93.5 against 98.2
+in light, 11.3 against 4.0 in dark — dL* >= 4, the floor below which two
+fills read as one field; a contrast RATIO does not answer that question,
+which is why `_colour.lightness` exists beside `contrast`). The shadow
+is a STATE, raised only while the header is detached from its place, and
+both mechanisms raise it off one `data-stuck` flag on the wrap, because
+which of the two is pinning the header is not the reader's business.
+Scoped to `thead th` and the ghost's clone: a `th[scope=row]` in the
+list view is a row label inside the data. Held by
+`browser/test_sticky_table_header.py`, which measures the lightness step
+in both themes and asserts the shadow is absent at rest.
+
+Two traps, both found by measuring. **A rule using `:is()` carries the
+specificity of its strongest argument**: the base cell rule is
+`:is(table, .okt-table-ghost) th`, so a plain `table thead th` loses to
+it and the band never appeared — the answer is to match the shape, not
+to reach for `!important`, which would have hidden which rule was
+winning. And **a sticky `th` moves while its `<thead>` does not**:
+`position: sticky` is on the cell, and Chrome leaves the section box
+where the flow put it, so the thead's rect read -1256 in the same frame
+its cells read 12. Anything asking "is this header pinned" must measure
+a CELL.
+
 **Tables read as one card.** `.okt-table-wrap` carries a border +
 padding so two consecutive tables don't bleed into each other. The
 filter input + stats counter sit together on the left; chip rack is

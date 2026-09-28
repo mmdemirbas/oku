@@ -4283,11 +4283,30 @@ function initReadingAids() {
       // listener on the document would not. Released on the first scroll
       // after — the same rule the column grabber follows for its pair.
       if (!wrap.isConnected) { release(); return; }
-      if (ghost.hidden) return;
-      // In flow the ghost sits exactly over the real thead; stuck, it
-      // is below it. No offset or zoom to know — works in any scrollport.
-      var stuck = ghost.getBoundingClientRect().top > table.tHead.getBoundingClientRect().top + 0.5;
-      if (stuck) ghost.dataset.stuck = '1'; else delete ghost.dataset.stuck;
+      var head = table.tHead;
+      if (!head) return;
+      var stuck;
+      if (ghost.hidden) {
+        // The fitting table's own header is stuck to the viewport. At
+        // rest it sits at the top of its table; pinned, it is below it.
+        // Measured on a CELL, never on the <thead>: `position: sticky`
+        // is on the `th`, and when a cell is pinned Chrome leaves the
+        // section box where the flow put it — the thead's rect read
+        // -1256 in the same frame its cells read 12, so a comparison
+        // against the section says "not stuck" at every scroll offset.
+        var cell = head.querySelector('th');
+        stuck = !!cell && cell.getBoundingClientRect().top > table.getBoundingClientRect().top + 0.5;
+      } else {
+        // In flow the ghost sits exactly over the real thead; stuck, it
+        // is below it. No offset or zoom to know — any scrollport.
+        stuck = ghost.getBoundingClientRect().top > head.getBoundingClientRect().top + 0.5;
+        if (stuck) ghost.dataset.stuck = '1'; else delete ghost.dataset.stuck;
+      }
+      // Both mechanisms raise the same shadow, off one flag on the wrap:
+      // a header floating over rows that look like it needs to say so,
+      // and which of the two is doing the floating is not the reader's
+      // business. Held by browser/test_sticky_table_header.py.
+      if (stuck) wrap.dataset.stuck = '1'; else delete wrap.dataset.stuck;
     }
     var queued = false;
     function queueSync() {
@@ -5632,7 +5651,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-28-r87';
+var __okuKitBuild = '2026-09-28-r88';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

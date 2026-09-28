@@ -440,3 +440,59 @@ def test_the_layout_write_happens_outside_the_delivery_pass(counted):
     assert counted.evaluate("() => window.__inCallback") == [], (
         "the sticky header wrote layout from inside a ResizeObserver callback"
     )
+
+
+# --- Telling the header from the rows ------------------------------------
+#
+# Reported by a reader: with a long table scrolled, the sticky header
+# and the rows under it are the same colour with no depth cue between
+# them, so the labels and the data run together exactly when the header
+# is doing its job. Measured before the fix: `th` and the rows both sat
+# on --bg, and the only thing between them was a 2px rule.
+#
+# Two rules, because they answer two states. At rest the header is a
+# BAND: a lightness step from the rows, which is what the eye reads as
+# a different surface (a contrast ratio does not answer that question).
+# While stuck it is also FLOATING, so it raises a shadow — and the
+# shadow appears for both mechanisms, since which one is pinning the
+# header is not the reader's business.
+
+
+def _bg(page, sel: str) -> str:
+    return page.evaluate(f"() => getComputedStyle(document.querySelector({sel!r})).backgroundColor")
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_header_is_a_different_surface_from_its_rows(page, theme):
+    from ._colour import lightness
+
+    page.evaluate("(t) => document.documentElement.setAttribute('data-theme', t)", theme)
+    page.wait_for_timeout(120)
+    head = _bg(page, "#fits table thead th")
+    row = _bg(page, "#fits table tbody td")
+    if row in ("rgba(0, 0, 0, 0)", "transparent"):
+        row = _bg(page, "#fits .okt-table-scroll")
+    step = abs(lightness(head) - lightness(row))
+    assert step >= 4, f"{theme}: header {head} and rows {row} are {step:.1f} L* apart; they read as one field"
+
+
+def test_the_stuck_header_raises_a_shadow_and_the_resting_one_does_not(page):
+    wrap = "#fits .okt-table-wrap"
+    assert page.evaluate(f"() => document.querySelector({wrap!r}).dataset.stuck") is None
+    at_rest = page.evaluate("() => getComputedStyle(document.querySelector('#fits table thead th')).boxShadow")
+    assert at_rest == "none", f"a header in its place is already raised: {at_rest}"
+
+    _scroll_table_top_to(page, "#fits", -1500)
+    until(page, f"() => document.querySelector({wrap!r}).dataset.stuck === '1'",
+          what="the header stuck and nothing said so")
+    stuck = page.evaluate("() => getComputedStyle(document.querySelector('#fits table thead th')).boxShadow")
+    assert stuck != "none", "a header floating over the rows has no shadow to separate it"
+
+
+def test_the_wide_table_ghost_raises_the_same_shadow(page):
+    wrap = "#wide .okt-table-wrap"
+    _scroll_table_top_to(page, "#wide", -1500)
+    until(page, f"() => document.querySelector({wrap!r}).dataset.stuck === '1'",
+          what="the ghost stuck and the wrap did not say so")
+    stuck = page.evaluate("() => getComputedStyle(document.querySelector('#wide .okt-table-ghost th')).boxShadow")
+    assert stuck != "none"

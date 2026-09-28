@@ -71,3 +71,17 @@ def contrast(a: str | tuple[float, float, float], b: str | tuple[float, float, f
     front = a if isinstance(a, tuple) else composite(a, f"rgb({back[0]}, {back[1]}, {back[2]})")
     hi, lo = sorted((_luminance(front), _luminance(back)), reverse=True)
     return (hi + 0.05) / (lo + 0.05)
+
+
+def lightness(rgb: str | tuple[float, float, float]) -> float:
+    """CIELAB L* — perceived lightness, 0 (black) to 100 (white).
+
+    Contrast ratio answers "can this text be read on this fill". It
+    does not answer "do these two fills read as different surfaces",
+    which is a lightness step: two fills one ratio apart can be told
+    apart by a machine and not by an eye. L* is the scale that matches
+    the eye, and dL* >= 4 is the floor below which a header band and
+    the rows under it read as one field.
+    """
+    y = _luminance(parse_rgb(rgb)[:3] if isinstance(rgb, str) else rgb)
+    return 116 * (y ** (1 / 3)) - 16 if y > 0.008856 else 903.3 * y

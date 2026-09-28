@@ -86,6 +86,11 @@
      beside any other one, on 38 surfaces at once. Same family, a
      quarter of the saturation. */
   --surface-2: #f5f4f8;
+  /* A table's header band. Not --surface-2: the rows sit on --bg and a
+     header has to be told apart from them at a glance, which needs a
+     lightness step, not a tint. L* 93.5 against the rows' 98.2, so
+     dL* 4.7 — the floor below which the two read as one field. */
+  --table-head: #eeebf5;
   --text: #1e1b29;
   --text-soft: #4c4760;
   --text-faint: #8b85a3;
@@ -185,6 +190,8 @@
   --bg: #0e0c1c;
   --surface: #1a1730;
   --surface-2: #15122a;
+  /* Lighter than the rows here, for the same dL*: 11.3 against 4.0. */
+  --table-head: #1e1a38;
   --text: #e8e6f5;
   --text-soft: #c9c4e0;
   --text-faint: #7a7493;
@@ -3944,6 +3951,29 @@ table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5p
   padding: 10px 14px; border-bottom: 2px solid var(--border);
   font-weight: 650; color: var(--text-soft); font-size: 12.5px;
   text-transform: uppercase; letter-spacing: 0.04em;
+}
+/* The column labels are a band, not a first row.
+   `th` and `td` shared one background, so the only thing between a
+   label and the data under it was a 2px rule — and the moment the
+   header sticks, it is floating over rows that look exactly like it,
+   with nothing to say which is which. The band is the fix at rest; the
+   shadow is the fix while it floats.
+   Scoped to `thead th` and the ghost's clone of it: a `th[scope=row]`
+   in the list view is a row label inside the data, and giving that the
+   header band would paint a column of the table as chrome.
+   Border AND shadow, which is normally one system too many — but the
+   border is a seam that is always there and the shadow is a STATE,
+   raised only while the header is detached from its place in the
+   document.
+
+   `:is(table thead, ...)` rather than `table thead th`: the base rule
+   above is `:is(table, .okt-table-ghost) th`, and `:is()` takes the
+   specificity of its strongest argument — a class — so three element
+   selectors lose to it and the band never appeared. Matching the shape
+   is the fix; `!important` would have hidden which rule was winning. */
+:is(table thead, .okt-table-ghost) th { background: var(--table-head); }
+.okt-table-wrap[data-stuck="1"] :is(table thead, .okt-table-ghost) th {
+  box-shadow: 0 6px 10px -8px var(--shadow-strong), 0 1px 0 var(--border);
 }
 /* Sticky column headers — only on top-level <thead> rows. Scoped this
    way so row-headers in the list-card view (<th scope="row">) don't
