@@ -1247,6 +1247,26 @@ by `browser/test_tile_map_cells.py`, which asks the rendered result —
 every code drawn once, no two codes at one point — because the question
 is what the reader sees, not what the table says.
 
+**The cover is the page's opening, not a banner.** It was a tinted
+panel: three layers of `--accent-soft` — a 118deg linear wash over two
+corner radials — inside a bordered, shadowed, 20px-radius card. Two
+things were wrong with it and a reader named both. The layers OVERLAP,
+so the tint is applied twice where they cross: the field comes out
+blotchy and with no light direction, which reads as a rendering
+artifact rather than a decision. And a full-bleed accent wash on every
+page spends the accent on decoration — with amber it reads as a
+promotion, with rose as a greeting card, and a technical document opens
+with neither. Now: no panel, no tint, no frame. One 52x3 accent rule
+above the title is the whole accent budget for the block, and the title
+carries the page on scale and tracking (46px, -0.032em). 144px against
+the panel's 182px, so the document starts sooner as well. The rule
+stands down on a page that has an eyebrow (`:has(.eyebrow)`), because
+an uppercase accent line IS the mark and two accent marks stacked is
+the spreading this rule exists to stop. Held by
+`test_invariants.py::test_the_cover_opens_with_one_accent_mark_and_no_panel`
+— which replaced the test asserting all three gradient layers were
+present, because those layers were the defect.
+
 **Tables read as one card.** `.okt-table-wrap` carries a border +
 padding so two consecutive tables don't bleed into each other. The
 filter input + stats counter sit together on the left; chip rack is

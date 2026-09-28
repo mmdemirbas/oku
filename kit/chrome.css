@@ -1974,44 +1974,57 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 }
 
 /* ============ Cover header ============ *
- * Card-like cover with two stacked radial washes (top-right + bottom-
- * left) that fade naturally into transparency, so the accent color
- * never cuts off abruptly at a hard edge. Subtle border + 1px shadow
- * give the cover its own elevation tier against the page bg. The old
- * heavy 3px primary underline is replaced by the card border + extra
- * margin so the visual seam between cover and content is quiet.
+ * The page's opening, not a banner.
+ *
+ * It used to be a tinted panel: three layers of `--accent-soft` — a
+ * 118deg linear wash and two corner radials — over `--surface`, inside
+ * a bordered, shadowed, 20px-radius card. Two things were wrong with
+ * it, and the reader named both. The layers OVERLAP, so the tint is
+ * applied twice where they cross and the field comes out blotchy and
+ * without a light direction, which reads as a rendering artifact
+ * rather than a decision. And a full-bleed accent wash on every page
+ * spends the accent on decoration: with amber it reads as a promotion,
+ * with rose as a greeting card, and neither is what a technical
+ * document opens with.
+ *
+ * Now: no panel, no tint, no border. One 52x3 accent rule above the
+ * title — the whole accent budget for the block — then the title
+ * carrying the page on scale and tracking alone. Emphasis is spent,
+ * not spread. The cover is 145px against the panel's 182px, so the
+ * document starts sooner too.
+ *
+ * The rule stands down when the page has an eyebrow: an uppercase
+ * accent-coloured line IS the mark, and two accent marks stacked is
+ * the spreading this rule exists to stop.
  * --------------------------------------------------------------- */
 header.cover {
   position: relative;
-  overflow: hidden;
-  margin: 0 0 48px 0;
-  padding: 44px 42px 48px 42px;
-  border-radius: 20px;
-  background:
-    /* Diagonal wash present at every width — the two corner glows alone
-       wash out on a wide desktop cover and the hero reads as flat white.
-       The linear layer keeps the accent visible across the whole block
-       (the way the corner radials already do on a narrow mobile card). */
-    linear-gradient(118deg, var(--accent-soft) 0%, transparent 50%),
-    radial-gradient(820px 460px at 108% -18%, var(--accent-soft) 0%, transparent 62%),
-    radial-gradient(560px 320px at -12% 118%, var(--accent-soft) 0%, transparent 70%),
-    var(--surface);
-  border: 1px solid var(--border-soft);
-  box-shadow: 0 1px 2px var(--shadow-soft);
+  margin: 0 0 40px 0;
+  padding: 6px 0 26px 0;
 }
+header.cover::before {
+  content: "";
+  display: block;
+  width: 52px;
+  height: 3px;
+  margin: 0 0 22px 0;
+  border-radius: 2px;
+  background: var(--accent);
+}
+header.cover:has(.eyebrow)::before { display: none; }
 header.cover > * { position: relative; z-index: 1; }
 /* Title only — no eyebrow, no subtitle, no meta line. The full panel
    padding leaves the heading stranded in the top third of a mostly
    empty tinted rectangle, so the block shrinks to fit what it holds. */
-header.cover.cover-bare { padding: 30px 42px 32px 42px; margin-bottom: 36px; }
+header.cover.cover-bare { padding: 6px 0 18px 0; margin-bottom: 32px; }
 header.cover.cover-bare h1 { margin-bottom: 0; }
 header.cover .eyebrow {
   font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.18em;
   color: var(--accent-strong); font-weight: 700; margin-bottom: 16px;
 }
 header.cover h1 {
-  font-size: 44px; line-height: 1.08; margin: 0 0 14px 0;
-  color: var(--text); font-weight: 800; letter-spacing: -0.025em;
+  font-size: 46px; line-height: 1.06; margin: 0 0 12px 0;
+  color: var(--text); font-weight: 800; letter-spacing: -0.032em;
 }
 header.cover .subtitle {
   font-size: 17px; color: var(--text-soft); margin: 0;
@@ -2032,8 +2045,9 @@ header.cover .meta-updated {
   letter-spacing: 0.02em;
 }
 @media (max-width: 700px) {
-  header.cover { padding: 32px 24px 36px 24px; border-radius: 14px; }
-  header.cover h1 { font-size: 34px; }
+  header.cover { padding: 4px 0 20px 0; margin-bottom: 28px; }
+  header.cover h1 { font-size: 32px; letter-spacing: -0.028em; }
+  header.cover::before { width: 44px; margin-bottom: 18px; }
 }
 
 /* ============ Section headings & text ============ */

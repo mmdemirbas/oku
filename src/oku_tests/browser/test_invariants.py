@@ -411,17 +411,42 @@ def test_nav_cards_are_unordered_two_column_grid(page, site_url):
     assert info["columns"] == 2, f"nav cards must tile two-up at desktop, got {info['columns']}"
 
 
-def test_hero_keeps_gradient_wash_at_desktop(page, site_url):
-    """The hero cover must read as a branded block on a wide desktop, not
-    flat white: it carries a diagonal accent wash (visible at any width)
-    on top of the two corner glows. Gradient legibility itself needs the
-    eye (see commit screenshots); this guards the layers from silently
-    being dropped."""
+def test_the_cover_opens_with_one_accent_mark_and_no_panel(page, site_url):
+    """The cover is the page's opening, not a banner.
+
+    It used to be a tinted panel — a diagonal wash over two corner
+    glows, and this test asserted all three layers were present. They
+    were the defect: the layers overlap, so the tint doubles where they
+    cross and the field reads blotchy and directionless, and a
+    full-bleed accent on every page spends the accent on decoration
+    (amber read as a promotion, rose as a greeting card). The invariant
+    that replaces it is the one the design now rests on: no panel, and
+    exactly one accent mark."""
     page.set_viewport_size(DESKTOP)
     _goto(page, f"{site_url}/docs/index.html")
-    bg = page.evaluate("() => getComputedStyle(document.querySelector('header.cover')).backgroundImage")
-    assert bg.count("linear-gradient") >= 1, f"hero lost its diagonal wash: {bg}"
-    assert bg.count("radial-gradient") >= 2, f"hero lost its corner glows: {bg}"
+    got = page.evaluate(
+        """() => {
+        const c = document.querySelector('header.cover');
+        const cs = getComputedStyle(c);
+        const rule = getComputedStyle(c, '::before');
+        return { bg: cs.backgroundImage, colour: cs.backgroundColor,
+                 border: cs.borderBottomWidth + ' ' + cs.borderTopWidth,
+                 shadow: cs.boxShadow,
+                 ruleW: parseFloat(rule.width), ruleH: parseFloat(rule.height),
+                 ruleBg: rule.backgroundColor,
+                 accent: cs.getPropertyValue('--accent').trim(),
+                 h1: parseFloat(getComputedStyle(c.querySelector('h1')).fontSize),
+                 height: Math.round(c.getBoundingClientRect().height) };
+    }"""
+    )
+    assert got["bg"] == "none", f"the cover still paints a panel: {got['bg']}"
+    assert got["shadow"] == "none", f"the cover still sits on an elevation tier: {got['shadow']}"
+    assert got["border"] == "0px 0px", f"the cover still has a frame: {got['border']}"
+    # One mark, and it is the accent: 52x3 above the title.
+    assert (got["ruleW"], got["ruleH"]) == (52.0, 3.0), f"accent rule is {got['ruleW']}x{got['ruleH']}"
+    assert got["ruleBg"] not in ("rgba(0, 0, 0, 0)", "transparent"), "the accent mark has no colour"
+    # The title carries the block, so it stays large.
+    assert got["h1"] >= 40, f"cover title is {got['h1']}px"
 
 
 def test_table_status_cells_render_semantic_pills(page, site_url):
