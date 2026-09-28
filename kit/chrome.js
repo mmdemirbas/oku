@@ -4335,10 +4335,31 @@ function initReadingAids() {
       var head = table.tHead;
       return head ? head.getBoundingClientRect().height : 0;
     }
+    /* Measure in the callback, write in the next frame, and only what
+       changed.
+
+       Both writes below invalidate layout: the custom property is the
+       ghost's `top`, and `data-fit` switches the scroller's overflow.
+       Making them from inside a ResizeObserver callback is how a page
+       comes to tell its reader `ResizeObserver loop completed with
+       undelivered notifications` — a callback resizing something the
+       same delivery pass has already visited leaves the browser to
+       defer the rest to the next frame, and it says so on the window.
+       Deferring the write puts it outside the pass; skipping an
+       unchanged one means most deliveries write nothing at all.
+       Measured on a delivered 31-table page, a load plus four
+       resizes: 155 `--okt-sticky-top` writes of which 62 set the value
+       already there, and 93 `data-fit` writes of which 91 did. */
+    var lastTop = '';
     function measureFit() {
-      wrap.style.setProperty('--okt-sticky-top', chromeFloor() + 'px');
+      var top = chromeFloor() + 'px';
+      if (top !== lastTop) {
+        lastTop = top;
+        wrap.style.setProperty('--okt-sticky-top', top);
+      }
       var fits = table.getBoundingClientRect().width <= scroll.getBoundingClientRect().width + 1;
-      scroll.dataset.fit = fits ? '1' : '0';
+      var want = fits ? '1' : '0';
+      if (scroll.dataset.fit !== want) scroll.dataset.fit = want;
       if (ghost.hidden !== fits) {
         ghost.hidden = fits;
         if (!fits) syncGhost();
@@ -4346,7 +4367,19 @@ function initReadingAids() {
         queueSync();
       }
     }
-    var ro = new ResizeObserver(measureFit);
+    var measureQueued = false;
+    function queueMeasure() {
+      if (measureQueued) return;
+      measureQueued = true;
+      requestAnimationFrame(function () {
+        measureQueued = false;
+        // Same rule as syncStuck: a table in a viewed markdown file
+        // goes away with the file, and the observer would not.
+        if (!wrap.isConnected) { release(); return; }
+        measureFit();
+      });
+    }
+    var ro = new ResizeObserver(queueMeasure);
     ro.observe(scroll);
     ro.observe(table);
     // The chrome cluster is assembled while the page renders — search
@@ -5599,7 +5632,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-27-r86';
+var __okuKitBuild = '2026-09-28-r87';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -16774,8 +16807,55 @@ var __okuWarnings = (function () {
     hide();
   }
 
-  // Capture standard error channels too
+  /* The standard error channels, filtered down to what the reader can
+     act on.
+
+     This panel's promise is that something is wrong with THIS
+     DOCUMENT — a diagram that did not parse, an image that is not
+     there, a chart with a backwards range. Two classes of window error
+     are not that, and both were badging delivered documents:
+
+     A ResizeObserver notice is not a failure. When a callback resizes
+     something the delivery pass has already visited, the spec defers
+     the remaining observations to the next frame and fires this to say
+     so; nothing threw and the layout settles. Chrome words it `loop
+     completed with undelivered notifications`, other engines `loop
+     limit exceeded`.
+
+     An error with no filename AND no error object is the cross-origin
+     sanitised form: the browser refuses to say what threw, or where.
+     Over file:// that covers the kit's own vendored bundles, and
+     everywhere it covers a script a browser extension injected into
+     the page — which is the one a reader meets most, on a document
+     with nothing wrong with it. The kit cannot attribute it, so it
+     cannot ask the reader to do anything about it.
+
+     Neither is dropped. Both go to the console once per distinct
+     message, because a silent drop is how the next real defect goes
+     unreported, and because the author chasing one is already there. */
+  // Null-prototype: a message that happens to read `constructor` is
+  // a message, not a method.
+  var _quieted = Object.create(null);
+  function unattributable(e) {
+    if (/^ResizeObserver loop/.test(e.message || '')) {
+      return 'a ResizeObserver delivery notice: the browser settles it on the next frame, nothing failed';
+    }
+    if (!e.filename && !e.error) {
+      return 'an error inside a script this page may not read — another origin, so a browser extension, '
+        + 'or over file:// one of the kit\'s own vendored bundles';
+    }
+    return null;
+  }
   window.addEventListener('error', function (e) {
+    var why = unattributable(e);
+    if (why) {
+      var msg = e.message || 'unknown';
+      if (!_quieted[msg]) {
+        _quieted[msg] = true;
+        if (window.console && console.warn) console.warn('[oku] not shown to the reader — ' + msg + ' (' + why + ')');
+      }
+      return;
+    }
     push([{ code: 'window-error', msg: (e.message || 'unknown') + ' @ ' + (e.filename || '?') + ':' + (e.lineno || 0), level: 'error' }]);
   });
   window.addEventListener('unhandledrejection', function (e) {

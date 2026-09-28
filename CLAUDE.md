@@ -1160,10 +1160,46 @@ with the width control. It is re-measured on `oku:rendered` and on
 page renders — search arrives when its subsystem initialises, and adding
 a button resizes nothing the observer watches. Held by
 `browser/test_sticky_table_header.py`, which asserts no fixed chrome box
-intersects the parked header at desktop, 1.25 text scale and 360px. Held by `browser/test_sticky_table_header.py`,
-which asks from the reader's side — under the rail, in this column,
-is there a cell with this label — so it does not care which mechanism
-answered.
+intersects the parked header at desktop, 1.25 text scale and 360px, and
+which asks the rest from the reader's side — under the rail, in this
+column, is there a cell with this label — so it does not care which
+mechanism answered.
+
+**Measure in a ResizeObserver callback, write in the next frame, and
+only write what changed.** Both of the sticky header's writes invalidate
+layout: `--okt-sticky-top` is the ghost's `top`, and `data-fit` switches
+the scroller's overflow. Making them from inside the callback is how a
+page comes to tell its reader `ResizeObserver loop completed with
+undelivered notifications` — a callback resizing something the delivery
+pass has already visited leaves the browser to defer the rest a frame,
+and it says so on the window. The measurement stays in the callback, the
+write moves to a `requestAnimationFrame` outside the pass, and an
+unchanged value is not written at all. Measured on a delivered 31-table
+page over a load and four resizes: 155 `--okt-sticky-top` writes of
+which 62 set the value already there, and 93 `data-fit` writes of which
+91 did. Held by the last two cases in
+`browser/test_sticky_table_header.py`, which count the writes and assert
+none lands while a callback is on the stack.
+
+**The indicator says what is wrong with the DOCUMENT, and a browser
+notice is not that.** Three delivered documents came back from a reader
+with an alarm badge: `ResizeObserver loop completed with undelivered
+notifications` on all three and `Script error. @ ?:0` on one, and
+nothing was wrong with any of them. A ResizeObserver notice is not a
+failure — the spec defers the remaining observations to the next frame
+and fires this to say so. An error with no filename AND no error object
+is the cross-origin sanitised form, which the page is not permitted to
+read: over `file://` that covers the kit's own vendored bundles, and
+everywhere it covers a script a browser extension injected, which is the
+one a reader meets most. The kit cannot attribute either, so it cannot
+ask the reader to do anything about them, and a panel that cries wolf is
+the one nobody opens when a diagram really does fail to parse. **Neither
+is dropped**: both go to the console once per distinct message, because
+a silent drop is how the next real defect goes unreported. Held by
+`browser/test_warning_indicator_signal.py`, where every case is paired
+with its opposite — an error the page can name, and a warning the kit's
+own subsystems push, must still badge, or the file would pass on an
+indicator that never fires at all.
 
 **Tables read as one card.** `.okt-table-wrap` carries a border +
 padding so two consecutive tables don't bleed into each other. The

@@ -632,7 +632,15 @@ class TestPayloadBudget:
     # in: the kit reads <html lang> when no filename or manifest can
     # answer, and the info-tip marker takes its gap from a margin rather
     # than a space an inline-block trims. Under 1,000 bytes of kit.
-    KIT_BUDGET_BYTES = 1_299_500
+    # Then from 1,299,500 by two answers to a delivered document that
+    # raised an alarm over nothing: the warning indicator no longer
+    # badges what it cannot attribute to the document, and the sticky
+    # header measures inside its ResizeObserver callback but writes in
+    # the next frame, and only what changed. About 3,700 bytes, of which
+    # the mechanism is roughly 900; the rest is the reasoning, because
+    # both rules are about what NOT to do and a deleted line leaves
+    # nothing for the next reader to find.
+    KIT_BUDGET_BYTES = 1_304_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

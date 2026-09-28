@@ -161,7 +161,7 @@ def _chrome_over_header(page, sel: str):
     Contents button covered the first while search and the menu covered
     the last."""
     return page.evaluate(
-        f"""() => {{
+        rf"""() => {{
           const wrap = {_wrap(sel)};
           const ghost = wrap.querySelector('.okt-table-ghost');
           const th = wrap.querySelector('.okt-table-scroll thead th');
@@ -333,3 +333,110 @@ def test_narrow_viewport_keeps_the_header_and_no_sideways_scroll(built, browser)
         )
     finally:
         context.close()
+
+
+# --- What the observer writes, and when ----------------------------------
+#
+# Three delivered documents came back from a reader with `ResizeObserver
+# loop completed with undelivered notifications` in the kit's own warning
+# panel. That notice is the browser saying a callback resized something
+# the delivery pass had already visited, so the rest was deferred a
+# frame. It did not reproduce here on any of the three files, across
+# viewport widths and heights, device pixel ratios 1 to 2, stored width /
+# text-scale / pinned-drawer combinations and the page's own controls —
+# but this is the one place in the kit that wrote layout from inside such
+# a callback, and it wrote on every delivery whether or not anything had
+# changed: measured on that 31-table page, 155 `--okt-sticky-top` writes
+# of which 62 set the value already there, and 93 `data-fit` writes of
+# which 91 did.
+#
+# So the rule is about the write, not about the notice: measure in the
+# callback, write in the next frame, and skip a write that changes
+# nothing.
+
+
+@pytest.fixture()
+def counted(built, browser):
+    """A page that counts what the kit writes, and when."""
+    context = browser.new_context(viewport={"width": 1280, "height": 800})
+    page = context.new_page()
+    page.add_init_script(
+        """
+        window.__cb = 0; window.__inCallback = []; window.__props = { total: 0, same: 0 };
+        window.__fit = { total: 0, same: 0 };
+        (function () {
+          const Real = window.ResizeObserver;
+          window.ResizeObserver = function (cb) {
+            return new Real(function (e, o) {
+              window.__cb++;
+              try { return cb.call(this, e, o); } finally { window.__cb--; }
+            });
+          };
+          window.ResizeObserver.prototype = Real.prototype;
+          const setProp = CSSStyleDeclaration.prototype.setProperty;
+          CSSStyleDeclaration.prototype.setProperty = function (n, v, p) {
+            if (n === '--okt-sticky-top') {
+              window.__props.total++;
+              if (this.getPropertyValue(n) === String(v)) window.__props.same++;
+              if (window.__cb) window.__inCallback.push(n + ':' + v);
+            }
+            return setProp.call(this, n, v, p);
+          };
+        })();
+        // `dataset.fit = x` does not pass through setAttribute, so the
+        // redundant-write count for it is read off the mutation record.
+        window.__watchFit = function () {
+          document.querySelectorAll('.okt-table-scroll').forEach(function (s) {
+            new MutationObserver(function (recs) {
+              recs.forEach(function (r) {
+                window.__fit.total++;
+                if (r.oldValue === s.getAttribute('data-fit')) window.__fit.same++;
+              });
+            }).observe(s, { attributes: true, attributeFilter: ['data-fit'], attributeOldValue: true });
+          });
+        };
+        """
+    )
+    page.goto(built.as_uri(), wait_until="load")
+    page_quiet(page)
+    yield page
+    context.close()
+
+
+def _storm(page) -> None:
+    for width in (1100, 940, 820, 700, 560, 380, 700, 1280):
+        page.set_viewport_size({"width": width, "height": 800})
+        page.wait_for_timeout(180)
+    page.wait_for_timeout(400)
+
+
+def _flip_the_fit(page) -> None:
+    """Make a table that fits stop fitting, and fit again. A resize storm
+    alone leaves both tables on the side of the threshold they started
+    on, so without this the `data-fit` half of the next test would be
+    counting an empty set."""
+    page.evaluate("() => { document.querySelector('main table').style.width = '3000px'; }")
+    page.wait_for_timeout(400)
+    page.evaluate("() => { document.querySelector('main table').style.width = ''; }")
+    page.wait_for_timeout(400)
+
+
+def test_the_header_machinery_writes_nothing_it_does_not_change(counted):
+    counted.evaluate("() => window.__watchFit()")
+    _storm(counted)
+    _flip_the_fit(counted)
+    props = counted.evaluate("() => window.__props")
+    fit = counted.evaluate("() => window.__fit")
+    # Non-vacuous: both counters have to have seen the machinery run.
+    assert props["total"] > 0, "no sticky-header measurement ran during the resize storm"
+    assert fit["total"] >= 2, "the fit state never changed, so nothing was counted"
+    assert props["same"] == 0, f"{props['same']} of {props['total']} --okt-sticky-top writes changed nothing"
+    assert fit["same"] == 0, f"{fit['same']} of {fit['total']} data-fit writes changed nothing"
+
+
+def test_the_layout_write_happens_outside_the_delivery_pass(counted):
+    _storm(counted)
+    assert counted.evaluate("() => window.__props.total") > 0
+    assert counted.evaluate("() => window.__inCallback") == [], (
+        "the sticky header wrote layout from inside a ResizeObserver callback"
+    )
