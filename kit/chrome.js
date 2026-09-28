@@ -10310,34 +10310,46 @@ class OkuChart extends HTMLElement {
     var vMin = Math.min.apply(null, values);
     var vMax = Math.max.apply(null, values);
     if (vMin === vMax) { vMin -= 1; vMax += 1; }
-    // Tile grid — (col, row) per region. 11 columns × 7 rows; roughly
-    // matches a flattened world (Americas left, Europe + Africa middle,
-    // Asia + Oceania right). Coordinates picked to be readable rather
-    // than geographically exact.
-    var TILES = {
-      // North America
-      CA: [1, 1], US: [1, 2], MX: [1, 3],
-      // South America
-      CO: [2, 3], BR: [2, 4], AR: [2, 5], CL: [2, 5], PE: [1, 4],
-      // Europe (col 4-5)
-      IS: [4, 1], GB: [4, 2], IE: [3, 2], NO: [5, 1], SE: [5, 1], FI: [6, 1],
-      PT: [3, 3], ES: [4, 3], FR: [4, 3], NL: [5, 2], BE: [4, 2], DE: [5, 2], DK: [5, 1], PL: [6, 2],
-      IT: [5, 3], CH: [4, 3], AT: [5, 3], CZ: [6, 3], SK: [6, 3], HU: [6, 3], RO: [6, 3], GR: [5, 4],
-      UA: [7, 2], RU: [8, 1],
-      // Middle East + Africa
-      TR: [6, 4], IL: [5, 4], SA: [6, 5], AE: [7, 5], IR: [7, 4], EG: [5, 5],
-      ZA: [5, 6], NG: [4, 5], KE: [5, 5], ET: [6, 5], MA: [4, 4],
-      // Asia
-      IN: [7, 4], PK: [7, 3], BD: [8, 4], CN: [8, 3], JP: [9, 3], KR: [9, 3], TW: [9, 4],
-      VN: [9, 4], TH: [8, 5], MY: [9, 5], SG: [9, 5], ID: [9, 6], PH: [10, 5],
-      // Oceania
-      AU: [10, 6], NZ: [10, 7],
-      // Synthetic bucket for everything else
-      OTH: [0, 0]
-    };
+    /* The tile grid, written as the picture it is: one line per row,
+       one token per column, `.` for an empty cell. Two regions cannot
+       share a cell, because a cell holds one token.
+
+       What this replaces was a hand-written `{code: [col, row]}` map,
+       and it had 23 collisions in it — AR over CL, NO over SE over DK,
+       CZ over SK over HU over RO, and so on. Each pair drew two
+       country tiles at the same coordinates with the later one painted
+       over the earlier, so the data was in the chart, the tooltip
+       worked, and the reader had no way to know the hidden country was
+       there. A map that silently drops a quarter of what it is given is
+       worse than one that refuses to draw.
+
+       Geography is approximate on purpose — readable beats exact, which
+       is the whole idea of a tile map. What is NOT approximate is that
+       every region gets its own cell, and a collision is now a typo
+       visible in the source. Held by
+       browser/test_tile_map_cells.py. */
+    var TILE_ROWS = [
+      //       0    1    2    3    4    5    6    7    8    9    10   11
+      /* 0 */ 'OTH  .    .    IS   .    NO   SE   FI   .    RU   .    .',
+      /* 1 */ '.    CA   .    IE   GB   DK   .    PL   UA   .    .    .',
+      /* 2 */ '.    US   .    PT   BE   NL   DE   CZ   SK   .    .    KR',
+      /* 3 */ '.    MX   .    ES   FR   CH   AT   HU   RO   TR   CN   JP',
+      /* 4 */ '.    .    CO   MA   IT   GR   IL   SA   IR   PK   BD   TW',
+      /* 5 */ '.    PE   BR   NG   ET   EG   AE   IN   TH   VN   PH   .',
+      /* 6 */ '.    CL   AR   ZA   KE   .    .    MY   SG   ID   .    .',
+      /* 7 */ '.    .    .    .    .    .    .    .    .    AU   NZ   .'
+    ];
+    var TILES = {};
+    var maxCol = 0, maxRow = TILE_ROWS.length - 1;
+    TILE_ROWS.forEach(function (line, row) {
+      line.trim().split(/\s+/).forEach(function (code, col) {
+        if (code === '.') return;
+        TILES[code] = [col, row];
+        if (col > maxCol) maxCol = col;
+      });
+    });
     var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
     var cellW = 54, cellH = 36, cellGap = 4;
-    var maxCol = 10, maxRow = 7;
     var W = (maxCol + 1) * (cellW + cellGap) + 40;
     var H = (maxRow + 1) * (cellH + cellGap) + 80;
     var titleTop = this._title ? 28 : 12;

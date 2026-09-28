@@ -1230,6 +1230,23 @@ where the flow put it, so the thead's rect read -1256 in the same frame
 its cells read 12. Anything asking "is this header pinned" must measure
 a CELL.
 
+**A layout table is written as the picture it lays out.** The tile
+map's grid was a hand-written `{code: [col, row]}` map, and 14 of its
+cells held more than one country — AR over CL, NO over SE over DK, CZ
+over SK over HU over RO. 18 of 59 regions were drawn at another's
+coordinates and painted over by it: the value was in the chart, the
+tooltip answered for it, and nothing on screen said the tile was there.
+A map that silently drops a quarter of what it is given is worse than
+one that refuses to draw. It is `TILE_ROWS` now — one line per grid
+row, one token per column, `.` for empty — so two regions cannot share
+a cell, because a cell holds one token, and a collision is a typo
+visible in the source. The grid's own width and height are derived from
+it rather than restated as constants. Geography stays approximate on
+purpose; what is not approximate is that every region gets a cell. Held
+by `browser/test_tile_map_cells.py`, which asks the rendered result —
+every code drawn once, no two codes at one point — because the question
+is what the reader sees, not what the table says.
+
 **Tables read as one card.** `.okt-table-wrap` carries a border +
 padding so two consecutive tables don't bleed into each other. The
 filter input + stats counter sit together on the left; chip rack is
