@@ -96,12 +96,48 @@ def examples() -> dict:
     return json.loads((KIT / "schema" / "examples.json").read_text(encoding="utf-8"))
 
 
-def longify(obj, token: str = LONG):
-    """The token appended to every string the example carries."""
-    if isinstance(obj, str):
-        return f"{obj} {token}" if obj else obj
-    if isinstance(obj, list):
-        return [longify(v, token) for v in obj]
+def _ids(obj, out: set[str] | None = None) -> set[str]:
+    """Every value a payload uses as an `id`.
+
+    A sankey names its nodes by id and its links point at them by that
+    same string under `source` and `target`; a treemap points at a
+    `parent`. Lengthening one side of that pair and not the other
+    breaks the reference, and the figure then draws whatever is left —
+    which measures the test helper, not the kit.
+    """
+    out = set() if out is None else out
     if isinstance(obj, dict):
-        return {k: (v if k in ENUM_KEYS else longify(v, token)) for k, v in obj.items()}
+        for k, v in obj.items():
+            if k == "id" and isinstance(v, str):
+                out.add(v)
+            else:
+                _ids(v, out)
+    elif isinstance(obj, list):
+        for v in obj:
+            _ids(v, out)
+    return out
+
+
+def longify(obj, token: str = LONG, ids: set[str] | None = None):
+    """The token appended to every string the example carries.
+
+    Except the two kinds that are not text: a value the schema pins to
+    an enum, and a string that names something else in the same
+    payload. Measured before the second rule existed: the shipped
+    sankey lengthened into a diagram with four nodes in one column and
+    no links at all, because every `source` and `target` had stopped
+    matching the `id` it pointed at. The audit reported that as the
+    figure collapsing under a long label, which would have been a real
+    defect and was not one.
+    """
+    if ids is None:
+        ids = _ids(obj)
+    if isinstance(obj, str):
+        if not obj or obj in ids:
+            return obj
+        return f"{obj} {token}"
+    if isinstance(obj, list):
+        return [longify(v, token, ids) for v in obj]
+    if isinstance(obj, dict):
+        return {k: (v if k in ENUM_KEYS else longify(v, token, ids)) for k, v in obj.items()}
     return obj

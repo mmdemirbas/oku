@@ -192,15 +192,75 @@ AUDIT = r"""(sel) => {
   }
 
   // ---- two labels over each other ---------------------------------
+  // A rotated label's axis-aligned rect is far bigger than its glyph
+  // run — a -45deg heatmap column label has a box overlapping half the
+  // figure and touches nothing. So where either label is rotated, the
+  // pair is compared as ORIENTED boxes: the four corners of each
+  // getBBox through its own screen CTM, separating-axis test between
+  // them. Comparing a rotated label to an upright one as rectangles
+  // reported a column label sitting clear above the grid as colliding
+  // with the first row's label.
+  const corners = (el) => {
+    const m = el.getScreenCTM && el.getScreenCTM();
+    if (!m) return null;
+    let bb; try { bb = el.getBBox(); } catch (e) { return null; }
+    const root = el.ownerSVGElement || el;
+    const pt = (x, y) => { const q = root.createSVGPoint(); q.x = x; q.y = y; const r = q.matrixTransform(m); return [r.x, r.y]; };
+    return [pt(bb.x, bb.y), pt(bb.x + bb.width, bb.y),
+            pt(bb.x + bb.width, bb.y + bb.height), pt(bb.x, bb.y + bb.height)];
+  };
+  const rotated = (el) => {
+    const m = el.getScreenCTM && el.getScreenCTM();
+    return !!m && Math.abs(Math.atan2(m.b, m.a)) > 0.02;
+  };
+  const overlapArea = (A, B) => {
+    // Separating axis: if any edge normal separates them, they do not
+    // touch. Returns 0 when separated, else an approximate shared area
+    // from the smaller box's extent along the least-separated axis.
+    let worst = Infinity;
+    for (const poly of [A, B]) {
+      for (let i = 0; i < 4; i++) {
+        const ax = poly[(i + 1) % 4][0] - poly[i][0];
+        const ay = poly[(i + 1) % 4][1] - poly[i][1];
+        const len = Math.hypot(ax, ay) || 1;
+        const nx = -ay / len, ny = ax / len;
+        let aMin = Infinity, aMax = -Infinity, bMin = Infinity, bMax = -Infinity;
+        for (const q of A) { const d = q[0] * nx + q[1] * ny; aMin = Math.min(aMin, d); aMax = Math.max(aMax, d); }
+        for (const q of B) { const d = q[0] * nx + q[1] * ny; bMin = Math.min(bMin, d); bMax = Math.max(bMax, d); }
+        const gapAxis = Math.min(aMax, bMax) - Math.max(aMin, bMin);
+        if (gapAxis <= 0.5) return 0;
+        worst = Math.min(worst, gapAxis);
+      }
+    }
+    return worst;
+  };
   for (let i = 0; i < leaves.length; i++) {
     for (let j = i + 1; j < leaves.length; j++) {
+      if (rotated(leaves[i].el) || rotated(leaves[j].el)) {
+        const A = corners(leaves[i].el), B = corners(leaves[j].el);
+        if (!A || !B) continue;
+        const shared = overlapArea(A, B);
+        if (shared <= 0.5) continue;
+        F.push({ cls: 'overlap', px: +shared.toFixed(1), rotated: true, where: near(leaves[i].el),
+                 text: (txt(leaves[i].el) + ' / ' + txt(leaves[j].el)).slice(0, 60) });
+        continue;
+      }
       const a = leaves[i].r, b = leaves[j].r;
       const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
       const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
       if (w <= 0.5 || h <= 0.5) continue;
       const share = (w * h) / Math.min(a.width * a.height, b.width * b.height);
-      if (share < 0.35) continue;
-      F.push({ cls: 'overlap', share: +share.toFixed(2), where: near(leaves[i].el),
+      // Two rules, because one number does not cover both shapes of
+      // collision. A big area share catches labels stacked on each
+      // other. Same-LINE collisions are the ones that ruin a reading
+      // and they can be small in area: a slope chart's two column
+      // heads ran four characters into each other at a 12% share, and
+      // a 35% floor called that clean. On one line, any real touch is
+      // a collision.
+      const sameLine = h >= 0.6 * Math.min(a.height, b.height) && w > 2;
+      if (share < 0.35 && !sameLine) continue;
+      F.push({ cls: 'overlap', share: +share.toFixed(2), px: +w.toFixed(1),
+               line: sameLine, where: near(leaves[i].el),
                text: (txt(leaves[i].el) + ' / ' + txt(leaves[j].el)).slice(0, 60) });
     }
   }
@@ -312,7 +372,10 @@ def main() -> int:
     ap.add_argument("--keep", action="store_true", help="leave the built pages in place")
     a = ap.parse_args()
 
-    out = (ROOT / "tmp/textfit").resolve()
+    # Per run, not a fixed name: a sweep and a spot check started in
+    # the same minute shared one build directory, and the second one's
+    # rebuild deleted the pages the first was still loading.
+    out = (ROOT / f"tmp/textfit-{os.getpid()}").resolve()
     kinds = [k for k in a.kinds.split(",") if k]
     pages = build_pages(kinds, out)
     widths = [int(w) for w in a.widths.split(",")]
@@ -353,7 +416,9 @@ def main() -> int:
     if a.json:
         pathlib.Path(a.json).write_text(json.dumps(rows, indent=1, ensure_ascii=False), encoding="utf-8")
     report(rows, pages, widths, scales)
-    if not a.keep:
+    if a.keep:
+        print(f"\npages kept in {out}")
+    else:
         shutil.rmtree(out, ignore_errors=True)
     return 0
 

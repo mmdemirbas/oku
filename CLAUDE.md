@@ -1267,6 +1267,47 @@ the spreading this rule exists to stop. Held by
 — which replaced the test asserting all three gradient layers were
 present, because those layers were the defect.
 
+**A label's room is decided before its text is.** Every renderer that
+reserves space for text estimates it from the character count, because
+an SVG string is built before it is in the DOM where anything could
+measure it. The defect is not the estimate, it is reserving room as a
+FUNCTION of the text with no ceiling: slope asked for `24 + len * 6`
+of a 480-unit surface, so a 60-character label made the plot width
+negative and every slope drew backwards; the heatmap's two gutters grew
+the whole figure instead, and the container then scaled the svg down
+until every cell and every label shrank with it. **A gutter is a share
+of the surface first and a function of the text second** —
+`okuFitLabelGutter` says so (`maxFrac`), and every gutter goes through
+it.
+
+Ticks along an axis had no such helper and nothing was fitting them at
+all: measured with real labels, stream collided 19 times, horizon 14,
+waterfall 11, bump 10. `okuFitAxisTicks` gives a tick the slot it
+actually has, and where even a shortened label would be under
+`minChars` it labels FEWER categories rather than drawing a row of
+stubs — `k…` under every column says nothing, where every third label
+under a dense axis still says what the axis is. The last category is
+always labelled, and the one before it is dropped when both would sit
+closer than 0.6 of a step.
+
+Radial labels get the same treatment from their own geometry: a radar
+spoke label is anchored by the side it is on and capped by the chord
+between adjacent spokes, which is what actually decides the room —
+three axes leave space for a sentence, ten for a word.
+
+**One character-width estimate, named once.** There were four: 0.66em
+in the gutter fitter, 0.62em in the tick fitter, and 5.6px-at-11px
+(0.51em) in each of the two legends. The legends are where it showed:
+they pack chips left to right and wrap when the next will not fit, so
+an 18% under-estimate is chips drawn over each other. `OKU_EM_PER_CHAR`
+is 0.66 and errs high on purpose — too wide costs a few pixels of plot,
+too narrow costs the end of a label or a chip painted over another.
+
+Held by `browser/test_labels_do_not_collide.py`, which imports the
+detector from `tools/text_fit_audit.py` rather than copying it: two
+implementations of "is this label cut" drift, and the copy in the test
+is the one that stops matching what the audit reports.
+
 **Tables read as one card.** `.okt-table-wrap` carries a border +
 padding so two consecutive tables don't bleed into each other. The
 filter input + stats counter sit together on the left; chip rack is

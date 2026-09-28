@@ -7980,12 +7980,13 @@ class OkuChart extends HTMLElement {
       // Wrapping to the next row only helps a chip that is narrower
       // than the row. One wider than the whole legend has nowhere to
       // wrap to and ran off the viewBox, so cap it here.
-      var maxChars = Math.max(4, Math.floor((width - swatch - 4 - gap) / 5.6));
+      var chW = fontPx * OKU_EM_PER_CHAR;
+      var maxChars = Math.max(4, Math.floor((width - swatch - 4 - gap) / chW));
       var label = full.length > maxChars ? full.slice(0, maxChars - 1).replace(/\s+$/, '') + '…' : full;
-      // Estimate label width — 5.6px per char at 11px font with a
-      // little slack. Cheap heuristic; SVG doesn't tell us the real
-      // measure until paint, so we over-estimate by ~10% to be safe.
-      var labW = Math.max(20, Math.ceil(label.length * 5.6) + 2);
+      // The same estimate that decided maxChars decides the packing:
+      // measuring the chip with a narrower character than the one the
+      // cap used is how two chips end up on top of each other.
+      var labW = Math.max(20, Math.ceil(label.length * chW) + 2);
       var chipW = swatch + 4 + labW + gap;
       if (cx + chipW > x0 + width && cx > x0) {
         cx = x0; cy += rowH;
@@ -8387,10 +8388,34 @@ class OkuChart extends HTMLElement {
     // anchor; without enough headroom the leftmost label clips the title
     // and the rest visually crowd into the cell rim. Same idea for row
     // labels: scale the left gutter with the longest label.
-    var maxColLabelLen = (x.col_labels || []).reduce(function (m, s) { return Math.max(m, String(s || '').length); }, 0);
-    var maxRowLabelLen = (x.row_labels || []).reduce(function (m, s) { return Math.max(m, String(s || '').length); }, 0);
-    var labelLeft = (x.row_labels && x.row_labels.length) ? Math.max(96, maxRowLabelLen * 7 + 16) : 4;
-    var labelTop  = (x.col_labels && x.col_labels.length) ? Math.max(64, maxColLabelLen * 5 + 28) : 4;
+    /* Both gutters used to be a function of the longest label with no
+       ceiling — `maxRowLabelLen * 7 + 16` and `maxColLabelLen * 5 + 28`
+       — and W and H are built from them, so a long label did not
+       squeeze the plot, it GREW the whole figure: the container then
+       scaled the svg down and every cell and every label shrank with
+       it. The column labels still collided, because a -45deg label's
+       room is its own diagonal (cell / cos45) and nothing was fitting
+       them to it. Measured on the shipped example with real labels: 30
+       collisions between column labels and between a column label and
+       the row labels it swept through.
+
+       A gutter is a share of the figure, and the label is fitted to
+       the gutter it gets. */
+    var rowFit = okuFitLabelGutter(x.row_labels || [],
+      { width: cols * cell, fontPx: 11, maxFrac: 0.45, minW: 96, pad: 16 });
+    var colFit = okuFitAxisTicks(x.col_labels || [],
+      { slot: cell * 1.41, fontPx: 11, gap: 4, minChars: 3 });
+    var labelLeft = (x.row_labels && x.row_labels.length) ? rowFit.gutter : 4;
+    // sin(45) of the fitted label, plus the 28 the anchor already sat above.
+    /* The rotated run's own vertical reach, plus the clearance its
+       LOWER-LEFT corner needs: a -45deg label anchored just above the
+       grid dips below its own baseline by half a line, and the first
+       column's tail reaches left into the row-label gutter, where the
+       first row's label is. Measured before the clearance: a 22px
+       collision between `00 Ku…` and `svc-a Kul…`. */
+    var colDrop = 22;
+    var labelTop  = (x.col_labels && x.col_labels.length)
+      ? Math.max(72, Math.round(colFit.maxChars * 11 * OKU_EM_PER_CHAR * 0.71) + 28 + colDrop) : 4;
     var titleTop  = this._title ? 28 : 0;
     var W = labelLeft + cols * cell + 12;
     var H = titleTop + labelTop + rows * cell + 12;
@@ -8415,14 +8440,20 @@ class OkuChart extends HTMLElement {
         var cxp = labelLeft + c * cell + cell / 2;
         // Push the anchor 12px above the cell row so the rotated
         // label doesn't visually touch the cell's top edge.
-        var cyp = titleTop + labelTop - 12;
-        parts.push('<text x="' + cxp + '" y="' + cyp + '" text-anchor="end" class="okc-heatmap-label" transform="rotate(-45 ' + cxp + ',' + cyp + ')">' + escapeXml(String(x.col_labels[c] || '')) + '</text>');
+        var cyp = titleTop + labelTop - colDrop;
+        var colFull = String(x.col_labels[c] || '');
+        var colShort = colFit.fit(colFull);
+        parts.push('<text x="' + cxp + '" y="' + cyp + '" text-anchor="end" class="okc-heatmap-label" transform="rotate(-45 ' + cxp + ',' + cyp + ')">' +
+                   escapeXml(colShort) + (colShort === colFull ? '' : '<title>' + escapeXml(colFull) + '</title>') + '</text>');
       }
     }
     if (x.row_labels && x.row_labels.length) {
       for (var r = 0; r < rows; r++) {
         var ry = titleTop + labelTop + r * cell + cell / 2 + 4;
-        parts.push('<text x="' + (labelLeft - 6) + '" y="' + ry + '" text-anchor="end" class="okc-heatmap-label">' + escapeXml(String(x.row_labels[r] || '')) + '</text>');
+        var rowFull = String(x.row_labels[r] || '');
+        var rowShort = rowFit.fit(rowFull);
+        parts.push('<text x="' + (labelLeft - 6) + '" y="' + ry + '" text-anchor="end" class="okc-heatmap-label">' +
+                   escapeXml(rowShort) + (rowShort === rowFull ? '' : '<title>' + escapeXml(rowFull) + '</title>') + '</text>');
       }
     }
     for (var i = 0; i < rows; i++) {
@@ -8636,7 +8667,7 @@ class OkuChart extends HTMLElement {
     // on one row, a zone named with a phrase instead of a word walked
     // the row off the right edge — 318px past it for the example on
     // the reference page, which is most of a second chart's width.
-    var LG = { swatch: 11, gap: 14, fontPx: 11, charW: 5.6, rowH: 18 };
+    var LG = { swatch: 11, gap: 14, fontPx: 11, charW: 11 * OKU_EM_PER_CHAR, rowH: 18 };
     var lgRows = [];
     zones.filter(function (z) { return !!z.label; }).forEach(function (z) {
       var full = String(z.label);
@@ -8804,6 +8835,17 @@ class OkuChart extends HTMLElement {
     if (axes.length < 3 || !series.length) return;
     var W = 420, H = 360;
     var cx = W / 2, cy = (this._title ? 196 : 180), R = 130;
+    // A big slot: the per-label room is what decides here, and it is
+    // different on every spoke.
+    var radarFit = okuFitAxisTicks(axes.map(function (a) { return a.label || ''; }),
+                                   { slot: 1e4, fontPx: 11, gap: 4, minChars: 3 });
+    /* A spoke label may not reach its neighbour. The distance between
+       two adjacent label anchors is the chord at the label radius, so
+       that is the cap — 0.85 of it, since the chord is diagonal and
+       the text is horizontal. It falls out of the axis COUNT, which is
+       the thing that actually decides how much room there is: three
+       axes leave room for a sentence, ten for a word. */
+    var spokeRoom = 2 * (R + 18) * Math.sin(Math.PI / Math.max(3, axes.length)) * 0.85;
     // Shared scale: largest value across series + per-axis max (if any).
     var axMax = axes.map(function (a, i) {
       var m = +a.max || 0;
@@ -8837,7 +8879,26 @@ class OkuChart extends HTMLElement {
       parts.push('<line x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) + '" class="okc-radar-axis"/>');
       var lx = cx + Math.cos(-Math.PI / 2 + i * (2 * Math.PI / axes.length)) * (R + 18);
       var ly = cy + Math.sin(-Math.PI / 2 + i * (2 * Math.PI / axes.length)) * (R + 18);
-      parts.push('<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" class="okc-radar-label">' + escapeXml(a.label || '') + '</text>');
+      /* Anchored by where it sits, and fitted to the room on that
+         side. Centred anchors put half of every label on the wrong
+         side of its own axis, so with real labels the ring collided
+         with itself 16 times and the left and right ones ran out of
+         the viewBox. A label to the right of centre starts at its
+         point and runs outward; one to the left ends at it. */
+      var lAnchor = okuTickAnchor(lx, 0, W);
+      /* Capped at a share of the figure as well as by the side it is
+         on. A label at the top is centred, so the room to its own edge
+         is nearly the whole width — and a label that wide sweeps
+         across the ring and lands on the ones left and right of it.
+         Measured: five axes, 5 collisions of 240-570px. No spoke label
+         may take more than 30% of the figure. */
+      var room = Math.min(
+        spokeRoom,
+        lAnchor === 'start' ? (W - lx - 6)
+          : lAnchor === 'end' ? (lx - 6)
+          : (Math.min(lx, W - lx) * 2 - 12)
+      );
+      parts.push(radarFit.text(lx.toFixed(1), ly.toFixed(1), a.label || '', 'okc-radar-label', lAnchor, room));
     });
     // Series polygons — each carries a rich-hover payload listing
     // its per-axis values so the reader can compare a series'
@@ -8857,12 +8918,21 @@ class OkuChart extends HTMLElement {
       });
       parts.push('<polygon points="' + pts + '" fill="' + color + '" fill-opacity="0.22" stroke="' + color + '" stroke-width="1.6" class="okc-radar-series" data-series-idx="' + si + '" tabindex="0" data-hover-payload="' + escapeXml(radarPayload) + '"><title>' + escapeXml((s.label || 'series') + ' — ' + kv.map(function (e) { return e.k + ': ' + e.v; }).join(', ')) + '</title></polygon>');
     });
-    // Legend.
+    /* Legend. The stride was a constant 130 and the label was never
+       fitted to it, so three series named with a phrase rather than a
+       word drew their chips over each other and off the right edge.
+       The stride is what the row can actually give each chip, and the
+       label is cut to the stride with the whole of it in a <title>. */
     var lgY = H - 24;
+    var lgStride = Math.max(48, Math.min(130, (W - 32) / Math.max(1, series.length)));
+    var lgFit = okuFitAxisTicks(series.map(function (s) { return s.label || ''; }),
+                                { slot: lgStride, fontPx: 11, gap: 20, minChars: 3 });
     series.forEach(function (s, si) {
       var color = palette[s.color] || palette.accent;
-      var lx = 16 + si * 130;
-      parts.push('<g class="okc-radar-legend" data-series-idx="' + si + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml(okuT('Toggle {0} series', s.label || 'series')) + '"><rect x="' + lx + '" y="' + (lgY - 8) + '" width="10" height="10" rx="2" fill="' + color + '"/><text x="' + (lx + 16) + '" y="' + lgY + '" class="okc-radar-legend-label">' + escapeXml(s.label || '') + '</text></g>');
+      var lx = 16 + si * lgStride;
+      var full = String(s.label || '');
+      var short = lgFit.fit(full);
+      parts.push('<g class="okc-radar-legend" data-series-idx="' + si + '" tabindex="0" role="button" aria-pressed="false" aria-label="' + escapeXml(okuT('Toggle {0} series', full || 'series')) + '"><rect x="' + lx + '" y="' + (lgY - 8) + '" width="10" height="10" rx="2" fill="' + color + '"/><text x="' + (lx + 16) + '" y="' + lgY + '" class="okc-radar-legend-label">' + escapeXml(short) + (short === full ? '' : '<title>' + escapeXml(full) + '</title>') + '</text></g>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -9086,23 +9156,31 @@ class OkuChart extends HTMLElement {
   }
 
   _renderSlope() {
+    var W_SLOPE = 480;
     var x = (this._extras && this._extras.slope) || {};
     var items = x.items || [];
     if (!items.length) return;
-    // Right-pad scales with the longest endpoint readout ("value · label") so
-    // the labels never clip past the SVG edge. Empirically ~6 viewBox-units
-    // per character covers our 11px label font + an 8px gutter.
-    var maxRightLen = items.reduce(function (acc, it) {
-      var s = fmtNum(+it.to || 0) + ' · ' + (it.label || '');
-      return Math.max(acc, s.length);
-    }, 6);
-    var rightPad = Math.max(80, 24 + maxRightLen * 6);
+    /* The right gutter holds one "value · label" readout per row, and
+       it used to be sized from the longest of them with no ceiling:
+       `Math.max(80, 24 + len * 6)`. A 60-character label then asked
+       for 384 units of a 480-unit surface, the plot width came out
+       NEGATIVE, and the right column landed to the LEFT of the left
+       one — every slope drawn backwards. A gutter is a share of the
+       surface before it is a function of the text, which is what
+       okuFitLabelGutter exists to say: it clamps to maxFrac of the
+       width and hands back a `fit()` that shortens what is left over,
+       with the whole string kept in a <title>. */
+    var rightFit = okuFitLabelGutter(
+      items.map(function (it) { return fmtNum(+it.to || 0) + ' · ' + (it.label || ''); }),
+      { width: W_SLOPE, fontPx: 11, pad: 24, minW: 80, maxFrac: 0.38 }
+    );
+    var rightPad = rightFit.gutter;
     // Title + "Before/After" column-head row need vertical breathing room so
     // the title (y=22) doesn't collide with the column heads (y=pad.top-12).
     // With pad.top=44 the column heads sit at y=32 — 10px below the title.
     // Bump pad.top so column heads land at y≥40.
     var topPad = this._title ? 56 : 30;
-    var W = 480, H = 60 + items.length * 12 + 40;
+    var W = W_SLOPE, H = 60 + items.length * 12 + 40;
     if (H < 240) H = 240;
     var pad = { top: topPad, bottom: 30, left: 80, right: rightPad };
     var plotH = H - pad.top - pad.bottom;
@@ -9115,9 +9193,19 @@ class OkuChart extends HTMLElement {
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Slope chart') + '" class="okc-svg okc-slope">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
-    // Column labels.
-    parts.push('<text x="' + leftX + '" y="' + (pad.top - 12) + '" text-anchor="middle" class="okc-slope-col">' + escapeXml(x.from_label || 'Before') + '</text>');
-    parts.push('<text x="' + rightX + '" y="' + (pad.top - 12) + '" text-anchor="middle" class="okc-slope-col">' + escapeXml(x.to_label || 'After') + '</text>');
+    /* Column labels, each fitted to the half of the gap it owns.
+       They are centred on the two guides, so an author's own words for
+       the two columns grow towards each other: measured with real
+       labels, "Before …" and "After …" ran 73px into one another and
+       both became unreadable at the point where they crossed. Half the
+       gap each, less a margin, and the rest goes to the <title>. */
+    var headRoom = Math.max(40, (rightX - leftX) / 2 - 10);
+    var headFit = okuFitLabelGutter([x.from_label || 'Before', x.to_label || 'After'],
+      { width: headRoom * 2, maxFrac: 0.5, pad: 0, minW: 40, fontPx: 11 });
+    [[leftX, x.from_label || 'Before'], [rightX, x.to_label || 'After']].forEach(function (pair) {
+      parts.push('<text x="' + pair[0] + '" y="' + (pad.top - 12) + '" text-anchor="middle" class="okc-slope-col">' +
+                 escapeXml(headFit.fit(pair[1])) + '<title>' + escapeXml(pair[1]) + '</title></text>');
+    });
     // Vertical guides.
     parts.push('<line x1="' + leftX + '" y1="' + pad.top + '" x2="' + leftX + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     parts.push('<line x1="' + rightX + '" y1="' + pad.top + '" x2="' + rightX + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
@@ -9138,7 +9226,9 @@ class OkuChart extends HTMLElement {
       parts.push('<circle cx="' + leftX + '" cy="' + fy.toFixed(1) + '" r="4" fill="' + color + '"/>');
       parts.push('<circle cx="' + rightX + '" cy="' + ty.toFixed(1) + '" r="4" fill="' + color + '"/>');
       parts.push('<text x="' + (leftX - 8) + '" y="' + (fy + 4).toFixed(1) + '" text-anchor="end" class="okc-slope-readout">' + escapeXml(fmtNum(+it.from || 0)) + '</text>');
-      parts.push('<text x="' + (rightX + 8) + '" y="' + (ty + 4).toFixed(1) + '" class="okc-slope-readout">' + escapeXml(fmtNum(+it.to || 0)) + ' · ' + escapeXml(it.label || '') + '</text>');
+      var readout = fmtNum(+it.to || 0) + ' · ' + (it.label || '');
+      parts.push('<text x="' + (rightX + 8) + '" y="' + (ty + 4).toFixed(1) + '" class="okc-slope-readout">' +
+                 escapeXml(rightFit.fit(readout)) + '<title>' + escapeXml(readout) + '</title></text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -10852,6 +10942,8 @@ class OkuChart extends HTMLElement {
     // muting a series must not take its category label with it.
     var bySeries = series.map(function () { return []; });
     var tickParts = [];
+    // One fitter for the row; each tick passes its own column width.
+    var mkTickFit = okuFitAxisTicks(categories, { slot: plotW / Math.max(1, categories.length), fontPx: 11 });
     categories.forEach(function (cat, ci) {
       var colW = (colTotals[ci] / grandTotal) * plotW;
       if (colW <= 0) return;
@@ -10873,7 +10965,10 @@ class OkuChart extends HTMLElement {
       });
       // Category label at the bottom of the column.
       var mkTickX = xCursor + colW / 2;
-      tickParts.push('<text x="' + mkTickX.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="' + okuTickAnchor(mkTickX, 0, W) + '" class="okc-tick">' + escapeXml(cat) + '</text>');
+      // A marimekko sizes each column by its own weight, so the tick's
+      // room is that column, not an equal share of the axis.
+      tickParts.push(mkTickFit.text(mkTickX.toFixed(1), pad.top + plotH + 16, cat,
+                                    'okc-tick', okuTickAnchor(mkTickX, 0, W), colW));
       xCursor += colW;
     });
     bySeries.forEach(function (cells, si) {
@@ -10945,9 +11040,11 @@ class OkuChart extends HTMLElement {
       parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.78" stroke="var(--bg)" stroke-width="0.6" class="okc-stream-band" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(series[si].label || '') + '</title></path>');
       parts.push('</g>');
     });
-    // Category ticks at bottom.
+    // Category ticks at bottom, fitted to the slot each one has.
+    var tickFit = okuFitAxisTicks(categories, { slot: plotW / Math.max(1, categories.length), fontPx: 11 });
     categories.forEach(function (c, i) {
-      parts.push('<text x="' + xOf(i).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="' + okuTickAnchor(xOf(i), 0, W) + '" class="okc-tick">' + escapeXml(c) + '</text>');
+      if (!tickFit.shows(i)) return;
+      parts.push(tickFit.text(xOf(i).toFixed(1), H - 10, c, 'okc-tick', okuTickAnchor(xOf(i), 0, W)));
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -11275,6 +11372,8 @@ class OkuChart extends HTMLElement {
     var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     var step = plotW / entries.length;
     var bw = Math.min(step * 0.65, 48);
+    var tickFit = okuFitAxisTicks(entries.map(function (e) { return e.label; }),
+                                  { slot: plotW / Math.max(1, entries.length), fontPx: 11 });
     function yOf(v) { return pad.top + plotH - (v - vMin) / (vMax - vMin) * plotH; }
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Waterfall') + '" class="okc-svg okc-waterfall">');
@@ -11317,7 +11416,9 @@ class OkuChart extends HTMLElement {
         ]
       });
       parts.push('<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + yT.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2" fill="' + color + '" class="okc-waterfall-bar ' + kindClass + '" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(e.label + ' · ' + (e.value >= 0 ? '+' : '') + fmtNum(e.value) + ' → ' + fmtNum(e.running)) + '</title></rect>');
-      parts.push('<text x="' + cx.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="' + okuTickAnchor(cx, 0, W) + '" class="okc-tick">' + escapeXml(e.label) + '</text>');
+      if (tickFit.shows(i)) {
+        parts.push(tickFit.text(cx.toFixed(1), pad.top + plotH + 16, e.label, 'okc-tick', okuTickAnchor(cx, 0, W)));
+      }
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -11586,9 +11687,11 @@ class OkuChart extends HTMLElement {
       parts.push('<text x="' + (pad.left - 8) + '" y="' + (yOf(firstRank) + 4) + '" text-anchor="end" class="okc-bump-end-label" fill="' + color + '">' + endLabel + '</text>');
       parts.push('<text x="' + (W - pad.right + 8) + '" y="' + (yOf(lastRank) + 4) + '" text-anchor="start" class="okc-bump-end-label" fill="' + color + '">' + endLabel + '</text>');
     });
-    // Category ticks at bottom.
+    // Category ticks at bottom, fitted to the slot each one has.
+    var tickFit = okuFitAxisTicks(categories, { slot: plotW / Math.max(1, categories.length), fontPx: 11 });
     categories.forEach(function (c, i) {
-      parts.push('<text x="' + xOf(i).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="' + okuTickAnchor(xOf(i), 0, W) + '" class="okc-tick">' + escapeXml(c) + '</text>');
+      if (!tickFit.shows(i)) return;
+      parts.push(tickFit.text(xOf(i).toFixed(1), H - 10, c, 'okc-tick', okuTickAnchor(xOf(i), 0, W)));
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -11862,9 +11965,13 @@ class OkuChart extends HTMLElement {
     });
     // X-axis category ticks at the bottom, sampled (≤6).
     var stride = Math.max(1, Math.floor(categories.length / 6));
+    // The stride thinned the ticks by COUNT; the fitter thins by the
+    // room each label actually has, and shortens what is left.
+    var tickFit = okuFitAxisTicks(categories, { slot: plotW / Math.max(1, categories.length), fontPx: 11 });
     categories.forEach(function (c, i) {
+      if (!tickFit.shows(i)) return;
       if (i % stride !== 0 && i !== categories.length - 1) return;
-      parts.push('<text x="' + xOf(i) + '" y="' + (H - 10) + '" text-anchor="' + okuTickAnchor(xOf(i), 0, W) + '" class="okc-tick">' + escapeXml(c) + '</text>');
+      parts.push(tickFit.text(xOf(i), H - 10, c, 'okc-tick', okuTickAnchor(xOf(i), 0, W)));
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -13600,7 +13707,7 @@ function __okuSafeUrl(u) {
 function okuFitLabelGutter(labels, opts) {
   var o = opts || {};
   var fontPx = o.fontPx || 11;
-  var chW = fontPx * (o.emPerChar || 0.66);
+  var chW = fontPx * (o.emPerChar || OKU_EM_PER_CHAR);
   var pad = o.pad === undefined ? 10 : o.pad;
   var maxW = Math.max(40, (o.width || 720) * (o.maxFrac || 0.42));
   var minW = o.minW || 60;
@@ -13668,6 +13775,89 @@ function okuFitLabelGutter(labels, opts) {
             return '<tspan x="' + x + '"' + (i ? ' dy="' + lineH + '"' : '') + '>' + escapeXml(line) + '</tspan>';
           }).join('');
       return head + body + '<title>' + escapeXml(full) + '</title></text>';
+    }
+  };
+}
+/* One character-width estimate, for everything that has to guess.
+
+   An SVG string is built before it is in the DOM, where nothing can
+   measure it, so every renderer that reserves room for text estimates
+   from the character count. There were three estimates: 0.66em in
+   okuFitLabelGutter, 0.62em in the tick fitter, and 5.6px at 11px —
+   0.51em — in the series legend. The legend's is the one that showed:
+   it packs chips left to right and wraps when the next one will not
+   fit, so an 18% under-estimate is chips drawn over each other, which
+   is what a reader saw on a radar legend with real series names.
+
+   0.66em, measured as the mean advance for Inter at mixed-case Latin
+   plus Turkish. It errs HIGH on purpose, in the direction every caller
+   wants: too wide costs a few pixels of plot, too narrow costs the end
+   of a label or one chip painted over another. Capitals and CJK run
+   wider still, which the post-paint fit absorbs. */
+var OKU_EM_PER_CHAR = 0.66;
+
+/* Fit a row of category ticks to the slots they actually have.
+
+   A gutter label has okuFitLabelGutter; a tick along an x axis had
+   nothing. Every renderer drawing author text under an axis emitted
+   `<text>` at the category's centre and hoped: measured with real
+   labels, a stream chart's ticks overlapped 19 times, horizon 14,
+   bump 10, waterfall 11. Overlapping text is worse than shortened
+   text — two labels crossing are both unreadable, and the reader
+   cannot tell there were two.
+
+   Two moves, in this order. Shorten to the slot, keeping the whole
+   string in a <title>. And when even a shortened label would be
+   narrower than `minChars`, label FEWER categories rather than drawing
+   a row of stubs: `k…` under every column says nothing at all, where
+   every third label under a dense axis still says what the axis is.
+
+   The index set is computed up front so the last category — the end of
+   the range, which a reader looks for — is always labelled, and the
+   one before it is dropped when including both would put them closer
+   than 0.6 of a step. */
+function okuFitAxisTicks(labels, opts) {
+  var o = opts || {};
+  var list = (labels || []).map(function (l) { return String(l == null ? '' : l); });
+  var fontPx = o.fontPx || 11;
+  var chW = fontPx * (o.emPerChar || OKU_EM_PER_CHAR);
+  var gap = o.gap === undefined ? 12 : o.gap;
+  var minChars = Math.max(2, o.minChars || 4);
+  var slot = Math.max(1, o.slot || ((o.width || 640) / Math.max(1, list.length)));
+  var step = 1;
+  var chars = Math.floor((slot - gap) / chW);
+  while (chars < minChars && step < list.length) {
+    step++;
+    chars = Math.floor((slot * step - gap) / chW);
+  }
+  var shown = [];
+  for (var i = 0; i < list.length; i += step) shown.push(i);
+  var last = list.length - 1;
+  if (shown.length && shown[shown.length - 1] !== last) {
+    if (last - shown[shown.length - 1] < step * 0.6) shown.pop();
+    shown.push(last);
+  }
+  var isShown = {};
+  shown.forEach(function (i) { isShown[i] = true; });
+  function cut(sTxt, room) {
+    var max = room === undefined ? chars : Math.floor((room - gap) / chW);
+    if (max < 1) max = 1;
+    return sTxt.length <= max ? sTxt : sTxt.slice(0, Math.max(1, max - 1)).replace(/\s+$/, '') + '…';
+  }
+  return {
+    step: step,
+    maxChars: chars,
+    shows: function (i) { return !!isShown[i]; },
+    /* `room` overrides the shared slot for an axis whose columns are
+       not equal — a marimekko sizes each column by its own weight. */
+    fit: function (l, room) { return cut(String(l == null ? '' : l), room); },
+    /* The tick as markup: shortened text, full string in a <title>. */
+    text: function (xPos, yPos, l, cls, anchorAttr, room) {
+      var full = String(l == null ? '' : l);
+      var short = cut(full, room);
+      return '<text x="' + xPos + '" y="' + yPos + '" text-anchor="' + (anchorAttr || 'middle') +
+             '" class="' + (cls || 'okc-tick') + '">' + escapeXml(short) +
+             (short === full ? '' : '<title>' + escapeXml(full) + '</title>') + '</text>';
     }
   };
 }
