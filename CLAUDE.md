@@ -1535,6 +1535,63 @@ this rule. Held by `browser/test_table_cells_fit_their_column.py`, whose
 six cases were each run against the kit without the fix: four fail on
 the marking pass and the sixth by 86px on the CSS.
 
+**The reader chooses how cells wrap: one row, three stops, per
+table.** Asked for by a reader "without making the table complicated",
+so it is the same shape as the View row above it and not a control per
+column — a control for every column is a table of controls. *Wrap
+text* is the default and the rule above (a phrase wraps, a token keeps
+its line). *Fit to width* breaks anywhere so the table holds its
+column, which is the one case the default cannot rescue — a single
+token with no whitespace, a URL or a path, because keeping a token
+whole is the default's whole point. *One line* wraps nothing and
+scrolls. The author's `okt-nowrap` is where it starts, as
+`data-default-view` is for the view, and the reader's One line is that
+same class, so the two cannot drift. Not persisted, as the view is not.
+
+**A panel built on open is built after localize, so its words are
+translated where they are built.** The Configure panel was English on
+every Turkish page — title, row labels, subtitle, placeholder — though
+three of those had entries in the table; the coverage test was green
+throughout because it holds the TABLE, and `'Group by'` reached the
+label through a variable and `'contains…'` starts lowercase, so its
+patterns never saw them. Localizing the panel as a subtree would be the
+wrong repair: its filter rows are labelled with the author's column
+names. So each kit word is looked up at build time, and the words new
+to the panel go under `menu:` — `Group by` and `Cells` are words an
+author writes, a SQL clause in a table cell among them. `View`, `Close`
+and `Configure table` keep the bare keys they already had, because the
+gear, four other close buttons and the markdown viewer still use them,
+and a word may not be both (`test_i18n_coverage` refuses it).
+
+**And the words built when a table is wired are set again when the
+panel opens.** On a SERVED page the table is wired before the string
+table has arrived; standalone inlines the table, so the same code was
+right in one delivery mode and English in the other — measured, the
+view and cell buttons and the group-by option on `dist/site`.
+`okuTableWords` holds them once, literally, keyed by the value each
+control already carries (`data-view`, `data-cells`, an option's
+`value`), and `open()` relabels from it after every row is in. The
+keys are never the text: the group-by list also holds the author's
+column names, which are marked `data-oku-verbatim` — a column named
+`View` was coming back as `Görünüm` in that list while the header above
+the column read `View`.
+
+**A control moved into a popover is not in its toolbar any more.**
+`setView` updated the buttons with `ctrl.querySelectorAll` at click
+time, and the popover MOVES them out of `ctrl` while it is open.
+Measured on the shipped kit: clicking List switched the table to list
+view and left Table highlighted and `aria-pressed`. The buttons are
+held once at wiring time now, for both rows — the nodes are the same
+wherever they live, which the comment above the gear's wiring always
+said.
+
+Held by `browser/test_table_cells_control.py`, ten cases, all failing
+against the kit without this change: each stop does what it says and
+the stops are exclusive, the author's `okt-nowrap` is where the control
+opens, the panel holds no English kit word on a Turkish page in EITHER
+delivery mode, the author's column names come through untranslated in
+both, and the panel says which view is on.
+
 **Tables read as one card.** `.okt-table-wrap` carries a border +
 padding so two consecutive tables don't bleed into each other. The
 filter input + stats counter sit together on the left; chip rack is

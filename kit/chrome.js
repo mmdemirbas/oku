@@ -1582,10 +1582,27 @@ var __okuTableConfig = (function () {
     currentWrap = wrap;
     anchorBtn = btn;
     popover.hidden = false;
+    // Every word below is translated HERE, at build time. The panel is
+    // built on open, which is after the page's one-shot localize pass,
+    // so a word left for that pass is English on a Turkish page — and
+    // measured, the whole panel was: title, row labels, the filter
+    // subtitle and its placeholder, although three of them had entries
+    // in the table. The coverage test was green throughout, because it
+    // holds the TABLE. Localizing the panel as a subtree instead would
+    // be wrong: its filter rows are labelled with the author's column
+    // names, and a column called `View` would come back as `Görünüm`.
+    // Words new to this panel, or used nowhere else, go through
+    // `menuWord` for the reason the presentation menu's do: `Group by`
+    // and `Cells` are words an author writes — a SQL clause in a table
+    // cell among them — and a bare key is matched against author
+    // content. `Configure table`, `Close` and `View` keep the bare keys
+    // they already had, because the gear, four other close buttons and
+    // the markdown viewer's own view group still use them; moving those
+    // is its own change, and a word may not be both.
     popover.innerHTML =
       '<div class="okc-cfg-head">' +
-        '<span class="okc-cfg-title">Configure table</span>' +
-        '<button type="button" class="okc-cfg-close" aria-label="Close">' + ICON_CROSS + '</button>' +
+        '<span class="okc-cfg-title">' + escapeXml(okuT('Configure table')) + '</span>' +
+        '<button type="button" class="okc-cfg-close" aria-label="' + escapeXml(okuT('Close')) + '">' + ICON_CROSS + '</button>' +
       '</div>';
     var closeBtn = popover.querySelector('.okc-cfg-close');
     closeBtn.addEventListener('click', close);
@@ -1597,8 +1614,29 @@ var __okuTableConfig = (function () {
       var groupby   = stash.querySelector('.okt-groupby');
       // The empty .okt-ctrl-sep used inline between view and groupby
       // can stay in ctrl — only move the meaningful controls.
-      moveInto(viewGroup, popover, 'View');
-      moveInto(groupby,   popover, 'Group by');
+      moveInto(viewGroup, popover, okuT('View'));
+      moveInto(groupby,   popover, menuWord('Group by'));
+      moveInto(stash.querySelector('.okt-cells-group'), popover, menuWord('Cells'));
+      // Words set at wiring time may predate the string table on a
+      // served page, so they are set again here — after ALL the rows
+      // are in, because the relabel reads the popover and a row not yet
+      // moved is a row it cannot see. Keys, never text: the group-by
+      // options also list the author's column names, and those are not
+      // looked up.
+      var W = okuTableWords();
+      popover.querySelectorAll('[data-view], [data-cells]').forEach(function (b) {
+        var w = W[b.getAttribute('data-view') || b.getAttribute('data-cells')];
+        if (!w) return;
+        b.setAttribute('title', w);
+        b.setAttribute('aria-label', w);
+      });
+      [['.okt-view-group', W.view], ['.okt-cells-group', W.cells]].forEach(function (g) {
+        var el = popover.querySelector(g[0]);
+        if (el) el.setAttribute('aria-label', g[1]);
+      });
+      popover.querySelectorAll('select option[value="none"], select option[value="author"]').forEach(function (o) {
+        o.textContent = W[o.value];
+      });
     }
     // Per-column filters. Lives in code under wrap.__oktState so the
     // popover can write into the wrap's filter map + trigger a
@@ -1607,17 +1645,19 @@ var __okuTableConfig = (function () {
     if (state && state.headers && state.headers.length) {
       var section = document.createElement('div');
       section.className = 'okt-cfg-section';
-      section.innerHTML = '<div class="okt-cfg-subtitle">Filter columns</div>';
+      section.innerHTML = '<div class="okt-cfg-subtitle">' + escapeXml(menuWord('Filter columns')) + '</div>';
       state.headers.forEach(function (label, idx) {
         var row = document.createElement('label');
         row.className = 'okt-cfg-row';
         var lbl = document.createElement('span');
         lbl.className = 'okt-cfg-label';
-        lbl.textContent = label || ('Column ' + (idx + 1));
+        // The column's own name is the AUTHOR's and is never looked up;
+        // only the fallback for an unnamed column is a kit word.
+        lbl.textContent = label || menuWord('Column {0}').split('{0}').join(String(idx + 1));
         var input = document.createElement('input');
         input.type = 'search';
         input.className = 'okt-cfg-colfilter';
-        input.placeholder = 'contains…';
+        input.placeholder = menuWord('contains…');
         input.value = state.columnFilters[idx] || '';
         input.addEventListener('input', function () {
           state.columnFilters[idx] = input.value;
@@ -3100,6 +3140,34 @@ function menuWord(en) {
   var key = 'menu:' + en;
   var out = okuT(key);
   return out === key ? en : out;
+}
+
+/* The table toolbar's own words, in ONE place, keyed by the value each
+   control already carries (`data-view`, `data-cells`, an option's
+   `value`). Called twice, and the second call is the point: the view
+   and cells buttons and the group-by options are built when the table
+   is wired, and on a SERVED page that is before the string table has
+   arrived — measured, the popover's own labels came out Turkish and
+   every one of those came out English. Standalone inlines the table, so
+   the same code was right there, which is how it looked finished. The
+   popover sets them again on open, where the reader is about to read
+   them. The words stay literal here so the coverage test can see them:
+   it derives the required keys from the literal each call is handed,
+   and a call handed a variable is one it would have to be taught. */
+function okuTableWords() {
+  return {
+    view: okuT('View'),
+    cells: menuWord('Cells'),
+    table: menuWord('Table view'),
+    list: menuWord('List view'),
+    cards: menuWord('Cards view'),
+    board: menuWord('Board view'),
+    wrap: menuWord('Wrap text'),
+    fit: menuWord('Fit to width'),
+    nowrap: menuWord('One line'),
+    none: menuWord('— no grouping —'),
+    author: menuWord('Original groups'),
+  };
 }
 
 var RAIL_FIGURES = [
@@ -4662,16 +4730,25 @@ function initReadingAids() {
       '</label>'
     ) : '';
     var statsHTML = canPivot ? '<span class="okt-stats" aria-live="polite"></span>' : '';
+    // Before either control is built: the group-by options read it too.
+    var TW = okuTableWords();
     var groupByHTML = '';
     if (canPivot && headers.length > 1) {
       // Strip HTML tags from header text for the picker option label
       // so author-emitted <code> / inline formatting doesn't leak into
       // the dropdown choices.
       var stripHtml0 = function (s) { return String(s).replace(/<[^>]+>/g, '').trim(); };
-      var opts = ['<option value="none">— no grouping —</option>'];
-      if (hasAuthorGroups) opts.push('<option value="author" selected>Original groups</option>');
+      var opts = ['<option value="none">' + escapeXml(TW.none) + '</option>'];
+      if (hasAuthorGroups) opts.push('<option value="author" selected>' + escapeXml(TW.author) + '</option>');
+      // A column's name is the AUTHOR's, and the list sits inside kit
+      // chrome that the page's localize pass walks — so a column named
+      // `View` came back as `Görünüm` in this list on a Turkish page,
+      // though the header above the column read `View`. Marked
+      // verbatim; only the fallback for an unnamed column is a kit word.
       headers.forEach(function (h, i) {
-        opts.push('<option value="' + i + '">' + escapeXml(stripHtml0(h) || ('Column ' + (i + 1))) + '</option>');
+        var named = stripHtml0(h);
+        opts.push('<option value="' + i + '"' + (named ? ' data-oku-verbatim=""' : '') + '>' +
+          escapeXml(named || menuWord('Column {0}').split('{0}').join(String(i + 1))) + '</option>');
       });
       // No visible 'Group:' label — the dropdown's first option says
       // "— no grouping —" and the aria-label gives screen readers
@@ -4696,20 +4773,56 @@ function initReadingAids() {
       // Board: three vertical lanes (kanban).
       board: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="3.5" height="12" rx="1"/><rect x="6.25" y="2" width="3.5" height="9" rx="1"/><rect x="10.5" y="2" width="3.5" height="6" rx="1"/></svg>',
     };
+    // The label is the WHOLE phrase. It used to be `label + ' view'`,
+    // which no string table can hold and no coverage test can see.
     function viewBtnHTML(key, label, isActive) {
       return '<button data-view="' + key + '" type="button" class="okt-view-btn' +
         (isActive ? ' active' : '') + '" aria-pressed="' + (isActive ? 'true' : 'false') +
-        '" aria-label="' + label + ' view" title="' + label + ' view">' +
+        '" aria-label="' + escapeXml(label) + '" title="' + escapeXml(label) + '">' +
         VIEW_ICONS[key] + '</button>';
     }
     var viewBtns = canPivot ? (
-      '<span class="okt-view-group" role="group" aria-label="View">' +
-        viewBtnHTML('table', 'Table', true) +
-        viewBtnHTML('list',  'List',  false) +
-        viewBtnHTML('cards', 'Cards', false) +
-        viewBtnHTML('board', 'Board', false) +
+      '<span class="okt-view-group" role="group" aria-label="' + escapeXml(TW.view) + '">' +
+        viewBtnHTML('table', TW.table, true) +
+        viewBtnHTML('list',  TW.list,  false) +
+        viewBtnHTML('cards', TW.cards, false) +
+        viewBtnHTML('board', TW.board, false) +
       '</span>' +
       '<span class="okt-ctrl-sep" aria-hidden="true"></span>'
+    ) : '';
+    /* How cells wrap, as a reader's choice. The default is the rule the
+       CSS already applies — a phrase wraps, a token keeps its line — and
+       it is right for nearly every table. What it cannot do is fit a
+       single token too long for any column (a URL, a path), and what it
+       does not want is to stop a reader who would rather scan one line
+       per row and scroll. So three stops, the same shape as the View row
+       above it, and per table rather than per column: a control for
+       every column is a table of controls.
+
+       The author's `okt-nowrap` sets where it starts, the way
+       `data-default-view` sets the view; the reader's choice lasts the
+       visit, as the view's does. */
+    var CELL_ICONS = {
+      // Lines with a return arrow: text continues on the next line.
+      wrap: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h12"/><path d="M2 8h9a2.5 2.5 0 0 1 0 5H8"/><path d="M9.5 11.5 8 13l1.5 1.5"/><path d="M2 12h3"/></svg>',
+      // Arrows meeting two walls: everything held between the edges.
+      fit: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3v10"/><path d="M14 3v10"/><path d="M5 8h6"/><path d="M6.5 6.5 5 8l1.5 1.5"/><path d="M9.5 6.5 11 8l-1.5 1.5"/></svg>',
+      // One line running past a dashed edge: it continues off screen.
+      nowrap: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8h11"/><path d="M10.5 5.5 13 8l-2.5 2.5"/><path d="M11 3v1.5M11 11.5V13" stroke-width="1.2"/></svg>',
+    };
+    var startNowrap = table.classList.contains('okt-nowrap');
+    function cellBtnHTML(key, label, isActive) {
+      return '<button data-cells="' + key + '" type="button" class="okt-view-btn' +
+        (isActive ? ' active' : '') + '" aria-pressed="' + (isActive ? 'true' : 'false') +
+        '" aria-label="' + escapeXml(label) + '" title="' + escapeXml(label) + '">' +
+        CELL_ICONS[key] + '</button>';
+    }
+    var cellsBtns = canPivot ? (
+      '<span class="okt-cells-group" role="group" aria-label="' + escapeXml(TW.cells) + '">' +
+        cellBtnHTML('wrap',   TW.wrap,   !startNowrap) +
+        cellBtnHTML('fit',    TW.fit,    false) +
+        cellBtnHTML('nowrap', TW.nowrap, startNowrap) +
+      '</span>'
     ) : '';
     // Order: filter → stats → copy → gear → expand. The gear opens the
     // configuration popover (group-by, view mode, multi-column sort,
@@ -4758,7 +4871,7 @@ function initReadingAids() {
       '</button>' +
       // Stashed area — group-by + view-toggle live here at rest but
       // visually hidden; the popover moves them into itself when open.
-      '<span class="okt-config-stashed" hidden>' + viewBtns + groupByHTML + '</span>';
+      '<span class="okt-config-stashed" hidden>' + viewBtns + groupByHTML + cellsBtns + '</span>';
 
     var scroll = document.createElement('div');
     scroll.className = 'okt-table-scroll';
@@ -5540,18 +5653,45 @@ function initReadingAids() {
           __okuTableConfig.toggle(wrap, gearBtn);
         });
       }
+      // The buttons themselves, held once. The popover MOVES them out of
+      // `ctrl` while it is open, so a `ctrl.querySelectorAll` at click
+      // time finds nothing: measured on the shipped kit, clicking List
+      // in the panel switched the table to list view and left Table
+      // highlighted and `aria-pressed` — the panel reporting a view that
+      // was no longer on screen. The nodes are the same wherever they
+      // are, which is what "same DOM nodes so the wiring keeps working"
+      // above always assumed.
+      var viewBtnEls = Array.prototype.slice.call(ctrl.querySelectorAll('[data-view]'));
+      var cellBtnEls = Array.prototype.slice.call(ctrl.querySelectorAll('[data-cells]'));
       // View-toggle handler — CSS-driven via wrap.dataset.view.
       function setView(view) {
         wrap.dataset.view = view;
-        ctrl.querySelectorAll('[data-view]').forEach(function (b) {
+        viewBtnEls.forEach(function (b) {
           var active = b.getAttribute('data-view') === view;
           b.classList.toggle('active', active);
           b.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
       }
-      ctrl.querySelectorAll('[data-view]').forEach(function (btn) {
+      viewBtnEls.forEach(function (btn) {
         btn.addEventListener('click', function () {
           setView(btn.getAttribute('data-view'));
+        });
+      });
+      // Cells: one class on the table per stop, so the author's own
+      // `okt-nowrap` and the reader's choice are the same mechanism —
+      // there is no second rule to drift from the first.
+      function setCells(mode) {
+        table.classList.toggle('okt-fit', mode === 'fit');
+        table.classList.toggle('okt-nowrap', mode === 'nowrap');
+        cellBtnEls.forEach(function (b) {
+          var on = b.getAttribute('data-cells') === mode;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+      }
+      cellBtnEls.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          setCells(btn.getAttribute('data-cells'));
         });
       });
       // Author-pinned initial view via `block.view` → table[data-default-view].
@@ -5665,7 +5805,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-28-r89';
+var __okuKitBuild = '2026-09-29-r90';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

@@ -652,7 +652,13 @@ class TestPayloadBudget:
     # two flex items in the config popover that refused to shrink.
     # Under 3,000 bytes, most of it the measurement that says why a
     # blanket `white-space: normal` is the wrong fix.
-    KIT_BUDGET_BYTES = 1_340_000
+    # Then from 1,340,000 by the Cells row a reader asked for, and the
+    # three defects in the same panel found while building it: the
+    # panel English on every Turkish page, a column named `View`
+    # translated in the group-by list, and the View row highlighting
+    # a view that was no longer on screen. About 9,000 bytes with three
+    # icons, of which the reasoning is most.
+    KIT_BUDGET_BYTES = 1_350_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

@@ -1922,7 +1922,7 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 }
 /* Re-style the moved-in view buttons + group-by select so they
    sit inside the popover rather than the toolbar context. */
-.okt-config-popover .okt-view-group {
+.okt-config-popover :is(.okt-view-group, .okt-cells-group) {
   display: inline-flex;
   gap: 4px;
 }
@@ -4102,7 +4102,20 @@ table td a > code[data-oku-phrase] {
   min-width: 9ch;
 }
 table tr.okt-nowrap td,
-table.okt-nowrap td { white-space: nowrap; overflow-wrap: normal; }
+table.okt-nowrap td,
+table.okt-nowrap td code[data-oku-phrase] { white-space: nowrap; overflow-wrap: normal; }
+/* The reader's "fit to width": break anywhere, so the table holds its
+   column whatever a cell carries. The default cannot do this for a
+   single token with no whitespace — a URL, a path — because keeping a
+   token whole is the default's whole point. Every cell and every code
+   span in it, phrase or token, since the reader has asked for exactly
+   the trade the default refuses to make. The `td` floor of 9ch still
+   holds, so no column is squeezed to a letter. */
+.okt-table-scroll > table.okt-fit :is(td, th),
+.okt-table-scroll > table.okt-fit td code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 /* Semantic status pill (header `status` value→verdict map). Same colour
    language as compare-grid verdicts so state reads at a glance instead of
    as bare text. Soft fill + strong text; tokens carry their own light/dark
