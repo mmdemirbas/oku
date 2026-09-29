@@ -1510,10 +1510,32 @@ keyed on the measured `data-fit` state oscillates, because applying
 fit. After: 0px of sideways scroll at 1500px, every column visible,
 tallest row 90px, and the dates still on one line.
 
-What is left is a single token with no whitespace that is too long for
-any column — a URL, a long path. That one keeps its line and the
-scroller earns its keep, which is the honest outcome and what the
-reader's own wrap control is for.
+**A URL or a path is the token that breaks, and only at its
+separators.** Chrome does not break an address at its slashes, so after
+the phrase rule 31 of the 47 tables still pushed sideways in a
+delivered research tree were held open by one — the widest a
+99-character Wiktionary address drawn as a 539px line. `anywhere` would
+release it and every word in the table with it, which is the reader's
+*Fit to width* and not a default. `__okuBreakPaths` inserts `<wbr>`
+where the Chicago Manual of Style puts a URL break (after `//` and a
+colon, before a single slash and `~ . , - _ ? # %`, either side of `=`
+and `&`), never inside a run of punctuation, and a code span that took
+breaks is marked `data-oku-path` so it can leave `nowrap`. Three things
+are decisions. **`<wbr>`, not a zero-width space**: it holds no
+character, so the cell text, both copies, the filter and a hand
+selection read the address as written — a ZWSP would ride into every
+clipboard and break the URL there. **Only what is shaped like a path**:
+a scheme, `www.`, a dotted host with a slash, `./`, `~/`; in a code
+span any slash, because there it is a separator. Prose `and/or` and a
+date stay one word. **Not inside source text**: `pre`, `script`,
+`style`, `svg` in a cell are read back by Prism, the line splitter or
+a diagram, so the walk rejects them. Held by
+`browser/test_table_paths_break.py`.
+
+What is left is a single token that is neither — a class name, a
+digest, a long identifier. That one keeps its line and the scroller
+earns its keep, which is the honest outcome and what the reader's own
+wrap control is for.
 
 **The config popover's rows shrink, and the item that has to know is
 the one the row sizes.** `.okt-cfg-colfilter` carried `min-width: 0`
@@ -1542,7 +1564,7 @@ column — a control for every column is a table of controls. *Wrap
 text* is the default and the rule above (a phrase wraps, a token keeps
 its line). *Fit to width* breaks anywhere so the table holds its
 column, which is the one case the default cannot rescue — a single
-token with no whitespace, a URL or a path, because keeping a token
+token with no whitespace that is not a path, because keeping a token
 whole is the default's whole point. *One line* wraps nothing and
 scrolls. The author's `okt-nowrap` is where it starts, as
 `data-default-view` is for the view, and the reader's One line is that

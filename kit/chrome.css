@@ -4096,6 +4096,11 @@ table td a > code[data-oku-phrase] {
   white-space: normal;
   overflow-wrap: break-word;
 }
+/* A token that is a URL or a path carries `<wbr>` at its separators
+   (chrome.js, __okuBreakPaths), and `nowrap` suppresses a `<wbr>` as it
+   suppresses every other opportunity. `normal` alone, not `break-word`:
+   the address breaks at its slashes and dots, never mid-segment. */
+table td code[data-oku-path] { white-space: normal; }
 :is(table, .okt-table-ghost) th {
   /* Headers earn the same readable floor so labelled columns don't
      collapse below the label length. */
@@ -4103,11 +4108,12 @@ table td a > code[data-oku-phrase] {
 }
 table tr.okt-nowrap td,
 table.okt-nowrap td,
-table.okt-nowrap td code[data-oku-phrase] { white-space: nowrap; overflow-wrap: normal; }
+table.okt-nowrap td code:is([data-oku-phrase], [data-oku-path]) { white-space: nowrap; overflow-wrap: normal; }
 /* The reader's "fit to width": break anywhere, so the table holds its
    column whatever a cell carries. The default cannot do this for a
-   single token with no whitespace — a URL, a path — because keeping a
-   token whole is the default's whole point. Every cell and every code
+   single token with no whitespace that is not a path — a class name, a
+   digest — because keeping a token whole is the default's whole point
+   (a URL or a path breaks at its separators, see __okuBreakPaths). Every cell and every code
    span in it, phrase or token, since the reader has asked for exactly
    the trade the default refuses to make. The `td` floor of 9ch still
    holds, so no column is squeezed to a letter. */

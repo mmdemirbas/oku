@@ -10,8 +10,9 @@ of controls.
     rule `test_table_cells_fit_their_column.py` holds.
   - Fit to width: break anywhere, so the table holds its column. The
     one case the default cannot rescue is a single token with no
-    whitespace — a URL, a path — because keeping a token whole is the
-    default's whole point.
+    whitespace that is not a path — a class name, a digest — because
+    keeping a token whole is the default's whole point. A URL or a path
+    breaks at its separators by default (test_table_paths_break.py).
   - One line: nothing wraps and the table scrolls, for a reader who
     would rather scan one row per line.
 
@@ -47,8 +48,11 @@ from ._wait import page_quiet
 
 pytestmark = pytest.mark.browser
 
+# A token the default cannot break: no whitespace and not shaped like a
+# path. A URL used to stand here, until URLs and paths learned to break
+# at their separators (test_table_paths_break.py).
 LONG_TOKEN = (
-    "s3://warehouse-prod-eu-central-1/iceberg/db/events/data/partition=2026-09-28/00000-0-a1b2c3d4.parquet"
+    "org.apache.iceberg.relocated.com.google.common.util.concurrent.MoreExecutors$DirectExecutorService"
 )
 
 PAGE_MD = f"""---

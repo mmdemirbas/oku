@@ -3950,6 +3950,85 @@ function wireCopyRegions(root) {
   });
 }
 
+/* ---- A URL or a path in a cell breaks where a reader expects it ----
+   Chrome does not break a URL at its slashes: measured on a delivered
+   research tree, 31 of the 47 tables still pushed sideways past their
+   column were held open by one, the widest a 99-character Wiktionary
+   address drawing as a 539px line in a 4-column table. `overflow-wrap:
+   anywhere` would release it and would also release every word in the
+   table, which is the reader's "Fit to width" and not a default.
+
+   So the break opportunities go where the Chicago Manual of Style puts
+   them (17th ed., 14.18): after `//` and a colon, before a single
+   slash, `~ . , - _ ? # %`, and on either side of `=` and `&`. `<wbr>`
+   is a break opportunity with no character in it, so textContent, the
+   TSV and markdown copies, a selection copied by hand and the filter
+   all read the address exactly as written. A run of punctuation is
+   never split — that is what keeps `https://` and `?=` whole.
+
+   Only what is SHAPED like a path takes them. Prose `and/or` or `1/2`
+   stays one word. In a code span a slash is enough, because there it
+   is a separator — a route, a relative path, a MIME type. */
+var OKU_URL_SHAPED = /(?:[a-z][a-z0-9+.-]*:\/\/|^www\.|^[a-z0-9-]+(?:\.[a-z0-9-]+)+\/|^\.{0,2}\/[^\/\s]+\/|^~\/)/i;
+
+function __okuPathShaped(tok, inCode) {
+  if (inCode && tok.indexOf('/') !== -1) return true;
+  return OKU_URL_SHAPED.test(tok.replace(/^[\[(<"'«]+/, ''));
+}
+
+function __okuPathBreaks(s) {
+  var at = [];
+  var word = /[\p{L}\p{N}]/u;
+  for (var i = 1; i < s.length; i++) {
+    var c = s[i], p = s[i - 1];
+    if (!word.test(c) && !word.test(p)) continue;
+    if (c === '/' ? s[i + 1] !== '/' : '~.,-_?#%=&'.indexOf(c) !== -1) at.push(i);
+    else if (':=&'.indexOf(p) !== -1 || (p === '/' && s[i - 2] === '/')) at.push(i);
+  }
+  return at;
+}
+
+/* Returns true when it inserted anything, so the caller can let a code
+   span that was held to one line take the breaks it now carries. */
+function __okuBreakPaths(root) {
+  var nodes = [];
+  // Text a later pass reads back as source is not prose: a diagram's
+  // holder, a block Prism rewrites from its own text, a drawing.
+  var walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: function (t) {
+      return t.parentElement && t.parentElement.closest('script, style, pre, textarea, svg, noscript')
+        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  var n;
+  while ((n = walk.nextNode())) nodes.push(n);
+  var any = false;
+  nodes.forEach(function (node) {
+    var inCode = !!(node.parentElement && node.parentElement.closest('code'));
+    var parts = node.nodeValue.split(/(\s+)/);
+    var frag = null;
+    parts.forEach(function (tok, k) {
+      var at = (k % 2 === 0 && tok && __okuPathShaped(tok, inCode)) ? __okuPathBreaks(tok) : [];
+      if (!at.length && !frag) return;
+      if (!frag) {
+        frag = document.createDocumentFragment();
+        if (k) frag.appendChild(document.createTextNode(parts.slice(0, k).join('')));
+      }
+      var from = 0;
+      at.forEach(function (i) {
+        frag.appendChild(document.createTextNode(tok.slice(from, i)));
+        frag.appendChild(document.createElement('wbr'));
+        from = i;
+      });
+      frag.appendChild(document.createTextNode(tok.slice(from)));
+    });
+    if (!frag) return;
+    node.parentNode.replaceChild(frag, node);
+    any = true;
+  });
+  return any;
+}
+
 /* ---- A live table, in the two shapes a reader takes it away in ----
    Filtered-out rows and group headers are chrome, not data, so neither
    format carries them: the clipboard holds what the reader is looking
@@ -4607,6 +4686,15 @@ function initReadingAids() {
        oscillation, and this cannot start one. */
     Array.prototype.forEach.call(table.querySelectorAll('td code'), function (code) {
       if (/\s/.test((code.textContent || '').trim())) code.dataset.okuPhrase = '1';
+    });
+    /* A token that is a URL or a path is the exception to "one token,
+       one line": it has places a reader expects it to break, and
+       nowhere else to go. See __okuBreakPaths. */
+    Array.prototype.forEach.call(table.querySelectorAll('td'), function (td) {
+      if (!__okuBreakPaths(td)) return;
+      Array.prototype.forEach.call(td.querySelectorAll('code:not([data-oku-phrase])'), function (code) {
+        if (code.querySelector('wbr')) code.dataset.okuPath = '1';
+      });
     });
     var headers = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
       var copy = th.cloneNode(true);
@@ -5805,7 +5893,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-29-r90';
+var __okuKitBuild = '2026-09-29-r91';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
