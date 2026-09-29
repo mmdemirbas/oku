@@ -4526,6 +4526,20 @@ function initReadingAids() {
      * Cloned rather than read before wireColResize runs, because any
      * future header decoration has the same problem and the same fix
      * should already cover it. */
+    /* A code span in a cell is one token or it is a phrase, and only
+       the second one may be broken. The CSS keeps cell code on one
+       line — an identifier folded mid-word to save pixels the table
+       had to spare — but it said that unconditionally, so a cell
+       holding an exception message drew as one 780px line, the table
+       came out 1379px wide inside a 1086px scroller at a 1500px
+       viewport, and the last two columns were pushed out of sight.
+       Whitespace is the decidable difference, and it is a CONTENT test
+       rather than a layout one: reading a rendered width here and
+       feeding it back into a rule that changes widths is an
+       oscillation, and this cannot start one. */
+    Array.prototype.forEach.call(table.querySelectorAll('td code'), function (code) {
+      if (/\s/.test((code.textContent || '').trim())) code.dataset.okuPhrase = '1';
+    });
     var headers = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
       var copy = th.cloneNode(true);
       Array.prototype.forEach.call(copy.querySelectorAll('.okt-col-resize'), function (n) { n.remove(); });

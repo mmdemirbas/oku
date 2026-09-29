@@ -1899,11 +1899,26 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   flex: 0 0 80px;
   font-size: 12px;
   color: var(--text-soft);
+  /* Same rule on the other side of the row: the basis is 80px but
+     `min-width: auto` lets a long column name grow the track past it
+     and push the input out. A column may be named anything, so the
+     name wraps inside its 80px rather than widening the row. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .okt-config-popover .okt-cfg-field {
   flex: 1 1 auto;
   display: inline-flex;
   align-items: center;
+  /* The input inside already carries `min-width: 0`, which is one
+     level too deep to help: THIS is the flex item the row sizes, and a
+     flex item defaults to `min-width: auto`, so it refuses to shrink
+     below the intrinsic width of the `<input>` it holds — a search
+     input sizes itself from its `size` attribute, not from its box.
+     Measured: squeeze the panel below what that intrinsic width wants
+     and every filter input hangs 46px outside the panel's card, over
+     the table behind it. */
+  min-width: 0;
 }
 /* Re-style the moved-in view buttons + group-by select so they
    sit inside the popover rather than the toolbar context. */
@@ -4038,11 +4053,49 @@ table td {
 }
 /* The last row's rule doubled the wrap's own border into a 2px edge. */
 table tbody tr:last-child td { border-bottom: none; }
-/* An identifier in a cell is one token, and a column label is written
-   to be read on one line. Both used to fold mid-word to save pixels the
-   table had to spare. */
+/* An identifier in a cell is one token and reads best on one line —
+   but `white-space: nowrap` says that unconditionally, and a cell does
+   not only hold identifiers. Measured on a comparison table whose
+   Iceberg column carries an exception message in a code span: the span
+   drew as ONE 780px line, the table came out 1379px wide inside a
+   1086px scroller at a 1500px viewport, and the last two columns were
+   pushed out of sight entirely. With no break opportunity there is
+   nothing the container can do — that is the same trap the chip rule
+   names, one element over.
+
+   `break-word` is the answer and NOT `anywhere`, for the reason the
+   `td` rule above gives: it leaves min-content at the longest WORD, so
+   a column holding `cast_ntz_to_date` still claims the width for the
+   whole identifier while the table has slack to give, and only breaks
+   the token when there genuinely is none. A message with spaces —
+   which is what a long cell value almost always is — wraps at them. */
 table td > code,
 table td > a > code { white-space: nowrap; }
+/* ...unless the span is a PHRASE rather than a token. `wireTable`
+   marks any cell code holding whitespace, because that is the real
+   distinction and it is decidable from the content: `2026-12-31` and
+   `cast_ntz_to_date` are one token each and belong on one line, while
+   `UnsupportedOperationException: Cannot cast TIMESTAMP WITH LOCAL
+   TIME ZONE to DATE for column ts_ltz` is a sentence that happens to
+   be set in mono.
+
+   It cannot be a CSS rule. Measured against `2026-12-31` in a 40px
+   box: `hyphens: none`, `word-break: keep-all` and `line-break:
+   strict` all leave min-content at 36px — the hyphen is a break
+   opportunity under UAX #14 and nothing but `white-space: nowrap`
+   suppresses it. So a blanket `normal` here does not just wrap the
+   long message; it also collapses the date column's min-content to
+   five characters, the auto layout hands the slack to the prose
+   column, and every date in the table renders as `2026-12- / 31`.
+
+   `break-word` and not `anywhere`, for the reason the `td` rule gives:
+   min-content stays at the longest WORD, so the column claims the room
+   it needs while the table has slack to give. */
+table td code[data-oku-phrase],
+table td a > code[data-oku-phrase] {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
 :is(table, .okt-table-ghost) th {
   /* Headers earn the same readable floor so labelled columns don't
      collapse below the label length. */

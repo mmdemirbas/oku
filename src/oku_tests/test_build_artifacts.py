@@ -647,7 +647,12 @@ class TestPayloadBudget:
     # row-bounded post-paint fit, and the point-label side and band
     # clamp. About 25,000 bytes, and most of it is the reasoning — each
     # rule is a measurement someone would otherwise have to take again.
-    KIT_BUDGET_BYTES = 1_336_000
+    # Then from 1,336,000 by a reader's screenshot of a table whose
+    # cells would not wrap: the phrase/token rule for cell code and the
+    # two flex items in the config popover that refused to shrink.
+    # Under 3,000 bytes, most of it the measurement that says why a
+    # blanket `white-space: normal` is the wrong fix.
+    KIT_BUDGET_BYTES = 1_340_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

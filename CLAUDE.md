@@ -1478,6 +1478,63 @@ time is what produced the second case. Its cost is that a label
 spelling a field name is not lengthened, which loses a little coverage
 and cannot invent a finding.
 
+**A code span in a cell is one token or it is a phrase, and only the
+second one may be broken.** `table td > code { white-space: nowrap }`
+said "an identifier in a cell is one token" — true, and said
+unconditionally, so a cell holding an exception message had no break
+opportunity at all. Measured on a comparison table at a 1500px
+viewport: the span drew as one 780px line, the table came out 1379px
+wide inside a 1086px scroller, 293px of forced sideways scrolling, and
+the `Same?` and `Note` columns were off screen entirely — a reader
+could not see those values, and the row was 177px tall for two lines of
+text because the column that had been pushed out of sight was wrapping
+into many lines there.
+
+**It cannot be a CSS rule, and the reason is the whole of it.** A
+blanket `white-space: normal` fixes the message and breaks every date:
+measured against `2026-12-31` in a 40px box, `hyphens: none`,
+`word-break: keep-all` and `line-break: strict` all leave min-content at
+36px, because a hyphen is a break opportunity under UAX #14 and nothing
+but `nowrap` suppresses it. The date column's min-content then collapses
+to five characters, the auto layout hands the slack to the prose column,
+and every date renders as `2026-12- / 31` — the same failure the `td`
+rule's own comment describes for `overflow-wrap: anywhere`.
+
+So `wireTable` marks a cell's `code` when its text holds whitespace, and
+the CSS wraps only those. Whitespace is the real distinction rather than
+a length threshold: `2026-12-31` and `cast_ntz_to_date` are one token
+each, `UnsupportedOperationException: Cannot cast …` is a sentence set
+in mono. It is a CONTENT test and deliberately not a layout one — a rule
+keyed on the measured `data-fit` state oscillates, because applying
+`anywhere` makes the table fit, which withdraws it, which makes it not
+fit. After: 0px of sideways scroll at 1500px, every column visible,
+tallest row 90px, and the dates still on one line.
+
+What is left is a single token with no whitespace that is too long for
+any column — a URL, a long path. That one keeps its line and the
+scroller earns its keep, which is the honest outcome and what the
+reader's own wrap control is for.
+
+**The config popover's rows shrink, and the item that has to know is
+the one the row sizes.** `.okt-cfg-colfilter` carried `min-width: 0`
+and it is one level too deep: its parent `.okt-cfg-field` is the flex
+item, and a flex item defaults to `min-width: auto`, so it refuses to
+shrink below the intrinsic width of the `<input>` inside — and a search
+input sizes itself from its `size` attribute, not from its box. Every
+filter input hung outside the panel's card, over the table behind it,
+in a reader's screenshot. `.okt-cfg-label` has the same defect on the
+other side of the row: `flex: 0 0 80px` is a basis, not a cap, so a
+long column name grows the track past it and pushes the input out.
+
+The test presses the MECHANISM rather than the panel's width — it gives
+the inputs a wide `size`. Narrowing the panel would have been the wrong
+press: the View row holds four 28px buttons that cannot shrink at all,
+so below about 230px that row overflows however the fields behave, and
+the assertion would have been measuring an impossible layout instead of
+this rule. Held by `browser/test_table_cells_fit_their_column.py`, whose
+six cases were each run against the kit without the fix: four fail on
+the marking pass and the sixth by 86px on the CSS.
+
 **Tables read as one card.** `.okt-table-wrap` carries a border +
 padding so two consecutive tables don't bleed into each other. The
 filter input + stats counter sit together on the left; chip rack is

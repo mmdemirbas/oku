@@ -1,0 +1,187 @@
+"""A table cell holds what it is given without pushing the table wider.
+
+Reported by a reader with a screenshot: a comparison table whose
+Iceberg column carried an exception message in a code span. The span
+drew as one unbroken line, the table came out wider than its column,
+and the last two columns were pushed out of sight — the reader could
+not see the `Same?` and `Note` values at all, and the row was more
+than twice as tall as its content because the off-screen Note column
+was wrapping into many lines.
+
+Two rules, and the second is the reason the first cannot be a blanket
+`white-space: normal`:
+
+  - a code span that is a PHRASE wraps inside its column;
+  - a code span that is one TOKEN does not, so the column claims the
+    width it needs while the table has slack to give.
+
+Whitespace decides which, from the content. Measured against
+`2026-12-31` in a 40px box: `hyphens: none`, `word-break: keep-all`
+and `line-break: strict` all leave min-content at 36px, because the
+hyphen is a break opportunity under UAX #14 and nothing but
+`white-space: nowrap` suppresses it. A blanket `normal` therefore also
+collapses a date column to five characters, the auto layout hands the
+slack to the prose column, and every date renders as `2026-12- / 31`.
+The fourth case here is that regression, stated as a measurement.
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+
+import pytest
+
+from oku import cli
+
+from ._wait import page_quiet
+
+pytestmark = pytest.mark.browser
+
+ERROR = "UnsupportedOperationException: Cannot cast TIMESTAMP WITH LOCAL TIME ZONE to DATE for column ts_ltz"
+PAGE_MD = f"""---
+title: Table cells
+summary: A table whose cells hold both tokens and phrases.
+---
+
+## Cases {{#cases}}
+
+| Case | Spark | Flink | Iceberg | Same? | Note |
+|---|---|---|---|---|---|
+| `cast_ntz_to_date` | `2026-12-31` | `2026-12-31` | `2026-12-31` | yes | |
+| `cast_ltz_to_date` | `2026-12-31` | `2026-12-31` | error: `{ERROR}` | no | Flink and Spark agree; Iceberg refuses the cast |
+| `year_ntz` | `2026` | `2026` | `2026` | yes | |
+| `month_ntz` | `12` | `12` | `12` | yes | |
+"""
+
+
+@pytest.fixture(scope="module")
+def built(tmp_path_factory):
+    docs = tmp_path_factory.mktemp("tablecells") / "docs"
+    docs.mkdir(parents=True)
+    (docs / "page.md").write_text(PAGE_MD, encoding="utf-8")
+    (docs / "page.html").write_text(cli._stub_for("Table cells"), encoding="utf-8")
+    cwd = Path.cwd()
+    os.chdir(docs)
+    try:
+        assert cli.cmd_build(argparse.Namespace(no_search=True, no_vendor=True)) == 0
+    finally:
+        os.chdir(cwd)
+    return docs / "dist" / "standalone" / "page.html"
+
+
+@pytest.fixture()
+def page(built, browser):
+    context = browser.new_context(viewport={"width": 1500, "height": 900})
+    pg = context.new_page()
+    pg.goto(built.as_uri(), wait_until="load")
+    page_quiet(pg)
+    yield pg
+    context.close()
+
+
+MEASURE = """() => {
+  const scroll = document.querySelector('.okt-table-scroll');
+  const table = scroll.querySelector('table');
+  const cell = (t) => [...document.querySelectorAll('.okt-table-scroll td code')]
+      .filter(c => c.textContent.trim() === t)[0];
+  const lines = (el) => el ? Math.round(el.getBoundingClientRect().height
+      / parseFloat(getComputedStyle(el).lineHeight || 21)) : null;
+  const phrase = [...document.querySelectorAll('.okt-table-scroll td code')]
+      .find(c => c.textContent.length > 40);
+  return {
+    tableW: Math.round(table.getBoundingClientRect().width),
+    scrollW: Math.round(scroll.getBoundingClientRect().width),
+    scrollRight: Math.round(scroll.getBoundingClientRect().right),
+    sideways: scroll.scrollWidth - scroll.clientWidth,
+    headers: [...document.querySelectorAll('.okt-table-scroll thead th')]
+        .map(th => ({text: th.textContent.trim().replace(/\\s+$/, ''),
+                     right: Math.round(th.getBoundingClientRect().right)})),
+    phraseMarked: phrase ? phrase.dataset.okuPhrase === '1' : null,
+    phraseLines: lines(phrase),
+    dateMarked: cell('2026-12-31') ? cell('2026-12-31').dataset.okuPhrase === '1' : null,
+    dateLines: lines(cell('2026-12-31')),
+    identLines: lines(cell('cast_ntz_to_date')),
+    tallestRow: Math.max(...[...document.querySelectorAll('.okt-table-scroll tbody tr')]
+        .map(t => Math.round(t.getBoundingClientRect().height))),
+  };
+}"""
+
+
+@pytest.fixture()
+def m(page):
+    return page.evaluate(MEASURE)
+
+
+def test_a_phrase_in_a_code_span_wraps_inside_its_column(m):
+    assert m["phraseMarked"] is True, "a code span holding whitespace is a phrase and has to be marked one"
+    assert m["phraseLines"] >= 2, f"the message drew on {m['phraseLines']} line(s) — it did not wrap"
+
+
+def test_the_table_does_not_outgrow_its_column(m):
+    """The reader's actual complaint. Before: 1379px of table in a
+    1086px scroller, 293px of forced sideways scrolling."""
+    assert m["sideways"] == 0, (
+        f"{m['sideways']}px of sideways scroll — table {m['tableW']}px in a {m['scrollW']}px scroller"
+    )
+
+
+def test_every_column_is_visible(m):
+    """The two right-hand columns were off screen entirely, which is
+    how a value goes missing without anything failing."""
+    # Upper-cased by CSS, so the DOM text is the author's casing.
+    names = [h["text"].upper() for h in m["headers"]]
+    assert names[:6] == ["CASE", "SPARK", "FLINK", "ICEBERG", "SAME?", "NOTE"], names
+    over = [h["text"] for h in m["headers"] if h["right"] > m["scrollRight"] + 1]
+    assert not over, f"columns past the right edge of the scroller at {m['scrollRight']}px: {over}"
+
+
+def test_a_token_in_a_code_span_keeps_its_line(m):
+    """The regression the phrase rule must not cause: a hyphen is a
+    break opportunity, so a blanket `normal` renders every date as
+    `2026-12- / 31`."""
+    assert m["dateMarked"] is False, "a date is one token, not a phrase"
+    assert m["dateLines"] == 1, f"`2026-12-31` drew on {m['dateLines']} lines"
+    assert m["identLines"] == 1, f"`cast_ntz_to_date` drew on {m['identLines']} lines"
+
+
+def test_the_row_is_no_taller_than_its_content(m):
+    """It was 177px for two lines of text, because the column that had
+    been pushed off screen was wrapping into many lines out of sight."""
+    assert m["tallestRow"] <= 120, f"tallest row {m['tallestRow']}px"
+
+
+def test_a_config_row_never_hangs_outside_the_panel(page):
+    """The other half of the same report, and the same CSS rule one
+    element over: `.okt-cfg-field` is the flex item the row sizes, and
+    a flex item will not shrink below the intrinsic width of the
+    `<input>` it holds — a search input sizes itself from its `size`
+    attribute. The input already carried `min-width: 0`, one level too
+    deep to help.
+
+    Squeezed on purpose: the panel is content-sized between 280 and
+    360px, so the overflow only shows once the intrinsic width exceeds
+    the share the row can give. Without the squeeze this passes on a
+    panel that was never under pressure."""
+    page.hover(".okt-table-wrap")
+    page.evaluate("() => document.querySelector('.okt-table-controls button[data-cfg]').click()")
+    page.wait_for_timeout(400)
+    page.add_style_tag(
+        content=".okt-config-popover { min-width: 200px !important; max-width: 200px !important; }"
+    )
+    page.wait_for_timeout(300)
+    got = page.evaluate("""() => {
+      const pop = document.querySelector('.okt-config-popover:not([hidden])');
+      const pr = pop.getBoundingClientRect();
+      const rows = [...pop.querySelectorAll('.okt-cfg-row')].filter(r => r.querySelector('input[type=search]'));
+      return {rows: rows.length,
+              worst: Math.max(...rows.map(r => {
+                const c = r.querySelector('input[type=search]');
+                return Math.round(c.getBoundingClientRect().right - pr.right);
+              })),
+              overflow: Math.max(...rows.map(r => Math.round(r.scrollWidth - r.clientWidth)))};
+    }""")
+    assert got["rows"] >= 6, f"only {got['rows']} rows measured — the panel did not open"
+    assert got["overflow"] == 0, f"a config row overflows by {got['overflow']}px"
+    assert got["worst"] <= 0, f"a control hangs {got['worst']}px outside the panel"
