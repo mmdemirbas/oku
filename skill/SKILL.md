@@ -1,16 +1,6 @@
 ---
 name: oku
-description: >
-  Produce a standalone, **visual-first** HTML artifact for long-form
-  replies — reviews, feedback rounds, study guides, briefs, design docs.
-  Use when the user has 5+ distinct points/questions, asks for "visually
-  rich" or "well-designed" output, needs ~1500+ words, or wants a
-  document to read alongside another file. Figures are the primary
-  communication medium and prose is the caption. You write one markdown
-  file — charts, tables, diagrams, comparison grids and step flows are
-  typed fences — and the kit renders all the chrome, so there is no CSS
-  to write.
-  Companion repo: https://github.com/mmdemirbas/oku.
+description: "Standalone visual-first HTML artifact for long replies: reviews, study guides, briefs, design docs. Use for 5+ points, ~1500+ words, a \"visually rich\" ask, or a document read beside another file. One markdown file; the kit renders the rest."
 ---
 
 # oku Skill
