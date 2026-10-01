@@ -48,7 +48,8 @@ def served(tmp_path_factory):
 ROWS = """() => {
   const nav = document.querySelector('page-nav');
   return [...nav.querySelectorAll('.page-nav-level a[href]')].map(a => ({
-    text: a.textContent.trim(),
+    // The title only: the row also carries the file's name under it.
+    text: a.querySelector('.page-nav-title').textContent.trim(),
     href: a.getAttribute('href'),
     resolved: a.href,
   }));

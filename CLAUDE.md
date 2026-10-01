@@ -1222,6 +1222,48 @@ covered on the day it lands. Measuring first is half the rule: the same
 sweep found that donut, pie, waffle and radar — the four the roadmap
 asked for — had shipped, and that box-plot has no legend to wire.
 
+**The sidebar's two lists each keep their room.** The site tree and
+the page's contents shared one scroll region, so a long tree pushed the
+contents out of sight — measured on a delivered research page, the
+contents began at y=1993 in a 900px window. Each list scrolls on its
+own now (`.page-nav-panel`, `page-toc .toc-list`) and the contents claim
+height FIRST: `flex: 0 0 auto` up to 64% of the column, the tree
+`flex: 0 1 auto` with what is left, so a short outline leaves the tree
+everything and a long one still leaves it a third. Two consequences:
+the scroll-spy's `revealActive` scrolls the TOC's own list, and the tree
+scrolls ITSELF to the page being read (`_revealActiveRow`, arithmetic on
+the panel's `scrollTop`, never `scrollIntoView`, which takes the
+document with it). After: contents at y=338 on the same page.
+
+**Each row names its file.** Near-same titles could not be told apart,
+so a row is `.page-nav-title` over `.page-nav-file` — the basename of
+the manifest's `source`, mono, a size down, in `--text-soft` because it
+is the fact that disambiguates and a fact below the contrast floor is
+not one the reader has. Both are inside the link: the whole row is the
+target and a screen reader hears the name. A test reading a row's title
+reads `.page-nav-title`.
+
+**One filter, both lists, as you type.** `__okuFuzzy` folds one
+character to one character — lowercase, accents off, Turkish İ / ı / I
+all to `i` — so an index into the folded text is an index into the
+original and the marks land on the right letters. A token matches as a
+substring first; three letters or more may match as a subsequence only
+when it spans at most twice the token plus one (`tkt` finds `tüketici`
+and not a t, a k and a t scattered across a title). Every word must
+match, in the title or the file name. It filters and does not rank: the
+lists keep their order because their order is the document's shape. A
+hit keeps its ancestors as dimmed context, counts are bare numerals, Up
+and Down walk the visible links, Enter follows the first, the first
+Escape clears and the second closes, and a peek stays open while the
+filter has focus wherever the pointer wanders. The input sits in the
+Contents button's own row, which the panel's top padding already
+reserves; below 520px the corner cluster stands over that row (measured
+at 360px, the search button sat on the filter) and it takes a row of its
+own. Held by `browser/test_sidebar_lists.py` — 12 of its 15 cases fail
+against the kit without this change, and the other three were tightened
+to assert the mechanism (the tree really is its own scroller, the
+reveal was really needed).
+
 **Neutral count visual language.** Stats counter / chip badges /
 group count badges render bare numerals ("5" or "3/5"), never
 English words. The page can flip to TR or EN without touching kit

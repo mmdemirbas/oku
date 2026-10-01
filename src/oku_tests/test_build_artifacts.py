@@ -664,7 +664,12 @@ class TestPayloadBudget:
     # trail of files opened from files. About 20,000 bytes, roughly half
     # of it the reasoning for why nesting lives in the viewer and why the
     # artifact never carries a machine path.
-    KIT_BUDGET_BYTES = 1_375_000
+    # Then from 1,375,000 by the sidebar a reader asked for: the two
+    # lists scrolling on their own with the contents claiming height
+    # first, the file's name under every title, and one filter over both
+    # with Turkish-aware folding and compact fuzzy matching. About
+    # 17,000 bytes, the matcher and its reasoning the larger part.
+    KIT_BUDGET_BYTES = 1_395_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

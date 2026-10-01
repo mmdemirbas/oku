@@ -5305,7 +5305,7 @@ page-nav .page-nav-scroll {
    group from the TOC stacked below. Sits below the chrome strip via
    its own 76px top margin. */
 page-nav .page-nav-panel {
-  margin: 14px 14px 18px 14px;
+  margin: 14px 14px 12px 14px;
   padding: 14px 14px;
   background: var(--surface-2);
   border: 1px solid var(--border-soft);
@@ -5558,6 +5558,182 @@ page-toc .page-toc-tab { display: none !important; }
   border-top: 1px solid var(--border-soft);
   overflow-y: auto;
   transition: opacity 0.2s ease, padding 0.25s;
+}
+/* ---- Two lists, one column ------------------------------------------
+   The site tree and this page's contents shared ONE scroll region, so a
+   long tree pushed the contents below the fold: measured on a delivered
+   research page, the contents began at y=1993 in a 900px window — two
+   screens of other documents' titles before the outline of the one being
+   read. Each list scrolls on its own now, and the contents come first in
+   the claim on height: they keep their own height up to 64% of the
+   column and the tree takes what is left. A short outline leaves the
+   tree everything else; a long one still leaves it a third. Specificity
+   matches the `.layout:has(page-nav) page-toc` rules above it, which
+   this has to override, rather than reaching for !important. */
+page-nav .page-nav-scroll {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+page-nav .page-nav-panel {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.layout:has(page-nav) page-nav .page-nav-scroll > page-toc {
+  flex: 0 0 auto;
+  max-height: 64%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.layout:has(page-nav) page-nav .page-nav-scroll > page-toc .page-toc-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+page-nav page-toc .toc-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The filter sits in the row the Contents button stands in, beside it —
+   space the panel's top padding already reserves, so the lists lose no
+   height to it. Centred on the button's 44px row (top: 16px). */
+page-nav .page-nav-filter {
+  position: absolute;
+  top: 21px;
+  left: 70px;
+  right: 14px;
+  height: 34px;
+}
+page-nav .page-nav-filter-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 0 10px 0 31px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+page-nav .page-nav-filter-input::placeholder { color: var(--text-faint); }
+page-nav .page-nav-filter-input:hover { border-color: var(--text-faint); }
+page-nav .page-nav-filter-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* Narrower than the panel plus the corner cluster, the search and menu
+   buttons stand over the panel's top row — measured at 360px, the
+   search button sat on the filter's right third. There the filter takes
+   its own row under the buttons instead of sharing theirs. */
+@media (max-width: 520px) {
+  page-nav .page-nav-filter {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    flex: 0 0 auto;
+    margin: 8px 14px 0;
+  }
+}
+page-nav .page-nav-filter-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+/* Each list says what it is, and while a filter is in effect, how many
+   of its entries match — bare numerals, since the page may be in any
+   language. The tree's label takes the TOC header's own type so the two
+   read as siblings. */
+/* Sticky inside the tree's own scroller, so the label stays while the
+   tree scrolls to the page being read. It sits in the panel's top
+   padding (the negative margin) and paints that strip itself, so rows
+   do not show through above it. */
+page-nav .page-nav-label {
+  position: sticky;
+  top: -14px;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: -14px -14px 6px;
+  padding: 14px 22px 6px;
+  background: var(--surface-2);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-soft);
+}
+page-nav .page-toc-panel .toc-header { display: flex; align-items: baseline; gap: 8px; }
+page-nav .page-toc-panel .toc-header h2 { flex: 1 1 auto; min-width: 0; }
+page-nav .page-nav-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+page-nav .page-nav-count:empty { display: none; }
+
+/* The file under its title. Quiet — a size and a face below the title —
+   but `--text-soft`, not faint: it is the fact that tells two near-same
+   titles apart, and a fact below the contrast floor is not one the
+   reader has. One line; the whole name is on the row's hover. */
+page-nav .page-nav-title { display: block; }
+page-nav .page-nav-file {
+  display: block;
+  margin-top: 1px;
+  font: 400 10.5px/1.35 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: -0.01em;
+  color: var(--text-soft);
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+page-nav .page-nav-item.active > a .page-nav-file { color: var(--accent); opacity: 0.8; }
+
+/* Filtering: what does not match goes, what holds a match stays as its
+   context (dimmed in the tree, so the hit is what the eye lands on), and
+   a section holding a matched subsection opens to show it. */
+page-nav.is-filtering .page-nav-tree li:not(.okt-filter-hit):not(.okt-filter-path),
+page-nav.is-filtering .toc-list li:not(.okt-filter-hit):not(.okt-filter-path) { display: none; }
+page-nav.is-filtering .toc-list li.okt-filter-path > .toc-sub { display: block; }
+page-nav.is-filtering .page-nav-tree li.okt-filter-path:not(.okt-filter-hit) > a { opacity: 0.6; }
+page-nav mark.okt-hit {
+  padding: 0;
+  border-radius: 2px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+page-nav .page-nav-none {
+  margin: 4px 8px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-soft);
 }
 body.toc-collapsed .layout:has(page-nav) page-toc .page-toc-panel {
   opacity: 0;

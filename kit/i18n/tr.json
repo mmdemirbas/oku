@@ -173,5 +173,8 @@
   "Opened files": "Açılan dosyalar",
   "Copy the full path": "Tam yolu kopyala",
   "could not be read.": "okunamadı.",
-  "A page opened from disk cannot read the file beside it, and the build did not carry this one.": "Diskten açılan bir sayfa yanındaki dosyayı okuyamaz ve derleme bu dosyayı taşımamış."
+  "A page opened from disk cannot read the file beside it, and the build did not carry this one.": "Diskten açılan bir sayfa yanındaki dosyayı okuyamaz ve derleme bu dosyayı taşımamış.",
+  "Filter the contents": "İçindekileri süz",
+  "menu:Documents": "Belgeler",
+  "menu:No match": "Eşleşme yok"
 }

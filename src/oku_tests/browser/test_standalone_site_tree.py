@@ -48,9 +48,10 @@ ROWS = """() => {
   const rows = nav ? [...nav.querySelectorAll('.page-nav-tree a[href]')] : [];
   return {
     panel:  !!(nav && nav.querySelector('.page-nav-panel')),
-    titles: rows.map(a => a.textContent),
+    // The title only: the row also carries the file's name under it.
+    titles: rows.map(a => a.querySelector('.page-nav-title').textContent),
     hrefs:  rows.map(a => a.href),
-    active: rows.filter(a => a.getAttribute('aria-current') === 'page').map(a => a.textContent),
+    active: rows.filter(a => a.getAttribute('aria-current') === 'page').map(a => a.querySelector('.page-nav-title').textContent),
   };
 }"""
 

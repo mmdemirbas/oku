@@ -777,6 +777,120 @@ var __okuLangSwitch = (function () {
   return { build: build, locate: entryFor };
 })();
 
+/* ============ Fuzzy filter ============ *
+ * The sidebar's filter: type and the two lists narrow to what matches,
+ * with the matched letters marked. A filter, not a ranking — the lists
+ * keep their order, because their order is the document's shape.
+ *
+ * Folding is one character in, one character out: lowercase, accents
+ * off, and the Turkish dotted and dotless i both to `i`. So `turkiye`
+ * finds `Türkiye`, `ISIK` finds `ışık`, and an index into the folded
+ * text is an index into the original — the rule __okuLowerWithMap
+ * exists for, made true by never changing the length.
+ *
+ * A token matches as a substring first. Failing that, three letters or
+ * more may match as a subsequence, but only a COMPACT one (spanning at
+ * most twice the token plus one): `tkt` finds `tüketici`, and does not
+ * find a t, a k and a t scattered across a sentence. Every token has to
+ * match somewhere; that is what typing a second word means.
+ * ---------------------------------------------------------------- */
+var __okuFuzzy = (function () {
+  function foldChar(c) {
+    if (c === 'İ' || c === 'I' || c === 'ı') return 'i';
+    var d = c.normalize ? c.normalize('NFD').charAt(0) : c;
+    var l = d.toLowerCase();
+    return l.length === 1 ? l : d;
+  }
+
+  function fold(s) {
+    var out = '';
+    for (var i = 0; i < s.length; i++) out += foldChar(s.charAt(i));
+    return out;
+  }
+
+  function tokens(query) {
+    return fold(String(query || '')).split(/\s+/).filter(Boolean);
+  }
+
+  function matchToken(hay, token) {
+    var at = hay.indexOf(token);
+    var i;
+    if (at !== -1) {
+      var run = [];
+      for (i = 0; i < token.length; i++) run.push(at + i);
+      return run;
+    }
+    if (token.length < 3) return null;
+    var best = null;
+    for (var s = hay.indexOf(token.charAt(0)); s !== -1; s = hay.indexOf(token.charAt(0), s + 1)) {
+      var idx = [s];
+      for (var k = s + 1, j = 1; k < hay.length && j < token.length; k++) {
+        if (hay.charAt(k) === token.charAt(j)) { idx.push(k); j++; }
+      }
+      // Starting later only finds a subset of what this start could.
+      if (idx.length < token.length) break;
+      var span = idx[idx.length - 1] - s + 1;
+      if (span <= token.length * 2 + 1 && (!best || span < best.span)) best = { idx: idx, span: span };
+    }
+    return best ? best.idx : null;
+  }
+
+  /* Each token in any one of the fields. Returns, per field, the
+     indices to mark — or null when some token matched nowhere. */
+  function matchFields(fields, query) {
+    var ts = tokens(query);
+    if (!ts.length) return null;
+    var hays = fields.map(function (f) { return fold(String(f || '')); });
+    var marks = fields.map(function () { return []; });
+    for (var t = 0; t < ts.length; t++) {
+      var found = false;
+      for (var f = 0; f < hays.length; f++) {
+        var m = matchToken(hays[f], ts[t]);
+        if (m) { marks[f] = marks[f].concat(m); found = true; break; }
+      }
+      if (!found) return null;
+    }
+    return marks;
+  }
+
+  /* The element's text with the matched characters in <mark>, and back.
+     The original string is kept on the element, so marking twice never
+     reads its own marks back as text. Nodes, never innerHTML: these are
+     the author's titles. */
+  function mark(el, indices) {
+    if (!el) return;
+    if (el._okuText == null) el._okuText = el.textContent;
+    var text = el._okuText;
+    var on = {};
+    (indices || []).forEach(function (i) { on[i] = true; });
+    el.textContent = '';
+    var i = 0;
+    while (i < text.length) {
+      var hit = !!on[i];
+      var j = i;
+      while (j < text.length && !!on[j] === hit) j++;
+      var part = text.slice(i, j);
+      if (hit) {
+        var m = document.createElement('mark');
+        m.className = 'okt-hit';
+        m.textContent = part;
+        el.appendChild(m);
+      } else {
+        el.appendChild(document.createTextNode(part));
+      }
+      i = j;
+    }
+  }
+
+  function unmark(el) {
+    if (!el || el._okuText == null) return;
+    el.textContent = el._okuText;
+    el._okuText = null;
+  }
+
+  return { fold: fold, matchFields: matchFields, mark: mark, unmark: unmark };
+})();
+
 /* ============ File viewer ============ *
  * A link from an oku page to a .md FILE used to hand the reader off to
  * the browser's plain-text rendering: no typography, no theme, no way
@@ -2314,6 +2428,11 @@ document.addEventListener('pointermove', function (e) {
   if (__okuDrawerState !== 'peek') return;
   var nav = document.querySelector('page-nav');
   if (!nav) return;
+  // Typing in the filter is reading the panel, wherever the pointer
+  // wandered while the hands were on the keyboard. Escape, a click
+  // outside or a link still end the peek.
+  var typing = document.activeElement;
+  if (typing && typing.classList && typing.classList.contains('page-nav-filter-input') && nav.contains(typing)) return;
   // `offsetWidth`, not the live rect's right edge. The panel slides in
   // over 250ms and the pointermove that OPENED the peek arrives while it
   // is still parked at left: -100% — measured live, its right edge is
@@ -3378,7 +3497,9 @@ function buildTOC(tocList) {
   function revealActive(el) {
     if (!el || el === lastRevealed) return;
     if (!document.body.classList.contains('drawer-open')) return;
-    var scroller = document.querySelector('page-nav .page-nav-scroll');
+    // The TOC list scrolls on its own; the whole column no longer does.
+    var scroller = document.querySelector('page-nav page-toc .toc-list') ||
+      document.querySelector('page-nav .page-nav-scroll');
     if (!scroller) return;
     lastRevealed = el;
     var r = el.getBoundingClientRect();
@@ -6314,7 +6435,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-01-r92';
+var __okuKitBuild = '2026-10-01-r93';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -17258,10 +17379,23 @@ class PageNav extends HTMLElement {
     // is this file" is legible without knowing the current one.
     // `.page-nav-freshness` is filled once the manifest arrives, and
     // the version with it — see _renderBuild.
+    // The filter sits in the row the Contents button already occupies,
+    // which the panel's top padding reserves for it — so it costs the
+    // lists no height. Its words are set with data-oku-t / exact-match
+    // keys because on a served page this runs before the string table
+    // has arrived, and localize() comes back for them.
     this.innerHTML =
+      '<div class="page-nav-filter" role="search">' +
+        '<svg class="page-nav-filter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>' +
+        '<input type="search" class="page-nav-filter-input" autocomplete="off" spellcheck="false"' +
+        ' placeholder="' + escapeHTML(okuT('Filter…')) + '" aria-label="' + escapeHTML(okuT('Filter the contents')) + '">' +
+      '</div>' +
       '<div class="page-nav-scroll">' +
         '<div class="page-nav-panel">' +
+          '<div class="page-nav-label"><span data-oku-t="menu:Documents">' + escapeHTML(menuWord('Documents')) + '</span>' +
+          '<span class="page-nav-count"></span></div>' +
           '<ol class="page-nav-tree"><li class="page-nav-loading">Loading…</li></ol>' +
+          '<p class="page-nav-none" data-oku-t="menu:No match" hidden>' + escapeHTML(menuWord('No match')) + '</p>' +
         '</div>' +
       '</div>' +
       '<div class="page-nav-footer">' +
@@ -17304,6 +17438,7 @@ class PageNav extends HTMLElement {
     } else {
       Promise.resolve().then(adopt);
     }
+    this._wireFilter();
     // Defer until the document is fully parsed so we can reliably detect
     // the standalone-build inline page-data script (which sits at the
     // end of body, after <page-nav>).
@@ -17760,7 +17895,18 @@ class PageNav extends HTMLElement {
         li.className = 'page-nav-item';
         var anchor = document.createElement('a');
         anchor.href = base + page.path;
-        anchor.textContent = page.title || page.path;
+        var label = document.createElement('span');
+        label.className = 'page-nav-title';
+        label.textContent = page.title || page.path;
+        anchor.appendChild(label);
+        // The file's own name under its title. Two pages with near-same
+        // titles are told apart by the name the author gave the FILE,
+        // which is also what they would search their editor for.
+        var src = page.source || page.path;
+        var file = document.createElement('span');
+        file.className = 'page-nav-file';
+        file.textContent = String(src).slice(String(src).lastIndexOf('/') + 1);
+        anchor.appendChild(file);
         if (page.summary) anchor.title = page.summary;
         if (isActive(page)) {
           li.classList.add('active');
@@ -17803,6 +17949,136 @@ class PageNav extends HTMLElement {
 
     var root = renderLevel('', 0);
     tree.appendChild(root);
+    var self = this;
+    requestAnimationFrame(function () { self._revealActiveRow(); });
+    var input = this.querySelector('.page-nav-filter-input');
+    if (input && input.value) this._applyFilter(input.value);
+  }
+
+  /* The tree scrolls on its own now, so the page being read can sit
+     below its fold. Scroll the TREE to it, never the document. */
+  _revealActiveRow() {
+    var panel = this.querySelector('.page-nav-panel');
+    var row = this.querySelector('.page-nav-tree li.active > a');
+    if (!panel || !row) return;
+    var r = row.getBoundingClientRect();
+    var p = panel.getBoundingClientRect();
+    if (r.top >= p.top + 8 && r.bottom <= p.bottom - 8) return;
+    panel.scrollTop += (r.top - p.top) - (p.height - r.height) / 2;
+  }
+
+  _wireFilter() {
+    var self = this;
+    var input = this.querySelector('.page-nav-filter-input');
+    if (!input) return;
+    var run = function () { self._applyFilter(input.value); };
+    input.addEventListener('input', run);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && input.value) {
+        // The first Escape clears; the next one is the drawer's.
+        e.stopPropagation();
+        input.value = '';
+        run();
+      } else if (e.key === 'ArrowDown') {
+        var first = self._visibleLinks()[0];
+        if (first) { e.preventDefault(); first.focus(); }
+      } else if (e.key === 'Enter' && input.value.trim()) {
+        var hit = self._visibleLinks()[0];
+        if (hit) { e.preventDefault(); hit.click(); }
+      }
+    });
+    // Up and Down walk the visible links, filtered or not, and Up from
+    // the first one returns to the filter. A list the keyboard can
+    // reach one Tab at a time is a list nobody walks with it.
+    this.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      var a = e.target.closest && e.target.closest('a');
+      if (!a || !self.contains(a)) return;
+      var links = self._visibleLinks();
+      var i = links.indexOf(a);
+      if (i < 0) return;
+      e.preventDefault();
+      var next = links[i + (e.key === 'ArrowDown' ? 1 : -1)];
+      if (next) next.focus();
+      else if (e.key === 'ArrowUp') input.focus();
+    });
+    // The TOC is rebuilt on every render; a filter in effect applies again.
+    window.addEventListener('oku:rendered', function () {
+      if (input.value) requestAnimationFrame(run);
+    });
+  }
+
+  _visibleLinks() {
+    return Array.prototype.filter.call(
+      this.querySelectorAll('.page-nav-tree a, .toc-list a'),
+      function (a) { return a.getClientRects().length > 0; }
+    );
+  }
+
+  /* Narrow both lists to what matches, keeping each hit's ancestors as
+     context so a match never floats free of where it lives, and mark
+     the matched letters. Counts are bare numerals: the page may be in
+     any language. */
+  _applyFilter(query) {
+    var q = String(query || '').trim();
+    var on = q.length > 0;
+    this.classList.toggle('is-filtering', on);
+    var F = __okuFuzzy;
+    var lift = function (li, stop) {
+      for (var p = li.parentElement; p && p !== stop; p = p.parentElement) {
+        if (p.tagName === 'LI') p.classList.add('okt-filter-path');
+      }
+    };
+
+    var tree = this.querySelector('.page-nav-tree');
+    var treeHits = 0, treeAll = 0;
+    if (tree) {
+      tree.querySelectorAll('li').forEach(function (li) { li.classList.remove('okt-filter-hit', 'okt-filter-path'); });
+      tree.querySelectorAll('a').forEach(function (a) {
+        var title = a.querySelector('.page-nav-title');
+        var file = a.querySelector('.page-nav-file');
+        F.unmark(title); F.unmark(file);
+        treeAll++;
+        if (!on) return;
+        var m = F.matchFields([title ? title.textContent : a.textContent, file ? file.textContent : ''], q);
+        if (!m) return;
+        treeHits++;
+        if (title) F.mark(title, m[0]);
+        if (file) F.mark(file, m[1]);
+        var li = a.closest('li');
+        li.classList.add('okt-filter-hit');
+        lift(li, tree);
+      });
+    }
+
+    var toc = this.querySelector('.toc-list');
+    var tocHits = 0, tocAll = 0;
+    if (toc) {
+      toc.querySelectorAll('li').forEach(function (li) { li.classList.remove('okt-filter-hit', 'okt-filter-path'); });
+      toc.querySelectorAll('a').forEach(function (a) {
+        F.unmark(a);
+        tocAll++;
+        if (!on) return;
+        var m = F.matchFields([a.textContent], q);
+        if (!m) return;
+        tocHits++;
+        F.mark(a, m[0]);
+        var li = a.closest('li');
+        li.classList.add('okt-filter-hit');
+        lift(li, toc);
+      });
+    }
+
+    var say = function (el, hits, all) { if (el) el.textContent = on ? hits + '/' + all : ''; };
+    say(this.querySelector('.page-nav-label .page-nav-count'), treeHits, treeAll);
+    var head = this.querySelector('page-toc .toc-header');
+    if (head) {
+      var c = head.querySelector('.page-nav-count');
+      if (!c) { c = document.createElement('span'); c.className = 'page-nav-count'; head.appendChild(c); }
+      say(c, tocHits, tocAll);
+    }
+    var none = this.querySelector('.page-nav-none');
+    if (none) none.hidden = !(on && treeHits === 0 && tocHits === 0);
   }
 }
 if (!customElements.get('page-nav')) customElements.define('page-nav', PageNav);

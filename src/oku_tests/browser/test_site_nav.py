@@ -66,7 +66,9 @@ def site(tmp_path_factory):
 def test_site_tree_lists_pages_that_all_live_below_the_root(page, site):
     page.goto(f"{site}/docs/index.html")
     page_quiet(page)
-    links = page.eval_on_selector_all(".page-nav-tree a", "els => els.map(e => e.textContent)")
+    links = page.eval_on_selector_all(
+        ".page-nav-tree a .page-nav-title", "els => els.map(e => e.textContent)"
+    )
     assert "Giriş" in links and "Derin" in links, links
     assert page.locator(".page-nav-empty").count() == 0
 

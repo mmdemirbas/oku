@@ -36,7 +36,7 @@ PROBE = """() => {
     copy: attr('.copy-btn', 'aria-label'),
     updated: text('.meta-updated'),
     treeTitles: [...document.querySelectorAll('page-nav .page-nav-tree a')]
-                  .slice(0, 4).map(a => a.textContent.trim()),
+                  .slice(0, 4).map(a => a.querySelector('.page-nav-title').textContent.trim()),
     treeHrefs: [...document.querySelectorAll('page-nav .page-nav-tree a')]
                   .slice(0, 4).map(a => a.getAttribute('href')),
   };
