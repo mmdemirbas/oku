@@ -16,6 +16,8 @@ tested in both shapes here, and pinned on the build side by
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from ._wait import page_quiet, until
 
 import pytest
@@ -180,14 +182,17 @@ def test_a_fragment_scrolls_within_the_viewed_file(page, site_url):
     assert out["scrolled"] > 0, "the viewer stayed at the top"
 
 
-def test_the_path_names_the_file_the_author_typed(page, site_url):
-    """The resolved URL is a machine's answer. `/docs/reference.md` is the
-    reader's — and the filename is the half that identifies it, so it is
-    the half that never truncates."""
+def test_the_path_is_the_full_path_on_this_machine(page, site_url):
+    """Asked for by a reader: the full path, visible and one click from
+    the clipboard. The live server says where the docs tree sits on disk
+    (only while bound to loopback), so the viewer can name the file the
+    way a terminal or a file manager would. The filename stays its own
+    span — the half that identifies the file."""
     state = _open_viewer(page, site_url)
 
+    docs = (Path(__file__).resolve().parents[3] / "docs").as_posix() + "/"
     assert state["file"] == "reference.md", state["file"]
-    assert state["dir"] == "/docs/", state["dir"]
+    assert state["dir"] == docs, state["dir"]
 
 
 def test_an_island_href_reaches_the_viewer_too(page, site_url):

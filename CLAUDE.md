@@ -1103,6 +1103,61 @@ not open", never "the page lost the reference the author wrote".
 at build time instead. Held by `test_filepath.py`, which runs against the
 standalone build because it is the mode with the least to work with.
 
+**A file opened from a page fills the frame, says where it is, and can
+open the next file.** A reader named four defects in one sentence. A
+code file opened in `.okt-fp-view`, a box capped at 1100 x 774 in the
+middle of the screen whatever the screen's size, with its own scrollbar
+for no reason the screen could see, while a markdown file filled the
+frame: two previews, two rules. The preview could not be opened
+anywhere else and named the file by the path as authored
+(`../../../../src/oku/cli.py`). A file opened from a viewed file
+REPLACED it with no way back. And most chips inside a viewed file were
+dead — measured on a delivered research page, 20 of 45 — because the
+page carried the files IT named and not the ones they named. Every
+kind now opens in the one viewer (`__okuMdViewer`), which fills the
+frame, shows the full path with a copy button, offers a new tab, and
+keeps a trail.
+
+**Nesting lives in the viewer, not in the lightbox.** The lightbox
+holds one thing: `open()` while open empties the holder and overwrites
+`currentOpts`, so the first item's `onClose` never runs. The viewer
+keeps a stack inside its one frame instead — each file with its own DOM,
+view and scroll position — with a back button, Alt+Left, a clickable
+trail, and browser semantics for opening from partway back (what was
+ahead is dropped). Escape closes the whole trail.
+
+**The build carries what the carried files reference.**
+`collect_file_closure` walks every carried markdown file breadth-first,
+under `MAX_FILE_CLOSURE_BYTES` (4 MB, furthest first to go), and carries
+each further file in `m._files_more` keyed by `rel` — its path from the
+project root — because a path as authored inside a viewed file is
+relative to THAT file and the page's own keys cannot answer it. The
+references are found by making the carrier a page dict and walking its
+strings, the way its own page would: a scan of the raw markdown found
+one of the eleven references on the measured page, because the rest sat
+in a table fence and `_strip_code` blanks fences with the code. A chip
+inside a viewed file looks itself up by place
+(`[data-oku-file-base]` + `__okuFileStore.lookup`, the build's two bases
+from the file's own directory) and never by the page's keys — the same
+string can name a different file. Measured on the research tree: 0
+dead chips, and the standalone tree 1.8% larger.
+
+**The full path is derived, never shipped.** A built page works out the
+docs root from its own URL (`…/dist/standalone/<page>.html`) and the
+project root from `m._rel`, the page's own place in the project; both
+directions occur, a docs tree inside its project and a build run above
+it. Under `oku serve` the server puts `root_abs` in the manifest, and
+only while bound to loopback — `--host 0.0.0.0` publishes the server
+and the path must not go with it. A deployed site knows neither and
+shows the project path. That keeps the artifact naming a layout and
+never an account, which is the rule the rebuild command already
+follows. **Open file** opens a markdown file that is a page of the tree
+as that page, and any other file as itself over `file://`; a served page
+cannot hand the browser a `file://` URL, so there it is not offered
+rather than offered broken. Held by `browser/test_file_viewer.py`,
+whose behaviour cases all fail against the kit without this change, and
+`test_file_closure.py`.
+
 **A card appears when the pointer arrives, not when the page moves under
 it.** `mouseenter` fires when a layer above an element goes away, so
 closing the popup a chip opened put that chip's card back under a cursor

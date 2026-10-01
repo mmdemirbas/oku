@@ -1548,35 +1548,125 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   /* The lightbox close button is absolutely positioned at top: 10px /
      right: 10px over this bar. Reserve its 36px box plus its inset so
      the last action never lands underneath it. */
-  padding: 8px 56px 8px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 56px 4px 10px;
+  min-height: 44px;
   background: var(--surface-2);
 }
-/* The path answers "what am I looking at", so it gets the slack — but
-   the FILENAME is the part that answers it. Two spans rather than one
-   truncated string: the directory absorbs the ellipsis, the filename
-   never shrinks. (The usual one-span trick for this is `direction: rtl`,
-   which reorders the leading slash of an absolute path and prints
-   `docs/notes/plan.md/`.) */
-.okt-mdview-path {
+/* Which file, and how the reader got here. The trail is the file names
+   in the order they were opened; the last one is where the reader is
+   and never shrinks, the earlier ones give up their width first. */
+.okt-viewer-nav {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
-  font: 0.82rem 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.okt-viewer-back {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.okt-viewer-back[hidden] { display: none; }
+.okt-viewer-back svg { width: 15px; height: 15px; }
+.okt-viewer-back:hover { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
+.okt-viewer-crumbs {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 0 4px;
+  list-style: none;
+  font-size: 0.86rem;
+}
+.okt-viewer-crumbs > li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+/* Shrinks last: a shrink factor a thousand times smaller than the
+   others' means the earlier names give up their width before this one
+   gives up any, and only then does it take an ellipsis. */
+.okt-viewer-crumbs > li[aria-current] { flex: 0 0.001 auto; }
+.okt-viewer-crumbs > li + li::before {
+  content: '\203A';
+  margin: 0 8px;
   color: var(--text-faint);
 }
-.okt-mdview-dir {
+.okt-viewer-crumb,
+.okt-viewer-crumb-here {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.okt-mdview-file {
-  flex: 0 0 auto;
+.okt-viewer-crumb {
+  padding: 2px 0;
+  border: 0;
+  background: none;
   color: var(--text-soft);
-  font-weight: 500;
+  font: inherit;
+  cursor: pointer;
 }
+.okt-viewer-crumb:hover { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 3px; }
+.okt-viewer-crumb-here { color: var(--text); font-weight: 600; }
+/* Where the file is: the full path on this machine when the page knows
+   it, and one click to take it away. Its own line under the bar, quiet
+   and in the code face, because a path is something read character by
+   character and it is long — squeezed into the bar beside the actions
+   it would be the ellipsis, not the path. The filename is the part that
+   answers "what am I looking at", so it is a step brighter. */
+.okt-viewer-where {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 0 56px 7px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 0.74rem;
+  color: var(--text-faint);
+}
+.okt-mdview-path {
+  min-width: 0;
+  font: 0.76rem 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: none;
+  padding: 0;
+  border: 0;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+.okt-mdview-file { color: var(--text-soft); font-weight: 500; }
+.okt-viewer-copypath {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.okt-viewer-copypath svg { width: 13px; height: 13px; }
+.okt-viewer-copypath:hover { color: var(--accent-strong); background: var(--accent-soft); }
+.okt-viewer-copypath.copied { color: var(--success); }
+.okt-viewer-meta { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
+.okt-viewer-meta:empty { display: none; }
 .okt-mdview-actions {
   display: flex;
   align-items: center;
@@ -1613,7 +1703,8 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   cursor: pointer;
   transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
-.okt-mdview-copy svg { width: 13px; height: 13px; }
+.okt-mdview-copy svg,
+.okt-mdview-open svg { width: 13px; height: 13px; }
 .okt-mdview-copy:hover,
 .okt-mdview-open:hover {
   color: var(--accent-strong);
@@ -1675,14 +1766,33 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
    page's own top margin — unwanted as the first thing under the bar. */
 .okt-mdview-rendered > :first-child { margin-top: 0; }
 .okt-mdview-rendered > section:first-child > h2:first-child { margin-top: 0; }
+/* A code file reads edge to edge: its lines are as long as its author
+   made them, and the reading measure is for prose. */
+.okt-mdview[data-kind="text"] .okt-mdview-body { padding: 0; }
+.okt-mdview[data-kind="text"] .okt-pre-host { margin: 0; }
+.okt-mdview[data-kind="text"] .okt-pre-host pre { border: 0; border-radius: 0; margin: 0; }
+.okt-mdview[data-kind="media"] .okt-viewer-file {
+  display: flex;
+  justify-content: center;
+}
+.okt-mdview[data-kind="media"] .okt-viewer-file > * { max-width: 100%; }
 .okt-mdview-fail { margin: 0; }
 .okt-mdview-inert { margin: 0 0 16px; }
 
 @media (max-width: 640px) {
-  /* The path and the actions cannot share one line at phone width, and
-     the path is what identifies the file — it keeps the full row. */
+  /* The trail and the actions cannot share one line at phone width, and
+     the trail is what says which file this is — it keeps the full row,
+     clear of the close button. Only the file the reader is on is named
+     there; the back button is the way to the ones before it. */
   .okt-mdview-bar { flex-wrap: wrap; padding-right: 14px; }
-  .okt-mdview-path { flex: 1 0 100%; padding-right: 42px; }
+  .okt-viewer-nav { flex: 1 0 100%; padding-right: 42px; box-sizing: border-box; }
+  .okt-viewer-crumbs > li:not([aria-current]) { display: none; }
+  .okt-viewer-crumbs > li[aria-current]::before { display: none; }
+  /* The path shares its line with its copy button, and the size and
+     line count take the next one. */
+  .okt-viewer-where { flex-wrap: wrap; padding-right: 14px; }
+  .okt-mdview-path { flex: 1 1 0; }
+  .okt-viewer-meta { flex: 1 0 100%; margin-left: 0; }
   .okt-mdview-body { padding: 20px 14px 48px; }
 }
 
@@ -4941,55 +5051,11 @@ footer {
 }
 .okt-fp-media-small { max-height: 190px; }
 
-/* ---- popup ---- */
-.okt-fp-view {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  /* A three-line file in a full-screen overlay reads as a dialog that
-     failed to load. The floor gives the frame a shape; the ceiling
-     keeps a long file inside the viewport with its own scrollbar. */
-  min-width: min(560px, 90vw);
-  max-width: min(1100px, 94vw);
-  max-height: 86vh;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-/* The reading-aids pass wraps a <pre> in its own host with 16px of
-   block margin, which split the frame into a bar and a separate card
-   floating under it. Inside this frame they are one surface. */
-.okt-fp-view .okt-pre-host { margin: 0; }
-.okt-fp-view .okt-pre-host pre { border: 0; border-radius: 0; margin: 0; }
-.okt-fp-view-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-}
-.okt-fp-view-path {
-  font: 500 12.5px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-.okt-fp-view-meta {
-  font-size: 11.5px;
-  color: var(--text-faint);
-  white-space: nowrap;
-}
 .okt-fp-view-pre {
   margin: 0;
   padding: 12px 14px;
   overflow: auto;
   min-height: 0;
-}
-.okt-fp-view-cut {
-  padding: 10px 14px;
-  font-size: 12px;
-  color: var(--text-faint);
 }
 
 .oku-gloss,

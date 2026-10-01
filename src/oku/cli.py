@@ -1237,7 +1237,17 @@ def _page_from_source_file(p: Path) -> dict | None:
     _apply_meta_defaults(page, p)
     refs = collect_file_refs(page, p)
     if refs:
-        page.setdefault("m", {})["_files"] = refs
+        meta = page.setdefault("m", {})
+        meta["_files"] = refs
+        more = collect_file_closure(refs, p)
+        if more:
+            meta["_files_more"] = more
+        # The page's own place in the project: the one fact the runtime
+        # needs to turn every `rel` above into a path on this machine.
+        try:
+            meta["_rel"] = p.resolve().relative_to(project_root_for(p.parent)).as_posix()
+        except ValueError:
+            pass
     return page
 
 
@@ -6570,7 +6580,7 @@ def _file_kind(target: Path) -> tuple[str, str]:
     return "text", mime or "text/plain"
 
 
-def _file_ref_payload(href: str, page_src: Path) -> dict:
+def _file_ref_payload(href: str, page_src: Path, root: Path | None = None) -> dict:
     """What the page hands the browser for one `#f/` reference.
 
     Always carries the path, the name and the status; carries content
@@ -6578,6 +6588,12 @@ def _file_ref_payload(href: str, page_src: Path) -> dict:
     with no content still copies its path, which is what the author had
     before the primitive existed — the failure mode is a preview that
     does not open, never a page that loses a reference.
+
+    `rel` is the file's place in the PROJECT, relative to `root` (the
+    page's project root unless the caller names one). It is what lets a
+    file opened inside another file find its own references, and what
+    the runtime turns into an absolute path from wherever the page was
+    opened — so the artifact names a layout and never an account.
     """
     target, status = resolve_file_ref(href, page_src)
     out: dict = {"path": href, "name": Path(unquote(href)).name or href, "status": status}
@@ -6585,6 +6601,10 @@ def _file_ref_payload(href: str, page_src: Path) -> dict:
         if target is not None:
             out["resolved"] = str(target)
         return out
+    try:
+        out["rel"] = target.relative_to(root or project_root_for(page_src.parent)).as_posix()
+    except ValueError:
+        pass
     kind, mime = _file_kind(target)
     size = target.stat().st_size
     out.update({"kind": kind, "mime": mime, "bytes": size})
@@ -6619,6 +6639,66 @@ def _file_ref_payload(href: str, page_src: Path) -> dict:
     # a preview pane that renders nothing is worse than a line saying
     # what the file is.
     return out
+
+
+# A file opened from a page is a document too, and its own chips have to
+# open. They cannot be looked up by the path as authored — that is
+# relative to a file the page did not write — so the build follows them
+# and carries each by its place in the project. Breadth-first, so a
+# budget that runs out drops the references furthest from the page.
+MAX_FILE_CLOSURE_BYTES = 4 * 1024 * 1024
+
+
+def collect_file_closure(refs: dict[str, dict], src: Path) -> dict[str, dict]:
+    """Files the page's markdown files reference, and theirs, keyed by `rel`.
+
+    Only what the page does not already carry, only what resolved, and
+    no more than `MAX_FILE_CLOSURE_BYTES` of it. A reference past the
+    budget is not an error: its chip renders, copies its path, and says
+    on its card that the page did not carry it.
+    """
+    root = project_root_for(src.parent)
+    try:
+        seen = {src.resolve().relative_to(root).as_posix()}
+    except ValueError:
+        seen = set()
+    seen.update(r["rel"] for r in refs.values() if r.get("rel"))
+    queue = [r for r in refs.values() if r.get("kind") == "markdown" and r.get("text") and r.get("rel")]
+    more: dict[str, dict] = {}
+    used = 0
+    while queue:
+        carrier = queue.pop(0)
+        carrier_path = root / carrier["rel"]
+        # The carrier's references, found the way they would be found
+        # on the carrier's own page: its markdown made a page dict, every
+        # string walked. A chip in a table fence is a string in a payload,
+        # and a scan of the raw text strips the fence with the code.
+        try:
+            carrier_page = md_to_v2_page(carrier["text"], default_title=carrier_path.stem)
+        except Exception:  # noqa: BLE001 — a file that will not parse carries nothing further
+            continue
+        hrefs: list[str] = []
+        for text in _iter_strings(carrier_page):
+            if "#f/" in text:
+                hrefs.extend(h.strip() for h in _MD_FILE_REF_RE.findall(_strip_code(text)))
+        for href in dict.fromkeys(hrefs):
+            if not href:
+                continue
+            payload = _file_ref_payload(href, carrier_path, root)
+            rel = payload.get("rel")
+            if payload.get("status") != "ok" or not rel or rel in seen:
+                continue
+            seen.add(rel)
+            size = payload.get("bytes") or 0
+            if used + size > MAX_FILE_CLOSURE_BYTES:
+                continue
+            used += size
+            # Keyed by place, so the authored path means nothing here.
+            payload["path"] = rel
+            more[rel] = payload
+            if payload.get("kind") == "markdown" and payload.get("text"):
+                queue.append(payload)
+    return more
 
 
 def collect_file_refs(page_data, src: Path) -> dict[str, dict]:
@@ -7311,7 +7391,7 @@ def _watcher_loop(root: Path, stop: threading.Event) -> None:
         _sse_broadcast("change")
 
 
-def _make_serve_handler(root: Path):
+def _make_serve_handler(root: Path, *, local_only: bool = True):
     """Subclass SimpleHTTPRequestHandler with a /__reload SSE endpoint and
     quiet logging for the keepalive ticks."""
 
@@ -7559,6 +7639,13 @@ def _make_serve_handler(root: Path):
                 content_type = "text/plain; charset=utf-8"
             else:
                 manifest = compute_manifest(docs_root)
+                # Only the live server says where the tree sits on disk,
+                # and only while it is bound to loopback: then it answers
+                # the author on their own machine. A built manifest is
+                # handed to other people and never carries this. The viewer uses it to show a file's
+                # full path, which a built page derives from its own URL.
+                if local_only:
+                    manifest["root_abs"] = docs_root.resolve().as_posix()
                 body = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
                 content_type = "application/json; charset=utf-8"
             try:
@@ -7710,7 +7797,9 @@ def cmd_serve(args: argparse.Namespace) -> int:
     _write_prism_carried()
     user_cwd = cwd  # capture before chdir so we can prefer pages near where the user was
     os.chdir(root)
-    handler_cls = _make_serve_handler(root)
+    handler_cls = _make_serve_handler(
+        root, local_only=_is_loopback(getattr(args, "host", "127.0.0.1") or "127.0.0.1")
+    )
 
     # Loopback by default. The previous bind was `("", port)` — every
     # interface — while the line printed underneath said `localhost`,

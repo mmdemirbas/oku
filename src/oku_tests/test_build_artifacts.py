@@ -658,7 +658,13 @@ class TestPayloadBudget:
     # translated in the group-by list, and the View row highlighting
     # a view that was no longer on screen. About 9,000 bytes with three
     # icons, of which the reasoning is most.
-    KIT_BUDGET_BYTES = 1_350_000
+    # Then from 1,350,000 by the file viewer a reader asked for in four
+    # parts: every kind of file in one frame that fills the window, the
+    # full path derived from where the page was opened, a new tab, and a
+    # trail of files opened from files. About 20,000 bytes, roughly half
+    # of it the reasoning for why nesting lives in the viewer and why the
+    # artifact never carries a machine path.
+    KIT_BUDGET_BYTES = 1_375_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

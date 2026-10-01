@@ -1709,7 +1709,13 @@
       // authored. Set before the body is walked: <oku-filepath> reads
       // it in connectedCallback, which fires the moment the element is
       // appended.
-      if (meta._files) window.__okuFiles = meta._files;
+      // Set unconditionally: a page reached by in-site navigation must
+      // not inherit the previous page's files.
+      window.__okuFiles = meta._files || {};
+      // What those files reference in turn, keyed by place in the
+      // project, and this page's own place — see __okuFileStore.
+      window.__okuFilesMore = meta._files_more || {};
+      window.__okuPageRel = meta._rel || null;
       if (page.t) document.title = page.t;
       if (meta.lang) {
         document.documentElement.lang = meta.lang;

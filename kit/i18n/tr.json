@@ -90,7 +90,6 @@
   "Search query": "Arama sorgusu",
   "Search the site…": "Sitede ara…",
   "Searching…": "Aranıyor…",
-  "Shown up to the size the page can carry.": "Sayfanın taşıyabildiği boyuta kadar gösteriliyor.",
   "Skip to content": "İçeriğe geç",
   "Smaller text": "Yazıyı küçült",
   "Source": "Kaynak",
@@ -169,5 +168,10 @@
   "menu:Fit to width": "Genişliğe sığdır",
   "menu:One line": "Tek satır",
   "menu:— no grouping —": "— gruplama yok —",
-  "menu:Original groups": "Özgün gruplar"
+  "menu:Original groups": "Özgün gruplar",
+  "menu:Back": "Geri",
+  "Opened files": "Açılan dosyalar",
+  "Copy the full path": "Tam yolu kopyala",
+  "could not be read.": "okunamadı.",
+  "A page opened from disk cannot read the file beside it, and the build did not carry this one.": "Diskten açılan bir sayfa yanındaki dosyayı okuyamaz ve derleme bu dosyayı taşımamış."
 }

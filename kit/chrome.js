@@ -777,29 +777,212 @@ var __okuLangSwitch = (function () {
   return { build: build, locate: entryFor };
 })();
 
-/* ============ Markdown viewer ============ *
+/* ============ File viewer ============ *
  * A link from an oku page to a .md FILE used to hand the reader off to
  * the browser's plain-text rendering: no typography, no theme, no way
  * back except the back button. The file is markdown and the kit already
  * renders markdown, so it renders it here instead — in the shared
- * lightbox frame, over the page the reader came from.
+ * lightbox frame, over the page the reader came from. A path chip opens
+ * here too, for every kind it can show: markdown rendered, text as code,
+ * an image, a clip, a recording.
  *
- * Read-only, and deliberately so. Two views of the same bytes:
+ * Read-only, and deliberately so. Two views of a markdown file:
  *   rendered — the kit's own block pipeline (headings, tables, callouts,
  *              typed fences, mermaid — everything a page gets)
  *   source   — the bytes, in a <pre>, which is what the reader came for
  *              when they wanted to copy or check exact whitespace
  *
+ * ONE FRAME, A STACK OF FILES. A file opened from a file opens in the
+ * same frame, with a way back and a trail saying how the reader got
+ * there. The lightbox holds one thing at a time — opening a second one
+ * over the first dropped the first's close handler — so nesting lives
+ * here, inside the one thing it holds. Each file keeps its own DOM, its
+ * own view and its own scroll position while the reader is elsewhere.
+ *
+ * ONE FRAME SIZE. Every file fills the frame. A code file used to sit
+ * in a 1100 x 774 box in the middle of a screen that had room for three
+ * of it, and to need its own scrollbar for no reason the screen could
+ * see; a markdown file filled the frame. Two previews, two rules.
+ *
  * WHERE THE BYTES COME FROM is the part that shapes everything else.
  * A page opened over file:// has an opaque origin, so fetch() cannot
  * read the file sitting next to it — the same wall renderFromUrl hits.
- * So the standalone build INLINES every .md its pages link to (keyed by
- * the href as authored) and the viewer reads that map first. Over HTTP
- * there is no map and it fetches. One viewer, two supply lines, and the
- * reader cannot tell which one ran.
- *
- * `window.__okuLocalDocs` — { "<href as authored>": "<file text>" }.
+ * So the build carries them: a linked .md in `__oku_local_docs__`
+ * (keyed by the href as authored), a chip's file in `m._files` (keyed
+ * the same way), and the files THOSE reference in `m._files_more`,
+ * keyed by their place in the project. Over HTTP a link the build did
+ * not carry is fetched. The reader cannot tell which supply line ran.
  * ---------------------------------------------------------------- */
+
+/* Where a carried file sits — in the project, and on this machine.
+ *
+ * Every carried file says `rel`: its path from the project root. That
+ * is enough to find a file a viewed file references (its own directory
+ * first, then the root — the build's two bases), and enough to say
+ * where it is on disk, given where the PAGE is on disk. A built page
+ * works that out from its own URL, so the artifact names a layout and
+ * never an account: `…/dist/standalone/<page>.html` is the docs root
+ * plus the page, and `m._rel` says where the page sits in the project.
+ * Under `oku serve` the server says where the docs root is, and only
+ * while bound to loopback. On a deployed site nothing says, and the
+ * viewer shows the project path instead of a full one. */
+var __okuFileStore = (function () {
+  var cache = null, cachedFor = null, cachedMore = null;
+
+  function index() {
+    var files = window.__okuFiles || {};
+    var more = window.__okuFilesMore || {};
+    if (cache && cachedFor === files && cachedMore === more) return cache;
+    cache = {}; cachedFor = files; cachedMore = more;
+    Object.keys(files).forEach(function (k) {
+      var r = files[k];
+      if (r && r.rel && !cache[r.rel]) cache[r.rel] = r;
+    });
+    Object.keys(more).forEach(function (k) { if (!cache[k]) cache[k] = more[k]; });
+    return cache;
+  }
+
+  function norm(p) {
+    var out = [];
+    String(p).split('/').forEach(function (s) {
+      if (!s || s === '.') return;
+      if (s === '..') { if (out.length && out[out.length - 1] !== '..') out.pop(); else out.push('..'); return; }
+      out.push(s);
+    });
+    return out.join('/');
+  }
+
+  function dirOf(rel) {
+    var s = String(rel || '');
+    var i = s.lastIndexOf('/');
+    return i < 0 ? '' : s.slice(0, i);
+  }
+
+  function decoded(href) {
+    var h = String(href || '').split('#')[0];
+    try { return decodeURIComponent(h); } catch (e) { return h; }
+  }
+
+  // A relative href, from a file at `fromRel`: that file's own place.
+  function relFrom(fromRel, href) {
+    var h = decoded(href);
+    if (!h || /^[a-z][a-z0-9+.-]*:/i.test(h) || h.charAt(0) === '/' || h.charAt(0) === '~') return null;
+    var d = dirOf(fromRel);
+    return norm(d ? d + '/' + h : h);
+  }
+
+  function lookup(fromRel, href) {
+    var idx = index();
+    var a = relFrom(fromRel, href);
+    if (a && idx[a]) return idx[a];
+    var b = relFrom('', href);
+    return (b && idx[b]) || null;
+  }
+
+  /* The page's own path on disk and its project-relative path, set
+     against each other. Both directions occur: a docs tree inside its
+     project (`docs/` in a repo) and a build run above the project. */
+  function pageOnDisk() {
+    var pageRel = window.__okuPageRel;
+    var docsAbs = null, htmlRel = null;
+    var path;
+    try { path = decodeURIComponent(window.location.pathname); } catch (e) { path = window.location.pathname; }
+    if (window.location.protocol === 'file:') {
+      var m = /^(.*)\/dist\/standalone\/(.+)\.html$/.exec(path);
+      if (m) { docsAbs = m[1]; htmlRel = m[2]; }
+    } else {
+      var mf = window.__okuSiteManifest;
+      var rootPath;
+      try { rootPath = decodeURIComponent(new URL(__okuDocsRoot).pathname); } catch (e) { rootPath = null; }
+      if (mf && mf.root_abs && rootPath && path.indexOf(rootPath) === 0 && /\.html$/.test(path)) {
+        docsAbs = String(mf.root_abs).replace(/\/$/, '');
+        htmlRel = path.slice(rootPath.length).replace(/\.html$/, '');
+      }
+    }
+    if (docsAbs == null) return null;
+    docsAbs = docsAbs.replace(/^\/([A-Za-z]:)/, '$1');
+    return { docsAbs: docsAbs, htmlRel: htmlRel, pageRel: pageRel || null };
+  }
+
+  function projectRootAbs() {
+    var d = pageOnDisk();
+    if (!d || !d.pageRel) return null;
+    var relNoExt = d.pageRel.replace(/\.[^./]+$/, '');
+    if (relNoExt === d.htmlRel) return d.docsAbs;
+    if (relNoExt.slice(-(d.htmlRel.length + 1)) === '/' + d.htmlRel) {
+      var docsRel = relNoExt.slice(0, relNoExt.length - d.htmlRel.length - 1);
+      return d.docsAbs.slice(-(docsRel.length + 1)) === '/' + docsRel
+        ? d.docsAbs.slice(0, d.docsAbs.length - docsRel.length - 1)
+        : null;
+    }
+    if (d.htmlRel.slice(-(relNoExt.length + 1)) === '/' + relNoExt) {
+      return d.docsAbs + '/' + d.htmlRel.slice(0, d.htmlRel.length - relNoExt.length - 1);
+    }
+    return null;
+  }
+
+  function absPath(rel) {
+    var root = rel ? projectRootAbs() : null;
+    return root == null ? null : root + '/' + rel;
+  }
+
+  // A file the page linked by URL rather than carried by place.
+  function absFromUrl(url) {
+    var u;
+    try { u = new URL(url, window.location.href); } catch (e) { return null; }
+    var path;
+    try { path = decodeURIComponent(u.pathname); } catch (e) { path = u.pathname; }
+    if (u.protocol === 'file:') return path.replace(/^\/([A-Za-z]:)/, '$1');
+    var d = pageOnDisk();
+    if (!d || u.origin !== window.location.origin) return null;
+    var rootPath;
+    try { rootPath = decodeURIComponent(new URL(__okuDocsRoot).pathname); } catch (e) { return null; }
+    return path.indexOf(rootPath) === 0 ? d.docsAbs + '/' + path.slice(rootPath.length) : null;
+  }
+
+  /* Where "open in a new tab" goes for a carried file. A markdown file
+     that is a page of this tree opens as that page; any other file,
+     on a page opened from disk, opens as itself. A served page cannot
+     hand the browser a file:// URL, and a deployed site has no file to
+     point at — so there it is not offered, rather than offered broken. */
+  function newTabHref(rel) {
+    if (!rel) return null;
+    var d = pageOnDisk();
+    var root = projectRootAbs();
+    if (!d || root == null) return null;
+    var mf = window.__okuSiteManifest || window.__okuManifest;
+    var abs = root + '/' + rel;
+    if (/\.(md|markdown)$/i.test(rel) && mf && mf.pages && abs.indexOf(d.docsAbs + '/') === 0) {
+      var src = abs.slice(d.docsAbs.length + 1);
+      for (var i = 0; i < mf.pages.length; i++) {
+        var p = mf.pages[i];
+        if (p && p.source === src && p.path) {
+          return window.location.protocol === 'file:'
+            ? fileUrl(d.docsAbs + '/dist/standalone/') + p.path
+            : __okuDocsRoot + p.path;
+        }
+      }
+    }
+    return window.location.protocol === 'file:' ? fileUrl(abs) : null;
+  }
+
+  function fileUrl(abs) {
+    var s = String(abs);
+    var lead = /^[A-Za-z]:/.test(s) ? 'file:///' : 'file://';
+    return lead + s.split('/').map(function (seg, i) {
+      return i === 0 && /^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg);
+    }).join('/');
+  }
+
+  return {
+    lookup: lookup, relFrom: relFrom, absPath: absPath, absFromUrl: absFromUrl,
+    newTabHref: newTabHref, fileUrl: fileUrl, dirOf: dirOf,
+  };
+})();
+
+var ICON_BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>';
+var ICON_EXTERNAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
+
 var __okuMdViewer = (function () {
   // Ids emitted by the viewed file are prefixed with this. They land in
   // the same document as the page's own ids, and a viewed file whose
@@ -807,6 +990,8 @@ var __okuMdViewer = (function () {
   // getElementById reach into the overlay for the rest of the session.
   var ID_PREFIX = 'okv-';
   var seq = 0;
+  // { wrap, stack: [item], at } while the frame is open, else null.
+  var state = null;
 
   /* The standalone build's inlined map, hydrated on first use rather
      than at boot: a page that never links to a .md should not pay for
@@ -834,8 +1019,7 @@ var __okuMdViewer = (function () {
   }
 
   /* The path as the reader thinks of it: what the author typed, not the
-     resolved URL. `/Users/you/dev/x/docs/notes/plan.md` is the same file
-     as `notes/plan.md` and says less about where it sits in the tree. */
+     resolved URL. */
   function displayPath(href, url) {
     if (href && !/^[a-z][a-z0-9+.-]*:/i.test(href)) return href;
     try {
@@ -848,62 +1032,320 @@ var __okuMdViewer = (function () {
     return s.slice(s.lastIndexOf('/') + 1);
   }
 
-  function build(path, url) {
-    var wrap = document.createElement('div');
-    wrap.className = 'okt-mdview';
-    wrap.innerHTML =
-      '<div class="okt-mdview-bar">' +
-      '  <span class="okt-mdview-path" title="' + escapeAttr(path) + '">' +
-      '    <span class="okt-mdview-dir">' + escapeHtml(path.slice(0, path.length - baseName(path).length)) + '</span>' +
-      '    <span class="okt-mdview-file">' + escapeHtml(baseName(path)) + '</span>' +
-      '  </span>' +
-      '  <div class="okt-mdview-actions">' +
-      // Same segmented control the table chrome uses — one shape for
-      // "pick one of these views" everywhere in the kit.
-      '    <div class="okt-view-group" role="group" aria-label="View">' +
-      '      <button type="button" class="okt-view-btn okt-mdview-view active" data-view="rendered" aria-pressed="true">Rendered</button>' +
-      '      <button type="button" class="okt-view-btn okt-mdview-view" data-view="source" aria-pressed="false">Source</button>' +
-      '    </div>' +
-      '    <button type="button" class="okt-mdview-copy" title="Copy the source">' + ICON_CLIPBOARD + '<span>Copy</span></button>' +
-      '    <a class="okt-mdview-open" href="' + escapeAttr(url) + '" target="_blank" rel="noopener" title="Open the file itself in a new tab">Open file</a>' +
-      '  </div>' +
-      '</div>' +
-      '<div class="okt-mdview-body">' +
-      '  <div class="okt-mdview-rendered"></div>' +
-      '  <pre class="okt-mdview-source"><code></code></pre>' +
-      '</div>';
+  function stripHash(s) {
+    var at = String(s).indexOf('#');
+    return at < 0 ? String(s) : String(s).slice(0, at);
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function iconButton(cls, icon, label) {
+    var b = el('button', cls);
+    b.type = 'button';
+    b.innerHTML = icon;
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    return b;
+  }
+
+  /* The frame: a bar saying which file and how the reader got there, a
+     line saying where it is, and a body. Built once per opening; every
+     file in the stack is drawn into it. Words are looked up here, where
+     they are built, because the frame is built after localize ran. */
+  function shell() {
+    var wrap = el('div', 'okt-mdview');
+    var bar = el('div', 'okt-mdview-bar');
+    var nav = el('nav', 'okt-viewer-nav');
+    nav.setAttribute('aria-label', okuT('Opened files'));
+    var back = iconButton('okt-viewer-back', ICON_BACK, menuWord('Back'));
+    back.hidden = true;
+    nav.appendChild(back);
+    nav.appendChild(el('ol', 'okt-viewer-crumbs'));
+    bar.appendChild(nav);
+    bar.appendChild(el('div', 'okt-mdview-actions'));
+    wrap.appendChild(bar);
+
+    var where = el('div', 'okt-viewer-where');
+    var path = el('code', 'okt-mdview-path');
+    path.appendChild(el('span', 'okt-mdview-dir'));
+    path.appendChild(el('span', 'okt-mdview-file'));
+    where.appendChild(path);
+    where.appendChild(iconButton('okt-viewer-copypath', ICON_CLIPBOARD, okuT('Copy the full path')));
+    where.appendChild(el('span', 'okt-viewer-meta'));
+    wrap.appendChild(where);
+
+    wrap.appendChild(el('div', 'okt-mdview-body'));
+    wrap.addEventListener('click', onClick);
+    wrap.addEventListener('keydown', onKey);
     return wrap;
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-  function escapeAttr(s) {
-    return escapeHtml(s).replace(/"/g, '&quot;');
+  function current() { return state && state.stack[state.at]; }
+
+  function flash(btn) {
+    btn.classList.add('copied');
+    setTimeout(function () { btn.classList.remove('copied'); }, 1400);
   }
 
-  function fail(wrap, path, url, reason) {
-    var body = wrap.querySelector('.okt-mdview-rendered');
-    body.innerHTML =
-      // `warning`, not `callout-warning`: the stylesheet keys the type
-      // off a bare class, and the hyphenated spelling matched no rule —
-      // so a file that could not be read announced itself in the accent
-      // colour, under a solid square where the icon should be (an unset
-      // --callout-icon leaves ::before unmasked).
-      '<div class="callout warning okt-mdview-fail">' +
-      '<p><strong>' + escapeHtml(path) + '</strong> could not be read.</p>' +
-      '<p>' + escapeHtml(reason) + '</p>' +
-      '<p><a href="' + escapeAttr(url) + '" target="_blank" rel="noopener">Open it directly</a></p>' +
-      '</div>';
+  function copyText(text, btn) {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+    navigator.clipboard.writeText(text).then(function () { flash(btn); }, function () {});
   }
 
-  function show(wrap, view) {
-    wrap.setAttribute('data-view', view);
-    wrap.querySelectorAll('.okt-mdview-view').forEach(function (b) {
+  function onClick(e) {
+    var t = e.target.closest ? e.target : null;
+    if (!t || !state) return;
+    if (t.closest('.okt-viewer-back')) { go(state.at - 1); return; }
+    var crumb = t.closest('.okt-viewer-crumb');
+    if (crumb) { go(+crumb.getAttribute('data-at')); return; }
+    var view = t.closest('.okt-mdview-view');
+    if (view) { setView(current(), view.getAttribute('data-view')); return; }
+    var copy = t.closest('.okt-mdview-copy');
+    if (copy) { copyText(current().text || '', copy); return; }
+    var cp = t.closest('.okt-viewer-copypath');
+    if (cp) { copyText(where(current()).copy, cp); }
+  }
+
+  // Alt+Left is "back" in every browser; inside the frame it means the
+  // frame's own history, not the page's.
+  function onKey(e) {
+    if (e.altKey && e.key === 'ArrowLeft' && state && state.at > 0) {
+      e.preventDefault();
+      go(state.at - 1);
+    }
+  }
+
+  function go(i) {
+    if (!state || i < 0 || i >= state.stack.length || i === state.at) return;
+    var body = state.wrap.querySelector('.okt-mdview-body');
+    var leaving = current();
+    if (leaving) leaving.scroll = body.scrollTop;
+    state.at = i;
+    render();
+  }
+
+  /* Where the file is, said three ways in falling order of use: the
+     full path on this machine, the path in the project, the path as
+     the author wrote it. The copy button hands over the first that is
+     known, because that is the one a reader pastes into a terminal. */
+  function where(item) {
+    var abs = item.rel ? __okuFileStore.absPath(item.rel) : (item.url ? __okuFileStore.absFromUrl(item.url) : null);
+    var shown = abs || item.rel || item.path;
+    return { shown: shown, copy: shown };
+  }
+
+  function setView(item, view) {
+    if (!item) return;
+    item.view = view;
+    state.wrap.setAttribute('data-view', view);
+    state.wrap.querySelectorAll('.okt-mdview-view').forEach(function (b) {
       var on = b.getAttribute('data-view') === view;
       b.setAttribute('aria-pressed', String(on));
       b.classList.toggle('active', on);
     });
+  }
+
+  function actionsFor(item) {
+    var box = el('div', 'okt-mdview-actions');
+    if (item.kind === 'markdown') {
+      // Same segmented control the table chrome uses — one shape for
+      // "pick one of these views" everywhere in the kit.
+      var group = el('div', 'okt-view-group');
+      group.setAttribute('role', 'group');
+      group.setAttribute('aria-label', okuT('View'));
+      [['rendered', okuT('Rendered')], ['source', okuT('Source')]].forEach(function (v) {
+        var b = el('button', 'okt-view-btn okt-mdview-view', v[1]);
+        b.type = 'button';
+        b.setAttribute('data-view', v[0]);
+        group.appendChild(b);
+      });
+      box.appendChild(group);
+      var copy = el('button', 'okt-mdview-copy');
+      copy.type = 'button';
+      copy.title = okuT('Copy the source');
+      copy.innerHTML = ICON_CLIPBOARD;
+      copy.appendChild(el('span', null, okuT('Copy')));
+      box.appendChild(copy);
+    }
+    var href = item.rel ? __okuFileStore.newTabHref(item.rel) : (item.url && item.text == null ? item.url : null);
+    if (href) {
+      var open = el('a', 'okt-mdview-open');
+      open.href = href;
+      open.target = '_blank';
+      open.rel = 'noopener';
+      open.title = okuT('Open the file itself in a new tab');
+      open.innerHTML = ICON_EXTERNAL;
+      open.appendChild(el('span', null, okuT('Open file')));
+      box.appendChild(open);
+    }
+    return box;
+  }
+
+  function render() {
+    var item = current();
+    var wrap = state.wrap;
+
+    var crumbs = wrap.querySelector('.okt-viewer-crumbs');
+    crumbs.innerHTML = '';
+    for (var i = 0; i <= state.at; i++) {
+      var it = state.stack[i];
+      var li = el('li');
+      if (i === state.at) {
+        li.setAttribute('aria-current', 'page');
+        li.appendChild(el('span', 'okt-viewer-crumb-here', it.name));
+      } else {
+        var b = el('button', 'okt-viewer-crumb', it.name);
+        b.type = 'button';
+        b.setAttribute('data-at', String(i));
+        b.title = it.rel || it.path;
+        li.appendChild(b);
+      }
+      crumbs.appendChild(li);
+    }
+    wrap.querySelector('.okt-viewer-back').hidden = state.at === 0;
+    wrap.setAttribute('data-depth', String(state.at + 1));
+
+    var w = where(item);
+    var dirLen = w.shown.length - baseName(w.shown).length;
+    wrap.querySelector('.okt-mdview-dir').textContent = w.shown.slice(0, dirLen);
+    wrap.querySelector('.okt-mdview-file').textContent = w.shown.slice(dirLen);
+    wrap.querySelector('.okt-mdview-path').title = w.shown;
+    wrap.querySelector('.okt-viewer-meta').textContent = item.ref ? __okuFileMeta(item.ref) : '';
+
+    var oldActions = wrap.querySelector('.okt-mdview-actions');
+    oldActions.parentNode.replaceChild(actionsFor(item), oldActions);
+    wrap.setAttribute('data-kind', item.kind);
+    if (item.kind === 'markdown') setView(item, item.view || 'rendered');
+    else wrap.removeAttribute('data-view');
+
+    var body = wrap.querySelector('.okt-mdview-body');
+    while (body.firstChild) body.removeChild(body.firstChild);
+    var fresh = !item.node;
+    if (fresh) item.node = el('div', 'okt-viewer-file');
+    body.appendChild(item.node);
+    if (fresh) draw(item);
+    else if (item.drawnDetached && typeof initReadingAids === 'function') {
+      // Filled while the reader was on another file, so the page's
+      // enhancement pass never saw it.
+      item.drawnDetached = false;
+      initReadingAids();
+    }
+    body.scrollTop = item.scroll || 0;
+    mirror(item);
+    var lb = document.querySelector('.okt-lightbox');
+    if (lb) lb.setAttribute('aria-label', item.rel || item.path);
+  }
+
+  // The frame answers for the file on top: its ids' prefix and its bytes.
+  function mirror(item) {
+    if (!state || current() !== item) return;
+    state.wrap._idPrefix = item.idPrefix;
+    state.wrap._source = item.text;
+  }
+
+  function draw(item) {
+    if (item.kind === 'markdown') { drawMarkdown(item); return; }
+    if (item.kind === 'media') {
+      var media = __okuFileMedia(item.ref, false);
+      if (media) item.node.appendChild(media);
+      return;
+    }
+    drawText(item);
+  }
+
+  function drawText(item) {
+    // No copy button in the bar: the reading-aids pass puts one on every
+    // `pre code`, and two controls for one action read as two actions.
+    var pre = el('pre', 'okt-fp-view-pre');
+    var code = el('code');
+    if (item.ref && item.ref.lang) code.className = 'language-' + item.ref.lang;
+    // One trailing newline is how a text file ends, not a fourth line.
+    code.textContent = String(item.text || '').replace(/\n$/, '');
+    pre.appendChild(code);
+    item.node.appendChild(pre);
+    // highlightOnce, never highlightAll: the block gains a line-number
+    // gutter and fold markers from initReadingAids, and a second Prism
+    // pass reads those back as program text (see the annotated-code
+    // note above `__prismLoader`).
+    var lang = item.ref && item.ref.lang;
+    if (lang && typeof __prismLoader !== 'undefined') {
+      __prismLoader.highlightOnce(pre, lang).then(function () {
+        if (typeof initReadingAids === 'function') initReadingAids();
+      });
+    } else if (typeof initReadingAids === 'function') {
+      initReadingAids();
+    }
+  }
+
+  function drawMarkdown(item) {
+    item.node.innerHTML =
+      '<div class="okt-mdview-rendered"></div>' +
+      '<pre class="okt-mdview-source"><code></code></pre>';
+    // A chip inside this file is relative to this file, not to the page.
+    if (item.rel) item.node.querySelector('.okt-mdview-rendered').setAttribute('data-oku-file-base', item.rel);
+    var done = function (text) {
+      item.text = text;
+      fill(item, text);
+      if (!item.node.isConnected) item.drawnDetached = true;
+      if (item.frag) {
+        var target = document.getElementById(item.idPrefix + item.frag);
+        if (target) target.scrollIntoView();
+      }
+    };
+    // A caller that already holds the bytes says so. The path chip
+    // does: the build read the file to build its preview, and asking
+    // the viewer to find it again would fail in exactly the case the
+    // chip exists for — a file outside the served tree.
+    if (item.text != null) { done(item.text); return; }
+    var inline = localDoc([stripHash(item.href || ''), item.url, item.path]);
+    if (inline == null && item.rel) {
+      var carried = __okuFileStore.lookup('', item.rel);
+      if (carried && carried.text != null) inline = carried.text;
+    }
+    if (inline != null) { done(inline); return; }
+    if (window.location.protocol === 'file:') {
+      // Not a fetch we can retry — a file:// origin is opaque, so the
+      // browser refuses before a request is made. Calling fetch anyway
+      // only adds a console error the reader cannot act on.
+      fail(item,
+        okuT('A page opened from disk cannot read the file beside it, and the build did not carry this one.'));
+      return;
+    }
+    fetch(item.url, { cache: 'no-cache' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.text();
+      })
+      .then(done)
+      .catch(function (e) { fail(item, e.message); });
+  }
+
+  function fail(item, reason) {
+    var body = item.node.querySelector('.okt-mdview-rendered');
+    // `warning`, not `callout-warning`: the stylesheet keys the type
+    // off a bare class, and the hyphenated spelling matched no rule.
+    var box = el('div', 'callout warning okt-mdview-fail');
+    var p1 = el('p');
+    p1.appendChild(el('strong', null, item.path));
+    p1.appendChild(document.createTextNode(' ' + okuT('could not be read.')));
+    box.appendChild(p1);
+    box.appendChild(el('p', null, reason));
+    if (item.url) {
+      var p3 = el('p');
+      var a = el('a', null, okuT('Open it directly'));
+      a.href = item.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      p3.appendChild(a);
+      box.appendChild(p3);
+    }
+    body.innerHTML = '';
+    body.appendChild(box);
   }
 
   /* One scalar out of a front-matter block. Not a YAML parser and not
@@ -919,56 +1361,46 @@ var __okuMdViewer = (function () {
     return v;
   }
 
-  function fill(wrap, text, url) {
-    wrap.querySelector('.okt-mdview-source code').textContent = text;
-    wrap._source = text;
-    var host = wrap.querySelector('.okt-mdview-rendered');
+  function fill(item, text) {
+    var node = item.node;
+    node.querySelector('.okt-mdview-source code').textContent = text;
+    var host = node.querySelector('.okt-mdview-rendered');
 
     /* The file's own title, which renderMarkdownInto strips with the
        rest of the front-matter. A reader who clicked "the plan" should
        see what the document calls itself, not only what the filesystem
-       calls it — and dropping it left the rendered view opening on the
-       first section heading, which reads as a document missing its top. */
+       calls it. */
     if (window.OkuRenderer && window.OkuRenderer.splitFrontMatter) {
       var meta = window.OkuRenderer.splitFrontMatter(text).meta;
       var title = frontMatterValue(meta, 'title');
       var summary = frontMatterValue(meta, 'summary');
       if (title || summary) {
-        var head = document.createElement('div');
-        head.className = 'okt-mdview-head';
-        if (title) {
-          var h = document.createElement('h1');
-          h.className = 'okt-mdview-title';
-          h.textContent = title;
-          head.appendChild(h);
-        }
-        if (summary) {
-          var s = document.createElement('p');
-          s.className = 'okt-mdview-summary';
-          s.textContent = summary;
-          head.appendChild(s);
-        }
+        var head = el('div', 'okt-mdview-head');
+        if (title) head.appendChild(el('h1', 'okt-mdview-title', title));
+        if (summary) head.appendChild(el('p', 'okt-mdview-summary', summary));
         host.appendChild(head);
       }
     }
     if (!window.OkuRenderer || typeof window.OkuRenderer.renderMarkdownInto !== 'function') {
       // renderer.js is a separate file and a page can be built without
       // it. Say so rather than showing an empty pane.
-      show(wrap, 'source');
-      wrap.querySelector('[data-view="rendered"]').disabled = true;
+      setView(item, 'source');
+      var r = state && state.wrap.querySelector('[data-view="rendered"]');
+      if (r) r.disabled = true;
       return;
     }
-    wrap._idPrefix = ID_PREFIX + (++seq) + '-';
+    item.idPrefix = ID_PREFIX + (++seq) + '-';
+    mirror(item);
     try {
       var warnings = window.OkuRenderer.renderMarkdownInto(text, host, {
-        idPrefix: wrap._idPrefix,
-        base: url,
+        idPrefix: item.idPrefix,
+        base: item.url || item.path,
         // This file is not this page. See makeInert in renderer.js.
         inert: true,
       });
       noteInert(host, warnings);
     } catch (e) {
-      show(wrap, 'source');
+      setView(item, 'source');
       return;
     }
     // The viewed file's code blocks and tables are new DOM in a page
@@ -999,9 +1431,8 @@ var __okuMdViewer = (function () {
     // Built as nodes rather than one innerHTML string: the sentences go
     // through okuT, and a translator handed markup inside a key is a
     // translator who can break the markup.
-    var note = document.createElement('div');
-    note.className = 'callout warning okt-mdview-inert';
-    var p = document.createElement('p');
+    var note = el('div', 'callout warning okt-mdview-inert');
+    var p = el('p');
     var say = function (text) {
       if (p.childNodes.length) p.appendChild(document.createTextNode(' '));
       p.appendChild(document.createTextNode(text));
@@ -1027,11 +1458,36 @@ var __okuMdViewer = (function () {
     host.insertBefore(note, host.firstChild);
   }
 
-  function stripHash(s) {
-    var at = String(s).indexOf('#');
-    return at < 0 ? String(s) : String(s).slice(0, at);
+  function isOpen() {
+    return !!(state && state.wrap.isConnected);
   }
 
+  /* Into the open frame if there is one, on top of what the reader is
+     looking at; otherwise a fresh frame. Opening from partway back
+     along the trail drops what was ahead of it, as a browser does. */
+  function present(item) {
+    if (isOpen()) {
+      var body = state.wrap.querySelector('.okt-mdview-body');
+      var leaving = current();
+      if (leaving) leaving.scroll = body.scrollTop;
+      state.stack = state.stack.slice(0, state.at + 1);
+      state.stack.push(item);
+      state.at = state.stack.length - 1;
+      render();
+      return;
+    }
+    var wrap = shell();
+    state = { wrap: wrap, stack: [item], at: 0 };
+    __okuLightbox.open(wrap, {
+      panZoom: false,
+      title: item.rel || item.path,
+      onClose: function () { if (state && state.wrap === wrap) state = null; },
+    });
+    render();
+  }
+
+  /* A link to a .md. `from` is the place, in the project, of the file
+     the link was written in — the page's own, or the viewed file's. */
   function open(url, opts) {
     opts = opts || {};
     var href = opts.href || url;
@@ -1041,66 +1497,24 @@ var __okuMdViewer = (function () {
     var frag = String(href).split('#')[1] || '';
     var fileUrl = stripHash(url);
     var path = displayPath(stripHash(href), fileUrl);
-    var wrap = build(path, fileUrl);
-    show(wrap, 'rendered');
-
-    wrap.addEventListener('click', function (e) {
-      var view = e.target.closest && e.target.closest('.okt-mdview-view');
-      if (view) { show(wrap, view.getAttribute('data-view')); return; }
-      var copy = e.target.closest && e.target.closest('.okt-mdview-copy');
-      if (copy) {
-        var text = wrap._source || '';
-        var done = function () {
-          copy.classList.add('copied');
-          setTimeout(function () { copy.classList.remove('copied'); }, 1400);
-        };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(done, function () {});
-        }
-      }
+    var rel = opts.rel || (opts.from != null ? __okuFileStore.relFrom(opts.from, href) : null);
+    present({
+      kind: 'markdown', name: baseName(path), path: path, rel: rel, href: href,
+      url: opts.text != null ? null : fileUrl, text: opts.text, frag: frag, ref: opts.ref || null,
     });
-
-    if (opts.text != null) {
-      var openLink = wrap.querySelector('.okt-mdview-open');
-      if (openLink) openLink.remove();
-    }
-    __okuLightbox.open(wrap, { panZoom: false, title: path });
-    __okuI18n.localize(wrap);
-
-    var done = function (text) {
-      fill(wrap, text, fileUrl);
-      if (!frag) return;
-      var el = document.getElementById(wrap._idPrefix + frag);
-      if (el) el.scrollIntoView();
-    };
-
-    // A caller that already holds the bytes says so. The path chip
-    // does: the build read the file to build its preview, and asking
-    // the viewer to find it again would fail in exactly the case the
-    // chip exists for — a file outside the served tree.
-    if (opts.text != null) { done(opts.text); return; }
-    var inline = localDoc([stripHash(href), fileUrl, path]);
-    if (inline != null) { done(inline); return; }
-    if (window.location.protocol === 'file:') {
-      // Not a fetch we can retry — a file:// origin is opaque, so the
-      // browser refuses before a request is made. Calling fetch anyway
-      // only adds a console error the reader cannot act on.
-      fail(wrap, path, fileUrl,
-        'A page opened over file:// cannot read another file next to it. ' +
-        'The standalone build carries every linked .md inside the HTML — ' +
-        'this page was opened without one, or the link was added after it was built.');
-      return;
-    }
-    fetch(fileUrl, { cache: 'no-cache' })
-      .then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.text();
-      })
-      .then(done)
-      .catch(function (e) { fail(wrap, path, fileUrl, e.message); });
   }
 
-  return { open: open };
+  // A path chip's file: markdown, text or media, by what the build found.
+  function openRef(ref) {
+    var kind = ref.kind === 'markdown' ? 'markdown'
+      : (ref.kind === 'image' || ref.kind === 'video' || ref.kind === 'audio') ? 'media' : 'text';
+    present({
+      kind: kind, name: ref.name || baseName(ref.path), path: ref.path, rel: ref.rel || null,
+      text: ref.text, ref: ref, frag: '',
+    });
+  }
+
+  return { open: open, openRef: openRef, isOpen: isOpen };
 })();
 
 /* A plain left-click on a link to a local .md opens it in the viewer.
@@ -1130,7 +1544,14 @@ document.addEventListener('click', function (e) {
   // re-render — and fetching it would fail on CORS anyway.
   if (url.protocol !== 'file:' && url.origin !== window.location.origin) return;
   e.preventDefault();
-  __okuMdViewer.open(url.href, { href: href });
+  // The file the link was written in: a viewed file's own place when the
+  // link is inside one, else the page's. That is what a relative href
+  // inside a viewed file is relative to.
+  var base = a.closest('[data-oku-file-base]');
+  __okuMdViewer.open(url.href, {
+    href: href,
+    from: base ? base.getAttribute('data-oku-file-base') : (window.__okuPageRel || null),
+  });
 });
 
 /* ============ Chart-config popover ============ *
@@ -5893,7 +6314,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-09-29-r91';
+var __okuKitBuild = '2026-10-01-r92';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -7471,78 +7892,29 @@ function __okuFileOpenable(ref) {
   return !!(ref && (ref.text != null || ref.url));
 }
 
-/* The popup, for a reference that resolved. Markdown goes to the viewer
-   the kit already has — same frame, same rendered/source toggle, same
-   copy button — so a .md file reached through a path chip and one
-   reached through a link are the same experience. Everything else gets
-   a frame built here.
+/* The popup, for a reference that resolved. Every kind opens in the
+   file viewer — markdown rendered, text as code, media as itself — so a
+   .md reached through a chip and one reached through a link are the
+   same experience, and a file opened from a viewed file opens on top
+   of it with a way back.
+
+   One exception: a still image opened from the PAGE gets the pan/zoom
+   stage, where the reader wants to look closer. Inside the viewer it
+   is one more file in the trail.
 
    A reference with nothing to show never reaches this: its chip is not
    openable, and the reason lives on the hover card, where the reader
    already is. A popup that explains an absence is a control that
    answers a question nobody asked it. */
 function __okuFileOpen(ref) {
-  if (ref.kind === 'markdown' && ref.text != null) {
-    __okuMdViewer.open(ref.path, { href: ref.path, text: ref.text });
-    return;
+  if (ref.kind === 'image' && !__okuMdViewer.isOpen()) {
+    var media = __okuFileMedia(ref, false);
+    if (media) {
+      __okuLightbox.open(media, { panZoom: true, title: ref.path });
+      return;
+    }
   }
-  var media = __okuFileMedia(ref, false);
-  if (media) {
-    // Pan/zoom for a still image, where the reader wants to look
-    // closer. Not for a video or an audio player: their own controls
-    // live inside the frame, and a drag that pans the element instead
-    // of scrubbing is a control that fights the reader.
-    __okuLightbox.open(media, { panZoom: ref.kind === 'image', title: ref.path });
-    return;
-  }
-
-  var wrap = document.createElement('div');
-  wrap.className = 'okt-fp-view';
-  var bar = document.createElement('div');
-  bar.className = 'okt-fp-view-bar';
-  var name = document.createElement('span');
-  name.className = 'okt-fp-view-path';
-  name.textContent = ref.path;
-  bar.appendChild(name);
-  var meta = __okuFileMeta(ref);
-  if (meta) {
-    var m = document.createElement('span');
-    m.className = 'okt-fp-view-meta';
-    m.textContent = meta;
-    bar.appendChild(m);
-  }
-  wrap.appendChild(bar);
-
-  // No copy button here: the reading-aids pass puts one on every
-  // `pre code`, and two controls for one action read as two actions.
-  var pre = document.createElement('pre');
-  pre.className = 'okt-fp-view-pre';
-  var code = document.createElement('code');
-  if (ref.lang) code.className = 'language-' + ref.lang;
-  // One trailing newline is how a text file ends, not a fourth line.
-  // Displayed without it; the copy button still hands over ref.text.
-  code.textContent = ref.text.replace(/\n$/, '');
-  pre.appendChild(code);
-  wrap.appendChild(pre);
-  if (ref.truncated) {
-    var cut = document.createElement('div');
-    cut.className = 'okt-fp-view-cut';
-    cut.textContent = okuT('Shown up to the size the page can carry.');
-    wrap.appendChild(cut);
-  }
-  __okuLightbox.open(wrap, { panZoom: false, title: ref.path });
-  __okuI18n.localize(wrap);
-  // highlightOnce, never highlightAll: the block gains a line-number
-  // gutter and fold markers from initReadingAids, and a second Prism
-  // pass reads those back as program text (see the annotated-code
-  // note above `__prismLoader`).
-  if (ref.lang && typeof __prismLoader !== 'undefined') {
-    __prismLoader.highlightOnce(pre, ref.lang).then(function () {
-      if (typeof initReadingAids === 'function') initReadingAids();
-    });
-  } else if (typeof initReadingAids === 'function') {
-    initReadingAids();
-  }
+  __okuMdViewer.openRef(ref);
 }
 
 class OkuFilePath extends HTMLElement {
@@ -7555,8 +7927,17 @@ class OkuFilePath extends HTMLElement {
 
     var path = this.getAttribute('path') || this.textContent.trim();
     var label = this.textContent.trim() || path;
-    var ref = __okuFileRef(path) || { path: path, name: path.split('/').pop(), status: 'unknown' };
-    ref.path = path;
+    // Inside a viewed file the path is relative to THAT file, and only
+    // a lookup by place can answer it — the page's own keys are paths
+    // relative to the page, and the same string can name another file.
+    var base = this.closest('[data-oku-file-base]');
+    var found = base
+      ? __okuFileStore.lookup(base.getAttribute('data-oku-file-base'), path)
+      : __okuFileRef(path);
+    // A copy: the entry is shared by every chip naming that file, and
+    // each chip keeps the path its own author wrote.
+    var ref = found ? Object.assign({}, found, { path: path })
+      : { path: path, name: path.split('/').pop(), status: 'unknown' };
     this._ref = ref;
 
     this.className = 'okt-fp';
@@ -16979,6 +17360,8 @@ class PageNav extends HTMLElement {
       }
       loadManifest()
         .then(function (manifest) {
+          // The file viewer reads `root_abs` off it (served only).
+          window.__okuSiteManifest = manifest;
           // The switch first: it is what stamps `data-lang` on <html>,
           // and both the string table and _renderTree read that.
           __okuLangSwitch.build(manifest);
