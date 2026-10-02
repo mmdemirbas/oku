@@ -33,7 +33,7 @@ from ._wait import measured, page_quiet, until
 
 pytestmark = pytest.mark.browser
 
-RAIL_H = 12  # the top rail at rest; opaque, so a header under it is hidden
+RAIL_H = 0  # nothing spans the top edge: the rail is a capsule in the buttons' row, measured with them
 
 ROWS = 160
 LONG = "\n".join(f"| name{i:03d} | {i} | note {i} |" for i in range(ROWS))
@@ -167,7 +167,7 @@ def _chrome_over_header(page, sel: str):
           const th = wrap.querySelector('.okt-table-scroll thead th');
           const shown = (ghost && ghost.dataset.stuck === '1') ? ghost : th;
           const hdr = shown.getBoundingClientRect();
-          return [...document.querySelectorAll('.ctrl-btn, .okt-chrome-cluster')].filter((b) => {{
+          return [...document.querySelectorAll('.ctrl-btn, .okt-chrome-cluster, .okt-rail')].filter((b) => {{
             const cs = getComputedStyle(b);
             if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') return false;
             const r = b.getBoundingClientRect();
@@ -273,8 +273,8 @@ def test_the_stuck_header_still_sorts(page):
     h = page.evaluate(
         f"() => {_wrap('#wide')}.querySelector('.okt-table-scroll thead th').getBoundingClientRect().height"
     )
-    page.mouse.click(first["foundLeft"] + 20, RAIL_H + h / 2)
-    page.mouse.click(first["foundLeft"] + 20, RAIL_H + h / 2)  # asc → desc
+    page.mouse.click(first["foundLeft"] + 20, first["foundTop"] + h / 2)
+    page.mouse.click(first["foundLeft"] + 20, first["foundTop"] + h / 2)  # asc → desc
     until(
         page,
         f"() => {_wrap('#wide')}.querySelector('.okt-table-scroll tbody tr td').textContent.trim() !== {before!r}",
@@ -292,7 +292,9 @@ def test_the_header_stops_at_the_end_of_its_table(page):
     stray = page.evaluate(
         f"""() => {{
           const wrap = {_wrap("#wide")};
-          const el = document.elementFromPoint(innerWidth / 2, {RAIL_H} + 20);
+          const rail = document.getElementById('oku-rail');
+          const below = rail ? rail.getBoundingClientRect().bottom : {RAIL_H};
+          const el = document.elementFromPoint(innerWidth / 2, below + 20);
           return !!(el && el.closest('.okt-table-wrap') === wrap);
         }}"""
     )

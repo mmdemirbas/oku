@@ -136,19 +136,38 @@ content share.
 
 ## The rail does not move — and opening it is not moving. {#the-rail-does-not-move-and-opening-it-is-not-mov}
 
-**The rail does not move — and opening it is not moving.** The strip at
-the top carries read progress plus a tick per heading and a dot per
-figure, each a button that jumps there. Hover and focus OPEN it: 12px
-of hairline becomes a 32px map, marks scale x2, and the swell still
-applies on top of that. Nothing drifts, because the strip is `fixed`
-with a fixed top edge and can therefore only grow **downward** — every
-mark keeps its x, its width and its top, `main` does not move, and
-`test_page_rail.py` compares all of it across states. The three numbers
-(32px open height, x2 open scale, `RAIL_MAG_MAX` 1.6) are one
+**The rail does not move — and opening it is not moving.** The rail is
+a capsule in the row of the corner buttons, between the Contents button
+and the cluster: the name of the section being read, a track with the
+read progress and a tick per heading and a dot per figure (each a
+button that jumps there), and the percentage read, in the page
+language's own format. Hover and focus OPEN it: the 12px track becomes
+a 32px map, marks scale x2, and the swell still applies on top of that.
+Nothing drifts, because the capsule is `fixed` with a fixed top edge and
+can therefore only grow **downward** — every mark keeps its x, its width
+and its top, the name and the number keep theirs, `main` does not move,
+and `test_page_rail.py` compares all of it across states. The three
+numbers (32px open track, x2 open scale, `RAIL_MAG_MAX` 1.6) are one
 constraint against the 9px title bar: 9 x 2 x 1.6 = 28.8 has to fit
 inside 32. Change one, re-check the other two. The label is absolutely
 positioned and `pointer-events: none`, so revealing it cannot push
 anything.
+
+It was a 12px strip along the top edge of the window, above the buttons
+rather than among them, with ticks and no number — and a reader said it
+looked as if the file were broken, which is what a band of scattered
+marks along the edge of a window does look like. Three things about the
+capsule are decisions. **The name has a fixed share of the capsule**:
+sized to its text, it changed width at every section and the track
+beside it slid sideways as the reader scrolled (the current-mark test
+caught it). **The edges are measured**, by `placeRail`, from the
+Contents button and the cluster, because the cluster gains buttons and a
+pinned drawer moves the document. **A phone's track carries no marks**:
+under 200px, twelve ticks read as a barcode no finger can pick from, so
+it shows the fill and the number and the contents panel is the map.
+Sticky table headers park under the capsule because `chromeFloor`
+measures it with the buttons; nothing spans the top edge any more, so
+`--okt-rail-h` is 0.
 
 Three decisions inside it are load-bearing. Marks and the fill share one
 scale (`elementTop / maxScroll`), so the fill edge reaches a mark

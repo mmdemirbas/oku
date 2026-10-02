@@ -315,14 +315,13 @@ html {
      any Mac set to "Show scroll bars: Always". Ignored by browsers that
      do not support it, which leaves them exactly where they were. */
   scrollbar-gutter: stable;
-  /* The top rail's height at rest. Declared here rather than on
-     `.okt-rail` because it is not only the rail's business: the rail
-     is opaque and fixed, so anything else that pins itself to the top
-     of the viewport — a sticky table header — starts this far down.
-     The rail's hover grows it in its own scope; nothing else follows
-     that, on purpose (a header that jumps when the pointer nears the
-     rail is a header that moves). */
-  --okt-rail-h: 12px;
+  /* How far down from the top of the viewport something that pins
+     itself there — a sticky table header — has to start before anything
+     else is measured. Zero: the rail is a capsule floating in the row of
+     the corner buttons, not a strip across the top edge, and
+     chromeFloor() measures it along with the buttons wherever it stands
+     over a table's columns. */
+  --okt-rail-h: 0px;
 }
 body {
   margin: 0; padding: 0;
@@ -411,10 +410,9 @@ body.drawer-modal { overflow: hidden; }
 @media (min-width: 900px) {
   body.drawer-pinned .layout { padding-left: var(--oku-drawer-w); }
   /* The rail is a map OF the document, so it belongs over the document
-     and not over the panel beside it. Its marks are percentages of its
-     own width, so they rescale; chrome.js rebuilds it on the state
-     change because a class flip fires no resize event. */
-  body.drawer-pinned .okt-rail { left: var(--oku-drawer-w); }
+     and not over the panel beside it. placeRail() measures where the
+     panel ends; this is the value before it has. */
+  body.drawer-pinned .okt-rail { left: calc(var(--oku-drawer-w) + 16px); }
 }
 
 /* The Contents button opens the drawer at every width — the sidebar's
@@ -896,87 +894,148 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
 .okt-menu-open svg { width: 14px; height: 14px; display: block; }
 
 /* ============ Reading aids ============ *
- * The rail: a 12px strip across the top that answers three questions
- * without the reader asking any of them — how far in am I, what shape
- * is this page, and can I get back to that table.
+ * The rail: a capsule in the row of the corner buttons, between the
+ * Contents button and the cluster on the right, that answers three
+ * questions without the reader asking any of them — where am I (the
+ * section's name), how far in (a track and a percentage), and can I get
+ * back to that table (a mark per landmark, opened into a map on hover).
+ *
+ * It was a 12px strip across the very top edge with a tick per heading
+ * and no number, above the buttons rather than among them. A reader
+ * said it looked like the file was broken: a band of scattered ticks
+ * along the edge of the window is what a rendering fault looks like,
+ * and nothing in it said what it was for.
  *
  * Two rules govern every declaration below.
  *
  * 1. NO BUTTON BOX EVER MOVES. The hover swell, the current-position
  *    highlight and focus all act on the mark's ::before via `transform`
- *    and colour. The <button> hit boxes are fixed at 14x13 and the
- *    strip is fixed at 12px, at every state. A dock that reflows makes
- *    you chase the thing you were aiming at; this one cannot.
- * 2. NOTHING ON THE PAGE MOVES EITHER. The strip is `position: fixed`
- *    and the label is absolutely positioned inside it with
- *    `pointer-events: none`, so revealing either cannot displace a
- *    single element of the document.
+ *    and colour. The <button> hit boxes keep their x and their top in
+ *    every state. A dock that reflows makes you chase the thing you
+ *    were aiming at; this one cannot.
+ * 2. NOTHING ON THE PAGE MOVES EITHER. The capsule is `position: fixed`
+ *    with a fixed top edge, so opening it can only grow it downward;
+ *    the section name and the percentage sit at fixed offsets from that
+ *    edge; the label is absolutely positioned with `pointer-events:
+ *    none`. Revealing any of it cannot displace an element of the
+ *    document or of the rail.
  * Pinned by test_page_rail.py. */
 .okt-rail {
-  position: fixed; top: 0; left: 0; right: 0;
-  /* Tall enough to CONTAIN the marks, including magnified. At 3px they
-     had to hang below the strip onto whatever text was scrolling under
-     it, where a 2px tick is a speck. Painted --bg, so the effect is
-     that page content ends 12px early — what any fixed header does, at
-     a fraction of the height. Rest height inherited from :root. */
-  /* One multiplier drives every mark's size, so at rest the strip is a
-     hairline and under the pointer it is a legible map. It composes with
-     the per-mark dock swell (`--okt-mag`) rather than replacing it: the
-     neighbourhood you are pointing at is the biggest thing on the rail,
-     inside a rail that has already grown. */
+  position: fixed; top: 20px;
+  /* Between the Contents button and the corner cluster. placeRail() in
+     chrome.js measures both and writes these; the fallbacks are the
+     common case before it has. */
+  left: var(--okt-rail-left, 76px);
+  right: var(--okt-rail-right, 128px);
+  /* One multiplier drives every mark's size, so at rest the track is a
+     hairline with ticks and under the pointer it is a legible map. It
+     composes with the per-mark dock swell (`--okt-mag`) rather than
+     replacing it: the neighbourhood you are pointing at is the biggest
+     thing on the rail, inside a rail that has already grown. */
   --okt-rail-scale: 1;
-  height: var(--okt-rail-h);
-  transition: height 0.16s ease;
+  --okt-track-h: 12px;
+  display: flex; align-items: flex-start; gap: 14px;
+  min-height: 36px; padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  backdrop-filter: blur(12px) saturate(130%);
+  box-shadow: 0 1px 2px var(--shadow-soft);
+  font: 500 13px/34px var(--font-ui);
+  color: var(--text-soft);
   z-index: 250;
-  background: var(--bg);
-  /* The strip takes the pointer so the swell can start BEFORE the
-     pointer reaches a mark — a dock that only responds once you are
-     already on target is backwards. Nothing interactive lives in the
-     top 12px (the chrome buttons start at y=16), and the strip is
-     opaque, so nothing is being covered. */
+  transition: padding-bottom 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
 }
-/* Hover opens the map. The strip grows DOWNWARD from a fixed top edge
+/* Where the reader is, by name. A FIXED share of the capsule, and
+   ellipsised rather than wrapped: sized to its text, the name changed
+   width at every section and the track beside it — every mark on it —
+   slid sideways as the reader scrolled. */
+.okt-rail-where {
+  flex: 0 0 clamp(120px, 26%, 300px); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text); font-weight: 560;
+  pointer-events: none;
+}
+.okt-rail-where:empty { display: none; }
+/* How far in, as a number. Tabular figures so it does not jitter as it
+   counts. The format is the page language's (Turkish `%33`, English
+   `33%`), from the browser's own number formatter. */
+.okt-rail-pct {
+  /* Wide enough for `%100` / `100%`, so the track does not shrink as the
+     count gains a digit. */
+  flex: 0 0 4.6ch; text-align: right;
+  color: var(--text); font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+/* The track holds the line, the fill, the marks and the label. Its top
+   edge is fixed 12px into the capsule and it only grows downward. */
+.okt-rail-track {
+  position: relative; flex: 1 1 auto; min-width: 48px;
+  margin-top: 11px;
+  height: var(--okt-track-h);
+  transition: height 0.16s ease;
+}
+/* Hover opens the map. The capsule grows DOWNWARD from a fixed top edge
    and it is `position: fixed`, so nothing in the document moves and no
    mark changes its x or its top — the growth is the one direction that
    cannot displace anything, including the mark you are aiming at.
-   32px, because the tallest thing on the rail is the title bar at
-   9px x 2 (open scale) x 1.6 (swell at the pointer) = 28.8px, and it
-   has to stay inside the strip rather than hang onto the text scrolling
-   under it. Those three numbers are one constraint — change any and
-   re-check the other two against the 9px bar.
+   32px of track, because the tallest thing on the rail is the title bar
+   at 9px x 2 (open scale) x 1.6 (swell at the pointer) = 28.8px, and it
+   has to stay inside the capsule. Those three numbers are one
+   constraint — change any and re-check the other two against the 9px
+   bar.
    `focus-within` is not decoration: the keyboard path through the marks
    is a roving tabindex, and a 3px mark you cannot see is not a target. */
 .okt-rail:hover,
 .okt-rail:focus-within {
-  --okt-rail-h: 32px;
+  --okt-track-h: 32px;
   --okt-rail-scale: 2;
+  padding-bottom: 10px;
   background: var(--surface);
-  box-shadow: 0 4px 14px var(--shadow-soft);
+  box-shadow: 0 6px 18px var(--shadow-soft);
 }
-/* A touch pointer has no hover. Expanding on tap would grow the strip
+/* A touch pointer has no hover. Expanding on tap would grow the capsule
    under the finger that just committed to a target. */
 @media (hover: none) {
-  .okt-rail:hover { --okt-rail-h: inherit; --okt-rail-scale: 1; background: var(--bg); box-shadow: none; }
+  .okt-rail:hover { --okt-track-h: 12px; --okt-rail-scale: 1; padding-bottom: 0; box-shadow: 0 1px 2px var(--shadow-soft); }
 }
-/* The track. It has to be visible or the ticks read as a row of
+/* A phone's capsule is the width of a thumb's reach: the name goes, the
+   track and the number stay. */
+@media (max-width: 600px) {
+  .okt-rail-where { display: none; }
+  .okt-rail { gap: 10px; padding: 0 12px; }
+}
+/* The line. It has to be visible or the ticks read as a row of
    floating marks with nothing joining them — and the line joining them
-   is the page. --border-soft against --bg was a 4-value step and
-   disappeared entirely. */
-.okt-rail::before {
+   is the page. */
+.okt-rail-track::before {
   content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  border-radius: 2px;
   background: var(--border);
 }
 /* Read progress. Still `.progress-bar` / `#progress-bar` — the id is
    what initReadingAids drives and what the print sheet hides. */
 .progress-bar {
   position: absolute; top: 0; left: 0;
-  height: 2px; width: 0;
+  height: 3px; width: 0; border-radius: 2px;
   background: var(--accent);
   transition: width 0.1s linear; pointer-events: none;
 }
 .okt-rail-marks { position: absolute; inset: 0; pointer-events: none; }
-/* A landmark is a button with a constant 14x13 box and no visuals of
+/* The band above the capsule. Text scrolling under the corner row left
+   clipped half-lines above it; a short fade into the page colour lets
+   them go quietly. 24px, the space above the capsule and no more —
+   anything taller would veil a sticky table header parked under the
+   row. Below the buttons and the capsule, above the document. */
+.okt-top-veil {
+  position: fixed; top: 0; left: 0; right: 0; height: 24px;
+  background: linear-gradient(var(--bg) 30%, transparent);
+  pointer-events: none; z-index: 190;
+}
+/* A landmark is a button with a constant-width box and no visuals of
    its own. Everything visible is the ::before, so the target can be
    comfortably large while the mark stays a hairline. */
 .okt-rail-mark {
@@ -984,7 +1043,7 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
   /* The box follows the strip so an expanded rail is also a bigger
      target. It only ever grows downward from top: 0 — the x and the top
      of every mark are the same in every state. */
-  top: 0; height: max(13px, var(--okt-rail-h, 12px)); width: 14px; margin-left: -7px;
+  top: 0; height: max(13px, var(--okt-track-h, 12px)); width: 14px; margin-left: -7px;
   padding: 0; border: 0; background: none;
   -webkit-appearance: none; appearance: none;
   cursor: pointer; pointer-events: auto;
@@ -1073,10 +1132,10 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
 /* Absolutely positioned and pointer-transparent, so revealing it cannot
    move the rail, the marks, or anything on the page. */
 .okt-rail-tip {
-  /* Below the strip at whatever height the strip currently is — the tip
-     only ever shows while the rail is open, so this resolves to 34px in
-     practice and never lands on top of a mark. */
-  position: absolute; top: calc(var(--okt-rail-h, 12px) + 6px);
+  /* Below the capsule at whatever height it currently is — the tip only
+     ever shows while the rail is open, and it sits under the track's
+     bottom edge plus the capsule's padding, never on top of a mark. */
+  position: absolute; top: calc(100% + 20px);
   transform: translateX(-50%);
   max-width: min(300px, 66vw);
   padding: 7px 10px;
@@ -1086,7 +1145,8 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
   box-shadow: 0 6px 18px var(--shadow-strong);
   -webkit-backdrop-filter: blur(12px) saturate(140%);
   backdrop-filter: blur(12px) saturate(140%);
-  font: 500 11.5px/1.35 'Inter', -apple-system, sans-serif;
+  font: 500 11.5px/1.35 var(--font-ui);
+  white-space: normal;
   color: var(--text);
   opacity: 0; pointer-events: none;
   transition: opacity 0.14s ease;
@@ -4943,7 +5003,7 @@ footer {
 
 /* ============ Print / PDF ============ */
 @media print {
-  .ctrl-btn, .okt-chrome-cluster, .okt-rail, .progress-bar, .skip-link,
+  .ctrl-btn, .okt-chrome-cluster, .okt-rail, .okt-top-veil, .progress-bar, .skip-link,
   .copy-btn, .permalink, .okt-copy-actions,
   /* A path chip prints as the path. The button that copies it is
      one of the two things paper cannot do. */

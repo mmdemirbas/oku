@@ -142,7 +142,8 @@ BOXES = """() => {
                      return [Math.round(b.x), Math.round(b.y),
                              Math.round(b.width), Math.round(b.height)]; };
   const rail = document.getElementById('oku-rail');
-  return { rail: box(rail),
+  const q = s => box(document.querySelector(s));
+  return { rail: box(rail), track: q('.okt-rail-track'), where: q('.okt-rail-where'), pct: q('.okt-rail-pct'),
            marks: [...document.querySelectorAll('.okt-rail-mark')].map(box) };
 }"""
 
@@ -365,12 +366,13 @@ def test_a_rebuild_replaces_the_rails_listeners_rather_than_adding_them(rail_url
 
 
 def test_nothing_moves_on_hover(rendered):
-    """The rail OPENS on hover — 12px of hairline becomes 28px of legible
-    map. "Thicker, without drifting the UI" is the whole constraint, and
-    it is satisfied by the direction of the growth: the strip is fixed
-    with a fixed top edge, so it can only grow downward, and every mark
-    keeps its x, its width and its top. Nothing the pointer is aiming at
-    moves, and nothing in the document moves at all."""
+    """The rail OPENS on hover — a 12px track becomes a 32px map.
+    "Thicker, without drifting the UI" is the whole constraint, and it is
+    satisfied by the direction of the growth: the capsule is fixed with a
+    fixed top edge, so it can only grow downward, every mark keeps its x,
+    its width and its top, and the section name and the percentage keep
+    theirs. Nothing the pointer is aiming at moves, and nothing in the
+    document moves at all."""
     before = rendered.evaluate(BOXES)
     before_main = rendered.evaluate(
         """() => Math.round(document.querySelector('main').getBoundingClientRect().top)"""
@@ -385,9 +387,11 @@ def test_nothing_moves_on_hover(rendered):
     assert [b[:3] for b in before["marks"]] == [a[:3] for a in after["marks"]], (
         "a mark moved or changed width under the pointer"
     )
-    assert before["rail"][:3] == after["rail"][:3], "the strip moved under the pointer"
-    assert before["rail"][3] == 12, before["rail"]
-    assert after["rail"][3] == 32, after["rail"]
+    assert before["rail"][:3] == after["rail"][:3], "the capsule moved under the pointer"
+    assert after["rail"][3] > before["rail"][3], "the capsule did not grow downward"
+    assert before["track"][3] == 12, before["track"]
+    assert after["track"][3] == 32, after["track"]
+    assert before["where"] == after["where"] and before["pct"] == after["pct"], (before, after)
     assert after["marks"][0][3] > before["marks"][0][3], "the targets did not grow with the strip"
     assert before_main == after_main, "the page content moved when the rail opened"
 
@@ -409,8 +413,8 @@ def test_nothing_moves_on_focus(rendered):
     assert [b[:3] for b in before["marks"]] == [a[:3] for a in after["marks"]], (
         "a mark moved or changed width on focus"
     )
-    assert before["rail"][:3] == after["rail"][:3], "the strip moved on focus"
-    assert after["rail"][3] == 32, after["rail"]
+    assert before["rail"][:3] == after["rail"][:3], "the capsule moved on focus"
+    assert after["track"][3] == 32, after["track"]
 
 
 def test_nothing_moves_when_the_current_mark_changes(rendered):
@@ -439,38 +443,44 @@ def test_nothing_moves_when_the_current_mark_changes(rendered):
 # ---------- it stays legible ----------
 
 
-def test_the_rail_is_opaque_so_marks_read_over_scrolled_content(rendered):
-    """The marks hang below the track. At 3px tall the strip could not
-    contain them and they were drawn over whatever prose was scrolling
-    underneath, where a 2px tick is a speck rather than a landmark."""
+def test_the_capsule_holds_its_marks_over_scrolled_content(rendered):
+    """The marks hang below the track. At 3px tall the old strip could
+    not contain them and they were drawn over whatever prose was
+    scrolling underneath, where a 2px tick is a speck rather than a
+    landmark. The capsule is a near-opaque surface with the text behind
+    it blurred, and every mark ends inside it."""
     got = rendered.evaluate(
         """() => {
         const rail = document.getElementById('oku-rail');
         const cs = getComputedStyle(rail);
-        const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
         const probe = document.createElement('div');
-        probe.style.color = bg; document.body.appendChild(probe);
-        const bgRgb = getComputedStyle(probe).color; probe.remove();
+        probe.style.cssText = 'position:fixed;left:-99px;width:1px;height:1px;background:' + cs.backgroundColor;
+        document.body.appendChild(probe);
+        const alpha = (cs.backgroundColor.match(/[\\d.]+(?=\\)$)/) || ['1'])[0];
+        probe.remove();
+        const r = rail.getBoundingClientRect();
         const tallest = Math.max(...[...document.querySelectorAll('.okt-rail-mark')].map(m => {
             const b = getComputedStyle(m, '::before');
-            return parseFloat(b.top || 0) + parseFloat(b.height || 0);
+            return m.getBoundingClientRect().top + parseFloat(b.top || 0) + parseFloat(b.height || 0);
         }));
-        return { height: parseFloat(cs.height), bg: cs.backgroundColor, expect: bgRgb,
-                 tallestMark: tallest };
+        return { bottom: r.bottom, bg: cs.backgroundColor, alpha: parseFloat(alpha),
+                 blur: cs.backdropFilter || cs.webkitBackdropFilter, tallestMark: tallest };
     }"""
     )
-    assert got["bg"] == got["expect"], got
-    assert got["height"] >= got["tallestMark"], (
-        f"marks reach {got['tallestMark']}px inside a {got['height']}px strip"
+    assert got["alpha"] >= 0.85, got
+    assert "blur" in (got["blur"] or ""), got
+    assert got["bottom"] >= got["tallestMark"], (
+        f"marks reach y={got['tallestMark']} below a capsule ending at {got['bottom']}"
     )
 
 
-@pytest.mark.parametrize(("width", "expect_figures"), [(1440, True), (390, False)])
+@pytest.mark.parametrize(("width", "expect_figures"), [(1440, True), (800, False)])
 def test_marks_never_collide_at_any_width(rail_url, browser, width, expect_figures):
     """49 landmarks on a 390px rail measured 0px apart. Sections are
     always kept — they are the shape of the page — and figures are
     placed only where they clear their neighbours, or not at all on a
-    rail too narrow to separate them (and with no pointer to hover)."""
+    track too narrow to separate them. A phone's track carries no marks
+    at all (test_a_phone_capsule_is_a_number_and_a_line)."""
     page = browser.new_page(viewport={"width": width, "height": 844})
     try:
         page.goto(f"{rail_url}/long.html")
@@ -567,7 +577,10 @@ def test_a_wrapped_chart_still_reads_as_a_chart(rendered):
             const top = el.getBoundingClientRect().top + scrollY;
             const h = document.documentElement;
             const pct = (top / (h.scrollHeight - h.clientHeight)) * 100;
-            return marks.filter(m => Math.abs(parseFloat(m.style.left) - pct) < 1.5)
+            // Figures only: a sub-section heading a few pixels away is a
+            // different landmark, and the claim here is about the wrapper
+            // and the chart inside it.
+            return marks.filter(m => m.dataset.kind === 'figure' && Math.abs(parseFloat(m.style.left) - pct) < 1.5)
                         .map(m => m.dataset.shape + ':' + m.getAttribute('aria-label'));
         };
         return { hasPair: !!pair, hasChart: !!chart, at: chart ? near(chart) : [] };
@@ -652,12 +665,12 @@ def test_the_swell_moves_nothing(rendered):
         }
         return { same: JSON.stringify(before) === JSON.stringify(marks.map(box)),
                  mainMoved: Math.round(document.querySelector('main').getBoundingClientRect().top) !== mainTop,
-                 railH: Math.round(rail.getBoundingClientRect().height) };
+                 trackH: Math.round(document.querySelector('.okt-rail-track').getBoundingClientRect().height) };
     }"""
     )
     assert got["same"], "a mark box moved while the pointer swept the rail"
     assert not got["mainMoved"], "the page content moved while the rail was hovered"
-    assert got["railH"] == 12, got
+    assert got["trackH"] == 12, got
 
 
 def _worst_reach(page, swell):
@@ -675,7 +688,9 @@ def _worst_reach(page, swell):
             worst = Math.max(worst,
                 parseFloat(s.top || 0) + parseFloat(s.height || 0) * scale * swell);
         }
-        return { railH: rail.getBoundingClientRect().height, scale, worst };
+        // Marks hang from the track's top edge, so the track is what
+        // has to contain them.
+        return { railH: document.querySelector('.okt-rail-track').getBoundingClientRect().height, scale, worst };
     }""",
         swell,
     )
@@ -824,3 +839,65 @@ def test_a_table_mark_previews_its_size(rendered):
     if got.get("skipped"):
         pytest.skip("no table on the fixture page")
     assert got["text"] and "×" in got["text"], got
+
+
+def test_a_phone_capsule_is_a_number_and_a_line(rail_url, browser):
+    """At 390px the track is about 120px wide, and twelve ticks in it
+    read as a barcode that no finger can pick from. The phone's capsule
+    carries the fill and the percentage; the contents panel is the map
+    there. It still sits in the row of the buttons and covers none."""
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    try:
+        page.goto(f"{rail_url}/long.html")
+        page_quiet(page)
+        got = page.evaluate(
+            """() => { const r = e => e.getBoundingClientRect();
+            const rail = document.getElementById('oku-rail');
+            const btns = [...document.querySelectorAll('.ctrl-btn')].filter(b => r(b).width > 0 && getComputedStyle(b).position === 'fixed' && r(b).top < 70);
+            const hit = btns.filter(b => { const a = r(b), c = r(rail); return a.left < c.right && a.right > c.left && a.top < c.bottom && a.bottom > c.top; });
+            return { compact: rail.hasAttribute('data-compact'), marks: document.querySelectorAll('.okt-rail-mark').length,
+                     pct: document.querySelector('.okt-rail-pct').textContent, width: Math.round(r(rail).width),
+                     overlaps: hit.map(b => b.className) }; }"""
+        )
+        assert got["compact"] and got["marks"] == 0, got
+        assert got["pct"].strip() != "", got
+        assert got["overlaps"] == [], got
+    finally:
+        page.close()
+
+
+@pytest.mark.parametrize("width", [1440, 900, 390])
+def test_the_capsule_sits_between_the_buttons_and_says_where_and_how_far(rail_url, browser, width):
+    """The rail is in the row of the corner buttons, between the Contents
+    button and the cluster, and it names the section being read and how
+    far in the reader is — the two things the old strip along the top
+    edge could not say. Nothing in that row overlaps anything else."""
+    page = browser.new_page(viewport={"width": width, "height": 844})
+    try:
+        page.goto(f"{rail_url}/long.html")
+        page_quiet(page)
+        page.evaluate(
+            "() => window.scrollTo({ top: document.querySelector('#s3').getBoundingClientRect().top + scrollY - 60, behavior: 'instant' })"
+        )
+        page.wait_for_timeout(300)
+        got = page.evaluate(
+            """() => { const r = e => e.getBoundingClientRect();
+            const rail = r(document.getElementById('oku-rail'));
+            const toggle = r(document.querySelector('page-chrome .drawer-toggle'));
+            const cluster = r(document.querySelector('.okt-chrome-cluster'));
+            const where = document.querySelector('.okt-rail-where');
+            return { left: rail.left, right: rail.right, top: rail.top, bottom: rail.bottom,
+                     toggleRight: toggle.right, clusterLeft: cluster.left, btnTop: toggle.top, btnBottom: toggle.bottom,
+                     where: getComputedStyle(where).display === 'none' ? null : where.textContent,
+                     pct: document.querySelector('.okt-rail-pct').textContent,
+                     s3: (() => { const e = document.getElementById('s3'); const sec = e.closest('section') || e;
+                                  return (sec.querySelector('h2') || e).textContent; })() }; }"""
+        )
+        assert got["left"] >= got["toggleRight"] + 8, got
+        assert got["right"] <= got["clusterLeft"] - 8, got
+        assert got["top"] >= got["btnTop"] and got["bottom"] <= got["btnBottom"], got
+        assert got["pct"].strip().replace("%", "").strip().isdigit(), got
+        if width > 600:
+            assert got["where"] and got["where"] in got["s3"], got
+    finally:
+        page.close()

@@ -673,11 +673,15 @@ class TestPayloadBudget:
     # @font-face rules and the rules scoping it, the hyphenation probe
     # that gates justified prose, the nested lightbox, and the link rules
     # (balanced brackets, bare URLs). About 3,000 bytes.
-    KIT_BUDGET_BYTES = 1_400_000
+    # Then from 1,400,000 by the rail becoming a capsule between the
+    # corner buttons — the section name, the percentage, the measured
+    # placement and the phone's compact form. About 5,000 bytes, most of
+    # it the reasoning in the stylesheet.
+    KIT_BUDGET_BYTES = 1_410_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
-    STANDALONE_BUDGET_BYTES = 1_400_000
+    STANDALONE_BUDGET_BYTES = 1_415_000
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

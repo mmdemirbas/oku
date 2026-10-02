@@ -199,7 +199,9 @@ whole below.
 - **Contents drawer: one button, three states.** Held by `test_a_peek_moves_nothing`. → [why](PRESENTATION-RULES.md#contents-drawer-one-button-three-states)
 - **The default has to render finished.** Held by `test_presentation_defaults`. → [why](PRESENTATION-RULES.md#the-default-has-to-render-finished)
 - **One column, one right edge.** Held by `test_presentation_measure`. → [why](PRESENTATION-RULES.md#one-column-one-right-edge)
-- **The rail does not move — and opening it is not moving.** Held by `test_page_rail`. → [why](PRESENTATION-RULES.md#the-rail-does-not-move-and-opening-it-is-not-mov)
+- **The rail does not move — and opening it is not moving.** A capsule
+  between the corner buttons: section name, progress track with
+  landmark marks, percentage. Held by `test_page_rail`. → [why](PRESENTATION-RULES.md#the-rail-does-not-move-and-opening-it-is-not-mov)
 - **Shape says what kind of thing it is.** Four rail-mark silhouettes,
   not eleven — bar for a heading, square/circle/diamond for
   table/chart/diagram, hollow square for every other figure. → [why](PRESENTATION-RULES.md#shape-says-what-kind-of-thing-it-is)

@@ -3319,10 +3319,15 @@ class PageChrome extends HTMLElement {
     // tooltip — so nothing is lost except the ink.
     this.innerHTML =
       '<a class="skip-link" href="#main-content">' + skipLabel + '</a>' +
+      '<div class="okt-top-veil" aria-hidden="true"></div>' +
       '<div class="okt-rail" id="oku-rail">' +
-        '<div class="progress-bar" id="progress-bar"></div>' +
-        '<div class="okt-rail-marks" role="navigation" aria-label="Page landmarks"></div>' +
-        '<div class="okt-rail-tip" role="status" aria-live="off"></div>' +
+        '<span class="okt-rail-where" aria-hidden="true"></span>' +
+        '<div class="okt-rail-track">' +
+          '<div class="progress-bar" id="progress-bar"></div>' +
+          '<div class="okt-rail-marks" role="navigation" aria-label="Page landmarks"></div>' +
+          '<div class="okt-rail-tip" role="status" aria-live="off"></div>' +
+        '</div>' +
+        '<span class="okt-rail-pct" aria-hidden="true"></span>' +
       '</div>' +
       '<button class="ctrl-btn drawer-toggle" type="button" aria-expanded="false" aria-controls="oku-page-nav"' +
         ' aria-label="' + drawerLabel + '" title="' + drawerLabel + '">' + ICON_MENU + '</button>' +
@@ -3855,9 +3860,31 @@ function __okuScrollBehavior() { return __okuReducedMotion() ? 'auto' : 'smooth'
 // light the current mark without registering a second listener.
 var __okuRailOnScroll = null;
 
+/* The capsule stands between the Contents button and the corner
+   cluster, and both of those move: the cluster gains a button when
+   search or the warning indicator arrives, and a pinned drawer pushes
+   the document — and the Contents button with it — to the right. So the
+   two edges are measured rather than written down. */
+function placeRail(rail) {
+  var toggle = document.querySelector('page-chrome .drawer-toggle');
+  var cluster = document.querySelector('.okt-chrome-cluster');
+  var left = toggle ? toggle.getBoundingClientRect().right : 60;
+  if (document.body.classList.contains('drawer-pinned')) {
+    var nav = document.querySelector('page-nav');
+    if (nav) left = Math.max(left, nav.getBoundingClientRect().right);
+  }
+  var right = cluster && cluster.getBoundingClientRect().width
+    ? window.innerWidth - cluster.getBoundingClientRect().left : 60;
+  var l = Math.round(left + 16) + 'px';
+  var r = Math.round(right + 12) + 'px';
+  if (rail.style.getPropertyValue('--okt-rail-left') !== l) rail.style.setProperty('--okt-rail-left', l);
+  if (rail.style.getPropertyValue('--okt-rail-right') !== r) rail.style.setProperty('--okt-rail-right', r);
+}
+
 function buildRail() {
   var rail = document.getElementById('oku-rail');
   if (!rail) return;
+  placeRail(rail);
   // The rail is rebuilt on every resize, render, text-scale step and
   // body resize, and the rail and its mark host outlive each build. Every
   // build used to add its nine listeners on top of the last build's, so
@@ -3879,6 +3906,43 @@ function buildRail() {
   __okuRailOnScroll = null;
   if (maxScroll <= 40) return;
 
+  var h1 = document.querySelector('main h1');
+  // The name in the capsule is the SECTION being read, whatever mark is
+  // current: a figure is a place in a section, not a place of its own.
+  // The section list is every one the page has, not only the marks that
+  // survived thinning, so a narrow track does not lose a name.
+  var where = rail.querySelector('.okt-rail-where');
+  var sections = [];
+  document.querySelectorAll('main > section').forEach(function (sec) {
+    var h2 = sec.querySelector('h2');
+    if (!h2 || h2.classList.contains('okt-sr-only')) return;
+    var t = _okuHeadingText(h2);
+    if (t) sections.push({ top: sec.getBoundingClientRect().top + window.scrollY, label: t });
+  });
+  var title = h1 ? _okuHeadingText(h1) : '';
+  var shown = null;
+  function showWhere(pct) {
+    // A section is the one being read once its heading is in the top
+    // band of the window — the line the contents panel's scroll-spy
+    // uses — not once it has scrolled off the top.
+    var y = (pct / 100) * maxScroll + 150;
+    var name = title;
+    for (var k = 0; k < sections.length; k++) {
+      if (sections[k].top <= y) name = sections[k].label; else break;
+    }
+    if (where && name !== shown) { where.textContent = name; shown = name; }
+  }
+  __okuRailOnScroll = showWhere;
+  showWhere(maxScroll > 0 ? (doc.scrollTop / maxScroll) * 100 : 0);
+
+  // A track narrower than this is a phone's: twelve ticks in a thumb's
+  // width read as a barcode and no finger can pick one, so it carries
+  // the fill and the number and no marks. The contents panel is the map
+  // there.
+  var compact = host.getBoundingClientRect().width < 200;
+  rail.toggleAttribute('data-compact', compact);
+  if (compact) return;
+
   // Landmarks in document order. A figure is labelled by its kind plus
   // the section holding it — "Table · C5" is what the reader is
   // actually looking for, and a caption is not always there.
@@ -3889,7 +3953,6 @@ function buildRail() {
   // appears on a page — the body of a markdown page starts at `##`, so
   // the only h1 is the cover's. It is worth a mark on its own terms
   // too: the leftmost tick is where the document starts.
-  var h1 = document.querySelector('main h1');
   if (h1) {
     var htitle = _okuHeadingText(h1);
     if (htitle) {
@@ -3960,9 +4023,11 @@ function buildRail() {
   // anyway. A dropped figure always has a kept mark within a few
   // pixels of it, so nothing on the page becomes more than one screen
   // away from something the rail can reach.
-  var railW = rail.getBoundingClientRect().width || 1;
+  // The marks live on the track, which is the capsule less its name and
+  // its number, so that is the width they are spread over.
+  var railW = host.getBoundingClientRect().width || 1;
   var MIN_GAP_PX = 6;
-  var FIGURES_NEED_PX = 560;
+  var FIGURES_NEED_PX = 420;
   // Two passes, not one: sections go down first and IN FULL, so a
   // figure is measured against every section rather than only the ones
   // that happen to precede it in document order. A single pass left a
@@ -4202,6 +4267,7 @@ function buildRail() {
   // disagree with the bar next to it.
   var currentBtn = null;
   __okuRailOnScroll = function (pct) {
+    showWhere(pct);
     var found = null;
     for (var i = 0; i < buttons.length; i++) {
       if (buttons[i]._okuPct <= pct + 0.01) found = buttons[i]; else break;
@@ -4211,6 +4277,7 @@ function buildRail() {
     if (found) found.classList.add('is-current');
     currentBtn = found;
   };
+  __okuRailOnScroll(maxScroll > 0 ? (doc.scrollTop / maxScroll) * 100 : 0);
 }
 
 // Document height moves after the rail is built — mermaid renders
@@ -4231,7 +4298,13 @@ function buildRail() {
   window.addEventListener('oku:content-width-changed', rebuild);
   if (typeof ResizeObserver === 'function') {
     document.addEventListener('DOMContentLoaded', function () {
-      new ResizeObserver(rebuild).observe(document.body);
+      var ro = new ResizeObserver(rebuild);
+      ro.observe(document.body);
+      // The capsule's right edge is the cluster's left: a button arriving
+      // there (search, the warning indicator) moves it without resizing
+      // the body.
+      var cluster = document.querySelector('.okt-chrome-cluster');
+      if (cluster) ro.observe(cluster);
     });
   }
 })();
@@ -4791,12 +4864,26 @@ function initReadingAids() {
     (function () {
       var bar = document.getElementById('progress-bar');
       var btt = document.querySelector('.back-to-top');
+      var pctEl = document.querySelector('.okt-rail-pct');
       var ticking = false;
+      var fmt = null, fmtLang = null, said = null;
       function update() {
         var h = document.documentElement;
         var max = h.scrollHeight - h.clientHeight;
         var pct = max > 0 ? (h.scrollTop / max) * 100 : 0;
         if (bar) bar.style.width = pct + '%';
+        if (pctEl) {
+          // The page's own number format: `%33` in Turkish, `33%` in
+          // English. Rebuilt only when the language changes.
+          var lang = h.lang || 'en';
+          if (lang !== fmtLang) {
+            try { fmt = new Intl.NumberFormat(lang, { style: 'percent', maximumFractionDigits: 0 }); }
+            catch (e) { fmt = new Intl.NumberFormat('en', { style: 'percent', maximumFractionDigits: 0 }); }
+            fmtLang = lang;
+          }
+          var text = fmt.format(Math.min(100, Math.max(0, Math.round(pct))) / 100);
+          if (text !== said) { pctEl.textContent = text; said = text; }
+        }
         if (btt) btt.classList.toggle('visible', h.scrollTop > 600);
         // Same number drives the rail's current mark, so the highlight
         // and the fill edge can never disagree.
@@ -5133,7 +5220,7 @@ function initReadingAids() {
       var box = scroll.getBoundingClientRect();
       var rail = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--okt-rail-h')) || 0;
       var floor = rail;
-      var chrome = document.querySelectorAll('.ctrl-btn, .okt-chrome-cluster');
+      var chrome = document.querySelectorAll('.ctrl-btn, .okt-chrome-cluster, .okt-rail');
       for (var pass = 0; pass < 4; pass++) {
         var moved = false;
         for (var i = 0; i < chrome.length; i++) {
@@ -6547,7 +6634,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-02-r98';
+var __okuKitBuild = '2026-10-02-r99';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
