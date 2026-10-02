@@ -8070,10 +8070,15 @@ def _write_prism_carried() -> None:
     (root / "carried.js").write_text(f"window.__okuPrismCarried={payload};\n", encoding="utf-8")
 
 
-# The two families chrome.css asks for, as variable woff2 — one file per
-# family per subset, every weight inside. Fontsource publishes the same
-# files Google Fonts serves, under the same OFL-1.1 licence, at a URL
-# that does not change per request.
+# The three families chrome.css asks for, as variable woff2 — one file per
+# family per subset (and per style, for the reading face), every weight
+# inside. Fontsource publishes the same files Google Fonts serves, under
+# the same OFL-1.1 licence, at a URL that does not change per request.
+#
+# Literata is the reading face: running prose and headings. Its `opsz`
+# files carry the optical-size axis as well as weight, so a 50px title
+# is drawn from the display cut and an 18px paragraph from the text cut
+# — about twice the bytes of the weight-only files, once per tree.
 #
 # latin-ext is not optional here: Turkish `ş` and `ğ` live in it, and
 # this kit ships Turkish pages. Without it those two letters fall back to
@@ -8084,6 +8089,10 @@ _VENDOR_FONTS = (
     ("inter-latin-ext-wght-normal.woff2", "inter"),
     ("jetbrains-mono-latin-wght-normal.woff2", "jetbrains-mono"),
     ("jetbrains-mono-latin-ext-wght-normal.woff2", "jetbrains-mono"),
+    ("literata-latin-opsz-normal.woff2", "literata"),
+    ("literata-latin-ext-opsz-normal.woff2", "literata"),
+    ("literata-latin-opsz-italic.woff2", "literata"),
+    ("literata-latin-ext-opsz-italic.woff2", "literata"),
 )
 
 

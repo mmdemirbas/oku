@@ -18,9 +18,10 @@
    an @import inside a render-blocking stylesheet is a second serial
    round trip before the first paint.
 
-   `oku vendor` fetches four variable woff2 (Inter + JetBrains Mono,
-   latin + latin-ext — Turkish needs latin-ext, and this kit ships
-   Turkish pages) into `vendor/fonts/` beside this file. The URLs below
+   `oku vendor` fetches eight variable woff2 — Inter, JetBrains Mono,
+   and Literata in both styles; latin + latin-ext, because Turkish needs
+   latin-ext and this kit ships Turkish pages — into `vendor/fonts/`
+   beside this file. The URLs below
    are relative to THIS stylesheet, so they resolve under `oku serve`
    and in `dist/site` without anything being injected; the standalone
    build rewrites them to its own `_oku/vendor/` copy, and drops these
@@ -70,6 +71,46 @@
     U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
     U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("vendor/fonts/literata-latin-opsz-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("vendor/fonts/literata-latin-ext-opsz-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: italic;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("vendor/fonts/literata-latin-opsz-italic.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: italic;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url("vendor/fonts/literata-latin-ext-opsz-italic.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
 /* ============ Tokens — light ============ */
 :root {
@@ -77,7 +118,17 @@
      paint from localStorage; declared here so a page whose script never
      ran still resolves every `zoom` below to 1 rather than to `normal`. */
   --oku-text-scale: 1;
-  --bg: #fafaf9;
+  /* Two voices. The reading face carries running prose and headings;
+     the interface face carries everything the kit draws around it —
+     tables, charts, cards, controls, labels — so data and sentences are
+     told apart before a word is read. */
+  --font-read: 'Literata', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* The neutrals are warm and quiet: a paper field, ink that is not
+     quite black, rules a step darker than the paper. They were tinted
+     toward the indigo accent, which looked intended beside indigo and
+     like an unrelated hue beside every other accent a tree can pick. */
+  --bg: #fbfaf7;
   --surface: #ffffff;
   /* Quiet raised/recessed surface — table header band, chart tracks,
      code background, TOC hover. It was #f5f3ff, which carries 12 points
@@ -85,18 +136,18 @@
      beside the default indigo accent and looks like an unrelated hue
      beside any other one, on 38 surfaces at once. Same family, a
      quarter of the saturation. */
-  --surface-2: #f5f4f8;
+  --surface-2: #f3f2ee;
   /* A table's header band. Not --surface-2: the rows sit on --bg and a
      header has to be told apart from them at a glance, which needs a
      lightness step, not a tint. L* 93.5 against the rows' 98.2, so
      dL* 4.7 — the floor below which the two read as one field. */
-  --table-head: #eeebf5;
-  --text: #1e1b29;
-  --text-soft: #4c4760;
-  --text-faint: #8b85a3;
-  --border: #e4e1ee;
-  --border-soft: #f0edf7;
-  --primary: #1e1b29;
+  --table-head: #e8e7e3;
+  --text: #22201c;
+  --text-soft: #545049;
+  --text-faint: #87817a;
+  --border: #e5e2dc;
+  --border-soft: #efede8;
+  --primary: #22201c;
   --accent: #6366f1;
   --accent-soft: #e0e7ff;
   --accent-strong: #4338ca;
@@ -108,12 +159,10 @@
   --success-soft: #dcfce7;
   --on-accent: #ffffff;
   --max-width: 960px;
-  /* Reader-controlled content width (D3 + P7). The default is the
-     'comfortable' reading width — a hair wider than the prior 860px
-     so visual primitives (kpi-grid, charts, tables) don't crowd at
-     full-token zoom. Narrow / wide / max are picked via the top-right
-     chrome button and persist to localStorage. */
-  --content-width: 960px;
+  /* Reader-controlled content width. The fallback for a page with no
+     body attribute yet; the per-mode values below are the source of
+     truth, picked in the presentation menu and kept in localStorage. */
+  --content-width: 900px;
   /* Line-length cap for running prose. Visual primitives (table, chart,
      kpi-grid, compare-grid, step-flow, diagram, code, annotated-code)
      always fill --content-width; only paragraphs and lists clamp here.
@@ -127,15 +176,15 @@
      this wide, and the pinned inset is exactly this much. Two numbers
      that had to agree would drift the first time one was tuned. */
   --oku-drawer-w: min(320px, 88vw);
-  --shadow-strong: rgba(30, 27, 41, 0.18);
-  --shadow-soft:   rgba(30, 27, 41, 0.06);
+  --shadow-strong: rgba(34, 30, 24, 0.18);
+  --shadow-soft:   rgba(34, 30, 24, 0.06);
   --ctrl-bg:        rgba(255, 255, 255, 0.85);
-  --ctrl-bg-hover:  rgba(245, 243, 255, 0.95);
-  --line-strong:    #cbc7dd;
-  --scrim:          rgba(30, 27, 41, 0.45);
+  --ctrl-bg-hover:  rgba(244, 241, 235, 0.95);
+  --line-strong:    #cfc8bb;
+  --scrim:          rgba(28, 25, 20, 0.45);
   /* Code block fill — clearly separated from the page bg so fenced
      code reads as a distinct surface at a glance. */
-  --code-bg:        #eef0f6;
+  --code-bg:        #f0efeb;
   /* Extended chart palette — light theme. The 'series-N' tokens are
      used when authors don't pin a colour on individual series; the
      chart renderer rotates through them for series 6+ that the
@@ -187,17 +236,17 @@
    step. */
 @media not print {
 :root[data-theme="dark"] {
-  --bg: #0e0c1c;
-  --surface: #1a1730;
-  --surface-2: #15122a;
-  /* Lighter than the rows here, for the same dL*: 11.3 against 4.0. */
-  --table-head: #1e1a38;
-  --text: #e8e6f5;
-  --text-soft: #c9c4e0;
-  --text-faint: #7a7493;
-  --border: #2e2a4a;
-  --border-soft: #1f1b3a;
-  --primary: #e8e6f5;
+  --bg: #131210;
+  --surface: #1c1b18;
+  --surface-2: #181714;
+  /* Lighter than the rows here, for the same dL* step. */
+  --table-head: #25231f;
+  --text: #ebe7df;
+  --text-soft: #c8c2b7;
+  --text-faint: #8d877c;
+  --border: #302d28;
+  --border-soft: #22201c;
+  --primary: #ebe7df;
   --accent: #a5b4fc;
   --accent-soft: #1e1b4b;
   --accent-strong: #c7d2fe;
@@ -207,14 +256,14 @@
   --danger-soft: #450a0a;
   --success: #86efac;
   --success-soft: #052e16;
-  --on-accent: #0e0c1c;
+  --on-accent: #131210;
   --shadow-strong: rgba(0, 0, 0, 0.5);
   --shadow-soft:   rgba(0, 0, 0, 0.25);
-  --ctrl-bg:        rgba(26, 23, 48, 0.78);
-  --ctrl-bg-hover:  rgba(46, 42, 74, 0.92);
-  --line-strong:    #4e4870;
+  --ctrl-bg:        rgba(28, 27, 24, 0.8);
+  --ctrl-bg-hover:  rgba(48, 45, 40, 0.92);
+  --line-strong:    #4f4a42;
   --scrim:          rgba(0, 0, 0, 0.55);
-  --code-bg:        #14121f;
+  --code-bg:        #171613;
   /* Extended chart palette — dark theme. Lighter, more saturated
      versions of the light-theme ramp so contrast against the dark
      surface stays comfortable. */
@@ -277,7 +326,7 @@ html {
 }
 body {
   margin: 0; padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-ui);
   font-size: 16px; line-height: 1.65;
   letter-spacing: 0.005em;
   color: var(--text); background: var(--bg);
@@ -434,8 +483,8 @@ nav.toc, page-toc {
 }
 .toc-header { margin: 0 0 14px 0; }
 .toc-header h2 {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--text-faint); font-weight: 700; margin: 0;
+  font-size: 12.5px; letter-spacing: 0;
+  color: var(--text-soft); font-weight: 650; margin: 0;
 }
 .toc-list { list-style: none; margin: 0; padding: 0; }
 .toc-list > li.toc-h2 { margin: 2px 0; }
@@ -599,15 +648,22 @@ body[data-ctrl-proximity="1"] .back-to-top:not(.visible) { opacity: 0; }
 .menu-toggle svg circle { fill: var(--ctrl-bg); }
 .menu-toggle:hover svg circle { fill: var(--ctrl-bg-hover); }
 
-/* Content-width modes (D3). The CSS variable wins because <main> reads
-   it via max-width; the body attribute is the persisted source of truth. */
-/* The `ch` values are calibrated, not chosen: `ch` is the width of "0",
-   which in Inter is wider than the average character in running prose,
-   so the rendered line runs ~1.1x the nominal figure. Measured medians
-   at these settings are 63 / 67 / 78 characters, against a readable
-   range of 45-75. Re-measure if the body font changes. */
-body[data-content-width="narrow"]      { --content-width: 860px;  --prose-width: 54ch; }
-body[data-content-width="comfortable"] { --content-width: 1100px; --prose-width: 62ch; }
+/* Content-width modes. The CSS variable wins because <main> reads it
+   via max-width; the body attribute is the persisted source of truth.
+
+   The default is a READING measure, and that is the whole decision.
+   Comfortable was 1100px and grew with the screen (1240 from 1500px,
+   1400 from 1900px) so the column "used the room" on a big monitor —
+   and every paragraph ran 92 characters to the line on a 1440px laptop
+   and longer on anything wider, against a readable 45-75. A measure is
+   counted in characters, and a bigger screen does not make a reader's
+   eye travel better, so the bumps are gone and the stop is fixed.
+   Because the column has one right edge, tables and figures share the
+   measure; a page of wide tables is what `max` is for, one press away.
+   Medians measured on a delivered Turkish research page, Inter at 16px
+   (the face this was set for): 92 at the old comfortable, 73 at 900. */
+body[data-content-width="narrow"]      { --content-width: 760px;  --prose-width: 54ch; }
+body[data-content-width="comfortable"] { --content-width: 900px;  --prose-width: 62ch; }
 /* `100%`, not `100vw`. A viewport unit resolves against the initial
    containing block, which the reader's text scale (`zoom` on main) does
    not touch, so at 1.25 this mode asked for 125% of the viewport and the
@@ -616,14 +672,6 @@ body[data-content-width="comfortable"] { --content-width: 1100px; --prose-width:
    at every scale — and the same thing it meant before, since main's
    containing block was already the full width here. */
 body[data-content-width="max"]         { --content-width: 100%;   --prose-width: none; }
-/* Wide-screen bumps, so the default actually USES the room on a
-   1600px+ monitor instead of leaving two hand-widths of margin. */
-@media (min-width: 1500px) {
-  body[data-content-width="comfortable"] { --content-width: 1240px; }
-}
-@media (min-width: 1900px) {
-  body[data-content-width="comfortable"] { --content-width: 1400px; }
-}
 
 .back-to-top { bottom: 18px; right: 18px; opacity: 0; pointer-events: none; }
 .back-to-top.visible { opacity: 1; pointer-events: auto; }
@@ -1048,8 +1096,7 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
 }
 .okt-rail-tip .okt-rail-tip-kind {
   color: var(--text-soft);
-  font-weight: 600; font-size: 10px;
-  text-transform: uppercase; letter-spacing: 0.07em;
+  font-weight: 600; font-size: 11.5px;
   margin-right: 6px;
 }
 /* Preview. A rendered SVG clones inertly — no scripts, no
@@ -2118,9 +2165,9 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
  * not spread. The cover is 145px against the panel's 182px, so the
  * document starts sooner too.
  *
- * The rule stands down when the page has an eyebrow: an uppercase
- * accent-coloured line IS the mark, and two accent marks stacked is
- * the spreading this rule exists to stop.
+ * The rule stands down when the page has an eyebrow: an accent-coloured
+ * line of words IS the mark, and two accent marks stacked is the
+ * spreading this rule exists to stop.
  * --------------------------------------------------------------- */
 header.cover {
   position: relative;
@@ -2143,18 +2190,23 @@ header.cover > * { position: relative; z-index: 1; }
    empty tinted rectangle, so the block shrinks to fit what it holds. */
 header.cover.cover-bare { padding: 6px 0 18px 0; margin-bottom: 32px; }
 header.cover.cover-bare h1 { margin-bottom: 0; }
+/* The eyebrow names the kind of document in the accent, in italic:
+   one line of colour, set as words rather than as a tracked-out
+   capital label. */
 header.cover .eyebrow {
-  font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.18em;
-  color: var(--accent-strong); font-weight: 700; margin-bottom: 16px;
+  font-size: 17px; font-style: italic; font-weight: 500;
+  color: var(--accent-strong); margin-bottom: 14px; line-height: 1.3;
 }
+/* The title carries the page on scale: the reading face's display cut
+   (optical size follows the font size), heavy enough to anchor the
+   page and no heavier. */
 header.cover h1 {
-  font-size: 46px; line-height: 1.06; margin: 0 0 12px 0;
-  color: var(--text); font-weight: 800; letter-spacing: -0.032em;
+  font-size: 50px; line-height: 1.06; margin: 0 0 14px 0;
+  color: var(--text); font-weight: 620; letter-spacing: -0.02em;
 }
 header.cover .subtitle {
-  font-size: 17px; color: var(--text-soft); margin: 0;
-  font-weight: 400; line-height: 1.55;
-  max-width: 62ch;
+  font-size: 21px; color: var(--text-soft); margin: 0;
+  font-weight: 400; font-style: italic; line-height: 1.5;
 }
 header.cover .meta {
   margin-top: 24px;
@@ -2171,15 +2223,16 @@ header.cover .meta-updated {
 }
 @media (max-width: 700px) {
   header.cover { padding: 4px 0 20px 0; margin-bottom: 28px; }
-  header.cover h1 { font-size: 32px; letter-spacing: -0.028em; }
+  header.cover h1 { font-size: 34px; letter-spacing: -0.015em; }
+  header.cover .subtitle { font-size: 18px; }
   header.cover::before { width: 44px; margin-bottom: 18px; }
 }
 
 /* ============ Section headings & text ============ */
 h2 {
-  font-size: 28px; color: var(--primary);
-  margin: 64px 0 8px 0; padding-top: 16px;
-  font-weight: 800; letter-spacing: -0.015em;
+  font-size: 30px; color: var(--primary); line-height: 1.2;
+  margin: 64px 0 10px 0; padding-top: 16px;
+  font-weight: 620; letter-spacing: -0.014em;
 }
 h2 .num {
   display: inline-block; font-size: 14px;
@@ -2189,11 +2242,13 @@ h2 .num {
   position: relative; top: -4px;
 }
 .section-lead { font-size: 17px; color: var(--text-soft); margin: 0 0 28px 0; line-height: 1.6; }
-h3 { font-size: 21px; color: var(--text); margin: 36px 0 12px 0; font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 22px; color: var(--text); margin: 38px 0 12px 0; font-weight: 600; letter-spacing: -0.006em; line-height: 1.3; }
+/* The fourth level is a label in the interface face, in sentence case:
+   a tracked-out capital line is the label every template has. */
 h4 {
-  font-size: 14px; color: var(--text-soft);
-  margin: 22px 0 10px 0; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.06em;
+  font-size: 15px; color: var(--text-soft);
+  margin: 24px 0 8px 0; font-weight: 650;
+  letter-spacing: 0;
 }
 /* Titles that name a figure or a callout, and are NOT headings.
  *
@@ -2221,6 +2276,38 @@ main .okt-chart-grid-title {
   hyphens: manual;
 }
 p { margin: 0 0 18px 0; }
+
+/* The reading face, and where it stops. Running prose and the headings
+   that organise it are set in --font-read; everything the kit draws
+   AROUND prose — tables, charts, cards, step flows, controls, captions
+   of figures, code — keeps --font-ui, so a reader tells a sentence from
+   a datum before reading either. A list rather than `main`, for the same
+   reason the justify rule is a list: a component inheriting a serif it
+   was not drawn for is the failure, and a new component should have to
+   opt in. A file opened in the viewer is read the same way as the page. */
+:is(main, .okt-mdview-body) > section > :is(p, ul, ol, dl, blockquote, h2, h3),
+:is(main, .okt-mdview-body) :is(.callout, .tldr, .insight, .footnotes),
+header.cover :is(h1, .subtitle, .eyebrow) {
+  font-family: var(--font-read);
+  /* The open digits and single-storey a are Inter's stylistic sets and
+     mean nothing to the reading face. */
+  font-feature-settings: normal;
+  letter-spacing: 0;
+}
+:is(main, .okt-mdview-body) > section > :is(p, ul, ol, dl, blockquote),
+:is(main, .okt-mdview-body) :is(.callout, .insight) :is(p, li),
+:is(main, .okt-mdview-body) .tldr li {
+  font-size: 18px;
+  line-height: 1.7;
+}
+/* A phone holds about 35 characters of 18px text; a size down keeps a
+   line long enough to read in phrases rather than in words. */
+@media (max-width: 600px) {
+  :is(main, .okt-mdview-body) > section > :is(p, ul, ol, dl, blockquote),
+  :is(main, .okt-mdview-body) :is(.callout, .insight) :is(p, li),
+  :is(main, .okt-mdview-body) .tldr li { font-size: 17px; line-height: 1.65; }
+  .tldr .one-line { font-size: 19px; }
+}
 ul, ol { padding-left: 22px; margin: 0 0 18px 0; }
 li { margin: 8px 0; }
 li.task-item { list-style: none; margin-left: -18px; }
@@ -3474,10 +3561,13 @@ pre[class*="language-"] {
 /* The far stop is --surface, not --surface-2: a gradient wants to end
    on a colour with no hue of its own, and --surface-2 is a tinted
    surface even after the de-saturation above. */
+/* The summary is a lead, not a panel: one rule in the accent down its
+   left and the opening line set larger. It was a tinted, bordered card,
+   and beside a callout that made two coloured boxes on the first screen
+   before a word of the document — the decoration arriving first. */
 .tldr {
-  margin: 0 0 40px 0; padding: 28px 32px;
-  background: linear-gradient(135deg, var(--accent-soft) 0%, var(--surface) 100%);
-  border: 1px solid var(--border); border-radius: 12px;
+  margin: 0 0 44px 0; padding: 2px 0 2px 28px;
+  border-left: 3px solid var(--accent);
 }
 /* Kept in the accessibility tree and in the TOC, out of the visual
    flow. Not `display: none` — that would drop it from both. */
@@ -3489,21 +3579,24 @@ pre[class*="language-"] {
   overflow: hidden; white-space: nowrap;
 }
 .tldr .tldr-label {
-  font-size: 11px; font-weight: 800; letter-spacing: 0.15em;
-  text-transform: uppercase; color: var(--accent-strong);
-  margin-bottom: 12px; display: inline-block;
-  padding: 4px 10px; background: var(--surface); border-radius: 12px;
+  font-size: 16px; font-weight: 600; font-style: italic;
+  color: var(--accent-strong);
+  margin-bottom: 10px; display: inline-block;
 }
 .tldr h2 { margin: 0 0 16px 0; border: none; padding-top: 0; font-size: 22px; }
-.tldr .one-line { font-size: 17px; line-height: 1.55; font-weight: 600; color: var(--primary); margin: 0 0 16px 0; }
+.tldr .one-line { font-size: 21px; line-height: 1.5; font-weight: 500; color: var(--primary); margin: 0 0 16px 0; }
 .tldr ul { margin-bottom: 0; }
-.tldr li { font-size: 15.5px; }
 
 /* ============ Callouts ============ */
+/* A callout is a rule and a glyph in its type's colour, on the page's
+   own paper. The tinted box it was is the kit's loudest surface, and a
+   warning, a note and a tip in three tints read as decoration before
+   they read as warnings. The colour still says which kind it is; it no
+   longer covers the words. */
 .callout {
   position: relative;
-  margin: 22px 0; padding: 18px 22px 18px 48px; border-radius: 10px;
-  border-left: 5px solid var(--accent); background: var(--accent-soft);
+  margin: 24px 0; padding: 2px 0 2px 46px;
+  border-left: 2px solid var(--accent);
 }
 /* Inline-SVG glyph per callout type, masked with the accent colour
    so it inherits the per-type tint. No circle wrapper — the icon
@@ -3512,7 +3605,7 @@ pre[class*="language-"] {
   content: '';
   position: absolute;
   left: 16px;
-  top: 18px;
+  top: 6px;
   width: 20px;
   height: 20px;
   background-color: var(--accent-strong);
@@ -3557,13 +3650,13 @@ pre[class*="language-"] {
 /* Note: schema accepts "warn"; ".warning" kept as alias for legacy HTML. */
 .callout.warn,
 .callout.warning,
-.callout.caution { border-left-color: var(--warning); background: var(--warning-soft); }
-.callout.danger  { border-left-color: var(--danger);  background: var(--danger-soft); }
+.callout.caution { border-left-color: var(--warning); }
+.callout.danger  { border-left-color: var(--danger); }
 .callout.success,
-.callout.tip     { border-left-color: var(--success); background: var(--success-soft); }
-.callout.neutral { border-left-color: var(--text-soft); background: var(--surface-2); }
+.callout.tip     { border-left-color: var(--success); }
+.callout.neutral { border-left-color: var(--line-strong); }
 .callout.note,
-.callout.info    { border-left-color: var(--accent); background: var(--accent-soft); }
+.callout.info    { border-left-color: var(--accent); }
 .callout .callout-title { margin: 0 0 8px 0; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--accent-strong); }
 .callout.warn .callout-title,
 .callout.warning .callout-title,
@@ -3572,15 +3665,13 @@ pre[class*="language-"] {
 /* Insight — pull-quote for a key takeaway. Bigger than a callout. */
 .insight {
   display: block;
-  background: linear-gradient(90deg, var(--accent-soft) 0%, transparent 100%);
-  border-left: 4px solid var(--accent);
-  padding: 14px 18px;
-  margin: 18px 0;
-  font-size: 16px;
+  border-left: 3px solid var(--accent);
+  padding: 2px 0 2px 24px;
+  margin: 24px 0;
+  font-size: 20px;
   line-height: 1.5;
   color: var(--text);
   font-weight: 500;
-  letter-spacing: -0.005em;
 }
 .insight strong { color: var(--accent-strong); }
 
@@ -4075,8 +4166,10 @@ a.step-card.step-card-link:focus-visible {
 
 /* ============ Tables, pills, KPI tiles, comparison cards, details ============ */
 table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5px; line-height: 1.5; }
-/* A column label is a label, not a heading: small, uppercase, tracked
-   out, and quieter than the data under it. The filled band it used to
+/* A column label is a label, not a heading: small, in sentence case,
+   and quieter than the data under it. It was uppercase and tracked out,
+   which is the label every template draws and which spells a Turkish
+   column name with dotted capitals the author never typed. The filled band it used to
    sit in made the header the loudest row in the table, which is exactly
    backwards — the reader came for the cells. The 2px rule carries the
    separation the fill used to.
@@ -4088,8 +4181,8 @@ table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5p
 :is(table, .okt-table-ghost) th {
   text-align: left; background: var(--bg);
   padding: 10px 14px; border-bottom: 2px solid var(--border);
-  font-weight: 650; color: var(--text-soft); font-size: 12.5px;
-  text-transform: uppercase; letter-spacing: 0.04em;
+  font-weight: 650; color: var(--text-soft); font-size: 13px;
+  letter-spacing: 0;
 }
 /* The column labels are a band, not a first row.
    `th` and `td` shared one background, so the only thing between a
@@ -5450,10 +5543,8 @@ page-nav .page-nav-item.active > a {
 }
 page-nav .page-nav-folder {
   padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 12.5px;
+  font-weight: 650;
   color: var(--text-soft);
 }
 page-nav .page-nav-loading,
@@ -5678,10 +5769,8 @@ page-nav .page-nav-label {
   margin: -14px -14px 6px;
   padding: 14px 22px 6px;
   background: var(--surface-2);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  font-size: 12.5px;
+  font-weight: 650;
   color: var(--text-soft);
 }
 page-nav .page-toc-panel .toc-header { display: flex; align-items: baseline; gap: 8px; }

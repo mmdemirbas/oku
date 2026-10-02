@@ -201,17 +201,25 @@ def test_a_titled_tldr_still_shows_its_title(defaults_url, browser):
         page.close()
 
 
-def test_tldr_gradient_does_not_fade_to_an_unrelated_hue(rendered):
-    """The far stop was --surface-2 (#f5f3ff), a violet-leaning neutral.
-    Under the default indigo accent that reads as intentional; under any
-    other accent the card fades to lavender."""
-    stops = rendered.evaluate("""() => getComputedStyle(document.querySelector('.tldr')).backgroundImage""")
-    assert "245, 243, 255" not in stops, f"the violet stop is still in the gradient: {stops}"
-    surface = rendered.evaluate(
-        """() => getComputedStyle(document.documentElement).getPropertyValue('--surface').trim()"""
+def test_the_summary_is_a_lead_and_not_a_panel(rendered):
+    """The TL;DR was a tinted, bordered card with a gradient, and beside
+    a callout it made two coloured boxes on the first screen, before a
+    word of the document. It is a lead now: no fill, no frame, one rule
+    in the accent down its left. (The gradient's far stop was also how a
+    violet tint reached pages under every other accent; with no gradient
+    there is no stop to get wrong.)"""
+    got = rendered.evaluate(
+        """() => { const t = getComputedStyle(document.querySelector('.tldr'));
+        const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+        const probe = document.createElement('i'); probe.style.color = accent; document.body.appendChild(probe);
+        const accentRgb = getComputedStyle(probe).color; probe.remove();
+        return { image: t.backgroundImage, color: t.backgroundColor, top: t.borderTopWidth,
+                 left: t.borderLeftWidth, leftColor: t.borderLeftColor, accentRgb, radius: t.borderTopLeftRadius }; }"""
     )
-    assert surface == "#ffffff", surface
-    assert "255, 255, 255" in stops, f"the gradient does not fade to --surface: {stops}"
+    assert got["image"] == "none", got
+    assert got["color"] in ("rgba(0, 0, 0, 0)", "transparent"), got
+    assert got["top"] == "0px" and got["radius"] == "0px", got
+    assert got["left"] == "3px" and got["leftColor"] == got["accentRgb"], got
 
 
 # ---------- cover ----------

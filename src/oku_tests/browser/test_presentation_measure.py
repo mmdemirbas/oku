@@ -203,3 +203,32 @@ def test_the_width_toggle_still_moves_the_measure(rendered):
     # More lines for the same text is the same statement, arrived at
     # independently of the width: narrow really does wrap sooner.
     assert seen["narrow"]["lines"] > seen["max"]["lines"], seen
+
+
+MEDIAN_CHARS = """() => {
+  const per = [...document.querySelectorAll('main > section > p')].map(p => {
+    const r = document.createRange(); r.selectNodeContents(p);
+    const lines = new Set([...r.getClientRects()].filter(b => b.width > 1).map(b => Math.round(b.top))).size;
+    return lines >= 3 ? p.textContent.trim().length / lines : null;
+  }).filter(v => v !== null).sort((a, b) => a - b);
+  return { median: per.length ? per[Math.floor(per.length / 2)] : null, n: per.length,
+           width: Math.round(document.querySelector('main').getBoundingClientRect().width) };
+}"""
+
+
+@pytest.mark.parametrize("viewport", [1440, 1920])
+def test_the_default_is_a_reading_measure_on_every_screen(measure_url, browser, viewport):
+    """The default stop is a measure, and a measure is counted in
+    characters. It grew with the screen — 1100px, 1240 from 1500, 1400
+    from 1900 — so a paragraph ran 92 characters to the line on a 1440px
+    laptop and further on a wide monitor, against a readable 45-75 (80
+    allowed here for the variance of a fixture's words). A wider screen
+    adds margin now, not line length."""
+    page = browser.new_page(viewport={"width": viewport, "height": 900})
+    page.goto(f"{measure_url}/page.html")
+    page_quiet(page)
+    got = page.evaluate(MEDIAN_CHARS)
+    page.close()
+    assert got["n"] >= 1, got
+    assert 45 <= got["median"] <= 80, got
+    assert got["width"] <= 900, got

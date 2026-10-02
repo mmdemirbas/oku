@@ -248,6 +248,32 @@ on the day it was written. Held by
 which asks the browser the same question itself instead of trusting the
 kit's probe.
 
+**The page reads in two voices, at a reading measure.** Running prose
+and its headings are set in Literata (`--font-read`), at 18px with 1.7
+leading, 17px on a phone; everything the kit draws AROUND prose —
+tables, charts, cards, controls, labels — stays in Inter
+(`--font-ui`), so a sentence and a datum are told apart before either
+is read. The reading face is a selector list, not `main`, for the reason
+the justify rule is one: a component inheriting a face it was not drawn
+for is the failure, and a new one opts in. The default column is 900px
+and no longer grows with the screen — at 1100 → 1240 → 1400 a paragraph
+ran 92 characters to the line on a 1440px laptop; now 69, measured on
+a delivered Turkish page, and the same on a 1920px monitor (see
+[the width rule](PRESENTATION-RULES.md#the-width-control-has-three-stops-and-the-icon-h)).
+The quiet surfaces lost their colour: the TL;DR is a lead with one
+accent rule, a callout is a rule and a glyph in its type's colour, the
+insight a rule and a larger line — no tinted boxes, which were the
+loudest thing on the first screen and arrived before a word of the
+document. Labels are sentence case: a tracked-out capital label is the
+one every template draws, and it spells Turkish with dotted capitals
+nobody typed. The neutrals are warm and quiet in both themes; the
+quiet surface stays under a 5-point RGB spread, so it never reads as a
+hue beside an accent it was not chosen for. Held by
+`test_presentation_measure.py::test_the_default_is_a_reading_measure_on_every_screen`,
+`test_presentation_defaults.py::test_the_summary_is_a_lead_and_not_a_panel`,
+`test_fonts_are_local.py` (the reading face loads, Turkish included, in
+both trees with no network) and `test_colour_contrast.py`.
+
 **The swell is a transform, and that is the whole safety argument.**
 Marks within 46px of the pointer scale on a cosine falloff, like a
 dock. A dock that reflows makes you chase the thing you were aiming
@@ -1452,11 +1478,10 @@ page spends the accent on decoration — with amber it reads as a
 promotion, with rose as a greeting card, and a technical document opens
 with neither. Now: no panel, no tint, no frame. One 52x3 accent rule
 above the title is the whole accent budget for the block, and the title
-carries the page on scale and tracking (46px, -0.032em). 144px against
-the panel's 182px, so the document starts sooner as well. The rule
-stands down on a page that has an eyebrow (`:has(.eyebrow)`), because
-an uppercase accent line IS the mark and two accent marks stacked is
-the spreading this rule exists to stop. Held by
+carries the page on scale (50px in the reading face's display cut).
+The rule stands down on a page that has an eyebrow (`:has(.eyebrow)`),
+because an accent-coloured eyebrow IS the mark and two accent marks
+stacked is the spreading this rule exists to stop. Held by
 `test_invariants.py::test_the_cover_opens_with_one_accent_mark_and_no_panel`
 — which replaced the test asserting all three gradient layers were
 present, because those layers were the defect.
@@ -1907,8 +1932,8 @@ on load — measured on a standalone page opened over `file://`: three
 requests, one to fonts.googleapis.com and two to fonts.gstatic.com. That
 is the kit telling Google who is reading a document it was handed, which
 is the exact thing the rebuild button refuses to do for its own build
-stamp. `oku vendor` fetches four variable woff2 (Inter + JetBrains Mono,
-latin + latin-ext) into `vendor/fonts/`, and the `@font-face` rules name
+stamp. `oku vendor` fetches eight variable woff2 (Inter, JetBrains Mono
+and Literata in both styles, latin + latin-ext) into `vendor/fonts/`, and the `@font-face` rules name
 them relative to chrome.css — so serve and `dist/site` resolve them with
 nothing injected, and `build_standalone` repoints them at its own
 `_oku/vendor/` copy through `_retarget_font_urls`.

@@ -230,10 +230,17 @@ menu. See "One button holds every presentation choice" below.
 ## The width control has three stops, and you can see which one you are in. {#the-width-control-has-three-stops-and-the-icon-h}
 
 **The width control has three stops, and you can see which one you are
-in.** `narrow` (860px, a prose measure) · `comfortable` (the default,
-1100 → 1240 → 1400 as the screen grows) · `max` (the full width of what
-is available, for wide tables and matrices). One stop per thing a reader
-wants.
+in.** `narrow` (760px, a short measure) · `comfortable` (the default,
+900px) · `max` (the full width of what is available, for wide tables and
+matrices). One stop per thing a reader wants.
+
+The default is a reading measure, fixed. It was 1100px and grew with
+the screen (1240, then 1400) so the column used the room on a big
+monitor, and every paragraph ran 92 characters to the line on a 1440px
+laptop against a readable 45–75. A measure is counted in characters,
+and a wider screen does not make the eye's return trip shorter. With one
+right edge, tables share the measure; a page of wide tables is what
+`max` is for.
 
 It was a cycler with a three-segment icon, filled left-to-right, because
 a 44px box in the corner has no room for words. That icon had to be

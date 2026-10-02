@@ -863,17 +863,26 @@ class TestChromeKitMarkers:
         assert "c.b" in js, "renderer must read c.b for the compare-grid markdown body"
         assert "c.accent" in js, "renderer must read c.accent (taking precedence over verdict)"
 
-    def test_wide_screen_uniform_widening(self, repo_root: Path) -> None:
-        """Wide-screen support — every component fills the reader-
-        selected --content-width. Media queries at 1500px and 1900px
-        push the content width up so charts, tables, prose ALL grow
-        in lockstep on bigger monitors. --prose-width remains as a
-        CSS variable for callers that want a per-block line-length
-        cap; the kit itself no longer auto-applies it."""
+    def test_every_component_fills_the_measure_and_the_measure_holds(self, repo_root: Path) -> None:
+        """Every component fills the reader-selected --content-width, and
+        the default stop does not grow with the screen.
+
+        It did: media queries at 1500px and 1900px pushed comfortable to
+        1240 and then 1400px so the column "used the room" — and a
+        paragraph ran 92 characters to the line on a 1440px laptop and
+        longer on anything wider, against a readable 45-75. A measure is
+        counted in characters; a wider screen now adds margin, not line
+        length. The browser half is
+        test_presentation_measure.py::test_the_default_is_a_reading_measure_on_every_screen.
+        --prose-width remains as a CSS variable for callers that want a
+        per-block line-length cap; the kit itself does not apply it."""
         css = (repo_root / "kit" / "chrome.css").read_text(encoding="utf-8")
-        # The wide-screen bumps are required.
-        assert "min-width: 1500px" in css, "missing 1500px breakpoint"
-        assert "min-width: 1900px" in css, "missing 1900px breakpoint"
+        declarations = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+        grows = re.findall(
+            r"@media[^{]*min-width[^{]*\{[^{}]*body\[data-content-width=\"(?:narrow|comfortable)\"\][^{}]*\{[^}]*--content-width",
+            declarations,
+        )
+        assert not grows, f"a stop grows with the screen again: {grows}"
         # Visual primitives don't cap themselves below content-width.
         for selector in (
             "main .okt-table-wrap",
@@ -887,10 +896,10 @@ class TestChromeKitMarkers:
         """Reader has a chrome button to cycle content width, and it has
         exactly THREE stops.
 
-        narrow (860px, a prose measure); comfortable (the boot default,
-        1100 → 1240 → 1400 as the screen grows); max (the whole
-        viewport, for wide tables and matrices). The mode persists to
-        localStorage so the choice survives reloads.
+        narrow (760px, a short measure); comfortable (the boot default,
+        900px, a reading measure that no longer grows with the screen);
+        max (the whole viewport, for wide tables and matrices). The mode
+        persists to localStorage so the choice survives reloads.
 
         There were four. 'wide' (1400 → 1560 → 1760) sat between
         comfortable and max and answered the same want as max, so a

@@ -49,6 +49,10 @@ The quick brown fox jumps over the lazy dog.
 
 Şu ağacın gölgesinde iğne aradık; çilingir çıkageldi.
 
+| Şehir | Ölçüm |
+|---|---|
+| Iğdır | çığ |
+
 ```python
 def f(x):
     return x + 1
@@ -85,7 +89,10 @@ FONT_STATE = """async () => {
   return {
     inter: document.fonts.check('16px Inter'),
     mono: document.fonts.check('16px "JetBrains Mono"'),
-    turkish: document.fonts.check('16px Inter', 'şğİıÇ'),
+    reading: document.fonts.check('18px Literata'),
+    // Prose is set in the reading face and a table in the interface
+    // face, and the page carries Turkish in both.
+    turkish: document.fonts.check('18px Literata', 'şğİıÇ') && document.fonts.check('16px Inter', 'şğİıÇ'),
     loaded: [...document.fonts].filter(f => f.status === 'loaded').map(f => f.family),
     body: getComputedStyle(document.body).fontFamily,
   };
@@ -141,18 +148,20 @@ def site_state(browser, built):
 # ---------- what the reader gets, in both delivered trees
 
 
-def test_a_standalone_page_renders_in_inter_with_no_network(standalone_state) -> None:
+def test_a_standalone_page_renders_in_its_faces_with_no_network(standalone_state) -> None:
     state, _, _ = standalone_state
     assert state["inter"], f"Inter did not load: {state}"
     assert state["mono"], f"JetBrains Mono did not load: {state}"
+    assert state["reading"], f"Literata did not load: {state}"
 
 
-def test_a_site_page_renders_in_inter_with_no_network(site_state) -> None:
+def test_a_site_page_renders_in_its_faces_with_no_network(site_state) -> None:
     """The tree that gets deployed was built from its own recipe, and
     that is exactly where the last vendoring defect lived."""
     state, _, _ = site_state
     assert state["inter"], f"Inter did not load: {state}"
     assert state["mono"], f"JetBrains Mono did not load: {state}"
+    assert state["reading"], f"Literata did not load: {state}"
 
 
 @pytest.mark.parametrize("fixture", ["standalone_state", "site_state"])
@@ -192,7 +201,7 @@ def test_a_standalone_page_points_at_the_copy_beside_it(built) -> None:
     silently gets the system stack."""
     html = (built / "standalone" / "page.html").read_text(encoding="utf-8")
     urls = re.findall(r'url\("([^"]*fonts/[^"]+)"\)', html)
-    assert len(urls) == 4, urls
+    assert len(urls) == len(cli._VENDOR_FONTS), urls
     for u in urls:
         assert u.startswith("_oku/vendor/fonts/"), u
         assert (built / "standalone" / u).is_file(), u
@@ -201,7 +210,7 @@ def test_a_standalone_page_points_at_the_copy_beside_it(built) -> None:
 def test_the_site_stylesheet_keeps_its_own_relative_urls(built) -> None:
     css = (built / "site" / "_oku" / "chrome.css").read_text(encoding="utf-8")
     urls = re.findall(r'url\("([^"]*fonts/[^"]+)"\)', css)
-    assert len(urls) == 4, urls
+    assert len(urls) == len(cli._VENDOR_FONTS), urls
     for u in urls:
         assert (built / "site" / "_oku" / u).is_file(), u
 
