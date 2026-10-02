@@ -478,7 +478,7 @@
      enters the pattern is a substitution rather than a copy. Compiled
      per parseInline call (as the literal was), because parseInline
      recurses and `lastIndex` is per-object state. */
-  const INLINE_RE_SOURCE = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|(`+)([\s\S]+?)\2(?!`)|!\[([^\]]*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[([^\]]+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+)>|<(__TAGS__)(\s+[^<>]*)?>([\s\S]*?)<\/\15\s*>|<br\s*\/?>|\[\^([^\]]+?)\]|\[([^\]]+?)\]\[([^\]]*?)\]|\[([^\]^][^\]]*?)\]/
+  const INLINE_RE_SOURCE = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|(`+)([\s\S]+?)\2(?!`)|!\[((?:[^\[\]]|\[[^\[\]]*\])*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[((?:[^\[\]]|\[(?:[^\[\]]|\[[^\[\]]*\])*\])+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+)>|<(__TAGS__)(\s+[^<>]*)?>([\s\S]*?)<\/\15\s*>|<br\s*\/?>|\[\^([^\]]+?)\]|\[([^\]]+?)\]\[([^\]]*?)\]|\[([^\]^][^\]]*?)\]|((?:https?:\/\/|www\.)[^\s<]+)/
     .source.replace('__TAGS__', INLINE_HTML_PAIRED.join('|'));
 
   /* An allow-listed inline tag is REBUILT, never passed through: the
@@ -528,10 +528,16 @@
     // keys with spaces in them ("Iceberg paper", "Time travel"). That
     // branch is tried first; everything else keeps the strict form.
     //
+    // A link's words may hold brackets as long as they balance, two
+    // levels deep — `[AJSLP 2025 **[özet]**](url)` is one link, as it is
+    // in CommonMark. A label that refused `]` left that whole construct
+    // on the page as typed — on two delivered research pages, 172 of 220
+    // links.
+    //
     // Groups: 1 escape · 2,3 code (fence run + body) · 4,5 image ·
     // 6,7 strong · 8 strike · 9,10 em · 11,12,13 link · 14 autolink ·
     // 15,16,17 inline HTML · 18 footnote ref · 19,20 reference link ·
-    // 21 shortcut reference. A code span opens with N backticks and
+    // 21 shortcut reference · 22 bare URL (GFM's extended autolink). A code span opens with N backticks and
     // closes on the next run of exactly N — the CommonMark rule that
     // lets ``a `b` c`` hold a backtick.
     // The three reference forms sit last: they are the loosest patterns
@@ -560,7 +566,25 @@
         re.lastIndex = m.index + 1;
         continue;
       }
+      // A bare URL is a link only where GFM says one starts — at the
+      // start, after whitespace or after `*` `_` `~` `(` — and never inside
+      // the words of another link. Declining skips the whole run, so the
+      // address stays one piece of text rather than being re-scanned.
+      let bare = null;
+      if (m[22] !== undefined) {
+        bare = __inLinkLabel ? null : bareUrl(text, m.index, m[22]);
+        if (bare === null) {
+          re.lastIndex = m.index + m[0].length;
+          continue;
+        }
+      }
       if (m.index > pos) host.appendChild(textNode(text.slice(pos, m.index)));
+      if (bare !== null) {
+        host.appendChild(renderLink(bare, /^www\./i.test(bare) ? 'http://' + bare : bare));
+        pos = m.index + bare.length;
+        re.lastIndex = pos;
+        continue;
+      }
       if (m[1] !== undefined) {
         host.appendChild(document.createTextNode(m[1]));
       } else if (m[3] !== undefined) {
@@ -598,6 +622,38 @@
     if (pos < text.length) host.appendChild(textNode(text.slice(pos)));
   }
 
+  /* GFM's extended autolink, cut to what the spec counts as the link.
+     The run before the cut is `[^\s<]+`, which takes the sentence's own
+     punctuation with it: a trailing `.` `,` `:` `!` `?` `*` `_` `~` `'`
+     `"` belongs to the prose, a closing `)` belongs to the URL only when
+     the URL opened one (`(see https://a.b/c)` vs a Wikipedia path), and
+     an entity-shaped tail (`&amp;`) is left alone. The host needs a dot,
+     and its last two labels no underscore — `http://localhost` stays
+     text, as it does on GitHub. null means "not a link here". */
+  function bareUrl(text, index, run) {
+    const before = index > 0 ? text.charAt(index - 1) : '';
+    if (before && !/[\s*_~(]/.test(before)) return null;
+    let url = run;
+    for (;;) {
+      const prev = url;
+      url = url.replace(/[?!.,:*_~'"]+$/, '');
+      url = url.replace(/&[A-Za-z0-9]+;$/, '');
+      while (url.endsWith(')')) {
+        const open = (url.match(/\(/g) || []).length;
+        const close = (url.match(/\)/g) || []).length;
+        if (close <= open) break;
+        url = url.slice(0, -1);
+      }
+      if (url === prev) break;
+    }
+    const host = url.replace(/^(?:https?:\/\/)?/i, '').split(/[\/?#:]/)[0];
+    const labels = host.split('.');
+    if (labels.length < 2 || labels.some(function (l) { return !/^[\w-]+$/.test(l); })) return null;
+    if (labels.slice(-2).some(function (l) { return l.indexOf('_') !== -1; })) return null;
+    if (/^www\./i.test(url) ? host.length <= 4 : !/^https?:\/\/./i.test(url)) return null;
+    return url;
+  }
+
   // True when neither end of an underscore run touches a word character.
   // `snake_case`, `a__b` and `__init__`'s inner underscores all fail this;
   // a run that stands between spaces or punctuation passes.
@@ -628,6 +684,17 @@
     return img;
   }
 
+  /* A link's words are parsed as markdown, so `[**a**](b)` keeps its
+     markup — and so a bare URL among them would become an <a> inside the
+     <a>. The counter is how parseInline knows it is inside a label: an
+     element under construction is not attached to its link yet, so
+     `closest('a')` cannot answer. */
+  let __inLinkLabel = 0;
+  function parseLabel(label, host) {
+    __inLinkLabel++;
+    try { parseInline(label, host); } finally { __inLinkLabel--; }
+  }
+
   function renderLink(label, href, title) {
     // Kit-extension prefixes: #g/term-id  → <glossary-term>
     //                        #x/source-id → <ext-ref>
@@ -636,13 +703,13 @@
     if (href.startsWith('#g/')) {
       const e = document.createElement('glossary-term');
       e.setAttribute('term', href.slice(3));
-      parseInline(label, e);
+      parseLabel(label, e);
       return e;
     }
     if (href.startsWith('#x/')) {
       const e = document.createElement('ext-ref');
       e.setAttribute('name', href.slice(3));
-      parseInline(label, e);
+      parseLabel(label, e);
       return e;
     }
     // `#f/` names a FILE rather than a registry entry, and the path is
@@ -651,7 +718,7 @@
     if (href.startsWith('#f/')) {
       const e = document.createElement('oku-filepath');
       e.setAttribute('path', href.slice(3));
-      parseInline(label, e);
+      parseLabel(label, e);
       return e;
     }
     // Cross-page markdown link: a relative `foo.md(#frag)` href points
@@ -664,11 +731,11 @@
     const url = safeUrl(href, false);
     if (url === null) {
       const span = document.createElement('span');
-      parseInline(label, span);
+      parseLabel(label, span);
       return span;
     }
     const a = document.createElement('a');
-    parseInline(label, a);
+    parseLabel(label, a);
     a.setAttribute('href', url);
     if (title) a.setAttribute('title', title);
     if (/^https?:/i.test(url)) {

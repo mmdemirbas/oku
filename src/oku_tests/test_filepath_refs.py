@@ -292,6 +292,17 @@ def test_a_span_that_is_already_a_link_label_is_left_alone(tmp_path):
     assert _spans(root, root / "docs" / "page.md", "See [`src/app.py`](notes.md) for it.") == []
 
 
+def test_a_label_holding_brackets_is_still_a_label(tmp_path):
+    """Link text may hold balanced brackets, and the renderer draws
+    ``[`src/app.py` **[x]**](notes.md)`` as one link. A construct pattern
+    refusing `]` saw no link there, judged the span as prose, and
+    `--fix` would have written a link inside the link."""
+    root = _project(tmp_path)
+    body = "See [`src/app.py` **[x]**](notes.md) for it."
+    assert _spans(root, root / "docs" / "page.md", body) == []
+    assert _fix(root, body)[1] == []
+
+
 # ---------- the rewrite the nudge names ----------
 #
 # Telling an author about a primitive is half of it. The other half is

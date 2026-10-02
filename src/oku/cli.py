@@ -3185,7 +3185,11 @@ def _lint_md_string(
 
 
 _MD_ONE_CODE_SPAN_RE = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
-_MD_LINK_CONSTRUCT_RE = re.compile(r"\[[^\]]*\]\([^)\n]*\)")
+# A link's words may hold balanced brackets (`[a **[b]**](c)`), two levels
+# deep — the same label renderer.js's INLINE_RE_SOURCE accepts, or a code
+# span inside such a label is judged as prose and rewritten into a link
+# inside a link.
+_MD_LINK_CONSTRUCT_RE = re.compile(r"\[(?:[^\[\]]|\[(?:[^\[\]]|\[[^\[\]]*\])*\])*\]\([^)\n]*\)")
 
 
 _MD_FENCE_OPEN_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
@@ -4980,7 +4984,7 @@ def _md_chunks(text: str) -> list[str]:
 # A line that is nothing but images — `![alt](src)`, optionally wrapped in a
 # link — is a figure, and a caption line under it does not change that.
 # Counted as a paragraph, a section of screenshots read as prose-only.
-_IMAGE_LINE_RE = re.compile(r"^(?:\[?!\[[^\]]*\]\([^)]*\)(?:\]\([^)]*\))?\s*)+$")
+_IMAGE_LINE_RE = re.compile(r"^(?:\[?!\[(?:[^\[\]]|\[[^\[\]]*\])*\]\([^)]*\)(?:\]\([^)]*\))?\s*)+$")
 
 
 def _section_shapes(page: dict) -> list[tuple[str, int, int]]:
@@ -6122,7 +6126,7 @@ def _iter_strings(node):
 # attribute inside an HTML island, and the `src` of an `image` block on
 # a JSON page. All three shipped as broken references, because the build
 # carried the page and left the file behind.
-_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s<>]+?)>?(?:\s+[\"'(][^\n]*?)?\s*\)")
+_MD_IMAGE_RE = re.compile(r"!\[(?:[^\[\]]|\[[^\[\]]*\])*\]\(\s*<?([^)\s<>]+?)>?(?:\s+[\"'(][^\n]*?)?\s*\)")
 _HTML_ASSET_ATTR_RE = re.compile(r"""\b(?:src|poster)\s*=\s*["']([^"'\s]+)["']""", re.I)
 _HTML_SRCSET_RE = re.compile(r"""\bsrcset\s*=\s*["']([^"']+)["']""", re.I)
 

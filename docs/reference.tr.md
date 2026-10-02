@@ -374,6 +374,12 @@ Satır içi yapılar iki yönde de iç içe geçer — vurgunun içinde bağlant
 {"code":{"k":"code","src":"İç içe geçme işler: **[kalın bir bağlantı](https://example.com)**, [**kalın** içeren bağlantı](https://example.com), **kalının içinde `kod`** ve **içinde *eğik* olan kalın**. Ters tırnağın içinde hiçbir şey ayrıştırılmaz: `**[a](b)**`.","lang":"markdown"},"output":"İç içe geçme işler: **[kalın bir bağlantı](https://example.com)**, [**kalın** içeren bağlantı](https://example.com), **kalının içinde `kod`** ve **içinde *eğik* olan kalın**. Ters tırnağın içinde hiçbir şey ayrıştırılmaz: `**[a](b)**`."}
 ```
 
+Bağlantı metni, dengeli olduğu sürece köşeli parantez içerebilir; çıplak bir adres de bağlantıdır (GitHub'ın genişletilmiş otomatik bağlantısı). Cümleyi bitiren noktalama bağlantıya katılmaz, kapanan parantez yalnızca adres bir parantez açtıysa katılır, alan adında da en az bir nokta olmalıdır; bu yüzden `http://localhost` düz metin kalır.
+
+```oku-example
+{"code": {"k": "code", "src": "Bkz. [2025 çalışması **[özet]**](https://example.com/study) ya da https://example.com/notes. Bir viki yolu parantezini korur: https://en.wikipedia.org/wiki/Mercury_(planet).", "lang": "markdown"}, "output": "Bkz. [2025 çalışması **[özet]**](https://example.com/study) ya da https://example.com/notes. Bir viki yolu parantezini korur: https://en.wikipedia.org/wiki/Mercury_(planet)."}
+```
+
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Temizlenmiş satır içi HTML olduğu gibi geçer: \",\n    { \"kind\": \"html\", \"text\": \"<kbd>Ctrl</kbd>\" },\n    \" + \",\n    { \"kind\": \"html\", \"text\": \"<kbd>C</kbd>\" },\n    \" seçimi kopyalar; kimya dipnotu olarak da H<sub>2</sub>O.\"\n  ]\n}","lang":"json"},"output":"Temizlenmiş satır içi HTML olduğu gibi geçer: <kbd>Ctrl</kbd> + <kbd>C</kbd> seçimi kopyalar; kimya dipnotu olarak da H<sub>2</sub>O."}
 ```

@@ -374,6 +374,12 @@ Inline constructs nest in either order — a link inside emphasis, emphasis insi
 {"code":{"k":"code","src":"Nesting composes: **[a bold link](https://example.com)**, [**bold** inside a link](https://example.com), **`code` in bold**, and **bold with *italic* inside**. Inside backticks nothing is parsed: `**[a](b)**`.","lang":"markdown"},"output":"Nesting composes: **[a bold link](https://example.com)**, [**bold** inside a link](https://example.com), **`code` in bold**, and **bold with *italic* inside**. Inside backticks nothing is parsed: `**[a](b)**`."}
 ```
 
+Link text may hold brackets as long as they balance, and a bare address is a link — GitHub's extended autolink. Punctuation that ends the sentence stays out of the link, a closing parenthesis joins it only when the address opened one, and the host needs a dot, so `http://localhost` stays text.
+
+```oku-example
+{"code": {"k": "code", "src": "See [the 2025 study **[summary]**](https://example.com/study), or https://example.com/notes. A wiki path keeps its parentheses: https://en.wikipedia.org/wiki/Mercury_(planet).", "lang": "markdown"}, "output": "See [the 2025 study **[summary]**](https://example.com/study), or https://example.com/notes. A wiki path keeps its parentheses: https://en.wikipedia.org/wiki/Mercury_(planet)."}
+```
+
 ```oku-example
 {"code":{"k":"code","src":"{\n  \"kind\": \"paragraph\",\n  \"content\": [\n    \"Sanitised inline HTML pass-through: \",\n    { \"kind\": \"html\", \"text\": \"<kbd>Ctrl</kbd>\" },\n    \" + \",\n    { \"kind\": \"html\", \"text\": \"<kbd>C</kbd>\" },\n    \" copies a selection, with H<sub>2</sub>O as a chemistry footnote.\"\n  ]\n}","lang":"json"},"output":"Sanitised inline HTML pass-through: <kbd>Ctrl</kbd> + <kbd>C</kbd> copies a selection, with H<sub>2</sub>O as a chemistry footnote."}
 ```

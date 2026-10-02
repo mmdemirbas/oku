@@ -554,6 +554,21 @@ There is no check for a tag OUTSIDE the list, deliberately. Prose here
 writes `<name>`, `<rel-path>` and `<docs>` as metavariables, and a check
 cannot tell those from a typo'd tag without guessing.
 
+**A link's words may hold brackets, and a bare address is a link.**
+Both are GFM and the inline parser followed neither. The label pattern
+refused `]`, so `[AJSLP 2025 **[özet]**](url)` was not a link at all —
+on two delivered research pages, 172 of 220 links showed as source. A
+label now takes balanced brackets two levels deep, and cli.py's
+`_MD_LINK_CONSTRUCT_RE` / `_MD_IMAGE_RE` take the same shape, or a code
+span inside such a label is judged as prose and `--fix` writes a link
+inside a link. A bare `https://` or `www.` address is GFM's extended
+autolink, cut where the spec cuts it: sentence punctuation stays out, a
+closing `)` joins only when the URL opened one, the host needs a dot,
+the URL must start at a boundary, and never inside another link's
+words — `parseLabel` counts that depth, because an element under
+construction is not attached to its `<a>` yet and `closest('a')` cannot
+answer. Held by `browser/test_link_text_and_bare_urls.py`.
+
 **A viewed document is read, not run.** An island in a PAGE keeps full
 capability — the author wrote it into their own page and `oku check`
 lints it as page content. The markdown viewer renders something else: a
