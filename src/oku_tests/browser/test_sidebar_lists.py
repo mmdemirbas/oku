@@ -251,3 +251,34 @@ def test_at_phone_width_no_corner_button_covers_the_filter(browser, built):
         assert g["firstEntryBottom"] < g["vh"]
     finally:
         context.close()
+
+
+def test_each_render_replaces_the_scroll_spy_rather_than_adding_one(browser, built):
+    """buildTOC runs on every render, and every run added a window
+    `scroll` listener that nothing removed: a reader moving between
+    pages carried one scroll-spy per visit, each reading headings on
+    every scroll frame. Counted here as live scroll listeners on
+    `window` -- those registered without a signal, or with one that has
+    not been aborted."""
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.add_init_script(
+        """(() => {
+          const live = window.__okuScrollListeners = [];
+          const add = EventTarget.prototype.addEventListener;
+          EventTarget.prototype.addEventListener = function (type, fn, opts) {
+            if (this === window && type === 'scroll') live.push((opts && opts.signal) || null);
+            return add.call(this, type, fn, opts);
+          };
+        })()"""
+    )
+    pg = context.new_page()
+    pg.goto((built / "zz-rehber.html").as_uri(), wait_until="load")
+    page_quiet(pg)
+    count = "() => window.__okuScrollListeners.filter(s => !s || !s.aborted).length"
+    before = pg.evaluate(count)
+    for _ in range(4):
+        pg.evaluate("() => window.dispatchEvent(new Event('oku:rendered'))")
+    pg.wait_for_timeout(150)
+    after = pg.evaluate(count)
+    context.close()
+    assert after == before, (before, after)

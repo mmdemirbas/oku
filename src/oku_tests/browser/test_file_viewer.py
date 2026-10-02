@@ -249,3 +249,35 @@ def test_at_phone_width_the_bar_fits_and_names_the_file_clear_of_close(project, 
         assert got["sideways"] <= 0
     finally:
         context.close()
+
+
+def test_a_table_expanded_inside_a_viewed_file_closes_back_into_it(page):
+    """The lightbox held one thing, and an open over an open one drained
+    it: expanding a table inside a viewed file took the viewer's frame
+    with it, the viewer's own close never ran, and the next file link the
+    reader clicked drew into a frame that was no longer on the page. An
+    open over an open one is a second overlay now, and Escape takes down
+    only the one in front."""
+    _chip(page, "a.md").click()
+    page.wait_for_selector(".okt-mdview-body .okt-table-wrap [data-expand]", state="attached")
+    btn = page.locator(".okt-mdview-body .okt-table-wrap [data-expand]").first
+    # The button sits in the table's hover toolbar; the subject here is
+    # what the lightbox does with a second open, not the toolbar's reveal.
+    btn.evaluate("b => b.click()")
+    page.wait_for_function("document.querySelectorAll('.okt-lightbox.open').length === 2")
+    assert page.evaluate(
+        "() => !!document.querySelectorAll('.okt-lightbox.open')[1].querySelector('.okt-table-wrap')"
+    ), "the table is in the front overlay"
+
+    page.keyboard.press("Escape")
+    page.wait_for_function("document.querySelectorAll('.okt-lightbox.open').length === 1")
+    got = page.evaluate(STATE)
+    assert got and got["title"] == "Note A", got
+    assert page.locator(".okt-mdview-body .okt-table-wrap").count() == 1, "the table went back into the file"
+
+    page.keyboard.press("Escape")
+    page.wait_for_function("document.querySelectorAll('.okt-lightbox.open').length === 0")
+    _chip(page, "tool.py").click()
+    page.wait_for_function("document.querySelectorAll('.okt-lightbox.open').length === 1")
+    got = page.evaluate(STATE)
+    assert got and got["kind"] != "md", got

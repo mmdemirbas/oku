@@ -322,6 +322,45 @@ def test_the_rail_is_one_tab_stop_with_arrow_keys_inside(rendered):
     assert got["end"] == got["total"] - 1, got
 
 
+def test_a_rebuild_replaces_the_rails_listeners_rather_than_adding_them(rail_url, browser):
+    """The rail is rebuilt on every resize, render, text-scale step and
+    body resize, and the rail and its mark host outlive each build. Every
+    build added its nine listeners on top of the last build's, so a
+    pointer moving over the strip ran the swell once per build the page
+    had ever done. The stale handlers held detached marks, which is why
+    nothing visible gave it away. Counted as live listeners on the rail
+    and its mark host: registered without a signal, or with one that has
+    not been aborted."""
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.add_init_script(
+        """(() => {
+          const live = window.__okuRailListeners = [];
+          const add = EventTarget.prototype.addEventListener;
+          EventTarget.prototype.addEventListener = function (type, fn, opts) {
+            if (this instanceof Element && this.closest && this.closest('#oku-rail'))
+              live.push((opts && opts.signal) || null);
+            return add.call(this, type, fn, opts);
+          };
+        })()"""
+    )
+    pg = context.new_page()
+    pg.goto(f"{rail_url}/long.html")
+    page_quiet(pg)
+    got = pg.evaluate(
+        """async () => {
+        const frames = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const live = () => window.__okuRailListeners.filter(s => !s || !s.aborted).length;
+        window.__okuRebuildRail(); await frames();
+        const once = live();
+        for (let i = 0; i < 4; i++) { window.__okuRebuildRail(); await frames(); }
+        return { once, after: live(), marks: document.querySelectorAll('.okt-rail-mark').length };
+    }"""
+    )
+    context.close()
+    assert got["marks"] > 2, got
+    assert got["once"] > 0 and got["after"] == got["once"], got
+
+
 # ---------- it does not move ----------
 
 

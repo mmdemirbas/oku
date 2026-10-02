@@ -2274,6 +2274,29 @@ actually write.
   somebody remembered. `browser/test_live_snippet.py` holds the
   playground's own four documented claims beside it, in both modes.
 
+- **A builder that runs more than once owns the listeners it adds.**
+  `buildTOC` runs on every `oku:rendered` and `buildRail` on every
+  resize, render, text-scale step and body resize, and both added their
+  listeners to things that outlive the build — `window`, the rail, the
+  mark host — so every rebuild stacked another copy. Nothing visible gave
+  it away, because the stale handlers held detached headings and marks
+  and mostly did nothing: the cost was a scroll-spy per page visited and
+  the swell run once per build on every pointer move. Each build now
+  aborts the previous one's `AbortController` before adding its own.
+  Held by `test_page_rail.py` and `test_sidebar_lists.py`, which count
+  live listeners rather than guess at a symptom.
+
+- **The lightbox nests: one overlay per open.** `open()` over an open
+  lightbox drained the one holder and overwrote its options, so a table
+  expanded inside a viewed file took the viewer's frame with it and the
+  viewer's `onClose` never ran — the viewer still thought it was open,
+  and the next file link drew into a frame no longer on the page. A
+  second open is a second overlay on top, Escape and the close button
+  take down only the front one, and the covered frame is never moved, so
+  it keeps its scroll and its live elements. Code that needs ITS overlay
+  asks `closest('.okt-lightbox')`, never `querySelector`. Held by
+  `test_file_viewer.py::test_a_table_expanded_inside_a_viewed_file_closes_back_into_it`.
+
 - **CSS rules silently dropped by Chrome.** A multi-line comment
   inside a rule body, containing certain Unicode punctuation, has
   been observed to make Chrome's parser drop the trailing

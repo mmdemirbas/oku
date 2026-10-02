@@ -90,13 +90,21 @@ const ICON_EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
  * or backdrop click. Same affordance everywhere — one mental model.
  * ---------------------------------------------------------------- */
 var __okuLightbox = (function () {
-  var overlay = null;
-  var lastFocus = null;
-  var currentOpts = null;
+  /* One overlay per OPEN, stacked. An open() while the lightbox was
+     already open used to drain the one holder and overwrite its options:
+     a table expanded from inside a viewed file took the viewer's whole
+     frame with it, and the viewer's onClose never ran — so the viewer
+     still believed it was open, and the next .md link the reader clicked
+     drew into a frame that was no longer on the page. Each open now gets
+     its own overlay on top of the last, and a close takes down only the
+     top one. The covered frame is never moved or hidden, so it keeps its
+     scroll position and its live elements. */
+  var levels = [];
+  var spare = null;          // the first overlay, kept for reuse
+  var keysBound = false;
 
-  function build() {
-    if (overlay) return overlay;
-    overlay = document.createElement('div');
+  function makeOverlay() {
+    var overlay = document.createElement('div');
     overlay.className = 'okt-lightbox';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
@@ -107,13 +115,8 @@ var __okuLightbox = (function () {
       '  <button type="button" class="okt-lightbox-close" aria-label="Close" title="Close (Esc)">' + ICON_CROSS + '</button>' +
       '  <div class="okt-lightbox-content" tabindex="-1"></div>' +
       '</div>';
-    document.body.appendChild(overlay);
     overlay.querySelector('.okt-lightbox-backdrop').addEventListener('click', close);
     overlay.querySelector('.okt-lightbox-close').addEventListener('click', close);
-    document.addEventListener('keydown', function (e) {
-      if (!overlay.classList.contains('open')) return;
-      if (e.key === 'Escape') { e.preventDefault(); close(); }
-    });
     // The dialog says `aria-modal="true"` and the comment at the top of
     // this module says focus is trapped. It was not. The close button is
     // drawn BEFORE the content inside the frame, so tabbing forward from
@@ -134,16 +137,29 @@ var __okuLightbox = (function () {
       if (e.shiftKey && (here === first || !overlay.contains(here))) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && here === last) { e.preventDefault(); first.focus(); }
     });
+    if (!keysBound) {
+      keysBound = true;
+      // Escape takes down the top overlay only: the reader is closing
+      // the thing in front of them, not the trail behind it.
+      document.addEventListener('keydown', function (e) {
+        if (!levels.length || e.key !== 'Escape') return;
+        e.preventDefault();
+        close();
+      });
+    }
     return overlay;
   }
 
   function open(content, opts) {
-    var el = build();
+    var el;
+    if (!levels.length && spare) el = spare;
+    else el = makeOverlay();
+    if (!spare) spare = el;
+    document.body.appendChild(el);   // last in the body is on top
     var holder = el.querySelector('.okt-lightbox-content');
-    // Drain any leftover nodes from a previous open() that bypassed close()
-    // (defensive — should not happen in normal flow).
     while (holder.firstChild) holder.removeChild(holder.firstChild);
-    currentOpts = opts || {};
+    var level = { el: el, opts: opts || {}, lastFocus: document.activeElement };
+    levels.push(level);
     // Where focus lands on open. The holder unless there is a stage:
     // the stage owns the zoom and pan keys, and they only fire while it
     // has focus. Measured before the change — open a chart and press
@@ -158,7 +174,7 @@ var __okuLightbox = (function () {
     // and a small inline toolbar (zoom in, zoom out, fit, 1:1). The
     // wrap is undone on close so the content returns to its origin
     // unmolested.
-    if (currentOpts.panZoom !== false) {
+    if (level.opts.panZoom !== false) {
       var stage = document.createElement('div');
       stage.className = 'okt-lightbox-pz';
       var inner = document.createElement('div');
@@ -180,17 +196,18 @@ var __okuLightbox = (function () {
       if (content instanceof Node) holder.appendChild(content);
       else holder.innerHTML = String(content || '');
     }
-    if (currentOpts.title) el.setAttribute('aria-label', currentOpts.title);
-    lastFocus = document.activeElement;
+    el.setAttribute('aria-label', level.opts.title || 'Expanded view');
     el.classList.add('open');
     document.documentElement.classList.add('okt-lightbox-open');
     setTimeout(function () { focusTarget.focus(); }, 0);
   }
 
   function close() {
-    if (!overlay) return;
+    var level = levels.pop();
+    if (!level) return;
+    var overlay = level.el;
     overlay.classList.remove('open');
-    document.documentElement.classList.remove('okt-lightbox-open');
+    if (!levels.length) document.documentElement.classList.remove('okt-lightbox-open');
     var holder = overlay.querySelector('.okt-lightbox-content');
     // Unwrap pan/zoom stage so the caller's onClose sees the
     // original content node (and can return it to the page).
@@ -208,16 +225,16 @@ var __okuLightbox = (function () {
     // onClose runs BEFORE innerHTML clear so callers can move their own
     // nodes back into the page (e.g. table fullscreen). Anything still
     // in holder after the callback gets wiped.
-    if (currentOpts && typeof currentOpts.onClose === 'function') {
-      try { currentOpts.onClose(holder); } catch (e) {}
+    if (typeof level.opts.onClose === 'function') {
+      try { level.opts.onClose(holder); } catch (e) { console.warn('[oku] lightbox onClose failed', e); }
     }
     if (holder) holder.innerHTML = '';
-    currentOpts = null;
-    if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
-    lastFocus = null;
+    if (overlay !== spare) overlay.remove();
+    var back = level.lastFocus;
+    if (back && typeof back.focus === 'function' && back.isConnected) back.focus();
   }
 
-  return { open: open, close: close };
+  return { open: open, close: close, depth: function () { return levels.length; } };
 })();
 
 /* ============ Pan / zoom controller for the lightbox stage ============ *
@@ -1351,7 +1368,7 @@ var __okuMdViewer = (function () {
     }
     body.scrollTop = item.scroll || 0;
     mirror(item);
-    var lb = document.querySelector('.okt-lightbox');
+    var lb = state.wrap.closest('.okt-lightbox');
     if (lb) lb.setAttribute('aria-label', item.rel || item.path);
   }
 
@@ -3373,7 +3390,17 @@ function _okuHeadingText(el) {
   return (clone.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
+/* buildTOC runs on every `oku:rendered` — the first render and every
+   in-place navigation after it — and each run used to add one more
+   window `scroll` and `oku:hash-routing` listener that nothing removed.
+   A reader who moved between pages carried one scroll-spy per visit,
+   every one of them reading headings on every scroll frame, and a spy
+   for a page visited earlier held headings no longer in the document.
+   Each run now aborts the previous run's listeners. */
+var __okuTocSpy = null;
 function buildTOC(tocList) {
+  if (__okuTocSpy) __okuTocSpy.abort();
+  var spy = __okuTocSpy = new AbortController();
   if (!tocList) return;
   var sections = document.querySelectorAll('main > section');
   if (sections.length === 0) return;
@@ -3551,7 +3578,7 @@ function buildTOC(tocList) {
   window.addEventListener('oku:hash-routing', function () {
     suspendHashUpdate = true;
     setTimeout(function () { suspendHashUpdate = false; }, 600);
-  });
+  }, { signal: spy.signal });
 
   function updateActive() {
     // After hash-routing, buildTOC re-runs on `oku:rendered` and a
@@ -3605,7 +3632,7 @@ function buildTOC(tocList) {
   var ticking = false;
   window.addEventListener('scroll', function () {
     if (!ticking) { window.requestAnimationFrame(function () { updateActive(); ticking = false; }); ticking = true; }
-  }, { passive: true });
+  }, { passive: true, signal: spy.signal });
   updateActive();
 
   /* Close mobile drawer on link click */
@@ -3775,6 +3802,16 @@ var __okuRailOnScroll = null;
 function buildRail() {
   var rail = document.getElementById('oku-rail');
   if (!rail) return;
+  // The rail is rebuilt on every resize, render, text-scale step and
+  // body resize, and the rail and its mark host outlive each build. Every
+  // build used to add its nine listeners on top of the last build's, so
+  // after a few rebuilds one ArrowRight was handled once per build and
+  // moved focus that many marks, and one click jumped once per build.
+  // The previous build's listeners go first, whatever this build does.
+  if (rail._okuWiring) rail._okuWiring.abort();
+  var wiring = rail._okuWiring = new AbortController();
+  var on = { signal: wiring.signal };
+  var onPassive = { passive: true, signal: wiring.signal };
   var host = rail.querySelector('.okt-rail-marks');
   var tip = rail.querySelector('.okt-rail-tip');
   if (!host || !tip) return;
@@ -4057,31 +4094,31 @@ function buildRail() {
     if (magPending) return;
     magPending = true;
     requestAnimationFrame(function () { magPending = false; magnify(lastX); });
-  }, { passive: true });
-  rail.addEventListener('pointerleave', unmagnify, { passive: true });
+  }, onPassive);
+  rail.addEventListener('pointerleave', unmagnify, onPassive);
   // Turning the preference on mid-session would otherwise leave
   // whatever was swollen at the moment of the flip swollen until the
   // pointer moved again.
   __okuMotionQuery.addEventListener('change', function (e) {
     if (e.matches) unmagnify();
-  });
+  }, on);
 
   host.addEventListener('mouseover', function (e) {
     var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;
     if (btn) showTip(btn);
-  });
+  }, on);
   host.addEventListener('mouseout', function (e) {
     var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;
     if (btn) hideTip();
-  });
+  }, on);
   host.addEventListener('focusin', function (e) {
     if (e.target.classList.contains('okt-rail-mark')) showTip(e.target);
-  });
-  host.addEventListener('focusout', hideTip);
+  }, on);
+  host.addEventListener('focusout', hideTip, on);
   host.addEventListener('click', function (e) {
     var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;
     if (btn) goTo(btn);
-  });
+  }, on);
 
   // Roving tabindex: the rail is one tab stop, not one per landmark.
   // Fifty extra stops at the top of every page would make the keyboard
@@ -4102,7 +4139,7 @@ function buildRail() {
     buttons.forEach(function (b) { b.tabIndex = -1; });
     next.tabIndex = 0;
     next.focus();
-  });
+  }, on);
 
   // Current landmark = the last one the fill edge has reached. Same
   // comparison the fill itself makes, so the highlight can never
@@ -6435,7 +6472,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-02-r94';
+var __okuKitBuild = '2026-10-02-r95';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -18082,29 +18119,6 @@ class PageNav extends HTMLElement {
   }
 }
 if (!customElements.get('page-nav')) customElements.define('page-nav', PageNav);
-
-function relativizeHref(fromUrl, toPath) {
-  // fromUrl is location.pathname like /a/b/c.html; toPath is the manifest entry like "spark.html" or "storage/iceberg.html".
-  // Compute relative href from the directory of fromUrl to toPath.
-  var fromDir = fromUrl.replace(/[^/]*$/, ''); // ends in '/'
-  // Strip leading slash from fromDir for relative computation.
-  // Use URL constructor for correctness:
-  try {
-    var base = new URL(fromDir, window.location.origin);
-    var target = new URL(toPath, base);
-    // Compute relative from base.pathname to target.pathname
-    var fromParts = base.pathname.split('/');
-    var toParts = target.pathname.split('/');
-    fromParts.pop(); // last is empty
-    var i = 0;
-    while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) i++;
-    var up = fromParts.length - i;
-    var rest = toParts.slice(i).join('/');
-    return (up > 0 ? '../'.repeat(up) : './') + rest;
-  } catch (e) {
-    return toPath;
-  }
-}
 
 /* ============ Forward-compat warning indicator ============ *
  * One indicator regardless of error count. Sits in the top-right
