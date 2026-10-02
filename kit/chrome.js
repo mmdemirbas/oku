@@ -1167,6 +1167,89 @@ var __okuFileStore = (function () {
   };
 })();
 
+/* ---- Open a file in the reader's editor ----
+   A viewed file is usually one the reader is about to change, and the
+   viewer could show it and copy its path but not hand it to the tool
+   that edits it. Each editor registers a URL scheme on install; the
+   link is that scheme with the file's full path in it.
+
+   Offered only where the full path is KNOWN — a standalone page derives
+   it, `oku serve` on loopback states it — which is exactly where the
+   file is on the reader's own disk. A deployed site knows neither and
+   shows nothing, rather than a link to a path on someone else's machine.
+
+   The editor is the reader's choice and nothing guesses it: until one
+   is picked the control is a menu, and the pick is remembered under
+   `oku-editor`. The menu's rows are real links, so the first choice
+   opens the file in the same click that records it. */
+var __okuEditors = (function () {
+  var KEY = 'oku-editor';
+
+  // A path as a URL path: forward slashes, a leading slash, and every
+  // segment percent-encoded, so a space, a `#` or a Turkish letter in a
+  // folder name arrives as the folder name. A drive letter keeps its
+  // colon (`/C:/…`), which is how both schemes below spell Windows.
+  function urlPath(abs) {
+    var s = String(abs).replace(/\\/g, '/');
+    if (s.charAt(0) !== '/') s = '/' + s;
+    return s.split('/').map(function (seg, i) {
+      return i === 1 && /^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg);
+    }).join('/');
+  }
+
+  function onMac() {
+    var ua = navigator.userAgentData;
+    return ua && ua.platform ? ua.platform === 'macOS' : /^Mac/.test(navigator.platform || '');
+  }
+
+  function drive(abs) { return /^[A-Za-z]:[\\/]/.test(String(abs)); }
+
+  /* Each format as the editor's own source reads it, and offered only
+     where that source says it opens a file:
+       - VS Code: `vscode://file/<path>`, percent-decoded, `/C:/…` on
+         Windows (src/vs/code/electron-main/app.ts). It asks before
+         opening until the reader allows local paths.
+       - IntelliJ: `idea://open?file=…&line=…` is rewritten into an open
+         command by the macOS launcher only (MacOSApplicationProvider.kt);
+         elsewhere the IDE reports the URL unsupported. Without `line` it
+         takes the open-a-project path, so `line=1` is not decoration.
+       - Zed: `zed://file<path>`, percent-decoded (open_listener.rs).
+         Nothing strips the slash in front of a drive letter, so a
+         Windows path is not offered rather than offered broken. */
+  var list = [
+    { id: 'vscode', name: 'VS Code',
+      href: function (abs) { return 'vscode://file' + urlPath(abs); } },
+    { id: 'idea', name: 'IntelliJ IDEA',
+      when: function () { return onMac(); },
+      href: function (abs) { return 'idea://open?file=' + encodeURIComponent(String(abs)) + '&line=1'; } },
+    { id: 'zed', name: 'Zed',
+      when: function (abs) { return !drive(abs); },
+      href: function (abs) { return 'zed://file' + urlPath(abs); } },
+  ];
+
+  function forPath(abs) {
+    return list.filter(function (ed) { return !ed.when || ed.when(abs); });
+  }
+
+  // A choice made on another machine — file:// shares one localStorage
+  // per browser profile, not per OS — is no choice where it cannot open.
+  function chosen(abs) {
+    var id;
+    try { id = localStorage.getItem(KEY); } catch (e) { return null; }
+    var eds = forPath(abs);
+    for (var i = 0; i < eds.length; i++) if (eds[i].id === id) return eds[i];
+    return null;
+  }
+
+  function choose(id) {
+    try { localStorage.setItem(KEY, id); } catch (e) { /* private mode: the link still opens */ }
+  }
+
+  return { forPath: forPath, chosen: chosen, choose: choose };
+})();
+
+var ICON_EDITOR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>';
+var ICON_CARET = '<svg class="okt-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 var ICON_BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>';
 var ICON_EXTERNAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
 
@@ -1323,7 +1406,105 @@ var __okuMdViewer = (function () {
   function where(item) {
     var abs = item.rel ? __okuFileStore.absPath(item.rel) : (item.url ? __okuFileStore.absFromUrl(item.url) : null);
     var shown = abs || item.rel || item.path;
-    return { shown: shown, copy: shown };
+    return { shown: shown, copy: shown, abs: abs };
+  }
+
+  /* The editor control: one link to the chosen editor and a caret that
+     lists all of them, or — before anything is chosen — the list alone. */
+  function editorControl(abs) {
+    var box = el('div', 'okt-mdview-editor');
+    var pick = __okuEditors.chosen(abs);
+    if (pick) {
+      var go = el('a', 'okt-mdview-editor-go');
+      go.href = pick.href(abs);
+      go.title = okuT('Open in {0}', pick.name);
+      go.setAttribute('aria-label', go.title);
+      go.innerHTML = ICON_EDITOR;
+      go.appendChild(el('span', null, pick.name));
+      box.appendChild(go);
+    }
+    var toggle = el('button', 'okt-mdview-editor-pick');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-haspopup', 'menu');
+    toggle.setAttribute('aria-expanded', 'false');
+    if (pick) {
+      toggle.setAttribute('aria-label', okuT('Choose an editor'));
+      toggle.title = okuT('Choose an editor');
+    } else {
+      toggle.innerHTML = ICON_EDITOR;
+      toggle.appendChild(el('span', null, okuT('Open in editor')));
+    }
+    toggle.insertAdjacentHTML('beforeend', ICON_CARET);
+    box.appendChild(toggle);
+
+    var menu = el('div', 'okt-mdview-editor-menu');
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+    __okuEditors.forPath(abs).forEach(function (ed) {
+      var a = el('a', 'okt-mdview-editor-item', ed.name);
+      a.setAttribute('role', 'menuitemradio');
+      a.setAttribute('aria-checked', String(!!pick && pick.id === ed.id));
+      a.setAttribute('data-editor', ed.id);
+      a.href = ed.href(abs);
+      a.addEventListener('click', function () {
+        __okuEditors.choose(ed.id);
+        // Redrawn after the navigation has been handed off, so the bar
+        // shows the new choice when the reader comes back to the page.
+        setTimeout(function () { var item = current(); if (item) relabelActions(item); }, 0);
+      });
+      menu.appendChild(a);
+    });
+    box.appendChild(menu);
+
+    function setOpen(on) {
+      menu.hidden = !on;
+      toggle.setAttribute('aria-expanded', String(on));
+      if (on) {
+        // Hung from the control's right edge, which on a phone sits near
+        // the LEFT of the screen when the bar holds only this and Open
+        // file: measured at 360px, the list began at x=-58. Measured
+        // and pushed back in, rather than guessed per breakpoint.
+        menu.style.right = '';
+        var r = menu.getBoundingClientRect();
+        if (r.left < 8) menu.style.right = -(8 - r.left) + 'px';
+        var first = menu.querySelector('[aria-checked="true"]') || menu.firstChild;
+        if (first) first.focus();
+      }
+    }
+    toggle.addEventListener('click', function (e) {
+      e.stopPropagation();
+      setOpen(menu.hidden);
+    });
+    // On the box, so it runs before the lightbox's own Escape listener on
+    // the document and can keep that press: the menu is what is in front.
+    box.addEventListener('keydown', function (e) {
+      if (menu.hidden) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+        toggle.focus();
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        var items = Array.prototype.slice.call(menu.querySelectorAll('a'));
+        var at = items.indexOf(document.activeElement);
+        var next = items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length];
+        if (next) { e.preventDefault(); next.focus(); }
+      }
+    });
+    // Focus leaving the control closes it — a click anywhere else moves
+    // focus, and a document listener would outlive the bar it was for,
+    // which is rebuilt for every file.
+    box.addEventListener('focusout', function (e) {
+      if (!menu.hidden && !(e.relatedTarget && box.contains(e.relatedTarget))) setOpen(false);
+    });
+    return box;
+  }
+
+  function relabelActions(item) {
+    var oldActions = state.wrap && state.wrap.querySelector('.okt-mdview-actions');
+    if (!oldActions) return;
+    oldActions.parentNode.replaceChild(actionsFor(item), oldActions);
+    if (item.kind === 'markdown') setView(item, item.view || 'rendered');
   }
 
   function setView(item, view) {
@@ -1370,6 +1551,8 @@ var __okuMdViewer = (function () {
       open.appendChild(el('span', null, okuT('Open file')));
       box.appendChild(open);
     }
+    var abs = where(item).abs;
+    if (abs) box.appendChild(editorControl(abs));
     return box;
   }
 
@@ -6634,7 +6817,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-02-r99';
+var __okuKitBuild = '2026-10-02-r100';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

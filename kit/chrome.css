@@ -1795,7 +1795,9 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 .okt-mdview-bar .okt-view-btn.active { background: var(--accent); color: var(--on-accent); }
 .okt-mdview-bar .okt-view-btn[disabled] { opacity: 0.4; cursor: default; }
 .okt-mdview-copy,
-.okt-mdview-open {
+.okt-mdview-open,
+.okt-mdview-editor-go,
+.okt-mdview-editor-pick {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1811,14 +1813,72 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
 .okt-mdview-copy svg,
-.okt-mdview-open svg { width: 13px; height: 13px; }
+.okt-mdview-open svg,
+.okt-mdview-editor-go svg,
+.okt-mdview-editor-pick svg { width: 13px; height: 13px; }
 .okt-mdview-copy:hover,
-.okt-mdview-open:hover {
+.okt-mdview-open:hover,
+.okt-mdview-editor-go:hover,
+.okt-mdview-editor-pick:hover,
+.okt-mdview-editor-pick[aria-expanded="true"] {
   color: var(--accent-strong);
   border-color: var(--accent);
   background: var(--accent-soft);
 }
 .okt-mdview-copy.copied { color: var(--success); border-color: currentColor; }
+/* Open in the reader's editor: the chosen editor and a caret joined into
+   one control, and the list under the caret. Before a choice there is
+   only the caret's half, labelled. */
+.okt-mdview-editor { position: relative; display: inline-flex; }
+.okt-mdview-editor .okt-caret { width: 12px; height: 12px; }
+.okt-mdview-editor-go { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.okt-mdview-editor-go + .okt-mdview-editor-pick {
+  padding: 0 6px;
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.okt-mdview-editor-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 168px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-strong);
+}
+.okt-mdview-editor-menu[hidden] { display: none; }
+.okt-mdview-editor-item {
+  position: relative;
+  padding: 6px 10px 6px 28px;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.8rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.okt-mdview-editor-item:hover,
+.okt-mdview-editor-item:focus-visible {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  outline: none;
+}
+.okt-mdview-editor-item[aria-checked="true"]::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--accent);
+}
 .okt-mdview-body {
   flex: 1;
   min-height: 0;
@@ -1901,6 +1961,18 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   .okt-mdview-path { flex: 1 1 0; }
   .okt-viewer-meta { flex: 1 0 100%; margin-left: 0; }
   .okt-mdview-body { padding: 20px 14px 48px; }
+  /* The actions keep their icons and give up their words, which stay in
+     the accessibility tree: Rendered/Source, Copy, Open file and the
+     editor control measured 461px against a 316px row. */
+  .okt-mdview-actions :is(.okt-mdview-copy, .okt-mdview-open, .okt-mdview-editor-go, .okt-mdview-editor-pick) > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .okt-mdview-actions :is(.okt-mdview-copy, .okt-mdview-open, .okt-mdview-editor-go) { padding: 0 8px; }
 }
 
 /* Shared toolbar for diagrams + charts. Lives top-right of the host

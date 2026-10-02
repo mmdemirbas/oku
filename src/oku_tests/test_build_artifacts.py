@@ -677,11 +677,15 @@ class TestPayloadBudget:
     # corner buttons — the section name, the percentage, the measured
     # placement and the phone's compact form. About 5,000 bytes, most of
     # it the reasoning in the stylesheet.
-    KIT_BUDGET_BYTES = 1_410_000
+    # Then from 1,410,000 by the viewer's editor links: three URL formats
+    # with the source each was read from, the chooser, its keyboard and
+    # its measured placement, and the phone's icon-only actions. About
+    # 10,500 bytes.
+    KIT_BUDGET_BYTES = 1_420_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
-    STANDALONE_BUDGET_BYTES = 1_415_000
+    STANDALONE_BUDGET_BYTES = 1_422_000
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

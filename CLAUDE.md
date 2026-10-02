@@ -1216,6 +1216,26 @@ rather than offered broken. Held by `browser/test_file_viewer.py`,
 whose behaviour cases all fail against the kit without this change, and
 `test_file_closure.py`.
 
+**A file in the viewer can be handed to the reader's editor, and the
+reader names the editor.** `__okuEditors` holds three URL formats, each
+as the editor's OWN source parses it — VS Code's `vscode://file/<path>`
+(app.ts), IntelliJ's `idea://open?file=…&line=…` (rewritten into an open
+command by the macOS launcher and by nothing on Windows or Linux, and
+without `line` it takes the open-a-project path), Zed's
+`zed://file<path>` (open_listener.rs, which never strips the slash in
+front of a drive letter). So IntelliJ is listed on macOS only and Zed
+not for a Windows path: an editor is offered where its link opens a
+file, never offered broken. Nothing guesses the choice — before one is
+made the control is a menu whose rows are real links, so the first pick
+opens the file in the same click that records it under `oku-editor`.
+It appears only where `absPath` knows the full path, which is the same
+fence as the path line above it: a deployed site shows nothing. Below
+640px the viewer's actions give up their words and keep their icons
+(461px of actions against a 316px row), and the list is placed by
+measurement because the control sits at the left of a code file's bar.
+Held by `browser/test_open_in_editor.py`, with the platform pinned so
+the runner's own OS cannot decide what is expected.
+
 **A card appears when the pointer arrives, not when the page moves under
 it.** `mouseenter` fires when a layer above an element goes away, so
 closing the popup a chip opened put that chip's card back under a cursor
