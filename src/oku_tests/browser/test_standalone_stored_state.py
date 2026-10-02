@@ -66,6 +66,8 @@ SEED = {
     "htmldoc-content-width": "narrow",
     "oku-personalization": '{"env":"prod"}',
     "oku-text-scale": "1.5",
+    # A choice that cannot open on this platform must read as no choice.
+    "oku-editor": "idea",
 }
 
 CHROME = """() => ({
