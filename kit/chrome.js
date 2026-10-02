@@ -4873,8 +4873,18 @@ function __okuPathShaped(tok, inCode) {
    held a 6-column comparison table 90px past a 746px column and pushed
    the last two columns out of sight, the defect the phrase rule exists
    to prevent. The joints are the ones a reader sees in the word — a
-   camel hump, and the separators a path breaks at. A token on its own
-   is not touched: it keeps its line, and that rule is the date's. */
+   camel hump, and the separators a path breaks at.
+
+   So does a token of OKU_LONG_TOKEN characters or more on its own. At
+   the reading measure a table has about 746px, and a config key
+   (`spark.sql.iceberg.planning.preserve-data-grouping`, 432px), a
+   package id or a snake_case name held 7 of 336 tables in a research
+   tree past their column by itself. A shorter token keeps its line —
+   that rule is the date's and the short identifier's, which read as one
+   word and fit — and a long one with nothing to break at (a digest) is
+   what the reader's Fit to width is for. */
+var OKU_LONG_TOKEN = 20;
+
 function __okuWordJoints(s) {
   var at = __okuPathBreaks(s);
   for (var i = 1; i < s.length; i++) {
@@ -4918,7 +4928,8 @@ function __okuBreakPaths(root) {
     parts.forEach(function (tok, k) {
       var at = (k % 2 === 1 || !tok) ? []
         : inPhrase ? __okuWordJoints(tok)
-        : __okuPathShaped(tok, inCode) ? __okuPathBreaks(tok) : [];
+        : __okuPathShaped(tok, inCode) ? __okuPathBreaks(tok)
+        : tok.length >= OKU_LONG_TOKEN ? __okuWordJoints(tok) : [];
       if (!at.length && !frag) return;
       if (!frag) {
         frag = document.createDocumentFragment();
@@ -6817,7 +6828,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-02-r101';
+var __okuKitBuild = '2026-10-02-r102';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

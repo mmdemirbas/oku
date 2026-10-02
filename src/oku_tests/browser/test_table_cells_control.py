@@ -9,10 +9,11 @@ of controls.
   - Wrap text (default): a phrase wraps, a token keeps its line. The
     rule `test_table_cells_fit_their_column.py` holds.
   - Fit to width: break anywhere, so the table holds its column. The
-    one case the default cannot rescue is a single token with no
-    whitespace that is not a path — a class name, a digest — because
-    keeping a token whole is the default's whole point. A URL or a path
-    breaks at its separators by default (test_table_paths_break.py).
+    one case the default cannot rescue is a long token with nothing to
+    break at — a digest — because breaking inside a run of letters is
+    the trade the default refuses. A URL, a path and a long identifier
+    break at their separators by default (test_table_paths_break.py,
+    test_table_cells_fit_their_column.py).
   - One line: nothing wraps and the table scrolls, for a reader who
     would rather scan one row per line.
 
@@ -48,12 +49,11 @@ from ._wait import page_quiet
 
 pytestmark = pytest.mark.browser
 
-# A token the default cannot break: no whitespace and not shaped like a
-# path. A URL used to stand here, until URLs and paths learned to break
-# at their separators (test_table_paths_break.py).
-LONG_TOKEN = (
-    "org.apache.iceberg.relocated.com.google.common.util.concurrent.MoreExecutors$DirectExecutorService"
-)
+# A token the default cannot break: no whitespace and no joints — a
+# digest. A URL stood here until URLs learned to break at their
+# separators, then a dotted class name until long tokens learned to
+# break at their dots (test_table_cells_fit_their_column.py).
+LONG_TOKEN = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855e3b0c44298fc"
 
 PAGE_MD = f"""---
 title: Table cells control

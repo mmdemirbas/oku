@@ -1719,10 +1719,29 @@ taller for it, in plain view, and the test now says exactly that: a
 row may be as tall as its tallest VISIBLE cell, which is what the 177px
 row was not.
 
-What is left is a single token that is neither — a class name, a
-digest, a long identifier. That one keeps its line and the scroller
-earns its keep, which is the honest outcome and what the reader's own
-wrap control is for.
+**And so does a long token on its own, and dense tables set tighter
+gutters.** The reading measure took tables that scroll sideways at
+1440px from 9 to 29 of 336 in a research tree. Seven were held open by
+one long token — a config key, a package id, a snake_case name — so a
+token of 20 characters or more (`OKU_LONG_TOKEN`) takes the same
+joints; a date or `cast_ntz_to_date` keeps its line. Most of the rest
+were six to ten columns of ordinary words, where 28px of padding per
+column is a fifth of the table before a word is set, so a wrap holding
+a table of six columns or more pads cells 10px a side instead of 14 —
+scoped to the wrap so the sticky header's ghost, which copies content
+widths, pads alike. And the 9ch floor on every cell, put there when
+cells broke `anywhere` and a column could fall to one character, held
+columns of short values — an index `#`, a count, a percentage — at 9ch
+plus padding; under `break-word` the longest word is already the floor
+that means something, so it lives only in Fit to width now. 16 of 336
+still scroll: dense tables of long words, which hyphenation would
+release in a browser carrying the language's dictionary (headless
+Chromium has none for Turkish, so that is not measured here).
+
+What is left is a long token with nothing to break at — a digest, a
+base64 run. That one keeps its line and the scroller earns its keep,
+which is the honest outcome and what the reader's own wrap control is
+for.
 
 **The config popover's rows shrink, and the item that has to know is
 the one the row sizes.** `.okt-cfg-colfilter` carried `min-width: 0`

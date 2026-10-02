@@ -53,6 +53,27 @@ summary: A table whose cells hold both tokens and phrases.
 | `cast_ltz_to_date` | `2026-12-31` | `2026-12-31` | error: `{ERROR}` | no | Flink and Spark agree; Iceberg refuses the cast |
 | `year_ntz` | `2026` | `2026` | `2026` | yes | |
 | `month_ntz` | `12` | `12` | `12` | yes | |
+
+## Long tokens {{#long}}
+
+| Setting | Spark | Flink | Iceberg | Same? | Note |
+|---|---|---|---|---|---|
+| `spark.sql.iceberg.planning.preserve-data-grouping` | `true` | `false` | `true` | no | Flink has no such key |
+| `resmi_zorla_calistirma_listesi` | `on` | `on` | `on` | yes | |
+
+## Many columns {{#many}}
+
+| Month | Active days | Turns | Cache write 5m | Cache write 1h | Cache read | Output | USD | Subagent $ |
+|---|---|---|---|---|---|---|---|---|
+| 2026-06 (incomplete) | 18 | 4,973 | 10.5 M | 41.0 M | 1,813 M | 7.1 M | 1,734 | 9% |
+| 2026-07 | 31 | 8,120 | 12.9 M | 52.3 M | 2,410 M | 9.8 M | 2,215 | 11% |
+
+## Dense {{#dense}}
+
+| Month | Input | Output | Cache | Write | Agent | Total | Calls | Avg |
+|---|---|---|---|---|---|---|---|---|
+| 2026-06 | 105,025 | 9,411 | 77,902 | 1,204 | 12 | 193,554 | 311 | 622 |
+| 2026-07 | 98,310 | 8,920 | 70,118 | 1,010 | 9 | 178,367 | 290 | 615 |
 """
 
 
@@ -206,3 +227,52 @@ def test_a_config_row_never_hangs_outside_the_panel(page):
     assert got["rows"] >= 6, f"only {got['rows']} rows measured — the panel did not open"
     assert got["overflow"] == 0, f"a config row overflows by {got['overflow']}px"
     assert got["worst"] <= 0, f"a control hangs {got['worst']}px outside the panel"
+
+
+TABLES = """() => Object.fromEntries([...document.querySelectorAll('main section')].map(sec => {
+  const s = sec.querySelector('.okt-table-scroll'); if (!s) return null;
+  const codes = [...s.querySelectorAll('td code')];
+  return [sec.id, { sideways: s.scrollWidth - s.clientWidth,
+    codes: codes.map(c => ({ text: c.textContent, wbr: c.querySelectorAll('wbr').length,
+                             lines: Math.round(c.getBoundingClientRect().height / parseFloat(getComputedStyle(c).lineHeight)) })) }];
+}).filter(Boolean))"""
+
+
+def test_a_long_token_breaks_at_its_joints(page):
+    """At the reading measure a 49-character config key held a six-column
+    table open by itself. A token of 20 characters or more takes breaks
+    at its dots, underscores, hyphens and camel humps — never inside a
+    run of letters — and a short one keeps its line, so a date or a
+    short identifier still reads as one word. The text is untouched:
+    the breaks are `<wbr>`, which carry no character."""
+    t = page.evaluate(TABLES)["long"]
+    assert t["sideways"] == 0, f"{t['sideways']}px of sideways scroll"
+    key = next(c for c in t["codes"] if c["text"].startswith("spark."))
+    assert key["text"] == "spark.sql.iceberg.planning.preserve-data-grouping"
+    assert key["wbr"] >= 4, key
+    assert all(c["wbr"] == 0 and c["lines"] == 1 for c in t["codes"] if len(c["text"]) < 20), t["codes"]
+
+
+def test_a_table_of_short_values_fits_however_many_columns(page):
+    """Nine columns, most of them counts — the shape of a usage table in
+    a delivered research tree, which scrolled sideways at the reading
+    measure. A 9ch floor on every cell, left from when cells broke
+    anywhere, held the `18` and `9%` columns at 9ch plus padding. The
+    floor lives only where cells break anywhere now."""
+    t = page.evaluate(TABLES)["many"]
+    assert t["sideways"] == 0, f"{t['sideways']}px of sideways scroll"
+
+
+def test_a_dense_table_sets_tighter_gutters(page):
+    """Nine columns of numbers whose every column clears 9ch, so the
+    floor is not what holds it: 28px of padding per column is. A table
+    of six columns or more pads cells 10px a side, and the sticky
+    header's ghost — which copies content widths — pads alike."""
+    t = page.evaluate(TABLES)["dense"]
+    assert t["sideways"] == 0, f"{t['sideways']}px of sideways scroll"
+    pads = page.evaluate(
+        """() => { const w = document.querySelector('#dense .okt-table-wrap');
+          const p = (s) => { const e = w.querySelector(s); return e ? getComputedStyle(e).paddingLeft : null; };
+          return { td: p('table td'), th: p('table th') }; }"""
+    )
+    assert pads["td"] == pads["th"] == "10px", pads
