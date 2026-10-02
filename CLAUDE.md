@@ -1684,6 +1684,19 @@ date stay one word. **Not inside source text**: `pre`, `script`,
 a diagram, so the walk rejects them. Held by
 `browser/test_table_paths_break.py`.
 
+**And a word inside a phrase breaks at its joints.** A phrase wraps,
+so its min-content is its longest word, and in an exception message
+that word is an identifier: at the 900px reading measure
+`UnsupportedOperationException:` held the same six-column table 90px
+past its column and put `Same?` and `Note` out of sight again — the
+reported defect, back by a different road. `__okuWordJoints` gives the
+words of a `data-oku-phrase` span the separators a path breaks at plus
+camel humps, so the column can go down to `Unsupported`. A token on its
+own is not touched; keeping it whole is the date's rule. The row is
+taller for it, in plain view, and the test now says exactly that: a
+row may be as tall as its tallest VISIBLE cell, which is what the 177px
+row was not.
+
 What is left is a single token that is neither — a class name, a
 digest, a long identifier. That one keeps its line and the scroller
 earns its keep, which is the honest outcome and what the reader's own

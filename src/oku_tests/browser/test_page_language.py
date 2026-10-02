@@ -145,18 +145,20 @@ def test_the_browser_reads_it(built, browser) -> None:
         page_quiet(page)
         assert page.evaluate("() => document.documentElement.lang") == "tr"
         # The one consequence a test can read directly: Turkish casing.
-        # `text-transform: uppercase` on a table header maps `i` to `İ`
-        # under `tr` and to `I` under anything else, so the column label
-        # is the assertion.
+        # `text-transform: uppercase` maps `i` to `İ` under `tr` and to `I`
+        # under anything else, and `innerText` returns the text as drawn.
+        # A probe in the reading column, inheriting the page's language,
+        # rather than a kit element: which labels the kit sets in capitals
+        # is a style decision, and this is a question about the language.
         assert (
             page.evaluate(
-                "() => { const th = document.querySelector('main table th');"
-                " const r = document.createRange(); r.selectNodeContents(th);"
-                " return getComputedStyle(th).textTransform; }"
+                "() => { const s = document.createElement('span');"
+                " s.style.textTransform = 'uppercase'; s.textContent = 'işlem';"
+                " document.querySelector('main').appendChild(s);"
+                " const t = s.innerText; s.remove(); return t; }"
             )
-            == "uppercase"
+            == "İŞLEM"
         )
-        assert page.evaluate("() => document.querySelector('main table th').textContent.trim()") == "işlem"
     finally:
         context.close()
 

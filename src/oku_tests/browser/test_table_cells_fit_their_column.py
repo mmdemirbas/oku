@@ -105,6 +105,18 @@ MEASURE = """() => {
     identLines: lines(cell('cast_ntz_to_date')),
     tallestRow: Math.max(...[...document.querySelectorAll('.okt-table-scroll tbody tr')]
         .map(t => Math.round(t.getBoundingClientRect().height))),
+    // How much taller each row is than the tallest cell the reader can
+    // see in it: a row's height is its tallest cell's, so anything left
+    // over came from a cell past the scroller's edge.
+    hiddenHeight: Math.max(...[...document.querySelectorAll('.okt-table-scroll tbody tr')].map(tr => {
+      const edge = scroll.getBoundingClientRect().right + 1;
+      const content = (c) => { const r = document.createRange(); r.selectNodeContents(c);
+                               return r.getBoundingClientRect().height; };
+      const cs = getComputedStyle(tr.cells[0]);
+      const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      const seen = [...tr.cells].filter(c => c.getBoundingClientRect().right <= edge).map(content);
+      return Math.round(tr.getBoundingClientRect().height - pad - Math.max(0, ...seen));
+    })),
   };
 }"""
 
@@ -130,7 +142,6 @@ def test_the_table_does_not_outgrow_its_column(m):
 def test_every_column_is_visible(m):
     """The two right-hand columns were off screen entirely, which is
     how a value goes missing without anything failing."""
-    # Upper-cased by CSS, so the DOM text is the author's casing.
     names = [h["text"].upper() for h in m["headers"]]
     assert names[:6] == ["CASE", "SPARK", "FLINK", "ICEBERG", "SAME?", "NOTE"], names
     over = [h["text"] for h in m["headers"] if h["right"] > m["scrollRight"] + 1]
@@ -146,10 +157,20 @@ def test_a_token_in_a_code_span_keeps_its_line(m):
     assert m["identLines"] == 1, f"`cast_ntz_to_date` drew on {m['identLines']} lines"
 
 
-def test_the_row_is_no_taller_than_its_content(m):
+def test_a_row_is_as_tall_as_what_the_reader_can_see(m):
     """It was 177px for two lines of text, because the column that had
-    been pushed off screen was wrapping into many lines out of sight."""
-    assert m["tallestRow"] <= 120, f"tallest row {m['tallestRow']}px"
+    been pushed off screen was wrapping into many lines out of sight.
+
+    Stated against the visible cells rather than as a pixel ceiling: at
+    the reading measure a 98-character message in a six-column table
+    wraps onto several lines in plain view, and that row is tall for a
+    reason the reader can see. What may not happen is height arriving
+    from a cell past the edge."""
+    # A few pixels are a code chip's own padding and the row's rule; the
+    # defect measured 68 at this viewport.
+    assert m["hiddenHeight"] <= 6, (
+        f"a row is {m['hiddenHeight']}px taller than any cell in view (tallest row {m['tallestRow']}px)"
+    )
 
 
 def test_a_config_row_never_hangs_outside_the_panel(page):

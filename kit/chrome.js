@@ -4611,6 +4611,22 @@ function __okuPathShaped(tok, inCode) {
   return OKU_URL_SHAPED.test(tok.replace(/^[\[(<"'«]+/, ''));
 }
 
+/* A word inside a PHRASE breaks at its own joints too. A phrase already
+   wraps, so its min-content is its longest word, and in an exception
+   message that word is an identifier: `UnsupportedOperationException:`
+   held a 6-column comparison table 90px past a 746px column and pushed
+   the last two columns out of sight, the defect the phrase rule exists
+   to prevent. The joints are the ones a reader sees in the word — a
+   camel hump, and the separators a path breaks at. A token on its own
+   is not touched: it keeps its line, and that rule is the date's. */
+function __okuWordJoints(s) {
+  var at = __okuPathBreaks(s);
+  for (var i = 1; i < s.length; i++) {
+    if (/\p{Lu}/u.test(s[i]) && /\p{Ll}/u.test(s[i - 1]) && at.indexOf(i) === -1) at.push(i);
+  }
+  return at.sort(function (a, b) { return a - b; });
+}
+
 function __okuPathBreaks(s) {
   var at = [];
   var word = /[\p{L}\p{N}]/u;
@@ -4640,10 +4656,13 @@ function __okuBreakPaths(root) {
   var any = false;
   nodes.forEach(function (node) {
     var inCode = !!(node.parentElement && node.parentElement.closest('code'));
+    var inPhrase = !!(node.parentElement && node.parentElement.closest('code[data-oku-phrase]'));
     var parts = node.nodeValue.split(/(\s+)/);
     var frag = null;
     parts.forEach(function (tok, k) {
-      var at = (k % 2 === 0 && tok && __okuPathShaped(tok, inCode)) ? __okuPathBreaks(tok) : [];
+      var at = (k % 2 === 1 || !tok) ? []
+        : inPhrase ? __okuWordJoints(tok)
+        : __okuPathShaped(tok, inCode) ? __okuPathBreaks(tok) : [];
       if (!at.length && !frag) return;
       if (!frag) {
         frag = document.createDocumentFragment();
@@ -6528,7 +6547,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-02-r97';
+var __okuKitBuild = '2026-10-02-r98';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
