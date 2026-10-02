@@ -482,7 +482,11 @@ class TestChromeKitMarkers:
     # reading: a marker dot growing about its own centre, a "→" drawn by
     # a pseudo-element, the sidebar tab thumbs, a donut slice responding
     # under the pointer that put it there.
-    _NOT_CONTENT = ("::after", "::before", "-marker", "-thumb", ".okc-slice")
+    # `.okt-rail` grows its capsule DOWNWARD on hover, from a fixed top
+    # edge, so nothing in it moves — and that is measured rather than
+    # asserted: test_page_rail compares every mark's x, width and top and
+    # the boxes of the section name and the percentage across states.
+    _NOT_CONTENT = ("::after", "::before", "-marker", "-thumb", ".okc-slice", ".okt-rail")
 
     def test_no_hover_rule_moves_the_content_under_the_pointer(self, repo_root: Path) -> None:
         """A card answers the pointer with light, never with position.
