@@ -233,6 +233,21 @@ is a short string pulled to a box edge. Single-line blocks need no
 exception — `justify` leaves a block's LAST line ragged, and a one-line
 paragraph is all last line.
 
+**And only where the browser hyphenates the page's language.** The
+dictionary is the browser's, per language, and it does not have every
+one: measured in Chromium, `hyphens: auto` breaks no Turkish word, so a
+justified Turkish paragraph could only stretch word spaces — gaps
+several letters wide on a phone. `__okuHyphenation` asks the browser
+once per language (one long word in a 3em box, set with and without
+`hyphens: auto`; taller means broken) and puts the answer on `<html>` as
+`data-oku-hyphens`; the justify rule reads it, and without an answer
+prose is ragged-right. Asked rather than listed, because a list of
+"languages that hyphenate" would be a list of what one browser could do
+on the day it was written. Held by
+`test_presentation_defaults.py::test_prose_is_justified_only_where_the_browser_hyphenates`,
+which asks the browser the same question itself instead of trusting the
+kit's probe.
+
 **The swell is a transform, and that is the whole safety argument.**
 Marks within 46px of the pointer scale on a cosine falloff, like a
 dock. A dock that reflows makes you chase the thing you were aiming

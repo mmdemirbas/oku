@@ -82,6 +82,62 @@ const ICON_WRAP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
    diagram / mermaid expand buttons — same affordance everywhere. */
 const ICON_EXPAND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
 
+/* ============ Justify only where the browser hyphenates ============ *
+ * Running prose is justified and the hyphenation is part of it — the
+ * rule in chrome.css says why. But hyphenation is a dictionary the
+ * BROWSER carries per language, and it does not carry one for every
+ * language: measured in Chromium, `hyphens: auto` breaks no Turkish
+ * word at all, so a justified Turkish paragraph can only stretch its
+ * word spaces — gaps several letters wide on a phone. Whether this
+ * page's language is hyphenated is asked of the browser itself, once
+ * per language: one long word in a narrow box, set both ways, and a
+ * taller box means the word was broken. The answer goes on <html> as
+ * `data-oku-hyphens` and the justify rule reads it. With no answer — no
+ * script — prose is ragged-right, which is never wrong.
+ * ---------------------------------------------------------------- */
+var __okuHyphenation = (function () {
+  var asked = {};
+  // A word long enough to need a break in a 3em box, in the language
+  // asked about where it matters: patterns are per language, and a
+  // dictionary that knows no Turkish should not get credit for breaking
+  // an English word under `lang="tr"`.
+  var SAMPLE = { tr: 'kaynaklandırılabilirlik', de: 'Silbentrennungsregeln', fr: 'internationalisation' };
+
+  function probe(lang) {
+    var word = SAMPLE[lang.split('-')[0]] || 'internationalization';
+    var box = document.createElement('div');
+    box.lang = lang;
+    box.setAttribute('aria-hidden', 'true');
+    box.style.cssText = 'position:absolute;left:-9999px;top:0;width:3em;font:16px/20px serif;' +
+      'visibility:hidden;white-space:normal;overflow-wrap:normal;word-break:normal;' +
+      '-webkit-hyphens:manual;hyphens:manual';
+    box.textContent = word;
+    document.body.appendChild(box);
+    var whole = box.getBoundingClientRect().height;
+    box.style.webkitHyphens = 'auto';
+    box.style.hyphens = 'auto';
+    var broken = box.getBoundingClientRect().height;
+    box.remove();
+    return broken > whole;
+  }
+
+  function apply() {
+    if (!document.body) return;
+    var lang = (document.documentElement.lang || 'en').toLowerCase();
+    if (!Object.prototype.hasOwnProperty.call(asked, lang)) asked[lang] = probe(lang);
+    document.documentElement.setAttribute('data-oku-hyphens', asked[lang] ? 'on' : 'off');
+  }
+
+  // Before the content paints where possible: a standalone page runs
+  // this mid-<head>, so the first chance is DOMContentLoaded, which is
+  // registered here ahead of the renderer's own. Re-asked on every
+  // render, because an in-place navigation can change the language.
+  if (document.body) apply();
+  else document.addEventListener('DOMContentLoaded', apply);
+  window.addEventListener('oku:rendered', apply);
+  return { apply: apply, probe: probe };
+})();
+
 /* ============ Lightbox / fullscreen overlay ============ *
  * A single shared overlay used by image, chart, diagram, and mermaid
  * expand buttons. Open with __okuLightbox.open(content, { title })
@@ -6472,7 +6528,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-02-r95';
+var __okuKitBuild = '2026-10-02-r96';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

@@ -7861,15 +7861,21 @@ main .example-pair {
    label, chip or caption is a short string stretched to a box edge,
    which looks broken. Only blocks that run several lines of sentence
    text are in. Code is never justified — `pre` keeps its own spacing. */
-main > section > p:not(.okt-card-title),
-main > section > ul li,
-main > section > ol li,
-main > section > blockquote p,
-main .callout p:not(.callout-title):not(.okt-card-title),
-main .callout li,
-main .tldr li,
-main .insight p:not(.okt-card-title),
-main .example-pair p:not(.okt-card-title):not(.callout-title):not(.bar-chart-title) {
+/* And only where the browser actually hyphenates the page's language.
+   `data-oku-hyphens` is the browser's own answer, asked by
+   __okuHyphenation in chrome.js: Chromium carries no Turkish
+   dictionary, so on a Turkish page justify could only stretch word
+   spaces, which is the river this rule exists to prevent. Absent the
+   answer, prose stays ragged-right. */
+:root[data-oku-hyphens="on"] main > section > p:not(.okt-card-title),
+:root[data-oku-hyphens="on"] main > section > ul li,
+:root[data-oku-hyphens="on"] main > section > ol li,
+:root[data-oku-hyphens="on"] main > section > blockquote p,
+:root[data-oku-hyphens="on"] main .callout p:not(.callout-title):not(.okt-card-title),
+:root[data-oku-hyphens="on"] main .callout li,
+:root[data-oku-hyphens="on"] main .tldr li,
+:root[data-oku-hyphens="on"] main .insight p:not(.okt-card-title),
+:root[data-oku-hyphens="on"] main .example-pair p:not(.okt-card-title):not(.callout-title):not(.bar-chart-title) {
   text-align: justify;
   -webkit-hyphens: auto;
   hyphens: auto;

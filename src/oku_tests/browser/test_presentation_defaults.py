@@ -305,6 +305,45 @@ def test_running_prose_is_justified_to_both_edges(rendered):
     assert max(got["shortfall"]) <= 1, f"a line stopped short of the column edge: {got}"
 
 
+def test_prose_is_justified_only_where_the_browser_hyphenates(rendered):
+    """Justify needs hyphenation, and hyphenation is a dictionary the
+    browser carries per language. Chromium carries none for Turkish, so a
+    justified Turkish paragraph could only stretch its word spaces. The
+    test asks the browser the same question independently of the kit —
+    one long word in a narrow box, set with and without `hyphens: auto` —
+    and requires the alignment to follow the answer in both languages."""
+    got = rendered.evaluate(
+        """() => {
+        const breaks = (lang, word) => {
+          const b = document.createElement('div');
+          b.lang = lang;
+          b.style.cssText = 'position:absolute;left:-9999px;width:3em;font:16px/20px serif;hyphens:manual';
+          b.textContent = word; document.body.appendChild(b);
+          const whole = b.getBoundingClientRect().height;
+          b.style.hyphens = 'auto';
+          const broken = b.getBoundingClientRect().height; b.remove();
+          return broken > whole;
+        };
+        const html = document.documentElement, was = html.lang;
+        const read = lang => {
+          html.lang = lang; window.__okuHyphenation.apply();
+          return { attr: html.getAttribute('data-oku-hyphens'),
+                   align: getComputedStyle(document.querySelector('#why p')).textAlign };
+        };
+        const out = { en: read('en'), tr: read('tr'),
+                      enBreaks: breaks('en', 'internationalization'),
+                      trBreaks: breaks('tr', 'kaynaklandırılabilirlik') };
+        html.lang = was; window.__okuHyphenation.apply();
+        return out;
+    }"""
+    )
+    for lang in ("en", "tr"):
+        expect = "justify" if got[f"{lang}Breaks"] else "start"
+        assert got[lang]["align"] == expect, got
+        assert got[lang]["attr"] == ("on" if got[f"{lang}Breaks"] else "off"), got
+    assert got["enBreaks"], f"the test browser hyphenates English, so the English case is exercised: {got}"
+
+
 def test_short_strings_are_not_stretched_to_a_box_edge(rendered):
     """The scope is running prose, deliberately. A table cell, a chart
     label or a caption justified to its box edge is a fragment pulled
