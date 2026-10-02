@@ -281,3 +281,23 @@ def test_a_table_expanded_inside_a_viewed_file_closes_back_into_it(page):
     page.wait_for_function("document.querySelectorAll('.okt-lightbox.open').length === 1")
     got = page.evaluate(STATE)
     assert got and got["kind"] != "md", got
+
+
+def test_a_viewed_file_is_read_in_the_pages_own_voice(page):
+    """The reading face was scoped to `.okt-mdview-body > section`, and a
+    viewed file's sections sit two levels deeper, so every file opened
+    from a page was set in the interface face while the page itself was
+    in the reading face — measured: Inter at 16px against Literata at
+    18px, under a comment saying the two are read the same way."""
+    _chip(page, "a.md").click()
+    page.wait_for_selector(".okt-mdview-rendered section p", state="attached")
+    got = page.evaluate(
+        """() => { const f = (s) => { const e = document.querySelector(s); const c = getComputedStyle(e);
+                                      return [c.fontFamily.split(',')[0], c.fontSize]; };
+          return { page: f('main section > p'), file: f('.okt-mdview-rendered section > p'),
+                   pageH2: f('main section > h2')[0], fileH2: f('.okt-mdview-rendered section > h2')[0],
+                   title: f('.okt-mdview-title')[0], cover: f('header.cover h1')[0] }; }"""
+    )
+    assert got["file"] == got["page"], got
+    assert got["fileH2"] == got["pageH2"], got
+    assert got["title"] == got["cover"], got

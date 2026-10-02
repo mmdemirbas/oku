@@ -2416,17 +2416,21 @@ p { margin: 0 0 18px 0; }
    a datum before reading either. A list rather than `main`, for the same
    reason the justify rule is a list: a component inheriting a serif it
    was not drawn for is the failure, and a new component should have to
-   opt in. A file opened in the viewer is read the same way as the page. */
-:is(main, .okt-mdview-body) > section > :is(p, ul, ol, dl, blockquote, h2, h3),
+   opt in. A file opened in the viewer is read the same way as the page,
+   its title and summary standing in for the cover — and its sections
+   are children of `.okt-mdview-rendered`, two levels below the body,
+   which is why a rule written against the body matched nothing. */
+:is(main, .okt-mdview-rendered) > section > :is(p, ul, ol, dl, blockquote, h2, h3),
 :is(main, .okt-mdview-body) :is(.callout, .tldr, .insight, .footnotes),
-header.cover :is(h1, .subtitle, .eyebrow) {
+header.cover :is(h1, .subtitle, .eyebrow),
+.okt-mdview-head :is(.okt-mdview-title, .okt-mdview-summary) {
   font-family: var(--font-read);
   /* The open digits and single-storey a are Inter's stylistic sets and
      mean nothing to the reading face. */
   font-feature-settings: normal;
   letter-spacing: 0;
 }
-:is(main, .okt-mdview-body) > section > :is(p, ul, ol, dl, blockquote),
+:is(main, .okt-mdview-rendered) > section > :is(p, ul, ol, dl, blockquote),
 :is(main, .okt-mdview-body) :is(.callout, .insight) :is(p, li),
 :is(main, .okt-mdview-body) .tldr li {
   font-size: 18px;
@@ -2435,7 +2439,7 @@ header.cover :is(h1, .subtitle, .eyebrow) {
 /* A phone holds about 35 characters of 18px text; a size down keeps a
    line long enough to read in phrases rather than in words. */
 @media (max-width: 600px) {
-  :is(main, .okt-mdview-body) > section > :is(p, ul, ol, dl, blockquote),
+  :is(main, .okt-mdview-rendered) > section > :is(p, ul, ol, dl, blockquote),
   :is(main, .okt-mdview-body) :is(.callout, .insight) :is(p, li),
   :is(main, .okt-mdview-body) .tldr li { font-size: 17px; line-height: 1.65; }
   .tldr .one-line { font-size: 19px; }
