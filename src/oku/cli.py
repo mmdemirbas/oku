@@ -6550,6 +6550,12 @@ def resolve_file_ref(href: str, page_src: Path) -> tuple[Path | None, str]:
     raw = unquote(href).strip()
     if not raw:
         return None, "missing"
+    # A trailing slash names a directory, and `Path` drops it: `.git/`
+    # became `.git`, which in a git worktree is a FILE — so a sentence
+    # naming the `.git/` directory was nudged, in that checkout only, to
+    # become a chip previewing the worktree's gitlink.
+    if raw.endswith(("/", "\\")):
+        return None, "missing"
     try:
         expanded = Path(raw).expanduser()
     except RuntimeError:

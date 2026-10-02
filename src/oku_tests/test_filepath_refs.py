@@ -488,3 +488,13 @@ def test_the_command_writes_the_files_and_re_checks_the_tree(tmp_path, capsys, m
     cli._PAGE_BLOCK_LINES.clear()
     assert cli.cmd_check(args) == 0
     assert "nothing to rewrite" in capsys.readouterr().out
+
+
+def test_a_trailing_slash_names_a_directory_even_where_a_file_has_that_name(tmp_path):
+    """`Path(".git/")` is `Path(".git")`, and in a git worktree `.git` is
+    a file — so prose naming the `.git/` directory was nudged to become
+    a chip, in a worktree and nowhere else."""
+    root = _project(tmp_path)
+    (root / "notes").write_text("gitdir: elsewhere\n", encoding="utf-8")
+    assert _spans(root, root / "docs" / "page.md", "Look in `../notes/` for it.") == []
+    assert cli.resolve_file_ref("../notes/", root / "docs" / "page.md")[1] == "missing"
