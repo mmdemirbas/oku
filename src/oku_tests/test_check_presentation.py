@@ -143,6 +143,32 @@ class TestProseOnlySection:
         issues = _issues(tmp_path, f"---\ntitle: T\n---\n\n## S {{#s}}\n\n{PARA}\n{PARA}\n{PARA}\n{visual}\n")
         assert "prose-only-section" not in _codes(issues), issues
 
+    @pytest.mark.parametrize(
+        "image",
+        [
+            "![A screenshot of the page](shot.png)",
+            "![Before](a.png) ![After](b.png)",
+            "[![A thumbnail](thumb.png)](full.png)",
+            "![A screenshot](shot.png)\n*The caption under it.*",
+        ],
+    )
+    def test_an_image_is_a_visual_and_not_a_paragraph(self, tmp_path, image):
+        """A section of screenshots was reported as prose-only: the image
+        line was counted as a paragraph, so it added to the count instead
+        of clearing it."""
+        md = f"---\ntitle: T\n---\n\n## S {{#s}}\n\n{PARA}\n{PARA}\n{PARA}\n{image}\n"
+        assert "prose-only-section" not in _codes(_issues(tmp_path, md)), md
+
+    def test_an_image_does_not_push_two_paragraphs_over_the_line(self, tmp_path):
+        md = f"---\ntitle: T\n---\n\n## S {{#s}}\n\n{PARA}\n{PARA}\n![Shot](shot.png)\n"
+        shapes = cli._section_shapes(cli.md_to_v2_page(md.split("---\n", 2)[2], default_title="T"))
+        assert shapes[-1][1:] == (2, 1), shapes
+
+    def test_an_image_mentioned_inside_a_sentence_is_still_prose(self, tmp_path):
+        md = f"---\ntitle: T\n---\n\n## S {{#s}}\n\n{PARA}\n{PARA}\nSee ![icon](i.png) for the icon.\n"
+        shapes = cli._section_shapes(cli.md_to_v2_page(md.split("---\n", 2)[2], default_title="T"))
+        assert shapes[-1][1:] == (3, 0), shapes
+
     def test_a_callout_does_not_count_as_a_visual(self, tmp_path):
         """A coloured box around a paragraph reads as decorated text.
         Counting it would let any page pass by adding one."""

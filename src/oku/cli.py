@@ -4817,7 +4817,7 @@ def _presentation_issues(
                     "prose-only-section",
                     f"section '{title}'",
                     f"{paragraphs} paragraphs and nothing for the eye — no table, chart, diagram, "
-                    "card grid or code block. Either the figure is missing or the section is doing "
+                    "image, card grid or code block. Either the figure is missing or the section is doing "
                     "two jobs.",
                 )
             )
@@ -4977,12 +4977,19 @@ def _md_chunks(text: str) -> list[str]:
     return chunks
 
 
+# A line that is nothing but images — `![alt](src)`, optionally wrapped in a
+# link — is a figure, and a caption line under it does not change that.
+# Counted as a paragraph, a section of screenshots read as prose-only.
+_IMAGE_LINE_RE = re.compile(r"^(?:\[?!\[[^\]]*\]\([^)]*\)(?:\]\([^)]*\))?\s*)+$")
+
+
 def _section_shapes(page: dict) -> list[tuple[str, int, int]]:
     """(section title, paragraph count, visual count) per `##` section.
 
     A callout is not a visual. That is the whole point of the rule: a
     coloured box around a paragraph reads as decorated text, and
-    counting it would let a page pass by adding one.
+    counting it would let a page pass by adding one. An image is one: a
+    screenshot is the figure the rule asks for.
     """
     sections: list[list] = []
 
@@ -5008,7 +5015,11 @@ def _section_shapes(page: dict) -> list[tuple[str, int, int]]:
             if head.startswith("#"):
                 continue
             sec = current()
-            if head.startswith(("|", "```", "~~~")) or _HTML_ISLAND_RE.match(chunk):
+            if (
+                head.startswith(("|", "```", "~~~"))
+                or _HTML_ISLAND_RE.match(chunk)
+                or _IMAGE_LINE_RE.match(head.split("\n", 1)[0])
+            ):
                 sec[2] += 1
             elif head.startswith((">", "-", "*", "+", ":")) or re.match(r"\d+[.)]\s", head):
                 continue

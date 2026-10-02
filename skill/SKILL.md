@@ -539,7 +539,8 @@ disguised markdown):
 **The density gate is now the linter's job, not yours.**
 
 `oku check` reports `prose-only-section` for any section with three or
-more paragraphs and nothing for the eye — a callout does not count. It
+more paragraphs and nothing for the eye — a callout does not count, and
+an image on its own line does. It
 also reports `redundant-meta` for a field that repeats another,
 `island-hand-styled` for an island carrying hardcoded colour,
 `accent-divergence` for a tree with no colour convention,
