@@ -1849,7 +1849,17 @@ padding so two consecutive tables don't bleed into each other. The
 filter input + stats counter sit together on the left; chip rack is
 a two-column grid (label, chips) directly under the controls bar.
 Group count badges go FIRST in the group header (before the title)
-so the numbers line up at a consistent x.
+so the numbers line up at a consistent x. The controls bar is hidden until the
+pointer or focus reaches the table, and it used to keep its layout box
+while hidden so that appearing could not push the table — which left a
+38px band of nothing above every table, the table starting 48px into
+its own card. On a pointer device the bar now sits ON the card's top
+edge, out of the flow, its bottom where the table begins (so a second
+row grows up into the margin, not down over the column labels); a touch
+screen shows the bar always and keeps it in the flow; an expanded table
+in the lightbox keeps it in the flow too, because there is no edge
+above it to sit on. Held by
+`test_presentation_affordances.py::test_a_hidden_toolbar_leaves_no_empty_band`.
 
 **Code blocks: line numbers + language pill + brace folds.** Every
 `<pre><code>` gets a gray gutter with line numbers (`.okt-code-gutter`,

@@ -205,6 +205,51 @@ def test_hovering_the_table_reveals_the_controls_without_moving_it(rendered):
     )
 
 
+BAND = """() => { const w = document.querySelector('#big .okt-table-wrap'), c = w.querySelector('.okt-table-controls');
+  const t = w.querySelector('.okt-table-scroll'), i = c.querySelector('input');
+  const W = w.getBoundingClientRect(), C = c.getBoundingClientRect(), T = t.getBoundingClientRect(), I = i.getBoundingClientRect();
+  return { tableTop: Math.round(T.top - W.top), barTop: Math.round(C.top - W.top), barBottom: Math.round(C.bottom - W.top),
+           position: getComputedStyle(c).position,
+           inputHit: document.elementFromPoint(I.left + 10, I.top + I.height / 2) === i }; }"""
+
+
+def test_a_hidden_toolbar_leaves_no_empty_band(rendered):
+    """The bar kept its layout box while hidden, so every table opened on
+    a 38px band of nothing — the table began 48px into its own card. On
+    a pointer device the bar now sits on the card's top edge, out of the
+    flow: the table starts at the card's padding, and the bar, when it
+    shows, covers the edge and not the column labels."""
+    rendered.mouse.move(2, 2)
+    rendered.wait_for_timeout(300)
+    rest = rendered.evaluate(BAND)
+    assert rest["position"] == "absolute" and rest["tableTop"] <= 14, rest
+    box = rendered.locator("#big .okt-table-wrap").bounding_box()
+    rendered.mouse.move(box["x"] + box["width"] / 2, box["y"] + 60)
+    rendered.wait_for_function(
+        "() => getComputedStyle(document.querySelector('#big .okt-table-controls')).opacity === '1'",
+        timeout=10000,
+    )
+    shown = rendered.evaluate(BAND)
+    assert shown["tableTop"] == rest["tableTop"], (rest, shown)
+    assert shown["barTop"] < 0 and shown["barBottom"] <= shown["tableTop"], shown
+    assert shown["inputHit"], shown
+
+
+def test_a_touch_screen_keeps_the_bar_in_the_flow(afford_url, browser):
+    """There is no hover to reveal it with, so it is always shown — and a
+    bar that is always shown fills the room it takes."""
+    context = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
+    page = context.new_page()
+    try:
+        page.goto(f"{afford_url}/page.html")
+        page_quiet(page)
+        got = page.evaluate(BAND)
+        assert got["position"] == "static", got
+        assert got["barBottom"] <= got["tableTop"], got
+    finally:
+        context.close()
+
+
 def test_copy_sits_with_the_buttons_that_act_on_the_whole_table(rendered):
     """Copy used to land between the filter and its own row counter,
     splitting a pair that is read together ("I filtered — this many

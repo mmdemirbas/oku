@@ -2526,6 +2526,39 @@ code:not(pre code) {
 }
 /* Inner chrome reads as parts of a single card. */
 .okt-table-wrap .okt-table-controls { margin-bottom: 10px; }
+/* On a pointer device the bar sits ON the card's top edge, like a tab,
+   and takes no room from the card. It is hidden until the pointer or
+   focus reaches the table (see `.okt-table-controls`), and while it kept
+   its layout box hidden it left a 38px empty band above every table —
+   the first thing under the sentence introducing it. Out of the flow it
+   still cannot push the table when it appears, which is what keeping
+   the box was for. A touch screen shows the bar always, so there it
+   stays in the flow and fills the room it takes. */
+@media (hover: hover) {
+  .okt-table-wrap > .okt-table-controls {
+    position: absolute;
+    /* Its bottom where the table begins, whatever its height: a bar that
+       wraps to a second row grows up into the margin, not down over the
+       column labels the reader is about to filter by. */
+    bottom: calc(100% - 10px);
+    left: 12px;
+    right: 12px;
+    z-index: 3;
+    margin: 0;
+  }
+  /* An expanded table is the whole view, with no edge above it to sit
+     on: the lightbox's top would clip the bar. There it is a row. */
+  .okt-lightbox .okt-table-wrap > .okt-table-controls {
+    position: static;
+    margin-bottom: 10px;
+  }
+  /* The count would otherwise be drawn across the card's border line. */
+  .okt-table-wrap > .okt-table-controls .okt-stats {
+    padding: 0 6px;
+    border-radius: 6px;
+    background: var(--surface);
+  }
+}
 .okt-table-wrap .okt-chips {
   margin: 0 0 12px 0;
   background: var(--code-bg);
