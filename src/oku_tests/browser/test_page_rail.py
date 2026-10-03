@@ -866,6 +866,71 @@ def test_a_phone_capsule_is_a_number_and_a_line(rail_url, browser):
         page.close()
 
 
+OPENER = """() => { const o = document.querySelector('.okt-rail-open'); const rail = document.getElementById('oku-rail');
+  const a = o.getBoundingClientRect(), c = rail.getBoundingClientRect();
+  return { hidden: o.hidden, box: [a.left, a.top, a.width, a.height].map(Math.round),
+           capsule: [c.left, c.top, c.width, c.height].map(Math.round),
+           centre: document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2) === o,
+           expanded: o.getAttribute('aria-expanded'), label: o.getAttribute('aria-label'),
+           state: ['drawer-modal', 'drawer-pinned', 'drawer-peek'].filter(k => document.body.classList.contains(k)) }; }"""
+
+
+def test_tapping_a_phone_capsule_opens_the_contents(rail_url, browser):
+    """A phone's capsule has no marks to pick, so tapping it did nothing —
+    on the one screen where the capsule is the easiest thing to reach.
+    The whole capsule is now one button that opens the contents panel,
+    which is the map there; a second tap closes it."""
+    context = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
+    page = context.new_page()
+    try:
+        page.goto(f"{rail_url}/long.html")
+        page_quiet(page)
+        got = page.evaluate(OPENER)
+        assert not got["hidden"] and got["centre"], got
+        # Inside the capsule's 1px border, so two pixels on the size.
+        assert all(abs(a - b) <= 2 for a, b in zip(got["box"], got["capsule"])), got
+        assert got["label"] and got["expanded"] == "false", got
+        rail = page.locator("#oku-rail").bounding_box()
+        page.touchscreen.tap(rail["x"] + rail["width"] / 2, rail["y"] + rail["height"] / 2)
+        page.wait_for_function("() => document.body.classList.contains('drawer-modal')")
+        got = page.evaluate(OPENER)
+        assert got["expanded"] == "true", got
+        assert page.locator("page-nav").bounding_box()["width"] > 200
+        page.touchscreen.tap(rail["x"] + rail["width"] - 12, rail["y"] + rail["height"] / 2)
+        page.wait_for_function("() => !document.body.classList.contains('drawer-open')")
+        assert page.evaluate(OPENER)["expanded"] == "false"
+    finally:
+        context.close()
+
+
+def test_the_capsule_opens_the_contents_from_the_keyboard(rail_url, browser):
+    """A real button, so Enter works without a handler of its own."""
+    page = browser.new_page(viewport={"width": 390, "height": 844})
+    try:
+        page.goto(f"{rail_url}/long.html")
+        page_quiet(page)
+        page.focus(".okt-rail-open")
+        page.keyboard.press("Enter")
+        page.wait_for_function("() => document.body.classList.contains('drawer-open')")
+        page.keyboard.press("Escape")
+        page.wait_for_function("() => !document.body.classList.contains('drawer-open')")
+    finally:
+        page.close()
+
+
+def test_a_desktop_capsule_keeps_its_marks_and_no_cover(rail_url, browser):
+    """Where the capsule has marks, they are the targets: the cover stays
+    out of the way of every one of them."""
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        page.goto(f"{rail_url}/long.html")
+        page_quiet(page)
+        got = page.evaluate(OPENER)
+        assert got["hidden"] and got["box"][2] == 0, got
+    finally:
+        page.close()
+
+
 @pytest.mark.parametrize("width", [1440, 900, 390])
 def test_the_capsule_sits_between_the_buttons_and_says_where_and_how_far(rail_url, browser, width):
     """The rail is in the row of the corner buttons, between the Contents

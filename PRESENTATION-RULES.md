@@ -164,7 +164,10 @@ caught it). **The edges are measured**, by `placeRail`, from the
 Contents button and the cluster, because the cluster gains buttons and a
 pinned drawer moves the document. **A phone's track carries no marks**:
 under 200px, twelve ticks read as a barcode no finger can pick from, so
-it shows the fill and the number and the contents panel is the map.
+it shows the fill and the number and the contents panel is the map. And
+the whole capsule is then one button (`.okt-rail-open`) that opens that
+panel and closes it again, because on a phone the capsule is the
+easiest thing on the screen to reach and a tap on it used to do nothing.
 Sticky table headers park under the capsule because `chromeFloor`
 measures it with the buttons; nothing spans the top edge any more, so
 `--okt-rail-h` is 0.

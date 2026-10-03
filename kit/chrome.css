@@ -1001,6 +1001,23 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
 @media (hover: none) {
   .okt-rail:hover { --okt-track-h: 12px; --okt-rail-scale: 1; padding-bottom: 0; box-shadow: 0 1px 2px var(--shadow-soft); }
 }
+/* On a phone the capsule carries no marks, so the whole capsule is one
+   target: it opens the contents, which is the map there. A real button
+   over the capsule rather than a role on it, so Enter and Space work and
+   the capsule's own parts keep the roles they have. */
+.okt-rail-open {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.okt-rail-open[hidden] { display: none; }
+.okt-rail-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* A phone's capsule is the width of a thumb's reach: the name goes, the
    track and the number stay. */
 @media (max-width: 600px) {

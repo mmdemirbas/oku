@@ -2632,8 +2632,9 @@ function setDrawerState(state, remember) {
   body.classList.toggle('drawer-peek', state === 'peek');
   body.classList.toggle('drawer-pinned', state === 'pinned');
   body.classList.toggle('drawer-modal', state === 'modal');
-  var btn = document.querySelector('.ctrl-btn.drawer-toggle');
-  if (btn) btn.setAttribute('aria-expanded', state === 'closed' ? 'false' : 'true');
+  document.querySelectorAll('.ctrl-btn.drawer-toggle, .okt-rail-open').forEach(function (btn) {
+    btn.setAttribute('aria-expanded', state === 'closed' ? 'false' : 'true');
+  });
   if (remember !== false) {
     try { localStorage.setItem(DRAWER_PIN_KEY, state === 'pinned' ? '1' : '0'); } catch (e) { /* private mode */ }
   }
@@ -2659,8 +2660,9 @@ function toggleTOC() {
 }
 
 function syncDrawerButton() {
-  var btn = document.querySelector('.ctrl-btn.drawer-toggle');
-  if (btn) btn.setAttribute('aria-expanded', __okuDrawerState === 'closed' ? 'false' : 'true');
+  document.querySelectorAll('.ctrl-btn.drawer-toggle, .okt-rail-open').forEach(function (btn) {
+    btn.setAttribute('aria-expanded', __okuDrawerState === 'closed' ? 'false' : 'true');
+  });
 }
 
 /* Peek. Hover the button; the panel arrives without a click and leaves
@@ -2704,6 +2706,7 @@ document.addEventListener('click', function (e) {
   var nav = document.querySelector('page-nav');
   var button = document.querySelector('.ctrl-btn.drawer-toggle');
   if (button && button.contains(e.target)) return;   // toggleTOC owns it
+  if (e.target.closest && e.target.closest('.okt-rail-open')) return;   // so does the capsule
   // Inside the panel: a link is the reader saying "take me there", which
   // ends a peek. Clicking the panel's own chrome (a folder chevron) is
   // not, so the panel stays.
@@ -3511,12 +3514,21 @@ class PageChrome extends HTMLElement {
           '<div class="okt-rail-tip" role="status" aria-live="off"></div>' +
         '</div>' +
         '<span class="okt-rail-pct" aria-hidden="true"></span>' +
+        '<button class="okt-rail-open" type="button" aria-controls="oku-page-nav" aria-expanded="false"' +
+          ' aria-label="' + drawerLabel + '" hidden></button>' +
       '</div>' +
       '<button class="ctrl-btn drawer-toggle" type="button" aria-expanded="false" aria-controls="oku-page-nav"' +
         ' aria-label="' + drawerLabel + '" title="' + drawerLabel + '">' + ICON_MENU + '</button>' +
       '<button class="ctrl-btn back-to-top" type="button" aria-label="' + topLabel + '" title="' + topLabel + '">' + ICON_UP + '</button>';
 
     this.querySelector('.drawer-toggle').addEventListener('click', toggleTOC);
+    // A phone's capsule carries no marks, so the whole capsule is one
+    // target, and what it opens is the map the marks would have been.
+    // A second tap closes it: the capsule stays visible beside the panel.
+    this.querySelector('.okt-rail-open').addEventListener('click', function () {
+      if (__okuDrawerState === 'closed') toggleTOC();
+      else setDrawerState('closed');
+    });
     this.querySelector('.back-to-top').addEventListener('click', function () {
       window.scrollTo({ top: 0, behavior: __okuScrollBehavior() });
     });
@@ -4085,6 +4097,8 @@ function buildRail() {
   var doc = document.documentElement;
   var maxScroll = doc.scrollHeight - doc.clientHeight;
   rail.setAttribute('data-scrollable', maxScroll > 40 ? '1' : '0');
+  var opener = rail.querySelector('.okt-rail-open');
+  if (opener) opener.hidden = true;
   host.innerHTML = '';
   __okuRailOnScroll = null;
   if (maxScroll <= 40) return;
@@ -4124,6 +4138,7 @@ function buildRail() {
   // there.
   var compact = host.getBoundingClientRect().width < 200;
   rail.toggleAttribute('data-compact', compact);
+  if (opener) opener.hidden = !compact;
   if (compact) return;
 
   // Landmarks in document order. A figure is labelled by its kind plus
@@ -6828,7 +6843,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-02-r102';
+var __okuKitBuild = '2026-10-03-r103';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

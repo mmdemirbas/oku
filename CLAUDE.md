@@ -201,7 +201,8 @@ whole below.
 - **One column, one right edge.** Held by `test_presentation_measure`. → [why](PRESENTATION-RULES.md#one-column-one-right-edge)
 - **The rail does not move — and opening it is not moving.** A capsule
   between the corner buttons: section name, progress track with
-  landmark marks, percentage. Held by `test_page_rail`. → [why](PRESENTATION-RULES.md#the-rail-does-not-move-and-opening-it-is-not-mov)
+  landmark marks, percentage; on a phone, no marks, and a tap on the
+  capsule opens the contents. Held by `test_page_rail`. → [why](PRESENTATION-RULES.md#the-rail-does-not-move-and-opening-it-is-not-mov)
 - **Shape says what kind of thing it is.** Four rail-mark silhouettes,
   not eleven — bar for a heading, square/circle/diamond for
   table/chart/diagram, hollow square for every other figure. → [why](PRESENTATION-RULES.md#shape-says-what-kind-of-thing-it-is)
