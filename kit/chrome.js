@@ -6883,7 +6883,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-03-r106';
+var __okuKitBuild = '2026-10-03-r107';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -15371,11 +15371,12 @@ function __okuClipBoxFor(el, svg, outer) {
    Every gutter and tick in this file is sized from a character count,
    which is the only thing available before the string is in the
    document — and a character count cannot see what CSS does to the
-   glyphs. `.okc-parcoord-label` is `600 10.5px Inter` with
+   glyphs. `.okc-parcoord-label` was set with
    `text-transform: uppercase` and `letter-spacing: 0.06em`, so a
-   lowercase label is drawn in capitals about 40% wider than the count
-   predicts, and four axis names ran 279 units into each other with the
-   fitter reporting them fitted.
+   lowercase label was drawn in capitals about 40% wider than the count
+   predicted, and four axis names ran 279 units into each other with the
+   fitter reporting them fitted. The capitals are gone; the next rule
+   that widens glyphs is what this still guards against.
 
    Tuning a per-class constant is the fragile version of this: it fixes
    the class somebody measured and leaves the next one. The bound is

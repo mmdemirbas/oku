@@ -269,7 +269,14 @@ insight a rule and a larger line — no tinted boxes, which were the
 loudest thing on the first screen and arrived before a word of the
 document. Labels are sentence case: a tracked-out capital label is the
 one every template draws, and it spells Turkish with dotted capitals
-nobody typed. The neutrals are warm and quiet in both themes; the
+nobody typed. More exactly, the kit never changes the case of text:
+most of what twenty-two capital rules recased was the AUTHOR's — a
+column named `createdAt` drew as `CREATEDAT` in the card view, which is
+not the key a reader would type — and one rule forced card titles to
+lower case. The one exception is a language code, which is a code. Held
+by `test_label_case.py` (the stylesheet) and
+`browser/test_labels_keep_their_case.py` (every table view and a chart
+reading, by computed style). The neutrals are warm and quiet in both themes; the
 quiet surface stays under a 5-point RGB spread, so it never reads as a
 hue beside an accent it was not chosen for. Held by
 `test_presentation_measure.py::test_the_default_is_a_reading_measure_on_every_screen`,
@@ -1600,11 +1607,12 @@ the room and the fit shortens to the room it finds.
 measurement knows where that is.** Every gutter and tick in the kit is
 sized from a character count, which is all that is available before the
 string is in the DOM — and a character count cannot see what CSS does
-to the glyphs. `.okc-parcoord-label` is `600 10.5px Inter` with
-`text-transform: uppercase` and `letter-spacing: 0.06em`, so a
-lowercase label is drawn in capitals about 40% wider than the count
-predicts: four axis names ran 279 units into each other with the fitter
-reporting them fitted. Tuning a per-class `emPerChar` is the fragile
+to the glyphs. `.okc-parcoord-label` was set in tracked-out capitals,
+so a lowercase label was drawn about 40% wider than the count
+predicted: four axis names ran 279 units into each other with the fitter
+reporting them fitted. The capitals have since gone with every other
+capital label (the sentence-case rule under the two voices); the next rule that widens glyphs is what this
+still guards against. Tuning a per-class `emPerChar` is the fragile
 version — it fixes the class somebody measured and leaves the next one.
 `__okuTextRowBounds` takes the bound from the NEIGHBOURS instead and
 hands it to the post-paint fit, which measures real glyphs. Same class

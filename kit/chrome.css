@@ -711,8 +711,7 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
   display: grid; gap: 4px;
 }
 .personalize-label {
-  font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.06em;
+  font-size: 12px; font-weight: 600;
   color: var(--text-soft);
 }
 .personalize-field input {
@@ -2088,9 +2087,7 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 }
 .okc-cfg-title {
   font-weight: 600;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 13px;
   color: var(--text-soft);
 }
 .okc-cfg-close {
@@ -2268,9 +2265,7 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   gap: 6px;
 }
 .okt-cfg-subtitle {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 12px;
   color: var(--text-faint);
   margin-bottom: 2px;
 }
@@ -2781,11 +2776,6 @@ code:not(pre code) {
   letter-spacing: 0.02em;
   color: var(--text-soft);
 }
-.okt-groupby-label {
-  text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
 .okt-groupby-select {
   font: inherit;
   background: var(--surface);
@@ -2930,9 +2920,7 @@ code:not(pre code) {
 }
 .okt-chip-label {
   text-align: right;
-  font: 600 11px 'Inter', sans-serif;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 600 12px 'Inter', sans-serif;
   color: var(--text-soft);
   overflow-wrap: anywhere;
 }
@@ -3144,10 +3132,8 @@ code:not(pre code) {
    the cards grid. Same vocabulary in the list view below. */
 .okt-cards-group {
   grid-column: 1 / -1;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  font-size: 13px;
+  font-weight: 650;
   color: var(--accent-strong);
   margin: 10px 0 -2px 0;
   padding-bottom: 6px;
@@ -3216,8 +3202,7 @@ a.okt-card:focus-visible,
 .okt-card-row:last-child { margin-bottom: 0; }
 .okt-card-key {
   display: block;
-  font-size: 10.5px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: 12px; font-weight: 600;
   color: var(--text-soft);
   margin-bottom: 2px;
 }
@@ -3235,8 +3220,7 @@ a.okt-card:focus-visible,
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 11px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.1em;
+  font-size: 13px; font-weight: 650;
   color: var(--accent-strong);
   margin: 18px 0 0 0;
   padding-bottom: 6px;
@@ -3291,8 +3275,7 @@ a.okt-card:focus-visible,
   border-radius: 12px 12px 0 0;
 }
 .okt-board-lane-title {
-  font-size: 12px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: 13px; font-weight: 650;
   color: var(--accent-strong);
 }
 .okt-board-lane-count {
@@ -3339,8 +3322,7 @@ a.okt-card:focus-visible,
   padding: 2px 0;
 }
 .okt-board-card-key {
-  font-size: 10.5px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: 12px; font-weight: 600;
   color: var(--text-soft);
   align-self: start;
 }
@@ -3355,8 +3337,7 @@ a.okt-card:focus-visible,
 .okt-list-card th[scope="row"] {
   text-align: left;
   vertical-align: top;
-  font-size: 10.5px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: 12px; font-weight: 600;
   color: var(--text-soft);
   padding: 8px 12px;
   width: 1%;
@@ -4813,8 +4794,6 @@ a.compare-card-link:hover {
 .compare-card.compare-card-link .bar-chart-title {
   margin: 0 0 6px;
   font-size: 12px;
-  text-transform: lowercase;
-  letter-spacing: 0.02em;
   color: var(--text);
   text-align: center;
   font-weight: 600;
@@ -6452,8 +6431,6 @@ oku-chart .okc-quadrant {
 oku-chart .okc-quadrant-label {
   fill: var(--text-soft);
   font: 600 10.5px 'Inter', sans-serif;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 oku-chart .okc-legend {
   /* Same halo trick for legend chip text — keeps the label readable
@@ -6538,8 +6515,6 @@ oku-chart .okc-donut-total {
 oku-chart .okc-donut-caption {
   fill: var(--text-soft);
   font: 500 10.5px 'Inter', sans-serif;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 /* Interactive non-Cartesian legends — clicking a legend item toggles
    the matching slice / cell / area's visibility. Hidden shapes fade
@@ -6971,8 +6946,6 @@ oku-chart .okc-bullet .okc-bullet-readout {
 oku-chart .okc-slope .okc-slope-col {
   fill: var(--text-soft);
   font: 600 12px 'Inter', sans-serif;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 oku-chart .okc-slope .okc-slope-readout {
   fill: var(--text);
@@ -7262,10 +7235,8 @@ oku-chart .okc-legend-chip.off .okc-legend { fill: var(--text-faint); text-decor
 }
 .okc-tooltip.visible { opacity: 1; }
 .okc-tooltip .okc-tt-series {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 12px;
+  font-weight: 650;
   color: var(--accent-strong);
   margin-bottom: 2px;
 }
@@ -7289,9 +7260,7 @@ oku-chart .okc-legend-chip.off .okc-legend { fill: var(--text-faint); text-decor
 .okc-tooltip .okc-tt-kv dt {
   color: var(--text-soft);
   margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 10.5px;
+  font-size: 11.5px;
 }
 .okc-tooltip .okc-tt-kv dd {
   margin: 0;
@@ -7823,9 +7792,7 @@ oku-snippet .okt-snippet-preview {
 }
 .example-pair .example-title {
   grid-column: 1 / -1;
-  font: 600 12px 'Inter', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font: 600 13px 'Inter', sans-serif;
   color: var(--accent-strong);
 }
 .example-pair .example-code,
@@ -7835,9 +7802,7 @@ oku-snippet .okt-snippet-preview {
   min-width: 0;
 }
 .example-pair .example-col-label {
-  font: 600 10.5px 'Inter', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font: 600 12px 'Inter', sans-serif;
   color: var(--text-soft);
   margin-bottom: 6px;
 }
@@ -7902,9 +7867,7 @@ oku-snippet .okt-snippet-preview {
    buttons on the left, under the body text instead of over its edge. */
 .okt-copy-bar > .okt-copy-actions:only-child { margin-left: auto; }
 .okt-copy-role {
-  font: 600 10.5px 'Inter', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font: 600 12px 'Inter', sans-serif;
   color: var(--text-faint);
 }
 .okt-copy-actions { display: inline-flex; gap: 6px; }
@@ -8054,8 +8017,6 @@ oku-chart .okc-scatter-matrix .okc-sm-cell-diag:hover {
 oku-chart .okc-scatter-matrix .okc-sm-label {
   fill: var(--text);
   font: 600 12px 'Inter', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 /* Correlation coefficient chip in each off-diagonal cell. Faint
    when weak (|r| < 0.7), accent-strong when the relationship
@@ -8079,8 +8040,6 @@ oku-chart .okc-parcoord .okc-parcoord-axis {
 oku-chart .okc-parcoord .okc-parcoord-label {
   fill: var(--text-soft);
   font: 600 10.5px 'Inter', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 oku-chart .okc-parcoord .okc-parcoord-line {
   fill: none;
@@ -8334,9 +8293,7 @@ oku-chart .okc-pareto .okc-pareto-80-label {
 .okc-tooltip .okc-tt-pin-hint {
   display: block;
   margin-top: 4px;
-  font-size: 9.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 10.5px;
   color: var(--text-faint);
   opacity: 0.7;
 }
