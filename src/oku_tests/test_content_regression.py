@@ -2630,9 +2630,12 @@ class TestBarPopoverScaffolding:
     def test_bar_mode_chips_emitted(self, repo_root: Path) -> None:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
         assert "data-bar-mode" in js, "Bar-family popover must emit data-bar-mode chip row"
-        assert "[['single', 'bar'], ['stacked', 'stacked-bar'], ['grouped', 'grouped-bar']]" in js, (
-            "Bar mode chips must map single/stacked/grouped to their respective types"
-        )
+        # Each chip pairs its mode with the type it switches to; the third
+        # field is the chip's word, looked up in the page's language.
+        for mode, kind in (("single", "bar"), ("stacked", "stacked-bar"), ("grouped", "grouped-bar")):
+            assert f"['{mode}', '{kind}', menuWord(" in js, (
+                "Bar mode chips must map single/stacked/grouped to their respective types"
+            )
 
     def test_bar_orientation_chips_emitted(self, repo_root: Path) -> None:
         js = (repo_root / "kit" / "chrome.js").read_text(encoding="utf-8")
