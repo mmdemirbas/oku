@@ -1828,6 +1828,27 @@ column names, which are marked `data-oku-verbatim` — a column named
 `View` was coming back as `Görünüm` in that list while the header above
 the column read `View`.
 
+**The table panel was one of eight, and the rule is the class: anything
+built when the reader acts looks its words up where it builds them.**
+The chart configuration panel, every chart reading's pin hint and close
+button, the glossary card's `Learn more` and pin hint, the board view's
+`All` lane, the lightbox's close and zoom buttons — each was built after
+the localize pass and wrote its words as English literals, every one of
+them already in the Turkish table, unused. `test_i18n_runtime.py` could
+not see it: it sweeps the page as it loads, which is the one state none
+of them exist in. The donut's `total` is the ninth and the odd one, since
+it is drawn at RENDER, which on a served page can be before the table
+arrives — so it is looked up then AND carries `data-oku-t` for the pass
+that runs once the table lands, under `menu:` because `Total` is a word
+an author writes in a table header. A namespaced key the table lacks
+falls back to its English word in that pass, never to the key. Held by
+`browser/test_words_built_on_demand.py`, which does each thing a reader
+does and sweeps after every step, in both delivery modes. What is left
+of this family is named, not fixed: a chart reading's field names
+(`value`, `median`, `share`, about fifty of them) are English on every
+page, and some are the author's own field names, so they cannot simply
+be looked up.
+
 **A control moved into a popover is not in its toolbar any more.**
 `setView` updated the buttons with `ctrl.querySelectorAll` at click
 time, and the popover MOVES them out of `ctrl` while it is open.

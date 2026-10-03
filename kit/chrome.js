@@ -164,11 +164,11 @@ var __okuLightbox = (function () {
     overlay.className = 'okt-lightbox';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', 'Expanded view');
+    overlay.setAttribute('aria-label', okuT('Expanded view'));
     overlay.innerHTML =
       '<div class="okt-lightbox-backdrop"></div>' +
       '<div class="okt-lightbox-frame">' +
-      '  <button type="button" class="okt-lightbox-close" aria-label="Close" title="Close (Esc)">' + ICON_CROSS + '</button>' +
+      '  <button type="button" class="okt-lightbox-close" aria-label="' + escapeXml(okuT('Close')) + '" title="' + escapeXml(okuT('Close (Esc)')) + '">' + ICON_CROSS + '</button>' +
       '  <div class="okt-lightbox-content" tabindex="-1"></div>' +
       '</div>';
     overlay.querySelector('.okt-lightbox-backdrop').addEventListener('click', close);
@@ -240,10 +240,16 @@ var __okuLightbox = (function () {
       stage.appendChild(inner);
       var toolbar = document.createElement('div');
       toolbar.className = 'okt-lightbox-pz-toolbar';
+      // Looked up at the call, not inside the helper: the coverage test
+      // finds a kit string by its literal okuT('…'), and a variable hides it.
+      var pzBtn = function (pz, title, label, glyph) {
+        return '<button type="button" data-pz="' + pz + '" title="' + escapeXml(title) +
+               '" aria-label="' + escapeXml(label) + '">' + glyph + '</button>';
+      };
       toolbar.innerHTML =
-        '<button type="button" data-pz="out"   title="Zoom out (-)"     aria-label="Zoom out">−</button>' +
-        '<button type="button" data-pz="reset" title="Reset / fit (0)"  aria-label="Reset zoom">⤢</button>' +
-        '<button type="button" data-pz="in"    title="Zoom in (+)"      aria-label="Zoom in">+</button>';
+        pzBtn('out', okuT('Zoom out (-)'), okuT('Zoom out'), '−') +
+        pzBtn('reset', okuT('Reset / fit (0)'), okuT('Reset zoom'), '⤢') +
+        pzBtn('in', okuT('Zoom in (+)'), okuT('Zoom in'), '+');
       stage.appendChild(toolbar);
       holder.appendChild(stage);
       __okuPanZoom.attach(stage, inner, toolbar);
@@ -619,6 +625,9 @@ var __okuI18n = (function () {
               args.push(el.getAttribute('data-oku-t' + ai));
             }
             var next = t.apply(null, args);
+            // A namespaced key the table lacks falls back to its English
+            // word, as menuWord and railKind do — never to the key.
+            if (next === tpl) next = tpl.replace(/^(?:menu|rail):/, '');
             if (el.children.length === 0) {
               el.textContent = next;
             } else if (el.firstChild && el.firstChild.nodeType === 3) {
@@ -2038,7 +2047,7 @@ var __okuChartConfig = (function () {
     popover.className = 'okc-config-popover';
     popover.setAttribute('role', 'dialog');
     popover.setAttribute('aria-modal', 'false');
-    popover.setAttribute('aria-label', 'Chart configuration');
+    popover.setAttribute('aria-label', okuT('Chart configuration'));
     popover.hidden = true;
     document.body.appendChild(popover);
     document.addEventListener('keydown', function (e) {
@@ -2082,13 +2091,13 @@ var __okuChartConfig = (function () {
     var rows = [];
     rows.push(
       '<div class="okc-cfg-head">' +
-        '<span class="okc-cfg-title">Configure chart</span>' +
-        '<button type="button" class="okc-cfg-close" aria-label="Close">' + ICON_CROSS + '</button>' +
+        '<span class="okc-cfg-title">' + escapeXml(okuT('Configure chart')) + '</span>' +
+        '<button type="button" class="okc-cfg-close" aria-label="' + escapeXml(okuT('Close')) + '">' + ICON_CROSS + '</button>' +
       '</div>'
     );
     if (compat.length > 1) {
       rows.push('<label class="okc-cfg-row">' +
-        '<span class="okc-cfg-label">Type</span>' +
+        '<span class="okc-cfg-label">' + escapeXml(okuT('Type')) + '</span>' +
         '<select class="okc-cfg-select" data-cfg="type">' +
           compat.map(function (c) {
             var sel = c.type === host._type ? ' selected' : '';
@@ -2098,7 +2107,8 @@ var __okuChartConfig = (function () {
       '</label>');
     } else {
       rows.push('<div class="okc-cfg-row okc-cfg-hint">' +
-        'Type <code>' + host._type + '</code> has no shape-compatible alternatives yet.' +
+        escapeXml(okuT('Type {0} has no shape-compatible alternatives yet.'))
+          .split('{0}').join('<code>' + escapeXml(host._type) + '</code>') +
       '</div>');
     }
     // Cartesian — marks combo. Bubble + quadrant share the same
@@ -2106,11 +2116,11 @@ var __okuChartConfig = (function () {
     if (host._type === 'scatter' || host._type === 'line' || host._type === 'area' || host._type === 'plot' || host._type === 'bubble' || host._type === 'quadrant') {
       var marks = host._marks || (host._type === 'scatter' ? ['dots'] : host._type === 'line' ? ['line'] : host._type === 'area' ? ['line', 'area'] : ['dots']);
       rows.push('<div class="okc-cfg-row">' +
-        '<span class="okc-cfg-label">Marks</span>' +
+        '<span class="okc-cfg-label">' + escapeXml(okuT('Marks')) + '</span>' +
         '<div class="okc-cfg-chips" data-cfg="marks">' +
-          ['dots', 'line', 'area'].map(function (m) {
-            var on = marks.indexOf(m) !== -1;
-            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-mark="' + m + '">' + m + '</button>';
+          [['dots', menuWord('Dots')], ['line', menuWord('Line')], ['area', menuWord('Area')]].map(function (pair) {
+            var m = pair[0], on = marks.indexOf(m) !== -1;
+            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-mark="' + m + '">' + escapeXml(pair[1]) + '</button>';
           }).join('') +
         '</div>' +
       '</div>');
@@ -2121,21 +2131,21 @@ var __okuChartConfig = (function () {
     if (host._type === 'bar' || host._type === 'stacked-bar' || host._type === 'grouped-bar') {
       var barMode = host._type === 'stacked-bar' ? 'stacked' : host._type === 'grouped-bar' ? 'grouped' : 'single';
       rows.push('<div class="okc-cfg-row">' +
-        '<span class="okc-cfg-label">Mode</span>' +
+        '<span class="okc-cfg-label">' + escapeXml(okuT('Mode')) + '</span>' +
         '<div class="okc-cfg-chips" data-cfg="bar-mode">' +
-          [['single', 'bar'], ['stacked', 'stacked-bar'], ['grouped', 'grouped-bar']].map(function (pair) {
+          [['single', 'bar', menuWord('Single')], ['stacked', 'stacked-bar', menuWord('Stacked')], ['grouped', 'grouped-bar', menuWord('Grouped')]].map(function (pair) {
             var on = pair[0] === barMode;
-            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-bar-mode="' + pair[1] + '">' + pair[0] + '</button>';
+            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-bar-mode="' + pair[1] + '">' + escapeXml(pair[2]) + '</button>';
           }).join('') +
         '</div>' +
       '</div>');
       var barOrient = host.getAttribute('orientation') || 'horizontal';
       rows.push('<div class="okc-cfg-row">' +
-        '<span class="okc-cfg-label">Orientation</span>' +
+        '<span class="okc-cfg-label">' + escapeXml(okuT('Orientation')) + '</span>' +
         '<div class="okc-cfg-chips" data-cfg="bar-orient">' +
-          ['horizontal', 'vertical'].map(function (o) {
-            var on = o === barOrient;
-            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-orient="' + o + '">' + o + '</button>';
+          [['horizontal', menuWord('Horizontal')], ['vertical', menuWord('Vertical')]].map(function (pair) {
+            var o = pair[0], on = o === barOrient;
+            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-orient="' + o + '">' + escapeXml(pair[1]) + '</button>';
           }).join('') +
         '</div>' +
       '</div>');
@@ -2144,24 +2154,24 @@ var __okuChartConfig = (function () {
     if (host._type === 'donut' || host._type === 'pie') {
       var mode = host._type === 'pie' ? 'pie' : 'donut';
       rows.push('<div class="okc-cfg-row">' +
-        '<span class="okc-cfg-label">Mode</span>' +
+        '<span class="okc-cfg-label">' + escapeXml(okuT('Mode')) + '</span>' +
         '<div class="okc-cfg-chips" data-cfg="arc-mode">' +
-          ['pie', 'donut'].map(function (m) {
-            var on = m === mode;
-            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-mode="' + m + '">' + m + '</button>';
+          [['pie', menuWord('Pie')], ['donut', menuWord('Donut')]].map(function (pair) {
+            var m = pair[0], on = m === mode;
+            return '<button type="button" class="okc-cfg-chip' + (on ? ' on' : '') + '" data-mode="' + m + '">' + escapeXml(pair[1]) + '</button>';
           }).join('') +
         '</div>' +
       '</div>');
       rows.push('<div class="okc-cfg-row">' +
-        '<span class="okc-cfg-label">Arc start (deg)</span>' +
+        '<span class="okc-cfg-label">' + escapeXml(menuWord('Arc start (deg)')) + '</span>' +
         '<input type="number" class="okc-cfg-num" data-cfg="arc-start" min="-360" max="720" step="15" value="' + (host._arcStart !== null && host._arcStart !== undefined ? host._arcStart : 0) + '">' +
       '</div>');
       rows.push('<div class="okc-cfg-row">' +
-        '<span class="okc-cfg-label">Arc end (deg)</span>' +
+        '<span class="okc-cfg-label">' + escapeXml(menuWord('Arc end (deg)')) + '</span>' +
         '<input type="number" class="okc-cfg-num" data-cfg="arc-end" min="-360" max="720" step="15" value="' + (host._arcEnd !== null && host._arcEnd !== undefined ? host._arcEnd : 360) + '">' +
       '</div>');
       rows.push('<div class="okc-cfg-row">' +
-        '<span class="okc-cfg-label">Inner radius</span>' +
+        '<span class="okc-cfg-label">' + escapeXml(okuT('Inner radius')) + '</span>' +
         '<input type="number" class="okc-cfg-num" data-cfg="inner-radius" min="0" max="0.95" step="0.05" value="' + (host._innerRadius !== null && host._innerRadius !== undefined ? host._innerRadius : (host._type === 'pie' ? 0 : 0.55)) + '">' +
       '</div>');
     }
@@ -6428,7 +6438,7 @@ function initReadingAids() {
           var head = document.createElement('div');
           head.className = 'okt-board-lane-head';
           if (key === '__all__') {
-            head.innerHTML = '<span class="okt-board-lane-title">All</span>' +
+            head.innerHTML = '<span class="okt-board-lane-title">' + escapeXml(okuT('All')) + '</span>' +
                              '<span class="okt-board-lane-count">' + rows.length + '</span>';
           } else {
             var title = (key.label || key.title || key.key || '').toString();
@@ -6873,7 +6883,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-03-r105';
+var __okuKitBuild = '2026-10-03-r106';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -7616,8 +7626,10 @@ var __okuTooltip = (function () {
     // quote in it closed the attribute and the rest became markup. The
     // ext-ref path escaped the same field and this one did not.
     var safeLink = link ? __okuSafeUrl(link) : '';
-    if (safeLink) html += '<div class="okt-link"><a href="' + safeLink + '" target="_blank" rel="noopener">Learn more →</a></div>';
-    html += '<span class="okt-pin-hint">click to pin</span>';
+    if (safeLink) html += '<div class="okt-link"><a href="' + safeLink + '" target="_blank" rel="noopener">' + escapeXml(okuT('Learn more')) + ' →</a></div>';
+    // Built on hover, after the localize pass has run — so the words are
+    // looked up here or they stay English on a translated page.
+    html += '<span class="okt-pin-hint">' + escapeXml(okuT('click to pin')) + '</span>';
     t.innerHTML = html;
     return t;
   }
@@ -9667,7 +9679,10 @@ class OkuChart extends HTMLElement {
     // so the readout would overlay a slice. Skip it for pie.
     if (!isPie) {
       parts.push('<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" class="okc-donut-total">' + escapeXml(fmtNum(total)) + '</text>');
-      parts.push('<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" class="okc-donut-caption">total</text>');
+      // Drawn when the chart renders, which on a served page can be
+      // before the string table has arrived — so the word is looked up
+      // now AND named for the localize pass that runs once it lands.
+      parts.push('<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" class="okc-donut-caption" data-oku-t="menu:Total">' + escapeXml(menuWord('Total')) + '</text>');
     }
 
     // Legend on the right side, one row per slice.
@@ -13973,8 +13988,8 @@ class OkuChart extends HTMLElement {
       var closeBtn = document.createElement('button');
       closeBtn.type = 'button';
       closeBtn.className = 'okc-tt-close';
-      closeBtn.setAttribute('aria-label', 'Close tooltip');
-      closeBtn.setAttribute('title', 'Close (Esc)');
+      closeBtn.setAttribute('aria-label', okuT('Close tooltip'));
+      closeBtn.setAttribute('title', okuT('Close (Esc)'));
       closeBtn.textContent = '×'; // ×
       closeBtn.addEventListener('click', function (ev) {
         ev.stopPropagation();
@@ -14105,7 +14120,7 @@ class OkuChart extends HTMLElement {
       // unchanged; on one that does not -- `quadrant` is the only
       // shipped example -- this was the one reading in the kit a reader
       // could see and had no way to keep.
-      html += '<span class="okc-tt-pin-hint">click to pin</span>';
+      html += '<span class="okc-tt-pin-hint">' + escapeXml(okuT('click to pin')) + '</span>';
       rebuildTipBody(tip, html);
       tip.setAttribute('aria-hidden', 'false');
       // `position: fixed` tooltip — anchor at viewport coords so the
@@ -14387,7 +14402,7 @@ class OkuChart extends HTMLElement {
         html += '</dl>';
       }
       if (payload.footer) html += '<div class="okc-tt-coords">' + escapeXml(payload.footer) + '</div>';
-      html += '<span class="okc-tt-pin-hint">click to pin</span>';
+      html += '<span class="okc-tt-pin-hint">' + escapeXml(okuT('click to pin')) + '</span>';
       rebuildTipBody(tip, html);
       tip.setAttribute('aria-hidden', 'false');
       placeTooltipAt(tip, sx, sy - 8);
@@ -14430,7 +14445,7 @@ class OkuChart extends HTMLElement {
       // node group recording nothing at all. The pin could never fire,
       // and printing the offer anyway is the kit telling a reader to do
       // something that does nothing.
-      if (payload.pinnable !== false) html += '<span class="okc-tt-pin-hint">click to pin</span>';
+      if (payload.pinnable !== false) html += '<span class="okc-tt-pin-hint">' + escapeXml(okuT('click to pin')) + '</span>';
       rebuildTipBody(tip, html);
       tip.setAttribute('aria-hidden', 'false');
       // Viewport-relative + clamped position (tooltip is
@@ -14887,7 +14902,7 @@ function __okuEnhanceBarCharts(root) {
       if (feet[0] && feet.every(function (s) { return s === feet[0]; })) {
         html += '<div class="okc-tt-coords">' + escapeXml(feet[0]) + '</div>';
       }
-      html += '<span class="okc-tt-pin-hint">click to pin</span>';
+      html += '<span class="okc-tt-pin-hint">' + escapeXml(okuT('click to pin')) + '</span>';
       t.innerHTML = html;
       // A list of rows needs more width than a single reading, and the
       // 240px clamp squeezed the numbers until "26.9 GB" wrapped and
