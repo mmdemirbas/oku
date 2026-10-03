@@ -102,21 +102,24 @@ def page(built, browser):
     context.close()
 
 
+# Every reading is of the #cases table. The page holds two more, and a
+# document-wide selector mixed their rows into the row heights — worse,
+# into `hiddenHeight`, which measured them against THIS table's edge.
 MEASURE = """() => {
-  const scroll = document.querySelector('.okt-table-scroll');
+  const scroll = document.querySelector('main section#cases .okt-table-scroll');
   const table = scroll.querySelector('table');
-  const cell = (t) => [...document.querySelectorAll('.okt-table-scroll td code')]
+  const cell = (t) => [...scroll.querySelectorAll('td code')]
       .filter(c => c.textContent.trim() === t)[0];
   const lines = (el) => el ? Math.round(el.getBoundingClientRect().height
       / parseFloat(getComputedStyle(el).lineHeight || 21)) : null;
-  const phrase = [...document.querySelectorAll('.okt-table-scroll td code')]
+  const phrase = [...scroll.querySelectorAll('td code')]
       .find(c => c.textContent.length > 40);
   return {
     tableW: Math.round(table.getBoundingClientRect().width),
     scrollW: Math.round(scroll.getBoundingClientRect().width),
     scrollRight: Math.round(scroll.getBoundingClientRect().right),
     sideways: scroll.scrollWidth - scroll.clientWidth,
-    headers: [...document.querySelectorAll('.okt-table-scroll thead th')]
+    headers: [...scroll.querySelectorAll('thead th')]
         .map(th => ({text: th.textContent.trim().replace(/\\s+$/, ''),
                      right: Math.round(th.getBoundingClientRect().right)})),
     phraseMarked: phrase ? phrase.dataset.okuPhrase === '1' : null,
@@ -124,12 +127,12 @@ MEASURE = """() => {
     dateMarked: cell('2026-12-31') ? cell('2026-12-31').dataset.okuPhrase === '1' : null,
     dateLines: lines(cell('2026-12-31')),
     identLines: lines(cell('cast_ntz_to_date')),
-    tallestRow: Math.max(...[...document.querySelectorAll('.okt-table-scroll tbody tr')]
+    tallestRow: Math.max(...[...scroll.querySelectorAll('tbody tr')]
         .map(t => Math.round(t.getBoundingClientRect().height))),
     // How much taller each row is than the tallest cell the reader can
     // see in it: a row's height is its tallest cell's, so anything left
     // over came from a cell past the scroller's edge.
-    hiddenHeight: Math.max(...[...document.querySelectorAll('.okt-table-scroll tbody tr')].map(tr => {
+    hiddenHeight: Math.max(...[...scroll.querySelectorAll('tbody tr')].map(tr => {
       const edge = scroll.getBoundingClientRect().right + 1;
       const content = (c) => { const r = document.createRange(); r.selectNodeContents(c);
                                return r.getBoundingClientRect().height; };
