@@ -54,6 +54,15 @@ PARAS = {
     "bold": "Kalın **https://example.com/z** bağlantı olur.",
     "angle": "Açılı <https://example.com/q> tek bağlantıdır.",
     "code": "Kod `https://example.com/code` kod kalır.",
+    "email": "Yazın: ad.soyad+oku@example.com.tr. Sonraki cümle.",
+    "emailAngle": "Açılı <kisi@example.org> tek bağlantıdır.",
+    "emailLineStart": "<kisi@example.org> satır başında da bağlantıdır, ada değil.",
+    "emailScheme": "Önekli mailto:kisi@example.org de bağlantıdır.",
+    "emailNoDot": "Noktasız kisi@localhost bağlantı olmaz.",
+    "emailTail": "Sonu tireli kisi@example.org- bağlantı olmaz.",
+    "emailGlued": "Kelimeye yapışık çağrı.ad@example.org yarım bağlanmaz.",
+    "emailInUrl": "Kullanıcılı https://kisi@example.org/yol yarım bağlanmaz.",
+    "emailCode": "Kod `kisi@example.org` kod kalır.",
 }
 
 PAGE = {
@@ -153,6 +162,35 @@ def test_bold_angle_and_code_forms(cases):
     assert cases["bold"]["strongLinks"] == 1, cases["bold"]
     assert cases["angle"]["links"] == [["https://example.com/q"] * 2], cases["angle"]
     assert cases["code"]["links"] == [], cases["code"]
+
+
+def test_a_bare_email_address_is_a_mailto_link(cases):
+    """GFM's extended email autolink. The full stop is the sentence's, as
+    it is for a URL, and `+` is part of the local part."""
+    c = cases["email"]
+    assert c["links"] == [["mailto:ad.soyad+oku@example.com.tr", "ad.soyad+oku@example.com.tr"]], c
+    assert c["text"].endswith(".com.tr. Sonraki cümle."), c
+    assert cases["emailAngle"]["links"] == [["mailto:kisi@example.org", "kisi@example.org"]], cases[
+        "emailAngle"
+    ]
+    assert cases["emailScheme"]["links"] == [["mailto:kisi@example.org"] * 2], cases["emailScheme"]
+    # At the start of a line `<kisi` could read as a tag opening an HTML
+    # island; `@` is not a tag-name character, so it is a paragraph.
+    assert cases["emailLineStart"]["links"] == [["mailto:kisi@example.org", "kisi@example.org"]], cases[
+        "emailLineStart"
+    ]
+
+
+def test_what_is_not_an_address_stays_text(cases):
+    for case in ("emailNoDot", "emailTail", "emailGlued", "emailCode"):
+        assert cases[case]["links"] == [], (case, cases[case])
+    assert cases["emailGlued"]["text"] == PARAS["emailGlued"], cases["emailGlued"]
+    # A URL carrying a user part was never a link here (its host is not a
+    # host), and the address inside it must not be picked out as half of
+    # one: the run stays one piece of text.
+    c = cases["emailInUrl"]
+    assert c["links"] == [], c
+    assert c["text"] == PARAS["emailInUrl"], c
 
 
 def test_a_bare_url_in_a_table_cell_is_a_link(page, served):

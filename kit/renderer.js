@@ -478,7 +478,7 @@
      enters the pattern is a substitution rather than a copy. Compiled
      per parseInline call (as the literal was), because parseInline
      recurses and `lastIndex` is per-object state. */
-  const INLINE_RE_SOURCE = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|(`+)([\s\S]+?)\2(?!`)|!\[((?:[^\[\]]|\[[^\[\]]*\])*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[((?:[^\[\]]|\[(?:[^\[\]]|\[[^\[\]]*\])*\])+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+)>|<(__TAGS__)(\s+[^<>]*)?>([\s\S]*?)<\/\15\s*>|<br\s*\/?>|\[\^([^\]]+?)\]|\[([^\]]+?)\]\[([^\]]*?)\]|\[([^\]^][^\]]*?)\]|((?:https?:\/\/|www\.)[^\s<]+)/
+  const INLINE_RE_SOURCE = /\\([\\`*_{}[\]()#+\-.!|~<>&"'])|(`+)([\s\S]+?)\2(?!`)|!\[((?:[^\[\]]|\[[^\[\]]*\])*?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\s][^*]*?)\*|_([^_\s][^_]*?)_|\[((?:[^\[\]]|\[(?:[^\[\]]|\[[^\[\]]*\])*\])+?)\]\((#[gx]\/[^)\n]+?|[^)\s]+?)(?:\s+"([^"]*)")?\)|<((?:https?|mailto):[^>\s]+|[A-Za-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*)>|<(__TAGS__)(\s+[^<>]*)?>([\s\S]*?)<\/\15\s*>|<br\s*\/?>|\[\^([^\]]+?)\]|\[([^\]]+?)\]\[([^\]]*?)\]|\[([^\]^][^\]]*?)\]|((?:https?:\/\/|www\.)[^\s<]+|(?:mailto:)?[A-Za-z0-9._+-]+@[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+)/
     .source.replace('__TAGS__', INLINE_HTML_PAIRED.join('|'));
 
   /* An allow-listed inline tag is REBUILT, never passed through: the
@@ -537,7 +537,9 @@
     // Groups: 1 escape · 2,3 code (fence run + body) · 4,5 image ·
     // 6,7 strong · 8 strike · 9,10 em · 11,12,13 link · 14 autolink ·
     // 15,16,17 inline HTML · 18 footnote ref · 19,20 reference link ·
-    // 21 shortcut reference · 22 bare URL (GFM's extended autolink). A code span opens with N backticks and
+    // 21 shortcut reference · 22 bare URL or email address (GFM's
+    // extended autolinks). Group 14 takes CommonMark's `<a@b.c>` too.
+    // A code span opens with N backticks and
     // closes on the next run of exactly N — the CommonMark rule that
     // lets ``a `b` c`` hold a backtick.
     // The three reference forms sit last: they are the loosest patterns
@@ -571,8 +573,10 @@
       // the words of another link. Declining skips the whole run, so the
       // address stays one piece of text rather than being re-scanned.
       let bare = null;
+      const isUrl = m[22] !== undefined && /^(?:https?:\/\/|www\.)/i.test(m[22]);
       if (m[22] !== undefined) {
-        bare = __inLinkLabel ? null : bareUrl(text, m.index, m[22]);
+        bare = __inLinkLabel ? null
+             : isUrl ? bareUrl(text, m.index, m[22]) : bareEmail(text, m.index, m[22]);
         if (bare === null) {
           re.lastIndex = m.index + m[0].length;
           continue;
@@ -580,7 +584,9 @@
       }
       if (m.index > pos) host.appendChild(textNode(text.slice(pos, m.index)));
       if (bare !== null) {
-        host.appendChild(renderLink(bare, /^www\./i.test(bare) ? 'http://' + bare : bare));
+        const href = !isUrl ? (/^mailto:/i.test(bare) ? bare : 'mailto:' + bare)
+                   : /^www\./i.test(bare) ? 'http://' + bare : bare;
+        host.appendChild(renderLink(bare, href));
         pos = m.index + bare.length;
         re.lastIndex = pos;
         continue;
@@ -604,7 +610,7 @@
       } else if (m[11] !== undefined) {
         host.appendChild(renderLink(m[11], m[12], m[13]));
       } else if (m[14] !== undefined) {
-        host.appendChild(renderLink(m[14], m[14]));
+        host.appendChild(renderLink(m[14], /^(?:https?|mailto):/i.test(m[14]) ? m[14] : 'mailto:' + m[14]));
       } else if (m[15] !== undefined) {
         host.appendChild(inlineHtmlElement(m[15], m[16], m[17]));
       } else if (m[18] !== undefined) {
@@ -652,6 +658,21 @@
     if (labels.slice(-2).some(function (l) { return l.indexOf('_') !== -1; })) return null;
     if (/^www\./i.test(url) ? host.length <= 4 : !/^https?:\/\/./i.test(url)) return null;
     return url;
+  }
+
+  /* GFM's extended email autolink: a local part of letters, digits and
+     `.` `-` `_` `+`, an `@`, then dot-separated labels of letters,
+     digits, `-` and `_`, at least one dot — so `kisi@localhost` stays
+     text. The pattern already leaves a sentence's full stop out. A
+     domain ending in `-` or `_` is not an address and nothing is linked,
+     as the spec says; and a local part glued to a letter the pattern
+     cannot take (`çağrı.ad@x.org` would link `.ad@x.org`) is half a
+     word, so that is declined too rather than linking the half. */
+  function bareEmail(text, index, run) {
+    if (/[-_]$/.test(run)) return null;
+    const before = index > 0 ? text.charAt(index - 1) : '';
+    if (before && /[\p{L}\p{N}]/u.test(before)) return null;
+    return run;
   }
 
   // True when neither end of an underscore run touches a word character.

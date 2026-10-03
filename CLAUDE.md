@@ -618,7 +618,14 @@ closing `)` joins only when the URL opened one, the host needs a dot,
 the URL must start at a boundary, and never inside another link's
 words — `parseLabel` counts that depth, because an element under
 construction is not attached to its `<a>` yet and `closest('a')` cannot
-answer. Held by `browser/test_link_text_and_bare_urls.py`.
+answer. An email address is the same rule's other half: GFM's extended
+email autolink (local part of letters, digits and `.-_+`, a domain with
+at least one dot, never ending in `-` or `_`) becomes a `mailto:` link,
+and so does CommonMark's `<kisi@example.org>`. Two refusals go beyond
+the spec: a local part glued to a letter the pattern cannot take
+(`çağrı.ad@…`) is half a word and stays text, and an address inside a
+URL with a user part is not picked out of it. Held by
+`browser/test_link_text_and_bare_urls.py`.
 
 **A viewed document is read, not run.** An island in a PAGE keeps full
 capability — the author wrote it into their own page and `oku check`
