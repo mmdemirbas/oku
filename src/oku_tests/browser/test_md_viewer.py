@@ -195,6 +195,30 @@ def test_the_path_is_the_full_path_on_this_machine(page, site_url):
     assert state["dir"] == docs, state["dir"]
 
 
+def test_a_viewer_opened_before_the_manifest_names_the_full_path_once_it_lands(page, site_url):
+    """Under `oku serve` the full path comes from `root_abs`, which rides
+    in the manifest the page FETCHES. Under load (`pytest -n 8`) the
+    viewer opened first: it showed `/docs/` as the directory, offered no
+    editor, and kept both for as long as it stayed open. The manifest is
+    held here until the viewer is open, which makes the rare order
+    certain."""
+    held = []
+    page.route("**/site-manifest.json", lambda route: held.append(route))
+    state = _open_viewer(page, site_url)
+    # Vacuity: the request was really held, and the viewer really opened
+    # without the full path — otherwise this tests the ordinary order.
+    assert held, "the manifest was never requested, so nothing was held"
+    docs = (Path(__file__).resolve().parents[3] / "docs").as_posix() + "/"
+    assert state["dir"] != docs, state
+    held[0].continue_()
+    page.wait_for_function(
+        "(d) => document.querySelector('.okt-mdview .okt-mdview-dir').textContent === d",
+        arg=docs,
+        timeout=10000,
+    )
+    assert page.locator(".okt-mdview .okt-mdview-editor").count() == 1
+
+
 def test_an_island_href_reaches_the_viewer_too(page, site_url):
     """A relative href inside an island is not rewritten by the renderer,
     so it arrives here saying `.md`. This is the shape that sent readers

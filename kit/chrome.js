@@ -1565,6 +1565,32 @@ var __okuMdViewer = (function () {
     return box;
   }
 
+  /* The path line and the actions both depend on WHERE the file is, and
+     under `oku serve` that is known only once the manifest has arrived —
+     it carries `root_abs`. Measured under load: a viewer opened before
+     then showed `/docs/` as the file's directory and offered no editor,
+     and kept both for as long as it stayed open. So this half is drawn
+     on its own, and drawn again when the manifest lands. */
+  function drawWhere(item) {
+    var wrap = state.wrap;
+    var w = where(item);
+    var dirLen = w.shown.length - baseName(w.shown).length;
+    wrap.querySelector('.okt-mdview-dir').textContent = w.shown.slice(0, dirLen);
+    wrap.querySelector('.okt-mdview-file').textContent = w.shown.slice(dirLen);
+    wrap.querySelector('.okt-mdview-path').title = w.shown;
+    wrap.querySelector('.okt-viewer-meta').textContent = item.ref ? __okuFileMeta(item.ref) : '';
+
+    var oldActions = wrap.querySelector('.okt-mdview-actions');
+    oldActions.parentNode.replaceChild(actionsFor(item), oldActions);
+    wrap.setAttribute('data-kind', item.kind);
+    if (item.kind === 'markdown') setView(item, item.view || 'rendered');
+    else wrap.removeAttribute('data-view');
+  }
+  window.addEventListener('oku:manifest', function () {
+    var item = state && state.wrap && state.wrap.isConnected ? current() : null;
+    if (item) drawWhere(item);
+  });
+
   function render() {
     var item = current();
     var wrap = state.wrap;
@@ -1589,18 +1615,7 @@ var __okuMdViewer = (function () {
     wrap.querySelector('.okt-viewer-back').hidden = state.at === 0;
     wrap.setAttribute('data-depth', String(state.at + 1));
 
-    var w = where(item);
-    var dirLen = w.shown.length - baseName(w.shown).length;
-    wrap.querySelector('.okt-mdview-dir').textContent = w.shown.slice(0, dirLen);
-    wrap.querySelector('.okt-mdview-file').textContent = w.shown.slice(dirLen);
-    wrap.querySelector('.okt-mdview-path').title = w.shown;
-    wrap.querySelector('.okt-viewer-meta').textContent = item.ref ? __okuFileMeta(item.ref) : '';
-
-    var oldActions = wrap.querySelector('.okt-mdview-actions');
-    oldActions.parentNode.replaceChild(actionsFor(item), oldActions);
-    wrap.setAttribute('data-kind', item.kind);
-    if (item.kind === 'markdown') setView(item, item.view || 'rendered');
-    else wrap.removeAttribute('data-view');
+    drawWhere(item);
 
     var body = wrap.querySelector('.okt-mdview-body');
     while (body.firstChild) body.removeChild(body.firstChild);
@@ -6883,7 +6898,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-03-r110';
+var __okuKitBuild = '2026-10-03-r111';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -18005,8 +18020,10 @@ class PageNav extends HTMLElement {
       }
       loadManifest()
         .then(function (manifest) {
-          // The file viewer reads `root_abs` off it (served only).
+          // The file viewer reads `root_abs` off it (served only), and
+          // redraws a path it drew before this arrived.
           window.__okuSiteManifest = manifest;
+          window.dispatchEvent(new CustomEvent('oku:manifest'));
           // The switch first: it is what stamps `data-lang` on <html>,
           // and both the string table and _renderTree read that.
           __okuLangSwitch.build(manifest);
