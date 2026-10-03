@@ -134,6 +134,21 @@ same stepped right edge in a different guise, and the exemption is
 gone. Columns distribute the slack; `table-layout: auto` gives each its
 content share.
 
+The other direction holds too: a table WIDER than the column scrolls
+inside it and does not bleed past the right edge. When the reading
+measure narrowed the column to 900px, the tables that scroll sideways
+in a 336-table research tree went from 9 to 29; breaking long tokens at
+their joints, a tighter cell padding on wide tables and dropping the
+per-cell floor brought that to 16. Those 16 — mostly six or more
+columns of long words, a few five-column tables of short code tokens —
+were accepted as they are on 2026-10-03, against two alternatives:
+letting a wide table run past the right edge, which breaks this rule,
+and setting dense tables in smaller type, which costs every row its
+legibility to save a scroll on some. The scroll keeps its sticky
+header, and the width control opens the column for a reader who wants
+the whole table at once. Reopen if the count grows past those 16 on the
+same tree, or a reader reports a table they could not read.
+
 ## The rail does not move — and opening it is not moving. {#the-rail-does-not-move-and-opening-it-is-not-mov}
 
 **The rail does not move — and opening it is not moving.** The rail is
