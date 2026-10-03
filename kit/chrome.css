@@ -4110,6 +4110,7 @@ figure.okt-figure figcaption {
 .bar-row .bar-fill.warn    { background: var(--warning); }
 .bar-row .bar-fill.danger  { background: var(--danger); }
 .bar-row .bar-fill.success { background: var(--success); }
+.bar-row .bar-fill.muted   { background: var(--text-soft); }
 .bar-row .bar-value {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 12px;
