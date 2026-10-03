@@ -1218,13 +1218,13 @@ var __okuEditors = (function () {
          Windows path is not offered rather than offered broken. */
   var list = [
     { id: 'vscode', name: 'VS Code',
-      href: function (abs) { return 'vscode://file' + urlPath(abs); } },
+      href: function (abs, line) { return 'vscode://file' + urlPath(abs) + (line ? ':' + line : ''); } },
     { id: 'idea', name: 'IntelliJ IDEA',
       when: function () { return onMac(); },
-      href: function (abs) { return 'idea://open?file=' + encodeURIComponent(String(abs)) + '&line=1'; } },
+      href: function (abs, line) { return 'idea://open?file=' + encodeURIComponent(String(abs)) + '&line=' + (line || 1); } },
     { id: 'zed', name: 'Zed',
       when: function (abs) { return !drive(abs); },
-      href: function (abs) { return 'zed://file' + urlPath(abs); } },
+      href: function (abs, line) { return 'zed://file' + urlPath(abs) + (line ? ':' + line : ''); } },
   ];
 
   function forPath(abs) {
@@ -1411,12 +1411,12 @@ var __okuMdViewer = (function () {
 
   /* The editor control: one link to the chosen editor and a caret that
      lists all of them, or — before anything is chosen — the list alone. */
-  function editorControl(abs) {
+  function editorControl(abs, line) {
     var box = el('div', 'okt-mdview-editor');
     var pick = __okuEditors.chosen(abs);
     if (pick) {
       var go = el('a', 'okt-mdview-editor-go');
-      go.href = pick.href(abs);
+      go.href = pick.href(abs, line);
       go.title = okuT('Open in {0}', pick.name);
       go.setAttribute('aria-label', go.title);
       go.innerHTML = ICON_EDITOR;
@@ -1445,7 +1445,7 @@ var __okuMdViewer = (function () {
       a.setAttribute('role', 'menuitemradio');
       a.setAttribute('aria-checked', String(!!pick && pick.id === ed.id));
       a.setAttribute('data-editor', ed.id);
-      a.href = ed.href(abs);
+      a.href = ed.href(abs, line);
       a.addEventListener('click', function () {
         __okuEditors.choose(ed.id);
         // Redrawn after the navigation has been handed off, so the bar
@@ -1552,7 +1552,7 @@ var __okuMdViewer = (function () {
       box.appendChild(open);
     }
     var abs = where(item).abs;
-    if (abs) box.appendChild(editorControl(abs));
+    if (abs) box.appendChild(editorControl(abs, item.line));
     return box;
   }
 
@@ -1650,6 +1650,32 @@ var __okuMdViewer = (function () {
     } else if (typeof initReadingAids === 'function') {
       initReadingAids();
     }
+    if (item.line) revealLine(item, pre);
+  }
+
+  /* Mark the named line and bring it into view. The rows exist only
+     once the line-numbering pass has split the block, which happens
+     after Prism's `complete` and therefore not on any schedule this
+     function can name — so it waits for them, and gives up after a few
+     seconds with the file shown from the top rather than at a guess. */
+  function revealLine(item, pre) {
+    var tries = 0;
+    (function look() {
+      var rows = pre.querySelectorAll('code > .okt-code-line');
+      if (!rows.length) {
+        if (++tries < 120) requestAnimationFrame(look);
+        return;
+      }
+      var first = rows[Math.min(item.line, rows.length) - 1];
+      for (var n = item.line; n <= Math.min(item.lineEnd || item.line, rows.length); n++) {
+        rows[n - 1].classList.add('okt-line-hit');
+      }
+      var body = state && state.wrap.querySelector('.okt-mdview-body');
+      if (!body || current() !== item) return;
+      var top = first.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
+      body.scrollTop = Math.max(0, top - body.clientHeight / 3);
+      item.scroll = body.scrollTop;
+    })();
   }
 
   function drawMarkdown(item) {
@@ -1662,6 +1688,7 @@ var __okuMdViewer = (function () {
       item.text = text;
       fill(item, text);
       if (!item.node.isConnected) item.drawnDetached = true;
+      if (item.line) revealLine(item, item.node.querySelector('.okt-mdview-source'));
       if (item.frag) {
         var target = document.getElementById(item.idPrefix + item.frag);
         if (target) target.scrollIntoView();
@@ -1878,9 +1905,12 @@ var __okuMdViewer = (function () {
   function openRef(ref) {
     var kind = ref.kind === 'markdown' ? 'markdown'
       : (ref.kind === 'image' || ref.kind === 'video' || ref.kind === 'audio') ? 'media' : 'text';
+    // A line in a markdown file is a line of its SOURCE, so that is the
+    // view it opens in.
     present({
       kind: kind, name: ref.name || baseName(ref.path), path: ref.path, rel: ref.rel || null,
-      text: ref.text, ref: ref, frag: '',
+      text: ref.text, ref: ref, frag: '', line: ref.line || null, lineEnd: ref.lineEnd || ref.line || null,
+      view: ref.line && kind === 'markdown' ? 'source' : undefined,
     });
   }
 
@@ -6843,7 +6873,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-03-r103';
+var __okuKitBuild = '2026-10-03-r104';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -8269,6 +8299,33 @@ function __okuFileRef(path) {
   return Object.prototype.hasOwnProperty.call(map, path) ? map[path] : null;
 }
 
+/* A reference may name a line or a range — `cli.py:120`, `cli.py:120-140`
+   — the form compilers print and every editor takes. The same rule as
+   the build's `split_line_suffix`: the suffix is read only when the
+   whole string found nothing, so a file named `notes:2` stays reachable,
+   and the build carries the file once under the path without it. */
+function __okuSplitLine(path) {
+  var m = /^(.*[^\s:]):(\d+)(?:-(\d+))?$/.exec(String(path || ''));
+  if (!m) return null;
+  var a = +m[2], b = m[3] ? +m[3] : a;
+  if (a < 1) return null;
+  // Drawn ordered; `oku check` reports a range written backwards.
+  return { path: m[1], line: Math.min(a, b), end: Math.max(a, b) };
+}
+
+/* A window of a text around a line, numbered, for the hover card. */
+function __okuFileWindow(text, line, end, rows, width) {
+  var all = String(text).split('\n');
+  var first = Math.max(1, Math.min(line - 2, all.length - rows + 1));
+  var out = [];
+  for (var n = first; n < first + rows && n <= all.length; n++) {
+    var t = all[n - 1];
+    if (t.length > width) t = t.slice(0, width) + '…';
+    out.push({ n: n, text: t, hit: n >= line && n <= end });
+  }
+  return out;
+}
+
 /* Bytes as a reader reads them. Sizes appear beside a filename, where
    three significant figures is noise: 41 KB, not 41,231 bytes. */
 function __okuFileSize(n) {
@@ -8390,6 +8447,22 @@ function __okuFileCard(ref) {
   var media = __okuFileMedia(ref, true);
   if (media) {
     card.appendChild(media);
+  } else if (ref.text != null && ref.line) {
+    // A reference to a line previews that line: the twelve rows around
+    // it, numbered, the named ones marked — the top of a 2,000-line file
+    // says nothing about line 1,200.
+    var wpre = document.createElement('pre');
+    wpre.className = 'okt-fp-card-pre okt-fp-card-window';
+    var wcode = document.createElement('code');
+    __okuFileWindow(ref.text, ref.line, ref.lineEnd || ref.line, 12, 120).forEach(function (row) {
+      var r = document.createElement('span');
+      r.className = 'okt-fp-card-row' + (row.hit ? ' okt-fp-card-hit' : '');
+      r.setAttribute('data-n', String(row.n));
+      r.textContent = row.text;
+      wcode.appendChild(r);
+    });
+    wpre.appendChild(wcode);
+    card.appendChild(wpre);
   } else if (ref.text != null) {
     var pre = document.createElement('pre');
     pre.className = 'okt-fp-card-pre';
@@ -8460,13 +8533,22 @@ class OkuFilePath extends HTMLElement {
     // a lookup by place can answer it — the page's own keys are paths
     // relative to the page, and the same string can name another file.
     var base = this.closest('[data-oku-file-base]');
-    var found = base
-      ? __okuFileStore.lookup(base.getAttribute('data-oku-file-base'), path)
-      : __okuFileRef(path);
+    var find = function (p) {
+      return base ? __okuFileStore.lookup(base.getAttribute('data-oku-file-base'), p) : __okuFileRef(p);
+    };
+    var found = find(path);
+    var at = found ? null : __okuSplitLine(path);
+    if (at) found = find(at.path);
+    if (!found) at = null;
     // A copy: the entry is shared by every chip naming that file, and
     // each chip keeps the path its own author wrote.
     var ref = found ? Object.assign({}, found, { path: path })
       : { path: path, name: path.split('/').pop(), status: 'unknown' };
+    if (at) {
+      ref.line = at.line;
+      ref.lineEnd = at.end;
+      ref.name = (found.name || at.path.split('/').pop()) + ':' + at.line + (at.end > at.line ? '-' + at.end : '');
+    }
     this._ref = ref;
 
     this.className = 'okt-fp';

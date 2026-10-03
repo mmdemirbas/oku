@@ -681,11 +681,15 @@ class TestPayloadBudget:
     # with the source each was read from, the chooser, its keyboard and
     # its measured placement, and the phone's icon-only actions. About
     # 10,500 bytes.
-    KIT_BUDGET_BYTES = 1_420_000
+    # Then from 1,420,000 by a phone capsule that opens the contents and by
+    # file references that name a line (the suffix rule, the card's row
+    # window, marking and revealing the line, the editor link's line).
+    # 6,052 bytes measured against 97d6549, 1,440 of them the capsule.
+    KIT_BUDGET_BYTES = 1_430_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
-    STANDALONE_BUDGET_BYTES = 1_422_000
+    STANDALONE_BUDGET_BYTES = 1_432_000
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

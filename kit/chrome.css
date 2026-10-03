@@ -5284,6 +5284,22 @@ footer {
   max-height: 220px;
   overflow: hidden;
 }
+/* A reference to a line previews the rows around it, numbered, the
+   named ones marked. One block per row so the mark spans the width. */
+.okt-fp-card-window code { display: block; }
+.okt-fp-card-row { display: block; min-height: 1.45em; white-space: pre; }
+.okt-fp-card-row::before {
+  content: attr(data-n);
+  display: inline-block;
+  width: 4ch;
+  margin-right: 1.2ch;
+  text-align: right;
+  color: var(--text-faint);
+  user-select: none;
+}
+.okt-fp-card-hit { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
+/* The line a reference named, in the viewer. */
+.okt-code-line.okt-line-hit { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 .okt-fp-card-pre code {
   font: 400 11px/1.5 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--text-soft);

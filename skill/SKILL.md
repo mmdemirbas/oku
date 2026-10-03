@@ -246,8 +246,13 @@ entry to write.
      writing; run `--fix` over a page you have converted from somewhere
      else. The path resolves against the page's directory first, then
      the project root, so the root-relative spelling prose already uses
-     works. The bytes travel inside the page, so the file must be inside
-     the project and under the size cap; `oku check` reports both.
+     works. A line or a range goes after a colon — `[`cli.py:120`](#f/src/oku/cli.py:120)`,
+     `#f/…:120-140` — the way a compiler prints it: the card previews
+     those rows and the viewer opens on them, so a sentence about one
+     function points at that function rather than at the top of a
+     2,000-line file. The bytes travel inside the page, so the file must
+     be inside the project and under the size cap; `oku check` reports
+     both, and a line past the end of the file.
    - `oku spec` lists the three inline kinds (`filepath`,
      `glossary-term`, `ext-ref`) beside the fences, and `oku spec
      filepath` prints the syntax with a note on when to reach for it.

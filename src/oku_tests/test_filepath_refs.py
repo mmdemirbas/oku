@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from oku import cli
 
 
@@ -498,3 +500,97 @@ def test_a_trailing_slash_names_a_directory_even_where_a_file_has_that_name(tmp_
     (root / "notes").write_text("gitdir: elsewhere\n", encoding="utf-8")
     assert _spans(root, root / "docs" / "page.md", "Look in `../notes/` for it.") == []
     assert cli.resolve_file_ref("../notes/", root / "docs" / "page.md")[1] == "missing"
+
+
+# ---------- a reference to a line ----------
+
+
+def _lines(root: Path, n: int = 40) -> Path:
+    f = root / "src" / "long.py"
+    f.write_text("".join(f"line_{i} = {i}\n" for i in range(1, n + 1)), encoding="utf-8")
+    return f
+
+
+def test_the_line_suffix_is_read_only_off_the_end():
+    """`path:line` and `path:line-end`, the form compilers print and every
+    editor takes; anything else is a path."""
+    cases = {
+        "src/a.py:12": ("src/a.py", 12, None),
+        "a.py:12-20": ("a.py", 12, 20),
+        "a.py": ("a.py", None, None),
+        "a:b.py": ("a:b.py", None, None),
+        "a.py:": ("a.py:", None, None),
+        "a.py:x": ("a.py:x", None, None),
+    }
+    assert {h: cli.split_line_suffix(h) for h in cases} == cases
+
+
+def test_a_line_names_a_place_in_the_file_and_the_file_is_carried_once(tmp_path):
+    """Two references to two lines of one file are one file in the page,
+    under its own path — carrying it twice would double a 400 KB source
+    for nothing, and the runtime takes the line off the chip anyway."""
+    root = _project(tmp_path)
+    _lines(root)
+    page = {
+        "k": "doc",
+        "t": "Page",
+        "m": {"summary": "s"},
+        "b": ["## S {#s}", "[a](#f/../src/long.py:12) and [b](#f/../src/long.py:30-33)"],
+    }
+    refs = cli.collect_file_refs(page, root / "docs" / "p.md")
+    assert list(refs) == ["../src/long.py"], list(refs)
+    assert refs["../src/long.py"]["status"] == "ok" and refs["../src/long.py"]["lines"] == 40
+
+
+def test_a_file_whose_name_ends_in_a_number_is_that_file(tmp_path):
+    """Zed's rule: the whole string is tried as a path first."""
+    root = _project(tmp_path)
+    (root / "docs" / "notes:2").write_text("x\n", encoding="utf-8")
+    target, status, key, line, _end = cli.resolve_file_line("notes:2", root / "docs" / "p.md")
+    assert (status, key, line) == ("ok", "notes:2", None)
+
+
+def test_a_line_reference_that_resolves_is_reported_by_nothing(tmp_path):
+    root = _project(tmp_path)
+    _lines(root)
+    codes = _codes(root, root / "docs" / "p.md", "#f/../src/long.py:12", "#f/../src/long.py:38-40")
+    assert not [c for c in codes if c.startswith("filepath-")], codes
+
+
+@pytest.mark.parametrize(
+    ("ref", "says"),
+    [
+        ("#f/../src/long.py:41", "has 40 line(s)"),
+        ("#f/../src/long.py:20-10", "ends at 10, before it starts at 20"),
+        ("#f/../src/long.py:39-45", "has 40 line(s)"),
+    ],
+)
+def test_a_line_the_file_does_not_have_is_a_warning(tmp_path, ref, says):
+    root = _project(tmp_path)
+    _lines(root)
+    p, page = _page(root / "docs" / "p.md", ref)
+    issues = [i for i in cli.check_pages([(p, page)], root) if i["code"] == "filepath-line"]
+    assert len(issues) == 1 and says in issues[0]["message"], issues
+
+
+def test_a_line_in_an_image_is_a_warning(tmp_path):
+    root = _project(tmp_path)
+    (root / "docs" / "shot.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * 16)
+    p, page = _page(root / "docs" / "p.md", "#f/shot.png:3")
+    issues = [i for i in cli.check_pages([(p, page)], root) if i["code"] == "filepath-line"]
+    assert len(issues) == 1 and "no lines" in issues[0]["message"], issues
+
+
+def test_a_code_span_naming_a_line_is_nudged_and_fixed(tmp_path):
+    """`src/long.py:12` in a code span is the commonest way a document
+    points at code, and it names a real file — the nudge and the fix
+    treat it as one, and the chip they write keeps the line."""
+    root = _project(tmp_path)
+    _lines(root)
+    spans = _spans(root, root / "docs" / "p.md", "See `src/long.py:12` for it.")
+    assert len(spans) == 1, spans
+    after, moved = cli._rewrite_code_span_paths(
+        "See `src/long.py:12` for it.\n",
+        lambda t: cli.resolve_file_line(t, root / "docs" / "p.md")[1] == "ok",
+    )
+    assert "[`src/long.py:12`](#f/src/long.py:12)" in after and moved == ["src/long.py:12"], (after, moved)

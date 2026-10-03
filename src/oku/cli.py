@@ -4276,7 +4276,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         # will not open is reported at build time rather than found by
         # a reader clicking it.
         for where, href, ref_line in file_refs:
-            target, status = resolve_file_ref(href, p)
+            target, status, key, at_line, at_end = resolve_file_line(href, p)
             if status == "missing":
                 add(
                     p,
@@ -4301,7 +4301,28 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                     line=ref_line,
                 )
                 continue
-            payload = _file_ref_payload(href, p)
+            payload = _file_ref_payload(key, p)
+            if at_line is not None:
+                lines = payload.get("lines")
+                why = None
+                if at_end is not None and at_end < at_line:
+                    why = f"the range ends at {at_end}, before it starts at {at_line}"
+                elif payload.get("kind") not in ("text", "markdown"):
+                    why = f"'{key}' is {payload.get('kind', 'not text')}, which has no lines"
+                elif lines is not None and max(at_line, at_end or 0) > lines:
+                    why = f"'{key}' has {lines} line(s)"
+                elif at_line < 1:
+                    why = "lines are counted from 1"
+                if why:
+                    add(
+                        p,
+                        "warning",
+                        "filepath-line",
+                        f"{where} #f/{href}",
+                        f"'{href}' names line {at_line}{'-' + str(at_end) if at_end else ''}, and {why}. "
+                        "The chip opens the file without marking a line.",
+                        line=ref_line,
+                    )
             if payload.get("status") == "over-cap":
                 add(
                     p,
@@ -4344,7 +4365,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             if is_materialised or not _looks_like_a_path(text):
                 continue
             if text not in span_counts:
-                _target, status = resolve_file_ref(text, p)
+                status = resolve_file_line(text, p)[1]
                 if status != "ok":
                     span_counts[text] = 0
                     continue
@@ -5198,7 +5219,7 @@ def apply_path_chip_fixes(issues: list[dict], root: Path) -> list[tuple[Path, li
             before = src.read_text(encoding="utf-8")
         except OSError:
             continue
-        after, moved = _rewrite_code_span_paths(before, lambda t: resolve_file_ref(t, src)[1] == "ok")
+        after, moved = _rewrite_code_span_paths(before, lambda t: resolve_file_line(t, src)[1] == "ok")
         if not moved or after == before:
             continue
         src.write_text(after, encoding="utf-8")
@@ -6590,6 +6611,42 @@ def resolve_file_ref(href: str, page_src: Path) -> tuple[Path | None, str]:
     return target, status
 
 
+# A reference may name a line or a range: `cli.py:120`, `cli.py:120-140`
+# — the form compilers print and every editor takes. The suffix is read
+# only when the whole string is not itself a file, which is Zed's rule
+# and the reason a file named `notes:2` stays reachable.
+_LINE_SUFFIX_RE = re.compile(r"^(.*[^\s:]):(\d+)(?:-(\d+))?$")
+
+
+def split_line_suffix(href: str) -> tuple[str, int | None, int | None]:
+    """`(path, line, end)` for `path:line[-end]`, else `(href, None, None)`."""
+    m = _LINE_SUFFIX_RE.match(href)
+    if not m:
+        return href, None, None
+    return m.group(1), int(m.group(2)), int(m.group(3)) if m.group(3) else None
+
+
+def resolve_file_line(href: str, page_src: Path) -> tuple[Path | None, str, str, int | None, int | None]:
+    """`resolve_file_ref` for a reference that may carry a line.
+
+    Returns `(target, status, key, line, end)`, where `key` is the path
+    the file is carried under: the whole href when it names a file, the
+    path without the suffix when only that does. A suffix whose base
+    does not resolve either reports the WHOLE href, which is what the
+    author wrote and what the runtime will fail to find.
+    """
+    target, status = resolve_file_ref(href, page_src)
+    if status == "ok":
+        return target, status, href, None, None
+    base, line, end = split_line_suffix(href)
+    if line is None:
+        return target, status, href, None, None
+    b_target, b_status = resolve_file_ref(base, page_src)
+    if b_status == "ok":
+        return b_target, b_status, base, line, end
+    return target, status, href, None, None
+
+
 def _file_kind(target: Path) -> tuple[str, str]:
     """(kind, mime) for a resolved file. `kind` is what the reader gets:
     a preview they can look at, or a line saying what the file is."""
@@ -6705,6 +6762,8 @@ def collect_file_closure(refs: dict[str, dict], src: Path) -> dict[str, dict]:
         for href in dict.fromkeys(hrefs):
             if not href:
                 continue
+            # A line is a place in a file the closure carries whole.
+            href = resolve_file_line(href, carrier_path)[2]
             payload = _file_ref_payload(href, carrier_path, root)
             rel = payload.get("rel")
             if payload.get("status") != "ok" or not rel or rel in seen:
@@ -6737,8 +6796,14 @@ def collect_file_refs(page_data, src: Path) -> dict[str, dict]:
             continue
         for href in _MD_FILE_REF_RE.findall(_strip_code(text)):
             href = href.strip()
-            if href and href not in refs:
-                refs[href] = _file_ref_payload(href, src)
+            if not href:
+                continue
+            # `cli.py:120` and `cli.py:300` are one file, carried once
+            # under its own path; the runtime takes the line off the
+            # element's own attribute, the same way.
+            key = resolve_file_line(href, src)[2]
+            if key not in refs:
+                refs[key] = _file_ref_payload(key, src)
     return refs
 
 

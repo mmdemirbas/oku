@@ -1237,6 +1237,29 @@ measurement because the control sits at the left of a code file's bar.
 Held by `browser/test_open_in_editor.py`, with the platform pinned so
 the runner's own OS cannot decide what is expected.
 
+**A reference can name a line.** `#f/path:120` and `#f/path:120-140`,
+the form compilers print and editors take — a sentence about one
+function should land on that function, not on the top of a 2,000-line
+file. Two rules decide it and both sides apply them identically
+(`split_line_suffix` / `resolve_file_line` in cli.py, `__okuSplitLine`
+in chrome.js): the whole string is tried as a path first, which is
+Zed's rule and keeps a file named `notes:2` reachable; and the file is
+carried ONCE, under the path without the suffix — keyed per line, a
+page naming five lines of a 400 KB source would carry it five times.
+The card previews the twelve rows around the line, numbered, the named
+ones marked; the viewer marks them and scrolls them to a third of the
+frame, after WAITING for the rows, because the line-numbering pass runs
+from Prism's `complete` on no schedule a caller can name; a line of a
+markdown file opens its Source view, since that is what the number
+counts; the editor link carries the line. `filepath-line` reports a
+line past the end, a range written backwards, and a line in a file that
+has none. The nudge and `--fix` read `src/x.py:12` in a code span as
+the file it names, so the commonest way a document points at code
+becomes a chip that keeps its line. Held by
+`browser/test_filepath_lines.py`, all six of whose cases fail against
+the kit without the runtime half, and by the line section of
+`test_filepath_refs.py`.
+
 **A card appears when the pointer arrives, not when the page moves under
 it.** `mouseenter` fires when a layer above an element goes away, so
 closing the popup a chip opened put that chip's card back under a cursor

@@ -2359,7 +2359,7 @@
   "inline": {
     "filepath": {
       "markdown": "The resolver lives in [`src/oku/cli.py`](#f/src/oku/cli.py).",
-      "note": "A path the reader can look inside: hover for a preview, click to open (markdown in the kit's viewer, an image or video inline, anything else as highlighted source), copy button for the path itself. Use it wherever you would otherwise have put a path in a code span. Resolved against the page's own directory first, then the project root; the bytes travel inside the page, so the file must be inside the project and under the size cap. `oku check` reports filepath-missing, filepath-outside and filepath-not-carried."
+      "note": "A path the reader can look inside: hover for a preview, click to open (markdown in the kit's viewer, an image or video inline, anything else as highlighted source), copy button for the path itself. Use it wherever you would otherwise have put a path in a code span. Resolved against the page's own directory first, then the project root; the bytes travel inside the page, so the file must be inside the project and under the size cap. Add `:120` or `:120-140` to name a line or a range: the card previews those rows, the viewer opens on them marked, and the editor link carries the line. `oku check` reports filepath-missing, filepath-outside, filepath-line and filepath-not-carried."
     },
     "glossary-term": {
       "markdown": "Compaction rewrites [small files](#g/small-files) into larger ones.",
