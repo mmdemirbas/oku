@@ -12,6 +12,43 @@ carries the record, including what was measured before and after.
 
 ---
 
+## A `muted` series in a bar chart is filled with the accent colour; its legend swatch is grey
+
+**Symptom.** In a `stacked-bar` with one `accent` and one `muted` series, both
+fills are the same indigo, while the legend shows indigo and grey. The reader
+cannot tell the two series apart, and the legend points them to the wrong one.
+Found in a real page (bilgebaykus `docs/kalite/kultur-bakis-2026-10-03.md`,
+four series, "Karma" accent and "Başka" muted); worked around there by dropping
+the muted series.
+
+**Minimal reproduction.** One page, nothing else, built with `oku build`, opened
+as `dist/standalone/index.html` (kept in `tmp/muted-repro/`):
+
+```oku-chart
+{"type":"stacked-bar","title":"MUTEDREPRO","categories":["a","b"],"series":[{"label":"acc","color":"accent","values":[30,50]},{"label":"mut","color":"muted","values":[70,50]}]}
+```
+
+**Expected vs actual.** Expected: the `muted` fill has the swatch colour,
+`var(--text-soft)` — rgb(84, 80, 73) in the light theme. Actual, computed style
+of `.bar-fill.muted`: rgb(99, 102, 241), which is `--accent`; the
+`.bar-chart-legend-swatch` beside it is rgb(84, 80, 73).
+
+**Where it was localised.** `kit/chrome.css` has `.bar-row .bar-fill.warn`,
+`.danger` and `.success` (installed 0.6.5 assets: lines 4079-4081) and a muted
+swatch rule, `.bar-chart-legend-chip.muted .bar-chart-legend-swatch` (line
+4153), but no `.bar-row .bar-fill.muted`. A muted fill therefore keeps the base
+`.bar-row .bar-fill` background, the accent.
+
+**Observed.** The computed colours above, in Chromium through Playwright, oku
+0.6.5, kit 2026-10-02-r102, light theme, horizontal stacked bar, 2026-10-03.
+
+**Inferred from reading source, not executed.** That the missing rule is the
+whole cause (not yet tested by adding it); that `grouped-bar`, `bar` and the
+vertical orientation fail the same way, since they share `.bar-row .bar-fill`;
+the dark theme was not checked.
+
+---
+
 No other open defects.
 
 The five that were here are closed:
