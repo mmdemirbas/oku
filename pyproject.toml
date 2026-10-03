@@ -39,6 +39,10 @@ dev = [
     # they auto-skip when the chromium binary isn't installed
     # (`playwright install chromium` to enable).
     "pytest-playwright>=0.5",
+    # Opt-in: `uv run pytest -n 8` runs the suite in about 5 minutes
+    # against 13-21 serially. Not in addopts — the serial run stays the
+    # default, and the parallel one is also how order races surface.
+    "pytest-xdist>=3.8",
 ]
 
 [project.urls]

@@ -169,7 +169,8 @@ oku check --strict            # exit 1 on warnings too
 oku build                     # writes dist/{standalone,site}/
 oku verify                    # opens BOTH built trees in a browser
 oku serve --no-watch          # local server (live-reload on by default)
-uv run pytest -q              # 1500+ tests; should all pass
+uv run pytest -q              # 2500+ tests; should all pass
+uv run pytest -q -n 8         # the same in parallel, ~5 min against 13-21
 uv run ruff check . && uv run ruff format --check .
 ```
 
