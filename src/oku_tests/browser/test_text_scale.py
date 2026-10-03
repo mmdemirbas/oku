@@ -141,6 +141,11 @@ def test_the_chrome_does_not_move(page, site_url):
 
 def test_the_sidebar_text_scales_but_the_sidebar_does_not(page, site_url):
     _open(page, site_url)
+    # The tree is drawn from the manifest, which a served page FETCHES —
+    # under load it arrived after page_quiet, and the row this test
+    # measures was not there to measure (navLink: None).
+    page.wait_for_selector(".page-nav-tree a", state="attached")
+    _wait.box_stable(page, ".page-nav-tree a")
     before = page.evaluate(GEOMETRY)
     _set(page, 1.5)
     after = page.evaluate(GEOMETRY)

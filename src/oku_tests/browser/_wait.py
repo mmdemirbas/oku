@@ -179,18 +179,37 @@ def stable(
 
     A passing run pays `samples` polling intervals, not the ceiling.
     """
-    page.evaluate("() => { window.__okuWaitSig = undefined; window.__okuWaitHits = 0; }")
-    call = f"({expression})({json.dumps(arg)})" if arg is not None else f"({expression})()"
-    until(
-        page,
-        "() => {"
-        f" const sig = JSON.stringify({call});"
-        " if (window.__okuWaitSig === sig) window.__okuWaitHits++;"
-        " else { window.__okuWaitSig = sig; window.__okuWaitHits = 0; }"
-        f" return window.__okuWaitHits >= {samples}; }}",
-        timeout=timeout,
-        what=what or f"{expression} stopped changing",
+    page.evaluate(
+        "() => { window.__okuWaitSig = undefined; window.__okuWaitHits = 0;"
+        " window.__okuWaitPolls = 0; window.__okuWaitTrail = []; }"
     )
+    call = f"({expression})({json.dumps(arg)})" if arg is not None else f"({expression})()"
+    try:
+        until(
+            page,
+            "() => {"
+            f" const sig = JSON.stringify({call});"
+            " window.__okuWaitPolls++;"
+            " if (window.__okuWaitSig === sig) window.__okuWaitHits++;"
+            " else { window.__okuWaitSig = sig; window.__okuWaitHits = 0;"
+            "        window.__okuWaitTrail.push([Math.round(performance.now()), sig]);"
+            "        if (window.__okuWaitTrail.length > 12) window.__okuWaitTrail.shift(); }"
+            f" return window.__okuWaitHits >= {samples}; }}",
+            timeout=timeout,
+            what=what or f"{expression} stopped changing",
+        )
+    except AssertionError as exc:
+        # "Never settled" says nothing about WHY. How many polls ran and
+        # what the value did tell a starved page (few polls) from one
+        # that kept moving (many changes) from one that oscillated (two
+        # values alternating) — the three need three different fixes.
+        try:
+            seen = page.evaluate("() => ({ polls: window.__okuWaitPolls, trail: window.__okuWaitTrail })")
+        except Exception:  # noqa: BLE001 - the page may be gone; the original error stands
+            raise exc from None
+        raise AssertionError(
+            f"{exc} — {seen['polls']} polls, last changes [ms, value]: {seen['trail']}"
+        ) from exc
 
 
 def measured(page, expression: str, arg=None, *, samples: int = 3, timeout: int = DEFAULT_TIMEOUT):
