@@ -6883,7 +6883,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-03-r109';
+var __okuKitBuild = '2026-10-03-r110';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
@@ -8646,6 +8646,10 @@ if (!customElements.get('oku-filepath')) customElements.define('oku-filepath', O
  *     pin one. Renderers that have many series fall back via
  *     pickColor(series.color, seriesIdx).
  * --------------------------------------------------------------- */
+/* The ONE tone table. Every renderer reads this object rather than a
+ * copy of it: thirty renderers once carried their own literal, and two
+ * of them had lost `muted` — the same drift that left the bar family's
+ * CSS with a muted swatch and no muted fill. */
 var __okuChartPalette = {
   accent: 'var(--accent)',
   warn: 'var(--warning)',
@@ -9601,7 +9605,7 @@ class OkuChart extends HTMLElement {
       this.appendChild(document.createTextNode(''));
       return;
     }
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var W = 420, H = 320;
     var cx = 140, cy = H / 2;
     var rOuter = 110;
@@ -9940,7 +9944,7 @@ class OkuChart extends HTMLElement {
     var total = x.total || (gRows * gCols);
     var totalCells = gRows * gCols;
     // Build a flat array of [tone] per cell, by walking segments in order.
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var fills = [];
     segments.forEach(function (seg, sIdx) {
       var cells = Math.round((Math.max(0, +seg.count || 0) / total) * totalCells);
@@ -10042,7 +10046,7 @@ class OkuChart extends HTMLElement {
              ' L ' + ix1 + ' ' + iy1 +
              ' A ' + sr + ' ' + sr + ' 0 0 ' + (1 - sweep) + ' ' + ix2 + ' ' + iy2 + ' Z';
     }
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Gauge') + ': ' + val + '" class="okc-svg okc-gauge">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
@@ -10204,7 +10208,7 @@ class OkuChart extends HTMLElement {
       var ang = -Math.PI / 2 + i * (2 * Math.PI / axes.length);
       return [cx + Math.cos(ang) * R, cy + Math.sin(ang) * R];
     }
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Radar') + '" class="okc-svg okc-radar">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
@@ -10304,7 +10308,7 @@ class OkuChart extends HTMLElement {
     if (vmin === vmax) { vmin -= 1; vmax += 1; }
     var span = vmax - vmin;
     function sx(v) { return pad.left + ((v - vmin) / span) * plotW; }
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Box plot') + '" class="okc-svg okc-boxplot">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
@@ -10367,7 +10371,7 @@ class OkuChart extends HTMLElement {
     if (vmin === vmax) { vmin -= 1; vmax += 1; }
     var span = vmax - vmin;
     function sy(v) { return pad.top + (H - pad.top - pad.bottom) - ((v - vmin) / span) * (H - pad.top - pad.bottom); }
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Box plot') + '" class="okc-svg okc-boxplot">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
@@ -10436,7 +10440,7 @@ class OkuChart extends HTMLElement {
     var pad = { top: this._title ? 36 : 16, left: labelFit.gutter, right: readoutFit.gutter };
     var H = pad.top + tracks.length * rowH + 12;
     var plotW = W - pad.left - pad.right;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Bullet chart') + '" class="okc-svg okc-bullet">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
@@ -10532,7 +10536,7 @@ class OkuChart extends HTMLElement {
     if (vmin === vmax) { vmin -= 1; vmax += 1; }
     function sy(v) { return pad.top + plotH - ((v - vmin) / (vmax - vmin)) * plotH; }
     var leftX = pad.left, rightX = W - pad.right;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Slope chart') + '" class="okc-svg okc-slope">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
@@ -10796,7 +10800,7 @@ class OkuChart extends HTMLElement {
     var titleTop = this._title ? 28 : 0;
     var pad = 8;
     var area = { x: pad, y: titleTop + pad, w: W - pad * 2, h: H - titleTop - pad * 2 };
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     // Squarified treemap — pure JS port. Goal: keep each row's aspect
     // ratio near 1.
     function worstRatio(row, w) {
@@ -10914,7 +10918,7 @@ class OkuChart extends HTMLElement {
     if (lo === hi) { lo -= 1; hi += 1; }
     // Each ridge: bin its values into ~30 bins over [lo,hi].
     var bins = 30, binW = (hi - lo) / bins;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Ridgeline') + '" class="okc-svg okc-ridgeline">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="22" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
@@ -11070,7 +11074,7 @@ class OkuChart extends HTMLElement {
     var H              = titleTop + stages.length * stageH + 12;
     var maxVal = stages.reduce(function (m, s) { return Math.max(m, +s.value || 0); }, 0);
     if (maxVal <= 0) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var bandCenter = (bandLeft + bandRight) / 2;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Funnel') + '" class="okc-svg okc-funnel">');
@@ -11126,7 +11130,7 @@ class OkuChart extends HTMLElement {
     var nodes = (x.nodes || []).slice();
     var links = (x.links || []).slice();
     if (nodes.length < 2 || !links.length) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     // Index nodes by id; compute incoming/outgoing totals.
     var byId = {};
     nodes.forEach(function (n) { n._in = 0; n._out = 0; n._adj = []; byId[n.id] = n; });
@@ -11234,7 +11238,7 @@ class OkuChart extends HTMLElement {
     var nodes = (x.nodes || []).slice();
     var links = (x.links || []).slice();
     if (nodes.length < 2 || !links.length) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var W = 640, H = this._title ? 460 : 420;
     var titleTop = this._title ? 28 : 12;
     var byId = {};
@@ -11456,7 +11460,7 @@ class OkuChart extends HTMLElement {
     var vars = (x.variables || []).slice();
     var records = (x.records || []).slice();
     if (vars.length < 2 || records.length < 2) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var n = vars.length;
     var W = 640, H = 640;
     var titleTop = this._title ? 28 : 12;
@@ -11554,7 +11558,7 @@ class OkuChart extends HTMLElement {
     var vars = (x.variables || []).slice();
     var records = (x.records || []).slice();
     if (vars.length < 2 || records.length < 1) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var W = 720, H = 360;
     // Three rows share the space above the plot and only two were
     // budgeted for: the title at y=20, each axis's MAX tick at
@@ -11634,7 +11638,7 @@ class OkuChart extends HTMLElement {
     var matrix = x.matrix || [];
     if (groups.length < 2 || !matrix.length) return;
     var n = groups.length;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     // Total flow per group (in + out).
     var totals = new Array(n).fill(0);
     for (var i = 0; i < n; i++) {
@@ -11799,7 +11803,7 @@ class OkuChart extends HTMLElement {
         if (col > maxCol) maxCol = col;
       });
     });
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var cellW = 54, cellH = 36, cellGap = 4;
     var W = (maxCol + 1) * (cellW + cellGap) + 40;
     var H = (maxRow + 1) * (cellH + cellGap) + 80;
@@ -11864,7 +11868,7 @@ class OkuChart extends HTMLElement {
     var x = (this._extras && this._extras['dot-plot']) || {};
     var rows = (x.rows || []).slice();
     if (!rows.length) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var vMin = x.min !== undefined ? +x.min : Math.min.apply(null, rows.map(function (r) { return +r.value || 0; }));
     var vMax = x.max !== undefined ? +x.max : Math.max.apply(null, rows.map(function (r) { return +r.value || 0; }));
     if (vMin === vMax) { vMin -= 1; vMax += 1; }
@@ -11925,7 +11929,7 @@ class OkuChart extends HTMLElement {
     var stdev = Math.sqrt(variance) || 1;
     var bw = +x.bandwidth || 1.06 * stdev * Math.pow(values.length, -1 / 5);
     var sampleCount = +x.sample_count || 100;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)' };
+    var palette = __okuChartPalette;
     var color = palette[x.color] || palette.accent;
     var W = 640, H = this._title ? 320 : 280;
     var pad = { top: this._title ? 36 : 16, bottom: 32, left: 36, right: 24 };
@@ -12454,7 +12458,7 @@ class OkuChart extends HTMLElement {
     var pad = { top: this._title ? 36 : 16, bottom: 28, left: labelFit.gutter, right: 20 };
     var plotW = W - pad.left - pad.right;
     var rowH = (H - pad.top - pad.bottom) / distributions.length;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Violin') + '" class="okc-svg okc-violin">');
@@ -12547,7 +12551,7 @@ class OkuChart extends HTMLElement {
     var pad = { top: this._title ? 36 : 16, bottom: 40, left: 56, right: 20 };
     var plotH = H - pad.top - pad.bottom;
     var colW = (W - pad.left - pad.right) / distributions.length;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     function yOf(v) { return pad.top + plotH - (v - vMin) / (vMax - vMin) * plotH; }
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Violin') + '" class="okc-svg okc-violin">');
@@ -12643,7 +12647,7 @@ class OkuChart extends HTMLElement {
     var pad = { top: this._title ? 36 : 16, bottom: 32, left: 24, right: 24 };
     var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     var dotR = +x.dot_radius || 5;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)' };
+    var palette = __okuChartPalette;
     var color = palette[x.color] || palette.accent;
     function xOf(v) { return pad.left + (v - vMin) / (vMax - vMin) * plotW; }
     // Place dots greedily: for each value, compute its x. Then assign
@@ -12794,7 +12798,7 @@ class OkuChart extends HTMLElement {
     var x = (this._extras && this._extras.lollipop) || {};
     var rows = (x.rows || []).slice();
     if (!rows.length) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var vMin = x.min !== undefined ? +x.min : Math.min(0, Math.min.apply(null, rows.map(function (r) { return +r.value || 0; })));
     var vMax = x.max !== undefined ? +x.max : Math.max.apply(null, rows.map(function (r) { return +r.value || 0; }));
     if (vMin === vMax) { vMax += 1; }
@@ -12840,7 +12844,7 @@ class OkuChart extends HTMLElement {
     var vMin = Math.min.apply(null, allVals);
     var vMax = Math.max.apply(null, allVals);
     if (vMin === vMax) { vMin -= 1; vMax += 1; }
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var fromColor = palette[x.from_color] || palette.muted;
     var toColor   = palette[x.to_color]   || palette.accent;
     var W = 640, rowH = 32;
@@ -12958,7 +12962,7 @@ class OkuChart extends HTMLElement {
     var x = (this._extras && this._extras.gantt) || {};
     var tasks = (x.tasks || []).slice();
     if (!tasks.length) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var vMin = Math.min.apply(null, tasks.map(function (t) { return +t.start || 0; }));
     var vMax = Math.max.apply(null, tasks.map(function (t) { return +t.end   || 0; }));
     if (vMin === vMax) { vMax += 1; }
@@ -13110,7 +13114,7 @@ class OkuChart extends HTMLElement {
     var leftVals = (left.values || []).map(Number);
     var rightVals = (right.values || []).map(Number);
     if (!categories.length || !leftVals.length || !rightVals.length) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var W = 640, H = Math.max(280, 60 + categories.length * 26);
     var pad = { top: this._title ? 50 : 24, bottom: 36, left: 24, right: 24 };
     var centerLabelW = 76;
@@ -13279,7 +13283,7 @@ class OkuChart extends HTMLElement {
     var series = x.series || [];
     var bandCount = +x.bands || 3;
     if (categories.length < 2 || !series.length) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var W = 640, laneH = 36;
     var labelFit = okuFitLabelGutter(series.map(function (s, si) { return s.label || ('series ' + (si + 1)); }), { width: W, fontPx: 11 });
     var pad = { top: this._title ? 36 : 16, bottom: 28, left: labelFit.gutter, right: 16 };
@@ -13474,7 +13478,7 @@ class OkuChart extends HTMLElement {
     var nodes = x.nodes || [];
     var links = x.links || [];
     if (nodes.length < 2 || !links.length) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var W = 640, H = 320;
     var pad = { top: this._title ? 32 : 12, bottom: 64, left: 32, right: 32 };
     var baselineY = H - pad.bottom;
@@ -13545,7 +13549,7 @@ class OkuChart extends HTMLElement {
     var x = (this._extras && this._extras['range-bar']) || {};
     var rows = x.ranges || [];
     if (!rows.length) return;
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var W = 640, H = Math.max(180, 60 + rows.length * 32);
     var labelFit = okuFitLabelGutter(rows.map(function (r) { return r.label || ''; }),
                                      { width: W, fontPx: 11.5 });
@@ -13630,7 +13634,7 @@ class OkuChart extends HTMLElement {
     var rows = (x.rows || []).filter(function (r) { return !isNaN(+r.value); });
     if (!rows.length) return;
     rows = rows.slice().sort(function (a, b) { return (+b.value || 0) - (+a.value || 0); });
-    var palette = { accent: 'var(--accent)', warn: 'var(--warning)', danger: 'var(--danger)', success: 'var(--success)', muted: 'var(--text-soft)' };
+    var palette = __okuChartPalette;
     var total = rows.reduce(function (s, r) { return s + Math.max(0, +r.value || 0); }, 0);
     if (total <= 0) return;
     // Cumulative % per row.

@@ -367,3 +367,48 @@ def test_both_languages_record_the_same_capabilities() -> None:
     en = _interactivity_rows("roadmap.md")
     tr = _interactivity_rows("roadmap.tr.md")
     assert en == tr, [(a[0], a[2:], b[2:]) for a, b in zip(en, tr, strict=True) if a != b]
+
+
+# The five tones an author may name. Three places spell them and none
+# can see the others: the schema's enum (what validates), renderer.js's
+# TOKEN_COLORS (which tones the bar family draws as a class), and
+# chrome.js's __okuChartPalette (what every SVG renderer paints). The
+# CSS side — a fill rule and a swatch rule per tone — is a rendering
+# question and is held in the browser by test_bar_tone_matches_its_swatch.
+CHROME = (KIT / "chrome.js").read_text(encoding="utf-8")
+
+
+def _schema_tones() -> set[str]:
+    enums = set()
+
+    def walk(o, key=""):
+        if isinstance(o, dict):
+            if key == "color" and "enum" in o:
+                enums.add(tuple(o["enum"]))
+            for k, v in o.items():
+                walk(v, k)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v, key)
+
+    walk(SCHEMA["$defs"]["chart"])
+    assert len(enums) == 1, f"the chart schema spells its colour tones {len(enums)} ways: {enums}"
+    return set(next(iter(enums)))
+
+
+def test_the_three_tone_lists_agree() -> None:
+    m = re.search(r"var __okuChartPalette = \{([^}]*)\}", CHROME)
+    assert m, "chrome.js no longer declares __okuChartPalette"
+    palette = set(re.findall(r"(\w+):\s*'var\(", m.group(1)))
+    t = re.search(r"const TOKEN_COLORS = \[([^\]]*)\]", RENDERER)
+    assert t, "renderer.js no longer declares TOKEN_COLORS"
+    tokens = set(re.findall(r"'(\w+)'", t.group(1)))
+    schema = _schema_tones()
+    assert palette == schema == tokens, {"palette": palette, "schema": schema, "TOKEN_COLORS": tokens}
+
+
+def test_the_tone_table_is_written_once() -> None:
+    """Thirty renderers carried their own copy of the table and two had
+    lost `muted`. A copy is how a tone goes missing in one chart type."""
+    copies = re.findall(r"success:\s*'var\(--success\)'", CHROME)
+    assert len(copies) == 1, f"{len(copies)} copies of the tone table in chrome.js"
