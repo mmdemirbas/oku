@@ -16,7 +16,10 @@ Held here:
   - Escape closes the menu and leaves the viewer open — the menu is what
     is in front — and the menu works from the keyboard;
   - where the full path is not known the control is absent, not broken:
-    a page moved out of its build tree cannot say where the file is;
+    a page moved out of its build tree cannot say where the file is, and
+    a server facing the network does not say where its tree is;
+  - under `oku serve` on loopback the path comes from the server's
+    `root_abs` rather than from a build URL, and must be the same path;
   - an editor is offered only where its own source says the link opens
     a file: IntelliJ's `idea://open` is handled by the macOS launcher
     alone, so a Linux reader is not shown it.
@@ -25,8 +28,10 @@ Held here:
 from __future__ import annotations
 
 import argparse
+import http.server
 import os
 import shutil
+import threading
 from pathlib import Path
 from urllib.parse import quote
 
@@ -204,6 +209,47 @@ def test_no_full_path_no_control(project, browser, tmp_path):
         assert pg.evaluate(CONTROL) is None
     finally:
         context.close()
+
+
+def _serve(project, local_only):
+    handler = cli._make_serve_handler(project / "docs", local_only=local_only)
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd
+
+
+def test_a_served_page_hands_the_editor_the_same_path(project, browser):
+    """`oku serve` symlinks the kit and synthesizes the page, and the full
+    path comes from a different place — the `root_abs` the server puts in
+    the manifest — so it is a different derivation of the same answer."""
+    httpd = _serve(project, local_only=True)
+    context, pg = _open(browser, f"http://127.0.0.1:{httpd.server_address[1]}/index.html")
+    try:
+        pg.click(".okt-mdview-editor-pick")
+        c = pg.evaluate(CONTROL)
+        assert {name: href for name, href, _ in c["items"]} == _expected(project), c["items"]
+    finally:
+        context.close()
+        httpd.shutdown()
+
+
+def test_a_server_facing_the_network_names_no_path(project, browser):
+    """Bound past loopback (`--host 0.0.0.0`), the server must not publish
+    where its tree is on disk — and with no full path there is no editor
+    control, rather than one that opens a wrong or partial path. Bound to
+    127.0.0.1 here; `local_only` is the flag `oku serve` derives from the
+    host it was given."""
+    httpd = _serve(project, local_only=False)
+    context, pg = _open(browser, f"http://127.0.0.1:{httpd.server_address[1]}/index.html")
+    try:
+        assert (
+            pg.evaluate("() => fetch('site-manifest.json').then(r => r.json()).then(m => 'root_abs' in m)")
+            is False
+        )
+        assert pg.evaluate(CONTROL) is None
+    finally:
+        context.close()
+        httpd.shutdown()
 
 
 @pytest.mark.parametrize("width", [360, 1440])
