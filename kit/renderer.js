@@ -85,7 +85,9 @@
         return {
           k: 'info-tip',
           summary: b.summary || '',
-          content: Array.isArray(b.content) ? b.content : [],
+          // A v1 body may be one string rather than a block list.
+          content: typeof b.content === 'string' ? [{ kind: 'paragraph', content: b.content }]
+            : Array.isArray(b.content) ? b.content : [],
           open: !!b.open
         };
       }

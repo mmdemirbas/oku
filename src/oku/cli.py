@@ -2037,7 +2037,12 @@ def _v1_to_v2_block(blk):
         return "> [!TLDR]" + (f" {title}" if title else "") + body
     if k == "info-tip":
         parts: list[str] = []
-        for sub in blk.get("content") or []:
+        content = blk.get("content")
+        # A v1 body may be one string rather than a block list. Iterated
+        # as a list it is a run of characters, none of them a block.
+        if isinstance(content, str):
+            content = [{"kind": "paragraph", "content": content}]
+        for sub in content or []:
             c = _v1_to_v2_block(sub)
             if isinstance(c, str):
                 parts.append(c)
