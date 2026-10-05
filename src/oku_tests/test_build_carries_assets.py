@@ -351,3 +351,21 @@ def test_a_suffixed_href_still_carries_its_file(tmp_path: Path, suffix: str) -> 
     assert (docs / "dist" / "site" / "tiny.png").read_bytes() == PNG_8
     html = (docs / "dist" / "standalone" / "page.html").read_text(encoding="utf-8")
     assert base64.b64encode(PNG_8).decode() in html
+
+
+def test_an_image_through_a_symlinked_directory_lands_where_the_href_points(tmp_path: Path) -> None:
+    # I.2: the copy's destination came from the RESOLVED target, while
+    # the page still says `img/tiny.png`. Measured: dist/site held
+    # assets/tiny.png, there was no img/, and the image was broken in
+    # the deployed site with the build exiting 0.
+    docs = tmp_path / "docs"
+    (docs / "assets").mkdir(parents=True)
+    (docs / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+    (docs / "assets" / "tiny.png").write_bytes(PNG_8)
+    (docs / "img").symlink_to("assets", target_is_directory=True)
+    (docs / "page.md").write_text(
+        "---\ntitle: Page\nsummary: s\n---\n\n## A {#a}\n\n![tiny](img/tiny.png)\n", encoding="utf-8"
+    )
+    (docs / "page.html").write_text(cli._stub_for("Page"), encoding="utf-8")
+    _build(docs)
+    assert (docs / "dist" / "site" / "img" / "tiny.png").read_bytes() == PNG_8
