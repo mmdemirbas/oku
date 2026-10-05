@@ -7414,11 +7414,17 @@ def cmd_clean(args: argparse.Namespace) -> int:
 
 # ---------- serve ----------
 def find_project_root(start: Path) -> Path:
-    """Walk up to find the directory containing _oku; fallback to start."""
+    """Walk up to find the directory containing _oku; fallback to start.
+
+    The walk ends at the first repository root it meets: serve hands out
+    the whole tree it finds, and a repository cloned inside another one
+    served the OUTER working copy."""
     cur = start.resolve()
     for ancestor in [cur, *cur.parents]:
         if (ancestor / "docs" / "_oku").exists():
             return ancestor
+        if (ancestor / ".git").exists():
+            break
     return start
 
 
