@@ -9,6 +9,7 @@ place a reader could check said the opposite of what happened.
 
 from __future__ import annotations
 
+import http.client
 import http.server
 import socket
 import subprocess
@@ -103,3 +104,44 @@ def test_the_flag_names_what_it_costs(repo_root: Path) -> None:
     assert "--host" in out
     assert "127.0.0.1" in out
     assert "network" in out
+
+
+# I.1 / V.4: a loopback bind keeps other MACHINES out and does nothing
+# about other ORIGINS. A page the reader has open elsewhere can point a
+# hostname of its own at 127.0.0.1 (DNS rebinding) and then read the
+# preview same-origin — and the preview is the working copy, `.git/` and
+# `.env` included. Measured: `Host: attacker.example:9876` answered 200
+# with the repo's `.git/config`. The Host header is the one thing that
+# rebinding cannot forge, because the browser writes it from the URL.
+@pytest.mark.parametrize(
+    ("host", "status"),
+    [
+        ("attacker.example:{port}", 403),
+        ("attacker.example", 403),
+        ("127.0.0.1.nip.io:{port}", 403),
+        ("localhost:{port}", 200),
+        ("LOCALHOST:{port}", 200),
+        ("127.0.0.1:{port}", 200),
+        ("127.0.0.1", 200),
+        ("[::1]:{port}", 200),
+    ],
+)
+def test_a_loopback_preview_answers_only_to_a_loopback_name(tmp_path: Path, host: str, status: int) -> None:
+    (tmp_path / "secret.txt").write_text("working copy", encoding="utf-8")
+    handler = cli._make_serve_handler(tmp_path)
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    port = httpd.server_address[1]
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn.putrequest("GET", "/secret.txt", skip_host=True)
+        conn.putheader("Host", host.format(port=port))
+        conn.endheaders()
+        resp = conn.getresponse()
+        body = resp.read()
+        assert resp.status == status, body[:200]
+        if status != 200:
+            assert b"working copy" not in body
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
