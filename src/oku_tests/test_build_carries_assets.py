@@ -325,3 +325,29 @@ def test_somebody_elses_host_is_not_outside_the_project(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert [i for i in _check(docs) if i["code"] == "image-outside"] == []
+
+
+# ---------- a query or a fragment is not part of the file's name ----------
+#
+# `unquote(href)` kept the suffix, so `tiny.png?v=2` looked for a file
+# called that, found none, and neither tree carried the image; `oku
+# check` then called a file that exists unresolved. With `#frag` (an SVG
+# sprite's view) the check stayed clean and the image still vanished
+# from both trees.
+
+
+@pytest.mark.parametrize("suffix", ["?v=2", "#frag"])
+def test_a_suffixed_href_still_carries_its_file(tmp_path: Path, suffix: str) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "kit.json").write_text('{"name":"probe"}', encoding="utf-8")
+    (docs / "tiny.png").write_bytes(PNG_8)
+    (docs / "page.md").write_text(
+        f"---\ntitle: Page\nsummary: s\n---\n\n## A {{#a}}\n\n![tiny](tiny.png{suffix})\n", encoding="utf-8"
+    )
+    (docs / "page.html").write_text(cli._stub_for("Page"), encoding="utf-8")
+    assert not [i for i in _check(docs) if i["code"] == "unresolved-link"]
+    _build(docs)
+    assert (docs / "dist" / "site" / "tiny.png").read_bytes() == PNG_8
+    html = (docs / "dist" / "standalone" / "page.html").read_text(encoding="utf-8")
+    assert base64.b64encode(PNG_8).decode() in html
