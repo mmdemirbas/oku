@@ -2922,8 +2922,11 @@
           const pct = Math.max(0, Math.min(100, (v / scaleMax) * 100));
           fill.style.setProperty('--bar-pct', String(pct));
           fill.style.width = pct + '%';
+          // A share of the row is a share of a whole only where the bars
+          // stack into one. Grouped bars are separate measurements, and
+          // their sum is a number nobody can use.
           const share = rowTotal > 0 ? v / rowTotal : 0;
-          fill.setAttribute('data-hover-payload', JSON.stringify({
+          fill.setAttribute('data-hover-payload', JSON.stringify(mode === 'stacked-bar' ? {
             series: s.label || '',
             label: cat,
             kv: [
@@ -2931,6 +2934,10 @@
               { k: 'share', v: Math.round(share * 100) + '%' }
             ],
             footer: 'in ' + cat + ' = ' + numText(rowTotal)
+          } : {
+            series: s.label || '',
+            label: cat,
+            kv: [{ k: 'value', v: numText(v) }]
           }));
           if (s.label) fill.title = s.label + ': ' + numText(v);
           track.appendChild(fill);
@@ -2938,7 +2945,8 @@
         row.appendChild(track);
         const val = document.createElement('span');
         val.className = 'bar-value';
-        val.textContent = numText(rowTotal);
+        val.textContent = mode === 'stacked-bar' ? numText(rowTotal)
+          : series.map(s => numText((s.values && s.values[ci]) || 0)).join(' · ');
         row.appendChild(val);
         wrap.appendChild(row);
       });
