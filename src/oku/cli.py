@@ -2149,6 +2149,24 @@ def _v1_to_v2(data: dict) -> dict:
     return out
 
 
+def _v1_dropped_blocks(data: dict) -> list[str]:
+    """Paths of the v1 blocks `_v1_to_v2` leaves out — a bare string, an
+    unknown kind. The renderer's shim leaves out the same ones, so each is
+    content in the source that the page does not show, and that a
+    migration would delete with the .json."""
+    if not isinstance(data, dict) or data.get("k") == "page" or data.get("kind") != "page":
+        return []
+    dropped: list[str] = []
+    for i, top in enumerate(data.get("blocks") or []):
+        if isinstance(top, dict) and top.get("kind") == "section":
+            for j, sub in enumerate(top.get("blocks") or []):
+                if _v1_to_v2_block(sub) is None:
+                    dropped.append(f"blocks[{i}].blocks[{j}]")
+        elif _v1_to_v2_block(top) is None:
+            dropped.append(f"blocks[{i}]")
+    return dropped
+
+
 def find_json_pages(root: Path):
     """Recursively find *.json files where the root object has kind == 'page'.
 
@@ -2340,6 +2358,8 @@ def validate_pages(pages) -> list:
         # converting in-memory first. Migration to disk via `oku migrate`
         # is optional — this keeps `oku check` accurate for either shape.
         v2 = _v1_to_v2(data) if isinstance(data, dict) and data.get("k") != "page" else data
+        for where in _v1_dropped_blocks(data):
+            errors.append((p, f"{where}: a v1 block the kit cannot convert — it does not render"))
         # Every failing block, not the first. Stopping at one was called
         # "keeping the report focused"; in practice it meant a page with
         # three malformed blocks reported one, and an author who fixed
@@ -8823,6 +8843,15 @@ def cmd_migrate(args: argparse.Namespace) -> int:
         # Deleting the JSON is irreversible, so prove the round-trip first:
         # emit the markdown, parse it back, and compare content. A page
         # holding something the emitter cannot express keeps its JSON.
+        # The guard below compares content after the v1 shim, which has
+        # already left these out on both sides, so it cannot see them.
+        dropped = _v1_dropped_blocks(data)
+        if dropped:
+            print(
+                f"  skip {rel}: {', '.join(dropped)} cannot be converted — source kept.",
+                file=sys.stderr,
+            )
+            continue
         md_text = page_to_md(data)
         back = md_to_v2_page(md_text, default_title=_page_title(data) or md_path.stem)
         before, after = _page_content_fingerprint(data), _page_content_fingerprint(back)
