@@ -4836,6 +4836,18 @@ _HTML_ISLAND_RE = re.compile(r"^<[a-zA-Z][^\s>]*", re.MULTILINE)
 _MERMAID_STYLE_LINE_RE = re.compile(r"^\s*(?:classDef|style|linkStyle)\s|^\s*%%\{")
 _RAW_COLOUR_RE = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(")
 
+
+def _theme_bound_colour(line: str) -> bool:
+    """A literal colour that looks different on the two themes. An alpha
+    of zero (`#0000`, `#ffffff00`) draws nothing, so it is not one."""
+    for m in _RAW_COLOUR_RE.finditer(line):
+        hexd = m.group(0)[1:] if m.group(0).startswith("#") else ""
+        if (len(hexd) == 4 and hexd[3] == "0") or (len(hexd) == 8 and hexd[6:] == "00"):
+            continue
+        return True
+    return False
+
+
 # Primitives whose whole job is the relationship BETWEEN their members.
 # With one member there is no relationship left — what remains is a
 # titled box with an accent on it, which is the "looks like a
@@ -5012,7 +5024,7 @@ def _presentation_issues(
             hand = [
                 ln.strip()
                 for ln in str(blk.get("src") or "").split("\n")
-                if _MERMAID_STYLE_LINE_RE.match(ln) and _RAW_COLOUR_RE.search(ln)
+                if _MERMAID_STYLE_LINE_RE.match(ln) and _theme_bound_colour(ln)
             ]
             if hand:
                 out.append(
