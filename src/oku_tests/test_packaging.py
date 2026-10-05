@@ -13,6 +13,7 @@ So the list is checked against the directory rather than trusted.
 
 from __future__ import annotations
 
+import ast
 import re
 import shutil
 import tomllib
@@ -203,3 +204,50 @@ def test_deploy_installs_the_tool_with_its_capabilities(repo_root: Path) -> None
     ctl = (repo_root / "ctl").read_text(encoding="utf-8")
     installs = [m.group(1).split(",") for m in _EXTRA_HINT.finditer(ctl)]
     assert any({"verify", "search"} <= set(extras) for extras in installs), installs
+
+
+def _printed_strings(path: Path) -> list[tuple[int, str]]:
+    """String constants in a module that are not docstrings: what the
+    tool can print, as opposed to what it says about itself."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    docstrings = {
+        id(node.body[0].value)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        and node.body
+        and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+    }
+    return [
+        (node.lineno, node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings
+    ]
+
+
+# The fix that started this file's second half, applied to every hint.
+# Measured before: the jsonschema hint said `uv tool install --force
+# --no-cache --from . oku` (no extras, so following it removed playwright
+# and pagefind again, and `.` is the reader's own project); both pagefind
+# hints said `uv pip install 'pagefind[bin]'`, which installs into
+# whatever venv is active and never into the tool the hint came from.
+_FOREIGN_INSTALL = re.compile(r"\b(?:uv pip install|pip install|uv tool install)\b")
+
+
+def test_every_install_hint_the_tool_prints_is_ctl_deploy(repo_root: Path) -> None:
+    offenders = [
+        (line, text.strip()[:90])
+        for line, text in _printed_strings(repo_root / "src" / "oku" / "cli.py")
+        if _FOREIGN_INSTALL.search(text)
+    ]
+    assert offenders == []
+
+
+def test_the_docs_hand_no_one_the_bare_install(repo_root: Path) -> None:
+    offenders = [
+        f"{md.name}:{n}"
+        for md in sorted((repo_root / "docs").glob("*.md"))
+        for n, line in enumerate(md.read_text(encoding="utf-8").splitlines(), 1)
+        if re.search(r"uv tool install \.", line)
+    ]
+    assert offenders == []
