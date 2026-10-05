@@ -8871,7 +8871,12 @@ def cmd_verify(args: argparse.Namespace) -> int:
                 page.set_viewport_size({"width": width, "height": 900})
                 page.goto(url)
                 try:
-                    page.wait_for_function("() => window.__okuRendered === true", timeout=20000)
+                    # A page that writes its own HTML and uses the kit for
+                    # the chrome alone has no renderer, so nothing will ever
+                    # set the flag; its content is in the document already.
+                    page.wait_for_function(
+                        "() => window.__okuRendered === true || !window.OkuRenderer", timeout=20000
+                    )
                     page.wait_for_function(
                         "() => [...document.querySelectorAll('oku-diagram')]"
                         ".every((d) => d._rendered || /Parse error/i.test(d.textContent))",

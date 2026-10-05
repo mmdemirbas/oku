@@ -185,12 +185,13 @@ def test_a_page_with_its_own_html_is_checked_rather_than_timed_out(tmp_path: Pat
         encoding="utf-8",
     )
     _run(docs, lambda: cli.cmd_build(argparse.Namespace(no_search=True, no_vendor=True)))
-    proc = _verify(docs)
+    out = _verify(docs)
+    said = out.stdout + out.stderr
 
-    assert "never finished rendering" not in proc.stdout, proc.stdout
-    assert "own.html" not in proc.stdout, proc.stdout
+    assert "never finished rendering" not in said, said
+    assert "own.html" not in said, said
     # Checked, not waved through: the empty disclosure on the other one is found.
-    assert "bad.html @1440px: disclosure 1 opens onto nothing" in proc.stdout, proc.stdout
+    assert "bad.html @1440px: disclosure 1 opens onto nothing" in said, said
 
 
 def test_it_says_what_to_do_when_nothing_is_built(tmp_path: Path) -> None:
