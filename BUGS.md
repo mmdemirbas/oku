@@ -12,9 +12,60 @@ carries the record, including what was measured before and after.
 
 ---
 
-No open defects.
+Open, found by the 2026-10-05 bug hunt and deliberately not fixed in it.
+Each says why.
 
-The six that were here are closed:
+- **Two lint regexes are quadratic on a long line with no whitespace.**
+  Observed: `_MD_LINK_TARGET_RE` over `"[a](b" * n` took 0.73 s at 10 KB,
+  3.4 s at 20 KB, 10.8 s at 40 KB; `_HTML_TAG_RE` took 1.7 s over 36 KB of
+  `<a href="`. A realistic 29 KB table row with spaces took 0.0 s.
+  Deferred: the input is the author's own page. Fix when touched: bound
+  the target length (`{1,2048}`) or skip lines over a few KB.
+
+- **Every `.json` under the root is read and parsed in full, twice per
+  build** (`find_json_pages`, `find_unparseable_json`). Inferred from
+  source, not measured. A data repo with a large JSON pays it on every
+  check. Fix: skip by size, or sniff the first bytes for `"k"`/`"kind"`.
+
+- **The page tree sorts titles by `title.lower()` (Python) and
+  `localeCompare` with no locale (chrome.js).** A Turkish tree orders
+  `ılıca` after `İzmir`. Not changed alone, because `test_manifest_order`
+  holds the two sides equal and Python has no locale collation without a
+  new dependency (PyICU). Table sorting was fixed separately (page
+  language collator).
+
+- **Table group keys and filter values keep HTML entities.** Inferred:
+  `stripHtml(td.innerHTML)` leaves `&amp;`, so grouping by a column
+  holding `A & B` shows `A &amp; B` and a column filter typed `a & b`
+  matches nothing. Fix: carry the cell's `textContent` beside its HTML.
+  Not via a detached `innerHTML` decode, which would load `<img>` sources.
+
+- **A viewer render that throws falls back to the Source view without a
+  word** (chrome.js, the `renderMarkdownInto` catch in the viewer).
+  Inferred; no trigger found. Fix: `console.error` and disable the
+  Rendered button as the no-renderer branch does.
+
+- **Offline first build reports the wrong thing about Prism, and copies
+  empty vendor directories.** Observed: with the vendor cache empty and
+  no network, the build printed "no grammar for hcl, python — those
+  blocks render as plain text", while with the Prism core unvendored the
+  CDN supplies every grammar; and empty `vendor/fonts/` and
+  `vendor/prism/` were copied into dist. `oku serve` also keeps the
+  `@font-face` rules when the fonts are absent (eight 404s), where both
+  builds drop them. Mitigated: `./ctl deploy` now refills the cache.
+
+- **`./ctl setup docs` links a project's `_oku` at the repo checkout**,
+  because it scaffolds through `uv run --project $REPO`. That project
+  then serves this repo's working copy, uncommitted changes included,
+  instead of the installed kit. Inferred from source.
+
+- **The `updated` date is the committer's local date (`%cs`), not UTC.**
+  A commit just after midnight at UTC+3 shows the previous UTC day.
+  Inferred; arguably what an author expects, so not changed.
+
+No other open defects.
+
+The six that were here before are closed:
 
 - **A `muted` series in a bar chart was filled with the accent colour,
   while its legend swatch was grey.** Closed in the commit that removed
