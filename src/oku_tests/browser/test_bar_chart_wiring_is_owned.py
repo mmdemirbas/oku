@@ -87,13 +87,16 @@ def opened(browser, built):
 
 
 def test_a_preview_clone_is_not_wired(opened) -> None:
+    # The clone copies the cursor its source already has; wiring it drew
+    # a second one. So the measure is "no more than the source".
+    source = opened.evaluate("() => document.querySelector('#c0').querySelectorAll('.okc-bar-cursor').length")
     clones = opened.evaluate(
         """() => [...document.querySelectorAll('.okt-compare-preview, [class*="preview"]')]
              .filter((p) => p.querySelector('.bar-fill'))
              .map((p) => p.querySelectorAll('.okc-bar-cursor').length)"""
     )
     assert clones, "the grid drew no bar previews to inspect"
-    assert set(clones) == {0}, f"cursors drawn into preview clones: {clones}"
+    assert max(clones) <= source, f"source has {source} cursor(s), the clones {clones}"
 
 
 def test_bar_charts_share_one_escape_listener(opened) -> None:

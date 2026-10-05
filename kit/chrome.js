@@ -15026,13 +15026,24 @@ function __okuEnhanceBarCharts(root) {
       showCrossing(ev.clientX, ev.clientY, ev.target.closest && ev.target.closest('.bar-fill'));
       if (tip) tip.classList.add('pinned');
     });
-    document.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Escape' && pinned) {
-        pinned = null;
-        hide(true);
-        cursor.style.opacity = '0';
-      }
-    });
+    // Escape is wired ONCE for every bar chart (below the wiring), not
+    // per host: a listener per chart on `document` was never removed and
+    // held each chart alive after an in-place navigation replaced it.
+    host._okuUnpin = function () {
+      if (!pinned) return;
+      pinned = null;
+      hide(true);
+      cursor.style.opacity = '0';
+    };
+    if (!window.__okuBarEscapeWired) {
+      window.__okuBarEscapeWired = true;
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Escape') return;
+        document.querySelectorAll('[data-hdc-bars-bound="1"]').forEach(function (h) {
+          if (h._okuUnpin) h._okuUnpin();
+        });
+      });
+    }
     // Legend toggle — click a chip to dim the matching series across
     // every category row. Mirrors the Cartesian chart legend chip
     // behaviour. State is purely visual (CSS class), no data
@@ -16595,12 +16606,9 @@ function __okuBuildComparePreview(fig) {
   var el = fig.cloneNode(true);
   el.removeAttribute('role');
   el.removeAttribute('aria-label');
-  // The bar wiring adopts any host carrying this and would bind hover
-  // and click-pin handlers to a decoration.
-  el.removeAttribute('data-hdc-bars-bound');
-  Array.prototype.forEach.call(el.querySelectorAll('[data-hdc-bars-bound]'), function (n) {
-    n.removeAttribute('data-hdc-bars-bound');
-  });
+  // The clone keeps `data-hdc-bars-bound` from its source, and that is
+  // what keeps the bar wiring off a decoration: its guard skips a host
+  // that already carries it. Removing it is what wired every clone.
   makeInert(el);
   wrap.appendChild(el);
   wrap._okuFitScale = function () {
