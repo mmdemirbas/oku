@@ -126,6 +126,10 @@ cmd_install() {
   # skips the browser check; without `search` dist/site ships no index.
   uv tool install --force --no-cache "oku[search,verify] @ $REPO"
   install_verify_browser
+  # The vendor cache (fonts, mermaid, Prism) lives inside the tool's own
+  # site-packages, which the reinstall just replaced.
+  step "refilling the global oku's vendor cache"
+  (cd "$REPO" && oku vendor) || { red "✗ oku vendor failed; built pages will lack fonts offline."; exit 1; }
   local want have
   want="$(repo_kit_stamp)"
   have="$(global_kit_stamp)"
@@ -143,7 +147,12 @@ cmd_install() {
   local want_src have_src
   want_src="$(repo_src_digest)"
   have_src="$(global_src_digest)"
-  if [ -n "$want_src" ] && [ "$want_src" != "$have_src" ]; then
+  if [ -z "$want_src" ]; then
+    red "✗ could not compute this repo's code digest, so code drift cannot be checked."
+    red "  Run: uv run --project $REPO python -c 'from oku.cli import _tool_digest; print(_tool_digest())'"
+    exit 1
+  fi
+  if [ "$want_src" != "$have_src" ]; then
     red "✗ the global oku ships different code: src $have_src, this repo is $want_src."
     red "  The kit stamp matches, so this is a CLI-only drift the stamp cannot see."
     red "  Try: uv cache clean && ./ctl deploy"
