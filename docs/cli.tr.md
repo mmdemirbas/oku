@@ -34,7 +34,7 @@ oku init
 ```
 
 > [!NEUTRAL] Yinelenebilir ve kendini onarır
-> init'i yeniden çalıştırmak güvenlidir. Sembolik bağ zaten kite çözümleniyorsa "already linked" yazar. Bayat bir hedefi gösteriyorsa (örneğin kit deposu taşınmışsa) init onu sessizce tazeler. _oku konumunda sembolik bağ olmayan bir dosya varsa bu kullanıcı verisi sayılır ve işlem reddedilir. Var olan bir index.html'e dokunulmaz, böylece düzenlemeleriniz korunur.
+> init'i yeniden çalıştırmak güvenlidir. Sembolik bağ zaten kite çözümleniyorsa "already linked" yazar. Bayat bir hedefi gösteriyorsa (örneğin kit deposu taşınmışsa) init onu sessizce tazeler. Kurulu araç projeleri tek bir sabit yol üzerinden bağlar: `~/.local/share/oku/kit` (ya da `$XDG_DATA_HOME/oku/kit`). Araç her çalıştığında bu yolu kendi dosyalarına yeniden yöneltir; böylece aracı yeniden kurmak, başka bir Python sürümüyle bile, projenin bağını boşa düşürmez. `uv run` ya da [`bin/oku`](#f/bin/oku) ile çalışan bir çalışma kopyası kendi `kit/` dizinine doğrudan bağlanır ve sabit yola dokunmaz. _oku konumunda sembolik bağ olmayan bir dosya varsa bu kullanıcı verisi sayılır ve işlem reddedilir. Var olan bir index.html'e dokunulmaz, böylece düzenlemeleriniz korunur.
 
 ## oku build {#build}
 

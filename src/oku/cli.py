@@ -85,6 +85,46 @@ def _kit_assets_dir() -> Path:
 
 
 KIT_DIR = _kit_assets_dir()
+
+
+def _stable_kit_link() -> Path:
+    """The one path projects link `_oku` to: `$XDG_DATA_HOME/oku/kit`,
+    by default `~/.local/share/oku/kit`. The installed tool keeps it
+    pointing at its own assets, whose path names a Python version."""
+    base = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+    return Path(base) / "oku" / "kit"
+
+
+def _running_installed() -> bool:
+    """Whether the kit in use ships inside the installed package, as
+    opposed to a checkout's `kit/` reached through `uv run` or `bin/oku`."""
+    return KIT_DIR.resolve().parent == Path(__file__).resolve().parent
+
+
+def _refresh_stable_kit_link() -> Path | None:
+    """Point the stable link at this tool's assets; return it, or None
+    where it does not apply.
+
+    Only an installed tool moves it. A checkout moving it would point
+    every project on the machine at an uncommitted working copy, which is
+    the opposite of what a project linked to "the installed kit" means.
+    Swapped in with a rename, so no reader sees it missing."""
+    if not _running_installed():
+        return None
+    link, target = _stable_kit_link(), KIT_DIR.resolve()
+    try:
+        if link.is_symlink() and os.readlink(link) == str(target):
+            return link
+        link.parent.mkdir(parents=True, exist_ok=True)
+        tmp = link.with_name(f".{link.name}.{os.getpid()}")
+        tmp.unlink(missing_ok=True)
+        tmp.symlink_to(target, target_is_directory=True)
+        os.replace(tmp, link)
+        return link
+    except OSError:
+        return None
+
+
 KIT_FILES = ["chrome.css", "chrome.js", "chrome-boot.js", "renderer.js"]
 
 
@@ -607,26 +647,33 @@ def cmd_init(args: argparse.Namespace) -> int:
     """
     root = Path.cwd()
     kit_link = root / "_oku"
+    # An installed tool links projects through the stable path, so a
+    # reinstall under another Python does not strand them; a checkout
+    # links its own kit directly.
+    stable = _refresh_stable_kit_link()
+    target = stable or KIT_DIR
 
     if kit_link.is_symlink():
-        # Resolve before comparing — the on-disk symlink may be relative
-        # (e.g. "../kit") while KIT_DIR is absolute. Comparing literals
-        # would falsely flag the link as pointing somewhere else.
-        if kit_link.resolve() == KIT_DIR.resolve():
+        # Through the stable link, the literal target is the test: the
+        # old direct link resolves to the same directory today and
+        # dangles after the next reinstall. A checkout compares resolved
+        # paths — the link may be relative (e.g. "../kit").
+        current = os.readlink(kit_link) == str(target) if stable else kit_link.resolve() == KIT_DIR.resolve()
+        if current:
             print(f"✓ Already linked: {kit_link} -> {os.readlink(kit_link)}")
         else:
             # Stale symlink — replace it. Symlinks are cheap; refreshing
             # avoids "the kit moved, init won't fix it" surprises.
             old = os.readlink(kit_link)
             kit_link.unlink()
-            kit_link.symlink_to(KIT_DIR)
-            print(f"✓ Refreshed {kit_link} -> {KIT_DIR} (was -> {old})")
+            kit_link.symlink_to(target)
+            print(f"✓ Refreshed {kit_link} -> {target} (was -> {old})")
     elif kit_link.exists():
         print(f"✗ {kit_link} exists and is not a symlink — refusing to overwrite", file=sys.stderr)
         return 1
     else:
-        kit_link.symlink_to(KIT_DIR)
-        print(f"✓ Linked {kit_link} -> {KIT_DIR}")
+        kit_link.symlink_to(target)
+        print(f"✓ Linked {kit_link} -> {target}")
 
     # `oku init` deliberately does NOT generate .json twins of .md files.
     # The source of truth stays the .md (or hand-authored .json) — no
@@ -9155,6 +9202,10 @@ def main() -> int:
     )
 
     args = parser.parse_args()
+    # Every run of the installed tool keeps the stable kit link on its own
+    # assets, so the first command after a reinstall repairs the `_oku`
+    # link of every project that goes through it.
+    _refresh_stable_kit_link()
     if args.cmd == "init":
         return cmd_init(args)
     if args.cmd == "build":

@@ -169,6 +169,15 @@ every `dist/site` it built shipped without a search index. The hint
 the verify error printed named a `verify` extra that did not exist.
 Held by the last two cases in `test_packaging.py`.
 
+**A project's `_oku` goes through one stable link.** `oku init` from the
+installed tool links `_oku` to `~/.local/share/oku/kit` (or
+`$XDG_DATA_HOME/oku/kit`), and every run of the installed tool re-points
+that link at its own assets. The assets' real path names a Python
+version, so a reinstall under another one used to strand every project's
+link at once. A checkout (`uv run`, `bin/oku`) never moves the stable
+link, or every project on the machine would serve an uncommitted
+working copy. Held by `test_stable_kit_link.py`.
+
 ## Develop / verify
 
 ```bash

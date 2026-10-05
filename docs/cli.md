@@ -34,7 +34,7 @@ oku init
 ```
 
 > [!NEUTRAL] Idempotent + self-healing
-> Re-running init is safe. If the symlink already resolves to the kit, it prints "already linked". If it points to a stale target (e.g. the kit repo moved), init transparently refreshes it. A non-symlink file at _oku is treated as user data and refused. An existing index.html is left untouched so your edits survive.
+> Re-running init is safe. If the symlink already resolves to the kit, it prints "already linked". If it points to a stale target (e.g. the kit repo moved), init transparently refreshes it. The installed tool links through one stable path, `~/.local/share/oku/kit` (or `$XDG_DATA_HOME/oku/kit`), and re-points that path at its own files every time it runs — so reinstalling the tool, even under another Python, does not strand a project's link. A checkout run through `uv run` or [`bin/oku`](#f/bin/oku) links its own `kit/` directly and leaves the stable path alone. A non-symlink file at _oku is treated as user data and refused. An existing index.html is left untouched so your edits survive.
 
 ## oku build {#build}
 
