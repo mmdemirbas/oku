@@ -876,6 +876,39 @@ var __okuLangSwitch = (function () {
  * find a t, a k and a t scattered across a sentence. Every token has to
  * match somewhere; that is what typing a second word means.
  * ---------------------------------------------------------------- */
+/* Sorting follows the language the page says it is in (`<html lang>`),
+ * not the reader's browser: an en-US browser put `ılıca` after `İzmir`
+ * and the dotless `I` of `IRMAK` among the i-words on a Turkish page.
+ * The same goes for a number's separators — `4.400.000` in Turkish is
+ * `4,400,000` in English, and `parseFloat` read the latter as 4. */
+var __okuCollators = {};
+function __okuPageCollator() {
+  var lang = document.documentElement.lang || '';
+  if (!__okuCollators[lang]) {
+    __okuCollators[lang] = new Intl.Collator(lang || undefined, { numeric: true, sensitivity: 'base' });
+  }
+  return __okuCollators[lang];
+}
+
+/* A cell read as a number in the page's language, or NaN when the cell is
+   not only a number (an optional sign, currency `$`, digits with that
+   language's separators, an optional `%`). */
+function __okuPageNumber(s) {
+  var m = /^\s*(-?)\$?([\d.,\s\u00a0\u202f]*\d[\d.,]*)\s*%?\s*$/.exec(s);
+  if (!m) return NaN;
+  var lang = document.documentElement.lang || undefined;
+  var parts = new Intl.NumberFormat(lang).formatToParts(12345.6);
+  var dec = '.', grp = ',';
+  parts.forEach(function (p) {
+    if (p.type === 'decimal') dec = p.value;
+    if (p.type === 'group') grp = p.value;
+  });
+  var body = m[2].replace(/[\s\u00a0\u202f]/g, '').split(grp).join('');
+  if (dec !== '.') body = body.split(dec).join('.');
+  if (!/^\d*\.?\d+$|^\d+\.$/.test(body)) return NaN;
+  return (m[1] ? -1 : 1) * parseFloat(body);
+}
+
 var __okuFuzzy = (function () {
   function foldChar(c) {
     if (c === 'İ' || c === 'I' || c === 'ı') return 'i';
@@ -6121,7 +6154,7 @@ function initReadingAids() {
         });
         // Sort group keys: numeric-aware locale compare for stable order.
         var keys = Array.from(buckets.keys()).sort(function (a, b) {
-          return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+          return __okuPageCollator().compare(a, b);
         });
         var out = [];
         keys.forEach(function (k) {
@@ -6179,10 +6212,9 @@ function initReadingAids() {
             var entry = sortStack[s];
             var av = stripHtml(a.cells[entry.col] || '');
             var bv = stripHtml(b.cells[entry.col] || '');
-            var nA = parseFloat(av), nB = parseFloat(bv);
-            var numeric = !isNaN(nA) && !isNaN(nB) &&
-                          /^-?\$?[\d.,%]+\s*$/.test(av) && /^-?\$?[\d.,%]+\s*$/.test(bv);
-            var cmp = numeric ? (nA - nB) : av.toLowerCase().localeCompare(bv.toLowerCase());
+            var nA = __okuPageNumber(av), nB = __okuPageNumber(bv);
+            var numeric = !isNaN(nA) && !isNaN(nB);
+            var cmp = numeric ? (nA - nB) : __okuPageCollator().compare(av, bv);
             if (cmp !== 0) return entry.dir * cmp;
           }
           return 0;
