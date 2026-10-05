@@ -145,3 +145,25 @@ def test_a_loopback_preview_answers_only_to_a_loopback_name(tmp_path: Path, host
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+# The root `oku serve` hands out is a scope decision as much as the bind.
+# find_project_root walked up to ANY ancestor holding docs/_oku, so a
+# separate repository cloned inside another one served the OUTER working
+# copy — measured: serve started in a repo nested under this checkout
+# served this checkout. A repository boundary ends the walk.
+def test_serve_does_not_climb_out_of_its_own_repository(tmp_path: Path) -> None:
+    outer = tmp_path / "outer"
+    (outer / "docs" / "_oku").mkdir(parents=True)
+    (outer / ".git").mkdir()
+    inner = outer / "vendor" / "inner"
+    (inner / ".git").mkdir(parents=True)
+    assert cli.find_project_root(inner) == inner
+
+
+def test_serve_still_finds_the_root_from_a_subdirectory(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    (root / "docs" / "_oku").mkdir(parents=True)
+    (root / ".git").mkdir()
+    (root / "docs" / "deep").mkdir()
+    assert cli.find_project_root(root / "docs" / "deep") == root.resolve()
