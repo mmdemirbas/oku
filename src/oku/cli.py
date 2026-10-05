@@ -7575,9 +7575,26 @@ def _watcher_loop(root: Path, stop: threading.Event) -> None:
         last = cur
         # No source-side regeneration. The dev server synthesizes
         # site-manifest.{json,js} and llms.txt in memory on each request
-        # via _serve_generated_artifact, so the watcher only needs to
-        # tell connected clients to reload.
+        # via _serve_generated_artifact — but from caches of the tree's
+        # configuration, which have to be forgotten here or the reload
+        # serves the page as it was configured before the edit.
+        _forget_tree_state()
         _sse_broadcast("change")
+
+
+def _forget_tree_state() -> None:
+    """Drop every cache derived from the tree being served: the nearest
+    kit.json, the project root, the skip list, git's answers. The kit's
+    own files (schemas, catalog, examples) are not the tree's and stay."""
+    for cache in (
+        _tree_kit_cache,
+        _project_skip_cache,
+        _git_ignored_cache,
+        _git_date_cache,
+        _git_dir_dates,
+        _project_root_cache,
+    ):
+        cache.clear()
 
 
 def _make_serve_handler(root: Path, *, local_only: bool = True):
