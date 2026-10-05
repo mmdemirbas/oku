@@ -16,6 +16,7 @@ from __future__ import annotations
 import ast
 import re
 import shutil
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -278,3 +279,21 @@ def test_deploy_refuses_to_skip_the_code_comparison(repo_root: Path) -> None:
     body = _deploy_body(repo_root)
     assert '[ -n "$want_src" ] &&' not in body
     assert 'if [ -z "$want_src" ]' in body
+
+
+def test_the_npx_fallback_runs_a_pinned_pagefind(repo_root: Path, monkeypatch, tmp_path) -> None:
+    # I.5: with no pagefind installed, `oku build` ran `npx --yes pagefind`
+    # — whatever version npm served that day, downloaded and executed
+    # without a prompt. The fallback now names the version the lock file
+    # carries for the Python package.
+    from oku import cli
+
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "/usr/bin/npx" if name == "npx" else None)
+    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 1))
+    cmd = cli._pagefind_cmd(tmp_path)
+    assert cmd is not None and cmd[0] == "npx", cmd
+    pinned = [a for a in cmd if a.startswith("pagefind@")]
+    assert pinned, f"unpinned: {cmd}"
+    lock = (repo_root / "uv.lock").read_text(encoding="utf-8")
+    locked = re.search(r'name = "pagefind"\nversion = "([^"]+)"', lock).group(1)
+    assert pinned[0] == f"pagefind@{locked}"
