@@ -152,6 +152,11 @@ def test_a_sound_page_passes(tmp_path: Path) -> None:
 
     assert proc.returncode == 0, proc.stderr or proc.stdout
     assert "render clean" in proc.stdout
+    # The pass line is the record a session reports. It said "both built
+    # trees (1440px and 360px)" while dist/site is checked at 1440px only,
+    # so each tree's widths are named separately.
+    assert "standalone at 1440px and 360px" in proc.stdout, proc.stdout
+    assert "dist/site at 1440px" in proc.stdout, proc.stdout
 
 
 def test_it_says_what_to_do_when_nothing_is_built(tmp_path: Path) -> None:
