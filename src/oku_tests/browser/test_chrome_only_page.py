@@ -17,7 +17,9 @@ Found on a delivered report (solo, a 37 KB hand-written page) in dist/site.
 
 from __future__ import annotations
 
+import argparse
 import http.server
+import os
 import threading
 from pathlib import Path
 
@@ -91,3 +93,54 @@ def test_a_chart_reads_its_axis_titles_whole(loaded) -> None:
         "() => [...document.querySelectorAll('oku-chart svg text')].map((t) => t.textContent)"
     )
     assert "Day" in texts and "ms" in texts, texts
+
+
+# The other half. Everything the kit does AFTER content is in place —
+# the reading aids that wrap and wire tables, the contents list, the
+# rail, the string table — runs on `oku:rendered`, which only the
+# renderer fires. A page with its own HTML has no renderer, so nothing
+# announced it. Served, the element upgrades above happened to cover the
+# tables; standalone, where the kit runs before the body is parsed,
+# `page-chrome` upgraded as the parser met it, before any table existed,
+# and the delivered file shipped bare tables that pushed a 360px page to
+# 630px (solo, found once `oku verify` began checking such pages).
+
+
+@pytest.fixture(scope="module")
+def standalone(tmp_path_factory) -> str:
+    d = tmp_path_factory.mktemp("chromeonly-standalone").resolve()
+    (d / "_oku").symlink_to(KIT, target_is_directory=True)
+    (d / "page.html").write_text(PAGE, encoding="utf-8")
+    cwd = Path.cwd()
+    os.chdir(d)
+    try:
+        assert cli.cmd_build(argparse.Namespace(no_search=True, no_vendor=True)) == 0
+    finally:
+        os.chdir(cwd)
+    return (d / "dist" / "standalone" / "page.html").as_uri()
+
+
+AFTER_CONTENT = """() => ({
+  wrapped: [...document.querySelectorAll('main th')].some(
+    (th) => th.textContent === 'Where' && !!th.closest('.okt-table-scroll')),
+  toc: [...document.querySelectorAll('page-toc a')].map((a) => a.getAttribute('href')),
+  rendered: window.__okuRendered === true,
+})"""
+
+
+@pytest.mark.parametrize("mode", ["served", "standalone"])
+def test_the_passes_that_wait_for_content_run(browser, served, standalone, mode) -> None:
+    url = f"{served}/page.html" if mode == "served" else standalone
+    pg = browser.new_page()
+    errors: list[str] = []
+    pg.on("pageerror", lambda e: errors.append(e.message))
+    try:
+        pg.goto(url)
+        pg.wait_for_timeout(1500)
+        got = pg.evaluate(AFTER_CONTENT)
+    finally:
+        pg.close()
+    assert errors == [], errors
+    assert got["wrapped"], got
+    assert "#s" in got["toc"], got
+    assert got["rendered"], got
