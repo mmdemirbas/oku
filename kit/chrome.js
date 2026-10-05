@@ -6164,7 +6164,10 @@ function initReadingAids() {
           th.colSpan = Math.max(1, colCount);
           th.textContent = k;
           tr.appendChild(th);
-          out.push({ type: 'group', title: k, el: tr, classes: 'group' });
+          // `title` is HTML (an author's group row is its innerHTML); a
+          // group-by key is text from a cell's data-values, so it goes in
+          // escaped or the card view's header parses it.
+          out.push({ type: 'group', title: escapeXml(k), el: tr, classes: 'group' });
           buckets.get(k).forEach(function (r) { out.push(r); });
         });
         return out;
@@ -8216,7 +8219,7 @@ class GlossaryTerm extends HTMLElement {
         // Standalone mode without inline glossary data — render text only.
         self.classList.remove('oku-gloss');
       } else {
-        self.setAttribute('data-def', '<em>Unknown term:</em> ' + term);
+        self.setAttribute('data-def', '<em>Unknown term:</em> ' + escapeXml(term));
         self.classList.add('unknown');
         window.dispatchEvent(new CustomEvent('oku:warnings', {
           detail: [{ code: 'unknown-glossary-term', msg: 'No entry for "' + term + '"', level: 'warn' }]
@@ -8337,7 +8340,7 @@ class ExtRef extends HTMLElement {
       } else if (__okuStandalone()) {
         self.classList.remove('oku-extref');
       } else {
-        self.setAttribute('data-def', '<em>Unknown reference:</em> ' + name);
+        self.setAttribute('data-def', '<em>Unknown reference:</em> ' + escapeXml(name));
         self.classList.add('unknown');
         window.dispatchEvent(new CustomEvent('oku:warnings', {
           detail: [{ code: 'unknown-ext-ref', msg: 'No entry for "' + name + '"', level: 'warn' }]
@@ -15126,7 +15129,12 @@ function escapeXml(s) {
    `#fragment` and a bare query carry no scheme and pass through. */
 function __okuSafeUrl(u) {
   var raw = String(u == null ? '' : u).trim();
-  if (/^[a-z][a-z0-9+.-]*:/i.test(raw) && !/^(https?|mailto):/i.test(raw)) return '';
+  // Judged on what the browser will parse: it drops C0 controls and
+  // spaces before a scheme and tabs/newlines inside one, so
+  // `java<TAB>script:` and `\x01javascript:` were schemes to it and
+  // relative paths to a test of the raw string.
+  var probe = raw.replace(/[\u0000-\u0020]/g, '');
+  if (/^[a-z][a-z0-9+.-]*:/i.test(probe) && !/^(https?|mailto):/i.test(probe)) return '';
   return escapeXml(raw);
 }
 /* Size a left label gutter to the labels it must hold.

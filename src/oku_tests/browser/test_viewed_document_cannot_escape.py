@@ -150,8 +150,10 @@ def test_no_executable_script_type_runs(viewed) -> None:
 
 
 def test_a_stray_brace_cannot_close_the_confinement(viewed) -> None:
-    outline = viewed.evaluate("() => getComputedStyle(document.body).outlineWidth")
-    assert outline in ("0px", ""), f"the viewed sheet styled the host page: outline {outline}"
+    # The style, not the width: an unset outline computes to `medium`
+    # (3px) with style `none`. The escaped rule made it `7px solid`.
+    outline = viewed.evaluate("() => getComputedStyle(document.body).outlineStyle")
+    assert outline == "none", f"the viewed sheet styled the host page: outline-style {outline}"
 
 
 def test_an_unknown_term_is_text_in_its_tooltip(viewed) -> None:

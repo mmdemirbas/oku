@@ -2604,10 +2604,13 @@
 
       const renderRow = (row) => {
         const tr = document.createElement('tr');
-        if (row && typeof row === 'object' && !Array.isArray(row) && row.href) {
-          tr.setAttribute('data-href', row.href);
+        // Through safeUrl like every other link: the click listener
+        // holds the value in a closure, out of reach of any later pass.
+        const rowHref = row && typeof row === 'object' && !Array.isArray(row) && row.href ? safeUrl(row.href) : null;
+        if (rowHref) {
+          tr.setAttribute('data-href', rowHref);
           tr.style.cursor = 'pointer';
-          tr.addEventListener('click', () => { window.location.href = row.href; });
+          tr.addEventListener('click', () => { window.location.href = rowHref; });
         }
         const cells = (row && row.cells) || row;
         for (let ci = 0; ci < cells.length; ci++) {
@@ -3315,19 +3318,25 @@
    *
    * An author who wants a live island in a document makes that document
    * a page. */
-  const EXECUTABLE_TYPE = /^(|text\/javascript|text\/ecmascript|application\/javascript|application\/ecmascript|module|text\/babel|text\/jsx|text\/typescript|application\/x-javascript)$/i;
+  // An ALLOW-list of the data holders the kit's own renderers emit. It
+  // was a deny-list of executable types, and the browser runs more than
+  // any such list names: `text/jscript` and `text/x-javascript` both ran
+  // in the host page from a viewed file.
+  const DATA_HOLDER_TYPE = /^(text\/x-mermaid|text\/x-code|text\/x-md|application\/json|text\/plain)$/i;
   // Framing carries a document of its own, which this pass cannot
   // reach into; `base` and `meta` do not run anything themselves but
   // change how the WHOLE page resolves and navigates, which is the same
   // reach by another route.
   const REMOVED_TAGS = 'iframe,frame,frameset,object,embed,base,meta,link';
-  const URL_ATTRS = ['href', 'src', 'xlink:href', 'formaction', 'action'];
+  // `data-href` is a row's link, copied into a real href by the table
+  // views, so it is a URL like the others.
+  const URL_ATTRS = ['href', 'src', 'xlink:href', 'formaction', 'action', 'data-href'];
 
   function makeInert(root, scopeSel) {
     let removed = 0;
     let scoped = 0;
     root.querySelectorAll('script').forEach((el) => {
-      if (EXECUTABLE_TYPE.test((el.getAttribute('type') || '').trim())) { el.remove(); removed++; }
+      if (!DATA_HOLDER_TYPE.test((el.getAttribute('type') || '').trim())) { el.remove(); removed++; }
     });
     root.querySelectorAll(REMOVED_TAGS).forEach((el) => { el.remove(); removed++; });
     root.querySelectorAll('style').forEach((el) => {
@@ -3337,7 +3346,23 @@
       // that would need drops whatever it has no branch for, and the
       // thing it would drop first is the nested rule it was written
       // before anyone used.
-      el.textContent = scopeSel + ' {\n' + css + '\n}';
+      //
+      // But the text goes through the browser's own parser first and the
+      // block wraps what it SERIALISES: wrapping the raw text let a stray
+      // `}` close the block early, and every rule after it styled the
+      // page that opened the file. Serialised rules are balanced by
+      // construction (and `@import` is dropped on the way).
+      let balanced;
+      try {
+        const sheet = new CSSStyleSheet();
+        sheet.replaceSync(css);
+        balanced = Array.prototype.map.call(sheet.cssRules, (rule) => rule.cssText).join('\n');
+      } catch (e) {
+        el.remove();
+        removed++;
+        return;
+      }
+      el.textContent = scopeSel + ' {\n' + balanced + '\n}';
       scoped++;
     });
     root.querySelectorAll('*').forEach((el) => {
