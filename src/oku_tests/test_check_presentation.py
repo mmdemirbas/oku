@@ -363,6 +363,20 @@ class TestMermaidStyling:
         issues = _issues(tmp_path, _diagram("flowchart TB\n  A --> B\n  style A fill:#fff"))
         assert "island-hand-styled" in _codes(issues), issues
 
+    @pytest.mark.parametrize("fill", ["#0000", "#fff0", "#ffffff00"])
+    def test_a_transparent_fill_is_not_a_theme_colour(self, tmp_path, fill):
+        """An alpha of zero draws nothing, so it looks the same on both
+        themes — the warning's whole premise is a colour that does not.
+        `style A fill:#0000` (11111-hadis) drew a dashed outline only."""
+        issues = _issues(
+            tmp_path, _diagram(f"flowchart TB\n  A --> B\n  style A fill:{fill},stroke-dasharray: 4 4")
+        )
+        assert "island-hand-styled" not in _codes(issues), issues
+
+    def test_a_transparent_fill_beside_a_real_colour_is_still_flagged(self, tmp_path):
+        issues = _issues(tmp_path, _diagram("flowchart TB\n  A --> B\n  style A fill:#0000,stroke:#333"))
+        assert "island-hand-styled" in _codes(issues), issues
+
     def test_a_theme_directive_is_flagged_too(self, tmp_path):
         issues = _issues(
             tmp_path,
