@@ -6359,6 +6359,9 @@ function initReadingAids() {
              rather than a styled definition list. */
           var inner = document.createElement('table');
           inner.className = 'okt-list-card';
+          // Kit-built, so never a table for the wiring pass: unmarked,
+          // the next initReadingAids run gave every card a toolbar.
+          inner.setAttribute('data-okt-bound', '1');
           var tb = document.createElement('tbody');
           e.cells.forEach(function (cell, i) {
             if (!headers[i]) return;
