@@ -4834,6 +4834,68 @@ _HTML_ISLAND_RE = re.compile(r"^<[a-zA-Z][^\s>]*", re.MULTILINE)
 # The lines of a mermaid source that carry colour. A hex anywhere else is
 # part of a label ("#3 pick") and none of this rule's business.
 _MERMAID_STYLE_LINE_RE = re.compile(r"^\s*(?:classDef|style|linkStyle)\s|^\s*%%\{")
+
+# Three things mermaid cannot read as written, each measured against the
+# vendored build in Chromium. A route as a flowchart label (`G[/giris]`):
+# `[/` and `[\` open a slanted shape that must close with `/]` or `\]`.
+# A `;` in sequence or timeline text: it ends the statement. A bare `#`
+# in the same text: mermaid stops the text there and says nothing.
+_MERMAID_ENTITY_RE = re.compile(r"#\w+;")
+_MERMAID_SLANT_RE = re.compile(r"(?<!\[)\[([/\\])([^\]\n]*)\]")
+_MERMAID_SEQ_STATEMENT_RE = re.compile(
+    r"^(?:(?:[Nn]ote|participant|actor|loop|alt|else|opt|par|and|end|rect|activate|deactivate|"
+    r"autonumber|critical|option|break|box|create|destroy|title)\b"
+    r"|[^:]*?(?:->>|-->>|->|-->|-x|--x|-\)|--\))[^:]*:)"
+)
+_MERMAID_TRAP_FIX = {
+    "slash": "`[/` and `[\\` open mermaid's slanted shape, which must close with `/]` or `\\]`, so "
+    'the whole diagram fails to lex. Quote the label — `G["/giris"]` draws a plain box.',
+    "semicolon": "a `;` ends the statement in a {kind}, and what follows is not one, so the whole "
+    "diagram fails to parse. Write `,` or the entity `#59;`.",
+    "hash": "mermaid ends {kind} text at a bare `#` and says nothing — the reader sees only what "
+    "precedes it. Write the entity `#35;`.",
+}
+
+
+def _mermaid_syntax_traps(src: str) -> tuple[str, dict[str, list[tuple[int, str]]]]:
+    """The diagram's kind, and its lines that will not draw as written, by trap."""
+    lines = src.split("\n")
+    kind, start = "", 0
+    in_front = False
+    for n, ln in enumerate(lines):
+        t = ln.strip()
+        if t == "---":
+            in_front = not in_front
+            continue
+        if in_front or not t or t.startswith("%%"):
+            continue
+        kind, start = t.split()[0], n
+        break
+    found: dict[str, list[tuple[int, str]]] = {}
+    for n in range(start + 1, len(lines)):
+        ln = lines[n]
+        if ln.strip().startswith("%%"):
+            continue
+        if kind in ("flowchart", "flowchart-elk", "graph"):
+            bare = re.sub(r'"[^"]*"', '""', ln)
+            if any(not m.group(2).endswith(("/", "\\")) for m in _MERMAID_SLANT_RE.finditer(bare)):
+                found.setdefault("slash", []).append((n + 1, ln.strip()))
+        elif kind in ("sequenceDiagram", "timeline"):
+            bare = _MERMAID_ENTITY_RE.sub("_", ln)
+            if "#" in bare:
+                found.setdefault("hash", []).append((n + 1, ln.strip()))
+            segments = bare.split(";")
+            rest = [seg.strip() for seg in segments[1:]]
+            broken = (
+                len(segments) > 1
+                if kind == "timeline"
+                else any(seg and not _MERMAID_SEQ_STATEMENT_RE.match(seg) for seg in rest)
+            )
+            if broken:
+                found.setdefault("semicolon", []).append((n + 1, ln.strip()))
+    return kind, found
+
+
 _RAW_COLOUR_RE = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(")
 
 
@@ -5077,6 +5139,25 @@ def _presentation_issues(
                             "you wrote the page for; `./ctl deploy` in the kit repo updates it.",
                         )
                     )
+        if kind == "diagram":
+            # Mermaid fails these in the browser, after the build — `oku
+            # verify` was the only thing that saw them. Each trap has its
+            # own fix, so each is its own report.
+            dkind, traps = _mermaid_syntax_traps(str(blk.get("src") or ""))
+            for trap, hits in traps.items():
+                at, text = hits[0]
+                out.append(
+                    (
+                        "warning",
+                        "diagram-syntax",
+                        f"b[{i}] diagram",
+                        f"{len(hits)} line(s) mermaid cannot read as written, starting at diagram "
+                        f"line {at} `{text[:70]}`: "
+                        + _MERMAID_TRAP_FIX[trap].format(
+                            kind="sequence diagram" if dkind == "sequenceDiagram" else dkind
+                        ),
+                    )
+                )
         if kind == "diagram" and headings:
             labels = {_normalise_label(x) for x in _MERMAID_LABEL_RE.findall(str(blk.get("src") or ""))}
             labels.discard("")
