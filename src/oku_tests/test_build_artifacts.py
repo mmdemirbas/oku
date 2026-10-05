@@ -700,7 +700,10 @@ class TestPayloadBudget:
     # of central registries the loader may ask for, and a v1 disclosure
     # body written as one string. 1,131 bytes of kit measured against
     # ad357fc, most of it the reasoning.
-    STANDALONE_BUDGET_BYTES = 1_434_000
+    # Raised from 1,434,000 by the hover card colouring its code the way
+    # the viewer does, and the reading-face rules naming prose before the
+    # first section: the page measured 1,436,529 with both in.
+    STANDALONE_BUDGET_BYTES = 1_437_000
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

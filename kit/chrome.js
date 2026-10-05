@@ -8531,6 +8531,48 @@ function __okuFileMeta(ref) {
   return bits.join(' · ');
 }
 
+/* Colour what a hover card previews, the way the viewer colours the same
+   file. Highlighted in a detached block and moved in, never in place:
+   Prism stamps its language class on the parent <pre>, and the kit's
+   `pre[class*="language-"]` rule would then take the card's background
+   away. A line window is highlighted as ONE block, from the file's
+   first line, and split back into its rows by the viewer's own
+   splitter: a row highlighted on its own, or a window without the lines
+   above it, has lost the context a token spans — the middle of a
+   docstring that opened above the window would come back as code.
+   `before` is those lines, kept only as context. A target whose text
+   does not match what came back is left plain: colour is added, never a
+   character changed. */
+function __okuColourCardCode(targets, lang, before) {
+  if (!lang || !targets.length || typeof __prismLoader === 'undefined') return;
+  var rows = targets.length > 1 || targets[0].classList.contains('okt-fp-card-row');
+  var lead = rows && before ? before : [];
+  var pre = document.createElement('pre');
+  var block = document.createElement('code');
+  block.className = 'language-' + lang;
+  block.textContent = lead.concat(targets.map(function (t) { return t.textContent; })).join('\n');
+  pre.appendChild(block);
+  __prismLoader.highlightOnce(pre, lang).then(function (done) {
+    if (!done) return;
+    var cells = [block];
+    if (rows) {
+      _hdtWrapCodeLines(block);
+      cells = Array.prototype.slice.call(block.querySelectorAll(':scope > .okt-code-line > .okt-code-content'), lead.length);
+      // The splitter ends every line but the last with its newline.
+      cells.forEach(function (cell) {
+        var last = cell.lastChild;
+        if (last && last.nodeType === 3 && last.textContent === '\n') cell.removeChild(last);
+      });
+    }
+    if (cells.length !== targets.length) return;
+    if (cells.some(function (cell, i) { return cell.textContent !== targets[i].textContent; })) return;
+    targets.forEach(function (t, i) {
+      while (t.firstChild) t.removeChild(t.firstChild);
+      while (cells[i].firstChild) t.appendChild(cells[i].firstChild);
+    });
+  });
+}
+
 /* The hover card. Built as DOM, never as an HTML string: the body is
    the CONTENTS OF A FILE, and a file that happens to contain `<script>`
    is an ordinary file. The glossary tooltip's own body is
@@ -8565,15 +8607,18 @@ function __okuFileCard(ref) {
     var wpre = document.createElement('pre');
     wpre.className = 'okt-fp-card-pre okt-fp-card-window';
     var wcode = document.createElement('code');
-    __okuFileWindow(ref.text, ref.line, ref.lineEnd || ref.line, 12, 120).forEach(function (row) {
+    var rowEls = __okuFileWindow(ref.text, ref.line, ref.lineEnd || ref.line, 12, 120).map(function (row) {
       var r = document.createElement('span');
       r.className = 'okt-fp-card-row' + (row.hit ? ' okt-fp-card-hit' : '');
       r.setAttribute('data-n', String(row.n));
       r.textContent = row.text;
       wcode.appendChild(r);
+      return r;
     });
     wpre.appendChild(wcode);
     card.appendChild(wpre);
+    __okuColourCardCode(rowEls, ref.lang,
+      String(ref.text).split('\n').slice(0, Number(rowEls[0].getAttribute('data-n')) - 1));
   } else if (ref.text != null) {
     var pre = document.createElement('pre');
     pre.className = 'okt-fp-card-pre';
@@ -8581,6 +8626,7 @@ function __okuFileCard(ref) {
     code.textContent = __okuFileHead(ref.text, 12, 120);
     pre.appendChild(code);
     card.appendChild(pre);
+    __okuColourCardCode([code], ref.lang);
     if (ref.lines > 12) {
       var more = document.createElement('div');
       more.className = 'okt-fp-card-more';

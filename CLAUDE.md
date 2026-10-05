@@ -1293,6 +1293,17 @@ becomes a chip that keeps its line. Held by
 the kit without the runtime half, and by the line section of
 `test_filepath_refs.py`.
 
+**The card colours code the way the viewer does.** It set `textContent`
+and never asked Prism, so a `.py` chip previewed grey text and opened
+coloured. The window is highlighted from the file's FIRST line in a
+detached block and split back into its rows by the viewer's splitter —
+a window highlighted alone reads the middle of a docstring that opened
+above it as code — and moved in, never highlighted in place, because
+Prism stamps `language-*` on the parent `<pre>` and the kit's rule for
+that takes the card's background. Worst case measured, a line at the end
+of a 405 KB file: about 165 ms, after the plain card is already up.
+Held by `browser/test_file_card_highlighting.py`.
+
 **A card appears when the pointer arrives, not when the page moves under
 it.** `mouseenter` fires when a layer above an element goes away, so
 closing the popup a chip opened put that chip's card back under a cursor

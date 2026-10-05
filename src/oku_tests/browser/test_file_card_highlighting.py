@@ -40,19 +40,26 @@ def area(r):
 '''
 
 
+# A docstring opening on line 1 and closing on line 33: the window around
+# line 30 starts at row 28, inside it, with the opening quotes out of view.
+LONG = '"""Doc.\n' + "".join(f"prose line {i}\n" for i in range(2, 33)) + '"""\n\n\ndef f():\n    return 1\n'
+
+
 @pytest.fixture(scope="module")
 def built(tmp_path_factory):
     root = tmp_path_factory.mktemp("card") / "proj"
     (root / ".git").mkdir(parents=True)
     (root / "src").mkdir()
     (root / "src" / "tool.py").write_text(TOOL, encoding="utf-8")
+    (root / "src" / "long.py").write_text(LONG, encoding="utf-8")
     (root / "src" / "notes.txt").write_text("def is a word here\nnot code\n", encoding="utf-8")
     docs = root / "docs"
     docs.mkdir()
     (docs / "index.md").write_text(
         "---\ntitle: Cards\nsummary: Hover cards.\n---\n\n## Files {#files}\n\n"
         "The file [`tool.py`](#f/../src/tool.py), a line of it [`tool.py:3`](#f/../src/tool.py:3), "
-        "and plain text [`notes.txt`](#f/../src/notes.txt).\n",
+        "plain text [`notes.txt`](#f/../src/notes.txt), "
+        "and a line far down a long docstring [`long.py:30`](#f/../src/long.py:30).\n",
         encoding="utf-8",
     )
     (docs / "kit.json").write_text('{"rebuild_command": false}', encoding="utf-8")
@@ -139,3 +146,20 @@ def test_the_window_ends_at_the_files_last_line(page) -> None:
         "() => [...document.querySelectorAll('.oku-tooltip .okt-fp-card-row')].map(r => +r.dataset.n)"
     )
     assert ns and ns[-1] == len(TOOL.rstrip("\n").split("\n")), ns
+
+
+def test_a_window_inside_a_string_that_opened_above_it_is_still_a_string(page) -> None:
+    _hover(page, "long.py:30")
+    page.wait_for_function(
+        "() => document.querySelectorAll('.oku-tooltip .okt-fp-card-window .token').length > 0", timeout=10000
+    )
+    rows = page.evaluate(
+        """() => [...document.querySelectorAll('.oku-tooltip .okt-fp-card-row')].map(r => ({
+             n: +r.dataset.n, text: r.textContent,
+             string: !!r.querySelector('.token.string, .token.triple-quoted-string'),
+             keyword: !!r.querySelector('.token.keyword') }))"""
+    )
+    assert rows[0]["n"] < 30 < 33 <= rows[-1]["n"], rows
+    inside = [r for r in rows if r["n"] < 33]
+    assert inside and all(r["string"] for r in inside), inside
+    assert any(r["keyword"] for r in rows if r["text"].startswith("def ")), rows
