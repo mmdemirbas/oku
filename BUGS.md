@@ -12,6 +12,23 @@ carries the record, including what was measured before and after.
 
 ---
 
+## A gantt chart whose values are years labels every axis tick "2k"
+
+- **Symptom.** An `oku-chart` of type `gantt` with `start`/`end` between
+  2024 and 2026.5 draws its x-axis ticks as `2k`, all of them, so the axis
+  says nothing. The bars and labels are fine.
+- **Minimal reproduction.** `tmp/repro-stepflow-href/years.md` in this repo:
+  one gantt, tasks `2024–2025` and `2025–2026.5`. `oku build`, then read the
+  numeric `svg text` nodes of `dist/standalone/years.html`.
+- **Expected vs actual.** Expected ticks such as `2024`, `2024.5`, `2025`.
+  Actual: the only numeric tick text is `2k`.
+- **Where.** Not localised. Inferred: the axis uses a compact number format
+  (thousands as `k`), which suits counts and loses everything on a year.
+  A gantt has no date axis, so years are the natural numbers to give it.
+- **Observed.** The tick text above, read with Playwright (oku 0.6.5, kit
+  2026-10-05-r116, 2026-10-05). The same page with months 2–34 instead
+  shows `2`, `10`, `18`, `26`, `34`.
+
 ## A step-flow card's `href` to a sibling `.md` page is not rewritten to `.html`
 
 - **Symptom.** In a built page, a prose link `[x](other.md)` points at
