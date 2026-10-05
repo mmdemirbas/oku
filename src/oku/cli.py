@@ -2735,6 +2735,11 @@ _FOREIGN_HREF_RE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//|#g/|#x/|#f/)", re.I)
 _INLINE_KINDS = {"filepath": "#f/", "glossary-term": "#g/", "ext-ref": "#x/"}
 _MD_SETEXT_EQ_RE = re.compile(r"^=+\s*$")
 _MD_HR_RE = re.compile(r"^-{3,}\s*$")
+# A list item's marker: indent, the marker, then the gap to its content.
+_MD_LIST_ITEM_RE = re.compile(r"^( *)([-*+]|\d{1,9}[.)])( +|$)")
+_MD_THEMATIC_RE = re.compile(r"^ {0,3}(?:[-*_] *){3,}$")
+# A line that opens a block of its own rather than continuing a paragraph.
+_MD_INTERRUPT_RE = re.compile(r"^(?:[-*+](?: |$)|\d{1,9}[.)](?: |$)|#{1,6}(?: |$)|```|~~~|(?:[-*_] *){3,}$)")
 _MD_HTML_ISLAND_RE = re.compile(r"^</?([a-zA-Z][\w-]*)(?:[\s/>]|$)")
 # Inline-level tags never open an island — mirrors INLINE_HTML_TAGS in
 # renderer.js: a paragraph that starts with one of these stays prose,
@@ -3096,6 +3101,7 @@ def _lint_md_string(
     )
 
     in_raw_text = False
+    list_cols: list[int] = []
     # (kind, id, in-domain or None, line) for every element-form
     # reference in an island. Kept apart from the link-form lists,
     # which carry no domain and no line of their own.
@@ -3239,11 +3245,21 @@ def _lint_md_string(
                     "`---` directly under a text line is a setext heading in CommonMark but an <hr> in the kit — insert a blank line before it.",
                 )
             )
-        if (
-            prev_blank
-            and len(line) - len(line.lstrip(" ")) >= 4
-            and not re.match(r"^([-*]|\d+\.|>)", stripped)
-        ):
+        # The list items this line can still belong to, as content
+        # columns. After a blank line an item continues only at its own
+        # column, and a new item closes every item it is not inside.
+        indent = len(line) - len(line.lstrip(" "))
+        item = None if _MD_THEMATIC_RE.match(line) else _MD_LIST_ITEM_RE.match(line)
+        if hlevel:
+            list_cols.clear()
+        elif prev_blank or item:
+            while list_cols and list_cols[-1] > indent:
+                list_cols.pop()
+        in_item = bool(list_cols) and indent < list_cols[-1] + 4
+        if item:
+            gap = len(item.group(3))
+            list_cols.append(len(item.group(1)) + len(item.group(2)) + (gap if 1 <= gap <= 4 else 1))
+        if prev_blank and indent >= 4 and not in_item and not re.match(r"^([-*]|\d+\.|>)", stripped):
             issues.append(
                 (
                     "warning",
@@ -3252,10 +3268,13 @@ def _lint_md_string(
                     "Indented block after a blank line is an indented code block in CommonMark; the kit treats it as a paragraph. Use a ``` fence, or out-dent.",
                 )
             )
+        # A line that starts a block (an item, a heading, a fence, a
+        # break) is not paragraph text, so nothing is lazily continued.
         if (
             prev_nonblank is not None
             and prev_nonblank.lstrip().startswith(">")
             and not stripped.startswith(">")
+            and not _MD_INTERRUPT_RE.match(stripped)
         ):
             issues.append(
                 (
