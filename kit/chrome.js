@@ -19233,3 +19233,21 @@ function __okuPostRenderLanguagePillSmartHide() {
     if (!customElements.get(d[0])) customElements.define(d[0], d[1]);
   });
 })();
+
+/* A page that writes its own HTML has no renderer, so nothing says its
+   content is in place, and every pass that waits for `oku:rendered` —
+   the reading aids that wire tables and code, the contents list, the
+   rail, the string table — never ran on it. Standalone the kit runs
+   before the body is parsed, so not even an element upgrade saw the
+   content. Such a page announces itself once the document is parsed:
+   DOMContentLoaded, because a served renderer.js is a deferred script
+   that has not run yet when this line does. */
+(function () {
+  function announce() {
+    if (window.OkuRenderer || window.__okuRendered) return;
+    window.__okuRendered = true;
+    window.dispatchEvent(new CustomEvent('oku:rendered'));
+  }
+  if (document.readyState === 'complete') announce();
+  else document.addEventListener('DOMContentLoaded', announce);
+})();

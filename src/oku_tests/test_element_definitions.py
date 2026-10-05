@@ -17,4 +17,7 @@ def test_no_element_is_defined_outside_the_queue() -> None:
     # Two legitimate sites: the helper (after the queue has flushed) and
     # the flush itself at the foot of the file.
     assert len(direct) == 2, f"{len(direct)} direct customElements.define calls; use __okuDefine"
-    assert src.rstrip().endswith("})();") and src.rfind("customElements.define(") > len(src) - 600
+    # The flush comes after the last class is queued.
+    assert src.rfind("customElements.define(") > src.rfind("__okuDefine('"), (
+        "the flush must follow every queued define"
+    )
