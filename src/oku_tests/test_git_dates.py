@@ -13,6 +13,7 @@ One `git log --name-only` per directory answers for every file in it.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -93,3 +94,36 @@ def test_a_directory_outside_a_repository_still_answers_none(tmp_path: Path) -> 
     cli._git_dir_dates.clear()
 
     assert cli._git_last_modified(f) is None
+
+
+# VIII.5 / XII.3: git quotes a non-ASCII path by default
+# (core.quotePath), so `ölçüm.md` came back as
+# "\303\266l\303\247\303\274m.md" and matched no file name. The directory
+# answer had succeeded, so the per-file fallback never ran either: every
+# page whose name is not ASCII lost `updated`, which in a Turkish tree is
+# most of them.
+@pytest.mark.parametrize("name", ["ölçüm.md", "İçerik notları.md", "概述.md"])
+def test_a_page_named_in_any_script_gets_its_date(repo: Path, name: str) -> None:
+    f = repo / "docs" / name
+    f.write_text("x\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "commit", "-q", "-m", "n", "--date", "2026-07-04T12:00:00"],
+        cwd=repo,
+        check=True,
+        env={**os.environ, "GIT_COMMITTER_DATE": "2026-07-04T12:00:00"},
+    )
+    cli._git_dir_dates.clear()
+    cli._git_date_cache.clear()
+    assert cli._git_last_modified(f) == "2026-07-04"
+
+
+# XII.2: git exports GIT_DIR into hooks, often relative (`.git`). The
+# kit's git calls run with cwd set to the page's directory, where that
+# relative path names nothing, so a build run from a pre-commit hook
+# stamped no page with a date.
+def test_a_build_run_from_a_git_hook_still_dates_its_pages(repo: Path, monkeypatch) -> None:
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("GIT_DIR", ".git")
+    monkeypatch.setenv("GIT_WORK_TREE", ".")
+    assert cli._git_last_modified(repo / "docs" / "p0.md") is not None

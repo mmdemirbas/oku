@@ -189,3 +189,13 @@ def test_kit_json_skip_dirs_still_applies_without_git(tmp_path):
     # one that works everywhere.
 
     assert _titles(root) == {"Real"}
+
+
+# VIII.5: `git ls-files` quotes a non-ASCII path, so an ignored `çöp/`
+# came back as "\303\247\303\266p/" and matched no directory the walk
+# reached — it was walked while an ignored `junk/` beside it was pruned.
+def test_an_ignored_directory_named_outside_ascii_is_pruned_too(tmp_path):
+    root = _repo(tmp_path / "proj", "çöp/\n")
+    _write(root / "real.md", "Real")
+    _write(root / "çöp" / "copy.md", "Scratch copy")
+    assert _titles(root) == {"Real"}
