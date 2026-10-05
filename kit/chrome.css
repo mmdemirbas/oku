@@ -2431,8 +2431,13 @@ p { margin: 0 0 18px 0; }
    opt in. A file opened in the viewer is read the same way as the page,
    its title and summary standing in for the cover — and its sections
    are children of `.okt-mdview-rendered`, two levels below the body,
-   which is why a rule written against the body matched nothing. */
+   which is why a rule written against the body matched nothing. Prose
+   written before the first `##` is a child of main (or of the rendered
+   body) itself, not of a section — a lead under the cover, a README's
+   opening, a viewed file's `# title` — which is why every list here
+   names both. */
 :is(main, .okt-mdview-rendered) > section > :is(p, ul, ol, dl, blockquote, h2, h3),
+:is(main, .okt-mdview-rendered) > :is(p, ul, ol, dl, blockquote, h1, h2, h3),
 :is(main, .okt-mdview-body) :is(.callout, .tldr, .insight, .footnotes),
 header.cover :is(h1, .subtitle, .eyebrow),
 .okt-mdview-head :is(.okt-mdview-title, .okt-mdview-summary) {
@@ -2443,6 +2448,7 @@ header.cover :is(h1, .subtitle, .eyebrow),
   letter-spacing: 0;
 }
 :is(main, .okt-mdview-rendered) > section > :is(p, ul, ol, dl, blockquote),
+:is(main, .okt-mdview-rendered) > :is(p, ul, ol, dl, blockquote),
 :is(main, .okt-mdview-body) :is(.callout, .insight) :is(p, li),
 :is(main, .okt-mdview-body) .tldr li {
   font-size: 18px;
@@ -2452,6 +2458,7 @@ header.cover :is(h1, .subtitle, .eyebrow),
    line long enough to read in phrases rather than in words. */
 @media (max-width: 600px) {
   :is(main, .okt-mdview-rendered) > section > :is(p, ul, ol, dl, blockquote),
+  :is(main, .okt-mdview-rendered) > :is(p, ul, ol, dl, blockquote),
   :is(main, .okt-mdview-body) :is(.callout, .insight) :is(p, li),
   :is(main, .okt-mdview-body) .tldr li { font-size: 17px; line-height: 1.65; }
   .tldr .one-line { font-size: 19px; }
@@ -8134,6 +8141,9 @@ main .example-pair {
 :root[data-oku-hyphens="on"] main > section > ul li,
 :root[data-oku-hyphens="on"] main > section > ol li,
 :root[data-oku-hyphens="on"] main > section > blockquote p,
+:root[data-oku-hyphens="on"] main > p,
+:root[data-oku-hyphens="on"] main > :is(ul, ol) li,
+:root[data-oku-hyphens="on"] main > blockquote p,
 :root[data-oku-hyphens="on"] main .callout p:not(.callout-title):not(.okt-card-title),
 :root[data-oku-hyphens="on"] main .callout li,
 :root[data-oku-hyphens="on"] main .tldr li,

@@ -277,7 +277,11 @@ tables, charts, cards, controls, labels — stays in Inter
 (`--font-ui`), so a sentence and a datum are told apart before either
 is read. The reading face is a selector list, not `main`, for the reason
 the justify rule is one: a component inheriting a face it was not drawn
-for is the failure, and a new one opts in. The default column is 900px
+for is the failure, and a new one opts in. Prose before the first
+`##` is a child of `main` (or of the viewer's rendered body) rather than
+of a section, and the lists name that too: an opening paragraph was
+measured at Inter 16px ragged above Literata 18px justified, held by
+`browser/test_prose_before_the_first_section.py`. The default column is 900px
 and no longer grows with the screen — at 1100 → 1240 → 1400 a paragraph
 ran 92 characters to the line on a 1440px laptop; now 69, measured on
 a delivered Turkish page, and the same on a 1920px monitor (see
