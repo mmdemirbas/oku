@@ -42,6 +42,21 @@
  *     - Internal helpers:        nested inside their controller IIFE
  * ────────────────────────────────────────────────────────────────── */
 
+/* Every custom element is DEFINED at the foot of this file, not where its
+   class is written. Served, this script is deferred and runs over a body
+   that is already parsed, so a define upgrades any matching element on the
+   spot — its connectedCallback runs mid-file, before the top-level state
+   declared below it is initialised. A page with its own HTML met that:
+   `page-chrome` wired a table and threw on a constant set 1,300 lines
+   later, and a chart read its label width as undefined. Queued, the
+   upgrades run once everything they can reach exists, in source order. */
+var __okuPendingDefines = [];
+function __okuDefine(name, cls) {
+  if (customElements.get(name)) return;
+  if (__okuPendingDefines) __okuPendingDefines.push([name, cls]);
+  else customElements.define(name, cls);
+}
+
 /* The kit version used to be a constant here, told to track
  * pyproject.toml "in lockstep". It did not: the footer read v0.4.0 for
  * as long as the package read 0.6.5, and nothing failed, because a
@@ -3636,7 +3651,7 @@ class PageChrome extends HTMLElement {
     initReadingAids();
   }
 }
-customElements.define('page-chrome', PageChrome);
+__okuDefine('page-chrome', PageChrome);
 
 /* ============ <page-toc> Web Component ============ *
  * Renders inside the single left sidebar as a section under the site
@@ -3686,7 +3701,7 @@ class PageToc extends HTMLElement {
     }
   }
 }
-customElements.define('page-toc', PageToc);
+__okuDefine('page-toc', PageToc);
 
 /* ============ TOC builder + scroll-spy ============ */
 /* The same rule as renderer.js and `_md_slug`. It used to name six
@@ -8235,7 +8250,7 @@ class GlossaryTerm extends HTMLElement {
     });
   }
 }
-if (!customElements.get('glossary-term')) customElements.define('glossary-term', GlossaryTerm);
+__okuDefine('glossary-term', GlossaryTerm);
 
 /* ============ <ext-ref> Custom Element — Citation card ============ *
  * Per the design audit ("bold move"): treat every external reference as a
@@ -8357,10 +8372,10 @@ class ExtRef extends HTMLElement {
   }
 }
 
-if (!customElements.get('ext-ref')) customElements.define('ext-ref', ExtRef);
+__okuDefine('ext-ref', ExtRef);
 // "<cite>" alias — same behavior as <ext-ref> so authors can use the
 // semantically-correct HTML element when citing.
-if (!customElements.get('oku-cite')) customElements.define('oku-cite', class extends ExtRef {});
+__okuDefine('oku-cite', class extends ExtRef {});
 
 /* ============ <oku-filepath> — a path you can look inside ============ *
  * A document that mentions a file writes its path, and a path in a code
@@ -8713,7 +8728,7 @@ class OkuFilePath extends HTMLElement {
     }
   }
 }
-if (!customElements.get('oku-filepath')) customElements.define('oku-filepath', OkuFilePath);
+__okuDefine('oku-filepath', OkuFilePath);
 
 
 /* ============ Shared chart palette helper ============
@@ -14720,7 +14735,7 @@ class OkuChart extends HTMLElement {
     });
   }
 }
-if (!customElements.get('oku-chart')) customElements.define('oku-chart', OkuChart);
+__okuDefine('oku-chart', OkuChart);
 
 /* ============ .bar-chart hover enhancer ============ *
  * bar / stacked-bar / grouped-bar charts render via renderer.js as
@@ -17271,7 +17286,7 @@ class OkuDiagram extends HTMLElement {
     });
   }
 }
-if (!customElements.get('oku-diagram')) customElements.define('oku-diagram', OkuDiagram);
+__okuDefine('oku-diagram', OkuDiagram);
 
 // Re-render every diagram on theme toggle so colors track the theme.
 window.addEventListener('oku:theme-changed', function () {
@@ -17854,7 +17869,7 @@ class OkuAnnotatedCode extends HTMLElement {
     }
   }
 }
-if (!customElements.get('oku-annotated-code')) customElements.define('oku-annotated-code', OkuAnnotatedCode);
+__okuDefine('oku-annotated-code', OkuAnnotatedCode);
 
 /* ============ <oku-snippet> — editable HTML/CSS/JS playground ============ */
 class OkuSnippet extends HTMLElement {
@@ -17938,7 +17953,7 @@ class OkuSnippet extends HTMLElement {
     render();
   }
 }
-if (!customElements.get('oku-snippet')) customElements.define('oku-snippet', OkuSnippet);
+__okuDefine('oku-snippet', OkuSnippet);
 
 /* ============ <page-nav> Custom Element ============ *
  * Loads site-manifest.json from the docs root and renders a collapsible
@@ -18676,7 +18691,7 @@ class PageNav extends HTMLElement {
     if (none) none.hidden = !(on && treeHits === 0 && tocHits === 0);
   }
 }
-if (!customElements.get('page-nav')) customElements.define('page-nav', PageNav);
+__okuDefine('page-nav', PageNav);
 
 /* ============ Forward-compat warning indicator ============ *
  * One indicator regardless of error count. Sits in the top-right
@@ -19203,3 +19218,13 @@ function __okuPostRenderLanguagePillSmartHide() {
   setTimeout(sweep, 200);
   setTimeout(sweep, 600);
 }
+
+/* The foot of the file: everything a connectedCallback can reach is
+   initialised now. See __okuDefine. */
+(function () {
+  var pending = __okuPendingDefines;
+  __okuPendingDefines = null;
+  pending.forEach(function (d) {
+    if (!customElements.get(d[0])) customElements.define(d[0], d[1]);
+  });
+})();
