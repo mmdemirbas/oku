@@ -695,7 +695,12 @@ class TestPayloadBudget:
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
-    STANDALONE_BUDGET_BYTES = 1_432_000
+    # Raised from 1,432,000 by the fixes a sweep of 49 project doc trees
+    # found: custom elements defined at the foot of chrome.js, the list
+    # of central registries the loader may ask for, and a v1 disclosure
+    # body written as one string. 1,131 bytes of kit measured against
+    # ad357fc, most of it the reasoning.
+    STANDALONE_BUDGET_BYTES = 1_434_000
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

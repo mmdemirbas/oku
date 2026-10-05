@@ -7846,6 +7846,13 @@ var __okuKit = (function () {
     return kit;
   }
 
+  // The central registry files the kit ships, by kind — held against
+  // kit/glossary and kit/extrefs by test_registry_requests.py.
+  var OKU_CENTRAL_REGISTRIES = {
+    glossary: ['adhd', 'ai-llm', 'data-platforms', 'doc-tooling', 'hadith', 'voice', 'web'],
+    extrefs: ['ai-llm', 'data-platforms', 'doc-tooling', 'web'],
+  };
+
   function load() {
     if (loaded) return Promise.resolve(kit);
     // Standalone build — if the build inlined a kit bundle, hydrate from it.
@@ -7909,22 +7916,20 @@ var __okuKit = (function () {
           if (data.domains) kit.domains = data.domains;
           if (data.personalization) kit.personalization = data.personalization;
         }
-        // Load each domain file in parallel
+        // Load each domain's central files in parallel — only the ones
+        // the kit ships. A domain a project defines in its own kit.json
+        // has none, and asking anyway is a 404 on every page load.
         var promises = kit.domains.flatMap(function (d) {
-          return [
-            fetch(wa(__okuDocsRoot + '_oku/glossary/' + d + '.json'), { cache: 'no-cache' })
+          return ['glossary', 'extrefs'].filter(function (kind) {
+            return OKU_CENTRAL_REGISTRIES[kind].indexOf(d) !== -1;
+          }).map(function (kind) {
+            return fetch(wa(__okuDocsRoot + '_oku/' + kind + '/' + d + '.json'), { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
-                if (j && j.entries) kit.glossary[d] = j.entries;
-              }),
-            fetch(wa(__okuDocsRoot + '_oku/extrefs/' + d + '.json'), { cache: 'no-cache' })
-              .then(function (r) { return r.ok ? r.json() : null; })
-              .catch(function () { return null; })
-              .then(function (j) {
-                if (j && j.entries) kit.extrefs[d] = j.entries;
-              })
-          ];
+                if (j && j.entries) kit[kind][d] = j.entries;
+              });
+          });
         });
         return Promise.all(promises).then(function () {
           // Apply project-level overrides AFTER central domain files
