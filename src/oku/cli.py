@@ -5295,15 +5295,33 @@ def apply_path_chip_fixes(issues: list[dict], root: Path) -> list[tuple[Path, li
         if src.suffix != ".md" or not src.is_file():
             continue
         try:
-            before = src.read_text(encoding="utf-8")
-        except OSError:
+            # newline="" on both sides: the author's line endings are the
+            # author's, and translating them turned a CRLF page into a
+            # whole-file diff for a one-span fix.
+            with src.open(encoding="utf-8", newline="") as fh:
+                before = fh.read()
+        except (OSError, UnicodeDecodeError):
             continue
         after, moved = _rewrite_code_span_paths(before, lambda t: resolve_file_line(t, src)[1] == "ok")
         if not moved or after == before:
             continue
-        src.write_text(after, encoding="utf-8")
+        _replace_file_text(src, after)
         fixed.append((src, moved))
     return fixed
+
+
+def _replace_file_text(path: Path, text: str) -> None:
+    """Rewrite an author's file without a window in which it is half
+    written: a sibling temp file, then an atomic rename over it. The
+    file's mode is carried across."""
+    tmp = path.with_name(f".{path.name}.oku-{os.getpid()}.tmp")
+    try:
+        with tmp.open("w", encoding="utf-8", newline="") as fh:
+            fh.write(text)
+        shutil.copymode(path, tmp)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def cmd_check(args: argparse.Namespace) -> int:
