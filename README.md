@@ -10,7 +10,7 @@ with search, and a single-file copy of every page that opens from
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme-dark.png">
-  <img alt="The charts reference rendered by oku: the Contents drawer pinned on the left with the site tree and on-page TOC, a grid of pie, donut, waffle, treemap and polar-area previews in the reading column, and the display menu open at the top right with text size, column width, theme and language" src=".github/assets/readme-light.png" width="100%">
+  <img alt="The charts reference rendered by oku: the Contents drawer pinned on the left with the site tree and on-page TOC, a grid of pie, donut, waffle, marimekko and polar-area previews in the reading column, and the display menu open at the top right with text size, column width, theme and language" src=".github/assets/readme-light.png" width="100%">
 </picture>
 
 ## Why
