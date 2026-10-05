@@ -198,7 +198,7 @@ check cannot see. `oku check` reads the source; this reads the result.
 ```bash
 oku build && oku verify
 
-# ✓ 38 page(s) render clean at 1440px and 360px
+# ✓ 38 page(s) render clean: 19 standalone at 1440px and 360px, 19 in dist/site at 1440px
 ```
 
 ```oku-table

@@ -8885,8 +8885,11 @@ def cmd_verify(args: argparse.Namespace) -> int:
         if len(failures) > 40:
             print(f"  … {len(failures) - 40} more", file=sys.stderr)
         return 1
-    checked = len(standalone) + len(sorted(site_dir.rglob("*.html")) if site_dir.is_dir() else [])
-    print(f"✓ {checked} page(s) render clean across both built trees (1440px and 360px)")
+    site_count = len(sorted(site_dir.rglob("*.html"))) if site_dir.is_dir() else 0
+    print(
+        f"✓ {len(standalone) + site_count} page(s) render clean: "
+        f"{len(standalone)} standalone at 1440px and 360px, {site_count} in dist/site at 1440px"
+    )
     return 0
 
 
