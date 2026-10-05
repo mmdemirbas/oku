@@ -698,7 +698,10 @@ class TestPayloadBudget:
     # (fmtTicks, evenTicks, every renderer handing its ticks over whole,
     # y gutters sized from their labels, end ticks anchored inward) and
     # payload links going through linkHref: 1,451,945.
-    KIT_BUDGET_BYTES = 1_452_500
+    # Then by readings that say the value (fmtReading for the tooltip,
+    # <title> and aria-label; fmtAt for a value read off the pointer):
+    # 1,453,976.
+    KIT_BUDGET_BYTES = 1_454_500
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -713,7 +716,8 @@ class TestPayloadBudget:
     # Then by the viewer's contents list and width stops: 1,445,757.
     # Then by axis labels judged against their step and payload links
     # through linkHref: 1,452,525.
-    STANDALONE_BUDGET_BYTES = 1_453_000
+    # Then by readings that say the value: 1,454,556.
+    STANDALONE_BUDGET_BYTES = 1_455_000
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

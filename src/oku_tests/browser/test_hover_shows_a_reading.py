@@ -337,21 +337,17 @@ def _five_number(values: list[float]) -> dict[str, str]:
         JS rounds a tie AWAY FROM ZERO; Python rounds half to even. The
         difference is not exotic here — it is every other quartile of a
         four-value distribution. The example's `us-east` has a median of
-        126.5 and a q3 of 128.5, which the kit renders as 127 and 129
-        and `f"{126.5:.0f}"` renders as 126.
+        126.5 and a q3 of 128.5, which the kit rendered as 127 and 129
+        while readings were compact, and `f"{126.5:.0f}"` renders as 126.
         """
         q = Decimal(repr(n)).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
         return f"{q:f}"
 
     def fmt(n: float) -> str:
-        a = abs(n)
-        if a >= 1000:
-            return fixed(n / 1000, 1).removesuffix(".0") + "k"
-        if a >= 10:
-            return fixed(n, 0)
-        if a >= 1:
-            return fixed(n, 1).removesuffix(".0")
-        return fixed(n, 2)
+        """The reading's rule, `fmtReading`: the value itself, float
+        noise cut at the sixth decimal, trailing zeros dropped."""
+        s = fixed(n, 6)
+        return s.rstrip("0").rstrip(".") if "." in s else s
 
     return {
         "n": str(len(vs)),

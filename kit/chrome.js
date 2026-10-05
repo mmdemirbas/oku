@@ -9416,7 +9416,7 @@ class OkuChart extends HTMLElement {
           '" data-point-label="' + dotLabel + '" data-series-label="' + seriesLbl + '"' +
           ' tabindex="0" role="img" aria-label="' +
             (seriesLbl ? seriesLbl + ': ' : '') + (dotLabel ? dotLabel + ' ' : '') +
-            '(' + fmtNum(p.x) + ', ' + fmtNum(p.y) + ')' +
+            '(' + fmtReading(p.x) + ', ' + fmtReading(p.y) + ')' +
           '"/>'
         );
         if (p.label) {
@@ -9688,7 +9688,7 @@ class OkuChart extends HTMLElement {
         if (bestX === null) bestX = nearest.x;
         rows.push({
           k: s.label || ('series ' + (sIdx + 1)),
-          v: fmtNum(nearest.y) + (nearest.label ? ' (' + nearest.label + ')' : '')
+          v: fmtReading(nearest.y) + (nearest.label ? ' (' + nearest.label + ')' : '')
         });
       });
       if (!rows.length) return;
@@ -9697,7 +9697,7 @@ class OkuChart extends HTMLElement {
       cursor.setAttribute('visibility', 'visible');
       if (self._showCursorTip) {
         self._showCursorTip({
-          label: (self._xLabel ? self._xLabel + ' ≈ ' : 'x ≈ ') + fmtNum(bestX),
+          label: (self._xLabel ? self._xLabel + ' ≈ ' : 'x ≈ ') + fmtReading(bestX),
           kv: rows
         }, ev.clientX, svg.getBoundingClientRect().top);
       }
@@ -9977,7 +9977,7 @@ class OkuChart extends HTMLElement {
                  ' data-slice-value="' + value + '"' +
                  ' data-slice-share="' + fraction.toFixed(4) + '"' +
                  ' data-slice-total="' + total + '"' +
-                 ' tabindex="0" role="img" aria-label="' + escapeXml(slice.label || '') + ': ' + fmtNum(value) + ' (' + Math.round(fraction * 100) + '%)"/>');
+                 ' tabindex="0" role="img" aria-label="' + escapeXml(slice.label || '') + ': ' + fmtReading(value) + ' (' + Math.round(fraction * 100) + '%)"/>');
       angleStart = angleEnd;
     });
 
@@ -10115,9 +10115,9 @@ class OkuChart extends HTMLElement {
         var colLabel = (x.col_labels && x.col_labels[j]) || ('col ' + (j + 1));
         var payload = JSON.stringify({
           label: rowLabel + ' × ' + colLabel,
-          kv: [{ k: 'value', v: fmtNum(val) }]
+          kv: [{ k: 'value', v: fmtReading(val) }]
         });
-        parts.push('<rect x="' + px + '" y="' + py + '" width="' + markSize(cell - 2) + '" height="' + markSize(cell - 2) + '" rx="3" fill="' + tone(val) + '" fill-opacity="' + alpha(val).toFixed(3) + '" class="okc-heatmap-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(rowLabel + ' × ' + colLabel + ': ' + fmtNum(val)) + '</title></rect>');
+        parts.push('<rect x="' + px + '" y="' + py + '" width="' + markSize(cell - 2) + '" height="' + markSize(cell - 2) + '" rx="3" fill="' + tone(val) + '" fill-opacity="' + alpha(val).toFixed(3) + '" class="okc-heatmap-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(rowLabel + ' × ' + colLabel + ': ' + fmtReading(val)) + '</title></rect>');
       }
     }
     parts.push('</svg>');
@@ -10145,11 +10145,11 @@ class OkuChart extends HTMLElement {
     var sparkPayload = JSON.stringify({
       label: this._title || 'sparkline',
       kv: [
-        { k: 'min',   v: fmtNum(minV) },
-        { k: 'max',   v: fmtNum(maxV) },
-        { k: 'first', v: fmtNum(values[0]) },
-        { k: 'last',  v: fmtNum(values[values.length - 1]) },
-        { k: 'mean',  v: fmtNum(sumV / values.length) },
+        { k: 'min',   v: fmtReading(minV) },
+        { k: 'max',   v: fmtReading(maxV) },
+        { k: 'first', v: fmtReading(values[0]) },
+        { k: 'last',  v: fmtReading(values[values.length - 1]) },
+        { k: 'mean',  v: fmtReading(sumV / values.length) },
         { k: 'n',     v: String(values.length) }
       ]
     });
@@ -10224,7 +10224,7 @@ class OkuChart extends HTMLElement {
         self._showCursorTip({
           label: (self._title || 'sparkline') + ' · #' + (t + 1),
           kv: [
-            { k: 'value', v: fmtNum(values[t]) },
+            { k: 'value', v: fmtReading(values[t]) },
             { k: 'index', v: (t + 1) + ' / ' + values.length }
           ]
         }, ev.clientX, svgRect.top);
@@ -10358,21 +10358,21 @@ class OkuChart extends HTMLElement {
     // Zone bands only — labels go in the row below the value
     // readout, never on / around the arc.
     zones.forEach(function (z) {
-      parts.push('<path d="' + arcPath(angleOf(z.from), angleOf(z.to)) + '" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.32" class="okc-gauge-zone"><title>' + escapeXml((z.label || z.tone || 'zone') + ': ' + fmtNum(z.from) + ' – ' + fmtNum(z.to)) + '</title></path>');
+      parts.push('<path d="' + arcPath(angleOf(z.from), angleOf(z.to)) + '" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.32" class="okc-gauge-zone"><title>' + escapeXml((z.label || z.tone || 'zone') + ': ' + fmtReading(z.from) + ' – ' + fmtReading(z.to)) + '</title></path>');
     });
     // Value arc — rich hover surfaces value / target / range.
-    var zoneSummary = (x.zones || []).map(function (z) { return (z.label || z.tone) + ': ' + fmtNum(z.from) + '–' + fmtNum(z.to); }).join(', ');
+    var zoneSummary = (x.zones || []).map(function (z) { return (z.label || z.tone) + ': ' + fmtReading(z.from) + '–' + fmtReading(z.to); }).join(', ');
     var gaugeKv = [
-      { k: 'value', v: fmtNum(val) },
-      { k: 'range', v: fmtNum(mn) + ' – ' + fmtNum(mx) }
+      { k: 'value', v: fmtReading(val) },
+      { k: 'range', v: fmtReading(mn) + ' – ' + fmtReading(mx) }
     ];
-    if (typeof x.target === 'number') gaugeKv.push({ k: 'target', v: fmtNum(x.target) });
+    if (typeof x.target === 'number') gaugeKv.push({ k: 'target', v: fmtReading(x.target) });
     if (zoneSummary) gaugeKv.push({ k: 'zones', v: zoneSummary });
     var gaugePayload = JSON.stringify({
       label: x.label || (this._title || 'Gauge'),
       kv: gaugeKv
     });
-    parts.push('<path d="' + arcPath(angleOf(mn), angleOf(val)) + '" fill="var(--accent)" class="okc-gauge-value" tabindex="0" data-hover-payload="' + escapeXml(gaugePayload) + '"><title>' + escapeXml((x.label ? x.label + ': ' : '') + fmtNum(val) + ' (range ' + fmtNum(mn) + '–' + fmtNum(mx) + ')') + '</title></path>');
+    parts.push('<path d="' + arcPath(angleOf(mn), angleOf(val)) + '" fill="var(--accent)" class="okc-gauge-value" tabindex="0" data-hover-payload="' + escapeXml(gaugePayload) + '"><title>' + escapeXml((x.label ? x.label + ': ' : '') + fmtReading(val) + ' (range ' + fmtReading(mn) + '–' + fmtReading(mx) + ')') + '</title></path>');
     // Target tick.
     if (typeof x.target === 'number') {
       var ta = angleOf(x.target);
@@ -10461,10 +10461,10 @@ class OkuChart extends HTMLElement {
       }
       if (self._showCursorTip) {
         self._showCursorTip({
-          label: 'value ≈ ' + fmtNum(v),
+          label: 'value ≈ ' + fmtReading(v),
           kv: [
             { k: 'zone',  v: zoneHit ? (zoneHit.label || zoneHit.tone || 'zone') : '—' },
-            { k: 'range', v: fmtNum(mn) + ' – ' + fmtNum(mx) }
+            { k: 'range', v: fmtReading(mn) + ' – ' + fmtReading(mx) }
           ]
         }, ev.clientX, svg.getBoundingClientRect().top);
       }
@@ -10560,7 +10560,7 @@ class OkuChart extends HTMLElement {
         return p[0].toFixed(1) + ',' + p[1].toFixed(1);
       }).join(' ');
       var kv = axes.map(function (a, ai) {
-        return { k: (a.label || ('axis ' + (ai + 1))), v: fmtNum(+(s.values || [])[ai] || 0) };
+        return { k: (a.label || ('axis ' + (ai + 1))), v: fmtReading(+(s.values || [])[ai] || 0) };
       });
       var radarPayload = JSON.stringify({
         series: s.label || ('Series ' + (si + 1)),
@@ -10628,14 +10628,14 @@ class OkuChart extends HTMLElement {
       var bpPayload = JSON.stringify({
         label: b.label || ('Box ' + (i + 1)),
         kv: [
-          { k: 'min',    v: fmtNum(+b.min) },
-          { k: 'q1',     v: fmtNum(+b.q1) },
-          { k: 'median', v: fmtNum(+b.median) },
-          { k: 'q3',     v: fmtNum(+b.q3) },
-          { k: 'max',    v: fmtNum(+b.max) }
-        ].concat((b.outliers || []).length ? [{ k: 'outliers', v: (b.outliers || []).map(fmtNum).join(', ') }] : [])
+          { k: 'min',    v: fmtReading(+b.min) },
+          { k: 'q1',     v: fmtReading(+b.q1) },
+          { k: 'median', v: fmtReading(+b.median) },
+          { k: 'q3',     v: fmtReading(+b.q3) },
+          { k: 'max',    v: fmtReading(+b.max) }
+        ].concat((b.outliers || []).length ? [{ k: 'outliers', v: (b.outliers || []).map(fmtReading).join(', ') }] : [])
       });
-      parts.push('<rect x="' + iqr.start + '" y="' + (y - 12) + '" width="' + iqr.size + '" height="24" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="okc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtNum(+b.min) + ', q1 ' + fmtNum(+b.q1) + ', med ' + fmtNum(+b.median) + ', q3 ' + fmtNum(+b.q3) + ', max ' + fmtNum(+b.max)) + '</title></rect>');
+      parts.push('<rect x="' + iqr.start + '" y="' + (y - 12) + '" width="' + iqr.size + '" height="24" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="okc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtReading(+b.min) + ', q1 ' + fmtReading(+b.q1) + ', med ' + fmtReading(+b.median) + ', q3 ' + fmtReading(+b.q3) + ', max ' + fmtReading(+b.max)) + '</title></rect>');
       // Median line.
       parts.push('<line x1="' + sx(+b.median) + '" y1="' + (y - 12) + '" x2="' + sx(+b.median) + '" y2="' + (y + 12) + '" stroke="' + color + '" stroke-width="2" class="okc-boxplot-median"/>');
       (b.outliers || []).forEach(function (o) {
@@ -10700,15 +10700,15 @@ class OkuChart extends HTMLElement {
       var bpPayload = JSON.stringify({
         label: b.label || ('Box ' + (i + 1)),
         kv: [
-          { k: 'min',    v: fmtNum(+b.min) },
-          { k: 'q1',     v: fmtNum(+b.q1) },
-          { k: 'median', v: fmtNum(+b.median) },
-          { k: 'q3',     v: fmtNum(+b.q3) },
-          { k: 'max',    v: fmtNum(+b.max) }
-        ].concat((b.outliers || []).length ? [{ k: 'outliers', v: (b.outliers || []).map(fmtNum).join(', ') }] : [])
+          { k: 'min',    v: fmtReading(+b.min) },
+          { k: 'q1',     v: fmtReading(+b.q1) },
+          { k: 'median', v: fmtReading(+b.median) },
+          { k: 'q3',     v: fmtReading(+b.q3) },
+          { k: 'max',    v: fmtReading(+b.max) }
+        ].concat((b.outliers || []).length ? [{ k: 'outliers', v: (b.outliers || []).map(fmtReading).join(', ') }] : [])
       });
       var iqr = markSpan(sy(+b.q3), sy(+b.q1), 0);
-      parts.push('<rect x="' + (cx - bw / 2) + '" y="' + iqr.start + '" width="' + bw + '" height="' + iqr.size + '" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="okc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtNum(+b.min) + ', q1 ' + fmtNum(+b.q1) + ', med ' + fmtNum(+b.median) + ', q3 ' + fmtNum(+b.q3) + ', max ' + fmtNum(+b.max)) + '</title></rect>');
+      parts.push('<rect x="' + (cx - bw / 2) + '" y="' + iqr.start + '" width="' + bw + '" height="' + iqr.size + '" fill="' + color + '" fill-opacity="0.28" stroke="' + color + '" class="okc-boxplot-iqr" tabindex="0" data-hover-payload="' + escapeXml(bpPayload) + '"><title>' + escapeXml((b.label || 'box') + ': min ' + fmtReading(+b.min) + ', q1 ' + fmtReading(+b.q1) + ', med ' + fmtReading(+b.median) + ', q3 ' + fmtReading(+b.q3) + ', max ' + fmtReading(+b.max)) + '</title></rect>');
       // Median line (horizontal).
       parts.push('<line x1="' + (cx - bw / 2) + '" y1="' + sy(+b.median) + '" x2="' + (cx + bw / 2) + '" y2="' + sy(+b.median) + '" stroke="' + color + '" stroke-width="2" class="okc-boxplot-median"/>');
       (b.outliers || []).forEach(function (o) {
@@ -10765,15 +10765,15 @@ class OkuChart extends HTMLElement {
       // Value bar — rich hover surfaces actual / target / max + zones.
       var color = palette[t.color] || palette.accent;
       var bulletKv = [
-        { k: 'value', v: fmtNum(+t.value || 0) },
-        { k: 'max',   v: fmtNum(trackMax) }
+        { k: 'value', v: fmtReading(+t.value || 0) },
+        { k: 'max',   v: fmtReading(trackMax) }
       ];
-      if (typeof t.target === 'number') bulletKv.push({ k: 'target', v: fmtNum(t.target) });
+      if (typeof t.target === 'number') bulletKv.push({ k: 'target', v: fmtReading(t.target) });
       var bulletPayload = JSON.stringify({
         label: t.label || 'metric',
         kv: bulletKv
       });
-      parts.push('<rect x="' + pad.left + '" y="' + (y + 6) + '" width="' + markSize(sx(t.value) - pad.left) + '" height="10" rx="2" fill="' + color + '" class="okc-bullet-value" tabindex="0" data-hover-payload="' + escapeXml(bulletPayload) + '"><title>' + escapeXml((t.label || 'metric') + ': ' + fmtNum(+t.value || 0) + ' / ' + fmtNum(trackMax) + (typeof t.target === 'number' ? ' (target ' + fmtNum(t.target) + ')' : '')) + '</title></rect>');
+      parts.push('<rect x="' + pad.left + '" y="' + (y + 6) + '" width="' + markSize(sx(t.value) - pad.left) + '" height="10" rx="2" fill="' + color + '" class="okc-bullet-value" tabindex="0" data-hover-payload="' + escapeXml(bulletPayload) + '"><title>' + escapeXml((t.label || 'metric') + ': ' + fmtReading(+t.value || 0) + ' / ' + fmtReading(trackMax) + (typeof t.target === 'number' ? ' (target ' + fmtReading(t.target) + ')' : '')) + '</title></rect>');
       // Target tick.
       if (typeof t.target === 'number') {
         var tx = sx(t.target);
@@ -10800,7 +10800,7 @@ class OkuChart extends HTMLElement {
             label: Math.round(pct * 100) + '% of track',
             kv: tracks.map(function (t) {
               var trackMax = +t.max || 100;
-              return { k: t.label || 'metric', v: fmtNum(pct * trackMax) + ' / ' + fmtNum(trackMax) };
+              return { k: t.label || 'metric', v: fmtAt(pct * trackMax, trackMax / plotW) + ' / ' + fmtReading(trackMax) };
             })
           };
         }
@@ -10870,18 +10870,18 @@ class OkuChart extends HTMLElement {
       var slopePayload = JSON.stringify({
         label: it.label || 'item',
         kv: [
-          { k: x.from_label || 'before', v: fmtNum(+it.from || 0) },
-          { k: x.to_label   || 'after',  v: fmtNum(+it.to   || 0) },
-          { k: 'delta',                  v: (delta >= 0 ? '+' : '') + fmtNum(delta) + (pct !== null ? ' (' + (pct >= 0 ? '+' : '') + pct + '%)' : '') }
+          { k: x.from_label || 'before', v: fmtReading(+it.from || 0) },
+          { k: x.to_label   || 'after',  v: fmtReading(+it.to   || 0) },
+          { k: 'delta',                  v: (delta >= 0 ? '+' : '') + fmtReading(delta) + (pct !== null ? ' (' + (pct >= 0 ? '+' : '') + pct + '%)' : '') }
         ]
       });
-      parts.push('<line x1="' + leftX + '" y1="' + fy.toFixed(1) + '" x2="' + rightX + '" y2="' + ty.toFixed(1) + '" stroke="' + color + '" stroke-width="2" class="okc-slope-line" tabindex="0" data-hover-payload="' + escapeXml(slopePayload) + '"><title>' + escapeXml((it.label || 'item') + ': ' + fmtNum(+it.from || 0) + ' → ' + fmtNum(+it.to || 0)) + '</title></line>');
+      parts.push('<line x1="' + leftX + '" y1="' + fy.toFixed(1) + '" x2="' + rightX + '" y2="' + ty.toFixed(1) + '" stroke="' + color + '" stroke-width="2" class="okc-slope-line" tabindex="0" data-hover-payload="' + escapeXml(slopePayload) + '"><title>' + escapeXml((it.label || 'item') + ': ' + fmtReading(+it.from || 0) + ' → ' + fmtReading(+it.to || 0)) + '</title></line>');
       parts.push('<circle cx="' + leftX + '" cy="' + fy.toFixed(1) + '" r="4" fill="' + color + '"/>');
       parts.push('<circle cx="' + rightX + '" cy="' + ty.toFixed(1) + '" r="4" fill="' + color + '"/>');
       parts.push('<text x="' + (leftX - 8) + '" y="' + (fy + 4).toFixed(1) + '" text-anchor="end" class="okc-slope-readout">' + escapeXml(fmtNum(+it.from || 0)) + '</text>');
       var readout = fmtNum(+it.to || 0) + ' · ' + (it.label || '');
       parts.push('<text x="' + (rightX + 8) + '" y="' + (ty + 4).toFixed(1) + '" class="okc-slope-readout">' +
-                 escapeXml(rightFit.fit(readout)) + '<title>' + escapeXml(readout) + '</title></text>');
+                 escapeXml(rightFit.fit(readout)) + '<title>' + escapeXml(fmtReading(+it.to || 0) + ' · ' + (it.label || '')) + '</title></text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -10933,10 +10933,10 @@ class OkuChart extends HTMLElement {
       var span = markSpan(x0, sx(+b.hi), 1);
       var top = sy(+b.count || 0);
       var payload = JSON.stringify({
-        label: '[' + fmtNum(+b.lo) + ', ' + fmtNum(+b.hi) + ')',
-        kv: [{ k: 'count', v: fmtNum(+b.count || 0) }]
+        label: '[' + fmtReading(+b.lo) + ', ' + fmtReading(+b.hi) + ')',
+        kv: [{ k: 'count', v: fmtReading(+b.count || 0) }]
       });
-      parts.push('<rect x="' + span.start + '" y="' + top + '" width="' + span.size + '" height="' + markSize(pad.top + plotH - top) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
+      parts.push('<rect x="' + span.start + '" y="' + top + '" width="' + span.size + '" height="' + markSize(pad.top + plotH - top) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtReading(+b.lo)) + ', ' + escapeXml(fmtReading(+b.hi)) + '): ' + escapeXml(fmtReading(+b.count || 0)) + '</title></rect>');
       if (i in edgeAt) {
         parts.push('<line x1="' + x0 + '" y1="' + (pad.top + plotH) + '" x2="' + x0 + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
         parts.push('<text x="' + x0 + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(edgeText[edgeAt[i]]) + '</text>');
@@ -10998,10 +10998,10 @@ class OkuChart extends HTMLElement {
       var span = markSpan(y0, sy(+b.hi), 1);
       var w = markSize(sx(+b.count || 0) - pad.left);
       var payload = JSON.stringify({
-        label: '[' + fmtNum(+b.lo) + ', ' + fmtNum(+b.hi) + ')',
-        kv: [{ k: 'count', v: fmtNum(+b.count || 0) }]
+        label: '[' + fmtReading(+b.lo) + ', ' + fmtReading(+b.hi) + ')',
+        kv: [{ k: 'count', v: fmtReading(+b.count || 0) }]
       });
-      parts.push('<rect x="' + pad.left + '" y="' + span.start + '" width="' + w + '" height="' + span.size + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
+      parts.push('<rect x="' + pad.left + '" y="' + span.start + '" width="' + w + '" height="' + span.size + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtReading(+b.lo)) + ', ' + escapeXml(fmtReading(+b.hi)) + '): ' + escapeXml(fmtReading(+b.count || 0)) + '</title></rect>');
       // Y tick label (bin lower bound) at every other bin to avoid clutter.
       if (i in edgeAt) {
         parts.push('<line x1="' + (pad.left - 4) + '" y1="' + y0 + '" x2="' + pad.left + '" y2="' + y0 + '" class="okc-axis"/>');
@@ -11093,9 +11093,9 @@ class OkuChart extends HTMLElement {
       var rectFill = hasVal ? tone(+val) : 'var(--text-soft)';
       var calPayload = JSON.stringify({
         label: dayIso,
-        kv: hasVal ? [{ k: 'value', v: fmtNum(+val) }] : [{ k: 'value', v: 'no data' }]
+        kv: hasVal ? [{ k: 'value', v: fmtReading(+val) }] : [{ k: 'value', v: 'no data' }]
       });
-      parts.push('<rect x="' + px + '" y="' + py + '" width="' + cell + '" height="' + cell + '" rx="2" fill="' + rectFill + '" fill-opacity="' + rectAlpha + '" class="okc-calendar-cell" tabindex="0" data-hover-payload="' + escapeXml(calPayload) + '"><title>' + escapeXml(dayIso + (hasVal ? ' · ' + fmtNum(+val) : '')) + '</title></rect>');
+      parts.push('<rect x="' + px + '" y="' + py + '" width="' + cell + '" height="' + cell + '" rx="2" fill="' + rectFill + '" fill-opacity="' + rectAlpha + '" class="okc-calendar-cell" tabindex="0" data-hover-payload="' + escapeXml(calPayload) + '"><title>' + escapeXml(dayIso + (hasVal ? ' · ' + fmtReading(+val) : '')) + '</title></rect>');
       // Record the column where a new month begins.
       var mKey = cursor.getMonth();
       if (monthAt[mKey] === undefined) monthAt[mKey] = col;
@@ -11194,7 +11194,7 @@ class OkuChart extends HTMLElement {
         ' data-cell-label="' + escapeXml(r.item.label) + '"' +
         ' data-cell-value="' + v + '"' +
         ' data-cell-share="' + share.toFixed(4) + '">' +
-        '<title>' + escapeXml(r.item.label + ': ' + fmtNum(v) + ' (' + Math.round(share * 100) + '%)') + '</title>' +
+        '<title>' + escapeXml(r.item.label + ': ' + fmtReading(v) + ' (' + Math.round(share * 100) + '%)') + '</title>' +
       '</rect>');
       if (labelFits) {
         // Fit the name to ITS OWN CELL, not to the chart: a name wider
@@ -11278,13 +11278,13 @@ class OkuChart extends HTMLElement {
         label: d.label || ('distribution ' + (i + 1)),
         kv: [
           { k: 'n',       v: String(vs.length) },
-          { k: 'min',     v: fmtNum(vs.length ? vs[0] : 0) },
-          { k: 'median',  v: fmtNum(median) },
-          { k: 'mean',    v: fmtNum(mean) },
-          { k: 'max',     v: fmtNum(vs.length ? vs[vs.length - 1] : 0) }
+          { k: 'min',     v: fmtReading(vs.length ? vs[0] : 0) },
+          { k: 'median',  v: fmtReading(median) },
+          { k: 'mean',    v: fmtReading(mean) },
+          { k: 'max',     v: fmtReading(vs.length ? vs[vs.length - 1] : 0) }
         ]
       });
-      parts.push('<path d="' + pathPts.join(' ') + '" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-ridgeline-curve" tabindex="0" data-hover-payload="' + escapeXml(ridgePayload) + '"><title>' + escapeXml((d.label || 'distribution') + ': n=' + vs.length + ', median=' + fmtNum(median)) + '</title></path>');
+      parts.push('<path d="' + pathPts.join(' ') + '" fill="' + color + '" fill-opacity="0.32" stroke="' + color + '" stroke-width="1.2" class="okc-ridgeline-curve" tabindex="0" data-hover-payload="' + escapeXml(ridgePayload) + '"><title>' + escapeXml((d.label || 'distribution') + ': n=' + vs.length + ', median=' + fmtReading(median)) + '</title></path>');
       parts.push('<text x="' + (pad.left - 10) + '" y="' + (baseY - 2) + '" text-anchor="end" class="okc-ridgeline-label">' + escapeXml(labelFit.fit(d.label || '')) + '<title>' + escapeXml(d.label || '') + '</title></text>');
     });
     // X axis ticks (5).
@@ -11348,7 +11348,7 @@ class OkuChart extends HTMLElement {
       cursor.setAttribute('visibility', 'visible');
       label.setAttribute('x', vx);
       label.setAttribute('visibility', 'visible');
-      label.textContent = fmtNum(v);
+      label.textContent = fmtAt(v, (hi - lo) / plotW);
       // Find each distribution's count near v (±bin tolerance) so the
       // tooltip surfaces per-distribution density at the cursor x.
       var span = (hi - lo) || 1;
@@ -11358,9 +11358,9 @@ class OkuChart extends HTMLElement {
         return { k: d.label || 'series', v: vs.length ? String(vs.length) : '·' };
       });
       self._showCursorTip({
-        label: 'value ≈ ' + fmtNum(v),
+        label: 'value ≈ ' + fmtAt(v, (hi - lo) / plotW),
         kv: kv,
-        footer: 'count within ±' + fmtNum(binW)
+        footer: 'count within ±' + fmtAt(binW, (hi - lo) / plotW)
       }, ev.clientX, ev.clientY);
     }
     function leave() {
@@ -11436,7 +11436,7 @@ class OkuChart extends HTMLElement {
         ' data-stage-value="' + v + '"' +
         ' data-stage-share="' + share.toFixed(4) + '"' +
         (drop !== null ? (' data-stage-drop="' + drop + '"') : '') +
-        '><title>' + escapeXml((st.label || '') + ': ' + fmtNum(v) + ' (' + pct + '%)') + '</title></polygon>');
+        '><title>' + escapeXml((st.label || '') + ': ' + fmtReading(v) + ' (' + pct + '%)') + '</title></polygon>');
       var textY = y + stageH / 2 + 4;
       // Three fixed columns — labels, values, percentages — all
       // right-anchored to their column edge so digits stack and
@@ -11539,15 +11539,15 @@ class OkuChart extends HTMLElement {
       var color = palette[s.color] || palette.accent;
       var payload = JSON.stringify({
         label: (l.label || (s.label || s.id) + ' → ' + (t.label || t.id)),
-        kv: [{ k: 'flow', v: fmtNum(v) }]
+        kv: [{ k: 'flow', v: fmtReading(v) }]
       });
-      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.32" class="okc-sankey-link" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((l.label || (s.label || s.id) + ' → ' + (t.label || t.id)) + ': ' + fmtNum(v)) + '</title></path>');
+      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.32" class="okc-sankey-link" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((l.label || (s.label || s.id) + ' → ' + (t.label || t.id)) + ': ' + fmtReading(v)) + '</title></path>');
     });
     // Node rectangles + labels.
     nodes.forEach(function (n) {
       var nx = colX(n._col);
       var color = palette[n.color] || palette.accent;
-      parts.push('<rect x="' + nx + '" y="' + n._y + '" width="' + nodeW + '" height="' + n._h + '" fill="' + color + '" class="okc-sankey-node"><title>' + escapeXml((n.label || n.id) + ': ' + fmtNum(Math.max(n._in, n._out))) + '</title></rect>');
+      parts.push('<rect x="' + nx + '" y="' + n._y + '" width="' + nodeW + '" height="' + n._h + '" fill="' + color + '" class="okc-sankey-node"><title>' + escapeXml((n.label || n.id) + ': ' + fmtReading(Math.max(n._in, n._out))) + '</title></rect>');
       var labelX = nx + (n._col === cols.length - 1 ? -6 : nodeW + 6);
       var anchor = n._col === cols.length - 1 ? 'end' : 'start';
       parts.push('<text x="' + labelX + '" y="' + (n._y + n._h / 2 + 4) + '" text-anchor="' + anchor + '" class="okc-sankey-label">' + escapeXml(n.label || n.id) + '</text>');
@@ -11947,7 +11947,7 @@ class OkuChart extends HTMLElement {
         pts.push(axisX(i).toFixed(1) + ',' + scaleY(v, val).toFixed(1));
       }
       var color = palette[r._color] || palette.accent;
-      var payload = JSON.stringify({ label: r._label || ('record ' + (ri + 1)), kv: vars.map(function (v) { return { k: v.label || v.key, v: fmtNum(+r[v.key]) }; }) });
+      var payload = JSON.stringify({ label: r._label || ('record ' + (ri + 1)), kv: vars.map(function (v) { return { k: v.label || v.key, v: fmtReading(+r[v.key]) }; }) });
       parts.push('<polyline points="' + pts.join(' ') + '" stroke="' + color + '" fill="none" stroke-width="1.5" class="okc-parcoord-line" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(r._label || ('record ' + (ri + 1))) + '</title></polyline>');
     });
     parts.push('</svg>');
@@ -12042,9 +12042,9 @@ class OkuChart extends HTMLElement {
       var color = palette[sg.color] || palette.accent;
       var payload = JSON.stringify({
         label: (sg.label || sg.id) + ' → ' + (tg.label || tg.id),
-        kv: [{ k: 'flow', v: fmtNum(r.value) }]
+        kv: [{ k: 'flow', v: fmtReading(r.value) }]
       });
-      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.28" class="okc-chord-ribbon" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((sg.label || sg.id) + ' → ' + (tg.label || tg.id) + ': ' + fmtNum(r.value)) + '</title></path>');
+      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.28" class="okc-chord-ribbon" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((sg.label || sg.id) + ' → ' + (tg.label || tg.id) + ': ' + fmtReading(r.value)) + '</title></path>');
     });
     // Outer arcs (group perimeter).
     arcs.forEach(function (a) {
@@ -12058,7 +12058,7 @@ class OkuChart extends HTMLElement {
         ' A ' + rInner + ' ' + rInner + ' 0 ' + largeArc + ' 0 ' + ip0[0].toFixed(1) + ' ' + ip0[1].toFixed(1) +
         ' Z';
       var color = palette[a.group.color] || palette.accent;
-      parts.push('<path d="' + d + '" fill="' + color + '" class="okc-chord-arc"><title>' + escapeXml((a.group.label || a.group.id) + ': ' + fmtNum(totals[a.idx])) + '</title></path>');
+      parts.push('<path d="' + d + '" fill="' + color + '" class="okc-chord-arc"><title>' + escapeXml((a.group.label || a.group.id) + ': ' + fmtReading(totals[a.idx])) + '</title></path>');
       // Label outside the arc.
       var mid = (a.start + a.end) / 2;
       var lp = point(rOuter + 14, mid);
@@ -12161,14 +12161,14 @@ class OkuChart extends HTMLElement {
         var f = fillFor(+r.value);
         var payload = JSON.stringify({
           label: r.label || id,
-          kv: [{ k: 'value', v: fmtNum(+r.value) }, { k: 'region', v: id }]
+          kv: [{ k: 'value', v: fmtReading(+r.value) }, { k: 'region', v: id }]
         });
         attrs = ' fill="' + f.color + '" fill-opacity="' + f.opacity.toFixed(2) + '" data-hover-payload="' + escapeXml(payload) + '"';
         parts.push('<g class="okc-geo-cell okc-geo-cell-on" tabindex="0">');
         parts.push('<rect x="' + px + '" y="' + py + '" width="' + cellW + '" height="' + cellH + '" rx="3"' + attrs + '/>');
         parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 - 2) + '" text-anchor="middle" class="okc-geo-code">' + escapeXml(id) + '</text>');
         parts.push('<text x="' + (px + cellW / 2) + '" y="' + (py + cellH / 2 + 12) + '" text-anchor="middle" class="okc-geo-value">' + escapeXml(fmtNum(+r.value)) + '</text>');
-        parts.push('<title>' + escapeXml((r.label || id) + ': ' + fmtNum(+r.value)) + '</title>');
+        parts.push('<title>' + escapeXml((r.label || id) + ': ' + fmtReading(+r.value)) + '</title>');
         parts.push('</g>');
       } else {
         parts.push('<rect x="' + px + '" y="' + py + '" width="' + cellW + '" height="' + cellH + '" rx="3" class="okc-geo-cell-off"/>');
@@ -12182,8 +12182,8 @@ class OkuChart extends HTMLElement {
       var t = s / (stops - 1);
       parts.push('<rect x="' + (lgX + s * (lgW / stops)).toFixed(1) + '" y="' + legendY + '" width="' + (lgW / stops + 0.5).toFixed(2) + '" height="' + lgH + '" fill="' + palette.accent + '" fill-opacity="' + (0.2 + t * 0.8).toFixed(2) + '"/>');
     }
-    parts.push('<text x="' + lgX + '" y="' + (legendY + lgH + 14) + '" class="okc-geo-legend-tick">' + escapeXml(fmtNum(vMin)) + '</text>');
-    parts.push('<text x="' + (lgX + lgW) + '" y="' + (legendY + lgH + 14) + '" text-anchor="end" class="okc-geo-legend-tick">' + escapeXml(fmtNum(vMax)) + '</text>');
+    parts.push('<text x="' + lgX + '" y="' + (legendY + lgH + 14) + '" class="okc-geo-legend-tick">' + escapeXml(fmtTicks([vMin, vMax])[0]) + '</text>');
+    parts.push('<text x="' + (lgX + lgW) + '" y="' + (legendY + lgH + 14) + '" text-anchor="end" class="okc-geo-legend-tick">' + escapeXml(fmtTicks([vMin, vMax])[1]) + '</text>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
   }
@@ -12232,8 +12232,8 @@ class OkuChart extends HTMLElement {
       parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-dot-plot-label">' + escapeXml(labelFit.fit(r.label || '')) + '<title>' + escapeXml(r.label || '') + '</title></text>');
       // Connector from axis-left to dot (light) so the row reads as a single beat.
       parts.push('<line x1="' + pad.left + '" y1="' + y + '" x2="' + xOf(+r.value || 0).toFixed(1) + '" y2="' + y + '" class="okc-dot-plot-track"/>');
-      var payload = JSON.stringify({ label: r.label || '', kv: [{ k: 'value', v: fmtNum(+r.value || 0) }] });
-      parts.push('<circle cx="' + xOf(+r.value || 0).toFixed(1) + '" cy="' + y + '" r="6" fill="' + color + '" class="okc-dot-plot-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtNum(+r.value || 0)) + '</title></circle>');
+      var payload = JSON.stringify({ label: r.label || '', kv: [{ k: 'value', v: fmtReading(+r.value || 0) }] });
+      parts.push('<circle cx="' + xOf(+r.value || 0).toFixed(1) + '" cy="' + y + '" r="6" fill="' + color + '" class="okc-dot-plot-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtReading(+r.value || 0)) + '</title></circle>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -12337,7 +12337,7 @@ class OkuChart extends HTMLElement {
             if (values[mid] <= v) lo = mid + 1; else hi = mid;
           }
           return {
-            label: fmtNum(v),
+            label: fmtAt(v, (vMax - vMin) / plotW),
             kv: [
               { k: 'density', v: Math.round((nearest.d / maxDensity) * 100) + '% of peak' },
               { k: 'at or below', v: Math.round((lo / values.length) * 100) + '%' }
@@ -12395,10 +12395,10 @@ class OkuChart extends HTMLElement {
       var payload = JSON.stringify({
         label: e.date || '',
         kv: [
-          { k: 'O', v: fmtNum(+e.open) },
-          { k: 'H', v: fmtNum(+e.high) },
-          { k: 'L', v: fmtNum(+e.low) },
-          { k: 'C', v: fmtNum(+e.close) }
+          { k: 'O', v: fmtReading(+e.open) },
+          { k: 'H', v: fmtReading(+e.high) },
+          { k: 'L', v: fmtReading(+e.low) },
+          { k: 'C', v: fmtReading(+e.close) }
         ]
       });
       // Wick.
@@ -12451,10 +12451,10 @@ class OkuChart extends HTMLElement {
       var payload = JSON.stringify({
         label: e.date || '',
         kv: [
-          { k: 'O', v: fmtNum(+e.open) },
-          { k: 'H', v: fmtNum(+e.high) },
-          { k: 'L', v: fmtNum(+e.low) },
-          { k: 'C', v: fmtNum(+e.close) }
+          { k: 'O', v: fmtReading(+e.open) },
+          { k: 'H', v: fmtReading(+e.high) },
+          { k: 'L', v: fmtReading(+e.low) },
+          { k: 'C', v: fmtReading(+e.close) }
         ]
       });
       // Wick (horizontal).
@@ -12572,15 +12572,15 @@ class OkuChart extends HTMLElement {
         var payload = JSON.stringify({
           label: label,
           kv: [
-            { k: 'value', v: fmtNum(node._value) },
+            { k: 'value', v: fmtReading(node._value) },
             { k: 'share', v: sharePct + '%' },
             { k: 'depth', v: String(d) }
           ],
-          footer: 'of ' + fmtNum(totalValue)
+          footer: 'of ' + fmtReading(totalValue)
         });
         var rIn = rMin + (d - 1) * ringW;
         var rOut = rIn + ringW;
-        parts.push('<path d="' + arcPath(rIn, rOut, a0, a1) + '" fill="' + color + '" fill-opacity="' + (0.55 + d * 0.07).toFixed(2) + '" stroke="var(--bg)" stroke-width="1" class="okc-sunburst-arc" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · ' + fmtNum(node._value) + ' (' + sharePct + '%)') + '</title></path>');
+        parts.push('<path d="' + arcPath(rIn, rOut, a0, a1) + '" fill="' + color + '" fill-opacity="' + (0.55 + d * 0.07).toFixed(2) + '" stroke="var(--bg)" stroke-width="1" class="okc-sunburst-arc" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · ' + fmtReading(node._value) + ' (' + sharePct + '%)') + '</title></path>');
       }
       if (!node.children || !node.children.length) return;
       var span = a1 - a0;
@@ -12656,11 +12656,11 @@ class OkuChart extends HTMLElement {
         var payload = JSON.stringify({
           label: (ser.label || '') + ' · ' + cat,
           kv: [
-            { k: 'value', v: fmtNum(v) },
+            { k: 'value', v: fmtReading(v) },
             { k: '% of col', v: Math.round((v / colTotal) * 100) + '%' }
           ]
         });
-        bySeries[si].push('<rect x="' + xCursor.toFixed(1) + '" y="' + yCursor.toFixed(1) + '" width="' + colW.toFixed(1) + '" height="' + segH.toFixed(1) + '" fill="' + color + '" stroke="var(--bg)" stroke-width="1" class="okc-marimekko-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((ser.label || '') + ' · ' + cat + ' · ' + fmtNum(v)) + '</title></rect>');
+        bySeries[si].push('<rect x="' + xCursor.toFixed(1) + '" y="' + yCursor.toFixed(1) + '" width="' + colW.toFixed(1) + '" height="' + segH.toFixed(1) + '" fill="' + color + '" stroke="var(--bg)" stroke-width="1" class="okc-marimekko-cell" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((ser.label || '') + ' · ' + cat + ' · ' + fmtReading(v)) + '</title></rect>');
         yCursor += segH;
       });
       // Category label at the bottom of the column.
@@ -12761,7 +12761,7 @@ class OkuChart extends HTMLElement {
           }
           var rows = series.map(function (s) {
             var v = +(s.values && s.values[nearestIdx]) || 0;
-            return { k: s.label || '', v: fmtNum(v) };
+            return { k: s.label || '', v: fmtReading(v) };
           });
           return { label: categories[nearestIdx], kv: rows };
         }
@@ -13021,8 +13021,8 @@ class OkuChart extends HTMLElement {
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Beeswarm') + '" class="okc-svg okc-beeswarm">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     placed.forEach(function (p) {
-      var payload = JSON.stringify({ label: '', kv: [{ k: 'value', v: fmtNum(p.v) }] });
-      parts.push('<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + dotR + '" fill="' + color + '" fill-opacity="0.78" class="okc-beeswarm-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(fmtNum(p.v)) + '</title></circle>');
+      var payload = JSON.stringify({ label: '', kv: [{ k: 'value', v: fmtReading(p.v) }] });
+      parts.push('<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + dotR + '" fill="' + color + '" fill-opacity="0.78" class="okc-beeswarm-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(fmtReading(p.v)) + '</title></circle>');
     });
     // Bottom axis ticks at min / mid / max.
     var tickVals = [vMin, (vMin + vMax) / 2, vMax], tickText = fmtTicks(tickVals);
@@ -13115,11 +13115,11 @@ class OkuChart extends HTMLElement {
       var payload = JSON.stringify({
         label: e.label,
         kv: [
-          { k: 'change',     v: (e.value >= 0 ? '+' : '') + fmtNum(e.value) },
-          { k: 'cumulative', v: fmtNum(e.running) }
+          { k: 'change',     v: (e.value >= 0 ? '+' : '') + fmtReading(e.value) },
+          { k: 'cumulative', v: fmtReading(e.running) }
         ]
       });
-      parts.push('<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + yT.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2" fill="' + color + '" class="okc-waterfall-bar ' + kindClass + '" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(e.label + ' · ' + (e.value >= 0 ? '+' : '') + fmtNum(e.value) + ' → ' + fmtNum(e.running)) + '</title></rect>');
+      parts.push('<rect x="' + (cx - bw / 2).toFixed(1) + '" y="' + yT.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="2" fill="' + color + '" class="okc-waterfall-bar ' + kindClass + '" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(e.label + ' · ' + (e.value >= 0 ? '+' : '') + fmtReading(e.value) + ' → ' + fmtReading(e.running)) + '</title></rect>');
       if (tickFit.shows(i)) {
         parts.push(tickFit.text(cx.toFixed(1), pad.top + plotH + 16, e.label, 'okc-tick', okuTickAnchor(cx, 0, W)));
       }
@@ -13158,8 +13158,8 @@ class OkuChart extends HTMLElement {
       var cx = xOf(+r.value || 0);
       parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-lollipop-label">' + escapeXml(labelFit.fit(r.label || '')) + '<title>' + escapeXml(r.label || '') + '</title></text>');
       parts.push('<line x1="' + x0.toFixed(1) + '" y1="' + y + '" x2="' + cx.toFixed(1) + '" y2="' + y + '" stroke="' + color + '" stroke-width="2" class="okc-lollipop-stem"/>');
-      var payload = JSON.stringify({ label: r.label || '', kv: [{ k: 'value', v: fmtNum(+r.value || 0) }] });
-      parts.push('<circle cx="' + cx.toFixed(1) + '" cy="' + y + '" r="6" fill="' + color + '" class="okc-lollipop-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtNum(+r.value || 0)) + '</title></circle>');
+      var payload = JSON.stringify({ label: r.label || '', kv: [{ k: 'value', v: fmtReading(+r.value || 0) }] });
+      parts.push('<circle cx="' + cx.toFixed(1) + '" cy="' + y + '" r="6" fill="' + color + '" class="okc-lollipop-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtReading(+r.value || 0)) + '</title></circle>');
     });
     // Bottom ticks.
     var tickVals = [vMin, (vMin + vMax) / 2, vMax], tickText = fmtTicks(tickVals);
@@ -13204,10 +13204,10 @@ class OkuChart extends HTMLElement {
       var connectorColor = change >= 0 ? 'var(--success)' : 'var(--danger)';
       parts.push('<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-dumbbell-label">' + escapeXml(labelFit.fit(r.label || '')) + '<title>' + escapeXml(r.label || '') + '</title></text>');
       parts.push('<line x1="' + fromX.toFixed(1) + '" y1="' + y + '" x2="' + toX.toFixed(1) + '" y2="' + y + '" stroke="' + connectorColor + '" stroke-width="3" stroke-opacity="0.4" class="okc-dumbbell-connector"/>');
-      var fromPayload = JSON.stringify({ label: r.label + ' · ' + (x.from_label || 'from'), kv: [{ k: 'value', v: fmtNum(+r.from || 0) }] });
-      var toPayload   = JSON.stringify({ label: r.label + ' · ' + (x.to_label || 'to'), kv: [{ k: 'value', v: fmtNum(+r.to || 0) }, { k: 'Δ', v: (change >= 0 ? '+' : '') + fmtNum(change) }] });
-      parts.push('<circle cx="' + fromX.toFixed(1) + '" cy="' + y + '" r="5" fill="' + fromColor + '" class="okc-dumbbell-dot okc-dumbbell-from" tabindex="0" data-hover-payload="' + escapeXml(fromPayload) + '"><title>' + escapeXml((x.from_label || 'from') + ': ' + fmtNum(+r.from || 0)) + '</title></circle>');
-      parts.push('<circle cx="' + toX.toFixed(1)   + '" cy="' + y + '" r="6" fill="' + toColor   + '" class="okc-dumbbell-dot okc-dumbbell-to"   tabindex="0" data-hover-payload="' + escapeXml(toPayload)   + '"><title>' + escapeXml((x.to_label   || 'to')   + ': ' + fmtNum(+r.to   || 0)) + '</title></circle>');
+      var fromPayload = JSON.stringify({ label: r.label + ' · ' + (x.from_label || 'from'), kv: [{ k: 'value', v: fmtReading(+r.from || 0) }] });
+      var toPayload   = JSON.stringify({ label: r.label + ' · ' + (x.to_label || 'to'), kv: [{ k: 'value', v: fmtReading(+r.to || 0) }, { k: 'Δ', v: (change >= 0 ? '+' : '') + fmtReading(change) }] });
+      parts.push('<circle cx="' + fromX.toFixed(1) + '" cy="' + y + '" r="5" fill="' + fromColor + '" class="okc-dumbbell-dot okc-dumbbell-from" tabindex="0" data-hover-payload="' + escapeXml(fromPayload) + '"><title>' + escapeXml((x.from_label || 'from') + ': ' + fmtReading(+r.from || 0)) + '</title></circle>');
+      parts.push('<circle cx="' + toX.toFixed(1)   + '" cy="' + y + '" r="6" fill="' + toColor   + '" class="okc-dumbbell-dot okc-dumbbell-to"   tabindex="0" data-hover-payload="' + escapeXml(toPayload)   + '"><title>' + escapeXml((x.to_label   || 'to')   + ': ' + fmtReading(+r.to   || 0)) + '</title></circle>');
     });
     // Bottom ticks + legend.
     var tickVals = [vMin, (vMin + vMax) / 2, vMax], tickText = fmtTicks(tickVals);
@@ -13276,12 +13276,12 @@ class OkuChart extends HTMLElement {
       var payload = JSON.stringify({
         label: s.label || '',
         kv: [
-          { k: 'value', v: fmtNum(v) },
+          { k: 'value', v: fmtReading(v) },
           { k: 'share', v: sharePct + '%' }
         ],
-        footer: 'of ' + fmtNum(totalValue)
+        footer: 'of ' + fmtReading(totalValue)
       });
-      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.72" stroke="var(--bg)" stroke-width="1" class="okc-polar-area-sector" tabindex="0" data-slice-idx="' + i + '" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + fmtNum(v) + ' (' + sharePct + '%)') + '</title></path>');
+      parts.push('<path d="' + d + '" fill="' + color + '" fill-opacity="0.72" stroke="var(--bg)" stroke-width="1" class="okc-polar-area-sector" tabindex="0" data-slice-idx="' + i + '" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + fmtReading(v) + ' (' + sharePct + '%)') + '</title></path>');
       // Label on outer perimeter.
       var labelA = a0 + angleStep / 2;
       var labelR = rMax + 14;
@@ -13334,12 +13334,12 @@ class OkuChart extends HTMLElement {
       var payload = JSON.stringify({
         label: task.label || '',
         kv: [
-          { k: 'start',    v: x.tick_format === 'date' ? new Date(+task.start).toISOString().slice(0,10) : fmtNum(+task.start || 0) },
-          { k: 'end',      v: x.tick_format === 'date' ? new Date(+task.end).toISOString().slice(0,10)   : fmtNum(+task.end   || 0) },
-          { k: 'duration', v: fmtNum((+task.end || 0) - (+task.start || 0)) }
+          { k: 'start',    v: x.tick_format === 'date' ? new Date(+task.start).toISOString().slice(0,10) : fmtReading(+task.start || 0) },
+          { k: 'end',      v: x.tick_format === 'date' ? new Date(+task.end).toISOString().slice(0,10)   : fmtReading(+task.end   || 0) },
+          { k: 'duration', v: fmtReading((+task.end || 0) - (+task.start || 0)) }
         ]
       });
-      parts.push('<rect x="' + bx.toFixed(1) + '" y="' + y + '" width="' + bw.toFixed(1) + '" height="18" rx="3" fill="' + color + '" class="okc-gantt-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((task.label || '') + ' · ' + fmtNum(+task.start || 0) + ' → ' + fmtNum(+task.end || 0)) + '</title></rect>');
+      parts.push('<rect x="' + bx.toFixed(1) + '" y="' + y + '" width="' + bw.toFixed(1) + '" height="18" rx="3" fill="' + color + '" class="okc-gantt-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((task.label || '') + ' · ' + fmtReading(+task.start || 0) + ' → ' + fmtReading(+task.end || 0)) + '</title></rect>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -13393,7 +13393,7 @@ class OkuChart extends HTMLElement {
         var rank = ranks[ci][si];
         var payload = JSON.stringify({ label: (s.label || '') + ' · ' + categories[ci], kv: [
           { k: 'rank', v: '#' + rank },
-          { k: 'value', v: fmtNum(+(s.values && s.values[ci]) || 0) }
+          { k: 'value', v: fmtReading(+(s.values && s.values[ci]) || 0) }
         ]});
         parts.push('<circle cx="' + xOf(ci).toFixed(1) + '" cy="' + yOf(rank).toFixed(1) + '" r="5" fill="' + color + '" class="okc-bump-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + categories[ci] + ' · #' + rank) + '</title></circle>');
       });
@@ -13425,7 +13425,7 @@ class OkuChart extends HTMLElement {
           var rows = series.map(function (s, si) {
             return {
               k: s.label || ('series ' + (si + 1)),
-              v: '#' + ranks[nearestIdx][si] + ' (' + fmtNum(+(s.values && s.values[nearestIdx]) || 0) + ')'
+              v: '#' + ranks[nearestIdx][si] + ' (' + fmtReading(+(s.values && s.values[nearestIdx]) || 0) + ')'
             };
           });
           return { label: categories[nearestIdx], kv: rows };
@@ -13484,12 +13484,12 @@ class OkuChart extends HTMLElement {
       var rv = Math.abs(rightVals[i] || 0);
       var lw = (lv / maxAbs) * sideW;
       var rw = (rv / maxAbs) * sideW;
-      var leftPayload = JSON.stringify({ label: (left.label || 'Left') + ' · ' + cat, kv: [{ k: 'value', v: fmtNum(lv) }] });
-      var rightPayload = JSON.stringify({ label: (right.label || 'Right') + ' · ' + cat, kv: [{ k: 'value', v: fmtNum(rv) }] });
+      var leftPayload = JSON.stringify({ label: (left.label || 'Left') + ' · ' + cat, kv: [{ k: 'value', v: fmtReading(lv) }] });
+      var rightPayload = JSON.stringify({ label: (right.label || 'Right') + ' · ' + cat, kv: [{ k: 'value', v: fmtReading(rv) }] });
       // Left bar — extends leftward from leftStart.
-      parts.push('<rect x="' + (leftStart - lw) + '" y="' + (rowY - barH / 2) + '" width="' + lw + '" height="' + barH + '" rx="2" fill="' + leftColor + '" fill-opacity="0.78" class="okc-pop-bar" tabindex="0" data-hover-payload="' + escapeXml(leftPayload) + '"><title>' + escapeXml((left.label || 'left') + ' · ' + cat + ' · ' + fmtNum(lv)) + '</title></rect>');
+      parts.push('<rect x="' + (leftStart - lw) + '" y="' + (rowY - barH / 2) + '" width="' + lw + '" height="' + barH + '" rx="2" fill="' + leftColor + '" fill-opacity="0.78" class="okc-pop-bar" tabindex="0" data-hover-payload="' + escapeXml(leftPayload) + '"><title>' + escapeXml((left.label || 'left') + ' · ' + cat + ' · ' + fmtReading(lv)) + '</title></rect>');
       // Right bar — extends rightward from rightStart.
-      parts.push('<rect x="' + rightStart + '" y="' + (rowY - barH / 2) + '" width="' + rw + '" height="' + barH + '" rx="2" fill="' + rightColor + '" fill-opacity="0.78" class="okc-pop-bar" tabindex="0" data-hover-payload="' + escapeXml(rightPayload) + '"><title>' + escapeXml((right.label || 'right') + ' · ' + cat + ' · ' + fmtNum(rv)) + '</title></rect>');
+      parts.push('<rect x="' + rightStart + '" y="' + (rowY - barH / 2) + '" width="' + rw + '" height="' + barH + '" rx="2" fill="' + rightColor + '" fill-opacity="0.78" class="okc-pop-bar" tabindex="0" data-hover-payload="' + escapeXml(rightPayload) + '"><title>' + escapeXml((right.label || 'right') + ' · ' + cat + ' · ' + fmtReading(rv)) + '</title></rect>');
       // Category label in the centre.
       parts.push('<text x="' + centerX + '" y="' + (rowY + 4) + '" text-anchor="middle" class="okc-pop-cat">' + escapeXml(cat) + '</text>');
     });
@@ -13571,14 +13571,14 @@ class OkuChart extends HTMLElement {
         var isLast = i === pts.length - 1;
         var payload = JSON.stringify({
           label: (s.label || ('series ' + (si + 1))) + (p.label ? ' · ' + p.label : ''),
-          kv: [{ k: 'x', v: fmtNum(+p.x) }, { k: 'y', v: fmtNum(+p.y) }, { k: 'step', v: String(i + 1) + '/' + pts.length }]
+          kv: [{ k: 'x', v: fmtReading(+p.x) }, { k: 'y', v: fmtReading(+p.y) }, { k: 'step', v: String(i + 1) + '/' + pts.length }]
         });
         if (isFirst) {
-          parts.push('<circle cx="' + px + '" cy="' + py + '" r="5" fill="var(--bg)" stroke="' + color + '" stroke-width="2" class="okc-conn-dot okc-conn-start" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>start: (' + fmtNum(+p.x) + ', ' + fmtNum(+p.y) + ')</title></circle>');
+          parts.push('<circle cx="' + px + '" cy="' + py + '" r="5" fill="var(--bg)" stroke="' + color + '" stroke-width="2" class="okc-conn-dot okc-conn-start" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>start: (' + fmtReading(+p.x) + ', ' + fmtReading(+p.y) + ')</title></circle>');
         } else if (isLast) {
-          parts.push('<rect x="' + (px - 4) + '" y="' + (py - 4) + '" width="8" height="8" fill="' + color + '" class="okc-conn-dot okc-conn-end" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>end: (' + fmtNum(+p.x) + ', ' + fmtNum(+p.y) + ')</title></rect>');
+          parts.push('<rect x="' + (px - 4) + '" y="' + (py - 4) + '" width="8" height="8" fill="' + color + '" class="okc-conn-dot okc-conn-end" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>end: (' + fmtReading(+p.x) + ', ' + fmtReading(+p.y) + ')</title></rect>');
         } else {
-          parts.push('<circle cx="' + px + '" cy="' + py + '" r="4" fill="' + color + '" class="okc-conn-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>(' + fmtNum(+p.x) + ', ' + fmtNum(+p.y) + ')</title></circle>');
+          parts.push('<circle cx="' + px + '" cy="' + py + '" r="4" fill="' + color + '" class="okc-conn-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>(' + fmtReading(+p.x) + ', ' + fmtReading(+p.y) + ')</title></circle>');
         }
         if (p.label) {
           // The label sits to the RIGHT of its dot, which puts the last
@@ -13682,9 +13682,9 @@ class OkuChart extends HTMLElement {
         var rectX = xOf(i) - w / 2;
         var payload = JSON.stringify({
           label: (s.label || '') + ' · ' + categories[i],
-          kv: [{ k: 'value', v: fmtNum(v) }]
+          kv: [{ k: 'value', v: fmtReading(v) }]
         });
-        parts.push('<rect x="' + rectX + '" y="' + laneTop + '" width="' + w + '" height="' + markSize(laneH - 2) + '" fill="transparent" class="okc-horizon-hit" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + categories[i] + ' · ' + fmtNum(v)) + '</title></rect>');
+        parts.push('<rect x="' + rectX + '" y="' + laneTop + '" width="' + w + '" height="' + markSize(laneH - 2) + '" fill="transparent" class="okc-horizon-hit" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((s.label || '') + ' · ' + categories[i] + ' · ' + fmtReading(v)) + '</title></rect>');
       });
     });
     // X-axis category ticks at the bottom, sampled (≤6).
@@ -13710,7 +13710,7 @@ class OkuChart extends HTMLElement {
             if (d < bestDelta) { bestDelta = d; nearest = i; }
           }
           var rows = series.map(function (s) {
-            return { k: s.label || '', v: fmtNum(+(s.values && s.values[nearest]) || 0) };
+            return { k: s.label || '', v: fmtReading(+(s.values && s.values[nearest]) || 0) };
           });
           return { label: categories[nearest], kv: rows };
         }
@@ -13858,8 +13858,8 @@ class OkuChart extends HTMLElement {
       var d = 'M ' + x1.toFixed(1) + ' ' + baselineY + ' A ' + rx.toFixed(1) + ' ' + rx.toFixed(1) + ' 0 0 1 ' + x2.toFixed(1) + ' ' + baselineY;
       var label = (srcNode.label || l.source) + ' → ' + ((nodes[ti] && nodes[ti].label) || l.target);
       var v = +l.value || 0;
-      var payload = JSON.stringify({ label: label, kv: v ? [{ k: 'value', v: fmtNum(v) }] : [] });
-      parts.push('<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="' + strokeOf(v) + '" stroke-opacity="0.62" class="okc-arc-link" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + (v ? ' · ' + fmtNum(v) : '')) + '</title></path>');
+      var payload = JSON.stringify({ label: label, kv: v ? [{ k: 'value', v: fmtReading(v) }] : [] });
+      parts.push('<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="' + strokeOf(v) + '" stroke-opacity="0.62" class="okc-arc-link" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + (v ? ' · ' + fmtReading(v) : '')) + '</title></path>');
     });
     // Node markers + labels (rotated 35° so long labels do not collide).
     nodes.forEach(function (n, i) {
@@ -13940,18 +13940,18 @@ class OkuChart extends HTMLElement {
       var xLo = sx(rl), xHi = sx(rh);
       var band = markSpan(xLo, xHi, 0);
       var label = r.label || ('row ' + (i + 1));
-      var midDisplay = r.mid != null ? fmtNum(+r.mid) : '';
+      var midDisplay = r.mid != null ? fmtReading(+r.mid) : '';
       var payload = JSON.stringify({
         label: label,
         kv: [
-          { k: 'low', v: fmtNum(rl) },
-          { k: 'high', v: fmtNum(rh) }
+          { k: 'low', v: fmtReading(rl) },
+          { k: 'high', v: fmtReading(rh) }
         ].concat(midDisplay ? [{ k: 'mid', v: midDisplay }] : [])
       });
       // Row label on the left.
       parts.push('<text x="' + (pad.left - 8) + '" y="' + (rowY + 4) + '" text-anchor="end" class="okc-range-row-label">' + escapeXml(labelFit.fit(label)) + '<title>' + escapeXml(label) + '</title></text>');
       // Range band — filled rect.
-      parts.push('<rect x="' + band.start.toFixed(1) + '" y="' + (rowY - bandH / 2) + '" width="' + band.size.toFixed(1) + '" height="' + bandH + '" rx="3" fill="' + color + '" fill-opacity="0.45" stroke="' + color + '" stroke-opacity="0.85" class="okc-range-band" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · [' + fmtNum(rl) + ', ' + fmtNum(rh) + ']' + (midDisplay ? ' · mid ' + midDisplay : '')) + '</title></rect>');
+      parts.push('<rect x="' + band.start.toFixed(1) + '" y="' + (rowY - bandH / 2) + '" width="' + band.size.toFixed(1) + '" height="' + bandH + '" rx="3" fill="' + color + '" fill-opacity="0.45" stroke="' + color + '" stroke-opacity="0.85" class="okc-range-band" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(label + ' · [' + fmtReading(rl) + ', ' + fmtReading(rh) + ']' + (midDisplay ? ' · mid ' + midDisplay : '')) + '</title></rect>');
       // Optional midpoint tick.
       if (r.mid != null && !isNaN(+r.mid)) {
         var mx = sx(+r.mid);
@@ -14029,11 +14029,11 @@ class OkuChart extends HTMLElement {
       var payload = JSON.stringify({
         label: r.label || ('row ' + (i + 1)),
         kv: [
-          { k: 'value', v: fmtNum(v) },
+          { k: 'value', v: fmtReading(v) },
           { k: 'cumulative', v: Math.round(cumPct[i] * 100) + '%' }
         ]
       });
-      parts.push('<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="2" fill="' + color + '" fill-opacity="0.78" class="okc-pareto-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtNum(v) + ' · cum ' + Math.round(cumPct[i] * 100) + '%') + '</title></rect>');
+      parts.push('<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="2" fill="' + color + '" fill-opacity="0.78" class="okc-pareto-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtReading(v) + ' · cum ' + Math.round(cumPct[i] * 100) + '%') + '</title></rect>');
       // Category label below the bar (rotated -30° if many rows).
       var labelX = bx + barW / 2;
       var labelY = pad.top + plotH + 14;
@@ -14466,7 +14466,7 @@ class OkuChart extends HTMLElement {
       var html = '';
       if (seriesLbl) html += '<div class="okc-tt-series">' + escapeXml(seriesLbl) + '</div>';
       if (pointLbl)  html += '<div class="okc-tt-label">'  + escapeXml(pointLbl)  + '</div>';
-      html += '<div class="okc-tt-coords">(' + fmtNum(parseFloat(x)) + ', ' + fmtNum(parseFloat(y)) + ')</div>';
+      html += '<div class="okc-tt-coords">(' + fmtReading(parseFloat(x)) + ', ' + fmtReading(parseFloat(y)) + ')</div>';
       // The dot's reading is holdable now, so it says so. On a chart
       // that also wires a cursor this reading is replaced by the
       // cursor's on the next mousemove and the offer carries over
@@ -14938,10 +14938,10 @@ class OkuChart extends HTMLElement {
       return {
         label: label,
         kv: [
-          { k: 'value', v: fmtNum(value) },
+          { k: 'value', v: fmtReading(value) },
           { k: 'share', v: Math.round(share * 100) + '%' }
         ],
-        footer: 'of ' + fmtNum(total)
+        footer: 'of ' + fmtReading(total)
       };
     });
     // Treemap cells — already tagged from renderer.
@@ -14952,7 +14952,7 @@ class OkuChart extends HTMLElement {
       return {
         label: label,
         kv: [
-          { k: 'value', v: fmtNum(value) },
+          { k: 'value', v: fmtReading(value) },
           { k: 'share', v: Math.round(share * 100) + '%' }
         ]
       };
@@ -14964,7 +14964,7 @@ class OkuChart extends HTMLElement {
       var share = +el.getAttribute('data-stage-share') || 0;
       var dropPct = el.getAttribute('data-stage-drop');
       var kv = [
-        { k: 'value', v: fmtNum(value) },
+        { k: 'value', v: fmtReading(value) },
         { k: 'share', v: Math.round(share * 100) + '%' }
       ];
       if (dropPct !== null) kv.push({ k: 'drop-off', v: dropPct + '%' });
@@ -15963,6 +15963,31 @@ function fmtNum(n) {
   return n.toFixed(2);
 }
 
+/* A reading says the value, not a rounded stand-in for it.
+ *
+ * fmtNum is for what the figure itself prints, where room is short. A
+ * reading — the tooltip, a mark's <title>, its aria-label — is where the
+ * reader goes FOR the number, and fmtNum gave a gantt bar over 2024 to
+ * 2025 the reading `start 2k`, `end 2k`. This is renderer.js's numText,
+ * the rule the bar charts' readings already follow: float noise cut at
+ * the sixth decimal (26.9 + 10.4 + … prints 62.300000000000004), which
+ * leaves every value an author typed exactly as typed. */
+function fmtReading(n) {
+  if (n === undefined || n === null || n === '') return '';
+  var v = typeof n === 'number' ? n : parseFloat(n);
+  if (!isFinite(v)) return String(n);
+  return String(parseFloat(v.toFixed(6)));
+}
+
+/* A value read off the pointer's position, which is only as precise as
+ * the pointer: `unit` is what one unit of the drawing spans in data. One
+ * decimal finer than that is noise nobody aimed at; one coarser and two
+ * positions read the same. */
+function fmtAt(v, unit) {
+  var dp = unit > 0 ? Math.max(0, Math.min(6, Math.ceil(-Math.log10(unit)))) : 6;
+  return String(parseFloat((+v).toFixed(dp)));
+}
+
 /* An axis label names a gridline, so it has to say that gridline's value.
  *
  * fmtNum takes its precision from a number's MAGNITUDE — a `k` with one
@@ -16021,14 +16046,14 @@ function okuDistributionPayload(label, sorted, q1, median, q3) {
       label: label,
       kv: [
         { k: 'n',      v: String(sorted.length) },
-        { k: 'min',    v: fmtNum(sorted[0]) },
-        { k: 'q1',     v: fmtNum(q1) },
-        { k: 'median', v: fmtNum(median) },
-        { k: 'q3',     v: fmtNum(q3) },
-        { k: 'max',    v: fmtNum(sorted[sorted.length - 1]) }
+        { k: 'min',    v: fmtReading(sorted[0]) },
+        { k: 'q1',     v: fmtReading(q1) },
+        { k: 'median', v: fmtReading(median) },
+        { k: 'q3',     v: fmtReading(q3) },
+        { k: 'max',    v: fmtReading(sorted[sorted.length - 1]) }
       ]
     }),
-    title: label + ' · median ' + fmtNum(median) + ' · IQR ' + fmtNum(q1) + '–' + fmtNum(q3)
+    title: label + ' · median ' + fmtReading(median) + ' · IQR ' + fmtReading(q1) + '–' + fmtReading(q3)
   };
 }
 

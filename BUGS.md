@@ -12,30 +12,6 @@ carries the record, including what was measured before and after.
 
 ---
 
-## A chart's reading rounds a year to "2k"
-
-- **Symptom.** Hovering a gantt bar over the years 2024 to 2025 reads
-  `start 2k`, `end 2k`, `duration 1`. The axis under it reads `2024`,
-  `2024.6`, … since the axis fix; the reading still does not say which
-  year.
-- **Minimal reproduction.** `tmp/repro-stepflow-href/years.md` in this repo:
-  one gantt, tasks `2024–2025` and `2025–2026.5`. `oku build`, then read
-  `data-hover-payload` on `.okc-gantt-bar` in `dist/standalone/years.html`.
-- **Expected vs actual.** Expected `start 2024`, `end 2025`. Actual:
-  `{"k":"start","v":"2k"},{"k":"end","v":"2k"}`, and `2k`/`2k` for the
-  second task's 2025 → 2026.5.
-- **Where.** `_renderGantt` builds the payload with `fmtNum`, which writes
-  anything from 1000 up as thousands with one decimal.
-- **Observed.** The payload above, read with Playwright (oku 0.6.5, kit
-  stamp r116 plus the axis fix, 2026-10-05).
-- **Inferred from source, not traced.** About 150 other readings go
-  through `fmtNum`, so every chart's reading of a value from 1000 up is
-  rounded to a hundred (`1234` reads `1.2k`). For a count that is a
-  display choice; for a year, a price or an id it loses the value the
-  reader hovered for. Not fixed with the axis because the decision is
-  kit-wide — exact readings everywhere, or compact unless the value
-  needs more — and it changes what every existing chart's tooltip says.
-
 Open, found by the 2026-10-05 bug hunt and deliberately not fixed in it.
 Each says why.
 

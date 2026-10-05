@@ -1671,8 +1671,27 @@ measures it, the way `okuTickAnchor` already answers for category
 labels, because a number's width is known only after `fmtTicks` has
 chosen its precision. Held by `browser/test_axis_ticks_say_their_value.py`,
 which asks of every axis whether two labels read the same and whether
-any was cut. What is left is the READING: a tooltip still formats with
-`fmtNum`, so the gantt's says `start 2k`; see `BUGS.md`.
+any was cut.
+
+**The figure prints compact labels; a reading says the value.** A
+label drawn on the figure — a treemap cell, a donut's total, a slope's
+end readout — is where room is short, and `fmtNum` stays there. A
+reading is where the reader goes FOR the number: the tooltip, a mark's
+`<title>`, its `aria-label`. Those went through `fmtNum` too, so a gantt
+bar over 2024 to 2025 read `start 2k`, `end 2k`, and every reading from
+1000 up was rounded to a hundred — while the bar charts, drawn by
+renderer.js through `numText`, already said the value. `fmtReading` is
+`numText`'s rule in chrome.js: float noise cut at the sixth decimal,
+which leaves what an author typed as typed, no grouping, so one chart
+family cannot read `1234567` beside another's `1 234 567`. A value read
+off the POINTER is the one exception, because the pointer is only as
+precise as one unit of the drawing: `fmtAt(v, unit)` gives it that many
+decimals and no more, rather than six digits nobody aimed at. A `<title>`
+holding a drawn label's full text is a reading too — the slope's carried
+the compact readout until it got its own. Held by
+`browser/test_readings_say_the_value.py`: every shipped example shifted
+by 2000, the readings in the document read straight off it and the ones
+the pointer builds read off the tooltip.
 
 **One character-width estimate, named once.** There were four: 0.66em
 in the gutter fitter, 0.62em in the tick fitter, and 5.6px-at-11px
