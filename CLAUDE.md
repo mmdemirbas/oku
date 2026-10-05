@@ -160,6 +160,15 @@ that list against the directory in both directions, because a kit file
 nobody remembered to add ships as a silent absence — this repo renders
 it, the tests pass, and every other project builds without it.
 
+**The tool's capabilities ship the same way, as extras.** `./ctl
+deploy` installs `oku[search,verify]` and fetches the chromium the
+tool's own playwright pins, then fails unless both import. It used to
+install bare: every session in another project found `oku verify`
+"not installed on this machine" and skipped the browser check, and
+every `dist/site` it built shipped without a search index. The hint
+the verify error printed named a `verify` extra that did not exist.
+Held by the last two cases in `test_packaging.py`.
+
 ## Develop / verify
 
 ```bash

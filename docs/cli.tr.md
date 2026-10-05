@@ -206,9 +206,10 @@ oku build && oku verify
 {"headers":["Denetlenen","Kaynak denetimi neden göremez"],"rows":[["Diyagramlar çizildi mi","Kaynak ayrıştırılıyor; asıl başarısız olan çizici ve bu yalnızca tarayıcıda görülür."],["Hiçbir figür boş kutu değil","Geçerli ama yanlış bir veri gövdesi doğrulamayı geçer ve hiçbir şey çizmez. Şemanın yapısı gereği ulaşamadığı hata budur."],["1440px ve 360px'te yana kaydırma yok","Taşma bir geometri sorunudur; kaynakta hiçbir karşılığı yoktur."],["Konsol ya da sayfa hatası yok","Bir adacığın betiği hata fırlattığında bunu hiçbir durağan denetim göremez."]]}
 ```
 
-Tarayıcı gerekir: `uv tool install 'oku[verify]'` ardından
-`playwright install chromium`. Tarayıcı yoksa komut bunu söyler ve 2 ile
-çıkar; almadığı bir başarıyı bildirmez.
+Tarayıcı gerekir: playwright `oku[verify]` ekiyle gelir; oku deposunda
+`./ctl deploy` aracı bu ekle kurar ve playwright'ın beklediği chromium'u
+indirir. Tarayıcı yoksa komut bunu söyler ve 2 ile çıkar; almadığı bir
+başarıyı bildirmez.
 
 Uzak bir adrese giden isteğin başarısız olması yok sayılır — bu, sayfanın
 değil ağın durumudur ve yazarın düzeltemeyeceği sebeplerle başarısız olan

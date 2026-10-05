@@ -30,6 +30,11 @@ schema = ["jsonschema>=4.0"]
 # pagefind` over the system binary so an `oku[search]` install gives
 # users a self-contained search build out of the box.
 search = ["pagefind[bin]>=1.5"]
+# `oku verify` drives a real browser. Its ImportError hint named this
+# extra for as long as it did not exist, and `./ctl deploy` installed
+# without it — so every session outside this repo was told the verify
+# step "is not installed on this machine" and skipped it.
+verify = ["playwright>=1.50"]
 dev = [
     "jsonschema>=4.0",
     "pagefind[bin]>=1.5",

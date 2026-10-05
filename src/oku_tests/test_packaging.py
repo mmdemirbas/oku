@@ -13,6 +13,7 @@ So the list is checked against the directory rather than trusted.
 
 from __future__ import annotations
 
+import re
 import shutil
 import tomllib
 from pathlib import Path
@@ -170,3 +171,35 @@ def test_a_new_oku_symlink_cannot_reintroduce_it(repo_root: Path) -> None:
 
     assert "**/_oku" in sdist.get("exclude", [])
     assert sdist.get("skip-excluded-dirs") is True
+
+
+# The other half of "other projects read the installed tool": its
+# CAPABILITIES. `oku verify` printed `uv tool install 'oku[verify]'` while
+# no such extra existed, and `./ctl deploy` installed with no extras at
+# all — so every session outside this repo found the browser check "not
+# installed" and skipped it, and every dist/site shipped no search index.
+_EXTRA_HINT = re.compile(r"oku\[([a-z,]+)\]")
+
+
+def test_every_extra_a_hint_names_is_declared(repo_root: Path) -> None:
+    data = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = set(data["project"]["optional-dependencies"])
+    sources = [
+        repo_root / "src" / "oku" / "cli.py",
+        repo_root / "ctl",
+        *sorted((repo_root / "docs").glob("*.md")),
+    ]
+    named = {
+        (src.name, extra)
+        for src in sources
+        for m in _EXTRA_HINT.finditer(src.read_text(encoding="utf-8"))
+        for extra in m.group(1).split(",")
+    }
+    assert named, "no oku[...] hint found; the scan is not reading what it should"
+    assert {pair for pair in named if pair[1] not in declared} == set()
+
+
+def test_deploy_installs_the_tool_with_its_capabilities(repo_root: Path) -> None:
+    ctl = (repo_root / "ctl").read_text(encoding="utf-8")
+    installs = [m.group(1).split(",") for m in _EXTRA_HINT.finditer(ctl)]
+    assert any({"verify", "search"} <= set(extras) for extras in installs), installs

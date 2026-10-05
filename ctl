@@ -121,7 +121,11 @@ global_src_digest() {
 # regressed". Whatever goes wrong, it should go wrong here and loudly.
 cmd_install() {
   step "installing the global oku from $REPO"
-  uv tool install --force --no-cache --from "$REPO" oku
+  # The extras are the tool's capabilities, not options: without `verify`
+  # every other project's session finds `oku verify` "not installed" and
+  # skips the browser check; without `search` dist/site ships no index.
+  uv tool install --force --no-cache "oku[search,verify] @ $REPO"
+  install_verify_browser
   local want have
   want="$(repo_kit_stamp)"
   have="$(global_kit_stamp)"
@@ -145,7 +149,24 @@ cmd_install() {
     red "  Try: uv cache clean && ./ctl deploy"
     exit 1
   fi
+  if ! "$(global_tool_python)" -c 'import playwright, pagefind' 2>/dev/null; then
+    red "✗ the global oku is missing playwright or pagefind, so oku verify or"
+    red "  the search index will not run outside this repo."
+    exit 1
+  fi
   green "✓ global oku is building with this repo's kit ($want) and code ($want_src)"
+}
+
+global_tool_python() {
+  printf '%s/oku/bin/python\n' "$(uv tool dir)"
+}
+
+# The playwright the tool carries pins one chromium revision, and a
+# browser fetched for another venv's playwright does not satisfy it.
+# Idempotent: a revision already in the cache is not downloaded again.
+install_verify_browser() {
+  step "fetching the chromium the global oku's playwright expects"
+  "$(global_tool_python)" -m playwright install chromium
 }
 
 cmd_version() {

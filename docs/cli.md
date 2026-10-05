@@ -205,9 +205,10 @@ oku build && oku verify
 {"headers":["Checked","Why a source check cannot"],"rows":[["Diagrams drew","The source parses; the renderer is what fails, and only in a browser."],["No figure is an empty box","A wrong-but-valid payload validates and renders nothing. This is the failure the schema cannot reach by construction."],["No sideways scroll at 1440px or 360px","Overflow is geometry. It has no representation in the source."],["No console or page errors","An island's script throwing is invisible to every static check."]]}
 ```
 
-Needs a browser: `uv tool install 'oku[verify]'` then
-`playwright install chromium`. Without it the command says so and exits
-2 rather than reporting a pass it did not get.
+Needs a browser: the `oku[verify]` extra carries playwright, and
+`./ctl deploy` in the oku repository installs the tool with it and
+fetches the chromium that playwright expects. Without it the command
+says so and exits 2 rather than reporting a pass it did not get.
 
 A failing request to a remote origin is ignored — that is the network's
 state, not the page's, and a check that fails for reasons the author

@@ -309,6 +309,9 @@ schema = [
 search = [
     { name = "pagefind", extra = ["bin"] },
 ]
+verify = [
+    { name = "playwright" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -322,12 +325,13 @@ requires-dist = [
     { name = "jsonschema", marker = "extra == 'schema'", specifier = ">=4.0" },
     { name = "pagefind", extras = ["bin"], marker = "extra == 'dev'", specifier = ">=1.5" },
     { name = "pagefind", extras = ["bin"], marker = "extra == 'search'", specifier = ">=1.5" },
+    { name = "playwright", marker = "extra == 'verify'", specifier = ">=1.50" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-playwright", marker = "extra == 'dev'", specifier = ">=0.5" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.8" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
 ]
-provides-extras = ["schema", "search", "dev"]
+provides-extras = ["schema", "search", "verify", "dev"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "tiktoken", specifier = ">=0.13.0" }]

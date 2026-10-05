@@ -8581,8 +8581,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
         from playwright.sync_api import sync_playwright
     except ImportError:
         print(
-            "✗ oku verify needs playwright: uv tool install 'oku[verify]' "
-            "(then `playwright install chromium`)",
+            "✗ oku verify needs playwright, which the `oku[verify]` extra carries: "
+            "run `./ctl deploy` in the oku repository, which installs it with its browser",
             file=sys.stderr,
         )
         return 2
