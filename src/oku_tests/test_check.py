@@ -1344,6 +1344,21 @@ def test_a_translation_with_different_anchors_is_flagged(tmp_path: Path) -> None
     assert "setup" in flagged[0]["message"] and "kurulum" in flagged[0]["message"]
 
 
+def test_the_drift_names_the_original_by_the_file_the_author_has(tmp_path: Path) -> None:
+    """A markdown page is checked under a virtual `.json` name, and the
+    message built the original's name from that suffix — telling an
+    author to compare against `a.json`, a file that does not exist."""
+    (tmp_path / "kit.json").write_text(
+        json.dumps({"languages": ["en", "tr"], "defaultLanguage": "en"}), encoding="utf-8"
+    )
+    (tmp_path / "a.md").write_text("---\ntitle: A\n---\n\n## Setup {#setup}\n\nx\n", encoding="utf-8")
+    (tmp_path / "a.tr.md").write_text("---\ntitle: A\n---\n\n## Kurulum\n\nx\n", encoding="utf-8")
+    issues = cli.check_pages(cli.find_json_pages(tmp_path), tmp_path)
+    flagged = _issues_of(issues, code="translation-anchor-drift")
+    assert len(flagged) == 1, issues
+    assert "differ from a.md" in flagged[0]["message"], flagged[0]["message"]
+
+
 def test_a_translation_that_pins_the_same_anchors_is_clean(tmp_path: Path) -> None:
     """`slugify` strips non-ASCII, so a Turkish heading cannot produce
     its original's id by accident — it is pinned by hand, and this is
