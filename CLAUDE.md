@@ -2262,6 +2262,31 @@ actually write.
   new key arrives as a failure) and requires the chrome to be built
   anyway.
 
+- **A custom element is defined at the foot of chrome.js, never where
+  its class is written.** Served, chrome.js is deferred and runs over a
+  parsed body, so `customElements.define` upgrades every matching
+  element on the spot and its `connectedCallback` runs MID-FILE — before
+  the top-level `var`s further down are initialised. A page that writes
+  its own HTML and uses the kit for the chrome alone met it: `page-chrome`
+  wired a table and threw on `OKU_URL_SHAPED`, and a chart read its
+  label width as undefined and cut both axis titles to an ellipsis.
+  Standalone hid it, because the inlined kit runs before the body is
+  parsed. `__okuDefine` queues and the last statement of the file
+  defines, so an upgrade only ever sees a fully evaluated kit. Held by
+  `test_element_definitions.py` (no direct define) and
+  `browser/test_chrome_only_page.py`. The same page shape is why
+  `oku verify` waits for `__okuRendered` only where `OkuRenderer` exists:
+  such a page has no renderer to set it, and every one timed out
+  unchecked.
+
+- **The runtime asks only for the central registry files the kit
+  ships.** `OKU_CENTRAL_REGISTRIES` in the kit loader lists them by
+  kind, held against `kit/glossary/` and `kit/extrefs/` by
+  `browser/test_registry_requests.py`. A domain a project defines only
+  in its own `kit.json`, or a central domain with a glossary file and no
+  ext-refs file, was a 404 on every served page load and a failed
+  `oku verify`. Adding a central domain file means adding it there.
+
 - **Stale chrome.js in the browser.** The CDN-loaded Prism autoloader
   fires `complete` twice per block (once before the language module
   arrives, once after). The line-wrap / fold pass guards against the

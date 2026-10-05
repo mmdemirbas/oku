@@ -183,9 +183,10 @@ entry to write.
    — the second run is what makes the new entry visible in the site-
    tree sidebar when the user opens the file directly from their IDE.
 
-   In an otherwise empty directory init also drops a starter
-   `index.md`: front-matter skeleton plus a TL;DR block, ready to type
-   into. It never adds one next to pages that already exist.
+   In a docs tree with no pages yet — none in this directory or any
+   folder below it — init also drops a starter `index.md`: front-matter
+   skeleton plus a TL;DR block, ready to type into. It never adds one
+   to a tree that already has pages.
 
    Important: run `oku init` in the same directory the page lives
    under (typically `docs/`). Running from the project root when
