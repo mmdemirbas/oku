@@ -9170,9 +9170,20 @@ class OkuChart extends HTMLElement {
   _render() {
     var self = this;
     var v = this._view;
+    var xLog = this._xScale === 'log', yLog = this._yScale === 'log';
+    // The gutter holds the widest y label at THIS view, so a zoom that
+    // makes the labels finer widens it rather than cutting each one. It
+    // only grows: a gutter that shrank back would move the plot under a
+    // reader panning across it.
+    var yTicks = yLog ? logTicks(v.yMin, v.yMax) : niceTicks(v.yMin, v.yMax, 5);
+    var yText = fmtTicks(yTicks);
+    var gutter = okuTickGutter(yText, this._pad.left);
+    if (gutter > this._pad.left) {
+      this._plotW -= gutter - this._pad.left;
+      this._pad.left = gutter;
+    }
     var pad = this._pad, plotW = this._plotW, plotH = this._plotH;
     var W = this._W, H = this._H;
-    var xLog = this._xScale === 'log', yLog = this._yScale === 'log';
 
     function sx(x) {
       if (xLog) {
@@ -9265,16 +9276,16 @@ class OkuChart extends HTMLElement {
       return ticks.length ? ticks : [min, max];
     }
     var xTicks = xLog ? logTicks(v.xMin, v.xMax) : niceTicks(v.xMin, v.xMax, 5);
-    var yTicks = yLog ? logTicks(v.yMin, v.yMax) : niceTicks(v.yMin, v.yMax, 5);
-    xTicks.forEach(function (val) {
+    var xText = fmtTicks(xTicks);
+    xTicks.forEach(function (val, ti) {
       var pos = sx(val);
       parts.push('<line x1="' + pos + '" y1="' + (pad.top + plotH) + '" x2="' + pos + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
-      parts.push('<text x="' + pos + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + fmtNum(val) + '</text>');
+      parts.push('<text x="' + pos + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + xText[ti] + '</text>');
     });
-    yTicks.forEach(function (val) {
+    yTicks.forEach(function (val, ti) {
       var pos = sy(val);
       parts.push('<line x1="' + (pad.left - 4) + '" y1="' + pos + '" x2="' + pad.left + '" y2="' + pos + '" class="okc-axis"/>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (pos + 4) + '" text-anchor="end" class="okc-tick">' + fmtNum(val) + '</text>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (pos + 4) + '" text-anchor="end" class="okc-tick">' + yText[ti] + '</text>');
     });
 
     // Quadrant overlay: two reference lines underlay the data; corner
@@ -10632,11 +10643,12 @@ class OkuChart extends HTMLElement {
       });
     });
     // Axis ticks (5).
+    var tickText = fmtTicks(evenTicks(vmin, vmin + span, 4));
     for (var t = 0; t <= 4; t++) {
       var vv = vmin + (t / 4) * span;
       var xx = sx(vv);
       parts.push('<line x1="' + xx + '" y1="' + (H - pad.bottom + 2) + '" x2="' + xx + '" y2="' + (H - pad.bottom + 8) + '" class="okc-axis"/>');
-      parts.push('<text x="' + xx + '" y="' + (H - pad.bottom + 20) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(vv)) + '</text>');
+      parts.push('<text x="' + xx + '" y="' + (H - pad.bottom + 20) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[t]) + '</text>');
     }
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -10649,10 +10661,6 @@ class OkuChart extends HTMLElement {
      when comparing many distributions side-by-side (the typical
      box-plot shape in academic / statistical contexts). */
   _renderBoxPlotVertical(boxes) {
-    var W = Math.max(360, 80 + boxes.length * 64);
-    var H = 320;
-    var pad = { top: this._title ? 36 : 16, bottom: 44, left: 56, right: 24 };
-    var colW = (W - pad.left - pad.right) / boxes.length;
     var allVals = [];
     boxes.forEach(function (b) {
       allVals.push(+b.min, +b.q1, +b.median, +b.q3, +b.max);
@@ -10662,6 +10670,11 @@ class OkuChart extends HTMLElement {
     var vmax = Math.max.apply(null, allVals);
     if (vmin === vmax) { vmin -= 1; vmax += 1; }
     var span = vmax - vmin;
+    var tickText = fmtTicks(evenTicks(vmin, vmin + span, 4));
+    var W = Math.max(360, 80 + boxes.length * 64);
+    var H = 320;
+    var pad = { top: this._title ? 36 : 16, bottom: 44, left: okuTickGutter(tickText, 56), right: 24 };
+    var colW = (W - pad.left - pad.right) / boxes.length;
     function sy(v) { return pad.top + (H - pad.top - pad.bottom) - ((v - vmin) / span) * (H - pad.top - pad.bottom); }
     var palette = __okuChartPalette;
     var parts = [];
@@ -10672,7 +10685,7 @@ class OkuChart extends HTMLElement {
       var vv = vmin + (t / 4) * span;
       var yy = sy(vv);
       parts.push('<line x1="' + (pad.left - 4) + '" y1="' + yy + '" x2="' + pad.left + '" y2="' + yy + '" class="okc-axis"/>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (yy + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(vv)) + '</text>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (yy + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(tickText[t]) + '</text>');
     }
     parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (H - pad.bottom) + '" class="okc-axis"/>');
     boxes.forEach(function (b, i) {
@@ -10896,15 +10909,25 @@ class OkuChart extends HTMLElement {
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Y axis + ticks (5).
     parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
+    var tickText = fmtTicks(evenTicks(0, maxCount, 4));
     for (var t = 0; t <= 4; t++) {
       var v = maxCount * (t / 4);
       var y = sy(v);
       parts.push('<line x1="' + (pad.left - 4) + '" y1="' + y + '" x2="' + pad.left + '" y2="' + y + '" class="okc-axis"/>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(tickText[t]) + '</text>');
     }
     // X axis baseline.
     parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     // Bars + x-axis edge ticks.
+    // The edges that carry a label are one axis, so fmtTicks judges them
+    // together; the rest of the bins' edges are drawn unlabelled.
+    var labelEvery = Math.max(1, Math.floor(bins.length / 6));
+    var edgeVals = [], edgeAt = {};
+    bins.forEach(function (b, i) {
+      if (i === 0 || i === bins.length - 1 || i % labelEvery === 0) { edgeAt[i] = edgeVals.length; edgeVals.push(+b.lo); }
+    });
+    edgeVals.push(hi);
+    var edgeText = fmtTicks(edgeVals);
     bins.forEach(function (b, i) {
       var x0 = sx(+b.lo);
       var span = markSpan(x0, sx(+b.hi), 1);
@@ -10914,15 +10937,15 @@ class OkuChart extends HTMLElement {
         kv: [{ k: 'count', v: fmtNum(+b.count || 0) }]
       });
       parts.push('<rect x="' + span.start + '" y="' + top + '" width="' + span.size + '" height="' + markSize(pad.top + plotH - top) + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
-      if (i === 0 || i === bins.length - 1 || (i % Math.max(1, Math.floor(bins.length / 6))) === 0) {
+      if (i in edgeAt) {
         parts.push('<line x1="' + x0 + '" y1="' + (pad.top + plotH) + '" x2="' + x0 + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
-        parts.push('<text x="' + x0 + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(+b.lo)) + '</text>');
+        parts.push('<text x="' + x0 + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(edgeText[edgeAt[i]]) + '</text>');
       }
     });
     // Right edge tick (the upper bound of the last bin).
     var xMax = sx(hi);
     parts.push('<line x1="' + xMax + '" y1="' + (pad.top + plotH) + '" x2="' + xMax + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
-    parts.push('<text x="' + xMax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(hi)) + '</text>');
+    parts.push('<text x="' + xMax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(edgeText[edgeVals.length - 1]) + '</text>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
     this._wireGenericVerticalCursor({ top: pad.top, bottom: pad.top + plotH, left: pad.left, right: W - pad.right });
@@ -10953,13 +10976,23 @@ class OkuChart extends HTMLElement {
     parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     // Count ticks along the bottom (X axis = count).
+    var tickText = fmtTicks(evenTicks(0, maxCount, 4));
     for (var t = 0; t <= 4; t++) {
       var v = maxCount * (t / 4);
       var xc = sx(v);
       parts.push('<line x1="' + xc + '" y1="' + (pad.top + plotH) + '" x2="' + xc + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
-      parts.push('<text x="' + xc + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + xc + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[t]) + '</text>');
     }
     // Bins as horizontal bars.
+    // The edges that carry a label are one axis, so fmtTicks judges them
+    // together; the rest of the bins' edges are drawn unlabelled.
+    var labelEvery = Math.max(1, Math.floor(bins.length / 6));
+    var edgeVals = [], edgeAt = {};
+    bins.forEach(function (b, i) {
+      if (i === 0 || i === bins.length - 1 || i % labelEvery === 0) { edgeAt[i] = edgeVals.length; edgeVals.push(+b.lo); }
+    });
+    edgeVals.push(hi);
+    var edgeText = fmtTicks(edgeVals);
     bins.forEach(function (b, i) {
       var y0 = sy(+b.lo);
       var span = markSpan(y0, sy(+b.hi), 1);
@@ -10970,14 +11003,14 @@ class OkuChart extends HTMLElement {
       });
       parts.push('<rect x="' + pad.left + '" y="' + span.start + '" width="' + w + '" height="' + span.size + '" rx="1" fill="var(--accent)" fill-opacity="0.78" class="okc-histogram-bar" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>[' + escapeXml(fmtNum(+b.lo)) + ', ' + escapeXml(fmtNum(+b.hi)) + '): ' + escapeXml(fmtNum(+b.count || 0)) + '</title></rect>');
       // Y tick label (bin lower bound) at every other bin to avoid clutter.
-      if (i === 0 || i === bins.length - 1 || (i % Math.max(1, Math.floor(bins.length / 6))) === 0) {
+      if (i in edgeAt) {
         parts.push('<line x1="' + (pad.left - 4) + '" y1="' + y0 + '" x2="' + pad.left + '" y2="' + y0 + '" class="okc-axis"/>');
-        parts.push('<text x="' + (pad.left - 6) + '" y="' + (y0 + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(+b.lo)) + '</text>');
+        parts.push('<text x="' + (pad.left - 6) + '" y="' + (y0 + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(edgeText[edgeAt[i]]) + '</text>');
       }
     });
     var yMax = sy(hi);
     parts.push('<line x1="' + (pad.left - 4) + '" y1="' + yMax + '" x2="' + pad.left + '" y2="' + yMax + '" class="okc-axis"/>');
-    parts.push('<text x="' + (pad.left - 6) + '" y="' + (yMax + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(hi)) + '</text>');
+    parts.push('<text x="' + (pad.left - 6) + '" y="' + (yMax + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(edgeText[edgeVals.length - 1]) + '</text>');
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
     // Cursor is meaningless on a horizontal histogram (bins are
@@ -11256,10 +11289,11 @@ class OkuChart extends HTMLElement {
     });
     // X axis ticks (5).
     var axisY = titleTop + distributions.length * rowH + 4;
+    var tickText = fmtTicks(evenTicks(lo, hi, 4));
     for (var t = 0; t <= 4; t++) {
       var v = lo + (t / 4) * (hi - lo);
       var ax = pad.left + (t / 4) * plotW;
-      parts.push('<text x="' + ax + '" y="' + axisY + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + ax + '" y="' + axisY + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[t]) + '</text>');
     }
     // Parallel cursor — a single vertical line spanning every ridge
     // that follows the pointer's X position. Sits inside the SVG so
@@ -11900,8 +11934,8 @@ class OkuChart extends HTMLElement {
       // name there puts half of itself outside the viewBox.
       parts.push(axFit.text(ax, pad.top - 8, v.label || v.key, 'okc-parcoord-label',
                             okuTickAnchor(ax, pad.left, W - pad.right)));
-      parts.push('<text x="' + ax + '" y="' + (pad.top - 22) + '" text-anchor="middle" class="okc-tick">' + fmtNum(v._hi) + '</text>');
-      parts.push('<text x="' + ax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + fmtNum(v._lo) + '</text>');
+      parts.push('<text x="' + ax + '" y="' + (pad.top - 22) + '" text-anchor="middle" class="okc-tick">' + fmtTicks([v._lo, v._hi])[1] + '</text>');
+      parts.push('<text x="' + ax + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + fmtTicks([v._lo, v._hi])[0] + '</text>');
     });
     // Polylines.
     records.forEach(function (r, ri) {
@@ -12186,10 +12220,11 @@ class OkuChart extends HTMLElement {
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Dot plot') + '" class="okc-svg okc-dot-plot">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Faint baseline + ticks at min/max + midpoint.
-    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
+    var tickVals = [vMin, (vMin + vMax) / 2, vMax], tickText = fmtTicks(tickVals);
+    tickVals.forEach(function (v, ti) {
       var xx = xOf(v);
       parts.push('<line x1="' + xx.toFixed(1) + '" y1="' + pad.top + '" x2="' + xx.toFixed(1) + '" y2="' + (H - pad.bottom + 4) + '" class="okc-axis" stroke-dasharray="2 3"/>');
-      parts.push('<text x="' + xx.toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + xx.toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[ti]) + '</text>');
     });
     rows.forEach(function (r, i) {
       var y = pad.top + i * rowH + rowH / 2;
@@ -12258,9 +12293,10 @@ class OkuChart extends HTMLElement {
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Density') + '" class="okc-svg okc-density">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // X-axis ticks at vMin / mid / vMax.
-    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
+    var tickVals = [vMin, (vMin + vMax) / 2, vMax], tickText = fmtTicks(tickVals);
+    tickVals.forEach(function (v, ti) {
       var xx = xOf(v);
-      parts.push('<text x="' + xx.toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + xx.toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[ti]) + '</text>');
     });
     parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     parts.push('<path d="' + areaD + '" fill="' + color + '" fill-opacity="0.22" stroke="none"/>');
@@ -12330,7 +12366,9 @@ class OkuChart extends HTMLElement {
     var vMin = Math.min.apply(null, allValues);
     var vMax = Math.max.apply(null, allValues);
     if (vMin === vMax) { vMin -= 1; vMax += 1; }
-    var pad = { top: this._title ? 36 : 16, bottom: 28, left: 48, right: 12 };
+    var ticks = 5;
+    var tickText = fmtTicks(evenTicks(vMin, vMax, ticks));
+    var pad = { top: this._title ? 36 : 16, bottom: 28, left: okuTickGutter(tickText, 48), right: 12 };
     var W = 640, H = this._title ? 360 : 320;
     var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     var step = plotW / entries.length;
@@ -12340,12 +12378,11 @@ class OkuChart extends HTMLElement {
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Candlestick') + '" class="okc-svg okc-candlestick">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Y-axis ticks (5).
-    var ticks = 5;
     for (var t = 0; t <= ticks; t++) {
       var v = vMin + (t / ticks) * (vMax - vMin);
       var ty = yOf(v);
       parts.push('<line x1="' + pad.left + '" y1="' + ty.toFixed(1) + '" x2="' + (W - pad.right) + '" y2="' + ty.toFixed(1) + '" class="okc-axis" stroke-dasharray="2 3"/>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4).toFixed(1) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4).toFixed(1) + '" text-anchor="end" class="okc-tick">' + escapeXml(tickText[t]) + '</text>');
     }
     entries.forEach(function (e, i) {
       var cx = pad.left + step * (i + 0.5);
@@ -12396,11 +12433,12 @@ class OkuChart extends HTMLElement {
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // X-axis ticks (5) — value scale runs horizontally now.
     var ticks = 5;
+    var tickText = fmtTicks(evenTicks(vMin, vMax, ticks));
     for (var t = 0; t <= ticks; t++) {
       var v = vMin + (t / ticks) * (vMax - vMin);
       var tx = xOf(v);
       parts.push('<line x1="' + tx.toFixed(1) + '" y1="' + pad.top + '" x2="' + tx.toFixed(1) + '" y2="' + (pad.top + plotH) + '" class="okc-axis" stroke-dasharray="2 3"/>');
-      parts.push('<text x="' + tx.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + tx.toFixed(1) + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[t]) + '</text>');
     }
     entries.forEach(function (e, i) {
       var cy = pad.top + step * (i + 0.5);
@@ -12823,8 +12861,9 @@ class OkuChart extends HTMLElement {
       parts.push('<text x="' + (pad.left - 12) + '" y="' + (rowMid + 4).toFixed(1) + '" text-anchor="end" class="okc-violin-label">' + escapeXml(labelFit.fit(dist.label || '')) + '<title>' + escapeXml(dist.label || '') + '</title></text>');
     });
     // Bottom axis ticks at vMin / mid / vMax.
-    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
-      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    var tickVals = [vMin, (vMin + vMax) / 2, vMax], tickText = fmtTicks(tickVals);
+    tickVals.forEach(function (v, ti) {
+      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[ti]) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -12845,7 +12884,8 @@ class OkuChart extends HTMLElement {
     if (vMin === vMax) { vMin -= 1; vMax += 1; }
     var W = Math.max(360, 80 + distributions.length * 96);
     var H = 360;
-    var pad = { top: this._title ? 36 : 16, bottom: 40, left: 56, right: 20 };
+    var tickText = fmtTicks(evenTicks(vMin, vMax, 4));
+    var pad = { top: this._title ? 36 : 16, bottom: 40, left: okuTickGutter(tickText, 56), right: 20 };
     var plotH = H - pad.top - pad.bottom;
     var colW = (W - pad.left - pad.right) / distributions.length;
     var palette = __okuChartPalette;
@@ -12858,7 +12898,7 @@ class OkuChart extends HTMLElement {
       var v = vMin + (t / 4) * (vMax - vMin);
       var y = yOf(v);
       parts.push('<line x1="' + (pad.left - 4) + '" y1="' + y + '" x2="' + pad.left + '" y2="' + y + '" class="okc-axis"/>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (y + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(tickText[t]) + '</text>');
     }
     parts.push('<line x1="' + pad.left + '" y1="' + pad.top + '" x2="' + pad.left + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     distributions.forEach(function (dist, di) {
@@ -12985,8 +13025,9 @@ class OkuChart extends HTMLElement {
       parts.push('<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + dotR + '" fill="' + color + '" fill-opacity="0.78" class="okc-beeswarm-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml(fmtNum(p.v)) + '</title></circle>');
     });
     // Bottom axis ticks at min / mid / max.
-    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
-      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    var tickVals = [vMin, (vMin + vMax) / 2, vMax], tickText = fmtTicks(tickVals);
+    tickVals.forEach(function (v, ti) {
+      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[ti]) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -13029,7 +13070,8 @@ class OkuChart extends HTMLElement {
     var vMin = Math.min.apply(null, allValues);
     var vMax = Math.max.apply(null, allValues);
     if (vMin === vMax) { vMin -= 1; vMax += 1; }
-    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 56, right: 16 };
+    var tickText = fmtTicks(evenTicks(vMin, vMax, 4));
+    var pad = { top: this._title ? 36 : 16, bottom: 36, left: okuTickGutter(tickText, 56), right: 16 };
     var W = 640, H = this._title ? 360 : 320;
     var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     var step = plotW / entries.length;
@@ -13045,7 +13087,7 @@ class OkuChart extends HTMLElement {
       var v = vMin + (t / 4) * (vMax - vMin);
       var ty = yOf(v);
       parts.push('<line x1="' + pad.left + '" y1="' + ty.toFixed(1) + '" x2="' + (W - pad.right) + '" y2="' + ty.toFixed(1) + '" class="okc-axis" stroke-dasharray="2 3"/>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4).toFixed(1) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4).toFixed(1) + '" text-anchor="end" class="okc-tick">' + escapeXml(tickText[t]) + '</text>');
     }
     // Zero baseline.
     parts.push('<line x1="' + pad.left + '" y1="' + yOf(0).toFixed(1) + '" x2="' + (W - pad.right) + '" y2="' + yOf(0).toFixed(1) + '" class="okc-axis"/>');
@@ -13120,8 +13162,9 @@ class OkuChart extends HTMLElement {
       parts.push('<circle cx="' + cx.toFixed(1) + '" cy="' + y + '" r="6" fill="' + color + '" class="okc-lollipop-dot" tabindex="0" data-hover-payload="' + escapeXml(payload) + '"><title>' + escapeXml((r.label || '') + ' · ' + fmtNum(+r.value || 0)) + '</title></circle>');
     });
     // Bottom ticks.
-    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
-      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    var tickVals = [vMin, (vMin + vMax) / 2, vMax], tickText = fmtTicks(tickVals);
+    tickVals.forEach(function (v, ti) {
+      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[ti]) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -13167,8 +13210,9 @@ class OkuChart extends HTMLElement {
       parts.push('<circle cx="' + toX.toFixed(1)   + '" cy="' + y + '" r="6" fill="' + toColor   + '" class="okc-dumbbell-dot okc-dumbbell-to"   tabindex="0" data-hover-payload="' + escapeXml(toPayload)   + '"><title>' + escapeXml((x.to_label   || 'to')   + ': ' + fmtNum(+r.to   || 0)) + '</title></circle>');
     });
     // Bottom ticks + legend.
-    [vMin, (vMin + vMax) / 2, vMax].forEach(function (v) {
-      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+    var tickVals = [vMin, (vMin + vMax) / 2, vMax], tickText = fmtTicks(tickVals);
+    tickVals.forEach(function (v, ti) {
+      parts.push('<text x="' + xOf(v).toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[ti]) + '</text>');
     });
     if (x.from_label || x.to_label) {
       // Two chips at constant offsets: `to` sat 86 units after `from`
@@ -13274,11 +13318,12 @@ class OkuChart extends HTMLElement {
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Gantt') + '" class="okc-svg okc-gantt">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
     // Vertical grid lines (5).
+    var tickText = fmtTicks(evenTicks(vMin, vMax, 4));
     for (var t = 0; t <= 4; t++) {
       var v = vMin + (t / 4) * (vMax - vMin);
       var gx = xOf(v);
       parts.push('<line x1="' + gx.toFixed(1) + '" y1="' + pad.top + '" x2="' + gx.toFixed(1) + '" y2="' + (H - pad.bottom) + '" class="okc-axis" stroke-dasharray="2 3"/>');
-      parts.push('<text x="' + gx.toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + (x.tick_format === 'date' ? new Date(+v).toISOString().slice(0, 10) : escapeXml(fmtNum(v))) + '</text>');
+      parts.push('<text x="' + gx.toFixed(1) + '" y="' + (H - pad.bottom + 18) + '" text-anchor="middle" class="okc-tick">' + (x.tick_format === 'date' ? new Date(+v).toISOString().slice(0, 10) : escapeXml(tickText[t])) + '</text>');
     }
     tasks.forEach(function (task, i) {
       var y = pad.top + i * rowH + 4;
@@ -13449,11 +13494,12 @@ class OkuChart extends HTMLElement {
       parts.push('<text x="' + centerX + '" y="' + (rowY + 4) + '" text-anchor="middle" class="okc-pop-cat">' + escapeXml(cat) + '</text>');
     });
     // Bottom axis ticks (max & 0 on each side).
-    [0, maxAbs].forEach(function (v) {
+    var tickText = fmtTicks([0, maxAbs]);
+    [0, maxAbs].forEach(function (v, ti) {
       var lx = leftStart - (v / maxAbs) * sideW;
       var rx = rightStart + (v / maxAbs) * sideW;
-      parts.push('<text x="' + lx + '" y="' + (H - pad.bottom + 14) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
-      parts.push('<text x="' + rx + '" y="' + (H - pad.bottom + 14) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + lx + '" y="' + (H - pad.bottom + 14) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[ti]) + '</text>');
+      parts.push('<text x="' + rx + '" y="' + (H - pad.bottom + 14) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[ti]) + '</text>');
     });
     parts.push('</svg>');
     this.appendChild(document.createRange().createContextualFragment(parts.join('')));
@@ -13484,7 +13530,8 @@ class OkuChart extends HTMLElement {
     if (xMin === xMax) { xMin -= 1; xMax += 1; }
     if (yMin === yMax) { yMin -= 1; yMax += 1; }
     var W = 640, H = 360;
-    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 48, right: 16 };
+    var yText = fmtTicks(evenTicks(yMin, yMax, 4)), xText = fmtTicks(evenTicks(xMin, xMax, 4));
+    var pad = { top: this._title ? 36 : 16, bottom: 36, left: okuTickGutter(yText, 48), right: 16 };
     var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     function sx(v) { return pad.left + ((v - xMin) / (xMax - xMin)) * plotW; }
     function sy(v) { return pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH; }
@@ -13499,14 +13546,14 @@ class OkuChart extends HTMLElement {
       var vy = yMin + (t / 4) * (yMax - yMin);
       var ty = sy(vy);
       parts.push('<line x1="' + (pad.left - 4) + '" y1="' + ty + '" x2="' + pad.left + '" y2="' + ty + '" class="okc-axis"/>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(vy)) + '</text>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(yText[t]) + '</text>');
     }
     // X ticks (5).
     for (var u = 0; u <= 4; u++) {
       var vx = xMin + (u / 4) * (xMax - xMin);
       var tx = sx(vx);
       parts.push('<line x1="' + tx + '" y1="' + (pad.top + plotH) + '" x2="' + tx + '" y2="' + (pad.top + plotH + 4) + '" class="okc-axis"/>');
-      parts.push('<text x="' + tx + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(vx)) + '</text>');
+      parts.push('<text x="' + tx + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(xText[u]) + '</text>');
     }
     series.forEach(function (s, si) {
       var color = __okuPickColor(s.color, si);
@@ -13698,7 +13745,8 @@ class OkuChart extends HTMLElement {
     if (xMin === xMax) { xMin -= 1; xMax += 1; }
     if (yMin === yMax) { yMin -= 1; yMax += 1; }
     var W = 640, H = 360;
-    var pad = { top: this._title ? 36 : 16, bottom: 36, left: 48, right: 16 };
+    var xText = fmtTicks(evenTicks(xMin, xMax, 4)), yText = fmtTicks(evenTicks(yMin, yMax, 4));
+    var pad = { top: this._title ? 36 : 16, bottom: 36, left: okuTickGutter(yText, 48), right: 16 };
     var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     function sx(v) { return pad.left + ((v - xMin) / (xMax - xMin)) * plotW; }
     function sy(v) { return pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH; }
@@ -13734,8 +13782,8 @@ class OkuChart extends HTMLElement {
       var vx = xMin + (t / 4) * (xMax - xMin);
       var vy = yMin + (t / 4) * (yMax - yMin);
       var tx = sx(vx), ty = sy(vy);
-      parts.push('<text x="' + tx + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(vx)) + '</text>');
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(vy)) + '</text>');
+      parts.push('<text x="' + tx + '" y="' + (pad.top + plotH + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(xText[t]) + '</text>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(yText[t]) + '</text>');
     }
     // Build hex path once.
     function hexPath(cx, cy) {
@@ -13878,10 +13926,11 @@ class OkuChart extends HTMLElement {
     // X-axis baseline at top of plot area.
     parts.push('<line x1="' + pad.left + '" y1="' + (H - pad.bottom) + '" x2="' + (W - pad.right) + '" y2="' + (H - pad.bottom) + '" class="okc-axis"/>');
     // Ticks at lo, mid, hi.
-    [lo, (lo + hi) / 2, hi].forEach(function (v) {
+    var tickVals = [lo, (lo + hi) / 2, hi], tickText = fmtTicks(tickVals);
+    tickVals.forEach(function (v, ti) {
       var tx = sx(v);
       parts.push('<line x1="' + tx + '" y1="' + (H - pad.bottom) + '" x2="' + tx + '" y2="' + (H - pad.bottom + 4) + '" class="okc-axis"/>');
-      parts.push('<text x="' + tx + '" y="' + (H - pad.bottom + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + tx + '" y="' + (H - pad.bottom + 16) + '" text-anchor="middle" class="okc-tick">' + escapeXml(tickText[ti]) + '</text>');
     });
     rows.forEach(function (r, i) {
       var rowY = pad.top + i * rowH + rowH / 2;
@@ -13955,10 +14004,11 @@ class OkuChart extends HTMLElement {
     parts.push('<line x1="' + (W - pad.right) + '" y1="' + pad.top + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     parts.push('<line x1="' + pad.left + '" y1="' + (pad.top + plotH) + '" x2="' + (W - pad.right) + '" y2="' + (pad.top + plotH) + '" class="okc-axis"/>');
     // Y ticks (left = absolute value, right = cumulative %).
+    var tickText = fmtTicks(evenTicks(0, maxVal, 4));
     for (var t = 0; t <= 4; t++) {
       var v = (maxVal * t) / 4;
       var ty = barTop(v);
-      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(fmtNum(v)) + '</text>');
+      parts.push('<text x="' + (pad.left - 6) + '" y="' + (ty + 4) + '" text-anchor="end" class="okc-tick">' + escapeXml(tickText[t]) + '</text>');
       parts.push('<line x1="' + pad.left + '" y1="' + ty + '" x2="' + (pad.left + 4) + '" y2="' + ty + '" class="okc-axis"/>');
       var pctY = cumY(t / 4);
       parts.push('<text x="' + (W - pad.right + 6) + '" y="' + (pctY + 4) + '" class="okc-tick">' + escapeXml(Math.round((t / 4) * 100) + '%') + '</text>');
@@ -15752,6 +15802,7 @@ function __okuFitSvgTextToViewBox(svg) {
   Array.prototype.forEach.call(svg.querySelectorAll('text'), function (el) {
     var r = __okuSoleTextRun(el);
     if (r && el.__okuFullText != null) r.nodeValue = el.__okuFullText;
+    if (el.__okuAnchor) el.setAttribute('text-anchor', el.__okuAnchor);
   });
   var slack = __okuFitSlack(svg, outer);
   var rows = __okuTextRowBounds(svg);
@@ -15767,6 +15818,19 @@ function __okuFitSvgTextToViewBox(svg) {
       if (isFinite(rb.hi)) box.right = Math.min(box.right, rb.hi);
     }
     var run = __okuSoleTextRun(el);
+    // A number under a gridline is no use shortened, and an axis's end
+    // ticks sit ON the plot's edges, where a centred label hangs half its
+    // width outside the frame. Anchored inward it keeps every digit and
+    // still ends on its gridline — what okuTickAnchor does for category
+    // labels, decided here by measurement because a number's width is
+    // known only once fmtTicks has chosen its precision.
+    if (el.classList.contains('okc-tick') && el.getAttribute('text-anchor') === 'middle' &&
+        __okuTextOverflow(el, box) > slack) {
+      var tr = el.getBoundingClientRect();
+      el.__okuAnchor = 'middle';
+      el.setAttribute('text-anchor', tr.right - box.right > box.left - tr.left ? 'end' : 'start');
+      if (__okuTextOverflow(el, box) > slack) el.setAttribute('text-anchor', 'middle');
+    }
     // Glyph advances round to device pixels, so the same label measures
     // a few units wider at one rendered size than another — a fit made
     // while the page was still settling under-trims once it stops. The
@@ -15826,6 +15890,22 @@ function okuTickAnchor(x, left, right) {
   return 'middle';
 }
 
+/* The gutter a y axis needs for its own tick labels.
+
+   The labels are numbers in the tick face, right-anchored a few units
+   left of the plot, so the room they take is known before anything is
+   drawn. Each renderer's old constant is the floor: it was sized for
+   fmtNum's compact labels, which never ran past five characters, and a
+   chart whose labels fit keeps exactly the layout it had. A label
+   fmtTicks had to spell out — `2002.53` — widens the gutter instead of
+   being cut to `2002.…` beside four more of the same, which is an axis
+   saying nothing by another road. */
+function okuTickGutter(labels, floor) {
+  var widest = 0;
+  labels.forEach(function (s) { widest = Math.max(widest, String(s).length); });
+  return Math.max(floor, Math.ceil(widest * 10.5 * OKU_EM_PER_CHAR) + 10);
+}
+
 /* The smallest extent a mark is drawn at. Sub-pixel, because at 900
    bins across 576px the honest picture IS a dense band and a 1px floor
    would make every bar overlap its neighbour; positive, because a rect
@@ -15881,6 +15961,48 @@ function fmtNum(n) {
   if (abs >= 10) return n.toFixed(0);
   if (abs >= 1) return n.toFixed(1).replace(/\.0$/, '');
   return n.toFixed(2);
+}
+
+/* An axis label names a gridline, so it has to say that gridline's value.
+ *
+ * fmtNum takes its precision from a number's MAGNITUDE — a `k` with one
+ * decimal from 1000 up, no decimals from 10 up — which suits one reading
+ * and fails an axis whose ticks sit closer together than that: a gantt
+ * over 2024 to 2026.5 labelled all five ticks `2k`, and a box plot of
+ * values between 10 and 12 read `10 11 11 12 12`. The marks were right and
+ * the axis said nothing, or something false.
+ *
+ * So an axis is judged whole, against its own step. fmtNum's labels stand
+ * when each lands within a tenth of a step of its tick — every axis the
+ * kit drew correctly keeps the labels it had. Otherwise every tick gets
+ * the fewest decimals that do, so one axis never mixes `2k` with
+ * `2024.5`. */
+function fmtTicks(values) {
+  var labels = values.map(fmtNum);
+  var step = Infinity;
+  for (var i = 1; i < values.length; i++) {
+    var d = Math.abs(values[i] - values[i - 1]);
+    if (d > 0 && d < step) step = d;
+  }
+  if (!isFinite(step)) return labels;
+  function near(s, v) {
+    return Math.abs(parseFloat(s) * (/k$/.test(s) ? 1000 : 1) - v) <= step / 10;
+  }
+  if (labels.every(function (s, i) { return near(s, values[i]); })) return labels;
+  for (var dp = 0; dp <= 6; dp++) {
+    var fixed = values.map(function (v) { return v.toFixed(dp); });
+    if (fixed.every(function (s, i) { return near(s, values[i]); })) {
+      return fixed.map(function (s) { return dp ? s.replace(/\.?0+$/, '') : s; });
+    }
+  }
+  return values.map(String);
+}
+
+/* The n + 1 values an axis split evenly into n steps puts gridlines at. */
+function evenTicks(lo, hi, n) {
+  var out = [];
+  for (var t = 0; t <= n; t++) out.push(lo + (t / n) * (hi - lo));
+  return out;
 }
 
 /* The five-number summary a violin's shape encodes and never names.

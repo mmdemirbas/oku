@@ -16,7 +16,9 @@ squeezed into [10, 12], under the integer threshold. A chart type added
 tomorrow is covered on the day it lands.
 
 The question asked is the reader's: on one axis, do two numeric labels
-read the same? Ticks share a row (an x axis) or a column (a y axis); a
+read the same, and is any of them cut short? A precise label is longer
+than `2k`, and an axis's end ticks sit on the plot's edges, so the
+second half of the question is the one the fix itself could break. Ticks share a row (an x axis) or a column (a y axis); a
 category label is not a number and is not judged. Two charts put more
 than one axis on a row, and are read the way they are drawn: a
 population pyramid is two axes mirrored about its centre, and the labels
@@ -108,8 +110,14 @@ AXES = """([names, rows]) => {
     const svg = sec.querySelector('svg.okc-svg');
     const mid = svg ? svg.getBoundingClientRect().left + svg.getBoundingClientRect().width / 2 : 0;
     const groups = {};
+    const cut = [];
     for (const t of sec.querySelectorAll('svg text.okc-tick')) {
-      const label = t.textContent.trim();
+      // The fit shortens a label to its first text node plus an ellipsis
+      // and keeps the whole of it in a <title>.
+      const shown = (t.firstChild && t.firstChild.nodeValue || '').trim();
+      const full = (t.querySelector('title') || {}).textContent;
+      if (full && NUM.test(full.trim()) && shown !== full.trim()) cut.push(shown + ' of ' + full.trim());
+      const label = full ? full.trim() : shown;
       if (!NUM.test(label)) continue;
       const r = t.getBoundingClientRect();
       const half = rowRule === 'halves' ? (r.left + r.width / 2 < mid ? ' left' : ' right') : '';
@@ -125,7 +133,7 @@ AXES = """([names, rows]) => {
       if (labels.length < 2) continue;
       if (new Set(labels).size < labels.length) dup.push(axis + ': ' + labels.join(' '));
     }
-    out[name] = dup;
+    out[name] = dup.concat(cut.map(c => 'cut: ' + c));
   }
   return out;
 }"""

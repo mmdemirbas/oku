@@ -12,48 +12,29 @@ carries the record, including what was measured before and after.
 
 ---
 
-## A gantt chart whose values are years labels every axis tick "2k"
+## A chart's reading rounds a year to "2k"
 
-- **Symptom.** An `oku-chart` of type `gantt` with `start`/`end` between
-  2024 and 2026.5 draws its x-axis ticks as `2k`, all of them, so the axis
-  says nothing. The bars and labels are fine.
+- **Symptom.** Hovering a gantt bar over the years 2024 to 2025 reads
+  `start 2k`, `end 2k`, `duration 1`. The axis under it reads `2024`,
+  `2024.6`, … since the axis fix; the reading still does not say which
+  year.
 - **Minimal reproduction.** `tmp/repro-stepflow-href/years.md` in this repo:
-  one gantt, tasks `2024–2025` and `2025–2026.5`. `oku build`, then read the
-  numeric `svg text` nodes of `dist/standalone/years.html`.
-- **Expected vs actual.** Expected ticks such as `2024`, `2024.5`, `2025`.
-  Actual: the only numeric tick text is `2k`.
-- **Where.** Not localised. Inferred: the axis uses a compact number format
-  (thousands as `k`), which suits counts and loses everything on a year.
-  A gantt has no date axis, so years are the natural numbers to give it.
-- **Observed.** The tick text above, read with Playwright (oku 0.6.5, kit
-  2026-10-05-r116, 2026-10-05). The same page with months 2–34 instead
-  shows `2`, `10`, `18`, `26`, `34`.
-
-## A step-flow card's `href` to a sibling `.md` page is not rewritten to `.html`
-
-- **Symptom.** In a built page, a prose link `[x](other.md)` points at
-  `other.html`, but an `oku-step-flow` card with `"href":"other.md"` still
-  points at `other.md`, which does not exist in `dist/standalone/` (nor, by
-  the same logic, in `dist/site/`). Clicking the card is a dead link.
-  `oku check` accepts `other.md` (it resolves against the source tree) and
-  warns `unresolved-link` on `other.html`, so the author has no spelling
-  that is both clean and working.
-- **Minimal reproduction.** `tmp/repro-stepflow-href/` in this repo: two
-  pages, `index.md` with one prose link and one unordered step-flow card,
-  both to `other.md`. `oku init && oku build`, open
-  `dist/standalone/index.html`, read the anchors' `href`.
-- **Expected vs actual.** Expected both anchors to `other.html`. Actual:
-  prose `other.html`, card `other.md`.
-- **Where.** `kit/renderer.js` `_renderStepFlow` sets
-  `card.setAttribute('href', s.href)` with the payload string as is
-  (around line 2259).
-- **Observed.** The two hrefs above, read from the rendered DOM with
-  Playwright (oku 0.6.5, kit 2026-10-05-r116, 2026-10-05). Same result in a
-  five-page tree under `atolye/raporlar/2026-10-05-huawei-hatirlatici/`.
-- **Inferred from source, not traced.** The prose link is rewritten before
-  the renderer sees it (in the markdown conversion), and fence payload
-  strings such as `href` do not go through that pass, so any other block
-  that carries a link in its JSON may have the same gap.
+  one gantt, tasks `2024–2025` and `2025–2026.5`. `oku build`, then read
+  `data-hover-payload` on `.okc-gantt-bar` in `dist/standalone/years.html`.
+- **Expected vs actual.** Expected `start 2024`, `end 2025`. Actual:
+  `{"k":"start","v":"2k"},{"k":"end","v":"2k"}`, and `2k`/`2k` for the
+  second task's 2025 → 2026.5.
+- **Where.** `_renderGantt` builds the payload with `fmtNum`, which writes
+  anything from 1000 up as thousands with one decimal.
+- **Observed.** The payload above, read with Playwright (oku 0.6.5, kit
+  stamp r116 plus the axis fix, 2026-10-05).
+- **Inferred from source, not traced.** About 150 other readings go
+  through `fmtNum`, so every chart's reading of a value from 1000 up is
+  rounded to a hundred (`1234` reads `1.2k`). For a count that is a
+  display choice; for a year, a price or an id it loses the value the
+  reader hovered for. Not fixed with the axis because the decision is
+  kit-wide — exact readings everywhere, or compact unless the value
+  needs more — and it changes what every existing chart's tooltip says.
 
 Open, found by the 2026-10-05 bug hunt and deliberately not fixed in it.
 Each says why.
@@ -101,13 +82,6 @@ Each says why.
   because it scaffolds through `uv run --project $REPO`. That project
   then serves this repo's working copy, uncommitted changes included,
   instead of the installed kit. Inferred from source.
-
-- **`oku verify` prints a BrokenPipeError traceback from its own site
-  server.** Observed on a 46-page tree: the run passed (exit 0, "92
-  page(s) render clean") with a `BrokenPipeError` traceback above the
-  pass line. `cmd_verify`'s `_QuietHandler` does not swallow
-  ConnectionResetError / BrokenPipeError the way the serve handler does,
-  and a traceback in a verify log reads as a failure to whoever scans it.
 
 - **The `updated` date is the committer's local date (`%cs`), not UTC.**
   A commit just after midnight at UTC+3 shows the previous UTC day.

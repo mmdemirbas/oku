@@ -694,7 +694,11 @@ class TestPayloadBudget:
     # Then from 1,440,000 by the hover card colouring its code and the
     # viewer's contents list and width stops: 1,445,177 measured with
     # both in, most of it the reasoning.
-    KIT_BUDGET_BYTES = 1_446_000
+    # Then from 1,446,000 by axis labels judged against their own step
+    # (fmtTicks, evenTicks, every renderer handing its ticks over whole,
+    # y gutters sized from their labels, end ticks anchored inward) and
+    # payload links going through linkHref: 1,451,945.
+    KIT_BUDGET_BYTES = 1_452_500
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -707,7 +711,9 @@ class TestPayloadBudget:
     # the viewer does, and the reading-face rules naming prose before the
     # first section: the page measured 1,436,529 with both in.
     # Then by the viewer's contents list and width stops: 1,445,757.
-    STANDALONE_BUDGET_BYTES = 1_446_500
+    # Then by axis labels judged against their step and payload links
+    # through linkHref: 1,452,525.
+    STANDALONE_BUDGET_BYTES = 1_453_000
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

@@ -1647,6 +1647,33 @@ spoke label is anchored by the side it is on and capped by the chord
 between adjacent spokes, which is what actually decides the room —
 three axes leave space for a sentence, ten for a word.
 
+**An axis label says its gridline's value, judged against the axis's
+own step.** `fmtNum` takes its precision from a number's MAGNITUDE — a
+`k` with one decimal from 1000, no decimals from 10 — which suits one
+reading and fails an axis whose ticks sit closer together than that. A
+gantt over the years 2024 to 2026.5 drew five `2k` ticks; a box plot of
+values between 10 and 12 read `10 11 11 12 12`. Every shipped example
+shifted by 2000 or squeezed into [10, 12] found the same on 34 cases,
+the cartesian axis among them. `fmtTicks` takes
+the whole axis: fmtNum's labels stand when each lands within a tenth of
+a step of its tick, which keeps every axis that was right as it was, and
+otherwise every tick gets the fewest decimals that do, so one axis never
+mixes `2k` with `2024.5`.
+
+A spelled-out label is longer, and that has two consequences, both
+measured before they were fixed. **A y gutter is sized from its labels**
+(`okuTickGutter`, the renderer's old constant as the floor): a fixed 48
+cut `2002.53` to `2002.…` beside four more of the same. The cartesian
+gutter is decided per view and only grows, so a zoom that makes the
+labels finer widens it and a pan never shakes the plot. **An end tick
+is anchored inward when it would hang off the frame** — the fit pass
+measures it, the way `okuTickAnchor` already answers for category
+labels, because a number's width is known only after `fmtTicks` has
+chosen its precision. Held by `browser/test_axis_ticks_say_their_value.py`,
+which asks of every axis whether two labels read the same and whether
+any was cut. What is left is the READING: a tooltip still formats with
+`fmtNum`, so the gantt's says `start 2k`; see `BUGS.md`.
+
 **One character-width estimate, named once.** There were four: 0.66em
 in the gutter fitter, 0.62em in the tick fitter, and 5.6px-at-11px
 (0.51em) in each of the two legends. The legends are where it showed:
