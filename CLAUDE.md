@@ -922,7 +922,7 @@ The inverted pair is ALSO a data error the author can fix, and the
 renderer drawing it ordered is exactly what hides it: the figure looks
 right and reads wrong. So `oku check` reports `chart-inverted-range`
 naming the row and the two fields, for box-plot, range-bar, histogram,
-gantt and candlestick. Equality passes throughout — a zero-width bin is
+gantt, candlestick and a bullet track's zones. Equality passes throughout — a zero-width bin is
 degenerate, not backwards, and a check that guesses at intent is one
 authors learn to ignore. Held by `test_chart_degenerate_payloads.py`,
 whose cases are derived from `kit/schema/examples.json` rather than

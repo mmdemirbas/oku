@@ -8899,11 +8899,16 @@ class OkuChart extends HTMLElement {
     if (yMin === yMax) { yMin -= 1; yMax += 1; }
     var xPad = (xMax - xMin) * 0.05;
     var yPad = (yMax - yMin) * 0.05;
+    // A log axis needs a positive domain of some width: the bounds come
+    // from the SMALLEST positive value (the first one put x=1 at
+    // -Infinity behind a 100), and an axis with nothing positive on it
+    // is drawn linear rather than as log(negative), which is NaN.
+    if (this._xScale === 'log' && !__okuLogDomainFits(xs)) this._xScale = 'linear';
+    if (this._yScale === 'log' && !__okuLogDomainFits(ys)) this._yScale = 'linear';
     if (this._xScale !== 'log') { xMin -= xPad; xMax += xPad; }
     if (this._yScale !== 'log') { yMin -= yPad; yMax += yPad; }
-    // Log scale requires positive values; clamp lower bound.
-    if (this._xScale === 'log' && xMin <= 0) xMin = Math.max(1e-6, xs.filter(function (v) { return v > 0; })[0] || 1e-6);
-    if (this._yScale === 'log' && yMin <= 0) yMin = Math.max(1e-6, ys.filter(function (v) { return v > 0; })[0] || 1e-6);
+    if (this._xScale === 'log') { var lx = __okuLogDomain(xs); xMin = lx[0]; xMax = lx[1]; }
+    if (this._yScale === 'log') { var ly = __okuLogDomain(ys); yMin = ly[0]; yMax = ly[1]; }
 
     this._W = 640; this._H = 360;
     // Quadrant charts need extra top/bottom padding so the corner
@@ -10507,7 +10512,8 @@ class OkuChart extends HTMLElement {
       parts.push('<rect x="' + pad.left + '" y="' + y + '" width="' + plotW + '" height="22" rx="3" class="okc-bullet-bg"/>');
       // Zone bands.
       (t.zones || []).forEach(function (z) {
-        var zx = sx(z.from), zw = sx(z.to) - sx(z.from);
+        var zs = markSpan(sx(z.from), sx(z.to), 0);
+        var zx = zs.start, zw = zs.size;
         parts.push('<rect x="' + zx + '" y="' + y + '" width="' + zw + '" height="22" fill="' + (palette[z.tone] || palette.muted) + '" fill-opacity="0.22" class="okc-bullet-zone"/>');
       });
       // Value bar — rich hover surfaces actual / target / max + zones.
@@ -10846,7 +10852,9 @@ class OkuChart extends HTMLElement {
 
   _renderTreemap() {
     var x = (this._extras && this._extras.treemap) || {};
-    var tree = (x.tree || []).slice().sort(function (a, b) { return (+b.value || 0) - (+a.value || 0); });
+    // A row of area zero has no rectangle to be; squarify divided by it.
+    var tree = (x.tree || []).filter(function (it) { return (+it.value || 0) > 0; })
+      .sort(function (a, b) { return (+b.value || 0) - (+a.value || 0); });
     if (!tree.length) return;
     var total = tree.reduce(function (s, it) { return s + Math.max(0, +it.value || 0); }, 0);
     if (total <= 0) return;
@@ -11982,7 +11990,9 @@ class OkuChart extends HTMLElement {
     var variance = values.reduce(function (s, v) { return s + (v - mean) * (v - mean); }, 0) / values.length;
     var stdev = Math.sqrt(variance) || 1;
     var bw = +x.bandwidth || 1.06 * stdev * Math.pow(values.length, -1 / 5);
-    var sampleCount = +x.sample_count || 100;
+    // Two samples at least: one is a division by zero in `step`, and none
+    // leaves the area path nothing to close on.
+    var sampleCount = Math.max(2, Math.round(+x.sample_count) || 100);
     var palette = __okuChartPalette;
     var color = palette[x.color] || palette.accent;
     var W = 640, H = this._title ? 320 : 280;
@@ -13698,8 +13708,10 @@ class OkuChart extends HTMLElement {
     var pad = { top: this._title ? 40 : 16, bottom: 56, left: 56, right: 56 };
     var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
     var maxVal = +rows[0].value || 1;
-    var barGap = 4;
-    var barW = (plotW - barGap * (rows.length + 1)) / rows.length;
+    // The gap shrinks with the cell, or past ~131 rows it ate the whole
+    // cell and the bar width went negative (see markSize).
+    var barGap = Math.min(4, plotW / rows.length / 4);
+    var barW = markSize((plotW - barGap * (rows.length + 1)) / rows.length);
     function barTop(v) { return pad.top + plotH - (v / maxVal) * plotH; }
     function cumY(p) { return pad.top + plotH - p * plotH; }
     var parts = [];
@@ -15590,6 +15602,18 @@ var MIN_MARK_PX = 0.5;
    `gap` is shared between the two sides, matching the `x + 0.5` /
    `width - 1` idiom this replaces, and is never allowed to eat more
    than half the span. */
+/* A log axis drawn over the positive values only, at least one decade
+   wide so a single value is not a domain of zero width. */
+function __okuLogDomainFits(vs) {
+  return vs.some(function (v) { return v > 0; });
+}
+function __okuLogDomain(vs) {
+  var pos = vs.filter(function (v) { return v > 0; });
+  var lo = Math.min.apply(null, pos), hi = Math.max.apply(null, pos);
+  if (!(hi > lo)) { lo = lo / Math.sqrt(10); hi = lo * 10; }
+  return [lo, hi];
+}
+
 function markSize(px) {
   return px > MIN_MARK_PX ? px : MIN_MARK_PX;
 }

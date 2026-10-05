@@ -3751,9 +3751,9 @@ def _chart_shape_issues(blk: dict) -> list[tuple[str, str]]:
                 "chart with type:geo requires a `regions` array of {id, value, label?}.",
             )
 
+    flipped: list[str] = []
     if ctype in _CHART_ORDERED_PAIRS:
         key, pairs = _CHART_ORDERED_PAIRS[ctype]
-        flipped: list[str] = []
         for i, row in enumerate(blk.get(key) or []):
             if not isinstance(row, dict):
                 continue
@@ -3762,17 +3762,25 @@ def _chart_shape_issues(blk: dict) -> list[tuple[str, str]]:
                 if isinstance(a, (int, float)) and isinstance(b, (int, float)) and a > b:
                     who = row.get("label") or row.get("date") or f"{key}[{i}]"
                     flipped.append(f"{who}: {lower} {a} is above {upper} {b}")
-        if flipped:
-            # One line per offending row would bury the page report under a
-            # 900-bin histogram; the first two say what the mistake is and
-            # the count says how far it goes.
-            more = f" (+{len(flipped) - 2} more)" if len(flipped) > 2 else ""
-            bad(
-                "chart-inverted-range",
-                f"chart with type:{ctype} has a range written the wrong way round — "
-                f"{'; '.join(flipped[:2])}{more}. The kit draws the pair in order, "
-                "so the figure looks right and reads wrong.",
-            )
+    elif ctype == "bullet":
+        # A bullet's pairs sit one level down, in each track's zones.
+        for i, track in enumerate(blk.get("tracks") or []):
+            for j, zone in enumerate((track.get("zones") or []) if isinstance(track, dict) else []):
+                a, b = (zone.get("from"), zone.get("to")) if isinstance(zone, dict) else (None, None)
+                if isinstance(a, (int, float)) and isinstance(b, (int, float)) and a > b:
+                    who = track.get("label") or f"tracks[{i}]"
+                    flipped.append(f"{who} zones[{j}]: from {a} is above to {b}")
+    if flipped:
+        # One line per offending row would bury the page report under a
+        # 900-bin histogram; the first two say what the mistake is and
+        # the count says how far it goes.
+        more = f" (+{len(flipped) - 2} more)" if len(flipped) > 2 else ""
+        bad(
+            "chart-inverted-range",
+            f"chart with type:{ctype} has a range written the wrong way round — "
+            f"{'; '.join(flipped[:2])}{more}. The kit draws the pair in order, "
+            "so the figure looks right and reads wrong.",
+        )
     return out
 
 
