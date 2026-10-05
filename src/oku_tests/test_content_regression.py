@@ -486,7 +486,7 @@ class TestChromeKitMarkers:
     # edge, so nothing in it moves — and that is measured rather than
     # asserted: test_page_rail compares every mark's x, width and top and
     # the boxes of the section name and the percentage across states.
-    _NOT_CONTENT = ("::after", "::before", "-marker", "-thumb", ".okc-slice", ".okt-rail")
+    _NOT_CONTENT = ("::after", "::before", "-marker", "-thumb", ".okt-rail")
 
     def test_no_hover_rule_moves_the_content_under_the_pointer(self, repo_root: Path) -> None:
         """A card answers the pointer with light, never with position.

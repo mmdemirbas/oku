@@ -662,8 +662,9 @@ border-*width*, font-size — is the defect, not the effect. Border
 `:hover` rule in the stylesheet, so a new primitive reaching for
 translateY fails on the day it is written; `_NOT_CONTENT` there is the
 list of genuine exceptions (a marker dot growing about its own centre,
-a `::after` arrow, the sidebar tab thumbs, a donut slice responding
-under the pointer that put it there). The geometry itself is pinned in
+a `::after` arrow, the sidebar tab thumbs). A donut slice used to be
+on that list and was the defect: its scale moved the ring's inner edge
+out from under a resting pointer, and the reading blinked. The geometry itself is pinned in
 `test_hovering_a_card_does_not_move_what_is_written_on_it`, to the
 pixel — a tolerance is what a 2px nudge hides in.
 
