@@ -7141,10 +7141,13 @@ def cmd_build(args: argparse.Namespace) -> int:
     if not getattr(args, "no_vendor", False) and not vendor_is_complete():
         print("  fetching mermaid + Prism once so pages render offline …")
         fetched, _ = fetch_vendor(quiet=True)
-        if fetched:
+        note = _vendor_incomplete_note()
+        if fetched and not note:
             print(f"  ✓ vendored {fetched} file(s) into {vendor_dir()}")
+        elif fetched:
+            print(f"  ! vendored {fetched} file(s), incomplete — {note} (run `oku vendor` to retry)")
         else:
-            print("  ! could not vendor — pages will use the CDN (run `oku vendor` later)")
+            print(f"  ! could not vendor — {note} (run `oku vendor` later)")
     # Single walk + parse — every downstream consumer (iter_page_stubs,
     # check, manifest, markdown twins, llms.txt) accepts a pre-computed
     # pages list. Avoids ~5 redundant rglob-parse passes over the tree.
@@ -8472,18 +8475,25 @@ def cmd_vendor(args: argparse.Namespace) -> int:
         fetched += len(extra)
     total = sum(f.stat().st_size for f in root.rglob("*") if f.is_file()) if root.exists() else 0
     print(f"✓ vendor: {fetched} fetched, {skipped} already present — {total / 1_000_000:.1f} MB in {root}")
-    if not vendor_is_complete():
-        # Two different fallbacks, so the line says which one applies.
-        # mermaid and Prism have a CDN behind them; the fonts do not, by
-        # design — reaching a font host is the defect vendoring them
-        # fixed, so their absence is a typeface change, not a slow page.
-        missing_fonts = not vendor_fonts_present()
-        note = "pages fall back to the CDN for whatever is missing"
-        if missing_fonts:
-            note += "; without the fonts, pages render in the system stack"
+    note = _vendor_incomplete_note()
+    if note:
         print(f"  ! incomplete — {note}", file=sys.stderr)
         return 1
     return 0
+
+
+def _vendor_incomplete_note() -> str | None:
+    """What a reader loses while the vendor directory is incomplete, or
+    None when it is whole. Two different fallbacks, so the line says which
+    one applies: mermaid and Prism have a CDN behind them; the fonts do
+    not, by design — reaching a font host is the defect vendoring them
+    fixed, so their absence is a typeface change, not a slow page."""
+    if vendor_is_complete():
+        return None
+    note = "pages fall back to the CDN for whatever is missing"
+    if not vendor_fonts_present():
+        note += "; without the fonts, pages render in the system stack"
+    return note
 
 
 _examples_cache: dict | None = None
