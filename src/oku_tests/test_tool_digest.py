@@ -25,6 +25,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from oku import cli
 
 
@@ -153,3 +155,51 @@ def test_the_vendor_cache_does_not_move_the_digest(tmp_path, monkeypatch) -> Non
     (fake / "vendor" / "prism" / "prism.min.js").write_text("// also fetched\n")
 
     assert cli._tool_digest() == before, "vendoring changed the digest"
+
+
+# The docstring says "everything the wheel ships" and the wheel's RECORD
+# also carries prism_catalog.json, templates/ and __init__.py beside
+# cli.py. None of them reached the digest, so ./ctl deploy's staleness
+# gate could not see a change to the catalog `oku check` answers from or
+# to the starter `oku init` copies.
+@pytest.mark.parametrize("shipped", ["prism_catalog.json", "templates/starter.md", "__init__.py"])
+def test_a_change_to_any_shipped_package_file_moves_the_digest(tmp_path, shipped: str) -> None:
+    pkg_root = Path(cli.__file__).resolve().parent
+    assets = cli._kit_assets_dir()
+
+    def digest_of(where: Path) -> str:
+        out = subprocess.run(
+            [sys.executable, "-c", "from oku.cli import _tool_digest; print(_tool_digest())"],
+            capture_output=True,
+            text=True,
+            env={"PYTHONPATH": str(where.parent), "PATH": ""},
+            cwd=str(where.parent),
+        )
+        assert out.returncode == 0, out.stderr
+        return out.stdout.strip()
+
+    for name in ("a", "b"):
+        dest = tmp_path / name / "oku"
+        dest.parent.mkdir()
+        shutil.copytree(pkg_root, dest, ignore=shutil.ignore_patterns("__pycache__", "assets"))
+        (dest / "assets").symlink_to(assets, target_is_directory=True)
+
+    edited = tmp_path / "b" / "oku" / shipped
+    edited.write_text(edited.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+    assert digest_of(tmp_path / "a" / "oku") != digest_of(tmp_path / "b" / "oku"), (
+        f"{shipped} is not in the digest"
+    )
+
+
+def test_a_directory_named_vendor_above_the_kit_does_not_empty_the_digest(tmp_path, monkeypatch) -> None:
+    # The vendor exclusion tested the ABSOLUTE path's parts, so a checkout
+    # or tool living anywhere under a directory called `vendor` dropped
+    # every asset from the digest.
+    fake = tmp_path / "vendor" / "assets"
+    fake.mkdir(parents=True)
+    (fake / "chrome.js").write_text("var __okuKitBuild = '2026-01-01';\n")
+    monkeypatch.setattr(cli, "_kit_assets_dir", lambda: fake)
+    before = cli._tool_digest()
+    (fake / "chrome.js").write_text("var __okuKitBuild = '2026-01-02';\n")
+    assert cli._tool_digest() != before
