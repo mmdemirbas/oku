@@ -125,3 +125,17 @@ def test_a_file_with_no_grammar_stays_plain_text(page) -> None:
     got = page.evaluate(CARD)
     assert got["tokens"] == 0, got
     assert got["text"].rstrip("\n") == "def is a word here\nnot code", got
+
+
+def test_the_window_ends_at_the_files_last_line(page) -> None:
+    """A file ends with a newline; that is not one more line.
+
+    The window split the text on newlines and showed the empty string
+    after the last one as a numbered row — row 9 of an 8-line file — while
+    the viewer and the card's own `{n} lines` both said 8.
+    """
+    _hover(page, "tool.py:3")
+    ns = page.evaluate(
+        "() => [...document.querySelectorAll('.oku-tooltip .okt-fp-card-row')].map(r => +r.dataset.n)"
+    )
+    assert ns and ns[-1] == len(TOOL.rstrip("\n").split("\n")), ns
