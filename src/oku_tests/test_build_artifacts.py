@@ -685,7 +685,13 @@ class TestPayloadBudget:
     # file references that name a line (the suffix rule, the card's row
     # window, marking and revealing the line, the editor link's line).
     # 6,052 bytes measured against 97d6549, 1,440 of them the capsule.
-    KIT_BUDGET_BYTES = 1_430_000
+    # Then from 1,430,000 by the bug-hunt fixes: the viewer's allow-list,
+    # the parsed-then-confined stylesheet, the safe-URL probe, the page
+    # collator and number reader, one shared bar Escape listener, the log
+    # domain and the NaN guards, and the comments saying what each
+    # closed. 5,363 bytes measured against c0f801c, net of the 300-byte
+    # lowercase map the fold made redundant.
+    KIT_BUDGET_BYTES = 1_440_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
