@@ -554,3 +554,102 @@ class TestFigureRestatesHeadings:
             "```mermaid\nflowchart LR\n  A[Plan] --> B[Execute]\n```\n"
         )
         assert "figure-restates-headings" not in _codes(_issues(tmp_path, md))
+
+
+class TestDiagramSyntax:
+    """Three mermaid traps that pass every check and fail in the browser.
+
+    A sweep of 49 project doc trees found four diagrams in three projects
+    that drew nothing — two sequence diagrams with a `;` in a note, two
+    route maps with a node labelled `/giris` — and `oku verify` was the
+    only thing that said so, after the build. A third trap fails with no
+    error at all: mermaid ends sequence and timeline text at a bare `#`,
+    so `issue #12 fixed` draws as `issue`.
+
+    Every case below was measured against the vendored mermaid in
+    Chromium (kit r115); the check reports exactly the rows that failed.
+    """
+
+    FAILS = [
+        ("slash", "flowchart LR\n  D --> G[/giris]"),
+        ("slash", "flowchart LR\n  D --> G[\\giris]"),
+        ("slash", "flowchart LR\n  D --> G[/a/b]"),
+        ("slash", "graph TD\n  D --> G[/giris]"),
+        ("slash", "flowchart LR\n  subgraph S[/api]\n  A\n  end"),
+        ("semicolon", "sequenceDiagram\n  participant A\n  Note over A: x; y z"),
+        ("semicolon", "sequenceDiagram\n  A->>B: hello; world"),
+        ("semicolon", "sequenceDiagram\n  participant A as x; y"),
+        ("semicolon", "sequenceDiagram\n  loop every 5s; retry\n  A->>B: hi\n  end"),
+        ("semicolon", "sequenceDiagram\n  A->>B: x; A->>B"),
+        ("semicolon", "timeline\n  2026 : a; b"),
+        ("semicolon", "timeline\n  2026 : a; 2027 : b"),
+        ("semicolon", "timeline\n  2026 : a;"),
+        ("semicolon", "timeline\n  section a; b\n  2026 : a"),
+        ("hash", "sequenceDiagram\n  A->>B: issue #12 fixed"),
+        ("hash", "sequenceDiagram\n  participant A\n  Note over A: step #2 of 3"),
+        ("hash", "sequenceDiagram\n  title Run #3\n  A->>B: hi"),
+        ("hash", "timeline\n  2026 : issue #12"),
+    ]
+
+    DRAWS = [
+        "flowchart LR\n  D --> G[/giris/]",
+        "flowchart LR\n  D --> G[/giris\\]",
+        "flowchart LR\n  D --> G[\\giris/]",
+        'flowchart LR\n  D --> G["/giris"]',
+        "flowchart LR\n  D --> G[/a/b/]",
+        "flowchart LR\n  A[x; y] --> B",
+        "flowchart LR\n  A --> B; B --> C",
+        "flowchart LR\n  A -->|/giris| B",
+        "flowchart LR\n  A --> G(/giris)",
+        "flowchart LR\n  A --> G{/giris}",
+        "flowchart LR\n  A --> G[[/giris]]",
+        "flowchart LR\n  A[issue #12] --> B",
+        "sequenceDiagram\n  A->>B: hi; B->>A: yo",
+        "sequenceDiagram\n  A->>B: hello#59; world",
+        "sequenceDiagram\n  A->>B: hello;",
+        "sequenceDiagram\n  participant A\n  A->>A: x; Note over A: y",
+        "sequenceDiagram\n  loop retry; A->>B: hi\n  end",
+        "sequenceDiagram\n  A->>B: issue #35;12 fixed",
+        "sequenceDiagram\n  participant A as x#59; y\n  A->>A: hi",
+        "sequenceDiagram\n  %% a; b #c\n  A->>B: hi",
+        '%%{init: {"themeVariables":{"primaryColor":"#ffffff"}}}%%\nsequenceDiagram\n  A->>B: hi',
+        "timeline\n  2026 : a, b",
+        "timeline\n  2026 : a#59; b",
+        "classDiagram\n  class A {\n    +go(a; b)\n  }",
+        "stateDiagram-v2\n  A --> B: x; y",
+        'erDiagram\n  A ||--o{ B : "x; y"',
+        "gantt\n  dateFormat YYYY-MM-DD\n  section S\n  a; b :t1, 2026-01-01, 3d",
+    ]
+
+    @pytest.mark.parametrize(("trap", "src"), FAILS)
+    def test_a_line_mermaid_cannot_read_is_reported(self, tmp_path, trap, src):
+        hits = [i for i in _issues(tmp_path, _diagram(src)) if i["code"] == "diagram-syntax"]
+        assert len(hits) == 1, hits
+        assert hits[0]["severity"] == "warning"
+        assert "diagram" in hits[0]["where"]
+
+    @pytest.mark.parametrize("src", DRAWS)
+    def test_a_diagram_that_draws_is_not_reported(self, tmp_path, src):
+        assert "diagram-syntax" not in _codes(_issues(tmp_path, _diagram(src)))
+
+    @pytest.mark.parametrize(
+        ("src", "names"),
+        [
+            ("flowchart LR\n  D --> G[/giris]", ['G["/giris"]', "/]"]),
+            ("sequenceDiagram\n  A->>B: hello; world", ["#59;"]),
+            ("sequenceDiagram\n  A->>B: issue #12 fixed", ["#35;", "issue"]),
+        ],
+    )
+    def test_the_message_names_the_line_and_the_spelling_that_draws(self, tmp_path, src, names):
+        """A warning that only says "this will not parse" leaves the author
+        to rediscover what this file measured."""
+        msg = [i for i in _issues(tmp_path, _diagram(src)) if i["code"] == "diagram-syntax"][0]["message"]
+        assert src.splitlines()[-1].strip()[:20] in msg, msg
+        for name in names:
+            assert name in msg, msg
+
+    def test_two_traps_in_one_diagram_are_two_reports(self, tmp_path):
+        """Each has its own fix, so each gets its own line."""
+        src = "sequenceDiagram\n  A->>B: hello; world\n  A->>B: issue #12"
+        hits = [i for i in _issues(tmp_path, _diagram(src)) if i["code"] == "diagram-syntax"]
+        assert len(hits) == 2, hits
