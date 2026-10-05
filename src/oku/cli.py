@@ -8924,6 +8924,26 @@ _VERIFY_PROBE = """() => {
 }"""
 
 
+class _VerifySiteHandler(http.server.SimpleHTTPRequestHandler):
+    """Serves dist/site to the browser `oku verify` drives.
+
+    Quiet in both ways the serve handler is: a verify run reports
+    findings, not a request log, and a request the browser abandons (a
+    navigation, a media range it no longer wants) is a disconnect rather
+    than a finding — left to socketserver, each one printed a traceback in
+    the middle of a clean report.
+    """
+
+    def log_message(self, *args):  # noqa: A003 - stdlib hook name
+        pass
+
+    def handle(self) -> None:
+        try:
+            super().handle()
+        except (ConnectionResetError, BrokenPipeError):
+            pass
+
+
 def cmd_verify(args: argparse.Namespace) -> int:
     """`oku verify` — open the built pages and report what a linter cannot see.
 
@@ -9041,11 +9061,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
             import http.server
             import threading
 
-            class _QuietHandler(http.server.SimpleHTTPRequestHandler):
-                def log_message(self, *args):  # noqa: A003 - stdlib hook name
-                    pass  # a verify run reports findings, not a request log
-
-            handler = functools.partial(_QuietHandler, directory=str(site_dir))
+            handler = functools.partial(_VerifySiteHandler, directory=str(site_dir))
             httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
             threading.Thread(target=httpd.serve_forever, daemon=True).start()
             base = f"http://127.0.0.1:{httpd.server_address[1]}"
