@@ -1214,6 +1214,23 @@ kind now opens in the one viewer (`__okuMdViewer`), which fills the
 frame, shows the full path with a copy button, offers a new tab, and
 keeps a trail.
 
+**A markdown file in the viewer uses the frame it is given.** The
+frame is the whole screen and the file sits in the page's reading
+column, so a wide screen left a band of nothing either side — 262px a
+side at 1440, about 500 at 1920, which a reader called a block in the
+middle with wasted space around it. The column is a rule, so the prose
+was not widened. The file's own `h2`/`h3` go in the left gutter as a
+sticky list that marks the section being read and jumps on a click,
+without touching the page's address; it is drawn only where it fits
+beside the column (`fitContents` MEASURES the room, because the window,
+the width stop and the text scale all decide it) and not at all where it
+does not, never over the text. And the bar carries the width stops,
+because the presentation menu is under the overlay — the PAGE's setting
+through `setContentWidth`, not a second one, hidden below 820px where
+all three stops draw the same column. Max gives every track to the text
+and the list goes with it. Held by
+`browser/test_viewer_contents_and_width.py`.
+
 **Nesting lives in the viewer, not in the lightbox.** The lightbox
 holds one thing: `open()` while open empties the holder and overwrites
 `currentOpts`, so the first item's `onClose` never runs. The viewer

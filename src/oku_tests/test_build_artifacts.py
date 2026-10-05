@@ -691,7 +691,10 @@ class TestPayloadBudget:
     # domain and the NaN guards, and the comments saying what each
     # closed. 5,363 bytes measured against c0f801c, net of the 300-byte
     # lowercase map the fold made redundant.
-    KIT_BUDGET_BYTES = 1_440_000
+    # Then from 1,440,000 by the hover card colouring its code and the
+    # viewer's contents list and width stops: 1,445,177 measured with
+    # both in, most of it the reasoning.
+    KIT_BUDGET_BYTES = 1_446_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -703,7 +706,8 @@ class TestPayloadBudget:
     # Raised from 1,434,000 by the hover card colouring its code the way
     # the viewer does, and the reading-face rules naming prose before the
     # first section: the page measured 1,436,529 with both in.
-    STANDALONE_BUDGET_BYTES = 1_437_000
+    # Then by the viewer's contents list and width stops: 1,445,757.
+    STANDALONE_BUDGET_BYTES = 1_446_500
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

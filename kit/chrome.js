@@ -1310,6 +1310,14 @@ var ICON_CARET = '<svg class="okt-caret" viewBox="0 0 24 24" fill="none" stroke=
 var ICON_BACK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>';
 var ICON_EXTERNAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
 
+/* The three column-width stops, drawn as what they do: lines of text at
+   three lengths inside one frame. */
+var ICON_WIDTH = {
+  narrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9.5 9h5M9.5 12h5M9.5 15h5"/></svg>',
+  comfortable: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7.5 9h9M7.5 12h9M7.5 15h9"/></svg>',
+  max: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M6 9h12M6 12h12M6 15h12"/></svg>'
+};
+
 var __okuMdViewer = (function () {
   // Ids emitted by the viewed file are prefixed with this. They land in
   // the same document as the page's own ids, and a viewed file whose
@@ -1406,7 +1414,14 @@ var __okuMdViewer = (function () {
     where.appendChild(el('span', 'okt-viewer-meta'));
     wrap.appendChild(where);
 
-    wrap.appendChild(el('div', 'okt-mdview-body'));
+    var body = el('div', 'okt-mdview-body');
+    var spying = false;
+    body.addEventListener('scroll', function () {
+      if (spying) return;
+      spying = true;
+      requestAnimationFrame(function () { spying = false; spyContents(current()); });
+    }, { passive: true });
+    wrap.appendChild(body);
     wrap.addEventListener('click', onClick);
     wrap.addEventListener('keydown', onKey);
     return wrap;
@@ -1432,6 +1447,17 @@ var __okuMdViewer = (function () {
     if (crumb) { go(+crumb.getAttribute('data-at')); return; }
     var view = t.closest('.okt-mdview-view');
     if (view) { setView(current(), view.getAttribute('data-view')); return; }
+    var stop = t.closest('.okt-mdview-width');
+    if (stop) { setContentWidth(stop.getAttribute('data-width')); return; }
+    var entry = t.closest('.okt-viewer-toc a');
+    if (entry) {
+      // The heading is in this file, not on the page: the page's address
+      // keeps its own fragment.
+      e.preventDefault();
+      e.stopPropagation();
+      jumpTo(current(), +entry.getAttribute('data-i'));
+      return;
+    }
     var copy = t.closest('.okt-mdview-copy');
     if (copy) { copyText(current().text || '', copy); return; }
     var cp = t.closest('.okt-viewer-copypath');
@@ -1590,6 +1616,18 @@ var __okuMdViewer = (function () {
         group.appendChild(b);
       });
       box.appendChild(group);
+      // The page's column width, here because the presentation menu is
+      // under the overlay. It is the page's setting and not a copy of it,
+      // so the page the reader returns to is the width they chose here.
+      var widths = el('div', 'okt-view-group okt-mdview-widths');
+      widths.setAttribute('role', 'group');
+      widths.setAttribute('aria-label', menuWord('Column width'));
+      WIDTH_MODES.forEach(function (m) {
+        var b = iconButton('okt-view-btn okt-mdview-width', ICON_WIDTH[m], menuWord(m.charAt(0).toUpperCase() + m.slice(1)));
+        b.setAttribute('data-width', m);
+        widths.appendChild(b);
+      });
+      box.appendChild(widths);
       var copy = el('button', 'okt-mdview-copy');
       copy.type = 'button';
       copy.title = okuT('Copy the source');
@@ -1610,8 +1648,107 @@ var __okuMdViewer = (function () {
     }
     var abs = where(item).abs;
     if (abs) box.appendChild(editorControl(abs, item.line));
+    syncWidths(box);
     return box;
   }
+
+  function syncWidths(root) {
+    var now = contentWidth();
+    root.querySelectorAll('.okt-mdview-width').forEach(function (b) {
+      var on = b.getAttribute('data-width') === now;
+      b.setAttribute('aria-pressed', String(on));
+      b.classList.toggle('active', on);
+    });
+  }
+
+  /* The file's own headings, in the gutter beside its column. The frame
+     is the whole screen and the column is the page's reading measure, so
+     a wide screen leaves a band of nothing either side of the text; this
+     is what goes in the left one. Built per file, so a file the reader
+     goes back to keeps its own list. Two headings at least: one is not
+     something to navigate. */
+  function buildContents(item) {
+    var host = item.node.querySelector('.okt-mdview-rendered');
+    var heads = Array.prototype.slice.call(host.querySelectorAll(':scope > section > :is(h2, h3)'));
+    if (heads.length < 2) return;
+    var nav = el('nav', 'okt-viewer-toc');
+    nav.setAttribute('aria-label', okuT('Contents'));
+    var list = el('ol');
+    heads.forEach(function (h, i) {
+      var copy = h.cloneNode(true);
+      copy.querySelectorAll('[aria-hidden="true"]').forEach(function (n) { n.remove(); });
+      var a = el('a', null, copy.textContent.trim());
+      if (h.id) a.href = '#' + h.id;
+      a.setAttribute('data-i', String(i));
+      var li = el('li', h.tagName === 'H3' ? 'okt-viewer-toc-sub' : null);
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+    nav.appendChild(list);
+    item.node.insertBefore(nav, item.node.firstChild);
+    item.toc = { nav: nav, heads: heads, links: nav.querySelectorAll('a'), at: -1 };
+  }
+
+  /* Drawn only where it fits beside the column, never over it. Measured
+     rather than set by breakpoint, because the room depends on three
+     things the reader sets: the window, the width stop and the text
+     scale. Max gives the gutter to the text, and the list goes with it. */
+  function fitContents(item) {
+    if (!item || !item.toc || !item.node.isConnected) return;
+    var rendered = item.node.querySelector('.okt-mdview-rendered');
+    var room = rendered.getBoundingClientRect().left - item.node.getBoundingClientRect().left;
+    item.node.setAttribute('data-toc', room >= TOC_MIN_ROOM ? 'on' : 'off');
+    // Its own scroll once it is taller than the frame. In the body's own
+    // units: the body is zoomed by the text scale, and a rect is not.
+    var body = state.wrap.querySelector('.okt-mdview-body');
+    var z = body.getBoundingClientRect().height / (body.offsetHeight || 1) || 1;
+    item.toc.nav.style.maxHeight = Math.max(120, body.clientHeight - 56 / z) + 'px';
+  }
+  var TOC_MIN_ROOM = 200;
+
+  /* The section being read is the last heading at or above the top of
+     the frame; before the first heading, the first. */
+  function spyContents(item) {
+    if (!item || !item.toc || item.node.getAttribute('data-toc') !== 'on') return;
+    var top = state.wrap.querySelector('.okt-mdview-body').getBoundingClientRect().top + 24;
+    var at = 0;
+    for (var i = 0; i < item.toc.heads.length; i++) {
+      if (item.toc.heads[i].getBoundingClientRect().top <= top) at = i;
+      else break;
+    }
+    if (at === item.toc.at) return;
+    item.toc.at = at;
+    item.toc.links.forEach(function (a, i) {
+      if (i === at) a.setAttribute('aria-current', 'true');
+      else a.removeAttribute('aria-current');
+    });
+    // Keep the marked entry in view inside the list, by arithmetic on the
+    // list's own scroll: scrollIntoView would move the frame too.
+    var nav = item.toc.nav;
+    var link = item.toc.links[at];
+    var lt = link.offsetTop - nav.offsetTop;
+    if (lt < nav.scrollTop || lt + link.offsetHeight > nav.scrollTop + nav.clientHeight) {
+      nav.scrollTop = Math.max(0, lt - nav.clientHeight / 3);
+    }
+  }
+
+  function jumpTo(item, i) {
+    if (!item || !item.toc || !item.toc.heads[i]) return;
+    var body = state.wrap.querySelector('.okt-mdview-body');
+    var z = body.getBoundingClientRect().height / (body.offsetHeight || 1) || 1;
+    var delta = item.toc.heads[i].getBoundingClientRect().top - body.getBoundingClientRect().top;
+    body.scrollTop += delta / z - 12;
+    spyContents(item);
+  }
+
+  ['oku:content-width-changed', 'oku:text-scale-changed', 'resize'].forEach(function (ev) {
+    window.addEventListener(ev, function () {
+      if (!isOpen()) return;
+      syncWidths(state.wrap);
+      fitContents(current());
+      spyContents(current());
+    });
+  });
 
   /* The path line and the actions both depend on WHERE the file is, and
      under `oku serve` that is known only once the manifest has arrived —
@@ -1679,6 +1816,8 @@ var __okuMdViewer = (function () {
     }
     body.scrollTop = item.scroll || 0;
     mirror(item);
+    fitContents(item);
+    spyContents(item);
     var lb = state.wrap.closest('.okt-lightbox');
     if (lb) lb.setAttribute('aria-label', item.rel || item.path);
   }
@@ -1880,6 +2019,9 @@ var __okuMdViewer = (function () {
     // rebuild the TOC or the rail: the viewed file's headings belong to
     // the file, not to the page the reader is on.
     if (typeof initReadingAids === 'function') initReadingAids();
+    buildContents(item);
+    fitContents(item);
+    spyContents(item);
   }
 
   /* Say where something was removed. An author whose island stopped

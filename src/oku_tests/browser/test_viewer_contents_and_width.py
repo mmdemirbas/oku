@@ -204,3 +204,19 @@ def test_a_code_file_has_no_width_control(browser, built) -> None:
         assert page.evaluate(GEO)["widths"] == []
     finally:
         context.close()
+
+
+def test_on_a_phone_the_bar_still_fits(browser, built) -> None:
+    """Below the narrow stop every stop draws the same column, so the
+    control is not offered; offered, it pushed the bar 65px past a 360px
+    screen."""
+    context, page = _open(browser, built, "long.md", width=360, height=740)
+    try:
+        got = page.evaluate(
+            """() => { const bar = document.querySelector('.okt-mdview-bar');
+                 return { over: bar.scrollWidth - bar.clientWidth,
+                          widths: getComputedStyle(document.querySelector('.okt-mdview-widths')).display }; }"""
+        )
+        assert got == {"over": 0, "widths": "none"}, got
+    finally:
+        context.close()
