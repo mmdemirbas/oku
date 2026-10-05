@@ -7508,6 +7508,19 @@ def _make_serve_handler(root: Path, *, local_only: bool = True):
             except (ConnectionResetError, BrokenPipeError):
                 pass
 
+        def parse_request(self) -> bool:
+            # A loopback bind keeps other machines out and does nothing
+            # about other origins: a page open elsewhere can point a name
+            # of its own at 127.0.0.1 (DNS rebinding) and read the working
+            # copy same-origin. The browser writes Host from the URL, so a
+            # rebound request names the attacker's host and is refused.
+            if not super().parse_request():
+                return False
+            if local_only and not _host_header_is_loopback(self.headers.get("Host")):
+                self.send_error(403, "Host is not a loopback name")
+                return False
+            return True
+
         def do_GET(self) -> None:  # noqa: N802 — base API
             if self.path == "/__reload":
                 self._serve_reload_stream()
@@ -7861,6 +7874,23 @@ def _is_loopback(host: str) -> bool:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return host == "localhost"
+
+
+def _host_header_is_loopback(value: str | None) -> bool:
+    """Whether a request's Host header names this machine.
+
+    An absent header passes: a browser always sends one, so only a
+    non-browser client omits it, and that client is not the rebinding
+    threat this guards against.
+    """
+    if value is None:
+        return True
+    host = value.strip().lower()
+    if host.startswith("["):
+        host = host[1 : host.find("]")] if "]" in host else host
+    elif host.count(":") == 1:
+        host = host.split(":", 1)[0]
+    return _is_loopback(host)
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
