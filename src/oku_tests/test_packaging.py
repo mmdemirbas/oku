@@ -297,3 +297,20 @@ def test_the_npx_fallback_runs_a_pinned_pagefind(repo_root: Path, monkeypatch, t
     lock = (repo_root / "uv.lock").read_text(encoding="utf-8")
     locked = re.search(r'name = "pagefind"\nversion = "([^"]+)"', lock).group(1)
     assert pinned[0] == f"pagefind@{locked}"
+
+
+# The skill is loaded by every session in every project, so an
+# instruction in it is the tool's behaviour as far as those sessions are
+# concerned. It said to run `oku check` "from the repo root
+# (`~/dev/mmdemirbas/oku`)": a session in another project then checked
+# the kit's own docs, got a pass, and never read its own page.
+def test_the_skill_never_sends_a_check_to_the_kit_repository(repo_root: Path) -> None:
+    skill = (repo_root / "skill" / "SKILL.md").read_text(encoding="utf-8")
+    assert "~/dev/mmdemirbas/oku`)" not in skill
+    # The instruction shape, not the phrase: the skill rightly warns
+    # AGAINST running `oku init` from a project root.
+    told = re.findall(r"oku (?:check|build)[^.]{0,80}from the (?:repo|project) root", skill)
+    assert told == [], told
+    # And the case that started this: verify unable to run is reported
+    # as such, with its fix, rather than skipped in silence.
+    assert "./ctl deploy" in skill

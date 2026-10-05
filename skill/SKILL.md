@@ -28,7 +28,7 @@ down.
 ## Design principles — apply to content, not just visual style
 
 `~/.claude/rules/design-principles.md` and `teaching-order.md` are
-loaded every session and carry the four principles, the three layers and
+loaded every session and carry the principles, the three layers and
 the catalog-vs-teaching decision in full; restating them here costs
 tokens on every invocation for what is already in context.
 
@@ -45,17 +45,21 @@ Two things are specific to this skill and are NOT in those files:
 
 ## Verify after every page edit — non-negotiable
 
-After ANY edit to a `docs/*.md` page source (or any kit schema), run:
+After ANY edit to a page source, run:
 
 ```bash
 oku check
 ```
 
-— from the repo root (`~/dev/mmdemirbas/oku`). `oku check` validates
-every page against
-`kit/schema/page.schema.json` and runs the structural / content lint.
-Exit code is the only signal that matters; parse the output for the
-offending file + path when non-zero.
+— from the directory that holds the pages: the docs root you ran
+`oku init` in (typically `docs/`). `oku check` checks the tree it is
+run in. Run from the oku repository it checks the kit's own docs and
+passes without reading your page; run from a project root it also
+checks, and `oku build` there also publishes, every README, CLAUDE.md
+and note in the repository. It validates every page against the kit's
+page schema and runs the structural / content lint. Exit code is the
+only signal that matters; parse the output for the offending file +
+path when non-zero.
 
 This applies to:
 
@@ -463,7 +467,7 @@ installed wheel. From any other project, `oku spec` is the source.
 A block-level HTML tag at column 0 passes through to the DOM untouched —
 custom elements, `<script>` and `<style>` included. Full capability, no
 restrictions. Reach for it only after checking that no primitive covers
-the relationship you are showing; `oku spec` lists all 68.
+the relationship you are showing; `oku spec` lists every one.
 
 **Colours come from the kit, never from a hex literal.** `var(--accent)`,
 `var(--surface)`, `--series-1..10` for an island; `.okt-diag-node` /
@@ -570,9 +574,10 @@ What the linter cannot decide, and you still have to:
 
 **Automated (every artifact — run this first):**
 
-Run `oku check --strict` from the project root. It validates every typed
-fence payload against the schema and runs 65 structural and content
-checks, and it names each finding with `file:line`, the offending value
+Run `oku check --strict` from the docs root (the directory you ran
+`oku init` in). It validates every typed fence payload against the
+schema and runs the structural and content checks, and it names each
+finding with `file:line`, the offending value
 and — for anything it can compute — the fix. Read what it prints rather
 than working from a list here: a catalogue in this file goes stale
 against the tool independently, and the tool is the one that is right.
@@ -596,11 +601,17 @@ there the warning is right and the sentence is the thing to fix.
 oku build && oku verify
 ```
 
-`oku verify` opens every built page at 1440px and 360px and reports what
-reading the source cannot: a diagram that failed to draw, a figure that
-rendered an empty box, sideways scroll, a console or page error. That
-last class is the one that matters most — a wrong-but-valid payload
-validates clean and draws nothing, and no source check reaches it.
+`oku verify` opens every built page and reports what reading the source
+cannot: a diagram that failed to draw, a figure that rendered an empty
+box, sideways scroll, a console or page error. That last class is the
+one that matters most — a wrong-but-valid payload validates clean and
+draws nothing, and no source check reaches it.
+
+If `oku verify` exits 2 saying playwright is missing, the globally
+installed tool is out of date — the machine is fine. Say so in the
+report, name the fix (`./ctl deploy` in the oku repository), and do not
+describe the page as verified. Checking the render another way is
+welcome; calling that `oku verify` is not.
 
 What is left for your eyes, because it needs judgement:
 
