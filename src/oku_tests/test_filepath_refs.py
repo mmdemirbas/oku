@@ -594,3 +594,18 @@ def test_a_code_span_naming_a_line_is_nudged_and_fixed(tmp_path):
         lambda t: cli.resolve_file_line(t, root / "docs" / "p.md")[1] == "ok",
     )
     assert "[`src/long.py:12`](#f/src/long.py:12)" in after and moved == ["src/long.py:12"], (after, moved)
+
+
+def test_fix_keeps_the_files_line_endings(tmp_path):
+    # VIII.2: read_text / write_text translate newlines, so a CRLF page
+    # came back LF on every line — the one change `--fix` names became a
+    # whole-file diff in the author's repository.
+    root = _project(tmp_path)
+    src = root / "docs" / "page.md"
+    src.write_bytes(b"---\r\ntitle: T\r\n---\r\n\r\n## S {#s}\r\n\r\nThe code is in `src/app.py`.\r\n")
+    issues = cli.check_pages([(src, cli._page_from_source_file(src))], root)
+    assert any(i["code"] == "path-in-code-span" for i in issues)
+    cli.apply_path_chip_fixes(issues, root)
+    after = src.read_bytes()
+    assert b"#f/src/app.py" in after
+    assert after.count(b"\r\n") == 7 and b"\n" not in after.replace(b"\r\n", b"")
