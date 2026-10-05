@@ -1295,19 +1295,39 @@ def _page_from_source_file(p: Path) -> dict | None:
         if not front_meta.get("title"):
             page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
     _apply_meta_defaults(page, p)
-    refs = collect_file_refs(page, p)
-    if refs:
-        meta = page.setdefault("m", {})
-        meta["_files"] = refs
-        more = collect_file_closure(refs, p)
-        if more:
-            meta["_files_more"] = more
-        # The page's own place in the project: the one fact the runtime
-        # needs to turn every `rel` above into a path on this machine.
-        try:
-            meta["_rel"] = p.resolve().relative_to(project_root_for(p.parent)).as_posix()
-        except ValueError:
-            pass
+    carry_file_refs(page, p)
+    return page
+
+
+def carry_file_refs(page: dict, p: Path) -> dict:
+    """Put the files this page's `#f/` references name into the page.
+
+    No delivery mode can fetch them when the reader clicks, so the bytes
+    travel in the page dict, which all three modes already carry. Every
+    page goes through here — a `.md` source as it is converted, a page
+    that is JSON on disk as it is read — because a JSON page that skipped
+    it rendered every chip with nothing behind it.
+
+    A v1 page writes a link as an inline object rather than as markdown,
+    so it is read through the v1 shim; its files go in `meta`, which the
+    shim (here and in renderer.js) carries over as `m` whole. Returns the
+    page for chaining; the dict is changed in place.
+    """
+    v1 = page.get("kind") == "page" and page.get("k") != "page"
+    refs = collect_file_refs(_v1_to_v2(page) if v1 else page, p)
+    if not refs:
+        return page
+    meta = page.setdefault("meta" if v1 else "m", {})
+    meta["_files"] = refs
+    more = collect_file_closure(refs, p)
+    if more:
+        meta["_files_more"] = more
+    # The page's own place in the project: the one fact the runtime
+    # needs to turn every `rel` above into a path on this machine.
+    try:
+        meta["_rel"] = p.resolve().relative_to(project_root_for(p.parent)).as_posix()
+    except ValueError:
+        pass
     return page
 
 
@@ -2268,7 +2288,7 @@ def find_json_pages(root: Path):
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             continue
         if _is_page(data):
-            pages.append((p, data))
+            pages.append((p, carry_file_refs(data, p)))
             real_json.add(p)
     # Also walk .md files — convert each into a synthesized page dict
     # via md_to_page. The "path" returned uses .json so consumers that
@@ -6239,10 +6259,12 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
             json_rel = json_sibling.relative_to(src_root)
             dest_json = out_dir / json_rel
             dest_json.parent.mkdir(parents=True, exist_ok=True)
-            if json_sibling.exists():
+            if json_sibling.exists() and not _page_meta(page).get("_files"):
                 shutil.copy(json_sibling, dest_json)
             else:
-                # Synthesized from .md — write the converted page dict.
+                # Synthesized from .md, or a JSON page carrying the files
+                # its #f/ references name — a copy of the file on disk
+                # would drop them. Write the page dict.
                 dest_json.write_text(
                     json.dumps(page, ensure_ascii=False, indent=2),
                     encoding="utf-8",
@@ -7947,7 +7969,21 @@ def _make_serve_handler(root: Path, *, local_only: bool = True):
             except (OSError, ValueError):
                 return False
             if fs.exists():
-                return False
+                # A page written as JSON leaves carrying the files its
+                # `#f/` references name, as a converted .md page does;
+                # anything else on disk is served as it is.
+                if not url_path.endswith(".json") or not fs.is_file():
+                    return False
+                try:
+                    page = json.loads(fs.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+                    return False
+                if not _is_page(page) or not _page_meta(carry_file_refs(page, fs)).get("_files"):
+                    return False
+                return self._send_bytes(
+                    json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8"),
+                    "application/json; charset=utf-8",
+                )
 
             source_path = None
             for cand in (_source_sibling(fs),):
@@ -8001,6 +8037,9 @@ def _make_serve_handler(root: Path, *, local_only: bool = True):
             else:
                 return False
 
+            return self._send_bytes(body, content_type)
+
+        def _send_bytes(self, body: bytes, content_type: str) -> bool:
             try:
                 self.send_response(200)
                 self.send_header("Content-Type", content_type)

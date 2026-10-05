@@ -1183,8 +1183,18 @@ result in `m._files`, keyed by the path AS AUTHORED — the same key the
 element carries and the runtime looks up, so the two cannot drift by
 disagreeing about how to normalise a path. `m._files` rides in the page
 dict, which is the one thing all three modes already carry, and it is
-computed at the ONE point a page dict is made, so serve, check and both
-build trees get it without three call sites to keep in step.
+computed by ONE function, `carry_file_refs`, so serve, check and both
+build trees get it without three call sites to keep in step. It is
+called where a page dict is made, and there are two such places: a `.md`
+source as it is converted, and a page that is JSON on disk as it is read
+(`find_json_pages`, and the serve handler for a `.json` request). Only
+the first called it once, so every chip in a JSON page rendered with
+nothing behind it in all three modes while `oku check` resolved the same
+references and said nothing; a v1 page is read through the shim, since
+it writes a link as an inline object, and its files go in `meta`, which
+the shim carries over as `m`. `dist/site` writes such a page as a dict
+rather than copying the file, and the file on disk is never rewritten.
+Held by `browser/test_json_page_carries_files.py`.
 
 Two consequences are decisions. **The project root is the fence**:
 nearest ancestor with `.git`, else with `kit.json`. Not the docs root —
