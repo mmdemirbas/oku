@@ -690,22 +690,21 @@ def cmd_init(args: argparse.Namespace) -> int:
                 title = data["title"]
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             pass
-    # Starter page — only when the directory holds no page source at
-    # all, so re-running init in a real docs tree never adds a stray
-    # index.md next to the pages that are already there.
+    # Starter page — only when the TREE holds no page at all, so
+    # re-running init in a real docs tree never adds a stray index.md.
+    # The tree, not this directory's own files: a docs root that keeps
+    # every page in subfolders is not empty. The manifest is the
+    # question asked the way the build asks it.
     index_md = root / "index.md"
-    has_source = any(
-        p.suffix in (".md", ".json") and p.name not in ("kit.json", "site-manifest.json")
-        for p in root.iterdir()
-        if p.is_file()
-    )
-    if not has_source:
+    manifest = _init_time_manifest(root)
+    if not manifest.get("pages"):
         template = _kit_starter_md()
         if template is not None:
             index_md.write_text(template, encoding="utf-8")
             print(f"✓ Created {index_md} (starter page — fill in the front-matter)")
+            manifest = _init_time_manifest(root)
 
-    fresh = _stub_for(title, inline_manifest=_init_time_manifest(root))
+    fresh = _stub_for(title, inline_manifest=manifest)
     if index_html.exists():
         existing = index_html.read_text(encoding="utf-8")
         if existing == fresh:
