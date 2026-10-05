@@ -8143,7 +8143,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
             rel = h.relative_to(root)
             marker = "  ←" if target is not None and h == target else ""
             print(f"    http://{display}:{bound_port}/{rel}{marker}")
-        if target is not None:
+        if target is not None and not getattr(args, "no_open", False):
             webbrowser.open(f"http://{display}:{bound_port}/{target.relative_to(root)}")
     print()
     try:
@@ -9137,6 +9137,11 @@ def main() -> int:
         "--no-search",
         action="store_true",
         help="skip background Pagefind index generation at startup",
+    )
+    serve_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="do not open the page in a browser (for a server started in the background)",
     )
     serve_parser.add_argument(
         "--host",

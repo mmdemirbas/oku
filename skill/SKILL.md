@@ -613,6 +613,9 @@ report, name the fix (`./ctl deploy` in the oku repository), and do not
 describe the page as verified. Checking the render another way is
 welcome; calling that `oku verify` is not.
 
+If you start `oku serve` yourself, pass `--no-open`: by default it opens
+a tab in the reader's own browser, which they did not ask for.
+
 What is left for your eyes, because it needs judgement:
 
 1. Toggle the theme; nothing strobes, and any island or hand-drawn SVG
