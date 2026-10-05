@@ -218,3 +218,25 @@ def test_changing_a_value_updates_every_place_it_appears(browser, declared):
         assert "proj_demo" not in got["prose"], got
     finally:
         pg.close()
+
+
+# X.1: `load()` took whatever JSON.parse returned. A stored `null` made
+# `values` null, `get()` threw, the module logged "failed to start" and
+# every `{{key}}` stayed literal; `set()` threw too, so the Placeholders
+# row could not repair it. A stored `[]` loaded, and every value written
+# onto the array was dropped by JSON.stringify, so nothing persisted.
+@pytest.mark.parametrize("stored", ["null", "[]", '"text"', "7"])
+def test_a_corrupted_stored_value_does_not_kill_the_swap(browser, declared, stored: str):
+    context = browser.new_context(viewport={"width": 1280, "height": 900})
+    context.add_init_script(f"localStorage.setItem('oku-personalization', {stored!r});")
+    pg = context.new_page()
+    try:
+        pg.goto((declared / "standalone" / "page.html").as_uri(), wait_until="load")
+        page_quiet(pg)
+        until(
+            pg,
+            "() => !/\\{\\{\\w+\\}\\}/.test(document.body.innerText)",
+            what=f"every placeholder was substituted over a stored {stored}",
+        )
+    finally:
+        context.close()
