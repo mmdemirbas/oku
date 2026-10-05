@@ -4462,7 +4462,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             if re.match(r"^[a-z][a-z0-9+.-]*:|^//|^#", href, re.I):
                 continue
             href_base = root if href.startswith("/") else p.parent
-            target = (href_base / unquote(href.lstrip("/"))).resolve()
+            target = (href_base / unquote(_asset_file_part(href).lstrip("/"))).resolve()
             if not target.is_file() or asset_within_project(target, p):
                 continue
             add(
@@ -4585,6 +4585,7 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             if not href or _FOREIGN_HREF_RE.match(href):
                 continue
             file_part, _, frag = href.partition("#")
+            file_part = file_part.split("?", 1)[0]  # a query is not part of the file's name
             if not file_part:
                 if frag and frag not in anchors_by_page.get(p, set()):
                     add(
@@ -6084,7 +6085,7 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
             dest_asset.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(target, dest_asset)
         for href in outside_tree:
-            target = (src.parent / unquote(href)).resolve()
+            target = (src.parent / unquote(_asset_file_part(href))).resolve()
             carried = target.is_file() and asset_within_project(target, src)
             print(
                 f"  ⚠ {src.relative_to(src_root)}: {href} is above the tree being built — "
@@ -6327,6 +6328,21 @@ def _asset_hrefs(page_data) -> list[str]:
     return hrefs
 
 
+def _asset_file_part(href: str) -> str:
+    """The file an asset href names, without its `?query` or `#fragment`.
+    Kept on the href, the suffix became part of the file name, so
+    `x.png?v=2` and a sprite's `x.svg#icon` resolved to nothing and
+    neither build tree carried the file."""
+    return re.split(r"[?#]", href, maxsplit=1)[0]
+
+
+def _asset_data_uri(target: Path, href: str) -> str:
+    """A data: URI for `target` that keeps the href's fragment — an SVG
+    view or sprite id still means something there; a query does not."""
+    _, _, frag = href.partition("#")
+    return _data_uri(target) + (f"#{frag}" if frag else "")
+
+
 def collect_page_assets(page_data, src: Path, src_root: Path) -> tuple[dict[str, Path], list[str]]:
     """Local files this page points at, keyed by the href AS AUTHORED.
 
@@ -6347,7 +6363,7 @@ def collect_page_assets(page_data, src: Path, src_root: Path) -> tuple[dict[str,
         if re.match(r"^[a-z][a-z0-9+.-]*:|^//|^#", href, re.I):
             continue  # someone else's origin, a data: URI, or an anchor
         base = root if href.startswith("/") else src.parent
-        target = (base / unquote(href.lstrip("/"))).resolve()
+        target = (base / unquote(_asset_file_part(href).lstrip("/"))).resolve()
         if not target.is_file():
             continue
         try:
@@ -6943,7 +6959,7 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
         page_assets, outside_tree = collect_page_assets(page, src, src_root)
         for href, target in page_assets.items():
             if target.stat().st_size <= MAX_INLINE_ASSET_BYTES:
-                uris[href] = _data_uri(target)
+                uris[href] = _asset_data_uri(target, href)
                 continue
             dest_asset = out_dir / target.relative_to(src_root.resolve())
             dest_asset.parent.mkdir(parents=True, exist_ok=True)
@@ -6959,7 +6975,7 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
         # project fence the page would publish somebody else's bytes to
         # whoever it is sent to, and it did so without a word.
         for href in outside_tree:
-            target = (src.parent / unquote(href)).resolve()
+            target = (src.parent / unquote(_asset_file_part(href))).resolve()
             if not target.is_file():
                 continue
             if not asset_within_project(target, src):
@@ -6970,7 +6986,7 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
                 )
                 continue
             if target.stat().st_size <= MAX_INLINE_ASSET_BYTES:
-                uris[href] = _data_uri(target)
+                uris[href] = _asset_data_uri(target, href)
         data_text = None
         if uris and page is not None:
             data_text = json.dumps(_rewrite_assets(page, uris), ensure_ascii=False, indent=2)
