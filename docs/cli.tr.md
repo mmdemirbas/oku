@@ -361,7 +361,7 @@ CLI'yi çağırmanın iki yolu var.
 ### uv ile kurulu {#installed-via-uv}
 
 ```bash
-uv tool install .
+./ctl deploy   # oku deposunda
 # Now `oku` is on PATH globally:
 oku serve
 ```

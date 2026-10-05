@@ -323,7 +323,7 @@ build_standalone, projenin kit.json'ını, etkin alan sözlüğünü ve dış-ka
 Kitin kodunu okuyorsanız bilmeye değer beş davranış.
 
 > [!NOTE] Kit varlıklarını bulan çözücü
-> İki geçerli varlık yerleşimi vardır: geliştirme (depodaki `kit/`) ve kurulu sürüm (aynı dosyalar wheel içindeki `oku/assets/` altında). `cli._kit_assets_dir()` hangisi varsa onu seçer, böylece `oku init` hem bir klondan hem de `uv tool install .` sonrasından çalışır. pyproject içindeki Hatchling `force-include` ayarı, wheel derlenirken varlıkları doğru yere paketler.
+> İki geçerli varlık yerleşimi vardır: geliştirme (depodaki `kit/`) ve kurulu sürüm (aynı dosyalar wheel içindeki `oku/assets/` altında). `cli._kit_assets_dir()` hangisi varsa onu seçer, böylece `oku init` hem bir klondan hem de `./ctl deploy` sonrasından çalışır. pyproject içindeki Hatchling `force-include` ayarı, wheel derlenirken varlıkları doğru yere paketler.
 
 > [!NOTE] Üretilen dosyalar dist/ altında durur, asla kaynakta değil
 > `oku build`, site-manifest.json ve llms.txt dosyalarını site kökünde (dist/site/) yazar; build_site paylaşılan _oku/ kitini oraya koyar ve chrome.js çalışma anında belge kökü olarak orayı çözer, dolayısıyla manifestteki sayfa yolları proje köküne göredir. `oku serve` hiçbir şey yazmaz — site-manifest.json, llms.txt ve kit.json dosyalarını her istekte bellekte üretir, böylece kaynak dizinlerde yalnızca yazılmış içerik kalır.

@@ -3,8 +3,8 @@ oku · CLI for the shared HTML chrome kit.
 
 This module is the canonical CLI implementation. Two ways to invoke:
 
-- `uv tool install .` puts `oku` on PATH; subsequent `oku
-  serve` etc. just work from anywhere.
+- `./ctl deploy` installs `oku` on PATH with its extras; subsequent
+  `oku serve` etc. just work from anywhere.
 - `bin/oku serve` (the PEP 723-annotated shim) runs `main()` from
   here without any install — handy for in-tree work.
 
@@ -5388,7 +5388,7 @@ def cmd_check(args: argparse.Namespace) -> int:
             print(
                 "✗ schema validation did not run — jsonschema is missing from this install.\n"
                 "  Only the structural checks ran, and they cannot see a malformed block\n"
-                "  payload. Reinstall with `uv tool install --force --no-cache --from . oku`.",
+                "  payload. Reinstall the tool: `./ctl deploy` in the oku repository.",
                 file=sys.stderr,
             )
             return 1
@@ -5786,8 +5786,8 @@ def pagefind_index(site_dir: Path) -> bool:
     cmd = _pagefind_cmd(site_dir)
     if cmd is None:
         print("! pagefind not available; skipping search index.")
-        print("  Install:  uv pip install 'pagefind[bin]'  (preferred — bundled binary)")
-        print("            or  brew install pagefind  /  npm i -g pagefind")
+        print("  The tool's `search` extra carries it: `./ctl deploy` in the oku repository.")
+        print("  A pagefind on PATH works too: brew install pagefind  /  npm i -g pagefind")
         return False
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -7118,7 +7118,7 @@ def cmd_build(args: argparse.Namespace) -> int:
             print(f"  {note}")
         if not _HAS_JSONSCHEMA:
             print(
-                "  (schema validation skipped — `pip install jsonschema` to enable; structural checks still ran)"
+                "  (schema validation skipped — run through `uv run bin/oku` or `./ctl deploy`; structural checks still ran)"
             )
 
     if not srcs:
@@ -7359,9 +7359,9 @@ def _build_serve_search_index(root: Path) -> bool:
         return False
     if _pagefind_cmd(root) is None:
         print(
-            "! Search disabled — install with  uv pip install 'pagefind[bin]'  "
-            "(bundled binary, no system prereq), or pass --no-search to silence "
-            "this notice."
+            "! Search disabled — the tool's `search` extra carries pagefind: "
+            "`./ctl deploy` in the oku repository. Or pass --no-search to "
+            "silence this notice."
         )
         return False
     docs_dir = _common_docs_dir(root, pages)

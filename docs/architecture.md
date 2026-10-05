@@ -323,7 +323,7 @@ build_standalone embeds the project's kit.json + active domain glossary + extref
 Five behaviors worth knowing about if you're reading the kit code.
 
 > [!NOTE] Kit assets resolver
-> Two valid asset layouts: development (`kit/` in the repo) and installed (the same files inside `oku/assets/` in the wheel). `cli._kit_assets_dir()` picks whichever exists, so `oku init` works from a clone OR from `uv tool install .`. Hatchling `force-include` in pyproject packs the assets into the right place at wheel build time.
+> Two valid asset layouts: development (`kit/` in the repo) and installed (the same files inside `oku/assets/` in the wheel). `cli._kit_assets_dir()` picks whichever exists, so `oku init` works from a clone OR from `./ctl deploy`. Hatchling `force-include` in pyproject packs the assets into the right place at wheel build time.
 
 > [!NOTE] Generated artifacts live under dist/, never source
 > `oku build` writes site-manifest.json and llms.txt at the site root (dist/site/), where build_site puts the shared _oku/ kit — that is the docs root chrome.js resolves at runtime, so page paths inside the manifest are relative to the project root. `oku serve` doesn't write at all — it synthesizes site-manifest.json, llms.txt and kit.json in memory on each request so source dirs stay authored-content-only.

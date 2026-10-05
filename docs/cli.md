@@ -359,7 +359,7 @@ Two ways to invoke the CLI.
 ### Installed via uv
 
 ```bash
-uv tool install .
+./ctl deploy   # from the oku repository
 # Now `oku` is on PATH globally:
 oku serve
 ```
