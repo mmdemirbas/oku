@@ -74,7 +74,7 @@ summary: Links a document and two registry terms.
 
 ## Link {#link}
 
-Open [the note](/note.md). Terms: [T](#g/T) and [U](#g/U).
+Open [the note](/note.md). Terms: [T](#g/T), [U](#g/U) and [V](#g/V).
 """
 
 KIT_JSON = {
@@ -84,6 +84,10 @@ KIT_JSON = {
         "web": {
             "T": {"en": {"def": "tab", "link": "java\tscript:window.__ESC_TAB=1"}},
             "U": {"en": {"def": "ctl", "link": "\u0001javascript:window.__ESC_CTL=1"}},
+            # No language level: the any-language fallback picked the
+            # STRING under `def` as the entry, and `.link` on a string is
+            # String.prototype.link — a function, rendered as the href.
+            "V": {"def": "flat"},
         }
     },
 }
@@ -132,6 +136,18 @@ def test_a_registry_link_cannot_smuggle_a_script_scheme(page, served, term: str,
         page.click(".oku-tooltip .okt-link a", timeout=3000)
         page.wait_for_timeout(300)
     assert not _flag(page, flag), f"Learn more ran {href!r}"
+
+
+def test_an_entry_without_a_language_level_offers_no_function_as_a_link(page, served) -> None:
+    page.goto(f"{served}/page.html")
+    page.wait_for_function("() => window.__okuRendered === true", timeout=60000)
+    page.hover("glossary-term[term='V']")
+    page.wait_for_timeout(900)
+    href = page.evaluate(
+        "() => { const a = document.querySelector('.oku-tooltip .okt-link a'); return a && a.getAttribute('href'); }"
+    )
+    assert not href or "function" not in href, href
+    page.mouse.move(5, 5)
 
 
 @pytest.fixture(scope="module")
