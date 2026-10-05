@@ -285,19 +285,35 @@ def _tool_files() -> list[Path]:
     than the digest is a version line whose two halves can disagree
     about which build they describe.
     """
-    files = [Path(__file__)]
+    package = Path(__file__).parent
     assets = _kit_assets_dir()
+    # The package's own files — cli.py, the Prism catalog, the starter
+    # templates — first, ordered by their path inside the package, which
+    # is the same in a checkout and in the wheel. `assets/` exists inside
+    # the package only in the wheel and is counted below either way.
+    files = sorted(
+        (p for p in package.rglob("*") if p.is_file() and _counts(p.relative_to(package), skip=("assets",))),
+        key=lambda p: (p != Path(__file__), p.relative_to(package).as_posix()),
+    )
     # `vendor/` is a fetched cache that deliberately does not ship, so a
     # populated one made the repo's digest differ from the installed
     # tool's forever. A staleness gate that always fires is one nobody
     # reads — the failure this digest exists to prevent, wearing the
-    # opposite sign.
+    # opposite sign. Judged on the path INSIDE the kit: a checkout under
+    # any directory called `vendor` otherwise dropped every asset.
     files += sorted(
-        p
-        for p in assets.rglob("*")
-        if p.is_file() and "__pycache__" not in p.parts and "vendor" not in p.parts
+        (p for p in assets.rglob("*") if p.is_file() and _counts(p.relative_to(assets), skip=("vendor",))),
+        key=lambda p: p.relative_to(assets).as_posix(),
     )
     return files
+
+
+def _counts(rel: Path, *, skip: tuple[str, ...]) -> bool:
+    return (
+        "__pycache__" not in rel.parts
+        and rel.suffix != ".pyc"
+        and (not rel.parts or rel.parts[0] not in skip)
+    )
 
 
 def _tool_dated() -> str:
