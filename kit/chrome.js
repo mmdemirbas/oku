@@ -8425,7 +8425,8 @@ function __okuSplitLine(path) {
 
 /* A window of a text around a line, numbered, for the hover card. */
 function __okuFileWindow(text, line, end, rows, width) {
-  var all = String(text).split('\n');
+  // One trailing newline is how a text file ends, not one more row.
+  var all = String(text).replace(/\n$/, '').split('\n');
   var first = Math.max(1, Math.min(line - 2, all.length - rows + 1));
   var out = [];
   for (var n = first; n < first + rows && n <= all.length; n++) {
