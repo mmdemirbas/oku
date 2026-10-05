@@ -5812,6 +5812,9 @@ def build_llms_txt(root: Path, *, out_dir: Path | None = None, pages: list | Non
 
 
 # ---------- Pagefind search index ----------
+_PAGEFIND_NPM_VERSION = "1.5.2"
+
+
 def _pagefind_cmd(site_dir: Path) -> list[str] | None:
     """Pick the most self-contained pagefind invocation available.
 
@@ -5837,7 +5840,10 @@ def _pagefind_cmd(site_dir: Path) -> list[str] | None:
     if shutil.which("pagefind"):
         return ["pagefind", "--site", str(site_dir)]
     if shutil.which("npx"):
-        return ["npx", "--yes", "pagefind", "--site", str(site_dir)]
+        # Pinned: `--yes` downloads and runs the package without a prompt,
+        # so it has to be a version somebody chose — the one uv.lock
+        # carries for the Python package (test_packaging holds them equal).
+        return ["npx", "--yes", f"pagefind@{_PAGEFIND_NPM_VERSION}", "--site", str(site_dir)]
     return None
 
 
