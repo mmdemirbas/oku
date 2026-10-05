@@ -159,6 +159,40 @@ def test_a_sound_page_passes(tmp_path: Path) -> None:
     assert "dist/site at 1440px" in proc.stdout, proc.stdout
 
 
+def _own_html(body: str) -> str:
+    return (
+        '<!DOCTYPE html>\n<html lang="en"><head><meta charset="UTF-8"><title>Own</title>\n'
+        '<script src="_oku/chrome-boot.js"></script>\n'
+        '<link rel="stylesheet" href="_oku/chrome.css">\n'
+        '<script src="_oku/chrome.js" defer></script>\n'
+        "</head><body><page-chrome></page-chrome>\n"
+        '<div class="layout"><page-toc title="Contents"></page-toc>\n'
+        f'<main id="main-content"><section id="s"><h2>Own</h2>{body}</section></main></div>\n'
+        "</body></html>\n"
+    )
+
+
+def test_a_page_with_its_own_html_is_checked_rather_than_timed_out(tmp_path: Path) -> None:
+    """A page that writes its own HTML and uses the kit for the chrome
+    never loads the renderer, so `__okuRendered` never turns true. verify
+    waited 20 s for it, reported "never finished rendering" and skipped
+    the probe — every such page failed verify and nothing on it was ever
+    checked. Found on a delivered hand-written report (solo)."""
+    docs = _project(tmp_path, SOUND_MD)
+    (docs / "own.html").write_text(_own_html("<p>Prose.</p>"), encoding="utf-8")
+    (docs / "bad.html").write_text(
+        _own_html('<details class="info-tip"><summary>Nothing inside</summary></details>'),
+        encoding="utf-8",
+    )
+    _run(docs, lambda: cli.cmd_build(argparse.Namespace(no_search=True, no_vendor=True)))
+    proc = _verify(docs)
+
+    assert "never finished rendering" not in proc.stdout, proc.stdout
+    assert "own.html" not in proc.stdout, proc.stdout
+    # Checked, not waved through: the empty disclosure on the other one is found.
+    assert "bad.html @1440px: disclosure 1 opens onto nothing" in proc.stdout, proc.stdout
+
+
 def test_it_says_what_to_do_when_nothing_is_built(tmp_path: Path) -> None:
     docs = _project(tmp_path, SOUND_MD)
 
