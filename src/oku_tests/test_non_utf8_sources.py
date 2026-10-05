@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -29,17 +31,19 @@ def tree(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_check_reports_both_files_instead_of_crashing(tree: Path, capsys) -> None:
-    cwd = Path.cwd()
-    os.chdir(tree)
-    try:
-        cli.cmd_check(argparse.Namespace(path=None, strict=False, fix=False, json=False))
-    finally:
-        os.chdir(cwd)
-    out = capsys.readouterr()
-    text = out.out + out.err
+def test_check_reports_both_files_instead_of_crashing(tree: Path, repo_root: Path) -> None:
+    out = subprocess.run(
+        [sys.executable, str(repo_root / "bin" / "oku"), "check"],
+        cwd=tree,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    text = out.stdout + out.stderr
+    assert "Traceback" not in text, text[-800:]
     assert "data.json" in text
     assert "notes.md" in text
+    assert "source-not-utf8" in text
 
 
 def test_build_still_ships_the_page_that_reads(tree: Path) -> None:

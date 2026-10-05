@@ -393,7 +393,7 @@ def project_skip_dirs(root: Path) -> frozenset[str]:
             raw = data.get("skip_dirs") if isinstance(data, dict) else None
             if isinstance(raw, list):
                 extras.update(str(x) for x in raw if isinstance(x, str))
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             pass
     result = frozenset(extras)
     _project_skip_cache[key] = result
@@ -427,7 +427,7 @@ def project_skips_gitignored(root: Path) -> bool:
         return False
     try:
         data = json.loads(kit_json.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return False
     return isinstance(data, dict) and data.get("skip_gitignored") is True
 
@@ -464,7 +464,7 @@ def project_shows_rebuild_command(root: Path) -> bool:
         return True
     try:
         data = json.loads(kit_json.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return True
     return not (isinstance(data, dict) and data.get("rebuild_command") is False)
 
@@ -641,7 +641,7 @@ def cmd_init(args: argparse.Namespace) -> int:
             data = json.loads(index_json.read_text(encoding="utf-8"))
             if isinstance(data, dict) and isinstance(data.get("title"), str):
                 title = data["title"]
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             pass
     # Starter page — only when the directory holds no page source at
     # all, so re-running init in a real docs tree never adds a stray
@@ -1235,7 +1235,8 @@ def _page_from_source_file(p: Path) -> dict | None:
         return None
     try:
         text = p.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError):
+        # Reported by unparseable_json_issues as `source-not-utf8`.
         return None
     if parser is md_to_v2_page:
         block_lines: dict[int, int] = {}
@@ -1311,7 +1312,7 @@ def _nearest_kit_data(source: Path) -> dict:
             continue
         try:
             data = json.loads(kit_json.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             data = {}
         if not isinstance(data, dict):
             data = {}
@@ -2213,7 +2214,7 @@ def find_json_pages(root: Path):
             continue
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             continue
         if _is_page(data):
             pages.append((p, data))
@@ -2257,7 +2258,7 @@ def _read_shipped_schema(schema_path: Path) -> dict:
     check then reported a clean tree it had not validated."""
     try:
         return json.loads(schema_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as e:
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
         raise SystemExit(
             f"✗ cannot read {schema_path}: {e}\n"
             "  The install is broken, so no page can be validated. Reinstall the tool: "
@@ -2527,7 +2528,7 @@ def _load_registry(kit_dir: Path, kind: str) -> dict:
     for f in base.glob("*.json"):
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             continue
         domain = data.get("domain") or f.stem
         for term, langs in (data.get("entries") or {}).items():
@@ -2576,7 +2577,7 @@ def _active_registry(
             loaded = json.loads(kit_json.read_text(encoding="utf-8"))
             if isinstance(loaded, dict):
                 data = loaded
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             data = {}
     domains = data.get("domains")
     if not isinstance(domains, list):
@@ -3828,7 +3829,7 @@ def _kit_json_issues(path: Path) -> list[tuple[str, str]]:
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         # `json-parse-failed` reports this one, at error severity, and
         # reporting it twice would put the same file on two lines under
         # two codes.
@@ -5143,6 +5144,8 @@ def find_unparseable_json(root: Path) -> list[tuple[Path, str]]:
             json.loads(p.read_text(encoding="utf-8"))
         except json.JSONDecodeError as err:
             bad.append((p, f"{err.msg} at line {err.lineno} col {err.colno}"))
+        except UnicodeDecodeError as err:
+            bad.append((p, f"not UTF-8 (byte {err.start}: {err.reason})"))
         except OSError as err:
             bad.append((p, f"read failed: {err}"))
     return bad
@@ -5211,6 +5214,24 @@ def unparseable_json_issues(root: Path) -> list[dict]:
         out.append(
             {"path": path, "severity": sev, "code": code, "where": "(file)", "message": f"{err} — {tail}"}
         )
+    # A page source that is not UTF-8 cannot be read at all, so the walk
+    # drops it; before, the decode error escaped every reader as a
+    # traceback and took the whole check or build with it.
+    for p in iter_repo_files(root, _SOURCE_SUFFIXES, extra_skip=project_skip_dirs(root)):
+        try:
+            p.read_bytes().decode("utf-8")
+        except UnicodeDecodeError as err:
+            out.append(
+                {
+                    "path": p,
+                    "severity": "warning",
+                    "code": "source-not-utf8",
+                    "where": "(file)",
+                    "message": f"not UTF-8 (byte {err.start}: {err.reason}) — not read, so the page is missing from the build",
+                }
+            )
+        except OSError:
+            continue
     return out
 
 
@@ -5464,7 +5485,7 @@ def declared_languages(root: Path) -> tuple[list[str], str]:
         return [], ""
     try:
         data = json.loads(kit_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return [], ""
     raw = data.get("languages") or []
     codes = [item.get("code") if isinstance(item, dict) else item for item in raw]
@@ -5720,7 +5741,7 @@ def compute_llms_txt(root: Path, *, pages: list | None = None) -> str:
             kit_data = json.loads(kit_json.read_text(encoding="utf-8"))
             project_name = kit_data.get("name", project_name)
             description = kit_data.get("description", "")
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             pass
 
     lines = ["# " + project_name, ""]
@@ -6012,7 +6033,7 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
         if page is None and json_sibling.exists():
             try:
                 page = json.loads(json_sibling.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
                 page = None
         if page is not None:
             json_rel = json_sibling.relative_to(src_root)
@@ -6112,7 +6133,7 @@ def build_kit_bundle(src_root: Path) -> str | None:
         return None
     try:
         kit_data = json.loads(kit_json_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return None
 
     domains = kit_data.get("domains") or []
@@ -6126,7 +6147,7 @@ def build_kit_bundle(src_root: Path) -> str | None:
                 g_data = json.loads(g_path.read_text(encoding="utf-8"))
                 if g_data.get("entries"):
                     glossary[domain] = g_data["entries"]
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
                 pass
         e_path = KIT_DIR / "extrefs" / f"{domain}.json"
         if e_path.exists():
@@ -6134,7 +6155,7 @@ def build_kit_bundle(src_root: Path) -> str | None:
                 e_data = json.loads(e_path.read_text(encoding="utf-8"))
                 if e_data.get("entries"):
                     extrefs[domain] = e_data["entries"]
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
                 pass
 
     bundle = {
@@ -6902,7 +6923,7 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
         if page is None and json_sibling.exists():
             try:
                 page = json.loads(json_sibling.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
                 page = None
         # The bytes of every file this page shows travel INSIDE it. A
         # copy beside the page is a copy the reader does not receive —
@@ -7721,7 +7742,7 @@ def _make_serve_handler(root: Path, *, local_only: bool = True):
                 # Synthesize the stub from the json's title (D5).
                 try:
                     page = json.loads(json_path.read_text(encoding="utf-8"))
-                except (json.JSONDecodeError, OSError):
+                except (json.JSONDecodeError, UnicodeDecodeError, OSError):
                     return False
                 if not _is_page(page):
                     return False
@@ -8396,7 +8417,7 @@ def _load_examples() -> dict:
     path = KIT_DIR / "schema" / "examples.json"
     try:
         _examples_cache = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         _examples_cache = {}
     return _examples_cache
 
@@ -8844,7 +8865,7 @@ def cmd_migrate(args: argparse.Namespace) -> int:
                 continue
             try:
                 data = json.loads(p.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
                 continue
             if _is_page(data):
                 candidates.append(p)
@@ -8855,7 +8876,7 @@ def cmd_migrate(args: argparse.Namespace) -> int:
     for p in candidates:
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError) as e:
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
             print(f"  skip {p}: {e}", file=sys.stderr)
             continue
         if not _is_page(data):
