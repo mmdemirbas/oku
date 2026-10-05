@@ -4713,8 +4713,8 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
     # deep inside — and it does it silently, because both pages render
     # perfectly well on their own.
     #
-    # This cannot be left to the slugifier: it strips non-ASCII, so a
-    # Turkish heading never produces its English original's id by
+    # This cannot be left to the slugifier: a translated heading has a
+    # different title, so it never produces its original's id by
     # accident. The translated side has to pin `{#id}` by hand, which is
     # exactly the kind of manual step that is right on the day it is
     # written and wrong two edits later.
@@ -4725,7 +4725,8 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
         base_stem, lang = split_language_suffix(p.stem, codes)
         if not lang or lang == default:
             continue
-        base_anchors = anchors_by_target.get((p.parent / (base_stem + p.suffix)).resolve())
+        base_path = p.parent / (base_stem + p.suffix)
+        base_anchors = anchors_by_target.get(base_path.resolve())
         if base_anchors is None:
             # A page whose name merely ends in a language code, with no
             # original beside it. `_fold_language_variants` keeps it as
@@ -4739,12 +4740,15 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
                 parts.append(f"absent here: {', '.join(missing)}")
             if extra:
                 parts.append(f"absent from the original: {', '.join(extra)}")
+            # A markdown page is checked under a virtual .json name; the
+            # author has the .md.
+            shown = base_path if base_path.exists() else _source_sibling(base_path)
             add(
                 p,
                 "warning",
                 "translation-anchor-drift",
                 "(page)",
-                f"Heading ids differ from {base_stem}{p.suffix} — {'; '.join(parts)}. "
+                f"Heading ids differ from {shown.name} — {'; '.join(parts)}. "
                 "The language switch carries the #fragment across, so a reader deep in one "
                 "language lands at the top of the other. Pin the id with {#id} on both sides.",
             )
