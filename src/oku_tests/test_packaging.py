@@ -251,3 +251,30 @@ def test_the_docs_hand_no_one_the_bare_install(repo_root: Path) -> None:
         if re.search(r"uv tool install \.", line)
     ]
     assert offenders == []
+
+
+def _deploy_body(repo_root: Path) -> str:
+    ctl = (repo_root / "ctl").read_text(encoding="utf-8")
+    start = ctl.index("cmd_install() {")
+    return ctl[start : ctl.index("\n}\n", start)]
+
+
+def test_deploy_refills_the_vendor_cache_it_wipes(repo_root: Path) -> None:
+    # The vendor cache lives inside the tool's own site-packages, and a
+    # reinstall replaces that directory. Measured: right after a deploy
+    # there was no vendor/ at all, so until some project's next build a
+    # served page asked for eight fonts that were not there.
+    body = _deploy_body(repo_root)
+    assert "uv tool install" in body
+    assert body.index("oku vendor") > body.index("uv tool install"), (
+        "deploy does not re-vendor after installing"
+    )
+
+
+def test_deploy_refuses_to_skip_the_code_comparison(repo_root: Path) -> None:
+    # `[ -n "$want_src" ] && …` skipped the comparison whenever the repo's
+    # digest came back empty (its stderr is discarded), and then printed
+    # "✓ … and code ()". The gate that catches CLI drift turned itself off.
+    body = _deploy_body(repo_root)
+    assert '[ -n "$want_src" ] &&' not in body
+    assert 'if [ -z "$want_src" ]' in body
