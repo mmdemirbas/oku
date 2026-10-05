@@ -59,6 +59,13 @@ Each says why.
   then serves this repo's working copy, uncommitted changes included,
   instead of the installed kit. Inferred from source.
 
+- **`oku verify` prints a BrokenPipeError traceback from its own site
+  server.** Observed on a 46-page tree: the run passed (exit 0, "92
+  page(s) render clean") with a `BrokenPipeError` traceback above the
+  pass line. `cmd_verify`'s `_QuietHandler` does not swallow
+  ConnectionResetError / BrokenPipeError the way the serve handler does,
+  and a traceback in a verify log reads as a failure to whoever scans it.
+
 - **The `updated` date is the committer's local date (`%cs`), not UTC.**
   A commit just after midnight at UTC+3 shows the previous UTC day.
   Inferred; arguably what an author expects, so not changed.
