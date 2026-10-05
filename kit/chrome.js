@@ -7955,7 +7955,10 @@ var __okuKit = (function () {
           var any = Object.keys(entry)[0];
           if (any) { hit = entry[any]; shownLang = any; }
         }
-        if (hit) return { hit: hit, domain: d, lang: shownLang };
+        // An entry is an object per language. Without the language level
+        // the fallback picks a STRING, and `.link` on a string is
+        // String.prototype.link, which then rendered as an href.
+        if (hit && typeof hit === 'object') return { hit: hit, domain: d, lang: shownLang };
       }
     }
     return null;
@@ -7982,7 +7985,10 @@ var __okuKit = (function () {
           var any = Object.keys(entry)[0];
           if (any) { hit = entry[any]; shownLang = any; }
         }
-        if (hit) return { hit: hit, domain: d, lang: shownLang };
+        // An entry is an object per language. Without the language level
+        // the fallback picks a STRING, and `.link` on a string is
+        // String.prototype.link, which then rendered as an href.
+        if (hit && typeof hit === 'object') return { hit: hit, domain: d, lang: shownLang };
       }
     }
     return null;
