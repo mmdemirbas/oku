@@ -192,7 +192,15 @@ def test_the_path_is_the_full_path_on_this_machine(page, site_url):
 
     docs = (Path(__file__).resolve().parents[3] / "docs").as_posix() + "/"
     assert state["file"] == "reference.md", state["file"]
-    assert state["dir"] == docs, state["dir"]
+    # The directory comes from the manifest the page fetches, and under
+    # load (`-n 8`) the viewer can open before it lands; the redraw on
+    # arrival is the next test's subject. Wait for it with a deadline
+    # rather than reading the first frame.
+    page.wait_for_function(
+        "(docs) => (document.querySelector('.okt-mdview-dir') || {}).textContent === docs",
+        arg=docs,
+        timeout=15000,
+    )
 
 
 def test_a_viewer_opened_before_the_manifest_names_the_full_path_once_it_lands(page, site_url):
