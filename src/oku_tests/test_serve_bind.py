@@ -9,6 +9,7 @@ place a reader could check said the opposite of what happened.
 
 from __future__ import annotations
 
+import argparse
 import http.client
 import http.server
 import socket
@@ -167,3 +168,44 @@ def test_serve_still_finds_the_root_from_a_subdirectory(tmp_path: Path) -> None:
     (root / ".git").mkdir()
     (root / "docs" / "deep").mkdir()
     assert cli.find_project_root(root / "docs" / "deep") == root.resolve()
+
+
+def _serve_once(tmp_path: Path, monkeypatch, **flags) -> list[str]:
+    """Run cmd_serve to the point of serving, then stop; return the URLs
+    it asked the browser to open."""
+    (tmp_path / "page.md").write_text("---\ntitle: P\n---\n\n## A {#a}\n\nx\n", encoding="utf-8")
+    (tmp_path / "page.html").write_text(cli._stub_for("P"), encoding="utf-8")
+    opened: list[str] = []
+    monkeypatch.setattr(cli.webbrowser, "open", lambda url, *a, **k: opened.append(url))
+
+    def stop(self, *a, **k):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(http.server.ThreadingHTTPServer, "serve_forever", stop)
+    # shutdown() waits for a serve_forever loop to finish, and this one
+    # never started.
+    monkeypatch.setattr(http.server.ThreadingHTTPServer, "shutdown", lambda self: None)
+    monkeypatch.chdir(tmp_path)
+    args = argparse.Namespace(no_watch=True, no_search=True, host="127.0.0.1", **flags)
+    cli.cmd_serve(args)
+    return opened
+
+
+# A session that runs `oku serve` in the background opened a tab in the
+# reader's own browser every time, and nothing could ask it not to.
+def test_serve_opens_the_page_by_default(tmp_path: Path, monkeypatch) -> None:
+    assert _serve_once(tmp_path, monkeypatch, no_open=False)
+
+
+def test_no_open_keeps_the_browser_closed(tmp_path: Path, monkeypatch) -> None:
+    assert _serve_once(tmp_path, monkeypatch, no_open=True) == []
+
+
+def test_the_no_open_flag_is_on_the_command_line(repo_root: Path) -> None:
+    out = subprocess.run(
+        [sys.executable, str(repo_root / "bin" / "oku"), "serve", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    ).stdout
+    assert "--no-open" in out
