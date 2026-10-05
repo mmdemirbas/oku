@@ -8026,6 +8026,9 @@ var __okuPersonalization = (function () {
   function load() {
     try { values = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
     catch (e) { values = {}; }
+    // Only a plain object can hold the values: a stored `null` made every
+    // get() throw, and an array dropped whatever was written onto it.
+    if (!values || typeof values !== 'object' || Array.isArray(values)) values = {};
   }
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(values)); }
