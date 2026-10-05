@@ -115,3 +115,48 @@ def test_migrate_still_converts_a_page_it_can_carry(tmp_path: Path) -> None:
     md = (docs / "p.md").read_text(encoding="utf-8")
     assert "summary: one line" in md
     assert "order: 2" in md
+
+
+# VI.4 / X.3: the v1 shim returns None for a block it cannot convert — a
+# bare string, an unknown kind — and the page is assembled without it.
+# The round-trip guard above compares content AFTER that shim, so the
+# block was already gone on both sides and the comparison passed. Run on
+# a scratch tree: `oku check` exited 0, `oku migrate` wrote a .md
+# without the text and deleted the .json. The renderer's shim drops the
+# same block, so the page had been showing less than its source all
+# along with nothing saying so.
+_V1_WITH_UNCONVERTIBLE = {
+    "kind": "page",
+    "title": "T",
+    "blocks": [
+        {
+            "kind": "section",
+            "title": "S",
+            "id": "s",
+            "blocks": [
+                {"kind": "paragraph", "content": "kept"},
+                "a bare string the shim cannot place",
+                {"kind": "no-such-kind", "content": "x"},
+            ],
+        }
+    ],
+}
+
+
+def test_migrate_keeps_a_v1_source_holding_a_block_the_shim_drops(tmp_path: Path, capsys) -> None:
+    src = tmp_path / "p.json"
+    src.write_text(json.dumps(_V1_WITH_UNCONVERTIBLE), encoding="utf-8")
+    cli.cmd_migrate(argparse.Namespace(path=str(src), dry_run=False, keep_json=False))
+    err = capsys.readouterr().err
+
+    assert src.exists(), "the source was deleted with blocks the markdown does not carry"
+    assert not (tmp_path / "p.md").exists()
+    assert "blocks[0].blocks[1]" in err
+    assert "blocks[0].blocks[2]" in err
+
+
+def test_check_reports_a_v1_block_that_will_not_render(tmp_path: Path) -> None:
+    errors = cli.validate_pages([(tmp_path / "p.json", _V1_WITH_UNCONVERTIBLE)])
+    text = "\n".join(msg for _, msg in errors)
+    assert "blocks[0].blocks[1]" in text
+    assert "blocks[0].blocks[2]" in text
