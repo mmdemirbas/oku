@@ -742,3 +742,51 @@ def test_the_close_button_still_releases_an_anchor_pin(page):
     until(page, _visible("donut", negate=True), what="the close button let the slice go")
     assert page.evaluate("() => document.querySelectorAll('#donut .okc-pinned').length") == 0
     page.mouse.move(4, 4)
+
+
+# The slice's hit area is the slice. A ring chart used to answer the
+# pointer with `transform: scale(1.04)` about its own centre, which moves
+# the INNER edge outward too: a pointer resting just inside that edge
+# fell into the hole, the hover ended, the slice shrank back under the
+# pointer and the hover began again. Measured with the pointer still,
+# one pixel in: `1110000011010010010111001000111000001001` — the reading
+# blinking for as long as the reader held still, and under parallel load
+# the reason the sweep above failed for `arc` now and then.
+RING_INNER_EDGE = """(id) => {
+  const sec = document.getElementById(id);
+  const slices = [...sec.querySelectorAll('.okc-slice')];
+  if (!slices.length) return null;
+  const svg = slices[0].ownerSVGElement;
+  const [ox, oy] = getComputedStyle(slices[0]).transformOrigin.split(' ').map(parseFloat);
+  const m = svg.getScreenCTM();
+  const cx = m.a * ox + m.c * oy + m.e, cy = m.b * ox + m.d * oy + m.f;
+  for (let deg = 0; deg < 360; deg += 15) {
+    const a = deg * Math.PI / 180;
+    for (let r = 2; r < 400; r += 1) {
+      const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);
+      const hit = document.elementFromPoint(x, y);
+      if (hit && hit.classList.contains('okc-slice') && sec.contains(hit)) {
+        if (r < 12) break;  // no hole on this ray: nothing to fall into
+        const x1 = cx + (r + 1) * Math.cos(a), y1 = cy + (r + 1) * Math.sin(a);
+        return { x: x1, y: y1, fromX: cx, fromY: cy };
+      }
+    }
+  }
+  return null;
+}"""
+
+
+@pytest.mark.parametrize("chart", ["arc", "donut"])
+def test_a_still_pointer_on_a_ring_keeps_its_reading(page, chart):
+    _settle(page, chart)
+    pt = page.evaluate(RING_INNER_EDGE, chart)
+    assert pt, f"{chart}: no slice with a hole inside it to stand at the edge of"
+    page.mouse.move(pt["fromX"], pt["fromY"])
+    page.mouse.move(pt["x"], pt["y"], steps=4)
+    until(page, _visible(chart), what=f"{chart} showed a reading at the slice's inner edge")
+    seen = ""
+    for _ in range(40):
+        seen += "1" if page.evaluate(_visible(chart)) else "0"
+        page.wait_for_timeout(25)
+    page.mouse.move(4, 4)
+    assert "0" not in seen, f"{chart}: the reading blinked under a pointer that did not move: {seen}"
