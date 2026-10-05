@@ -287,6 +287,29 @@ class TestMdStringLint:
     def test_indented_list_marker_not_flagged(self) -> None:
         assert "indented-code" not in self._codes("- item\n\n    - nested")
 
+    # Two false positives a sweep of 49 project doc trees found, each on
+    # a shape the renderer already draws the way CommonMark does — so the
+    # warning sent an author to "fix" markdown that was right.
+
+    def test_a_list_item_after_a_quote_is_not_a_lazy_continuation(self) -> None:
+        """A line that starts a block is not paragraph continuation text,
+        so nothing is lazily continued: `3.` is the next item of the list
+        the quote sits in (ajans spec.md)."""
+        text = "1. one\n2. two\n\n   > quoted inside item two\n3. three\n"
+        assert "lazy-continuation" not in self._codes(text)
+        assert "lazy-continuation" not in self._codes("> quoted\n- a new list\n")
+        assert "lazy-continuation" not in self._codes("> quoted\n## A heading\n")
+
+    def test_a_list_items_own_paragraph_is_not_indented_code(self) -> None:
+        """After a blank line, a line indented to the item's content column
+        continues the item (ajans: a table under `  - The damage by
+        month:`). Four more columns than that is code inside the item."""
+        text = "- top\n  - The damage by month:\n\n    | a | b |\n    |---|---|\n    | 1 | 2 |\n"
+        assert "indented-code" not in self._codes(text)
+        assert "indented-code" not in self._codes("1. first\n\n    second paragraph of item one\n")
+        assert "indented-code" in self._codes("- item\n\n      code inside the item\n")
+        assert "indented-code" in self._codes("- item\n\nnot in the list any more\n\n    code\n")
+
     def test_html_island_audited_once_per_island(self) -> None:
         codes = self._codes("<div>\nhello\n</div>")
         assert codes.count("html-island") == 1
