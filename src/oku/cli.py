@@ -2247,15 +2247,22 @@ def _load_schema():
     global _schema_cache
     if _schema_cache is not None:
         return _schema_cache
-    schema_path = KIT_DIR / "schema" / "page.schema.json"
-    if schema_path.exists():
-        try:
-            _schema_cache = json.loads(schema_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            _schema_cache = {}
-    else:
-        _schema_cache = {}
+    _schema_cache = _read_shipped_schema(KIT_DIR / "schema" / "page.schema.json")
     return _schema_cache
+
+
+def _read_shipped_schema(schema_path: Path) -> dict:
+    """A schema the kit ships, or a stop. Falling back to `{}` made an
+    unreadable file an empty schema, which accepts every page, and the
+    check then reported a clean tree it had not validated."""
+    try:
+        return json.loads(schema_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        raise SystemExit(
+            f"✗ cannot read {schema_path}: {e}\n"
+            "  The install is broken, so no page can be validated. Reinstall the tool: "
+            "`./ctl deploy` in the oku repository."
+        ) from e
 
 
 _kit_schema_cache = None
@@ -2273,11 +2280,7 @@ def _load_kit_schema() -> dict:
     global _kit_schema_cache
     if _kit_schema_cache is not None:
         return _kit_schema_cache
-    schema_path = KIT_DIR / "schema" / "project-kit.schema.json"
-    try:
-        _kit_schema_cache = json.loads(schema_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        _kit_schema_cache = {}
+    _kit_schema_cache = _read_shipped_schema(KIT_DIR / "schema" / "project-kit.schema.json")
     return _kit_schema_cache
 
 
