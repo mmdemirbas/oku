@@ -867,8 +867,8 @@ var __okuLangSwitch = (function () {
  * Folding is one character in, one character out: lowercase, accents
  * off, and the Turkish dotted and dotless i both to `i`. So `turkiye`
  * finds `Türkiye`, `ISIK` finds `ışık`, and an index into the folded
- * text is an index into the original — the rule __okuLowerWithMap
- * exists for, made true by never changing the length.
+ * text is an index into the original, made true by never changing
+ * the length. The table filter and the in-page search fold the same way.
  *
  * A token matches as a substring first. Failing that, three letters or
  * more may match as a subsequence, but only a COMPACT one (spanning at
@@ -6082,7 +6082,7 @@ function initReadingAids() {
 
       function rowMatchesText(e, needle) {
         if (!needle) return true;
-        return e.cells.some(function (c) { return stripHtml(c).toLowerCase().indexOf(needle) !== -1; });
+        return e.cells.some(function (c) { return __okuFuzzy.fold(stripHtml(c)).indexOf(needle) !== -1; });
       }
 
       /* Per-column filter — separate from the global text filter and
@@ -6092,9 +6092,9 @@ function initReadingAids() {
       function rowMatchesColumnFilters(e) {
         for (var col in columnFilters) {
           if (!Object.prototype.hasOwnProperty.call(columnFilters, col)) continue;
-          var needle = (columnFilters[col] || '').trim().toLowerCase();
+          var needle = __okuFuzzy.fold((columnFilters[col] || '').trim());
           if (!needle) continue;
-          var cellText = stripHtml(e.cells[+col] || '').toLowerCase();
+          var cellText = __okuFuzzy.fold(stripHtml(e.cells[+col] || ''));
           if (cellText.indexOf(needle) === -1) return false;
         }
         return true;
@@ -6147,7 +6147,9 @@ function initReadingAids() {
       function entriesMatchingFilter() {
         var entries = buildEntries();
         if (!filterText && !hasActiveChips() && !hasActiveColumnFilters()) return entries;
-        var needle = filterText ? filterText.toLowerCase() : '';
+        // Folded, not lowercased: `'İzmir'.toLowerCase()` is i + a combining
+        // dot, which `izmir` is not a substring of.
+        var needle = filterText ? __okuFuzzy.fold(filterText) : '';
         // Keep groups whose subsequent rows have at least one match.
         var visible = entries.map(function (e) {
           if (e.type === 'row') {
@@ -6627,7 +6629,9 @@ function initReadingAids() {
 
       function updateChipCounts() {
         if (!chipsRack) return;
-        var needle = filterText ? filterText.toLowerCase() : '';
+        // Folded, not lowercased: `'İzmir'.toLowerCase()` is i + a combining
+        // dot, which `izmir` is not a substring of.
+        var needle = filterText ? __okuFuzzy.fold(filterText) : '';
         // Chip counts always reflect the underlying flat row population,
         // independent of the current grouping choice — switching how
         // rows are bucketed shouldn't change what each chip represents.
@@ -15042,38 +15046,6 @@ window.addEventListener('oku:rendered', function () {
   });
 });
 
-/* `toLowerCase()` is not length-preserving. A Turkish `İ` lowercases to
-   `i` plus a combining dot, so a string holding one is a character
-   longer in lowercase and every index past it is off by one — slicing
-   the ORIGINAL with an index found in the lowered copy drifts by one
-   position per `İ` before it. In the in-page search that put the excerpt
-   window one character out and `<mark>` around the wrong characters, on
-   exactly the pages whose author writes Turkish.
-
-   The common case pays nothing: when lowercasing did not change the
-   length, the index already lines up and no map is built. When it did,
-   the pair is built in ONE pass so the text being searched and the map
-   back cannot disagree about what they describe. */
-function __okuLowerWithMap(s) {
-  var lc = s.toLowerCase();
-  if (lc.length === s.length) return { text: lc, at: null };
-  var text = '';
-  var at = [];
-  for (var i = 0; i < s.length; i++) {
-    var one = s[i].toLowerCase();
-    for (var j = 0; j < one.length; j++) at.push(i);
-    text += one;
-  }
-  at.push(s.length);
-  return { text: text, at: at };
-}
-
-/* An index into `low.text`, as an index into the string it came from. */
-function __okuAtSource(low, i) {
-  if (!low.at) return i;
-  return low.at[i < low.at.length ? i : low.at.length - 1];
-}
-
 function escapeXml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -18902,7 +18874,10 @@ var __okuSearch = (function () {
      navigate the page they're on, instead of getting a dead-end "index
      not found" toast. */
   function _inPageSearch(query) {
-    var q = String(query || '').trim().toLowerCase();
+    // Folded on both sides (see __okuFuzzy): lowercasing missed `İzmir`
+    // for `izmir` and `IRMAK` for `ırmak`. The fold is one character in,
+    // one out, so an index into the folded body is an index into the body.
+    var q = __okuFuzzy.fold(String(query || '').trim());
     if (!q) return [];
     var main = document.querySelector('#main-content') || document.body;
     var sections = main.querySelectorAll('section[id], h2[id], h3[id]');
@@ -18936,18 +18911,14 @@ var __okuSearch = (function () {
           })()
         : (sec.textContent || '');
       var body = scopeEl.replace(/\s+/g, ' ').trim();
-      var low = __okuLowerWithMap(body);
-      var pos = low.text.indexOf(q);
-      var headingMatch = headingText.toLowerCase().indexOf(q) >= 0;
+      var pos = __okuFuzzy.fold(body).indexOf(q);
+      var headingMatch = __okuFuzzy.fold(headingText).indexOf(q) >= 0;
       if (pos < 0 && !headingMatch) return;
       seen.add(id);
       var excerpt = body;
       if (pos >= 0) {
-        // Both ends translated back to the original before anything is
-        // sliced — see __okuLowerWithMap for why an index into the
-        // lowercased copy is not an index into the text.
-        var hitAt = __okuAtSource(low, pos);
-        var hitEnd = __okuAtSource(low, pos + q.length);
+        var hitAt = pos;
+        var hitEnd = pos + q.length;
         var start = Math.max(0, hitAt - 40);
         var end = Math.min(body.length, hitEnd + 80);
         var lead = start > 0 ? '… ' : '';
