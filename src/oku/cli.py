@@ -6081,7 +6081,16 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
         # and only the handed-over artifact is missing it.
         assets, outside_tree = collect_page_assets(page, src, src_root)
         for href, target in assets.items():
-            dest_asset = out_dir / target.relative_to(src_root.resolve())
+            # At the path the href NAMES, not the one it resolves to: via a
+            # symlinked directory the two differ, and the page asks for the
+            # first.
+            base = src_root if href.startswith("/") else src.parent
+            named = Path(os.path.normpath(base / unquote(_asset_file_part(href).lstrip("/"))))
+            try:
+                rel = named.relative_to(src_root)
+            except ValueError:
+                rel = target.relative_to(src_root.resolve())
+            dest_asset = out_dir / rel
             dest_asset.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(target, dest_asset)
         for href in outside_tree:
