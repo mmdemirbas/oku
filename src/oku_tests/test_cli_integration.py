@@ -429,6 +429,20 @@ def test_init_does_not_add_a_starter_next_to_existing_pages(tmp_path: Path, repo
     assert not (tmp_path / "index.md").exists()
 
 
+def test_init_does_not_add_a_starter_to_a_tree_whose_pages_are_in_subfolders(
+    tmp_path: Path, repo_root: Path
+) -> None:
+    """VII.4 — the emptiness test looked at the docs root's own files and
+    nowhere below it. A tree that keeps every page in a subfolder
+    (`reviews/`, `postmortems/`) read as empty, so init wrote a
+    `{{ TITLE }}` starter into it — and the next init listed that
+    placeholder as the tree's front page in the committed index.html."""
+    (tmp_path / "reviews").mkdir()
+    (tmp_path / "reviews" / "first.md").write_text("---\ntitle: R\n---\n\n## S\n\nx\n", encoding="utf-8")
+    assert _run_cli(tmp_path, "init", repo_root=repo_root).returncode == 0
+    assert not (tmp_path / "index.md").exists()
+
+
 def test_init_keeps_an_existing_starter(tmp_path: Path, repo_root: Path) -> None:
     (tmp_path / "index.md").write_text("---\ntitle: Mine\n---\n\n## S\n\nmine\n", encoding="utf-8")
     assert _run_cli(tmp_path, "init", repo_root=repo_root).returncode == 0
