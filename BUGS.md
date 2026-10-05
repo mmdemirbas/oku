@@ -12,6 +12,32 @@ carries the record, including what was measured before and after.
 
 ---
 
+## A step-flow card's `href` to a sibling `.md` page is not rewritten to `.html`
+
+- **Symptom.** In a built page, a prose link `[x](other.md)` points at
+  `other.html`, but an `oku-step-flow` card with `"href":"other.md"` still
+  points at `other.md`, which does not exist in `dist/standalone/` (nor, by
+  the same logic, in `dist/site/`). Clicking the card is a dead link.
+  `oku check` accepts `other.md` (it resolves against the source tree) and
+  warns `unresolved-link` on `other.html`, so the author has no spelling
+  that is both clean and working.
+- **Minimal reproduction.** `tmp/repro-stepflow-href/` in this repo: two
+  pages, `index.md` with one prose link and one unordered step-flow card,
+  both to `other.md`. `oku init && oku build`, open
+  `dist/standalone/index.html`, read the anchors' `href`.
+- **Expected vs actual.** Expected both anchors to `other.html`. Actual:
+  prose `other.html`, card `other.md`.
+- **Where.** `kit/renderer.js` `_renderStepFlow` sets
+  `card.setAttribute('href', s.href)` with the payload string as is
+  (around line 2259).
+- **Observed.** The two hrefs above, read from the rendered DOM with
+  Playwright (oku 0.6.5, kit 2026-10-05-r116, 2026-10-05). Same result in a
+  five-page tree under `atolye/raporlar/2026-10-05-huawei-hatirlatici/`.
+- **Inferred from source, not traced.** The prose link is rewritten before
+  the renderer sees it (in the markdown conversion), and fence payload
+  strings such as `href` do not go through that pass, so any other block
+  that carries a link in its JSON may have the same gap.
+
 Open, found by the 2026-10-05 bug hunt and deliberately not fixed in it.
 Each says why.
 
