@@ -475,11 +475,8 @@ def git_ignored_paths(root: Path) -> frozenset[str]:
     lines: list[str] = []
     if project_skips_gitignored(root):
         try:
-            out = subprocess.run(
-                ["git", "-C", str(root), "ls-files", "-o", "-i", "--exclude-standard", "--directory"],
-                capture_output=True,
-                text=True,
-                timeout=20,
+            out = _git(
+                ["-C", str(root), "ls-files", "-o", "-i", "--exclude-standard", "--directory"], timeout=20
             )
             if out.returncode == 0:
                 lines = [ln for ln in out.stdout.splitlines() if ln.strip()]
@@ -1469,7 +1466,7 @@ def _git_last_modified(p: Path) -> str | None:
         # it is one git has never seen, and asking again per file is how
         # the newest pages became the most expensive ones — `git log`
         # walks the entire history before returning empty.
-        out = dates.get(p.name)
+        out = dates.get(unicodedata.normalize("NFC", p.name))
     else:
         out = _git_date_one(p)
     _git_date_cache[key] = out
@@ -1495,13 +1492,7 @@ def _git_dates_in(directory: Path) -> dict[str, str] | None:
         return _git_dir_dates[key]
     result: dict[str, str] | None = None
     try:
-        r = subprocess.run(
-            ["git", "log", "--format=%cs", "--name-only", "--relative", "--", "."],
-            cwd=directory,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        r = _git(["log", "--format=%cs", "--name-only", "--relative", "--", "."], cwd=directory, timeout=30)
         if r.returncode == 0:
             result = {}
             current = ""
@@ -1511,24 +1502,43 @@ def _git_dates_in(directory: Path) -> dict[str, str] | None:
                     continue
                 if re.fullmatch(r"\d{4}-\d{2}-\d{2}", line):
                     current = line
-                elif current and line not in result:
-                    result[line] = current
+                else:
+                    line = unicodedata.normalize("NFC", line)
+                    if current and line not in result:
+                        result[line] = current
     except (OSError, subprocess.SubprocessError):
         result = None
     _git_dir_dates[key] = result
     return result
 
 
+# Where a repository is, git takes from these before it looks at cwd. A
+# hook exports GIT_DIR, often as the relative `.git`, and every call here
+# runs from a page's directory, where that path names nothing.
+_GIT_LOCATION_VARS = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
+
+
+def _git(args: list[str], *, cwd: Path | None = None, timeout: float) -> subprocess.CompletedProcess:
+    """Run git for the kit's own questions. Paths come back verbatim
+    (core.quotePath off) — quoted, a non-ASCII name matched no file —
+    and the repository is the one around `cwd`, never an inherited one."""
+    env = {k: v for k, v in os.environ.items() if k not in _GIT_LOCATION_VARS}
+    return subprocess.run(
+        ["git", "-c", "core.quotePath=false", *args],
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout,
+    )
+
+
 def _git_date_one(p: Path) -> str | None:
     """The single-file question, for a directory git has no answer for."""
     try:
-        r = subprocess.run(
-            ["git", "log", "-1", "--format=%cs", "--", p.name],
-            cwd=p.parent,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
+        r = _git(["log", "-1", "--format=%cs", "--", p.name], cwd=p.parent, timeout=5)
         if r.returncode == 0 and re.fullmatch(r"\d{4}-\d{2}-\d{2}", r.stdout.strip()):
             return r.stdout.strip()
     except (OSError, subprocess.SubprocessError):
