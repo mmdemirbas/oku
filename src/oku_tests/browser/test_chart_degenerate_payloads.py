@@ -158,6 +158,23 @@ HAND_WRITTEN = {
     "bar-negative-row": _example("bar", rows=[{"label": "down", "value": -40}, {"label": "up", "value": 20}]),
 }
 
+# Found by a sweep of nine further mutations over every example. Each
+# passed `oku check` and drew a mark the browser refuses or cannot place.
+SWEEP = {
+    # Bar width is (plot - gap * (n + 1)) / n: past ~131 rows it goes
+    # negative, the defect markSize exists for, at a site not using it.
+    "pareto-200-rows": _example("pareto", rows=[{"label": f"r{i}", "value": 200 - i} for i in range(200)]),
+    # step = range / (sample_count - 1): 1 divides by zero, a negative
+    # count leaves no samples and the renderer threw on the last one.
+    "density-one-sample": _example("density", sample_count=1),
+    "density-negative-samples": _example("density", sample_count=-5),
+    # squarify divides by a zero-valued row; the schema allows value 0.
+    "treemap-zero-items": _example(
+        "treemap",
+        tree=[{"label": "a", "value": 6200}, {"label": "b", "value": 0}, {"label": "c", "value": 0}],
+    ),
+}
+
 # Written the wrong way round. `oku check` rejects each of these, so the
 # runtime obligation is on the check rather than on the renderer — but
 # the renderer draws them anyway, which is what the browser half asserts
@@ -174,9 +191,31 @@ INVERTED = {
     "candlestick-inverted": _example(
         "candlestick", entries=[{"date": "Mon", "open": 100, "high": 90, "low": 110, "close": 105}]
     ),
+    "bullet-zone-inverted": _example(
+        "bullet",
+        tracks=[{"label": "z", "value": 30, "target": 40, "max": 100, "zones": [{"from": 80, "to": 40}]}],
+    ),
 }
 
-CASES = {**_derived_cases(), **HAND_WRITTEN, **INVERTED}
+# A log axis is set on the element (`x-scale` / `y-scale`), which only an
+# island reaches. The lower bound was the FIRST positive value rather than
+# the smallest, so [0, 5] collapsed the domain to one point and
+# [0, 100, 1] put x=1 at -Infinity; with no positive value at all every
+# position was log(negative), NaN.
+LOG_ISLANDS = {
+    f"log-{name}": (
+        '<oku-chart type="scatter" x-scale="log" y-scale="log"><script type="application/json">'
+        + json.dumps([{"label": "s", "data": [{"x": x, "y": y} for x, y in pts]}])
+        + "</script></oku-chart>"
+    )
+    for name, pts in {
+        "zero-and-one-value": [(0, 0), (5, 5)],
+        "first-positive-not-smallest": [(0, 0), (100, 100), (1, 1)],
+        "nothing-positive": [(-3, -3), (-1, -1)],
+    }.items()
+}
+
+CASES = {**_derived_cases(), **HAND_WRITTEN, **SWEEP, **INVERTED, **LOG_ISLANDS}
 
 
 def _page(blocks: list) -> dict:
