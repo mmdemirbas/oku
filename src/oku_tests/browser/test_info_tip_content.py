@@ -85,7 +85,19 @@ V1_PAGE = {
                     ],
                 }
             ],
-        }
+        },
+        {
+            "kind": "section",
+            "id": "legacy-text",
+            "title": "Legacy text body",
+            "blocks": [
+                {
+                    "kind": "info-tip",
+                    "summary": "A body written as one string",
+                    "content": "the body is one string",
+                }
+            ],
+        },
     ],
 }
 
@@ -196,3 +208,17 @@ def test_the_shipped_example_renders_its_body(md_page) -> None:
     assert body["count"] > 0, "`oku spec info-tip` prints a payload that renders empty"
     for word in ("lost with no error", "mutate(state)"):
         assert word in body["text"], f"expected {word!r} in the body, got {body['text']!r}"
+
+
+def test_a_legacy_disclosure_whose_body_is_a_string_renders_it(page, served) -> None:
+    """VII.1 — a v1 info-tip may carry its body as one string. Both shims
+    read `content` as a block list only: the renderer replaced a string
+    with [] and the Python one iterated it character by character and
+    kept none, so the disclosure opened onto nothing and `oku migrate`
+    wrote the page without the text. Found on a delivered research page
+    of 68 disclosures, one of them written this way."""
+    page.goto(f"{served}/legacy.html")
+    page.wait_for_function("() => window.__okuRendered === true", timeout=20000)
+    body = page.evaluate(BODY, {"sel": "#legacy-text details.info-tip", "tag": "p"})
+    assert body, "no disclosure rendered under #legacy-text"
+    assert "the body is one string" in body["text"], body

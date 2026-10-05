@@ -160,3 +160,18 @@ def test_check_reports_a_v1_block_that_will_not_render(tmp_path: Path) -> None:
     text = "\n".join(msg for _, msg in errors)
     assert "blocks[0].blocks[1]" in text
     assert "blocks[0].blocks[2]" in text
+
+
+def test_a_legacy_disclosure_body_written_as_one_string_survives() -> None:
+    """A v1 info-tip whose `content` is a string, not a block list. The
+    conversion iterated the string a character at a time and kept none
+    of them, so a migration wrote the disclosure without its body and
+    deleted the .json that held it."""
+    v1 = {
+        "kind": "page",
+        "title": "T",
+        "blocks": [{"kind": "info-tip", "summary": "S", "content": "the body is one string"}],
+    }
+    v2 = cli._v1_to_v2(v1)
+    tips = [b for b in v2["b"] if isinstance(b, str) and "[!TIP]" in b]
+    assert tips and "the body is one string" in tips[0], v2["b"]
