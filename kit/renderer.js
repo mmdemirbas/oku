@@ -323,6 +323,18 @@
     return href;
   }
 
+  // Where a link the author wrote actually goes, or null when it must not
+  // be a link. A relative `foo.md(#frag)` names a page's SOURCE, and both
+  // built trees hold the rendered page, so it becomes `.html`; absolute
+  // URLs, fragment-only and root-absolute hrefs pass through. Every link
+  // the renderer draws comes through here — a prose link, a step-flow or
+  // compare-grid card, a table row — because a payload href set raw was a
+  // dead link in both trees while the same target in prose worked.
+  function linkHref(href) {
+    const md = String(href).match(/^(?!\w+:|\/\/|#|\/)(.+?)\.md(#[^\s]*)?$/i);
+    return safeUrl(md ? md[1] + '.html' + (md[2] || '') : href, false);
+  }
+
   function textNode(s) {
     return document.createTextNode(decodeEntities(s));
   }
@@ -744,14 +756,9 @@
       parseLabel(label, e);
       return e;
     }
-    // Cross-page markdown link: a relative `foo.md(#frag)` href points
-    // at the rendered page — rewrite to .html. Absolute URLs,
-    // fragment-only and root-absolute hrefs pass through untouched.
-    const mdLink = href.match(/^(?!\w+:|\/\/|#|\/)(.+?)\.md(#[^\s]*)?$/i);
-    if (mdLink) href = mdLink[1] + '.html' + (mdLink[2] || '');
     // A destination that would execute script on click is not a link.
     // Dropping the href (rather than the text) keeps the label readable.
-    const url = safeUrl(href, false);
+    const url = linkHref(href);
     if (url === null) {
       const span = document.createElement('span');
       parseLabel(label, span);
@@ -2253,11 +2260,12 @@
       const ordered = block.ordered !== false;
       wrap.className = 'step-cards' + (ordered ? '' : ' step-cards-grid');
       (block.steps || []).forEach((s, i) => {
-        const card = document.createElement(s.href ? 'a' : 'div');
-        card.className = 'step-card' + (s.href ? ' step-card-link' : '');
-        if (s.href) {
-          card.setAttribute('href', s.href);
-          if (/^https?:/i.test(s.href)) {
+        const href = s.href ? linkHref(s.href) : null;
+        const card = document.createElement(href ? 'a' : 'div');
+        card.className = 'step-card' + (href ? ' step-card-link' : '');
+        if (href) {
+          card.setAttribute('href', href);
+          if (/^https?:/i.test(href)) {
             card.setAttribute('target', '_blank');
             card.setAttribute('rel', 'noopener');
           }
@@ -2352,10 +2360,11 @@
       // when every figure it might copy has been drawn.
       if (block.preview) grid.setAttribute('data-oku-preview', '1');
       for (const c of (block.cards || [])) {
-        const card = document.createElement(c.href ? 'a' : 'div');
+        const href = c.href ? linkHref(c.href) : null;
+        const card = document.createElement(href ? 'a' : 'div');
         const styleKey = c.accent || c.verdict || 'neutral';
-        card.className = 'compare-card ' + styleKey + (c.href ? ' compare-card-link' : '');
-        if (c.href) card.setAttribute('href', c.href);
+        card.className = 'compare-card ' + styleKey + (href ? ' compare-card-link' : '');
+        if (href) card.setAttribute('href', href);
         if (c.t) {
           const head = document.createElement('div');
           head.className = 'compare-card-head';
@@ -2606,9 +2615,9 @@
 
       const renderRow = (row) => {
         const tr = document.createElement('tr');
-        // Through safeUrl like every other link: the click listener
+        // Through linkHref like every other link: the click listener
         // holds the value in a closure, out of reach of any later pass.
-        const rowHref = row && typeof row === 'object' && !Array.isArray(row) && row.href ? safeUrl(row.href) : null;
+        const rowHref = row && typeof row === 'object' && !Array.isArray(row) && row.href ? linkHref(row.href) : null;
         if (rowHref) {
           tr.setAttribute('data-href', rowHref);
           tr.style.cursor = 'pointer';

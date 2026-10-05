@@ -628,6 +628,18 @@ There is no check for a tag OUTSIDE the list, deliberately. Prose here
 writes `<name>`, `<rel-path>` and `<docs>` as metavariables, and a check
 cannot tell those from a typo'd tag without guessing.
 
+**A link in a payload goes where the same link in prose goes.** A
+relative `foo.md` names a page's source and both built trees hold the
+rendered page, so `renderLink` rewrote it to `.html` — and a step-flow
+card, a compare-grid card and a table row set their payload `href` raw.
+Measured on a delivered five-page report whose index was a grid of
+step-flow cards: the prose link read `other.html`, every card
+`other.md`, a dead link in both trees, while `oku check` resolved
+`other.md` and reported `other.html`, so no spelling was both clean and
+working. The cards skipped `safeUrl` as well. `linkHref` is the one
+answer — the rewrite, then `safeUrl` — and every link the renderer draws
+asks it. Held by `browser/test_payload_links_to_pages.py`, both trees.
+
 **A link's words may hold brackets, and a bare address is a link.**
 Both are GFM and the inline parser followed neither. The label pattern
 refused `]`, so `[AJSLP 2025 **[özet]**](url)` was not a link at all —
