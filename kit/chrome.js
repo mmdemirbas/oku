@@ -7870,7 +7870,19 @@ var __okuKit = (function () {
     // Project config lives at the docs root; domain files live in _oku/.
     var wa = (window.__okuWithAuth || function (u) { return u; });
     return fetch(wa(__okuDocsRoot + 'kit.json'), { cache: 'no-cache' })
-      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (r) {
+        if (!r.ok) return null;  // no kit.json is a valid project
+        // One that does not parse is not: it turns off the glossary,
+        // ext-refs and placeholders, so it is said rather than swallowed.
+        return r.json().catch(function (e) {
+          var msg = 'kit.json did not parse — glossary, ext-refs and reader placeholders are off: ' + (e && e.message || e);
+          console.warn('[oku] ' + msg);
+          window.dispatchEvent(new CustomEvent('oku:warnings', {
+            detail: [{ code: 'kit-json-unparseable', msg: msg, level: 'error' }]
+          }));
+          return null;
+        });
+      })
       .catch(function () { return null; })
       .then(function (data) {
         if (data) {
