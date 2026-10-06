@@ -34,6 +34,20 @@ def front_app() -> str:
     return osa('tell application "System Events" to get name of (first process whose frontmost is true)')
 
 
+def front_pid() -> int:
+    return int(
+        osa('tell application "System Events" to get unix id of (first process whose frontmost is true)')
+    )
+
+
+def screen_locked() -> bool:
+    """A locked screen moves focus nowhere, so the IDE is never activated and
+    syncs on its background schedule instead: every time measured is then
+    10-15 s and says nothing about the preview."""
+    done = subprocess.run(["ioreg", "-n", "Root", "-d1"], capture_output=True, text=True)
+    return '"CGSSessionScreenIsLocked"=Yes' in done.stdout
+
+
 def sync(pid: int) -> str:
     """Bring the sandbox IDE to the front; activation is what syncs."""
     return (
@@ -57,11 +71,20 @@ def main() -> int:
         browser = p.chromium.connect_over_cdp(CDP)
         pages = {name(pg.url): pg for pg in preview_pages(browser)}
         report["targets"] = sorted(pages)
-        user_app = front_app()
+        if screen_locked():
+            print(
+                "the screen is locked: focus cannot move, so nothing measured here would mean anything",
+                file=sys.stderr,
+            )
+            return 2
+        # Never "give back" to the sandbox itself: activating it before the
+        # revert is written means the sync after it is no activation at all.
+        user_app = "Finder" if front_pid() == pid else front_app()
         # The IDE syncs on ACTIVATION: one already in front never activates,
         # and a freshly started sandbox usually is in front.
         give_back("Finder")
         time.sleep(0.3)
+        report["handed_away"] = front_pid() != pid
         try:
             for f in files:
                 f.write_bytes(originals[f] + ADDED.encode())
@@ -80,6 +103,7 @@ def main() -> int:
             for f in files:
                 f.write_bytes(originals[f])
         time.sleep(0.5)
+        report["handed_away_for_revert"] = front_pid() != pid
         sync(pid)
         report["reverted_" + files[0].name] = wait(
             lambda: (

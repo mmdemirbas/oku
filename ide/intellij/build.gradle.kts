@@ -49,4 +49,6 @@ tasks.runIde {
         "-Didea.trust.disabled=true",
     )
     providers.gradleProperty("openPaths").orNull?.let { args(it.split(",")) }
+    // -PokuExecutable=/abs/oku/bin/oku runs the preview from a checkout.
+    providers.gradleProperty("okuExecutable").orNull?.let { jvmArgs("-Doku.executable=$it") }
 }

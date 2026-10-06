@@ -1,4 +1,4 @@
-"""Open a page preview.py wrote, over file:// in headless Chromium, and say
+"""Open a page `oku preview` wrote, over file:// in headless Chromium, and say
 what rendered. The plugin's JCEF panel is Chromium too, so this is the
 browser half of the PoC measured without the IDE.
 

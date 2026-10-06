@@ -4,6 +4,7 @@ import com.intellij.ide.BrowserUtil
 import com.intellij.ide.ui.LafManagerListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.runReadActionBlocking
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
@@ -40,7 +41,7 @@ import kotlin.io.path.pathString
 /**
  * The kit's own rendering of one oku page, in the IDE's embedded Chromium.
  *
- * Every edit re-renders through the installed oku tool, and the page is
+ * Every edit re-renders through `oku preview --serve`, and the page is
  * reloaded; the page itself puts the reader back where they were. Links
  * leave the panel: another page or a `#f/` file opens in the IDE, a web
  * address opens in the system browser.
@@ -54,11 +55,16 @@ class OkuPreviewFileEditor(
     private val browser = JBCefBrowser()
     private val alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
     private val document = FileDocumentManager.getInstance().getDocument(file)
+    private val previews = service<OkuPreviewService>()
 
     @Volatile
     private var current: Rendered? = null
 
     private val generation = AtomicInteger()
+
+    /** The last render failed, so the panel is showing why and not the page. */
+    @Volatile
+    private var failed = false
 
     init {
         Disposer.register(this, browser)
@@ -79,9 +85,10 @@ class OkuPreviewFileEditor(
     private fun render() {
         val text = runReadActionBlocking { document?.text ?: VfsUtilCore.loadText(file) }
         val theme = if (JBColor.isBright()) "light" else "dark"
-        OkuTool.render(Path(file.path), text, theme)
+        previews.render(Path(file.path), text, theme)
             .onSuccess {
                 current = it
+                failed = false
                 // A new query per render: JBCefBrowserBase skips a load of
                 // the URL it last requested ("URL already requested,
                 // skipping"), so a re-render of the same page never reached
@@ -89,13 +96,14 @@ class OkuPreviewFileEditor(
                 browser.loadURL("${it.html.toUri()}?r=${generation.incrementAndGet()}")
             }
             .onFailure {
+                failed = true
                 log.warn("oku preview failed for ${file.path}", it)
                 showError(it.message ?: it.toString())
             }
     }
 
     private fun showError(message: String) {
-        val page = OkuTool.outBase.resolve("error.html")
+        val page = previews.outBase.resolve("error.html")
         val escaped = message.replace("&", "&amp;").replace("<", "&lt;")
         Files.writeString(page, "<!doctype html><meta charset=utf-8><body style=\"font:13px system-ui;padding:16px\"><h3>oku preview</h3><pre style=\"white-space:pre-wrap\">$escaped</pre>")
         browser.loadURL(page.toUri().toString())
@@ -135,14 +143,14 @@ class OkuPreviewFileEditor(
         val target = Path(uri.path)
         val rendered = current
         if (rendered != null && target == rendered.html) return false // our own (re)load
-        if (target.startsWith(OkuTool.outBase) && rendered == null) return false
+        if (target.startsWith(previews.outBase) && rendered == null) return false
         // A page of the same tree: the preview has `x.html`, the IDE wants `x.md`.
         val source = if (rendered != null && target.startsWith(rendered.out)) {
             val rel = rendered.out.relativize(target)
             val asMd = rendered.root.resolve(rel).resolveSibling(rel.fileName.pathString.removeSuffix(".html") + ".md")
             if (target.extension == "html" && asMd.exists()) asMd else rendered.root.resolve(rel)
         } else target
-        if (source.startsWith(OkuTool.outBase)) return false // error page and the like
+        if (source.startsWith(previews.outBase)) return false // error page and the like
         open(source, line = 0)
         return true
     }
@@ -177,6 +185,13 @@ class OkuPreviewFileEditor(
     override fun setState(state: FileEditorState) = Unit
     override fun isModified(): Boolean = false
     override fun isValid(): Boolean = file.isValid
+
+    // A failed render is otherwise retried only by the next edit, so a tab
+    // the reader did not touch kept its error after the cause was fixed
+    // (oku updated, a kit.json repaired). Coming back to the tab retries.
+    override fun selectNotify() {
+        if (failed) schedule(0)
+    }
     override fun addPropertyChangeListener(listener: PropertyChangeListener) = Unit
     override fun removePropertyChangeListener(listener: PropertyChangeListener) = Unit
     override fun dispose() = Unit
