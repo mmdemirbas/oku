@@ -1,14 +1,14 @@
 ---
 title: CLI reference
 eyebrow: Reference
-subtitle: Nine commands: oku init, build, clean, spec, vendor, verify, migrate, check, serve. Designed so you mostly forget the CLI exists.
+subtitle: Ten commands: oku init, build, clean, spec, vendor, verify, migrate, check, serve, preview. Designed so you mostly forget the CLI exists.
 date: 2026-05-18
 order: 50
-summary: oku init / build / clean / spec / vendor / verify / migrate / check / serve — what each does.
+summary: oku init / build / clean / spec / vendor / verify / migrate / check / serve / preview — what each does.
 ---
 
 > [!TLDR]
-> init scaffolds the cwd as a docs root: _oku symlink + index.html entry stub. build emits two single-purpose trees — dist/standalone/ and dist/site/ (with manifest + llms.txt + Pagefind). clean wipes dist/. migrate converts page-JSON sources to v3 markdown. check lints every page. serve runs a local HTTP server and synthesizes the manifest, llms.txt and kit.json in memory — source dirs stay clean apart from the one entry stub.
+> init scaffolds the cwd as a docs root: _oku symlink + index.html entry stub. build emits two single-purpose trees — dist/standalone/ and dist/site/ (with manifest + llms.txt + Pagefind). clean wipes dist/. migrate converts page-JSON sources to v3 markdown. check lints every page. serve runs a local HTTP server and synthesizes the manifest, llms.txt and kit.json in memory — source dirs stay clean apart from the one entry stub. preview renders one page for an editor's preview panel.
 >
 > - init treats cwd as the docs root. Run it from wherever you want pages to live (typically cd into your docs/ subdir first).
 > - Source dirs hold MD (or legacy JSON) plus a single index.html entry stub so IDE-served workflows work without the dev server running.
@@ -341,6 +341,27 @@ oku serve
 
 > [!NOTE] Optional flags
 > <strong>--no-watch</strong> disables the filesystem watcher + live-reload (serve static only).<br><strong>--no-search</strong> skips the background Pagefind index generation at startup. Both default to on so the dev loop is rich; opt out if you want a leaner serve.<br><strong>--no-open</strong> leaves the browser alone: by default serve opens the page nearest where it was started, which is wrong for a server started in the background or by a tool.<br><strong>--host</strong> is the address to bind, and it is <code>127.0.0.1</code> — this machine only. The server hands out the project root, working copy and all, so <code>--host 0.0.0.0</code> (to open the preview on a phone) makes every file under the root readable to anyone who can route to your machine, with no password. The startup line prints the address actually bound.
+
+## oku preview {#preview}
+
+Renders one page for an editor's preview panel and prints, as JSON, where it went. The page goes through the same standalone build as oku build, so the panel shows what the build ships. The markdown can come from stdin, because an editor's buffer is usually ahead of the file on disk. [The IntelliJ plugin](#f/ide/intellij/README.md) runs this command.
+
+```bash
+oku preview docs/guide.md --out /tmp/oku-preview --theme dark
+
+# {"protocol": 1, "html": "/tmp/oku-preview/3f2a9c1b7d4e/guide.html",
+#  "root": "/path/to/project/docs", "out": "/tmp/oku-preview/3f2a9c1b7d4e",
+#  "ms": {"convert": 47, "manifest": 60, "standalone": 21}, "notes": []}
+```
+
+- The page's tree is the directory of the nearest kit.json between the page and its project root (the nearest .git), else the page's own directory. Every page of one tree is written to one subdirectory of --out, so the site tree's links reach pages rendered from the same tree.
+- --stdin reads the markdown from stdin instead of the file. The path still decides the kit.json in force, the page's language, git's date and where #f/ references resolve.
+- --theme light or dark is the first paint's theme; without it the reader's system setting applies. The page keeps its scroll position across reloads, which an editor does after every edit.
+- The manifest carries the tree's absolute path, as oku serve does while bound to this machine, so the file viewer shows full paths. A preview is written for an editor on this machine; do not hand its directory to anyone.
+- notes holds what the build could not carry (an image over the inline cap, a file outside the project). Exit 1 with the reason on stderr when the page cannot be rendered at all: not a .md file, missing, or not UTF-8.
+
+> [!NOTE] Long-running: --serve
+> <strong>--serve</strong> keeps one process for a whole editing session: one JSON request per stdin line, one JSON response per stdout line, until stdin closes. The first line out is a greeting, <code>{"protocol": 1, "oku": …, "kit": …}</code>, so an editor can refuse an oku it does not speak to. A request is <code>{"id", "path", "text"?, "theme"?}</code> (no <code>text</code> reads the file); the answer is the one-page result with the same <code>id</code>, or <code>{"id", "error"}</code>, and a bad request does not end the session. The tree's manifest is kept between requests and computed again when a file in the tree changes, so every render after the first costs the page and not the tree: about 25 ms on this repository's docs, against about 200 ms for a one-shot run, most of which is starting Python.
 
 ## Dependencies {#optional-deps}
 

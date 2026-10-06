@@ -122,7 +122,7 @@ AI/LLM surface.
 | `renderer.js` | page JSON → DOM mapping. Walks `b[]`; strings parsed by the GFM block parser (headings → sections, paragraphs, lists, GFM tables, fences — `oku-*`/`mermaid` fences lift to typed blocks, def-lists, task-lists, HTML islands w/ executing scripts, admonitions); typed objects dispatched to typed renderers. v1→v2 shim keeps older pages rendering. ~2.6k LoC. |
 | `kit/schema/page.schema.json` | JSON-schema for page payloads. Every page (converted from .md) validates against it; the optional `jsonschema` dep makes the check active. Chart `type` enum here is the single source of truth for known chart types. |
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
-| `src/oku/cli.py` | `oku init / build / clean / check / spec / vendor / verify / migrate / serve` plus the v3 converter pair (`md_to_v2_page` / `page_to_md`), the strict-GFM + island lint (`_lint_md_string`), and the v1→v2 page shim (`_v1_to_v2`). |
+| `src/oku/cli.py` | `oku init / build / clean / check / spec / vendor / verify / migrate / serve / preview` plus the v3 converter pair (`md_to_v2_page` / `page_to_md`), the strict-GFM + island lint (`_lint_md_string`), and the v1→v2 page shim (`_v1_to_v2`). |
 | `src/oku/templates/` | `starter.{md,html}` — pair to copy when starting a new page. |
 | `bin/oku` | PEP 723 shim — run without install via `uv run bin/oku …`. Points at `oku.cli:main`. |
 | `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.md` tracks open phases. |
@@ -1035,6 +1035,19 @@ attribute name: the toolbar sizes and orders its icons through
 `[data-copy]`, and a button called `data-copy-md` fell out of every rule
 in that list — a 22x10 box around a 0x0 icon. Held by
 `test_table_copy_formats.py`.
+
+**`oku preview` is a contract with code outside this package, and the
+JSON it prints is the contract.** The IntelliJ plugin under `ide/intellij`
+runs it, and before it existed that plugin imported private `oku.cli`
+helpers from a bridge script, which is coupling nothing here could see.
+Two things keep it honest. The page goes through `page_from_markdown` and
+`build_standalone`, the build's own path, so the preview is what the build
+ships — `test_preview.py` compares the inlined page with `oku build`'s.
+And `--serve` keeps a tree's manifest between requests, which is the cache
+`oku serve` once kept past a kit.json edit: a tree whose snapshot changed
+goes through `_forget_tree_state` first. Changing a request or response
+field means raising `PREVIEW_PROTOCOL`, because the greeting is how an
+editor tells an oku it does not speak to from one that is merely slow.
 
 **`oku build` runs the checks `oku check` runs — it did not, and the
 gap was the whole point of one of them.** `find_unparseable_json`

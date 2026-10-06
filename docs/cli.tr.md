@@ -1,14 +1,14 @@
 ---
 title: CLI başvurusu
 eyebrow: Başvuru
-subtitle: Dokuz komut - oku init, build, clean, spec, vendor, verify, migrate, check, serve. Çoğu zaman CLI'nin varlığını unutacak şekilde tasarlandı.
+subtitle: On komut - oku init, build, clean, spec, vendor, verify, migrate, check, serve, preview. Çoğu zaman CLI'nin varlığını unutacak şekilde tasarlandı.
 date: 2026-05-18
 order: 50
-summary: oku init / build / clean / spec / vendor / verify / migrate / check / serve — her birinin ne yaptığı.
+summary: oku init / build / clean / spec / vendor / verify / migrate / check / serve / preview — her birinin ne yaptığı.
 ---
 
 > [!TLDR]
-> init, içinde bulunduğunuz dizini belge kökü olarak hazırlar: _oku sembolik bağı + index.html giriş taslağı. build tek amaçlı iki ağaç üretir — dist/standalone/ ve dist/site/ (manifesto + llms.txt + Pagefind ile). clean dist/ dizinini siler. migrate sayfa-JSON kaynaklarını v3 markdown'a çevirir. check her sayfayı denetler. serve yerel bir HTTP sunucusu çalıştırır ve manifestoyu, llms.txt'yi ve kit.json'u bellekte üretir — kaynak dizinleri tek giriş taslağı dışında temiz kalır.
+> init, içinde bulunduğunuz dizini belge kökü olarak hazırlar: _oku sembolik bağı + index.html giriş taslağı. build tek amaçlı iki ağaç üretir — dist/standalone/ ve dist/site/ (manifesto + llms.txt + Pagefind ile). clean dist/ dizinini siler. migrate sayfa-JSON kaynaklarını v3 markdown'a çevirir. check her sayfayı denetler. serve yerel bir HTTP sunucusu çalıştırır ve manifestoyu, llms.txt'yi ve kit.json'u bellekte üretir — kaynak dizinleri tek giriş taslağı dışında temiz kalır. preview bir sayfayı bir düzenleyicinin önizleme paneli için çizer.
 >
 > - init, içinde bulunduğunuz dizini belge kökü sayar. Sayfaların duracağı yerden çalıştırın (genellikle önce docs/ alt dizinine geçin).
 > - Kaynak dizinleri MD (ya da eski JSON) dosyalarını ve tek bir index.html giriş taslağını tutar; böylece IDE üzerinden sunulan akışlar geliştirme sunucusu çalışmadan da işler.
@@ -343,6 +343,27 @@ oku serve
 
 > [!NOTE] İsteğe bağlı bayraklar
 > <strong>--no-watch</strong> dosya sistemi izleyicisini ve canlı yenilemeyi kapatır (yalnızca durağan sunum).<br><strong>--no-search</strong> başlangıçtaki arka plan Pagefind dizin üretimini atlar. İkisi de öntanımlı olarak açıktır, böylece geliştirme döngüsü zengin olur; daha hafif bir serve isterseniz kapatın.<br><strong>--no-open</strong> tarayıcıya dokunmaz: öntanımlı olarak serve, başlatıldığı yere en yakın sayfayı açar; bu, arka planda ya da bir araç tarafından başlatılan bir sunucu için yanlıştır.<br><strong>--host</strong> bağlanılacak adrestir ve öntanımlı değeri <code>127.0.0.1</code>, yani yalnızca bu makine. Sunucu proje kökünü olduğu gibi paylaşır; bu yüzden <code>--host 0.0.0.0</code> (önizlemeyi telefonda açmak için) kökün altındaki her dosyayı, makinenize erişebilen herkese parolasız okunur kılar. Başlangıç satırı gerçekten bağlanılan adresi yazar.
+
+## oku preview {#preview}
+
+Bir sayfayı bir düzenleyicinin önizleme paneli için çizer ve nereye yazdığını JSON olarak basar. Sayfa oku build ile aynı tek dosyalık derlemeden geçer, yani panel derlemenin ürettiğini gösterir. Markdown stdin'den gelebilir, çünkü bir düzenleyicinin tamponu çoğu zaman diskteki dosyanın önündedir. Bu komutu [IntelliJ eklentisi](#f/ide/intellij/README.md) çalıştırır.
+
+```bash
+oku preview docs/guide.md --out /tmp/oku-preview --theme dark
+
+# {"protocol": 1, "html": "/tmp/oku-preview/3f2a9c1b7d4e/guide.html",
+#  "root": "/path/to/project/docs", "out": "/tmp/oku-preview/3f2a9c1b7d4e",
+#  "ms": {"convert": 47, "manifest": 60, "standalone": 21}, "notes": []}
+```
+
+- Sayfanın ağacı, sayfa ile proje kökü (en yakın .git) arasındaki en yakın kit.json'un dizinidir; yoksa sayfanın kendi dizini. Bir ağacın bütün sayfaları --out altında tek bir alt dizine yazılır; böylece site ağacının bağlantıları aynı ağaçtan çizilmiş sayfalara ulaşır.
+- --stdin markdown'u dosya yerine stdin'den okur. Geçerli kit.json'u, sayfanın dilini, git tarihini ve #f/ başvurularının nereden çözüleceğini yine yol belirler.
+- --theme light ya da dark ilk boyamanın temasıdır; verilmezse okuyucunun sistem ayarı geçerlidir. Sayfa, bir düzenleyicinin her düzenlemeden sonra yaptığı yeniden yüklemelerde kaydırma konumunu korur.
+- Manifest, oku serve'ün yalnızca bu makineye bağlıyken yaptığı gibi ağacın mutlak yolunu taşır; dosya görüntüleyici tam yolu böyle gösterir. Önizleme bu makinedeki bir düzenleyici için yazılır; dizinini kimseyle paylaşmayın.
+- notes, derlemenin taşıyamadıklarını içerir (satır içi sınırını aşan bir görsel, proje dışında bir dosya). Sayfa hiç çizilemiyorsa çıkış kodu 1'dir ve nedeni stderr'e yazılır: .md değil, dosya yok ya da UTF-8 değil.
+
+> [!NOTE] Sürekli çalışan kip: --serve
+> <strong>--serve</strong> bütün bir düzenleme oturumu boyunca tek bir süreç tutar: stdin'den satır başına bir JSON istek, stdout'a satır başına bir JSON yanıt; stdin kapanınca çıkar. İlk satır bir selamlamadır, <code>{"protocol": 1, "oku": …, "kit": …}</code>; böylece bir düzenleyici anlaşamadığı bir oku'yu reddedebilir. İstek <code>{"id", "path", "text"?, "theme"?}</code> biçimindedir (<code>text</code> yoksa dosya okunur); yanıt aynı <code>id</code> ile tek sayfalık sonuçtur ya da <code>{"id", "error"}</code>, ve hatalı bir istek oturumu bitirmez. Ağacın manifesti istekler arasında saklanır ve ağaçtaki bir dosya değişince yeniden hesaplanır; böylece ilkinden sonraki her çizim ağacın değil yalnızca sayfanın bedelini öder: bu reponun belgelerinde yaklaşık 25 ms, tek seferlik bir çalıştırmanın çoğu Python'u başlatmaya giden yaklaşık 200 ms'sine karşı.
 
 ## Bağımlılıklar {#optional-deps}
 

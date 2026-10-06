@@ -23,10 +23,12 @@ prefix for click-to-open.
 import argparse
 import base64
 import collections
+import contextlib
 import datetime
 import difflib
 import hashlib
 import http.server
+import io
 import ipaddress
 import json
 import mimetypes
@@ -1286,14 +1288,29 @@ def _page_from_source_file(p: Path) -> dict | None:
         return None
     if parser is md_to_v2_page:
         block_lines: dict[int, int] = {}
-        page = parser(text, default_title=_source_stem_path(p).name, block_lines=block_lines)
+        page = page_from_markdown(p, text, block_lines=block_lines)
         _remember_source(_synth_json_path(p), p, block_lines)
-    else:
-        page = parser(text, default_title=_source_stem_path(p).name)
-    if parser is md_to_v2_page:
-        _, front_meta = _strip_md_front_matter(text)
-        if not front_meta.get("title"):
-            page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
+        return page
+    page = parser(text, default_title=_source_stem_path(p).name)
+    _apply_meta_defaults(page, p)
+    carry_file_refs(page, p)
+    return page
+
+
+def page_from_markdown(p: Path, text: str, *, block_lines: dict[int, int] | None = None) -> dict:
+    """The page dict for markdown `text` that sits at `p`.
+
+    `text` need not be what is on disk: `oku preview` hands in an
+    editor's unsaved buffer. The path still decides everything that is
+    not in the text — the kit.json in force, the page's language from
+    its filename, git's date, and where `#f/` references resolve — so
+    one function serves the build and the preview, and the preview
+    cannot drift from what the build ships.
+    """
+    page = md_to_v2_page(text, default_title=_source_stem_path(p).name, block_lines=block_lines)
+    _, front_meta = _strip_md_front_matter(text)
+    if not front_meta.get("title"):
+        page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
     _apply_meta_defaults(page, p)
     carry_file_refs(page, p)
     return page
@@ -8396,6 +8413,227 @@ def _comparable_meta(page: dict) -> str:
     return json.dumps(keep, sort_keys=True, ensure_ascii=False, default=str)
 
 
+# ---------- oku preview ----------
+#
+# One page, rendered for an editor's preview panel. It goes through
+# build_standalone, so what the editor shows is the build's own output for
+# that page; the markdown comes from the caller, because an editor's buffer
+# is usually ahead of the file on disk. The JSON on stdout is the contract
+# an editor extension is written against, and PREVIEW_PROTOCOL names it.
+
+# Raised when a request or response changes shape, so an extension can
+# refuse an oku it does not speak to instead of failing on a missing field.
+PREVIEW_PROTOCOL = 1
+
+# Runs before chrome-boot.js reads `theme-pref`, so the first paint is in
+# the editor's theme; and keeps the reader's place across the reload an
+# editor does after every edit. `instant`, because the kit sets
+# `scroll-behavior: smooth` on <html>: a plain scrollTo animated the page
+# down from the top on every keystroke (1938 of 2400 px after 300 ms).
+_PREVIEW_SHIM = """<script>/* oku preview */
+(function () {
+  var theme = __THEME__;
+  try { if (theme) localStorage.setItem('theme-pref', theme); } catch (e) {}
+  var key = 'oku-preview-scroll:' + location.pathname;
+  try { history.scrollRestoration = 'manual'; } catch (e) {}
+  function restore() {
+    var y = 0;
+    try { y = +sessionStorage.getItem(key) || 0; } catch (e) {}
+    if (y) window.scrollTo({ top: y, behavior: 'instant' });
+  }
+  window.addEventListener('oku:rendered', function () {
+    requestAnimationFrame(restore);
+    setTimeout(restore, 250);
+  }, { once: true });
+  var t;
+  window.addEventListener('scroll', function () {
+    clearTimeout(t);
+    t = setTimeout(function () {
+      try { sessionStorage.setItem(key, String(window.scrollY)); } catch (e) {}
+    }, 80);
+  }, { passive: true });
+})();
+</script>
+"""
+
+
+class PreviewError(Exception):
+    """A request `oku preview` cannot render, in words for the editor."""
+
+
+def _require_markdown(md: Path) -> Path:
+    if md.suffix.lower() != ".md":
+        raise PreviewError(f"{md} is not a markdown page (.md)")
+    return md
+
+
+def _preview_tree_root(md: Path) -> Path:
+    """The tree a page is previewed in: the directory of the nearest
+    kit.json between the page and its project fence, else the page's own.
+
+    Bounded by the fence on purpose. `_nearest_kit_data` walks to the
+    filesystem root, which is right for reading a configuration and wrong
+    for choosing a tree to walk: a stray kit.json in the home directory
+    would make every file under it part of the preview's site tree.
+    """
+    fence = project_root_for(md.parent)
+    for d in (md.parent, *md.parent.parents):
+        if (d / "kit.json").is_file():
+            return d
+        if d == fence:
+            break
+    return md.parent
+
+
+def preview_page(
+    md: Path,
+    text: str,
+    out_base: Path,
+    *,
+    theme: str | None = None,
+    trees: dict[Path, tuple[dict, dict]] | None = None,
+) -> dict:
+    """Write the page an editor previews for `md` holding `text`, and say
+    where it went: {"html", "root", "out", "ms", "notes"}.
+
+    Every page of one tree lands in one directory under `out_base`, named
+    from the tree's path, so the site tree's relative links reach siblings
+    rendered from the same tree and an editor can map one back to its
+    source. `trees` is the long-running mode's memory: per tree, the
+    snapshot it was last seen at and the manifest computed then. A tree
+    that changed since drops every cache derived from it — the reason
+    `_forget_tree_state` exists, from `oku serve`.
+    """
+    started = time.perf_counter()
+    md = _require_markdown(md).resolve()
+    root = _preview_tree_root(md)
+    manifest = None
+    snapshot: dict = {}
+    if trees is not None:
+        snapshot = _snapshot_tree(root)
+        held = trees.get(root)
+        if held is not None and held[0] == snapshot:
+            manifest = held[1]
+        else:
+            _forget_tree_state()
+    page = page_from_markdown(md, text)
+    converted = time.perf_counter()
+    if manifest is None:
+        manifest = compute_manifest(root)
+        # Written for an editor on this machine, which is the case where
+        # `oku serve` on loopback hands the viewer the tree's real path;
+        # nothing here is handed to anyone else.
+        manifest["root_abs"] = root.as_posix()
+        if trees is not None:
+            trees[root] = (snapshot, manifest)
+    listed = time.perf_counter()
+
+    out = out_base.resolve() / hashlib.sha1(root.as_posix().encode()).hexdigest()[:12]
+    rel_html = md.relative_to(root).with_suffix(".html")
+    shim = _PREVIEW_SHIM.replace("__THEME__", json.dumps(theme))
+    stub = _stub_for(page.get("t") or md.stem, lang=_lang_of_page(page))
+    stub = stub.replace('<script src="_oku/chrome-boot.js', shim + '<script src="_oku/chrome-boot.js', 1)
+    # build_standalone narrates what it could not carry; in --serve mode
+    # stdout is the protocol, so the lines travel in the response instead.
+    narrated = io.StringIO()
+    with contextlib.redirect_stdout(narrated):
+        build_standalone([(root / rel_html, stub, page)], out, root, manifest=manifest)
+    written = time.perf_counter()
+    return {
+        "html": (out / rel_html).as_posix(),
+        "root": root.as_posix(),
+        "out": out.as_posix(),
+        "ms": {
+            "convert": round(1000 * (converted - started)),
+            "manifest": round(1000 * (listed - converted)),
+            "standalone": round(1000 * (written - listed)),
+        },
+        "notes": [line.strip() for line in narrated.getvalue().splitlines() if line.strip()],
+    }
+
+
+def _emit(obj: dict) -> None:
+    """One JSON line on stdout, UTF-8 whatever the locale: an editor that
+    starts oku from its Dock icon may hand the child none."""
+    sys.stdout.buffer.write(json.dumps(obj, ensure_ascii=False).encode("utf-8") + b"\n")
+    sys.stdout.buffer.flush()
+
+
+def _preview_serve(out_base: Path) -> int:
+    """`oku preview --serve`: one request per stdin line, one response per
+    stdout line, until stdin closes.
+
+    Request  {"id", "path", "text"?, "theme"?} — `text` absent reads the file.
+    Response {"id", "html", "root", "out", "ms", "notes"} or {"id", "error"}.
+    The first line out is a greeting naming the protocol, so an extension
+    can tell an oku it does not speak to from one that is merely slow.
+    """
+    trees: dict[Path, tuple[dict, dict]] = {}
+    _emit({"protocol": PREVIEW_PROTOCOL, "oku": _PKG_VERSION, "kit": _kit_build_stamp()})
+    for raw in sys.stdin.buffer:
+        if not raw.strip():
+            continue
+        req_id = None
+        try:
+            try:
+                req = json.loads(raw.decode("utf-8"))
+            except ValueError as e:
+                raise PreviewError(f"a request is one JSON object per line: {e}") from e
+            if not isinstance(req, dict):
+                raise PreviewError("a request is a JSON object")
+            req_id = req.get("id")
+            path, text, theme = req.get("path"), req.get("text"), req.get("theme")
+            if not isinstance(path, str):
+                raise PreviewError("`path` is required")
+            if theme not in (None, "light", "dark"):
+                raise PreviewError(f"`theme` is light, dark or absent, not {theme!r}")
+            md = Path(path)
+            if text is None:
+                text = _read_preview_source(md)
+            elif not isinstance(text, str):
+                raise PreviewError("`text` is a string")
+            _emit({"id": req_id, **preview_page(md, text, out_base, theme=theme, trees=trees)})
+        except PreviewError as e:
+            _emit({"id": req_id, "error": str(e)})
+        except Exception as e:  # one page that breaks the build must not end the editor's session
+            _emit({"id": req_id, "error": f"{type(e).__name__}: {e}"})
+    return 0
+
+
+def _read_preview_source(md: Path) -> str:
+    _require_markdown(md)
+    try:
+        return md.read_text(encoding="utf-8")
+    except FileNotFoundError as e:
+        raise PreviewError(f"{md} does not exist") from e
+    except UnicodeDecodeError as e:
+        raise PreviewError(f"{md} is not UTF-8") from e
+
+
+def cmd_preview(args: argparse.Namespace) -> int:
+    out_base = Path(args.out)
+    if args.serve:
+        return _preview_serve(out_base)
+    if args.path is None:
+        print("oku preview: a page path is required (or --serve)", file=sys.stderr)
+        return 2
+    md = Path(args.path)
+    try:
+        if args.stdin:
+            try:
+                text = sys.stdin.buffer.read().decode("utf-8")
+            except UnicodeDecodeError as e:
+                raise PreviewError("stdin is not UTF-8") from e
+        else:
+            text = _read_preview_source(md)
+        result = preview_page(md, text, out_base, theme=args.theme)
+    except PreviewError as e:
+        print(f"oku preview: {e}", file=sys.stderr)
+        return 1
+    _emit({"protocol": PREVIEW_PROTOCOL, **result})
+    return 0
+
+
 # ---------- main ----------
 # ---------- vendored runtime dependencies ----------
 #
@@ -9380,6 +9618,33 @@ def main() -> int:
             "root becomes readable to anyone who can route to this host."
         ),
     )
+    preview_parser = sub.add_parser(
+        "preview",
+        help="render one page for an editor's preview panel; prints where it went as JSON",
+    )
+    preview_parser.add_argument(
+        "path", nargs="?", help="the .md page (its tree, kit.json and links resolve from here)"
+    )
+    preview_parser.add_argument(
+        "--out",
+        required=True,
+        help="directory to write into; each tree gets its own subdirectory",
+    )
+    preview_parser.add_argument(
+        "--stdin",
+        action="store_true",
+        help="read the page's markdown from stdin (an unsaved buffer) instead of the file",
+    )
+    preview_parser.add_argument(
+        "--theme",
+        choices=["light", "dark"],
+        help="theme for the first paint (default: the reader's system setting)",
+    )
+    preview_parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="stay running: one JSON request per stdin line, one JSON response per stdout line",
+    )
 
     args = parser.parse_args()
     # Every run of the installed tool keeps the stable kit link on its own
@@ -9398,6 +9663,8 @@ def main() -> int:
         return cmd_migrate(args)
     if args.cmd == "serve":
         return cmd_serve(args)
+    if args.cmd == "preview":
+        return cmd_preview(args)
     if args.cmd == "spec":
         return cmd_spec(args)
     if args.cmd == "vendor":
