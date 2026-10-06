@@ -1,0 +1,7 @@
+{
+  "$schema": "https://raw.githubusercontent.com/mmdemirbas/oku/main/kit/schema/project-kit.schema.json",
+  "name": "oku · IntelliJ eklentisi",
+  "description": "IntelliJ IDEA içinde oku sayfalarını kitin kendi çizimiyle göstermek: araştırma, PoC ve plan.",
+  "accent": "indigo",
+  "audience": "Yazar"
+}
