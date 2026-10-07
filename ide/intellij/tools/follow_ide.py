@@ -62,8 +62,19 @@ def bring_front(pid: int) -> None:
     )
 
 
-def key(code: int) -> None:
+def key(code: int, ide: int) -> bool:
+    """Press a key in the sandbox, or press nothing and say so.
+
+    Checked before every key, not once: an app that takes focus back a
+    second after the sandbox came forward (measured: Brave, every time)
+    otherwise receives the keys meant for the editor.
+    """
+    front = front_pid()
+    if front != ide:
+        print(json.dumps({"stopped": f"focus left the sandbox for pid {front}; no key sent to it"}))
+        return False
     osa(f'tell application "System Events" to key code {code}')
+    return True
 
 
 def reading(pg) -> dict:
@@ -134,7 +145,8 @@ def main() -> int:
             # Read twice: a page that lands wrong and one that drifts after
             # landing (something above it changing height) need different fixes.
             for code in [PAGE_DOWN] * 4 + [PAGE_UP] * 2:
-                key(code)
+                if not key(code, ide):
+                    return 1
                 time.sleep(0.25)
                 soon = reading(pg)
                 time.sleep(1.0)

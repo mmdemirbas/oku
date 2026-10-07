@@ -102,6 +102,18 @@ class OkuFollowerTest : OkuFixtureTestCase() {
         assertEquals(sent.toString(), 1, sent.size)
     }
 
+    fun `test a double-click on a line just under the editor's top leaves the editor where the page is`() {
+        // The clicked heading sits 0.81 of a line under the page's top. The
+        // editor's scroll offset wants the caret a full line from the edge,
+        // and scrolling the caret into view to honour that moved the editor
+        // a third of its height: measured in the sandbox, editor top 164.59
+        // against page top 177.19.
+        assertEquals(1, fixture.editor.settings.verticalScrollOffset)
+        val after = follower.reveal(line = 178, top = 177.19)!!
+        assertTrue("page top 177.19, editor top $after", abs(after - 177.19) <= onePixel)
+        assertEquals(177, fixture.editor.caretModel.logicalPosition.line)
+    }
+
     fun `test a double-click puts the editor where the page is, and that is not sent back`() {
         val after = follower.reveal(line = 160, top = 150.25)!!
         assertTrue("editor top $after, page top 150.25", abs(after - 150.25) <= onePixel)

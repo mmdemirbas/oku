@@ -82,13 +82,23 @@ internal class OkuFollower(
                 scrolling.scrollVertically(start + ((top - floor(top)) * (end - start)).toInt())
             }
             editor.caretModel.moveToLogicalPosition(LogicalPosition((line - 1).coerceIn(0, lines - 1), 0))
-            scrolling.scrollToCaret(ScrollType.MAKE_VISIBLE)
+            // Not on every reveal: the clicked line is often less than a line
+            // under the top, inside the editor's scroll offset, and making the
+            // caret "visible" there moves the editor a third of its height.
+            if (!caretShown()) scrolling.scrollToCaret(ScrollType.MAKE_VISIBLE)
         } finally {
             scrolling.enableAnimation()
         }
         // The scroll just made is the page's own position: not one to send back.
         followed = topLine() ?: Double.NaN
         return followed
+    }
+
+    /** The caret's whole row is inside the editor's visible area. */
+    private fun caretShown(): Boolean {
+        val area = editor.scrollingModel.visibleArea
+        val y = editor.visualPositionToXY(editor.caretModel.visualPosition).y
+        return y >= area.y && y + editor.lineHeight <= area.y + area.height
     }
 
     /** The 1-based source line at the editor's top, with the part of it scrolled past. */
