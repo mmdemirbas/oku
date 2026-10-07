@@ -1278,7 +1278,7 @@ def _block_index_in(where: str, message: str) -> int | None:
     return None
 
 
-def _page_from_source_file(p: Path) -> dict | None:
+def _page_from_source_file(p: Path, *, carry: bool = True) -> dict | None:
     """Read + convert one page source (any registered format); None
     when unreadable or not a recognised source.
 
@@ -1287,6 +1287,9 @@ def _page_from_source_file(p: Path) -> dict | None:
     title (README, CHANGELOG, CLAUDE, SKILL.md and friends) gets the
     `_materialised_by` tag so the linter's prose rules skip
     author-owned repo prose.
+
+    `carry=False` leaves the `#f/` files out (carry_file_refs), for a
+    caller that reads only the page's metadata.
     """
     parser = _source_parser_for(p)
     if parser is None:
@@ -1298,16 +1301,17 @@ def _page_from_source_file(p: Path) -> dict | None:
         return None
     if parser is md_to_v2_page:
         block_lines: dict[int, int] = {}
-        page = page_from_markdown(p, text, block_lines=block_lines)
+        page = page_from_markdown(p, text, block_lines=block_lines, carry=carry)
         _remember_source(_synth_json_path(p), p, block_lines)
         return page
     page = parser(text, default_title=_source_stem_path(p).name)
     _apply_meta_defaults(page, p)
-    carry_file_refs(page, p)
+    if carry:
+        carry_file_refs(page, p)
     return page
 
 
-def page_from_markdown(p: Path, text: str, *, block_lines: dict[int, int] | None = None) -> dict:
+def page_from_markdown(p: Path, text: str, *, block_lines: dict[int, int] | None = None, carry: bool = True) -> dict:
     """The page dict for markdown `text` that sits at `p`.
 
     `text` need not be what is on disk: `oku preview` hands in an
@@ -1322,7 +1326,8 @@ def page_from_markdown(p: Path, text: str, *, block_lines: dict[int, int] | None
     if not front_meta.get("title"):
         page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
     _apply_meta_defaults(page, p)
-    carry_file_refs(page, p)
+    if carry:
+        carry_file_refs(page, p)
     return page
 
 
@@ -1585,6 +1590,8 @@ def _git_last_modified(p: Path) -> str | None:
         out = _git_date_one(p)
     _git_date_cache[key] = out
     return out
+
+
 
 
 def _git_dates_in(directory: Path) -> dict[str, str] | None:
@@ -2296,7 +2303,7 @@ def _v1_dropped_blocks(data: dict) -> list[str]:
     return dropped
 
 
-def find_json_pages(root: Path):
+def find_json_pages(root: Path, *, carry: bool = True):
     """Recursively find *.json files where the root object has kind == 'page'.
 
     ALSO converts .md files into synthesized page dicts. The returned
@@ -2304,6 +2311,10 @@ def find_json_pages(root: Path):
     code that does `path.with_suffix(".html")` still works.
 
     Returns list of (path, parsed-data) tuples sorted by path.
+
+    `carry=False` skips carrying each page's `#f/` files, which is most of
+    the cost of reading a tree whose pages cite files, for a caller that
+    reads only metadata (compute_manifest).
     """
     pages = []
     real_json: set[Path] = set()
@@ -2319,7 +2330,7 @@ def find_json_pages(root: Path):
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             continue
         if _is_page(data):
-            pages.append((p, carry_file_refs(data, p)))
+            pages.append((p, carry_file_refs(data, p) if carry else data))
             real_json.add(p)
     # Also walk .md files — convert each into a synthesized page dict
     # via md_to_page. The "path" returned uses .json so consumers that
@@ -2334,7 +2345,7 @@ def find_json_pages(root: Path):
         # Don't shadow a real .json sibling.
         if synth_path in real_json or synth_path in seen_stems:
             continue
-        page = _page_from_source_file(p)
+        page = _page_from_source_file(p, carry=carry)
         if page is None:
             continue
         seen_stems.add(synth_path)
@@ -5829,7 +5840,10 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
     markdown / llms.txt pass.
     """
     if pages is None:
-        pages = find_json_pages(root)
+        # Metadata only, so no page carries its `#f/` files: carrying them
+        # was 0.9-1.7 s of the 1.0-1.8 s render `oku preview --serve` paid
+        # after any save in a 21-page tree, which recomputes this.
+        pages = find_json_pages(root, carry=False)
     entries = []
     for p, data in pages:
         rel = p.relative_to(root)

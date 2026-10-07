@@ -108,3 +108,20 @@ def test_the_flag_follows_the_bind(project: Path) -> None:
     warning uses."""
     assert cli._is_loopback("127.0.0.1") and cli._is_loopback("::1")
     assert not cli._is_loopback("0.0.0.0") and not cli._is_loopback("")
+
+
+def test_the_site_manifest_reads_no_carried_file(project: Path, monkeypatch) -> None:
+    """The manifest needs each page's title and place, never the files its
+    chips name. Carrying them was 0.9-1.7 s of the 1.0-1.8 s render that
+    `oku preview --serve` paid after any save in a 21-page tree, because
+    a save makes it compute the manifest again."""
+    carried: list[str] = []
+    real = cli.carry_file_refs
+    monkeypatch.setattr(cli, "carry_file_refs", lambda page, p: (carried.append(p.name), real(page, p))[1])
+    manifest = cli.compute_manifest(project / "docs")
+    assert sorted(e["title"] for e in manifest["pages"]) == ["A", "B", "Index"]
+    assert carried == []
+    # A build still carries them: only the manifest's own walk is lighter.
+    pages = dict((p.stem, data) for p, data in cli.find_json_pages(project / "docs"))
+    assert "notes/a.md" in pages["index"]["m"]["_files"]
+    assert sorted(carried) == ["a.md", "b.md", "index.md"]
