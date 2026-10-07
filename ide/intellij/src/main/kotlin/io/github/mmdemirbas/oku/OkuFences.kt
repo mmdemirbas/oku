@@ -94,7 +94,7 @@ class OkuFenceSchemaReset : OkuGreetingListener {
             for (project in ProjectManager.getInstance().openProjects) {
                 if (project.isDisposed) continue
                 JsonSchemaService.Impl.get(project).reset()
-                DaemonCodeAnalyzer.getInstance(project).restart()
+                DaemonCodeAnalyzer.getInstance(project).restart("oku named the fence schemas")
             }
         }
     }

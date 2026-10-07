@@ -119,7 +119,7 @@ class OkuGreetingRestart : OkuGreetingListener {
     override fun greeted(greeting: Greeting) {
         ApplicationManager.getApplication().invokeLater {
             for (project in ProjectManager.getInstance().openProjects) {
-                if (!project.isDisposed) DaemonCodeAnalyzer.getInstance(project).restart()
+                if (!project.isDisposed) DaemonCodeAnalyzer.getInstance(project).restart("oku named its link prefixes")
             }
         }
     }
