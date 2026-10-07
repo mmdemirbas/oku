@@ -3343,11 +3343,21 @@ def _lint_md_string(
         _report_unclosed("in this page")
 
     # Inline code spans hold convention samples (`[label](#g/term-id)`)
-    # — never real references; strip before collecting.
-    prose_text = _INLINE_CODE_RE.sub("", "\n".join(line for _, line in prose))
-    gloss = _MD_GLOSS_REF_RE.findall(prose_text)
-    x_refs = _MD_EXTREF_REF_RE.findall(prose_text)
-    return issues, heading_ids, gloss, x_refs, element_refs
+    # — never real references. Blanked rather than removed: an offset in
+    # the text is then still an offset on its line, so each reference
+    # comes back with the line it is on (it used to come back with none,
+    # and the finding sat on the block's first line — a heading, while the
+    # link was further down); and a span between two halves can no longer
+    # join them into a reference that is not there.
+    joined = "\n".join(line for _, line in prose)
+    prose_text = _INLINE_CODE_RE.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), joined)
+
+    def located(pattern: re.Pattern[str]) -> list[tuple[str, int]]:
+        return [
+            (m.group(1), prose[prose_text.count("\n", 0, m.start())][0]) for m in pattern.finditer(prose_text)
+        ]
+
+    return issues, heading_ids, located(_MD_GLOSS_REF_RE), located(_MD_EXTREF_REF_RE), element_refs
 
 
 _MD_ONE_CODE_SPAN_RE = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
@@ -4259,8 +4269,8 @@ def check_pages(
                             line=_abs(lineno),
                         )
                     seen_ids[hid] = seen_ids.get(hid, 0) + 1
-                gloss_refs.extend((where, t, None, None) for t in gloss)
-                extref_refs.extend((where, x, None, None) for x in x_refs)
+                gloss_refs.extend((where, t, _abs(lineno), None) for t, lineno in gloss)
+                extref_refs.extend((where, x, _abs(lineno), None) for x, lineno in x_refs)
                 for kind, ident, in_dom, lineno in element_refs:
                     (gloss_refs if kind == "glossary" else extref_refs).append(
                         (where, ident, _abs(lineno), in_dom)

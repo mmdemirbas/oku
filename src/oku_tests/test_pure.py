@@ -361,9 +361,16 @@ class TestMdStringLint:
         assert "code-no-language" in self._codes("```\nplain\n```")
 
     def test_glossary_and_extref_collected(self) -> None:
-        _, _, gloss, xrefs, _ = cli._lint_md_string("see [x](#g/iceberg) and [y](#x/spec)", skip_prose=False)
-        assert gloss == ["iceberg"]
-        assert xrefs == ["spec"]
+        _, _, gloss, xrefs, _ = cli._lint_md_string(
+            "see [x](#g/iceberg)\n\nand [y](#x/spec)", skip_prose=False
+        )
+        # Each with the line it is on, which is where a finding about it goes.
+        assert gloss == [("iceberg", 1)]
+        assert xrefs == [("spec", 3)]
+
+    def test_a_code_span_does_not_join_text_into_a_reference(self) -> None:
+        _, _, gloss, _, _ = cli._lint_md_string("see ]`code`(#g/iceberg)", skip_prose=False)
+        assert gloss == []
 
     def test_refs_inside_fences_ignored(self) -> None:
         _, _, gloss, _, _ = cli._lint_md_string("```md\n[x](#g/iceberg)\n```", skip_prose=False)

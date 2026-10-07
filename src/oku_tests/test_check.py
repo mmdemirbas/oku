@@ -550,6 +550,24 @@ def test_unresolved_glossary_term_flagged(tmp_path: Path, monkeypatch: pytest.Mo
     assert len(unresolved) == 1
 
 
+def test_an_unresolved_reference_is_reported_on_the_line_it_is_on(tmp_path: Path) -> None:
+    """A prose block runs from one typed fence to the next, so its first
+    line can be far from the link. The link form used to come back from
+    the lint with no line, and the finding sat on the block's first line —
+    in an editor, a mark on the heading for a link four lines below it."""
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "kit.json").write_text('{"name": "t"}', encoding="utf-8")
+    (tmp_path / "a.md").write_text(
+        "---\ntitle: A\nsummary: a\n---\n\n## A {#a}\n\nFirst.\n\nA [term](#g/nowhere) and [ref](#x/nowhere).\n",
+        encoding="utf-8",
+    )
+    issues = cli.check_pages(cli.find_json_pages(tmp_path), tmp_path)
+    lines = {
+        i["code"]: i.get("line") for i in issues if i["code"] in ("unresolved-glossary", "unresolved-extref")
+    }
+    assert lines == {"unresolved-glossary": 10, "unresolved-extref": 10}, issues
+
+
 def _registry_fixture(tmp_path: Path) -> Path:
     """One central domain, `test`, holding one term."""
     fixture = tmp_path / "kit"
