@@ -374,19 +374,24 @@
 
   // Pull definition lines out of one markdown string and return what is
   // left. A footnote body continues onto following indented lines.
-  function extractDefinitions(src) {
+  // `keptAt`, when given, receives the original index of every line kept,
+  // so a line number counted in the result can be turned back into one in
+  // the source — the definitions removed here would otherwise shift every
+  // line after them.
+  function extractDefinitions(src, keptAt) {
     const lines = String(src || '').split('\n');
     const kept = [];
+    const keep = (k) => { kept.push(lines[k]); if (keptAt) keptAt.push(k); };
     let inFence = null;
     for (let i = 0; i < lines.length; i++) {
       const fence = lines[i].match(/^(`{3,}|~{3,})/);
       if (fence) {
         if (inFence && lines[i].charAt(0) === inFence.charAt(0) && fence[1].length >= inFence.length) inFence = null;
         else if (!inFence) inFence = fence[1];
-        kept.push(lines[i]);
+        keep(i);
         continue;
       }
-      if (inFence) { kept.push(lines[i]); continue; }
+      if (inFence) { keep(i); continue; }
       const fn = lines[i].match(FOOTNOTE_DEF_RE);
       if (fn) {
         const body = [fn[2]];
@@ -402,7 +407,7 @@
         __linkDefs.set(ld[1].toLowerCase(), { href: ld[2], title: ld[3] || '' });
         continue;
       }
-      kept.push(lines[i]);
+      keep(i);
     }
     return kept.join('\n');
   }
@@ -866,15 +871,20 @@
     const noIslands = !!(opts && opts.noIslands);
     const lines = String(src || '').split('\n');
     const out = [];
+    // Every top-level node carries the line it starts on, counted in
+    // `src`, so a page can map what is on screen back to its source.
+    let start = 0;
+    const put = (node) => { node.line = start; out.push(node); };
     let i = 0;
     while (i < lines.length) {
       const line = lines[i];
       // Blank line — skip.
       if (!line.trim()) { i++; continue; }
+      start = i;
       // Thematic break — any of `---`, `***`, `___`, with optional inner
       // spaces (`- - -`). Only `---` used to qualify, so a `***` rule
       // rendered as a paragraph of asterisks.
-      if (HR_RE.test(line)) { out.push({ k: 'hr' }); i++; continue; }
+      if (HR_RE.test(line)) { put({ k: 'hr' }); i++; continue; }
       // Fenced code block. Variable-length: a fence of N backticks (or
       // tildes) closes only at a line of N or more of the SAME character.
       // Lets authors nest a 3-tick fenced sample inside a 4-tick outer
@@ -907,9 +917,9 @@
               i = j + 1;
             }
           }
-          out.push({ k: 'typed', block: typed });
+          put({ k: 'typed', block: typed });
         } else {
-          out.push({ k: 'code', lang: lang, src: fsrc });
+          put({ k: 'code', lang: lang, src: fsrc });
         }
         continue;
       }
@@ -934,7 +944,7 @@
             i++;
           }
         }
-        out.push({ k: 'html', src: buf.join('\n') });
+        put({ k: 'html', src: buf.join('\n') });
         continue;
       }
       // Definition list — a term line whose next line is `: definition`.
@@ -951,7 +961,7 @@
           }
           pairs.push({ term: term, defs: defs });
         }
-        out.push({ k: 'dl', pairs: pairs });
+        put({ k: 'dl', pairs: pairs });
         continue;
       }
       // Heading. A closing sequence of #s is decoration, not title text.
@@ -963,7 +973,7 @@
         const level = head[1].length;
         const title = head[2].replace(/\s+#+\s*$/, '');
         const id = head[3] || slugify(title);
-        out.push({ k: 'heading', level: level, title: title, id: id });
+        put({ k: 'heading', level: level, title: title, id: id });
         i++;
         continue;
       }
@@ -977,9 +987,9 @@
         // Admonition extension: first non-empty line is `[!TYPE]` or `[!TYPE] Title`.
         const adm = block[0] && block[0].match(/^\[!([A-Z]+)\](?:\s+(.+))?$/);
         if (adm) {
-          out.push({ k: 'admonition', type: adm[1].toLowerCase(), title: adm[2] || '', body: block.slice(1).join('\n') });
+          put({ k: 'admonition', type: adm[1].toLowerCase(), title: adm[2] || '', body: block.slice(1).join('\n') });
         } else {
-          out.push({ k: 'quote', body: block.join('\n') });
+          put({ k: 'quote', body: block.join('\n') });
         }
         continue;
       }
@@ -1001,13 +1011,13 @@
           rows.push(cells.slice(0, hdr.length));
           i++;
         }
-        out.push({ k: 'table', headers: hdr, rows: rows, align: align });
+        put({ k: 'table', headers: hdr, rows: rows, align: align });
         continue;
       }
       // List — bullet (- / *) or numbered (1. / 1)).
       if (/^(\s*)([-*]|\d+[.)])\s+/.test(line)) {
         const consumed = parseList(lines, i);
-        out.push(consumed.node);
+        put(consumed.node);
         i = consumed.next;
         continue;
       }
@@ -1018,7 +1028,7 @@
         para.push(lines[i]);
         i++;
       }
-      out.push({ k: 'paragraph', text: joinParagraph(para) });
+      put({ k: 'paragraph', text: joinParagraph(para) });
     }
     return out;
   }
@@ -1753,6 +1763,20 @@
     if (window.scrollY !== place.y) window.scrollTo({ top: place.y, behavior: 'instant' });
   }
 
+  /* The units that know their source line, in page order, each with the
+   * node holding its place now. */
+  function lineUnits() {
+    const main = document.querySelector('main#main-content') || document.querySelector('main');
+    const out = [];
+    if (!main) return out;
+    for (const unit of mountedUnits) {
+      if (typeof unit.line !== 'number') continue;
+      const slot = slotOf(unit.node, main);
+      if (slot) out.push({ line: unit.line, top: slot.getBoundingClientRect().top });
+    }
+    return out;
+  }
+
   /* ================================================================ *
    * Public API
    * ================================================================ */
@@ -1861,7 +1885,8 @@
       page = this._begin(page, host);
       if (!page) return;
       const built = this._build(page);
-      mountedUnits = unitsOf(built).map((node) => ({ node: node, sig: node.outerHTML }));
+      const lines = this._unitLines;
+      mountedUnits = unitsOf(built).map((node) => ({ node: node, sig: node.outerHTML, line: lines.get(node) }));
       this.host.replaceChildren(...built.childNodes);
       this._announce(page);
     }
@@ -1902,14 +1927,16 @@
       let kept = 0;
       for (const node of unitsOf(built)) {
         const sig = node.outerHTML;
+        // From the new build: a kept unit may have moved in the source.
+        const line = this._unitLines.get(node);
         const same = pool.get(sig);
         const old = same && same.shift();
         if (old) {
           node.replaceWith(old);
-          next.push({ node: old, sig: sig });
+          next.push({ node: old, sig: sig, line: line });
           kept++;
         } else {
-          next.push({ node: node, sig: sig });
+          next.push({ node: node, sig: sig, line: line });
         }
       }
       mountedUnits = next;
@@ -1967,13 +1994,30 @@
       const main = document.createElement('main');
       main.appendChild(this._renderCover(page));
 
+      // The source line each unit starts on, when the page says where its
+      // blocks are (`m._lines`, one 1-based line per entry of `b[]`, which
+      // `oku preview` writes for an editor). Kept beside the DOM rather
+      // than in it: an attribute would put the line in every unit's
+      // signature, and one line typed above would make update() rebuild
+      // the whole page below it.
+      const lineOf = Array.isArray((page.m || {})._lines) ? page.m._lines : null;
+      const unitLines = new Map();
+      this._unitLines = unitLines;
+      const tagNew = (host, before, line) => {
+        if (line == null) return;
+        for (let el = before ? before.nextElementSibling : host.firstElementChild; el; el = el.nextElementSibling) {
+          if (!unitLines.has(el)) unitLines.set(el, line);
+        }
+      };
+
       let currentSection = null;
-      const openSection = (heading) => {
+      const openSection = (heading, line) => {
         const section = document.createElement('section');
         if (heading.id) section.id = uniqueAnchorId(heading.id);
         const h2 = document.createElement('h2');
         h2.textContent = heading.title;
         section.appendChild(h2);
+        if (line != null) unitLines.set(h2, line);
         main.appendChild(section);
         currentSection = section;
       };
@@ -1982,8 +2026,10 @@
       // Definitions are page-scoped: collect (and strip) them from every
       // string first, so a reference resolves against a definition that
       // lives in a later block.
-      const blocks = (page.b || []).map(function (b) {
-        return typeof b === 'string' ? extractDefinitions(b) : b;
+      const blocks = (page.b || []).map(function (b, index) {
+        if (typeof b !== 'string') return { typed: b, index: index };
+        const keptAt = [];
+        return { text: extractDefinitions(b, keptAt), keptAt: keptAt, index: index };
       });
 
       // One island stack for the whole walk, so an island that is still
@@ -1998,29 +2044,40 @@
       const into = () => (openIsland.length ? openIsland[openIsland.length - 1] : target());
 
       for (const block of blocks) {
-        if (typeof block === 'string') {
-          const parsed = parseMarkdown(block);
-          // Walk node-by-node so h2 can open a section mid-string.
+        const base = lineOf && typeof lineOf[block.index] === 'number' ? lineOf[block.index] : null;
+        if (block.text !== undefined) {
+          const parsed = parseMarkdown(block.text);
+          const lineFor = (node) => (base == null || node.line == null
+            ? null
+            : base + (block.keptAt[node.line] != null ? block.keptAt[node.line] : node.line));
+          // Walk node-by-node so h2 can open a section mid-string, and emit
+          // one node at a time so what each one drew can be given its line.
           let buffer = [];
           const flush = () => {
-            if (buffer.length) {
-              emitMarkdown(target(), buffer, null, openIsland);
-              buffer = [];
+            for (const node of buffer) {
+              const host = target();
+              const before = host.lastElementChild;
+              emitMarkdown(host, [node], null, openIsland);
+              tagNew(host, before, lineFor(node));
             }
+            buffer = [];
           };
           for (const node of parsed) {
             if (node.k === 'heading' && node.level === 2) {
               flush();
               openIsland.length = 0;
-              openSection(node);
+              openSection(node, lineFor(node));
             } else {
               buffer.push(node);
             }
           }
           flush();
-        } else if (block && typeof block === 'object') {
-          const el = this._renderTyped(block);
-          if (el) into().appendChild(el);
+        } else if (block.typed && typeof block.typed === 'object') {
+          const el = this._renderTyped(block.typed);
+          if (el) {
+            into().appendChild(el);
+            if (!openIsland.length && base != null) unitLines.set(el, base);
+          }
         }
       }
 
@@ -3321,6 +3378,43 @@
   /* ================================================================ *
    * Auto-boot
    * ================================================================ */
+
+  /* An editor beside the page: put source line `line` (1-based, may be
+   * fractional) at the top of the window, and say which line is there.
+   * Between two units the position is interpolated by line, so a long
+   * paragraph or code block scrolls through rather than jumping. Both
+   * need the page to say where its blocks are (`m._lines`); without it
+   * scrollToLine does nothing and returns false, and lineAt returns null. */
+  OkuRenderer.scrollToLine = function (line) {
+    const units = lineUnits();
+    if (!units.length) return false;
+    let k = -1;
+    for (let i = 0; i < units.length && units[i].line <= line; i++) k = i;
+    let y = 0;
+    if (k >= 0) {
+      const u = units[k];
+      const next = units[k + 1];
+      y = u.top;
+      if (next && next.line > u.line) {
+        y += Math.min(1, (line - u.line) / (next.line - u.line)) * (next.top - u.top);
+      }
+      y += window.scrollY;
+    }
+    window.scrollTo({ top: Math.max(0, y), behavior: 'instant' });
+    return true;
+  };
+
+  OkuRenderer.lineAt = function (clientY) {
+    const units = lineUnits();
+    if (!units.length) return null;
+    let k = -1;
+    for (let i = 0; i < units.length && units[i].top <= clientY; i++) k = i;
+    if (k < 0) return units[0].line;
+    const u = units[k];
+    const next = units[k + 1];
+    if (!next || next.top <= u.top) return u.line;
+    return u.line + Math.min(1, (clientY - u.top) / (next.top - u.top)) * (next.line - u.line);
+  };
 
   /* Generated from the `required` arrays in kit/schema/page.schema.json.
      The renderer cannot fetch the schema at runtime (standalone builds

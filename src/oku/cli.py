@@ -8535,7 +8535,13 @@ def preview_page(
             manifest = held[1]
         else:
             _forget_tree_state()
-    page = page_from_markdown(md, text)
+    lines: dict[int, int] = {}
+    page = page_from_markdown(md, text, block_lines=lines)
+    # Where each block starts in the source, so the editor beside the page
+    # and the page can follow each other (OkuRenderer.scrollToLine / lineAt).
+    # Preview only: a built page has no editor, and the numbers would change
+    # in every artifact on every edit above them.
+    page.setdefault("m", {})["_lines"] = [lines.get(i) for i in range(len(page.get("b", [])))]
     converted = time.perf_counter()
     if manifest is None:
         manifest = compute_manifest(root)

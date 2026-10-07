@@ -114,6 +114,10 @@ def test_the_preview_is_what_the_build_ships(tmp_path: Path) -> None:
     built = _inline_json(
         (docs / "dist" / "standalone" / "a.html").read_text(encoding="utf-8"), "__oku_page__"
     )
+    # The one difference is deliberate: where each block starts in the
+    # source, for the editor beside the preview. A built page has no editor.
+    lines = previewed["m"].pop("_lines")
+    assert len(lines) == len(previewed["b"]) and all(isinstance(n, int) for n in lines)
     assert previewed == built
 
 

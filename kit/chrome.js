@@ -2185,6 +2185,29 @@ function __okuHostOpen(abs, line) {
   }
 }
 
+/* A double-click on the page shows its source line in the host's editor.
+   The editor beside a preview scrolls the page to follow it; this is the
+   way back. Only where the host can take it (`revealLine`) and the page
+   knows its lines (`oku preview` writes them) — anywhere else a
+   double-click is the browser's, selecting a word. Never on something
+   that answers a double-click of its own (a chart resets its zoom) or on
+   a control, where the reader meant the control. */
+document.addEventListener('dblclick', function (e) {
+  var host = window.__okuHost;
+  if (!host || typeof host.revealLine !== 'function') return;
+  if (!window.OkuRenderer || typeof OkuRenderer.lineAt !== 'function') return;
+  var t = e.target;
+  if (!t || !t.closest || !t.closest('main') || t.closest('.okt-lightbox')) return;
+  if (t.closest('a, button, input, textarea, select, summary, label, [role="button"], oku-chart')) return;
+  var line = OkuRenderer.lineAt(e.clientY);
+  if (line == null) return;
+  try {
+    host.revealLine(Math.max(1, Math.floor(line)));
+  } catch (err) {
+    console.error('[oku] the host could not reveal line ' + line, err);
+  }
+});
+
 /* A plain left-click on a link to a local .md opens it in the viewer.
  *
  * Only a plain one. Cmd / Ctrl / Shift / middle-click, a `target`, and

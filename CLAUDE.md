@@ -1086,6 +1086,26 @@ already follows; only `oku preview` inlines a `root_abs`, so a built
 standalone page is unchanged. Held by `browser/test_host_hook.py`, all
 six of whose cases fail without the path half.
 
+**A page beside an editor knows the source line of every block, and
+keeps it out of the markup.** `oku preview` writes `m._lines` (one
+1-based line per entry of `b[]`, from `md_to_v2_page`'s `block_lines`);
+`parseMarkdown` gives each top-level node the line it starts on, and
+`_build` emits a string block one node at a time so what each node drew
+can be given its line. Two traps decide the shape. **`extractDefinitions`
+removes lines before the parse**, so a line counted in the parsed text is
+not a line of the source after the first link definition — it records
+the original index of every line it keeps. And **the line lives in a Map
+beside the DOM, never in an attribute**: a unit's signature is its
+markup, and one line typed above would change the markup of every block
+below it, so `update()` would rebuild the whole page. `update()` copies
+the NEW build's line onto a kept node instead. `scrollToLine` /
+`lineAt` interpolate between units by line; a double-click on the page
+calls the host's `revealLine` — never on a link, a control or an
+`oku-chart`, whose double-click resets its zoom. `m._lines` is
+preview-only: in a built page every edit above a block would change
+every artifact. Held by `browser/test_source_lines.py`, each of whose
+guards was removed in turn and failed exactly its own case.
+
 **`oku build` runs the checks `oku check` runs — it did not, and the
 gap was the whole point of one of them.** `find_unparseable_json`
 exists because `find_json_pages` catches `JSONDecodeError` and moves

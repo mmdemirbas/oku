@@ -459,10 +459,17 @@ Bir düzenleyicinin içinde gösterilen bir sayfanın bir dosyayı açmak için 
 window.__okuHost = {
   name: 'IntelliJ IDEA',
   openFile: function (path, line) { /* dosyayı aç */ return true; },
+  revealLine: function (line) { /* isteğe bağlı: imleci bu kaynak satırına koy */ },
 };
 ```
 
 Kit, okurun bir dosya açtığı her yerde — bir dosya çipi, yerel bir `.md`'ye bağlantı — önce ona sorar: dosyanın tam yolunu ve bir `#f/yol:120` başvurusunun andığı satırı verir (yoksa `null`). `true` dışındaki her yanıt ya da bir hata kitin kendi davranışını korur; böylece bir dosyayı açamayan ana makine okuru eli boş bırakmaz. Tam yol, görüntüleyicinin gösterdiğiyle aynıdır: ağacın `dist/standalone/` dizininden açılan sayfada türetilir, loopback'teki `oku serve` tarafından bildirilir, [oku preview](cli.tr.md#preview)'ın yazdığı bir sayfada ise satır içi manifestin `root_abs` alanından okunur. Tam yolu bilmeyen bir sayfa hiç sormaz.
+
+### Düzenleyiciyi izlemek · `OkuRenderer.scrollToLine` {#source-lines}
+
+Bir düzenleyicinin yanında sayfa ile kaynağı birlikte kayar. `OkuRenderer.scrollToLine(line)` bir kaynak satırını (1'den başlar, kesirli olabilir) pencerenin tepesine koyar; `OkuRenderer.lineAt(y)` penceredeki bir yükseklikte hangi kaynak satırının durduğunu söyler. İki bloğun arasında konum satıra göre ara değerle bulunur; böylece uzun bir paragraf ya da kod bloğu, sayfa her blokta bir kez sıçramak yerine satırları geçtikçe kayar. İkisi de her bloğun nerede başladığını bilmek ister ve bunu yalnızca [oku preview](cli.tr.md#preview)'ın yazdığı bir sayfa taşır; başka her sayfada `scrollToLine` hiçbir şey yapmaz ve `false` döndürür, `lineAt` ise `null` döndürür. Satırlar düzenlemeyi izler: [update](#update-in-place)'ten sonra korunan bir blok yeni satırıyla yanıt verir.
+
+Öbür yön ana makinenindir: `revealLine` varsa sayfada bir çift tıklama, imlecin altındaki kaynak satırını ona verir. Bir bağlantıda, bir denetimde ya da kendi çift tıklamasıyla yanıt veren bir grafikte vermez.
 
 ## Kesişen özellikler {#cross-cutting}
 
