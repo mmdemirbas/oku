@@ -113,7 +113,7 @@ Two choices here hold on any machine:
 ```bash
 cd ide/intellij
 JAVA_HOME="/path/to/IDE.app/Contents/jbr/Contents/Home" ./gradlew buildPlugin   # any JDK 21 or newer
-# → build/distributions/oku-intellij-0.2.0.zip
+# → build/distributions/oku-intellij-<version>.zip
 ```
 
 The build compiles against the IDE at `ideaPath` in `gradle.properties`

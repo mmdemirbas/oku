@@ -168,7 +168,7 @@ Java 21 bytecode target and no toolchain: the 2026.2 JBR is Java 25), and
 puts it where each IDE reads plugins from — the IDE's own `PathManager`
 rule, held for macOS, Linux and Windows layouts by `test_ide_install.py`.
 A copy is found by plugin id and compared by content, not by version
-string, which stays `0.2.0` across code changes the way the wheel's did.
+string, which does not move with every code change, the same trap as the wheel.
 `all`, a product code, part of a name, or a path; with no argument a
 terminal is asked. Never hand someone the zip and "Install Plugin from
 Disk".
