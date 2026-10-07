@@ -188,7 +188,7 @@ PoC'yi kendi IDEA'na kurmak için IntelliJ IDEA 2026.2 veya üstü ve `oku previ
 ```bash
 cd ide/intellij
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew buildPlugin
-# build/distributions/oku-intellij-0.0.1-poc.zip
+# build/distributions/oku-intellij-0.1.0.zip
 # Settings → Plugins → ⚙ → Install Plugin from Disk…
 ```
 

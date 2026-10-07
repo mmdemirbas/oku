@@ -74,7 +74,7 @@ instead of failing on a missing field.
 ```bash
 cd ide/intellij
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew buildPlugin
-# → build/distributions/oku-intellij-0.0.1-poc.zip
+# → build/distributions/oku-intellij-0.1.0.zip
 # Settings → Plugins → ⚙ → Install Plugin from Disk…
 ```
 
@@ -89,6 +89,10 @@ The build compiles against the IDE at `ideaPath` in `gradle.properties`
 The tests drive this checkout's `.venv/bin/oku`, so they exercise the oku
 the repository holds rather than whichever one is installed. They start a
 real `oku preview --serve` against files written to a temporary directory.
+
+```bash
+./gradlew verifyPlugin   # the IntelliJ Plugin Verifier, against the IDE at ideaPath
+```
 
 ## Which files it takes
 

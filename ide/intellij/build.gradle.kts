@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.github.mmdemirbas"
-version = "0.0.1-poc"
+version = "0.1.0"
 
 repositories {
     mavenCentral()
@@ -24,6 +24,7 @@ dependencies {
         bundledPlugin("org.intellij.plugins.markdown")
         bundledPlugin("com.intellij.modules.json")
         testFramework(TestFrameworkType.Platform)
+        pluginVerifier()
     }
     testImplementation("junit:junit:4.13.2")
 }
@@ -39,9 +40,17 @@ intellijPlatform {
             untilBuild = provider { null }
         }
     }
-    // A PoC has no searchable options worth indexing; this step boots a
-    // headless IDE and costs most of the build.
+    // Two settings rows are not worth indexing for Settings search; this
+    // step boots a headless IDE and costs most of the build.
     buildSearchableOptions = false
+    pluginVerification {
+        // The IDE the plugin is built against. The verifier still fetches the
+        // plugins that IDE's own plugins depend on from the Marketplace:
+        // 915 MB on the first run, cached after it.
+        ides {
+            local(file(providers.gradleProperty("ideaPath").get()))
+        }
+    }
 }
 
 tasks.runIde {
