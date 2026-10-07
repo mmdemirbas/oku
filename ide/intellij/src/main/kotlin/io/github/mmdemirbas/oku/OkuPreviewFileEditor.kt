@@ -11,11 +11,8 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.LogicalPosition
-import com.intellij.openapi.editor.ScrollType
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
-import com.intellij.openapi.editor.event.VisibleAreaListener
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorState
@@ -32,12 +29,10 @@ import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefBrowserBase
 import com.intellij.ui.jcef.JBCefJSQuery
 import com.intellij.platform.util.coroutines.childScope
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.debounce
@@ -49,7 +44,6 @@ import org.cef.handler.CefLifeSpanHandlerAdapter
 import org.cef.handler.CefLoadHandlerAdapter
 import org.cef.handler.CefRequestHandlerAdapter
 import org.cef.network.CefRequest
-import java.awt.Point
 import java.beans.PropertyChangeListener
 import java.net.URI
 import java.net.URLDecoder
@@ -61,8 +55,6 @@ import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.io.path.extension
 import kotlin.io.path.pathString
-import kotlin.math.abs
-import kotlin.math.floor
 
 /**
  * The kit's own rendering of one oku page, in the IDE's embedded Chromium.
@@ -76,12 +68,12 @@ import kotlin.math.floor
  * so a file chip opens its file here, on the line it names, rather than
  * in the kit's own viewer inside the panel.
  *
- * The page follows the text editor beside it ([follow]): the source line at
- * the editor's top is put at the page's top (`OkuRenderer.scrollToLine`,
- * which needs the line of every block — `oku preview` writes them). A
- * double-click on the page goes the other way, through the host's
- * `revealLine`: the caret moves to that line, and the editor is scrolled to
- * where the page is, so neither pane jumps.
+ * The page follows the text editor beside it ([follow], [OkuFollower]): the
+ * source line at the editor's top is put at the page's top
+ * (`OkuRenderer.scrollToLine`, which needs the line of every block — `oku
+ * preview` writes them). A double-click on the page goes the other way,
+ * through the host's `revealLine`: the caret moves to that line, and the
+ * editor is scrolled to where the page is, so neither pane jumps.
  */
 @OptIn(FlowPreview::class)
 class OkuPreviewFileEditor(
@@ -104,11 +96,8 @@ class OkuPreviewFileEditor(
      */
     private val renders = MutableSharedFlow<Long>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
-    /** A scroll in the editor; at most one follow per frame acts on them. */
-    private val scrolls = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-
-    /** The text editor the page follows, once the split has paired them. */
-    private var source: Editor? = null
+    /** The text editor the page follows, once the split has paired them; EDT only. */
+    private var follower: OkuFollower? = null
 
     // Created before the browser loads anything: a query made after the
     // native browser exists needs a slot from a pool sized in advance.
@@ -130,9 +119,6 @@ class OkuPreviewFileEditor(
     /** Set when a load is asked for, cleared when Chromium says it finished. */
     @Volatile
     private var loading = false
-
-    /** The editor's top line the page was last put at; EDT only. */
-    private var followed = Double.NaN
 
     init {
         Disposer.register(this, browser)
@@ -159,25 +145,16 @@ class OkuPreviewFileEditor(
             override fun onLoadEnd(browser: CefBrowser?, frame: CefFrame?, httpStatusCode: Int) {
                 if (frame?.isMain != true) return
                 browser?.executeJavaScript(hostScript, frame.url, 0)
-                ApplicationManager.getApplication().invokeLater { follow(force = true) }
+                ApplicationManager.getApplication().invokeLater { follower?.follow(force = true) }
             }
         }, browser.cefBrowser)
         cs.launch(Dispatchers.IO) { renders.debounce { it }.collect { render() } }
-        // Leading edge, then a frame's wait: a scroll fires for every pixel,
-        // and the page needs the latest position, not each one.
-        cs.launch(Dispatchers.EDT, start = CoroutineStart.UNDISPATCHED) {
-            scrolls.collect {
-                follow(force = false)
-                delay(FOLLOW_FRAME_MS)
-            }
-        }
         schedule(0)
     }
 
     /** Pair with the text editor beside this preview; the page follows it from now on. */
     fun follow(editor: Editor) {
-        source = editor
-        editor.scrollingModel.addVisibleAreaListener(VisibleAreaListener { scrolls.tryEmit(Unit) }, this)
+        follower = OkuFollower(editor, cs, this, ready = { force -> shown != null && (!loading || force) }, send = ::scrollPageTo)
     }
 
     private fun schedule(delayMs: Long) {
@@ -245,16 +222,11 @@ class OkuPreviewFileEditor(
     // ---- following the editor ---------------------------------------------
 
     /**
-     * Put the editor's top line at the page's top. Before the kit has drawn
-     * the page the line is held for its `oku:rendered`, and only the latest
-     * one is: a load answers with wherever the editor is by then.
+     * Put source line [top] at the page's top. Before the kit has drawn the
+     * page the line is held for its `oku:rendered`, and only the latest one
+     * is: a load answers with wherever the editor is by then.
      */
-    private fun follow(force: Boolean) {
-        val source = source ?: return
-        if (source.isDisposed || shown == null || (loading && !force)) return
-        val top = topLine(source) ?: return
-        if (!force && abs(top - followed) < 1e-6) return
-        followed = top
+    private fun scrollPageTo(top: Double) {
         val script = "(function (l) { window.__okuFollow = l;" +
             " var go = function () { if (window.OkuRenderer && OkuRenderer.scrollToLine) OkuRenderer.scrollToLine(window.__okuFollow); };" +
             " if (window.__okuRendered) go();" +
@@ -263,57 +235,13 @@ class OkuPreviewFileEditor(
         browser.cefBrowser.executeJavaScript(script, browser.cefBrowser.url, 0)
     }
 
-    /** The 1-based source line at the editor's top, with the part of it scrolled past. */
-    private fun topLine(source: Editor): Double? {
-        val lines = source.document.lineCount
-        if (lines == 0) return null
-        val y = source.scrollingModel.visibleArea.y
-        val line = source.xyToLogicalPosition(Point(0, y)).line.coerceIn(0, lines - 1)
-        val (start, end) = lineSpan(source, line)
-        val part = if (end > start) ((y - start).toDouble() / (end - start)).coerceIn(0.0, 1.0) else 0.0
-        return line + 1 + part
-    }
-
-    /** Where 0-based logical [line] starts and ends in the editor, soft wraps and folds included. */
-    private fun lineSpan(source: Editor, line: Int): Pair<Int, Int> {
-        val start = source.logicalPositionToXY(LogicalPosition(line, 0)).y
-        val end = if (line + 1 < source.document.lineCount) {
-            source.logicalPositionToXY(LogicalPosition(line + 1, 0)).y
-        } else {
-            start + source.lineHeight
-        }
-        return start to end
-    }
-
-    /**
-     * The page's double-click: the caret goes to [line], and the editor is
-     * scrolled so its top is the page's top ([top]), which leaves what the
-     * reader clicked where it was on the page. Only if that would hide the
-     * caret does the editor scroll further.
-     */
+    /** The page's double-click, handed to [OkuFollower.reveal]; the editor then takes the keyboard. */
     private fun reveal(line: Int, top: Double?) {
         ApplicationManager.getApplication().invokeLater {
-            val source = source ?: return@invokeLater
-            if (source.isDisposed) return@invokeLater
-            val lines = source.document.lineCount
-            if (lines == 0) return@invokeLater
-            val scrolling = source.scrollingModel
-            scrolling.disableAnimation()
-            try {
-                if (top != null && top.isFinite()) {
-                    val at = (floor(top).toInt() - 1).coerceIn(0, lines - 1)
-                    val (start, end) = lineSpan(source, at)
-                    scrolling.scrollVertically(start + ((top - floor(top)) * (end - start)).toInt())
-                }
-                source.caretModel.moveToLogicalPosition(LogicalPosition((line - 1).coerceIn(0, lines - 1), 0))
-                scrolling.scrollToCaret(ScrollType.MAKE_VISIBLE)
-            } finally {
-                scrolling.enableAnimation()
-            }
-            // The scroll just made is the page's own position: not one to send back.
-            followed = topLine(source) ?: Double.NaN
-            log.info("oku preview: reveal line $line, page top $top, editor top $followed")
-            IdeFocusManager.getInstance(project).requestFocus(source.contentComponent, true)
+            val follower = follower ?: return@invokeLater
+            val after = follower.reveal(line, top) ?: return@invokeLater
+            log.info("oku preview: reveal line $line, page top $top, editor top $after")
+            IdeFocusManager.getInstance(project).requestFocus(follower.editor.contentComponent, true)
         }
     }
 
@@ -459,6 +387,5 @@ class OkuPreviewFileEditor(
 
     private companion object {
         const val EDIT_DELAY_MS = 300L
-        const val FOLLOW_FRAME_MS = 16L
     }
 }
