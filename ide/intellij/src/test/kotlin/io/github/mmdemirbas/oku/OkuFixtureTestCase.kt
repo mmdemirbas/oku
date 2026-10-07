@@ -1,9 +1,11 @@
 package io.github.mmdemirbas.oku
 
 import com.intellij.openapi.components.service
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.LightProjectDescriptor
+import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.UsefulTestCase
 import com.intellij.testFramework.fixtures.CodeInsightTestFixture
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory
@@ -13,9 +15,14 @@ import kotlin.io.path.Path
 /**
  * A light project whose files are on disk: every feature under test hands
  * a page's path to oku, and a `temp://` file has no path oku can read.
+ *
+ * The directory is a content root of the project, as a page is in the IDE.
+ * Outside one the platform runs no inspections at all, so a test of what
+ * an inspection reports would be measuring the fixture.
  */
 abstract class OkuFixtureTestCase : UsefulTestCase() {
     protected lateinit var fixture: CodeInsightTestFixture
+    private var root: VirtualFile? = null
 
     override fun setUp() {
         super.setUp()
@@ -23,6 +30,8 @@ abstract class OkuFixtureTestCase : UsefulTestCase() {
         val project = factory.createLightFixtureBuilder(LightProjectDescriptor.EMPTY_PROJECT_DESCRIPTOR, name).fixture
         fixture = factory.createCodeInsightFixture(project, TempDirTestFixtureImpl())
         fixture.setUp()
+        root = LocalFileSystem.getInstance().refreshAndFindFileByPath(fixture.tempDirFixture.tempDirPath)
+            ?.also { PsiTestUtil.addContentRoot(fixture.module, it) }
         greet()
     }
 
@@ -40,6 +49,12 @@ abstract class OkuFixtureTestCase : UsefulTestCase() {
     }
 
     override fun tearDown() {
+        try {
+            // The light project outlives the test; its roots must not.
+            root?.let { PsiTestUtil.removeContentEntry(fixture.module, it) }
+        } catch (e: Throwable) {
+            addSuppressedException(e)
+        }
         try {
             fixture.tearDown()
         } catch (e: Throwable) {

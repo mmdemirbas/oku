@@ -3,6 +3,7 @@ package io.github.mmdemirbas.oku
 import com.intellij.json.JsonLanguage
 import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.components.service
+import com.jetbrains.jsonSchema.impl.inspections.JsonSchemaComplianceInspection
 import kotlin.io.path.Path
 
 class OkuFencesTest : OkuFixtureTestCase() {
@@ -31,6 +32,19 @@ class OkuFencesTest : OkuFixtureTestCase() {
         val offered = fixture.lookupElementStrings.orEmpty()
         assertTrue(offered.toString(), "rows" in offered && "title" in offered)
         assertFalse(offered.toString(), "headers" in offered) // a table's key, not a chart's
+    }
+
+    fun `test a fence body that breaks its schema is marked on the value that breaks it`() {
+        // The schema oku names for a fence does more than complete keys: the
+        // JSON support checks the fragment against it, and only inside the
+        // project's content, as a page is in the IDE (see the fixture).
+        fixture.enableInspections(JsonSchemaComplianceInspection::class.java)
+        open(page("oku-chart", """{"type": "bar", "rows": 3}"""))
+        val at = fixture.editor.document.text.indexOf("\"rows\": 3") + "\"rows\": ".length
+        val marked = fixture.doHighlighting().filter {
+            it.startOffset <= at && at < it.endOffset && "Incompatible types" in (it.description ?: "")
+        }
+        assertEquals(fixture.doHighlighting().map { "${it.startOffset}:${it.description}" }.toString(), 1, marked.size)
     }
 
     fun `test the fence tags are offered after the backticks`() {
