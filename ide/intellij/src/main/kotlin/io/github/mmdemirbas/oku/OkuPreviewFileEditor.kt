@@ -1,8 +1,11 @@
 package io.github.mmdemirbas.oku
 
+import com.google.gson.Gson
+import com.google.gson.JsonParser
 import com.intellij.ide.BrowserUtil
 import com.intellij.ide.ui.LafManagerListener
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
@@ -20,6 +23,8 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.JBColor
 import com.intellij.ui.jcef.JBCefBrowser
+import com.intellij.ui.jcef.JBCefBrowserBase
+import com.intellij.ui.jcef.JBCefJSQuery
 import com.intellij.util.Alarm
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
@@ -47,7 +52,9 @@ import kotlin.io.path.pathString
  * in the kit), which keeps every block the edit did not touch and the
  * reader's place; anything else reloads. Links leave the panel: another
  * page or a `#f/` file opens in the IDE, a web address opens in the system
- * browser.
+ * browser. The page is told it has a host (`window.__okuHost` in the kit),
+ * so a file chip opens its file here, on the line it names, rather than
+ * in the kit's own viewer inside the panel.
  */
 class OkuPreviewFileEditor(
     private val project: Project,
@@ -59,6 +66,10 @@ class OkuPreviewFileEditor(
     private val alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
     private val document = FileDocumentManager.getInstance().getDocument(file)
     private val previews = service<OkuPreviewService>()
+
+    // Created before the browser loads anything: a query made after the
+    // native browser exists needs a slot from a pool sized in advance.
+    private val hostQuery = JBCefJSQuery.create(browser as JBCefBrowserBase)
 
     @Volatile
     private var current: Rendered? = null
@@ -79,6 +90,11 @@ class OkuPreviewFileEditor(
 
     init {
         Disposer.register(this, browser)
+        Disposer.register(this, hostQuery)
+        hostQuery.addHandler { request ->
+            openFromPage(request)
+            null
+        }
         document?.addDocumentListener(object : DocumentListener {
             override fun documentChanged(event: DocumentEvent) = schedule(EDIT_DELAY_MS)
         }, this)
@@ -90,6 +106,11 @@ class OkuPreviewFileEditor(
                 browser: CefBrowser?, isLoading: Boolean, canGoBack: Boolean, canGoForward: Boolean,
             ) {
                 if (!isLoading) loading = false
+            }
+
+            // Every load is a new window object, so the host is told again.
+            override fun onLoadEnd(browser: CefBrowser?, frame: CefFrame?, httpStatusCode: Int) {
+                if (frame?.isMain == true) browser?.executeJavaScript(hostScript, frame.url, 0)
             }
         }, browser.cefBrowser)
         schedule(0)
@@ -155,6 +176,21 @@ class OkuPreviewFileEditor(
     }
 
     // ---- links ------------------------------------------------------------
+
+    /** The kit's `window.__okuHost`; it asks this before opening a file itself. */
+    private val hostScript: String by lazy {
+        val name = Gson().toJson(ApplicationNamesInfo.getInstance().fullProductName)
+        val send = hostQuery.inject("JSON.stringify({ path: String(path), line: line || 0 })")
+        "window.__okuHost = { name: $name, openFile: function (path, line) { $send; return true; } };"
+    }
+
+    private fun openFromPage(request: String) {
+        val message = runCatching { JsonParser.parseString(request).asJsonObject }.getOrNull() ?: return
+        val path = message.get("path")?.takeIf { it.isJsonPrimitive }?.asString ?: return
+        val line = message.get("line")?.takeIf { it.isJsonPrimitive }?.asInt ?: 0
+        log.info("oku preview: the page opens $path line $line")
+        open(Path(path), line = line - 1)
+    }
 
     private fun installNavigation() {
         browser.jbCefClient.addRequestHandler(object : CefRequestHandlerAdapter() {

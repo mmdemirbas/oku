@@ -10,6 +10,12 @@ blocks the edit changed, so open details, table filters, drawn diagrams and
 the reader's place survive. A change to anything else the page carries (the
 site tree, kit.json, the theme) reloads it.
 
+A file chip in the preview opens its file in the IDE, on the line a
+`#f/path:120` reference names, and so does a link to a local `.md`: the
+plugin sets the kit's `window.__okuHost` on every load, and the kit asks
+it before opening its own viewer. That works on every OS, where the kit's
+`idea://` link is offered on macOS only.
+
 The research, the measurements and the plan are in [`docs/index.md`](docs/index.md)
 (Turkish; `oku build` in `docs/` renders it).
 
