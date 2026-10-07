@@ -78,6 +78,14 @@ The build compiles against the IDE at `ideaPath` in `gradle.properties`
 (the one on this machine, so nothing is downloaded); pass
 `-PideaPath=/path/to/IDE.app` to use another.
 
+```bash
+./gradlew test    # platform tests; run `uv sync` in the oku repository first
+```
+
+The tests drive this checkout's `.venv/bin/oku`, so they exercise the oku
+the repository holds rather than whichever one is installed. They start a
+real `oku preview --serve` against files written to a temporary directory.
+
 ## Which files it takes
 
 A `.md` file is an oku page when a `kit.json` or an `_oku` link sits in one of
