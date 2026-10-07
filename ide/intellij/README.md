@@ -1,4 +1,4 @@
-# oku for IntelliJ IDEA — proof of concept
+# oku for IntelliJ IDEA
 
 Opens an oku page as text + the kit's own rendering, side by side, inside
 IntelliJ IDEA. The preview is what `oku build` ships, because it is made by
@@ -44,21 +44,25 @@ page is, so neither pane jumps.
 The research, the measurements and the plan are in [`docs/index.md`](docs/index.md)
 (Turkish; `oku build` in `docs/` renders it).
 
-Status: **proof of concept.** The JSON `oku preview` speaks is the contract
-(`docs/cli.md` in this repo, `PREVIEW_PROTOCOL` in `cli.py`): the process
-greets with its protocol number, and a plugin and an oku that disagree say
-which one to update instead of failing on a missing field.
+Distributed as a local zip (below), not through the Marketplace. The JSON
+`oku preview` speaks is the contract (`docs/cli.md` in this repo,
+`PREVIEW_PROTOCOL` in `cli.py`): the process greets with its protocol
+number, and a plugin and an oku that disagree say which one to update
+instead of failing on a missing field.
 
 ## Requirements
 
 - IntelliJ IDEA 2026.2 or newer (any IntelliJ-based IDE of that build should
   work; only IDEA 2026.2.3 was tried).
-- oku installed as a tool (`./ctl deploy` in this repo), new enough to have
-  `oku preview`. The plugin runs the `oku` on PATH, or in `~/.local/bin`
-  when the IDE was started from the Dock and has no shell PATH. To point it
-  at a checkout while developing, start the IDE with
-  `-Doku.executable=/abs/oku/.venv/bin/oku` (not `bin/oku`: run directly, its
-  shebang finds a python3 without jsonschema, and schema checks go quiet).
+- oku installed as a tool (`./ctl deploy` in this repo), new enough to speak
+  the plugin's preview protocol. The plugin runs the oku set in
+  *Settings → Tools → oku*, else the `oku` on PATH, else `~/.local/bin/oku`
+  (an IDE started from the Dock has no shell PATH). A path set there that
+  does not run is reported as that, not passed over for another oku. To
+  point a development IDE at a checkout, start it with
+  `-Doku.executable=/abs/oku/.venv/bin/oku`, which wins over the settings
+  (not `bin/oku`: run directly, its shebang finds a python3 without
+  jsonschema, and oku then refuses to check).
 - Two processes run: one renders previews, one checks pages, so a preview
   never waits behind a check of the whole tree. They write their stderr to
   `<IDE system dir>/oku-preview/preview.log` and `check.log`; a failure to
@@ -92,7 +96,19 @@ A `.md` file is an oku page when a `kit.json` or an `_oku` link sits in one of
 its directories up to the repository root, or when the file contains an
 ` ```oku- ` fence. Those open in the oku editor and the bundled Markdown
 editor is hidden for them (`FileEditorPolicy.HIDE_OTHER_EDITORS`, per file);
-every other `.md` opens as before.
+every other `.md` opens as before. The split layout the reader picks
+(editor, preview, both) is kept per file between sessions.
+
+*Settings → Tools → oku* has a switch that turns all of it off: no file is
+an oku page then, and nothing of oku runs. A file already open changes when
+it is opened again.
+
+When no oku can draw a page — none installed, the one set in the settings
+does not run, or the IDE has no JCEF — an oku page opens in the Markdown
+editor instead, and the first one that does says why in a notification,
+once per IDE session. A check that cannot run for any other reason (an oku
+too old for the plugin, a process that does not answer) says so at the top
+of the file: an empty margin is how a clean page looks.
 
 ## Verify in a sandbox IDE
 

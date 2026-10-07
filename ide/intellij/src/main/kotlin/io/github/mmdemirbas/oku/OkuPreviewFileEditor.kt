@@ -64,7 +64,7 @@ import kotlin.math.floor
  * so a file chip opens its file here, on the line it names, rather than
  * in the kit's own viewer inside the panel.
  *
- * The page follows [source], the text editor beside it: the source line at
+ * The page follows the text editor beside it ([follow]): the source line at
  * the editor's top is put at the page's top (`OkuRenderer.scrollToLine`,
  * which needs the line of every block — `oku preview` writes them). A
  * double-click on the page goes the other way, through the host's
@@ -74,7 +74,6 @@ import kotlin.math.floor
 class OkuPreviewFileEditor(
     private val project: Project,
     private val file: VirtualFile,
-    private val source: Editor,
 ) : UserDataHolderBase(), FileEditor {
 
     private val log = logger<OkuPreviewFileEditor>()
@@ -83,6 +82,9 @@ class OkuPreviewFileEditor(
     private val followAlarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, this)
     private val document = FileDocumentManager.getInstance().getDocument(file)
     private val previews = service<OkuPreviewService>()
+
+    /** The text editor the page follows, once the split has paired them. */
+    private var source: Editor? = null
 
     // Created before the browser loads anything: a query made after the
     // native browser exists needs a slot from a pool sized in advance.
@@ -115,7 +117,6 @@ class OkuPreviewFileEditor(
             fromPage(request)
             null
         }
-        source.scrollingModel.addVisibleAreaListener(VisibleAreaListener { followSoon() }, this)
         document?.addDocumentListener(object : DocumentListener {
             override fun documentChanged(event: DocumentEvent) = schedule(EDIT_DELAY_MS)
         }, this)
@@ -138,6 +139,12 @@ class OkuPreviewFileEditor(
             }
         }, browser.cefBrowser)
         schedule(0)
+    }
+
+    /** Pair with the text editor beside this preview; the page follows it from now on. */
+    fun follow(editor: Editor) {
+        source = editor
+        editor.scrollingModel.addVisibleAreaListener(VisibleAreaListener { followSoon() }, this)
     }
 
     private fun schedule(delayMs: Int) {
@@ -213,8 +220,9 @@ class OkuPreviewFileEditor(
      * one is: a load answers with wherever the editor is by then.
      */
     private fun follow(force: Boolean) {
+        val source = source ?: return
         if (source.isDisposed || shown == null || (loading && !force)) return
-        val top = topLine() ?: return
+        val top = topLine(source) ?: return
         if (!force && abs(top - followed) < 1e-6) return
         followed = top
         val script = "(function (l) { window.__okuFollow = l;" +
@@ -226,18 +234,18 @@ class OkuPreviewFileEditor(
     }
 
     /** The 1-based source line at the editor's top, with the part of it scrolled past. */
-    private fun topLine(): Double? {
+    private fun topLine(source: Editor): Double? {
         val lines = source.document.lineCount
         if (lines == 0) return null
         val y = source.scrollingModel.visibleArea.y
         val line = source.xyToLogicalPosition(Point(0, y)).line.coerceIn(0, lines - 1)
-        val (start, end) = lineSpan(line)
+        val (start, end) = lineSpan(source, line)
         val part = if (end > start) ((y - start).toDouble() / (end - start)).coerceIn(0.0, 1.0) else 0.0
         return line + 1 + part
     }
 
     /** Where 0-based logical [line] starts and ends in the editor, soft wraps and folds included. */
-    private fun lineSpan(line: Int): Pair<Int, Int> {
+    private fun lineSpan(source: Editor, line: Int): Pair<Int, Int> {
         val start = source.logicalPositionToXY(LogicalPosition(line, 0)).y
         val end = if (line + 1 < source.document.lineCount) {
             source.logicalPositionToXY(LogicalPosition(line + 1, 0)).y
@@ -255,6 +263,7 @@ class OkuPreviewFileEditor(
      */
     private fun reveal(line: Int, top: Double?) {
         ApplicationManager.getApplication().invokeLater {
+            val source = source ?: return@invokeLater
             if (source.isDisposed) return@invokeLater
             val lines = source.document.lineCount
             if (lines == 0) return@invokeLater
@@ -263,7 +272,7 @@ class OkuPreviewFileEditor(
             try {
                 if (top != null && top.isFinite()) {
                     val at = (floor(top).toInt() - 1).coerceIn(0, lines - 1)
-                    val (start, end) = lineSpan(at)
+                    val (start, end) = lineSpan(source, at)
                     scrolling.scrollVertically(start + ((top - floor(top)) * (end - start)).toInt())
                 }
                 source.caretModel.moveToLogicalPosition(LogicalPosition((line - 1).coerceIn(0, lines - 1), 0))
@@ -272,7 +281,7 @@ class OkuPreviewFileEditor(
                 scrolling.enableAnimation()
             }
             // The scroll just made is the page's own position: not one to send back.
-            followed = topLine() ?: Double.NaN
+            followed = topLine(source) ?: Double.NaN
             log.info("oku preview: reveal line $line, page top $top, editor top $followed")
             IdeFocusManager.getInstance(project).requestFocus(source.contentComponent, true)
         }

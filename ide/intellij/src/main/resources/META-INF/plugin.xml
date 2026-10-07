@@ -4,8 +4,11 @@
   <vendor>mmdemirbas</vendor>
   <description><![CDATA[
     Shows an oku page the way oku builds it: the kit's own renderer, beside the
-    markdown, updated as you type. Needs the oku tool installed (./ctl deploy).
-    Proof of concept.
+    markdown, updated as you type, following the editor's scroll. Checks the
+    page as it is typed, completes the JSON inside oku-* fences from oku's own
+    schema, and resolves #f/ file references. Needs the oku tool installed
+    (./ctl deploy in the oku repository); without it an oku page opens in the
+    Markdown editor. Settings → Tools → oku.
   ]]></description>
 
   <depends>com.intellij.modules.platform</depends>
@@ -14,5 +17,12 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <fileEditorProvider implementation="io.github.mmdemirbas.oku.OkuPreviewEditorProvider"/>
+    <applicationConfigurable parentId="tools" id="io.github.mmdemirbas.oku" displayName="oku"
+                             instance="io.github.mmdemirbas.oku.OkuConfigurable"/>
+    <notificationGroup id="oku" displayType="BALLOON"/>
   </extensions>
+  <projectListeners>
+    <listener class="io.github.mmdemirbas.oku.OkuFallbackNotifier"
+              topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+  </projectListeners>
 </idea-plugin>

@@ -22,10 +22,18 @@ import kotlin.io.path.Path
  * line and the note itself only under --verbose; drawn on every line it is
  * about (an HTML island, every one), it would be a squiggle authors learn
  * to look past, and then they look past the warnings too.
+ *
+ * A check that did not run says so at the top of the file: an empty margin
+ * is how a clean page looks, so silence would tell the author the page is
+ * fine. Except when there is no oku at all — the page then opens in the
+ * Markdown editor and [OkuFallbackNotifier] has said why.
  */
-class OkuCheckAnnotator : ExternalAnnotator<OkuCheckAnnotator.Input, List<Issue>>() {
+class OkuCheckAnnotator : ExternalAnnotator<OkuCheckAnnotator.Input, OkuCheckAnnotator.Outcome>() {
 
     class Input(val path: Path, val text: String)
+
+    /** What the check found, or why it could not look. */
+    class Outcome(val issues: List<Issue>, val failure: String?)
 
     private val log = logger<OkuCheckAnnotator>()
 
@@ -41,18 +49,28 @@ class OkuCheckAnnotator : ExternalAnnotator<OkuCheckAnnotator.Input, List<Issue>
         return Input(Path(virtual.path), text)
     }
 
-    override fun doAnnotate(input: Input): List<Issue>? =
-        service<OkuPreviewService>().check(input.path, input.text).getOrElse {
-            // Once per distinct cause: this runs on every pause in typing.
-            val said = it.message ?: it.toString()
-            if (said != lastFailure) log.warn("oku check failed for ${input.path}: $said")
-            lastFailure = said
-            null
-        }
+    override fun doAnnotate(input: Input): Outcome? {
+        if (OkuLauncher.find() is OkuLaunch.Missing) return null
+        return service<OkuPreviewService>().check(input.path, input.text).fold(
+            onSuccess = { Outcome(it, failure = null) },
+            onFailure = {
+                // Logged once per distinct cause: this runs on every pause in typing.
+                val said = it.message ?: it.toString()
+                if (said != lastFailure) log.warn("oku check failed for ${input.path}: $said")
+                lastFailure = said
+                Outcome(emptyList(), failure = said)
+            },
+        )
+    }
 
-    override fun apply(file: PsiFile, issues: List<Issue>, holder: AnnotationHolder) {
+    override fun apply(file: PsiFile, outcome: Outcome, holder: AnnotationHolder) {
         val document = file.viewProvider.document ?: return
-        for (issue in issues) {
+        outcome.failure?.let {
+            holder.newAnnotation(HighlightSeverity.WARNING, "oku check did not run: ${it.lineSequence().first()}")
+                .fileLevel()
+                .create()
+        }
+        for (issue in outcome.issues) {
             val severity = when (issue.severity) {
                 "error" -> HighlightSeverity.ERROR
                 "warning" -> HighlightSeverity.WARNING

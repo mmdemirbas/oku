@@ -2,7 +2,6 @@ package io.github.mmdemirbas.oku
 
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
-import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
@@ -14,7 +13,6 @@ import java.nio.file.Path
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.Path
-import kotlin.io.path.isExecutable
 import kotlin.io.path.readText
 
 /**
@@ -57,7 +55,8 @@ fun interface OkuGreetingListener {
  * refused with a message saying which side to update, rather than failing
  * later on a missing field. The greeting also says what the editor needs
  * to know about the format ([greeting]). A process that dies or stops
- * answering is replaced on the next request.
+ * answering is replaced on the next request, and so is every process when
+ * the settings name another oku ([restart]).
  */
 @Service(Service.Level.APP)
 class OkuPreviewService : Disposable {
@@ -108,21 +107,13 @@ class OkuPreviewService : Disposable {
         ApplicationManager.getApplication().messageBus.syncPublisher(OkuGreetingListener.TOPIC).greeted(said)
     }
 
-    /**
-     * `-Doku.executable=/path/to/oku` points the plugin at a checkout while
-     * developing it; otherwise the launcher `uv tool install` puts on PATH,
-     * looked for in ~/.local/bin too because a Dock-started IDE has no shell PATH.
-     */
-    private fun launcher(): Path? {
-        System.getProperty("oku.executable")?.let { return Path(it) }
-        PathEnvironmentVariableUtil.findInPath("oku")?.let { return it.toPath() }
-        return Path(System.getProperty("user.home"), ".local", "bin", "oku").takeIf { it.isExecutable() }
-    }
-
-    override fun dispose() {
+    /** End both processes; the next request starts whichever oku [OkuLauncher] finds then. */
+    fun restart() {
         previews.close()
         checks.close()
     }
+
+    override fun dispose() = restart()
 
     /** One process and the requests it answers, one at a time. */
     private inner class Channel(private val name: String) {
@@ -147,7 +138,10 @@ class OkuPreviewService : Disposable {
         }
 
         private fun start(): Session {
-            val oku = launcher() ?: error("oku is not installed: no `oku` on PATH or in ~/.local/bin")
+            val oku = when (val launch = OkuLauncher.find()) {
+                is OkuLaunch.Found -> launch.path
+                is OkuLaunch.Missing -> error(launch.reason)
+            }
             Files.createDirectories(outBase)
             val builder = ProcessBuilder(oku.toString(), "preview", "--serve", "--out", outBase.toString())
             // A Dock-started IDE may hand the child no locale at all.

@@ -42,6 +42,7 @@ private fun fenceTag(info: String?): String? = info?.trim()?.substringBefore(' '
  */
 class OkuFenceLanguageProvider : CodeFenceLanguageProvider {
     override fun getLanguageByInfoString(infoString: String): Language? {
+        if (!OkuSettings.get().state.enabled) return null
         val tag = fenceTag(infoString) ?: return null
         val known = service<OkuPreviewService>().fences
         val oku = if (known.isEmpty()) tag.startsWith("oku-") else tag in known

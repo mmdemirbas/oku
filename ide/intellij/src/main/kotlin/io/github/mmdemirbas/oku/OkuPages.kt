@@ -10,9 +10,11 @@ object OkuPages {
     /**
      * A tree that declares itself (a kit.json, or the `_oku` link `oku init`
      * leaves beside the pages) or a file that uses a typed fence. Front-matter
-     * alone is not a signal — Jekyll and Hugo pages carry it too.
+     * alone is not a signal — Jekyll and Hugo pages carry it too. With the
+     * plugin switched off in the settings, nothing is.
      */
     fun isOkuPage(file: VirtualFile): Boolean {
+        if (!OkuSettings.get().state.enabled) return false
         if (file.isDirectory || !file.name.endsWith(".md", ignoreCase = true)) return false
         if (inDeclaredTree(file)) return true
         if (file.length > MAX_SNIFF_BYTES) return false
