@@ -8,6 +8,7 @@ import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.util.messages.Topic
+import kotlinx.coroutines.CoroutineScope
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.LinkedBlockingQueue
@@ -57,9 +58,12 @@ fun interface OkuGreetingListener {
  * to know about the format ([greeting]). A process that dies or stops
  * answering is replaced on the next request, and so is every process when
  * the settings name another oku ([restart]).
+ *
+ * [scope] lives as long as the IDE; each preview runs its own work in a
+ * child of it.
  */
 @Service(Service.Level.APP)
-class OkuPreviewService : Disposable {
+class OkuPreviewService(val scope: CoroutineScope) : Disposable {
     private val log = logger<OkuPreviewService>()
     private val gson = Gson()
 

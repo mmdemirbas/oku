@@ -6,7 +6,8 @@ import com.intellij.ide.BrowserUtil
 import com.intellij.ide.ui.LafManagerListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationNamesInfo
-import com.intellij.openapi.application.runReadActionBlocking
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.Editor
@@ -30,7 +31,17 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefBrowserBase
 import com.intellij.ui.jcef.JBCefJSQuery
-import com.intellij.util.Alarm
+import com.intellij.platform.util.coroutines.childScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.launch
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
 import org.cef.handler.CefLifeSpanHandlerAdapter
@@ -71,6 +82,7 @@ import kotlin.math.floor
  * `revealLine`: the caret moves to that line, and the editor is scrolled to
  * where the page is, so neither pane jumps.
  */
+@OptIn(FlowPreview::class)
 class OkuPreviewFileEditor(
     private val project: Project,
     private val file: VirtualFile,
@@ -78,10 +90,21 @@ class OkuPreviewFileEditor(
 
     private val log = logger<OkuPreviewFileEditor>()
     private val browser = JBCefBrowser()
-    private val alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
-    private val followAlarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, this)
     private val document = FileDocumentManager.getInstance().getDocument(file)
     private val previews = service<OkuPreviewService>()
+
+    /** This preview's work; cancelled with it. */
+    private val cs = previews.scope.childScope("oku preview of ${file.name}")
+
+    /**
+     * A render request, as the wait before it: the render runs that long
+     * after the last request, and a request arriving meanwhile replaces the
+     * one waiting. One collector, so two renders never run at once.
+     */
+    private val renders = MutableSharedFlow<Long>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** A scroll in the editor; at most one follow per frame acts on them. */
+    private val scrolls = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     /** The text editor the page follows, once the split has paired them. */
     private var source: Editor? = null
@@ -138,24 +161,36 @@ class OkuPreviewFileEditor(
                 ApplicationManager.getApplication().invokeLater { follow(force = true) }
             }
         }, browser.cefBrowser)
+        cs.launch(Dispatchers.IO) { renders.debounce { it }.collect { render() } }
+        // Leading edge, then a frame's wait: a scroll fires for every pixel,
+        // and the page needs the latest position, not each one.
+        cs.launch(Dispatchers.EDT, start = CoroutineStart.UNDISPATCHED) {
+            scrolls.collect {
+                follow(force = false)
+                delay(FOLLOW_FRAME_MS)
+            }
+        }
         schedule(0)
     }
 
     /** Pair with the text editor beside this preview; the page follows it from now on. */
     fun follow(editor: Editor) {
         source = editor
-        editor.scrollingModel.addVisibleAreaListener(VisibleAreaListener { followSoon() }, this)
+        editor.scrollingModel.addVisibleAreaListener(VisibleAreaListener { scrolls.tryEmit(Unit) }, this)
     }
 
-    private fun schedule(delayMs: Int) {
-        alarm.cancelAllRequests()
-        alarm.addRequest(::render, delayMs)
+    private fun schedule(delayMs: Long) {
+        renders.tryEmit(delayMs)
     }
 
-    private fun render() {
-        val text = runReadActionBlocking { document?.text ?: VfsUtilCore.loadText(file) }
+    private suspend fun render() {
+        val text = readAction { document?.text ?: VfsUtilCore.loadText(file) }
         val theme = if (JBColor.isBright()) "light" else "dark"
-        previews.render(Path(file.path), text, theme)
+        val result = previews.render(Path(file.path), text, theme)
+        // A render already sent finishes (cutting it short would leave its
+        // reply to be read as the next one's), but a closed preview shows nothing.
+        cs.ensureActive()
+        result
             .onSuccess {
                 current = it
                 failed = false
@@ -207,12 +242,6 @@ class OkuPreviewFileEditor(
     }
 
     // ---- following the editor ---------------------------------------------
-
-    // One frame's worth: a scroll fires this for every pixel, and the page
-    // needs the latest position, not each one.
-    private fun followSoon() {
-        if (followAlarm.isEmpty) followAlarm.addRequest({ follow(force = false) }, FOLLOW_FRAME_MS)
-    }
 
     /**
      * Put the editor's top line at the page's top. Before the kit has drawn
@@ -402,10 +431,10 @@ class OkuPreviewFileEditor(
     }
     override fun addPropertyChangeListener(listener: PropertyChangeListener) = Unit
     override fun removePropertyChangeListener(listener: PropertyChangeListener) = Unit
-    override fun dispose() = Unit
+    override fun dispose() = cs.cancel()
 
     private companion object {
-        const val EDIT_DELAY_MS = 300
-        const val FOLLOW_FRAME_MS = 16
+        const val EDIT_DELAY_MS = 300L
+        const val FOLLOW_FRAME_MS = 16L
     }
 }
