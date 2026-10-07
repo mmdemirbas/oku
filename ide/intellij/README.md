@@ -77,7 +77,7 @@ instead of failing on a missing field.
 ```bash
 cd ide/intellij
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew buildPlugin
-# → build/distributions/oku-intellij-0.1.0.zip
+# → build/distributions/oku-intellij-0.2.0.zip
 # Settings → Plugins → ⚙ → Install Plugin from Disk…
 ```
 
