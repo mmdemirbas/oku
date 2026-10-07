@@ -29,8 +29,11 @@ import kotlin.math.floor
  * whether it should even when the line has not moved (a page that just
  * loaded starts at its top, wherever the editor is).
  *
- * Page to editor: [reveal] puts the editor where the page is and the caret
- * on a line, and records that position as sent, so it does not come back.
+ * Page to editor: the reader scrolling the page ([pageScrolled]) puts the
+ * editor's top at the page's top line, and a double-click ([reveal]) does
+ * that and puts the caret on a line. Both record the position as sent, so
+ * it does not come back: the page reports only the reader's own scrolls
+ * (the kit's `__okuHost.pageTop`), and this side does not report its own.
  */
 internal class OkuFollower(
     val editor: Editor,
@@ -40,6 +43,9 @@ internal class OkuFollower(
     private val send: (line: Double) -> Unit,
 ) {
     private val scrolls = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** The page's top lines as the reader scrolls it; only the latest one matters. */
+    private val pageTops = MutableSharedFlow<Double>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     /** The editor's top line the page was last put at; EDT only. */
     private var followed = Double.NaN
@@ -52,6 +58,26 @@ internal class OkuFollower(
                 delay(FRAME_MS)
             }
         }
+        scope.launch(Dispatchers.EDT, start = CoroutineStart.UNDISPATCHED) {
+            pageTops.collect { followPage(it) }
+        }
+    }
+
+    /** The reader scrolled the page to source line [top]. Any thread; the editor follows on the EDT. */
+    fun pageScrolled(top: Double) {
+        pageTops.tryEmit(top)
+    }
+
+    /**
+     * Put the editor's top at source line [top], where the page's is, and
+     * leave the caret where it is. Returns the editor's top after. EDT only.
+     */
+    fun followPage(top: Double): Double? {
+        if (editor.isDisposed || editor.document.lineCount == 0 || !top.isFinite()) return null
+        withoutAnimation { putTop(top) }
+        // The page's own position: not one to send back to it.
+        followed = topLine() ?: Double.NaN
+        return followed
     }
 
     /** Send the editor's top line to the page, unless it is already there. EDT only. */
@@ -73,25 +99,34 @@ internal class OkuFollower(
     fun reveal(line: Int, top: Double?): Double? {
         val lines = editor.document.lineCount
         if (editor.isDisposed || lines == 0) return null
-        val scrolling = editor.scrollingModel
-        scrolling.disableAnimation()
-        try {
-            if (top != null && top.isFinite()) {
-                val at = (floor(top).toInt() - 1).coerceIn(0, lines - 1)
-                val (start, end) = lineSpan(at)
-                scrolling.scrollVertically(start + ((top - floor(top)) * (end - start)).toInt())
-            }
+        withoutAnimation {
+            if (top != null && top.isFinite()) putTop(top)
             editor.caretModel.moveToLogicalPosition(LogicalPosition((line - 1).coerceIn(0, lines - 1), 0))
             // Not on every reveal: the clicked line is often less than a line
             // under the top, inside the editor's scroll offset, and making the
             // caret "visible" there moves the editor a third of its height.
-            if (!caretShown()) scrolling.scrollToCaret(ScrollType.MAKE_VISIBLE)
-        } finally {
-            scrolling.enableAnimation()
+            if (!caretShown()) editor.scrollingModel.scrollToCaret(ScrollType.MAKE_VISIBLE)
         }
         // The scroll just made is the page's own position: not one to send back.
         followed = topLine() ?: Double.NaN
         return followed
+    }
+
+    /** Scroll so 1-based, possibly fractional source line [top] is at the editor's top. */
+    private fun putTop(top: Double) {
+        val at = (floor(top).toInt() - 1).coerceIn(0, editor.document.lineCount - 1)
+        val (start, end) = lineSpan(at)
+        editor.scrollingModel.scrollVertically(start + ((top - floor(top)) * (end - start)).toInt())
+    }
+
+    private inline fun withoutAnimation(block: () -> Unit) {
+        val scrolling = editor.scrollingModel
+        scrolling.disableAnimation()
+        try {
+            block()
+        } finally {
+            scrolling.enableAnimation()
+        }
     }
 
     /** The caret's whole row is inside the editor's visible area. */

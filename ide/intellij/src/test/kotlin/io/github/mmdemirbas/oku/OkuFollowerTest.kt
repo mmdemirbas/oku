@@ -114,6 +114,23 @@ class OkuFollowerTest : OkuFixtureTestCase() {
         assertEquals(177, fixture.editor.caretModel.logicalPosition.line)
     }
 
+    fun `test the reader scrolling the page moves the editor there, and that is not sent back`() {
+        // From another thread, as the page's reports arrive.
+        Thread { follower.pageScrolled(200.4) }.apply { start() }.join()
+        PlatformTestUtil.waitWithEventsDispatching(
+            { "editor top ${follower.topLine()}, page top 200.4" },
+            { abs(follower.topLine()!! - 200.4) <= onePixel },
+            5,
+        )
+        settle()
+        assertEmpty(sent)
+        // The caret is the reader's: following the page does not move it.
+        assertEquals(0, fixture.editor.caretModel.logicalPosition.line)
+        // And the editor's own scroll after that still reaches the page.
+        scrollTo(120.0)
+        assertSentLast(120.0)
+    }
+
     fun `test a double-click puts the editor where the page is, and that is not sent back`() {
         val after = follower.reveal(line = 160, top = 150.25)!!
         assertTrue("editor top $after, page top 150.25", abs(after - 150.25) <= onePixel)

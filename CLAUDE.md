@@ -1138,6 +1138,20 @@ preview-only: in a built page every edit above a block would change
 every artifact. Held by `browser/test_source_lines.py`, each of whose
 guards was removed in turn and failed exactly its own case.
 
+**And the reader's scrolls go back, the page's own never do.** The
+reader scrolling the page hands the host the line now at the top
+(`__okuHost.pageTop`), so the editor follows the page as the page follows
+the editor. Reporting a scroll `scrollToLine` made would move the editor
+to where the page landed — a fraction off — which moves the page again,
+and the two panes chase each other. So a scroll counts as the reader's
+only while a pointer is held, or within a second of a wheel, key or touch
+made after the host last placed the page; what the page does by itself
+(an update keeping the reader's place, a deep link) never counts. The
+host does its half: a line the page reported is recorded as the editor's
+own position, so the editor's scroll to it is not sent back
+(`OkuFollower.followPage`). Held by four cases in
+`browser/test_source_lines.py` and by `OkuFollowerTest`.
+
 **`oku build` runs the checks `oku check` runs — it did not, and the
 gap was the whole point of one of them.** `find_unparseable_json`
 exists because `find_json_pages` catches `JSONDecodeError` and moves

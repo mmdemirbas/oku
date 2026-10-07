@@ -40,9 +40,11 @@ id and reports `#f/`, `#g/` and `#x/` links as anchors it cannot find; on an
 oku page that report is suppressed, and a real missing heading still gets it.
 
 The preview follows the editor: the source line at the top of the editor
-is put at the top of the page. A double-click on the page goes the other
-way — the caret moves to that line and the editor is scrolled to where the
-page is, so neither pane jumps.
+is put at the top of the page. Scrolling the page moves the editor the same
+way; the kit reports only the reader's own scrolls (`__okuHost.pageTop`),
+so the two panes do not chase each other. A double-click on the page puts
+the caret on that line and the editor where the page is, so neither pane
+jumps.
 
 The research, the measurements and the plan are in [`docs/index.md`](docs/index.md)
 (Turkish; `oku build` in `docs/` renders it).

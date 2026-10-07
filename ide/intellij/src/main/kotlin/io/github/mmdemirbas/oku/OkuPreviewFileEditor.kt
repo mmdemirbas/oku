@@ -73,7 +73,10 @@ import kotlin.io.path.pathString
  * (`OkuRenderer.scrollToLine`, which needs the line of every block — `oku
  * preview` writes them). A double-click on the page goes the other way,
  * through the host's `revealLine`: the caret moves to that line, and the
- * editor is scrolled to where the page is, so neither pane jumps.
+ * editor is scrolled to where the page is, so neither pane jumps. And the
+ * reader scrolling the page moves the editor with it, through the host's
+ * `pageTop`: the kit reports only the reader's scrolls, never one the
+ * editor made, so the two panes do not chase each other.
  */
 @OptIn(FlowPreview::class)
 class OkuPreviewFileEditor(
@@ -96,7 +99,12 @@ class OkuPreviewFileEditor(
      */
     private val renders = MutableSharedFlow<Long>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
-    /** The text editor the page follows, once the split has paired them; EDT only. */
+    /**
+     * The text editor the page follows, once the split has paired them.
+     * Set on the EDT; read from the page's thread too, where a stale null
+     * only drops one report.
+     */
+    @Volatile
     private var follower: OkuFollower? = null
 
     // Created before the browser loads anything: a query made after the
@@ -250,7 +258,8 @@ class OkuPreviewFileEditor(
     /**
      * The kit's `window.__okuHost`. It asks `openFile` before opening a file
      * itself, and calls `revealLine` on a double-click; the page's own top
-     * line goes with it so the editor can be put at the same place.
+     * line goes with it so the editor can be put at the same place. It
+     * calls `pageTop` with the line at the page's top as the reader scrolls.
      */
     private val hostScript: String by lazy {
         val name = Gson().toJson(ApplicationNamesInfo.getInstance().fullProductName)
@@ -258,13 +267,20 @@ class OkuPreviewFileEditor(
         val reveal = hostQuery.inject(
             "JSON.stringify({ reveal: line, top: window.OkuRenderer && OkuRenderer.lineAt ? OkuRenderer.lineAt(0) : null })",
         )
+        val pageTop = hostQuery.inject("JSON.stringify({ pageTop: line })")
         "window.__okuHost = { name: $name," +
             " openFile: function (path, line, anchor) { $open; return true; }," +
-            " revealLine: function (line) { $reveal; } };"
+            " revealLine: function (line) { $reveal; }," +
+            " pageTop: function (line) { $pageTop; } };"
     }
 
     private fun fromPage(request: String) {
         val message = runCatching { JsonParser.parseString(request).asJsonObject }.getOrNull() ?: return
+        val pageTop = message.get("pageTop")?.takeIf { it.isJsonPrimitive }?.asDouble
+        if (pageTop != null) {
+            follower?.pageScrolled(pageTop)
+            return
+        }
         val reveal = message.get("reveal")?.takeIf { it.isJsonPrimitive }?.asInt
         if (reveal != null) {
             val top = message.get("top")?.takeIf { it.isJsonPrimitive }?.asDouble
