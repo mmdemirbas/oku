@@ -42,6 +42,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
 import org.cef.handler.CefLifeSpanHandlerAdapter
@@ -402,14 +403,21 @@ class OkuPreviewFileEditor(
         open(Path(path), line = (params["line"]?.toIntOrNull() ?: 1) - 1)
     }
 
+    /**
+     * Finding a file the IDE has not seen yet is a VFS refresh, which is not
+     * UI-thread work: a chip naming a file outside the project, opened from
+     * the page, tripped SlowOperations on the EDT. Only the opening is.
+     */
     private fun open(path: Path, line: Int) {
-        ApplicationManager.getApplication().invokeLater {
+        cs.launch(Dispatchers.IO) {
             val target = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(path)
             if (target == null) {
                 log.info("oku preview: no file at $path")
-                return@invokeLater
+                return@launch
             }
-            OpenFileDescriptor(project, target, line.coerceAtLeast(0), 0).navigate(true)
+            withContext(Dispatchers.EDT) {
+                OpenFileDescriptor(project, target, line.coerceAtLeast(0), 0).navigate(true)
+            }
         }
     }
 
