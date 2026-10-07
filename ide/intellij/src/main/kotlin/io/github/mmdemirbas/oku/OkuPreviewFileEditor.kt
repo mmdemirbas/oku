@@ -24,6 +24,7 @@ import com.intellij.util.Alarm
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
 import org.cef.handler.CefLifeSpanHandlerAdapter
+import org.cef.handler.CefLoadHandlerAdapter
 import org.cef.handler.CefRequestHandlerAdapter
 import org.cef.network.CefRequest
 import java.beans.PropertyChangeListener
@@ -41,10 +42,12 @@ import kotlin.io.path.pathString
 /**
  * The kit's own rendering of one oku page, in the IDE's embedded Chromium.
  *
- * Every edit re-renders through `oku preview --serve`, and the page is
- * reloaded; the page itself puts the reader back where they were. Links
- * leave the panel: another page or a `#f/` file opens in the IDE, a web
- * address opens in the system browser.
+ * Every edit re-renders through `oku preview --serve`. When only the page
+ * changed, the new page is handed to the one on screen (`OkuRenderer.update`
+ * in the kit), which keeps every block the edit did not touch and the
+ * reader's place; anything else reloads. Links leave the panel: another
+ * page or a `#f/` file opens in the IDE, a web address opens in the system
+ * browser.
  */
 class OkuPreviewFileEditor(
     private val project: Project,
@@ -66,6 +69,14 @@ class OkuPreviewFileEditor(
     @Volatile
     private var failed = false
 
+    /** The render the panel holds, or null while it holds something else. */
+    @Volatile
+    private var shown: Rendered? = null
+
+    /** Set when a load is asked for, cleared when Chromium says it finished. */
+    @Volatile
+    private var loading = false
+
     init {
         Disposer.register(this, browser)
         document?.addDocumentListener(object : DocumentListener {
@@ -74,6 +85,13 @@ class OkuPreviewFileEditor(
         ApplicationManager.getApplication().messageBus.connect(this)
             .subscribe(LafManagerListener.TOPIC, LafManagerListener { schedule(0) })
         installNavigation()
+        browser.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
+            override fun onLoadingStateChange(
+                browser: CefBrowser?, isLoading: Boolean, canGoBack: Boolean, canGoForward: Boolean,
+            ) {
+                if (!isLoading) loading = false
+            }
+        }, browser.cefBrowser)
         schedule(0)
     }
 
@@ -89,11 +107,13 @@ class OkuPreviewFileEditor(
             .onSuccess {
                 current = it
                 failed = false
-                // A new query per render: JBCefBrowserBase skips a load of
-                // the URL it last requested ("URL already requested,
-                // skipping"), so a re-render of the same page never reached
-                // the panel.
-                browser.loadURL("${it.html.toUri()}?r=${generation.incrementAndGet()}")
+                val before = shown
+                shown = it
+                if (!loading && before != null && before.html == it.html && before.shell == it.shell) {
+                    update(it)
+                } else {
+                    load(it)
+                }
             }
             .onFailure {
                 failed = true
@@ -102,7 +122,32 @@ class OkuPreviewFileEditor(
             }
     }
 
+    private fun load(rendered: Rendered) {
+        loading = true
+        // A new query per load: JBCefBrowserBase skips a load of the URL it
+        // last requested ("URL already requested, skipping"), so a
+        // re-render of the same page never reached the panel.
+        browser.loadURL("${rendered.html.toUri()}?r=${generation.incrementAndGet()}")
+    }
+
+    /**
+     * Hand the new page to the one on screen. Anything that keeps that from
+     * working — the kit not finished starting, a kit without `update`, a
+     * throw — reloads instead, and the file on disk is already the new
+     * version, so the reload shows it.
+     */
+    private fun update(rendered: Rendered) {
+        val page = Files.readString(rendered.page)
+        val script = "(function (p) {" +
+            "try { if (window.__okuRendered && window.OkuRenderer && OkuRenderer.prototype.update" +
+            " && new OkuRenderer({}).update(p)) return; }" +
+            " catch (e) { console.error('[oku preview] update failed, reloading', e); }" +
+            " location.reload(); })($page);"
+        browser.cefBrowser.executeJavaScript(script, rendered.html.toUri().toString(), 0)
+    }
+
     private fun showError(message: String) {
+        shown = null
         val page = previews.outBase.resolve("error.html")
         val escaped = message.replace("&", "&amp;").replace("<", "&lt;")
         Files.writeString(page, "<!doctype html><meta charset=utf-8><body style=\"font:13px system-ui;padding:16px\"><h3>oku preview</h3><pre style=\"white-space:pre-wrap\">$escaped</pre>")

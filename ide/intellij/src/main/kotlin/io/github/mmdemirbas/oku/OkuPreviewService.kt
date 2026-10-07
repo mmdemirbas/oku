@@ -15,8 +15,14 @@ import kotlin.io.path.Path
 import kotlin.io.path.isExecutable
 import kotlin.io.path.readText
 
-/** What one render produced: the page, and the two roots a link maps between. */
-data class Rendered(val html: Path, val root: Path, val out: Path)
+/**
+ * What one render produced: the page, the two roots a link maps between,
+ * the page JSON the HTML inlines, and `shell` — a digest of everything else
+ * the HTML carries. Two renders of one `html` with one `shell` differ only
+ * in `page`, which can then be handed to the page on screen instead of
+ * reloading it.
+ */
+data class Rendered(val html: Path, val root: Path, val out: Path, val page: Path, val shell: String)
 
 /**
  * One `oku preview --serve` process for the whole IDE, shared by every open
@@ -52,7 +58,13 @@ class OkuPreviewService : Disposable {
             val reply = parse(line)
             reply.error?.let { error(it) }
             val html = reply.html ?: error("oku preview answered without a page: $line")
-            Rendered(Path(html), Path(requireNotNull(reply.root)), Path(requireNotNull(reply.out)))
+            Rendered(
+                Path(html),
+                Path(requireNotNull(reply.root)),
+                Path(requireNotNull(reply.out)),
+                Path(requireNotNull(reply.page)),
+                requireNotNull(reply.shell),
+            )
         }
     }
 
@@ -155,12 +167,14 @@ class OkuPreviewService : Disposable {
         val html: String? = null,
         val root: String? = null,
         val out: String? = null,
+        val page: String? = null,
+        val shell: String? = null,
         val error: String? = null,
     )
 
     private companion object {
         /** The `PREVIEW_PROTOCOL` of the oku this plugin is written against. */
-        const val PROTOCOL = 1
+        const val PROTOCOL = 2
         const val START_TIMEOUT_SECONDS = 30L
         const val REQUEST_TIMEOUT_SECONDS = 30L
 

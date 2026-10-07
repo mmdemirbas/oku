@@ -4,7 +4,11 @@ Opens an oku page as text + the kit's own rendering, side by side, inside
 IntelliJ IDEA. The preview is what `oku build` ships, because it is made by
 the same code: the editor buffer goes to `oku preview --serve`, one process
 the whole IDE shares, and the page it writes is shown in the IDE's embedded
-Chromium (JCEF).
+Chromium (JCEF). After the first load an edit does not reload the panel: the
+new page goes to the kit's `OkuRenderer.update`, which rebuilds only the
+blocks the edit changed, so open details, table filters, drawn diagrams and
+the reader's place survive. A change to anything else the page carries (the
+site tree, kit.json, the theme) reloads it.
 
 The research, the measurements and the plan are in [`docs/index.md`](docs/index.md)
 (Turkish; `oku build` in `docs/` renders it).

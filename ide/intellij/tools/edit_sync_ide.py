@@ -85,6 +85,9 @@ def main() -> int:
         give_back("Finder")
         time.sleep(0.3)
         report["handed_away"] = front_pid() != pid
+        # A reload throws this away; an update in place keeps it.
+        for pg in pages.values():
+            pg.evaluate("() => { window.__okuSameDocument = true; }")
         try:
             for f in files:
                 f.write_bytes(originals[f] + ADDED.encode())
@@ -98,6 +101,8 @@ def main() -> int:
                         lambda pg=pg: pg.evaluate(f"document.body.innerText.includes('{MARKER}')"), timeout=15
                     )
                 )
+                if pg is not None:
+                    report[f.name + " reloaded"] = pg.evaluate("() => !window.__okuSameDocument")
         finally:
             give_back(user_app)
             for f in files:
