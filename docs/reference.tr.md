@@ -460,6 +460,7 @@ window.__okuHost = {
   name: 'IntelliJ IDEA',
   openFile: function (path, line, anchor) { /* dosyayı aç */ return true; },
   revealLine: function (line) { /* isteğe bağlı: imleci bu kaynak satırına koy */ },
+  pageTop: function (line) { /* isteğe bağlı: okur kaydırdı; tepedeki kaynak satırı bu */ },
 };
 ```
 
@@ -469,7 +470,7 @@ Kit, okurun bir dosya açtığı her yerde — bir dosya çipi, yerel bir `.md`'
 
 Bir düzenleyicinin yanında sayfa ile kaynağı birlikte kayar. `OkuRenderer.scrollToLine(line)` bir kaynak satırını (1'den başlar, kesirli olabilir) pencerenin tepesine koyar; `OkuRenderer.lineAt(y)` penceredeki bir yükseklikte hangi kaynak satırının durduğunu söyler. İki bloğun arasında konum satıra göre ara değerle bulunur; böylece uzun bir paragraf ya da kod bloğu, sayfa her blokta bir kez sıçramak yerine satırları geçtikçe kayar. İkisi de her bloğun nerede başladığını bilmek ister ve bunu yalnızca [oku preview](cli.tr.md#preview)'ın yazdığı bir sayfa taşır; başka her sayfada `scrollToLine` hiçbir şey yapmaz ve `false` döndürür, `lineAt` ise `null` döndürür. Satırlar düzenlemeyi izler: [update](#update-in-place)'ten sonra korunan bir blok yeni satırıyla yanıt verir.
 
-Öbür yön ana makinenindir: `revealLine` varsa sayfada bir çift tıklama, imlecin altındaki kaynak satırını ona verir. Bir bağlantıda, bir denetimde ya da kendi çift tıklamasıyla yanıt veren bir grafikte vermez.
+Öbür yön ana makinenindir: `revealLine` varsa sayfada bir çift tıklama, imlecin altındaki kaynak satırını ona verir. Bir bağlantıda, bir denetimde ya da kendi çift tıklamasıyla yanıt veren bir grafikte vermez. `pageTop` varsa, okur sayfayı kaydırdıkça tepeye gelen kaynak satırı ona kare başına en fazla bir kez verilir; düzenleyici de onu izler. Yalnızca okurun kaydırmaları bildirilir. `scrollToLine`'ın yaptığı bir kaydırma bildirilmez; bildirilseydi düzenleyici sayfanın vardığı yere taşınır ve iki bölme birbirini kovalardı. Sayfanın kendi kendine yaptığı kaydırmalar da (bir güncellemede okurun yerini korumak, bir derin bağlantı) bildirilmez. Bir kaydırma, sayfada bir işaretçi basılı tutulurken ya da son `scrollToLine`'dan sonra sayfada yapılan bir tekerlek, tuş, işaretçi ya da dokunma hareketinin ardından bir saniye içinde okurun sayılır.
 
 ## Kesişen özellikler {#cross-cutting}
 

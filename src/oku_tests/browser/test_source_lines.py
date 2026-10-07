@@ -213,3 +213,78 @@ def test_a_page_built_for_reading_has_no_lines_to_follow(page) -> None:
     )
     assert page.evaluate("() => OkuRenderer.scrollToLine(10)") is False
     assert page.evaluate("() => OkuRenderer.lineAt(10)") is None
+
+
+# The way back: the reader scrolling the page moves the editor. The host
+# records every line the page reports.
+WITH_PAGE_TOP = """() => {
+  window.__okuTops = [];
+  window.__okuHost = { name: 'Test IDE', openFile: () => false, revealLine: () => {},
+                       pageTop: (line) => { window.__okuTops.push(line); } };
+}"""
+
+# Resolves once scrollY has held still for three frames: a wheel scroll
+# may be animated, and a report goes out on the frame after a scroll.
+SETTLED = """() => new Promise((done) => {
+  let last = -1, still = 0, frames = 0;
+  const tick = () => {
+    still = window.scrollY === last ? still + 1 : 0;
+    last = window.scrollY;
+    if (still >= 3 || ++frames > 240) done(window.scrollY); else requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})"""
+
+
+def _wheel(page, dy: int) -> None:
+    page.mouse.move(400, 300)
+    page.mouse.wheel(0, dy)
+    page.evaluate(SETTLED)
+
+
+def test_the_reader_scrolling_the_page_tells_the_host_the_line_at_its_top(page) -> None:
+    page.evaluate(WITH_PAGE_TOP)
+    _wheel(page, 600)
+    tops = page.evaluate("() => window.__okuTops")
+    assert tops, "a wheel scroll of the page reported nothing"
+    assert abs(tops[-1] - page.evaluate("() => OkuRenderer.lineAt(0)")) < 0.01, tops
+
+
+def test_a_page_the_host_placed_is_not_reported_back(page, preview) -> None:
+    """The editor puts the page where it is; reporting that would move the
+    editor to where the page landed, and the two would chase each other —
+    even when the reader had just scrolled the page."""
+    page.evaluate(WITH_PAGE_TOP)
+    _wheel(page, 300)
+    page.evaluate("() => { window.__okuTops = []; }")
+    page.evaluate("(l) => OkuRenderer.scrollToLine(l)", _line_of(preview["first"], "## Second"))
+    page.evaluate(SETTLED)
+    assert page.evaluate("() => window.__okuTops") == []
+
+
+def test_a_scroll_nobody_made_on_the_page_is_not_reported(page) -> None:
+    page.evaluate(WITH_PAGE_TOP)
+    page.evaluate("() => window.scrollTo({top: 500, behavior: 'instant'})")
+    page.evaluate(SETTLED)
+    assert page.evaluate("() => window.__okuTops") == []
+    # Nor one long after the reader last touched the page: the kit keeping
+    # the reader's place across an update is a scroll of the same kind.
+    # The wait IS the condition under test (the page counts a second).
+    _wheel(page, 200)
+    page.wait_for_timeout(1300)
+    page.evaluate("() => { window.__okuTops = []; window.scrollTo({top: 900, behavior: 'instant'}); }")
+    page.evaluate(SETTLED)
+    assert page.evaluate("() => window.__okuTops") == []
+
+
+def test_after_the_host_placed_the_page_the_readers_same_line_is_reported_again(page, preview) -> None:
+    page.evaluate(WITH_PAGE_TOP)
+    _wheel(page, 600)
+    first = page.evaluate("() => window.__okuTops.at(-1)")
+    y = page.evaluate("() => window.scrollY")
+    page.evaluate("(l) => OkuRenderer.scrollToLine(l)", _line_of(preview["first"], "Closing paragraph."))
+    page.evaluate(SETTLED)
+    page.evaluate("() => { window.__okuTops = []; }")
+    _wheel(page, int(y - page.evaluate("() => window.scrollY")))
+    assert page.evaluate("() => window.scrollY") == y
+    assert page.evaluate("() => window.__okuTops") == [first]

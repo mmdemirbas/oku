@@ -713,7 +713,9 @@ class TestPayloadBudget:
     # Then by a `.md#heading` link handing the host its anchor: 1,468,501.
     # Then by the table wiring reading every cell before writing any:
     # 1,469,274.
-    KIT_BUDGET_BYTES = 1_469_700
+    # Then by the page handing the host the reader's scrolls (`pageTop`):
+    # 1,471,131.
+    KIT_BUDGET_BYTES = 1_471_600
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -734,7 +736,8 @@ class TestPayloadBudget:
     # Then by source lines for an editor beside the page: 1,468,664.
     # Then by the anchor a `.md#heading` link hands the host: 1,469,081.
     # Then by the table wiring's reads: 1,469,877.
-    STANDALONE_BUDGET_BYTES = 1_470_300
+    # Then by `pageTop`: 1,471,734.
+    STANDALONE_BUDGET_BYTES = 1_472_200
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

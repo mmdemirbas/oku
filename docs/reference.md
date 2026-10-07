@@ -460,6 +460,7 @@ window.__okuHost = {
   name: 'IntelliJ IDEA',
   openFile: function (path, line, anchor) { /* open it */ return true; },
   revealLine: function (line) { /* optional: put the caret on this source line */ },
+  pageTop: function (line) { /* optional: the reader scrolled; this source line is at the top */ },
 };
 ```
 
@@ -469,7 +470,7 @@ The kit asks it first wherever a reader opens a file — a file chip, a link to 
 
 Beside an editor, the page and its source scroll as one. `OkuRenderer.scrollToLine(line)` puts a source line (1-based, fractional allowed) at the top of the window; `OkuRenderer.lineAt(y)` says which source line is at a height in the window. Between two blocks the position is interpolated by line, so a long paragraph or code block scrolls through as its lines go by instead of the page jumping once per block. Both need to know where each block starts, which only a page [oku preview](cli.md#preview) wrote carries; on any other page `scrollToLine` does nothing and returns `false`, and `lineAt` returns `null`. The lines follow an edit: after [update](#update-in-place) a kept block answers with its new line.
 
-The other direction is the host's: when it has `revealLine`, a double-click on the page hands it the source line under the pointer. Not on a link, a control or a chart, which answer a double-click of their own.
+The other direction is the host's: when it has `revealLine`, a double-click on the page hands it the source line under the pointer. Not on a link, a control or a chart, which answer a double-click of their own. When it has `pageTop`, the reader scrolling the page hands it the source line now at the top, at most once a frame, so the editor can follow. Only the reader's scrolls are reported: one `scrollToLine` made is not, or the editor would be moved to where the page landed and the two would chase each other, and neither is a scroll the page makes on its own (keeping the reader's place across an update, a deep link). A scroll counts as the reader's while a pointer is held on the page, or within a second of a wheel, key, pointer or touch on it that came after the last `scrollToLine`.
 
 ## Cross-cutting features {#cross-cutting}
 

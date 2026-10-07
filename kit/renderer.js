@@ -3388,6 +3388,8 @@
   OkuRenderer.scrollToLine = function (line) {
     const units = lineUnits();
     if (!units.length) return false;
+    placedAt = performance.now();
+    reported = null;
     let k = -1;
     for (let i = 0; i < units.length && units[i].line <= line; i++) k = i;
     let y = 0;
@@ -3415,6 +3417,48 @@
     if (!next || next.top <= u.top) return u.line;
     return u.line + Math.min(1, (clientY - u.top) / (next.top - u.top)) * (next.line - u.line);
   };
+
+  /* The way back: the reader scrolling the page hands the host the line
+   * now at the top (`__okuHost.pageTop`), so the editor follows. Only the
+   * READER's scrolls: reporting one scrollToLine made would move the
+   * editor to where the page landed, a fraction off, and the panes would
+   * chase each other. A scroll counts while a pointer is held, or within
+   * a second of a wheel, key or touch made after the host last placed
+   * the page; the page's own scrolls (an update keeping the reader's
+   * place, a deep link) never do. */
+  let placedAt = 0;
+  let actedAt = 0;
+  let held = false;
+  let reported = null;
+  let queued = false;
+  const ACTING_MS = 1000;
+  const acted = () => { actedAt = performance.now(); };
+  for (const type of ['wheel', 'keydown', 'touchstart', 'touchmove']) {
+    window.addEventListener(type, acted, { capture: true, passive: true });
+  }
+  window.addEventListener('pointerdown', () => { held = true; acted(); }, { capture: true, passive: true });
+  for (const type of ['pointerup', 'pointercancel']) {
+    window.addEventListener(type, () => { held = false; acted(); }, { capture: true, passive: true });
+  }
+  window.addEventListener('scroll', () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      const host = window.__okuHost;
+      if (!host || typeof host.pageTop !== 'function') return;
+      if (actedAt <= placedAt) return;
+      if (!held && performance.now() - actedAt > ACTING_MS) return;
+      const line = OkuRenderer.lineAt(0);
+      if (line == null || line === reported) return;
+      reported = line;
+      try {
+        host.pageTop(line);
+      } catch (err) {
+        console.error('[oku] the host could not follow line ' + line, err);
+      }
+    });
+  }, { passive: true });
 
   /* Generated from the `required` arrays in kit/schema/page.schema.json.
      The renderer cannot fetch the schema at runtime (standalone builds
