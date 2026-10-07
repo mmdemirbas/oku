@@ -70,7 +70,8 @@ def preview(tmp_path_factory) -> dict:
     # No file chip: the page carries no files, and its place in the project
     # was written only beside them.
     (docs / "plain.md").write_text(
-        '---\ntitle: Plain\n---\n\n<div class="links"><a href="notes.md#x">notes</a></div>\n', encoding="utf-8"
+        '---\ntitle: Plain\n---\n\n<div class="links"><a href="notes.md#x">notes</a></div>\n',
+        encoding="utf-8",
     )
     out = {
         "x": (project / "src" / "x.py").resolve().as_posix(),
