@@ -69,6 +69,10 @@ tasks.runIde {
     // Not bin/oku: run directly its shebang is the system python3, without
     // jsonschema, and oku then skips schema validation without a word.
     providers.gradleProperty("okuExecutable").orNull?.let { jvmArgs("-Doku.executable=$it") }
+    // -Pbackground: on macOS the sandbox runs as a UI element (no Dock icon,
+    // no menu bar) and never takes focus from the app in front, so it can be
+    // measured over CDP while someone is using the machine.
+    if (providers.gradleProperty("background").isPresent) jvmArgs("-Dapple.awt.UIElement=true")
 }
 
 tasks.prepareTestSandbox {

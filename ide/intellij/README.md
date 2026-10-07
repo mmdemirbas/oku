@@ -119,6 +119,7 @@ of the file: an empty margin is how a clean page looks.
 ```bash
 ./gradlew runIde -PopenPaths=/abs/oku/docs,/abs/oku/docs/index.md
 # add -PokuExecutable=/abs/oku/.venv/bin/oku to preview with this checkout (uv sync first)
+# add -Pbackground to keep the sandbox from ever taking focus (macOS)
 ```
 
 `runIde` opens the sandbox with JCEF remote debugging on port 9222, so the
@@ -130,6 +131,7 @@ built page. From the repository root:
 | `tools/check_preview.py <html>` | A page `oku preview` wrote, in headless Chromium: what rendered, console errors, scroll restored after a reload. No IDE needed. |
 | `tools/probe_ide.py probe [shot.png]` | The preview inside the sandbox IDE: the same counts, plus a screenshot. |
 | `tools/edit_sync_ide.py <ide-pid> <page.md> [<page.md> …]` | Appends a marker to each page on disk, activates the IDE (it reads external changes on activation), times until each preview shows it, restores the files. |
+| `tools/quiet_edit_ide.py <page.md>` | The same edit without moving focus: waits for the IDE's own background refresh (seconds, not the plugin's time) and reports whether the edit arrived without a reload. Pairs with `-Pbackground`. |
 | `tools/nav_and_edit_ide.py <docs-dir>` | Clicks a link to a page that is not open yet; the IDE should open it and the panel should stay put. |
 | `tools/idea_link_ide.py <file> <line>` | Follows the kit's `idea://open?file=…&line=…` link; the IDE should open the file. |
 | `tools/measure_render.py <page.md> …` | What one render costs, phase by phase, once per process and in a `--serve` session; prints the chart `docs/index.md` carries. |
