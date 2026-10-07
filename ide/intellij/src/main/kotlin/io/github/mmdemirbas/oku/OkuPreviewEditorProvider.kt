@@ -13,9 +13,11 @@ import com.intellij.openapi.vfs.VirtualFile
 /**
  * Opens an oku page as text + the kit's own rendering, side by side.
  *
- * Only files that are oku pages are taken; every other markdown file keeps
- * the bundled Markdown editor. Taking them all would hand a README to a
- * renderer it was not written for. An oku page the preview cannot draw —
+ * Only files that are oku pages are taken, unless the reader chose every
+ * markdown file in the settings ([OkuPages.opensInPreview]); every other
+ * markdown file keeps the bundled Markdown editor. Taking them all by
+ * default would hand a README to a renderer it was not written for. A
+ * file the preview cannot draw —
  * no oku, no embedded browser — is not taken either, so it opens in the
  * Markdown editor rather than in a panel that can only say what is wrong
  * ([OkuFallbackNotifier] says it once instead).
@@ -41,7 +43,7 @@ class OkuPreviewEditorProvider : TextEditorWithPreviewProvider(OkuPreviewProvide
 /** The rendering half. Not registered on its own: it exists as the split's second editor. */
 class OkuPreviewProvider : FileEditorProvider, DumbAware {
     override fun accept(project: Project, file: VirtualFile): Boolean =
-        OkuPages.isOkuPage(file) && whyPreviewUnavailable() == null
+        OkuPages.opensInPreview(file) && whyPreviewUnavailable() == null
 
     override fun createEditor(project: Project, file: VirtualFile): FileEditor = OkuPreviewFileEditor(project, file)
 

@@ -13,10 +13,13 @@ import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.AlignX
+import com.intellij.ui.dsl.builder.Cell
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.selected
 import java.nio.file.Path
+import javax.swing.JCheckBox
 import kotlin.io.path.Path
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isExecutable
@@ -29,6 +32,9 @@ class OkuSettings : SimplePersistentStateComponent<OkuSettings.Options>(Options(
     class Options : BaseState() {
         /** Off: no markdown file is an oku page, so nothing in this plugin runs. */
         var enabled by property(true)
+
+        /** Every `.md` opens in oku's preview, not only oku pages ([OkuPages.opensInPreview]). */
+        var everyMarkdown by property(false)
 
         /** The oku to run; blank finds one ([OkuLauncher]). */
         var executable by string()
@@ -79,13 +85,24 @@ class OkuConfigurable : BoundConfigurable("oku") {
     private val options = OkuSettings.get().state
 
     override fun createPanel(): DialogPanel = panel {
+        lateinit var on: Cell<JCheckBox>
         row {
-            checkBox("Open oku pages with oku's own rendering, and check them as they are typed")
+            on = checkBox("Open oku pages with oku's own rendering, and check them as they are typed")
                 .bindSelected(options::enabled)
                 .comment(
                     "An oku page is a markdown file in a tree with a kit.json or an _oku link, or one using an " +
                         "```oku- fence. Off: every markdown file is plain markdown. A file already open changes " +
                         "when it is opened again.",
+                )
+        }
+        row {
+            checkBox("Open every markdown file in oku's preview, not only oku pages")
+                .bindSelected(options::everyMarkdown)
+                .enabledIf(on.selected)
+                .comment(
+                    "A file that is not an oku page gets the preview only: oku does not check it, and its fences " +
+                        "and links stay plain markdown. Its site tree is the tree of the nearest kit.json above it, " +
+                        "else the markdown in its own folder and below.",
                 )
         }
         row("oku executable:") {

@@ -55,6 +55,22 @@ class OkuSettingsTest : OkuFixtureTestCase() {
         assertEmpty(fixture.doHighlighting().filter { "oku" in (it.description ?: "") })
     }
 
+    fun `test every markdown file opens in the preview only when asked, and is still not checked`() {
+        // No kit.json, no _oku, no oku fence: a README.
+        val readme = fixture.tempDirFixture.createFile("plain/README.md", "# Notes\n\nA link to [nowhere](#nowhere).\n")
+        assertFalse(OkuPages.opensInPreview(readme))
+        OkuSettings.get().state.everyMarkdown = true
+        assertTrue(OkuPages.opensInPreview(readme))
+        assertFalse(fixture.tempDirFixture.createFile("plain/notes.txt", "x").let(OkuPages::opensInPreview))
+        // The preview widens, nothing else: not an oku page, so not checked.
+        assertFalse(OkuPages.isOkuPage(readme))
+        fixture.openFileInEditor(readme)
+        assertEmpty(fixture.doHighlighting().filter { "[oku " in (it.description ?: "") })
+        // Switched off, the plugin takes nothing, whatever else is chosen.
+        OkuSettings.get().state.enabled = false
+        assertFalse(OkuPages.opensInPreview(readme))
+    }
+
     fun `test without oku an oku page is not taken, and the first one says why, once`() {
         val files = tree("a.md" to page, "b.md" to page)
         chooseOku("/no/such/oku")

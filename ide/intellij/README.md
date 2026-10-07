@@ -145,8 +145,10 @@ every other `.md` opens as before. The split layout the reader picks
 (editor, preview, both) is kept per file between sessions.
 
 *Settings → Tools → oku* has a switch that turns all of it off: no file is
-an oku page then, and nothing of oku runs. A file already open changes when
-it is opened again.
+an oku page then, and nothing of oku runs. A second one opens every `.md` in
+oku's preview, not only oku pages; such a file gets the preview alone — oku
+does not check it, and its fences and links stay the Markdown plugin's. A
+file already open changes when it is opened again.
 
 When no oku can draw a page — none installed, the one set in the settings
 does not run, or the IDE has no JCEF — an oku page opens in the Markdown
