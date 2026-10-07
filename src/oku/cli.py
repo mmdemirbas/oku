@@ -2438,7 +2438,16 @@ def _focused_schema_message(err, schema: dict) -> str:
             focused = validator_cls({**sub, "$defs": defs})
             # Deduped and capped: one bad block can fail a dozen ways, and
             # printing all of them buries the page the same way the echo did.
-            msgs = list(dict.fromkeys(e.message for e in focused.iter_errors(instance)))
+            # Each with the field it is about: "3 is not of type 'array'"
+            # alone does not say which of the block's fields holds the 3.
+            msgs = list(
+                dict.fromkeys(
+                    f"{'.'.join(str(x) for x in e.absolute_path)}: {e.message}"
+                    if e.absolute_path
+                    else e.message
+                    for e in focused.iter_errors(instance)
+                )
+            )
         except _jsonschema.SchemaError:
             msgs = []
         if msgs:
@@ -3861,7 +3870,7 @@ def _chart_shape_issues(blk: dict) -> list[tuple[str, str]]:
     flipped: list[str] = []
     if ctype in _CHART_ORDERED_PAIRS:
         key, pairs = _CHART_ORDERED_PAIRS[ctype]
-        for i, row in enumerate(blk.get(key) or []):
+        for i, row in enumerate(_items(blk.get(key))):
             if not isinstance(row, dict):
                 continue
             for lower, upper in pairs:
@@ -3871,8 +3880,8 @@ def _chart_shape_issues(blk: dict) -> list[tuple[str, str]]:
                     flipped.append(f"{who}: {lower} {a} is above {upper} {b}")
     elif ctype == "bullet":
         # A bullet's pairs sit one level down, in each track's zones.
-        for i, track in enumerate(blk.get("tracks") or []):
-            for j, zone in enumerate((track.get("zones") or []) if isinstance(track, dict) else []):
+        for i, track in enumerate(_items(blk.get("tracks"))):
+            for j, zone in enumerate(_items(track.get("zones")) if isinstance(track, dict) else []):
                 a, b = (zone.get("from"), zone.get("to")) if isinstance(zone, dict) else (None, None)
                 if isinstance(a, (int, float)) and isinstance(b, (int, float)) and a > b:
                     who = track.get("label") or f"tracks[{i}]"
@@ -3997,6 +4006,15 @@ def _kit_json_issues(path: Path) -> list[tuple[str, str]]:
             )
         )
     return out
+
+
+def _items(value: object) -> list:
+    """`value` when it is a list, else nothing to walk. A field of the wrong
+    type is the schema check's to report; a rule after it that iterates
+    the field anyway crashed the whole check instead — `"rows": 3` in a
+    table fence ended `oku check` with a TypeError and said nothing about
+    the page, and an editor checking a half-typed fence lost every finding."""
+    return value if isinstance(value, list) else []
 
 
 def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[dict]:
@@ -4316,9 +4334,9 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
             # `groups[].rows`, and counting only the first reported every
             # grouped table on the page as empty.
             if kind == "table":
-                n_rows = len(blk.get("rows") or [])
-                for grp in blk.get("groups") or []:
-                    n_rows += len(grp.get("rows") or [])
+                n_rows = len(_items(blk.get("rows")))
+                for grp in _items(blk.get("groups")):
+                    n_rows += len(_items(grp.get("rows"))) if isinstance(grp, dict) else 0
                 if not n_rows and not blk.get("headers"):
                     # No columns and no rows: the renderer emits a
                     # `<table>` with nothing inside it. There is no empty
