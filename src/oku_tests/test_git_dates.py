@@ -8,7 +8,12 @@ and the whole tree would render as "updated today". It cost one
 were the most expensive, because `git log -1 -- <file>` walks the whole
 history before returning empty for a file git has never seen.
 
-One `git log --name-only` per directory answers for every file in it.
+One `git log --name-only` per directory answers for every file in it —
+and one at the tree's root answers for every directory under it: per
+directory, a 126-directory tree ran 126 walks of the whole history at
+~0.1 s each, 12.9 s of a 15.6 s manifest. A served tree drops its caches
+on every save, which cannot change a date; the tree's answers are kept
+while HEAD holds.
 """
 
 from __future__ import annotations
@@ -36,6 +41,7 @@ def repo(tmp_path: Path) -> Path:
         run("commit", "-q", "-m", f"add p{i}", "--date", f"2026-0{i + 1}-15T12:00:00")
     cli._git_date_cache.clear()
     cli._git_dir_dates.clear()
+    cli._git_tree_dates.clear()
     return d
 
 
@@ -127,3 +133,55 @@ def test_a_build_run_from_a_git_hook_still_dates_its_pages(repo: Path, monkeypat
     monkeypatch.setenv("GIT_DIR", ".git")
     monkeypatch.setenv("GIT_WORK_TREE", ".")
     assert cli._git_last_modified(repo / "docs" / "p0.md") is not None
+
+
+def _counting(monkeypatch) -> list[list[str]]:
+    calls: list[list[str]] = []
+    real = subprocess.run
+
+    def counted(cmd, *a, **kw):
+        if cmd and cmd[0] == "git":
+            calls.append(list(cmd))
+        return real(cmd, *a, **kw)
+
+    monkeypatch.setattr(cli.subprocess, "run", counted)
+    return calls
+
+
+def _nest(repo: Path) -> list[Path]:
+    run = lambda *a: subprocess.run(["git", *a], cwd=repo, capture_output=True, text=True, check=True)  # noqa: E731
+    files = [repo / "docs" / "a" / "x.md", repo / "docs" / "b" / "c" / "y.md"]
+    for i, f in enumerate(files):
+        f.parent.mkdir(parents=True)
+        f.write_text(f"{f.name}\n", encoding="utf-8")
+        run("add", "-A")
+        run("commit", "-q", "-m", f"add {f.name}", "--date", f"2026-0{i + 6}-15T12:00:00")
+    return files + [repo / "docs" / "p0.md"]
+
+
+def test_one_log_answers_for_every_directory_of_a_tree(repo: Path, monkeypatch) -> None:
+    files = _nest(repo)
+    per_file = [cli._git_date_one(f) for f in files]
+    calls = _counting(monkeypatch)
+    cli._prime_git_dates(repo / "docs")
+    assert [c[3] for c in calls] == ["rev-parse", "log"], calls
+    assert [cli._git_last_modified(f) for f in files] == per_file
+    assert len(calls) == 2, f"asked git again after the tree's one log: {calls[2:]}"
+
+
+def test_a_save_asks_git_only_whether_head_moved(repo: Path, monkeypatch) -> None:
+    files = _nest(repo)
+    cli._prime_git_dates(repo / "docs")
+    calls = _counting(monkeypatch)
+    cli._forget_tree_state()  # what a served tree does on any save
+    cli._prime_git_dates(repo / "docs")
+    assert [c[3] for c in calls] == ["rev-parse"], calls
+    # A commit moves HEAD, and the tree is read again.
+    monkeypatch.undo()
+    files[0].write_text("changed\n", encoding="utf-8")
+    # %cs is the committer's date, which --date does not set.
+    when = {**os.environ, "GIT_COMMITTER_DATE": "2026-09-15T12:00:00"}
+    subprocess.run(["git", "commit", "-qam", "edit"], cwd=repo, env=when, check=True)
+    cli._forget_tree_state()
+    cli._prime_git_dates(repo / "docs")
+    assert cli._git_last_modified(files[0]) == cli._git_date_one(files[0]) == "2026-09-15"

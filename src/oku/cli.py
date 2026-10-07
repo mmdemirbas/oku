@@ -1394,6 +1394,11 @@ _git_date_cache: dict[tuple[str, int], str | None] = {}
 # directory git could not answer for, so the per-file path is tried
 # there and only there.
 _git_dir_dates: dict[str, dict[str, str] | None] = {}
+# Per tree root: the HEAD it was read at, and every directory's answer
+# under it, from one `git log` (_prime_git_dates). Not dropped by
+# _forget_tree_state, because only a commit changes a date: a save
+# changes the tree and not HEAD.
+_git_tree_dates: dict[str, tuple[str, dict[str, dict[str, str]]]] = {}
 
 
 def _nearest_kit_data(source: Path) -> dict:
@@ -1592,6 +1597,46 @@ def _git_last_modified(p: Path) -> str | None:
     return out
 
 
+def _prime_git_dates(root: Path) -> None:
+    """Answer `_git_dates_in` for every directory under `root` from ONE
+    `git log`, and keep the answers while the repository's HEAD holds.
+
+    One log per directory was one walk of the whole history per
+    directory: a 126-directory tree ran 126 of them at ~0.1 s, 12.9 s of
+    a 15.6 s manifest, where one log at the root takes 0.46 s. And every
+    save in a served tree dropped them all (_forget_tree_state), so the
+    next request paid it again. A directory the log does not mention — a
+    new one, or a nested repository — is left to `_git_dates_in`.
+    """
+    key = str(root)
+    try:
+        head = _git(["rev-parse", "HEAD"], cwd=root, timeout=5)
+        if head.returncode != 0:
+            return
+        held = _git_tree_dates.get(key)
+        if held is None or held[0] != head.stdout.strip():
+            r = _git(["log", "--format=%cs", "--name-only", "--relative", "--", "."], cwd=root, timeout=60)
+            if r.returncode != 0:
+                return
+            dirs: dict[str, dict[str, str]] = {}
+            current = ""
+            for line in r.stdout.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                if re.fullmatch(r"\d{4}-\d{2}-\d{2}", line):
+                    current = line
+                    continue
+                rel_dir, _, name = unicodedata.normalize("NFC", line).rpartition("/")
+                names = dirs.setdefault(str(root / rel_dir) if rel_dir else key, {})
+                if current and name not in names:
+                    names[name] = current
+            held = (head.stdout.strip(), dirs)
+            _git_tree_dates[key] = held
+    except (OSError, subprocess.SubprocessError):
+        return
+    for directory, names in held[1].items():
+        _git_dir_dates.setdefault(directory, names)
 
 
 def _git_dates_in(directory: Path) -> dict[str, str] | None:
@@ -2319,6 +2364,7 @@ def find_json_pages(root: Path, *, carry: bool = True):
     pages = []
     real_json: set[Path] = set()
     extra = project_skip_dirs(root)
+    _prime_git_dates(root)
     # Two passes — JSON first so the MD pass can dedupe against real
     # JSON siblings regardless of os.walk traversal order. Both use the
     # pruned walker so SKIP_DIRS subtrees are never descended into.
