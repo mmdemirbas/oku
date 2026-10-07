@@ -212,8 +212,10 @@ def session(tmp_path: Path):
 def test_the_session_opens_by_naming_its_protocol(session: _Session) -> None:
     hello = session.read()
     fences = hello.pop("fences")
+    inline = hello.pop("inline")
     assert hello == {"protocol": cli.PREVIEW_PROTOCOL, "oku": cli._PKG_VERSION, "kit": cli._kit_build_stamp()}
     assert sorted(fences) == sorted(f"oku-{kind}" for kind in cli._FENCE_KINDS)
+    assert inline == cli._INLINE_KINDS
     assert session.close() == 0
 
 

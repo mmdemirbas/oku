@@ -8645,12 +8645,22 @@ def _preview_serve(out_base: Path) -> int:
     The first line out is a greeting naming the protocol, so an extension
     can tell an oku it does not speak to from one that is merely slow. It
     also maps every `oku-*` fence to a JSON schema for its body
-    (fence_schemas), written under `out_base`.
+    (fence_schemas), written under `out_base`, and names the link prefixes
+    that are not anchors (`inline`, _INLINE_KINDS): `#f/src/x.py` is a file,
+    and an editor reading it as a heading id reports it as one it cannot find.
     """
     trees: dict[Path, tuple[dict, dict]] = {}
     held: dict[Path, tuple[dict, list]] = {}
     fences = fence_schemas(out_base / "schemas")
-    _emit({"protocol": PREVIEW_PROTOCOL, "oku": _PKG_VERSION, "kit": _kit_build_stamp(), "fences": fences})
+    _emit(
+        {
+            "protocol": PREVIEW_PROTOCOL,
+            "oku": _PKG_VERSION,
+            "kit": _kit_build_stamp(),
+            "fences": fences,
+            "inline": _INLINE_KINDS,
+        }
+    )
     for raw in sys.stdin.buffer:
         if not raw.strip():
             continue
