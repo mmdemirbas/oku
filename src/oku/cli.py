@@ -1341,20 +1341,24 @@ def carry_file_refs(page: dict, p: Path) -> dict:
     page for chaining; the dict is changed in place.
     """
     v1 = page.get("kind") == "page" and page.get("k") != "page"
-    refs = collect_file_refs(_v1_to_v2(page) if v1 else page, p)
-    if not refs:
-        return page
     meta = page.setdefault("meta" if v1 else "m", {})
-    meta["_files"] = refs
-    more = collect_file_closure(refs, p)
-    if more:
-        meta["_files_more"] = more
-    # The page's own place in the project: the one fact the runtime
-    # needs to turn every `rel` above into a path on this machine.
+    # The page's own place in the project: the one fact the runtime needs
+    # to turn a `rel` into a path on this machine — every carried file's,
+    # and a `.md` link's too. Every page, not only one that carries files:
+    # set only beside `_files`, a page with no `#f/` chip knew no full path,
+    # so its `.md` links never reached an editor's host and its viewer
+    # showed no path and no editor.
     try:
         meta["_rel"] = p.resolve().relative_to(project_root_for(p.parent)).as_posix()
     except ValueError:
         pass
+    refs = collect_file_refs(_v1_to_v2(page) if v1 else page, p)
+    if not refs:
+        return page
+    meta["_files"] = refs
+    more = collect_file_closure(refs, p)
+    if more:
+        meta["_files_more"] = more
     return page
 
 
