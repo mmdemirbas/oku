@@ -174,6 +174,7 @@ built page. From the repository root:
 | `tools/nav_and_edit_ide.py <docs-dir>` | Clicks a link to a page that is not open yet; the IDE should open it and the panel should stay put. |
 | `tools/idea_link_ide.py <file> <line>` | Follows the kit's `idea://open?file=…&line=…` link; the IDE should open the file. |
 | `tools/measure_render.py <page.md> …` | What one render costs, phase by phase, once per process and in a `--serve` session; prints the chart `docs/index.md` carries. |
+| `tools/check_time.py <page.md> …` | What an editor's check costs, through one `oku preview --serve` session: four `check` requests per page, the first one converting the whole tree. No IDE needed. |
 
 Run each with `uv run python ide/intellij/tools/<script>`. The scripts that
 edit pages restore them in a `finally`; check `git status docs/` anyway.
