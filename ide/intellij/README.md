@@ -47,7 +47,7 @@ page is, so neither pane jumps.
 The research, the measurements and the plan are in [`docs/index.md`](docs/index.md)
 (Turkish; `oku build` in `docs/` renders it).
 
-Distributed as a local zip (below), not through the Marketplace. The JSON
+Installed by `./ctl deploy ide` (below), not through the Marketplace. The JSON
 `oku preview` speaks is the contract (`docs/cli.md` in this repo,
 `PREVIEW_PROTOCOL` in `cli.py`): the process greets with its protocol
 number, and a plugin and an oku that disagree say which one to update
@@ -55,8 +55,9 @@ instead of failing on a missing field.
 
 ## Requirements
 
-- IntelliJ IDEA 2026.2 or newer (any IntelliJ-based IDE of that build should
-  work; only IDEA 2026.2.3 was tried).
+- An IntelliJ-based IDE of build 262 (2026.2) or newer that ships JCEF.
+  IntelliJ IDEA 2026.2.3 and Rider 2026.2.3.1 load it; Android Studio
+  2026.2.1 has no JCEF and cannot.
 - oku installed as a tool (`./ctl deploy` in this repo), new enough to speak
   the plugin's preview protocol. The plugin runs the oku set in
   *Settings → Tools → oku*, else the `oku` on PATH, else `~/.local/bin/oku`
@@ -70,20 +71,55 @@ instead of failing on a missing field.
   never waits behind a check of the whole tree. They write their stderr to
   `<IDE system dir>/oku-preview/preview.log` and `check.log`; a failure to
   start shows the last lines in the panel.
-- JDK 21 to run Gradle.
 
-## Build and install
+## Install
+
+From the repository root:
+
+```bash
+./ctl deploy ide          # lists the IDEs it finds and asks which
+./ctl deploy ide all      # every IDE that can load the plugin
+./ctl deploy ide IU rider # by product code, part of the name, or data directory
+./ctl deploy ide /opt/odd/idea   # an installation the search does not look in
+./ctl status              # which plugin build each IDE has
+```
+
+It first makes sure the global oku is this checkout's, because the plugin
+needs an oku that speaks its preview protocol. Then it builds the zip and
+puts it in each chosen IDE's plugins directory. An older copy is replaced,
+found by plugin id rather than by directory name. The same build is not
+written twice. The new copy is compared with the build before it says ✓.
+An IDE that cannot load the plugin is named with the reason and skipped.
+A running IDE loads the new copy when it restarts.
+
+Two choices here hold on any machine:
+
+- **The plugins directory is the IDE's own rule**, read out of its
+  `PathManager`: `idea.plugins.path` from the first `idea.properties` that
+  sets it, else `idea.config.path`/plugins, else the platform default. On
+  Linux the default has no `/plugins` and follows `XDG_DATA_HOME`.
+  Android Studio's vendor directory is `Google`. The rules are tested
+  for macOS, Linux and Windows layouts in
+  `src/oku_tests/test_ide_install.py`, but only macOS was run for real.
+- **The build runs on the IDE's own runtime** (its JBR), so a machine
+  needs no JDK. That is why `build.gradle.kts` sets a Java 21 bytecode
+  target and no toolchain: a toolchain asks for a JDK 21, and the 2026.2
+  JBR is Java 25.
+
+`install.py` does the work, and its docstring lists what it accepts.
+
+## Build by hand
 
 ```bash
 cd ide/intellij
-JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew buildPlugin
+JAVA_HOME="/path/to/IDE.app/Contents/jbr/Contents/Home" ./gradlew buildPlugin   # any JDK 21 or newer
 # → build/distributions/oku-intellij-0.2.0.zip
-# Settings → Plugins → ⚙ → Install Plugin from Disk…
 ```
 
 The build compiles against the IDE at `ideaPath` in `gradle.properties`
 (the one on this machine, so nothing is downloaded); pass
-`-PideaPath=/path/to/IDE.app` to use another.
+`-PideaPath=/path/to/IDE.app` to use another. `./ctl deploy ide` passes
+the IDE it builds against.
 
 ```bash
 ./gradlew test    # platform tests; run `uv sync` in the oku repository first

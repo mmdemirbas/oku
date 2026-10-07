@@ -1,4 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("org.jetbrains.kotlin.jvm") version "2.4.20"
@@ -29,8 +31,16 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
-kotlin {
-    jvmToolchain(21)
+// Bytecode for Java 21, compiled by whichever JDK runs Gradle. Not a
+// toolchain: that demands a JDK 21 on the machine, and `./ctl deploy ide`
+// builds on the runtime of the IDE being installed into — Java 25 in
+// 2026.2, which every machine with that IDE already has.
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions { jvmTarget = JvmTarget.JVM_21 }
+}
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 intellijPlatform {

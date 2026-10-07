@@ -28,8 +28,8 @@ clean	Remove dist/
 test	pytest, whole or in halves
 fmt	ruff format, then ruff check --fix
 verify	Everything CI runs: lint, doctree, build, tests
-deploy	Ship this repo's kit to the global tool, and to projects
-status	Which kit is the global tool building with?
+deploy	Ship this repo's kit to the global tool, to projects, and to IDEs
+status	Which kit is the global tool building with, and which plugin each IDE has?
 setup	Dependencies, the test browser, and new docs roots"
 
 qualifiers() {
@@ -43,7 +43,8 @@ qualifiers() {
       "browser	Only the headless-chromium suite" ;;
     deploy) printf '%s\n' \
       "tool	Reinstall the global \`oku\` from this repo, --no-cache (default)" \
-      "projects	Install, then \`oku build\` in each project directory given" ;;
+      "projects	Install, then \`oku build\` in each project directory given" \
+      "ide	Build the IntelliJ plugin, install it into JetBrains IDEs: all, the ones named, or asks" ;;
     setup)  printf '%s\n' \
       "deps	uv sync --extra dev (default)" \
       "browser	Install the chromium Playwright needs" \
@@ -196,6 +197,27 @@ cmd_rebuild() {
   done
 }
 
+# The plugin talks to the global oku over a preview protocol, so an oku
+# behind this checkout is brought up to it first. One already current is
+# left alone: reinstalling it costs a minute and changes nothing. Which
+# IDEs, where their plugins go and whether each can load the plugin is
+# ide/intellij/install.py's business; its exit status is this one's.
+cmd_ide() {
+  if [ "$(repo_kit_stamp)" = "$(global_kit_stamp)" ] && [ "$(repo_src_digest)" = "$(global_src_digest)" ]; then
+    step "the global oku is this checkout's (kit $(repo_kit_stamp)); leaving it as it is"
+  else
+    step "the global oku is not this checkout's; deploying it first"
+    cmd_install
+  fi
+  uv run python ide/intellij/install.py install "$@"
+}
+
+cmd_status() {
+  cmd_version
+  printf '  ides\n'
+  uv run python ide/intellij/install.py list | sed 's/^/  /'
+}
+
 # --- develop ----------------------------------------------------------------
 
 cmd_lint() {
@@ -252,10 +274,11 @@ case "$cmd" in
     case "${1:-tool}" in
       tool)     cmd_install ;;
       projects) shift; cmd_rebuild "$@" ;;
+      ide)      shift; cmd_ide "$@" ;;
       *)        red "unknown: ./ctl deploy $1  (./ctl deploy --list)"; exit 1 ;;
     esac
     ;;
-  status) cmd_version ;;
+  status) cmd_status ;;
   setup)
     case "${1:-deps}" in
       deps)    uv sync --extra dev ;;

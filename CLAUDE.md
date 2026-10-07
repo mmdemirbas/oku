@@ -160,6 +160,19 @@ that list against the directory in both directions, because a kit file
 nobody remembered to add ships as a silent absence — this repo renders
 it, the tests pass, and every other project builds without it.
 
+**The IntelliJ plugin is installed the same way: `./ctl deploy ide`.**
+It brings the global oku up to this checkout first (the plugin needs an
+oku that speaks its preview protocol), builds the zip on the target IDE's
+own JBR (so a machine needs no JDK, which is why `build.gradle.kts` sets a
+Java 21 bytecode target and no toolchain: the 2026.2 JBR is Java 25), and
+puts it where each IDE reads plugins from — the IDE's own `PathManager`
+rule, held for macOS, Linux and Windows layouts by `test_ide_install.py`.
+A copy is found by plugin id and compared by content, not by version
+string, which stays `0.2.0` across code changes the way the wheel's did.
+`all`, a product code, part of a name, or a path; with no argument a
+terminal is asked. Never hand someone the zip and "Install Plugin from
+Disk".
+
 **The tool's capabilities ship the same way, as extras.** `./ctl
 deploy` installs `oku[search,verify]` and fetches the chromium the
 tool's own playwright pins, then fails unless both import. It used to
