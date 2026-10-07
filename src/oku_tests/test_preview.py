@@ -367,6 +367,65 @@ def test_a_buffer_is_checked_as_oku_check_checks_the_saved_file(session: _Sessio
     assert got == want
 
 
+_ANCHORS = """---
+title: A
+---
+
+[site]: https://example.org
+
+Opening, after a [definition][site].
+
+## Özet
+
+```bash
+## not a heading
+```
+
+```oku-chart
+{"type":"bar","rows":[{"label":"a","value":1}]}
+```
+
+## Pinned title {#pinned}
+
+### Sub part
+
+## Özet
+"""
+
+
+def test_an_anchor_is_answered_with_the_line_its_heading_is_on(session: _Session, tmp_path: Path) -> None:
+    """An editor following `a.md#pinned` opens the file at that heading,
+    not at its top. The id is oku's (a pinned `{#id}`, else the slug, which
+    keeps the letters), the line is the source's — past a link definition
+    the renderer removes and a typed fence it lifts out — a `##` inside a
+    code fence is not a heading, and of two headings with one id the first
+    is the one a link lands on."""
+    docs = _tree(tmp_path)
+    session.read()
+    page = docs / "a.md"
+
+    def line(anchor: str, text: str | None = _ANCHORS) -> int | None:
+        req = {"id": anchor, "path": str(page), "anchor": anchor}
+        if text is not None:
+            req["text"] = text
+        reply = session.ask(req)
+        assert set(reply) == {"id", "line"}, reply
+        return reply["line"]
+
+    def at(needle: str) -> int:
+        return next(i for i, row in enumerate(_ANCHORS.split("\n"), start=1) if row.startswith(needle))
+
+    assert line("özet") == at("## Özet")
+    assert line("pinned") == at("## Pinned title")
+    assert line("sub-part") == at("### Sub part")
+    assert line("not-a-heading") is None
+    assert line("nowhere") is None
+    # No text: the file on disk.
+    assert line("disk", text=None) == 5
+    assert "error" in session.ask({"id": 9, "path": str(page), "text": _ANCHORS, "anchor": 3})
+    assert session.close() == 0
+
+
 def test_the_other_pages_are_linted_but_only_the_checked_one_is_validated(tmp_path: Path) -> None:
     """Schema validation is most of a check's cost and has no reach across
     pages, so `schema_for` limits it — and only it."""

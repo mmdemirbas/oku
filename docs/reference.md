@@ -458,12 +458,12 @@ A page shown inside an editor has a better place to open a file than the kit's v
 ```js
 window.__okuHost = {
   name: 'IntelliJ IDEA',
-  openFile: function (path, line) { /* open it */ return true; },
+  openFile: function (path, line, anchor) { /* open it */ return true; },
   revealLine: function (line) { /* optional: put the caret on this source line */ },
 };
 ```
 
-The kit asks it first wherever a reader opens a file — a file chip, a link to a local `.md` — with the file's full path and the line a `#f/path:120` reference names (`null` otherwise). Anything but `true`, or a throw, keeps the kit's own behaviour, so a host that cannot open one file never leaves the reader with nothing. The full path is the one the viewer shows: derived on a page opened from its tree's `dist/standalone/`, stated by `oku serve` on loopback, and read from the inlined manifest's `root_abs` on a page [oku preview](cli.md#preview) wrote. A page that knows no full path never asks.
+The kit asks it first wherever a reader opens a file — a file chip, a link to a local `.md` — with the file's full path, the line a `#f/path:120` reference names, and the heading id a link like `other.md#setup` names (each `null` when there is none). The kit passes the id rather than a line because the line of a heading on another page is the host's to find: [oku preview](cli.md#preview) answers it. Anything but `true`, or a throw, keeps the kit's own behaviour, so a host that cannot open one file never leaves the reader with nothing. The full path is the one the viewer shows: derived on a page opened from its tree's `dist/standalone/`, stated by `oku serve` on loopback, and read from the inlined manifest's `root_abs` on a page [oku preview](cli.md#preview) wrote. A page that knows no full path never asks.
 
 ### Following an editor · `OkuRenderer.scrollToLine` {#source-lines}
 

@@ -98,6 +98,17 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
             reply.issues ?: error("oku preview answered a check without issues: $line")
         }
 
+    /**
+     * The source line of the heading whose id is [anchor] on the page at
+     * [source], or null when no heading has it. [text] is the page's unsaved
+     * buffer when it has one; without it oku reads the file.
+     */
+    fun anchorLine(source: Path, anchor: String, text: String?): Result<Int?> {
+        val fields = mutableMapOf<String, Any>("path" to source.toString(), "anchor" to anchor)
+        if (text != null) fields["text"] = text
+        return checks.ask(fields) { reply, _ -> reply.line }
+    }
+
     private fun parse(line: String): Reply = try {
         gson.fromJson(line, Reply::class.java)
     } catch (e: JsonSyntaxException) {
@@ -234,12 +245,13 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         val page: String? = null,
         val shell: String? = null,
         val issues: List<Issue>? = null,
+        val line: Int? = null,
         val error: String? = null,
     )
 
     private companion object {
         /** The `PREVIEW_PROTOCOL` of the oku this plugin is written against. */
-        const val PROTOCOL = 3
+        const val PROTOCOL = 4
         const val START_TIMEOUT_SECONDS = 30L
         const val REQUEST_TIMEOUT_SECONDS = 30L
 

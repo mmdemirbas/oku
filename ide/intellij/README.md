@@ -14,7 +14,10 @@ A file chip in the preview opens its file in the IDE, on the line a
 `#f/path:120` reference names, and so does a link to a local `.md`: the
 plugin sets the kit's `window.__okuHost` on every load, and the kit asks
 it before opening its own viewer. That works on every OS, where the kit's
-`idea://` link is offered on macOS only.
+`idea://` link is offered on macOS only. A link to a heading on another
+page (`other.md#setup`) opens that page at the heading: the kit hands over
+the id, and oku says which line carries it, so the plugin keeps no copy of
+oku's heading-id rule.
 
 While a page is typed, the editor shows what `oku check` would report for it,
 on the lines it is about: errors and warnings, from the unsaved text,

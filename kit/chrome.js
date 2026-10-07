@@ -2174,11 +2174,11 @@ var __okuMdViewer = (function () {
    does a throw, which is logged: a host that cannot open one file must
    not leave the reader with nothing. Read at click time, so a host may
    arrive after the page has rendered. */
-function __okuHostOpen(abs, line) {
+function __okuHostOpen(abs, line, anchor) {
   var host = window.__okuHost;
   if (!abs || !host || typeof host.openFile !== 'function') return false;
   try {
-    return host.openFile(abs, line || null) === true;
+    return host.openFile(abs, line || null, anchor || null) === true;
   } catch (e) {
     console.error('[oku] the host could not open ' + abs, e);
     return false;
@@ -2240,7 +2240,14 @@ document.addEventListener('click', function (e) {
   // inside a viewed file is relative to.
   var base = a.closest('[data-oku-file-base]');
   var from = base ? base.getAttribute('data-oku-file-base') : (window.__okuPageRel || null);
-  if (__okuHostOpen(__okuFileStore.absOfLink(from, href), null)) return;
+  // The heading the link names goes with it: `other.md#setup` should land
+  // the editor on that heading, not on the top of the file. The host maps
+  // the id to a line; the kit knows the ids of the page it is showing only.
+  var anchor = null;
+  if (url.hash.length > 1) {
+    try { anchor = decodeURIComponent(url.hash.slice(1)); } catch (err) { anchor = url.hash.slice(1); }
+  }
+  if (__okuHostOpen(__okuFileStore.absOfLink(from, href), null, anchor)) return;
   __okuMdViewer.open(url.href, { href: href, from: from });
 });
 
@@ -7173,7 +7180,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-07-r121';
+var __okuKitBuild = '2026-10-07-r122';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the

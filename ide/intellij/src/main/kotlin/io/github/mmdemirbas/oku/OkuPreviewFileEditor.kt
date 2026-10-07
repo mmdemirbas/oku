@@ -326,12 +326,12 @@ class OkuPreviewFileEditor(
      */
     private val hostScript: String by lazy {
         val name = Gson().toJson(ApplicationNamesInfo.getInstance().fullProductName)
-        val open = hostQuery.inject("JSON.stringify({ path: String(path), line: line || 0 })")
+        val open = hostQuery.inject("JSON.stringify({ path: String(path), line: line || 0, anchor: anchor || null })")
         val reveal = hostQuery.inject(
             "JSON.stringify({ reveal: line, top: window.OkuRenderer && OkuRenderer.lineAt ? OkuRenderer.lineAt(0) : null })",
         )
         "window.__okuHost = { name: $name," +
-            " openFile: function (path, line) { $open; return true; }," +
+            " openFile: function (path, line, anchor) { $open; return true; }," +
             " revealLine: function (line) { $reveal; } };"
     }
 
@@ -345,8 +345,9 @@ class OkuPreviewFileEditor(
         }
         val path = message.get("path")?.takeIf { it.isJsonPrimitive }?.asString ?: return
         val line = message.get("line")?.takeIf { it.isJsonPrimitive }?.asInt ?: 0
-        log.info("oku preview: the page opens $path line $line")
-        open(Path(path), line = line - 1)
+        val anchor = message.get("anchor")?.takeIf { it.isJsonPrimitive }?.asString
+        log.info("oku preview: the page opens $path line $line anchor $anchor")
+        open(Path(path), line = line - 1, anchor = anchor)
     }
 
     private fun installNavigation() {
@@ -389,7 +390,9 @@ class OkuPreviewFileEditor(
             if (target.extension == "html" && asMd.exists()) asMd else rendered.root.resolve(rel)
         } else target
         if (source.startsWith(previews.outBase)) return false // error page and the like
-        open(source, line = 0)
+        // `other.html#setup`: the reader asked for that heading, not for the
+        // top of the file. URI.fragment is decoded, as heading ids are.
+        open(source, line = 0, anchor = uri.fragment?.takeIf { it.isNotEmpty() })
         return true
     }
 
@@ -400,23 +403,36 @@ class OkuPreviewFileEditor(
             k to URLDecoder.decode(v, Charsets.UTF_8)
         }.toMap()
         val path = params["file"] ?: return
-        open(Path(path), line = (params["line"]?.toIntOrNull() ?: 1) - 1)
+        open(Path(path), line = (params["line"]?.toIntOrNull() ?: 1) - 1, anchor = null)
     }
 
     /**
+     * Open [path] at 0-based [line], or at the heading whose id is [anchor]
+     * when oku finds one on that page (the id is oku's, so the line comes
+     * from oku, not from a second copy of its slug rule here).
+     *
      * Finding a file the IDE has not seen yet is a VFS refresh, which is not
      * UI-thread work: a chip naming a file outside the project, opened from
      * the page, tripped SlowOperations on the EDT. Only the opening is.
      */
-    private fun open(path: Path, line: Int) {
+    private fun open(path: Path, line: Int, anchor: String?) {
         cs.launch(Dispatchers.IO) {
             val target = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(path)
             if (target == null) {
                 log.info("oku preview: no file at $path")
                 return@launch
             }
+            val at = anchor?.takeIf { target.extension.equals("md", ignoreCase = true) }?.let { id ->
+                // The open buffer, when there is one: the heading may have moved since the save.
+                val text = readAction { FileDocumentManager.getInstance().getCachedDocument(target)?.text }
+                previews.anchorLine(path, id, text)
+                    .onFailure { log.info("oku preview: no line for #$id in $path: ${it.message}") }
+                    .getOrNull()
+                    ?.let { it - 1 }
+            } ?: line
+            log.info("oku preview: opens $path at line ${at + 1}" + (anchor?.let { " for #$it" } ?: ""))
             withContext(Dispatchers.EDT) {
-                OpenFileDescriptor(project, target, line.coerceAtLeast(0), 0).navigate(true)
+                OpenFileDescriptor(project, target, at.coerceAtLeast(0), 0).navigate(true)
             }
         }
     }

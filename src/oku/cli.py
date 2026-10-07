@@ -8479,7 +8479,7 @@ def _comparable_meta(page: dict) -> str:
 
 # Raised when a request or response changes shape, so an extension can
 # refuse an oku it does not speak to instead of failing on a missing field.
-PREVIEW_PROTOCOL = 3
+PREVIEW_PROTOCOL = 4
 
 # Runs before chrome-boot.js reads `theme-pref`, so the first paint is in
 # the editor's theme; and keeps the reader's place across the reload an
@@ -8705,6 +8705,12 @@ def _preview_serve(out_base: Path) -> int:
             if req.get("check") is True:
                 _emit({"id": req_id, **check_buffer(md, text, held=held)})
                 continue
+            anchor = req.get("anchor")
+            if anchor is not None:
+                if not isinstance(anchor, str):
+                    raise PreviewError("`anchor` is a heading id, a string")
+                _emit({"id": req_id, "line": heading_lines(md, text).get(anchor)})
+                continue
             _emit({"id": req_id, **preview_page(md, text, out_base, theme=theme, trees=trees)})
         except PreviewError as e:
             _emit({"id": req_id, "error": str(e)})
@@ -8739,6 +8745,34 @@ def fence_schemas(dest: Path) -> dict[str, str]:
             partial.replace(target)
         out[f"oku-{kind}"] = target.as_posix()
     return out
+
+
+def heading_lines(md: Path, text: str) -> dict[str, int]:
+    """Every heading id on the page, and the source line its heading is on.
+
+    For an editor that follows a link to `other.md#setup` and wants the
+    line rather than the top of the file. The ids are the ones `oku check`
+    collects, through the same lint pass, so they are the set
+    `unresolved-anchor` judges a link by; the slug rule itself is
+    `_md_slug`, held against the renderer's by test_heading_slug.py. Two
+    headings sharing an id answer with the first, as the document does.
+    """
+    lines: dict[int, int] = {}
+    page = page_from_markdown(_require_markdown(md), text, block_lines=lines)
+    found: dict[str, int] = {}
+    open_els: list[tuple[str, int]] = []
+    for idx, blk in enumerate(page.get("b", [])):
+        base = lines.get(idx)
+        if not isinstance(blk, str) or base is None:
+            continue
+
+        def _abs(rel: int | None, _base: int = base) -> int | None:
+            return _base + rel - 1 if rel else None
+
+        _issues, ids, *_ = _lint_md_string(blk, skip_prose=True, open_els=open_els, abs_line=_abs)
+        for rel, hid in ids:
+            found.setdefault(hid, base + rel - 1)
+    return found
 
 
 def check_buffer(md: Path, text: str, *, held: dict[Path, tuple[dict, list]] | None = None) -> dict:

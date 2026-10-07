@@ -37,6 +37,7 @@ The loader is in [x.py](#f/src/x.py:3).
 
 <div class="links">
 <a href="notes.md">the notes</a>
+<a class="at" href="notes.md#%C3%B6zet">the summary</a>
 </div>
 """
 
@@ -44,8 +45,8 @@ RECORDING_HOST = """(answer) => {
   window.__okuHostCalls = [];
   window.__okuHost = {
     name: 'Test IDE',
-    openFile: function (path, line) {
-      window.__okuHostCalls.push([path, line]);
+    openFile: function (path, line, anchor) {
+      window.__okuHostCalls.push([path, line, anchor]);
       if (answer === 'throw') throw new Error('no editor');
       return answer;
     },
@@ -105,7 +106,7 @@ def test_a_host_opens_the_chip_on_its_line_instead_of_the_viewer(page, preview) 
     page.evaluate(RECORDING_HOST, True)
     page.click("oku-filepath .okt-fp-label")
     page.wait_for_timeout(200)
-    assert page.evaluate("() => window.__okuHostCalls") == [[preview["x"], 3]]
+    assert page.evaluate("() => window.__okuHostCalls") == [[preview["x"], 3, None]]
     assert not _viewer_open(page)
 
 
@@ -114,7 +115,7 @@ def test_the_keyboard_reaches_the_host_too(page, preview) -> None:
     page.focus("oku-filepath .okt-fp-label")
     page.keyboard.press("Enter")
     page.wait_for_timeout(200)
-    assert page.evaluate("() => window.__okuHostCalls") == [[preview["x"], 3]]
+    assert page.evaluate("() => window.__okuHostCalls") == [[preview["x"], 3, None]]
 
 
 @pytest.mark.parametrize("answer", [False, "throw"])
@@ -127,7 +128,18 @@ def test_a_host_that_cannot_open_it_leaves_the_kits_viewer(page, preview, answer
 
 def test_a_link_to_a_markdown_file_goes_to_the_host(page, preview) -> None:
     page.evaluate(RECORDING_HOST, True)
-    page.click(".links a")
+    page.click(".links a:not(.at)")
     page.wait_for_timeout(200)
-    assert page.evaluate("() => window.__okuHostCalls") == [[preview["notes"], None]]
+    assert page.evaluate("() => window.__okuHostCalls") == [[preview["notes"], None, None]]
     assert not _viewer_open(page)
+
+
+def test_a_link_to_a_heading_hands_the_host_its_id(page, preview) -> None:
+    """`notes.md#özet` used to reach the host as the file alone, so the
+    editor opened at the top of it. The id goes with it, decoded: the host
+    asks oku which line carries it."""
+    page.evaluate(RECORDING_HOST, True)
+    page.click(".links a.at")
+    page.wait_for_timeout(200)
+    assert page.evaluate("() => window.__okuHostCalls") == [[preview["notes"], None, "özet"]]
+

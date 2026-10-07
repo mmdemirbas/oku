@@ -458,12 +458,12 @@ Bir düzenleyicinin içinde gösterilen bir sayfanın bir dosyayı açmak için 
 ```js
 window.__okuHost = {
   name: 'IntelliJ IDEA',
-  openFile: function (path, line) { /* dosyayı aç */ return true; },
+  openFile: function (path, line, anchor) { /* dosyayı aç */ return true; },
   revealLine: function (line) { /* isteğe bağlı: imleci bu kaynak satırına koy */ },
 };
 ```
 
-Kit, okurun bir dosya açtığı her yerde — bir dosya çipi, yerel bir `.md`'ye bağlantı — önce ona sorar: dosyanın tam yolunu ve bir `#f/yol:120` başvurusunun andığı satırı verir (yoksa `null`). `true` dışındaki her yanıt ya da bir hata kitin kendi davranışını korur; böylece bir dosyayı açamayan ana makine okuru eli boş bırakmaz. Tam yol, görüntüleyicinin gösterdiğiyle aynıdır: ağacın `dist/standalone/` dizininden açılan sayfada türetilir, loopback'teki `oku serve` tarafından bildirilir, [oku preview](cli.tr.md#preview)'ın yazdığı bir sayfada ise satır içi manifestin `root_abs` alanından okunur. Tam yolu bilmeyen bir sayfa hiç sormaz.
+Kit, okurun bir dosya açtığı her yerde — bir dosya çipi, yerel bir `.md`'ye bağlantı — önce ona sorar: dosyanın tam yolunu, bir `#f/yol:120` başvurusunun andığı satırı ve `other.md#setup` gibi bir bağlantının andığı başlık kimliğini verir (olmayan `null` gelir). Kit satır yerine kimliği verir, çünkü başka bir sayfadaki başlığın satırını bulmak ana makinenin işidir: [oku preview](cli.tr.md#preview) bunu yanıtlar. `true` dışındaki her yanıt ya da bir hata kitin kendi davranışını korur; böylece bir dosyayı açamayan ana makine okuru eli boş bırakmaz. Tam yol, görüntüleyicinin gösterdiğiyle aynıdır: ağacın `dist/standalone/` dizininden açılan sayfada türetilir, loopback'teki `oku serve` tarafından bildirilir, [oku preview](cli.tr.md#preview)'ın yazdığı bir sayfada ise satır içi manifestin `root_abs` alanından okunur. Tam yolu bilmeyen bir sayfa hiç sormaz.
 
 ### Düzenleyiciyi izlemek · `OkuRenderer.scrollToLine` {#source-lines}
 

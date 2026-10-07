@@ -1084,10 +1084,15 @@ panel holds, and reloads otherwise. Held by
 plain `render()`, and by the shell cases in `test_preview.py`.
 
 **A page inside an editor opens files in the editor.** `window.__okuHost
-= { name, openFile(path, line) }` is set by the embedder, and
+= { name, openFile(path, line, anchor) }` is set by the embedder, and
 `__okuHostOpen` asks it first at the two places a reader opens a file —
 `__okuFileOpen` (every chip, the viewer's too) and the `.md` link
-handler. Only `true` means handled; anything else, or a throw, falls
+handler. The `.md` link hands over its `#fragment` as `anchor`, decoded,
+and never a line: the kit knows the heading ids of the page it shows and
+not the lines of another page's, which `oku preview`'s `anchor` request
+answers from the ids `oku check` collects — so `other.md#setup` lands the
+editor on the heading instead of the top of the file (held by
+`browser/test_host_hook.py` and `test_preview.py`). Only `true` means handled; anything else, or a throw, falls
 through to the viewer, because a host that cannot open one file must
 not leave the reader with nothing. It is read at click time, so a host
 injected after load works. The path it gets is `absPath`'s, which over
