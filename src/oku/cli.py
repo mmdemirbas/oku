@@ -602,6 +602,16 @@ try:
 except ImportError:
     _HAS_JSONSCHEMA = False
 
+# What every check surface says when it cannot validate. jsonschema is a hard
+# dependency, so this is a broken install (or `python3 bin/oku` on a Python
+# without it), and a check that reports what it did not do as clean is the
+# failure: it once printed a tick for a page the renderer could not read.
+_NO_JSONSCHEMA = (
+    "schema validation did not run — jsonschema is missing from this install. "
+    "Only the structural checks ran, and they cannot see a malformed block payload. "
+    "Reinstall the tool: `./ctl deploy` in the oku repository."
+)
+
 
 # ---------- file:// printer ----------
 def file_url(p: Path) -> str:
@@ -5638,6 +5648,10 @@ def cmd_check(args: argparse.Namespace) -> int:
                 break
 
     if args.json:
+        if not _HAS_JSONSCHEMA:
+            # Not a JSON stream with an empty issue list: that is "clean".
+            print(f"✗ {_NO_JSONSCHEMA}", file=sys.stderr)
+            return 1
         # Emit a machine-parseable stream. Path is serialised relative
         # to root so consumers don't have to strip absolute prefixes.
         payload = []
@@ -5694,12 +5708,7 @@ def cmd_check(args: argparse.Namespace) -> int:
             # schema pass silently returned []. jsonschema is a hard
             # dependency now, so reaching here means a broken install —
             # say so, and fail.
-            print(
-                "✗ schema validation did not run — jsonschema is missing from this install.\n"
-                "  Only the structural checks ran, and they cannot see a malformed block\n"
-                "  payload. Reinstall the tool: `./ctl deploy` in the oku repository.",
-                file=sys.stderr,
-            )
+            print(f"✗ {_NO_JSONSCHEMA}", file=sys.stderr)
             return 1
         if not errors and not warnings:
             print(f"✓ {len(pages)} page(s) clean (schema + structural + content)")
@@ -8744,6 +8753,10 @@ def check_buffer(md: Path, text: str, *, held: dict[Path, tuple[dict, list]] | N
     page's findings are returned. `held` is the long-running mode's
     memory: per tree, the snapshot it was last seen at and its pages.
     """
+    if not _HAS_JSONSCHEMA:
+        # An editor shows nothing for a clean page, so an empty list here
+        # would read as "nothing wrong" on a page nobody validated.
+        raise PreviewError(_NO_JSONSCHEMA)
     started = time.perf_counter()
     md = _require_markdown(md).resolve()
     root = _preview_tree_root(md)

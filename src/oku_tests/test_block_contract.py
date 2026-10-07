@@ -173,23 +173,40 @@ def test_jsonschema_is_a_hard_dependency():
     assert cli._HAS_JSONSCHEMA, "jsonschema is not importable in this environment"
 
 
-def test_check_refuses_to_print_clean_when_the_schema_pass_did_not_run(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("as_json", [False, True], ids=["human", "json"])
+def test_check_refuses_to_print_clean_when_the_schema_pass_did_not_run(
+    tmp_path, monkeypatch, capsys, as_json
+):
     """Belt and braces for a broken install: without jsonschema the run
     must fail loudly rather than print a tick for a pass that never
-    happened."""
+    happened. `--json` too: an empty issue list is how a consumer of the
+    stream reads "clean", and it once printed exactly that."""
     (tmp_path / "ok.md").write_text(
         "---\ntitle: Ok\nsummary: S.\n---\n\n## One {#one}\n\nText.\n", encoding="utf-8"
     )
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cli, "_HAS_JSONSCHEMA", False)
     args = type(
-        "A", (), {"errors_only": False, "verbose": False, "strict": False, "quiet": False, "json": False}
+        "A", (), {"errors_only": False, "verbose": False, "strict": False, "quiet": False, "json": as_json}
     )()
     rc = cli.cmd_check(args)
     out = capsys.readouterr()
     assert rc == 1, "a run without schema validation exited 0"
     assert "did not run" in (out.err + out.out)
     assert "clean" not in out.out
+    assert '"issues"' not in out.out
+
+
+def test_an_editors_check_refuses_too(tmp_path, monkeypatch):
+    """`oku preview --serve`'s check request is how an editor lints the
+    buffer, and an editor draws nothing for a clean page — so without
+    jsonschema it answered with no findings on a page nobody validated."""
+    (tmp_path / ".git").mkdir()
+    page = tmp_path / "ok.md"
+    page.write_text("---\ntitle: Ok\nsummary: S.\n---\n\nText.\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "_HAS_JSONSCHEMA", False)
+    with pytest.raises(cli.PreviewError, match="did not run"):
+        cli.check_buffer(page, page.read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize(
