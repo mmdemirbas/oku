@@ -342,15 +342,23 @@ def _rgb(s):
     return tuple(int(v) for v in s.replace("rgb(", "").replace("rgba(", "").rstrip(")").split(",")[:3])
 
 
+def _show_cards(page):
+    """Each card test switches the view itself. The cards are in the DOM in
+    every view and hidden outside this one, so a test that relied on an
+    earlier test's click measured hidden cards alone: heights of 0 passed,
+    and a hover waited 30 s for a card that was never shown."""
+    page.evaluate("() => document.querySelector('#big [data-view=cards]').click()")
+    _wait.until(
+        page,
+        "() => [...document.querySelectorAll('#big .okt-card')].some(c => c.offsetHeight > 0)",
+        what="the cards view shown",
+    )
+
+
 def test_cards_sit_on_a_field_darker_than_the_cards(rendered):
     """Both were --surface, which left a 1px hairline as the only thing
     separating a card from the space around it."""
-    rendered.evaluate("() => document.querySelector('#big [data-view=cards]').click()")
-    _wait.until(
-        rendered,
-        "() => !!document.querySelector('#big .okt-card')",
-        what="the cards view rendered",
-    )
+    _show_cards(rendered)
     got = rendered.evaluate(
         """() => {
         const field = document.querySelector('#big .okt-table-cards');
@@ -370,11 +378,12 @@ def test_cards_sit_on_a_field_darker_than_the_cards(rendered):
 def test_a_card_sizes_to_its_own_content(rendered):
     """`align-items: start` — a stretched row leaves slack inside a card
     whose edge is now visible, and empty framed space reads as a fault."""
+    _show_cards(rendered)
     hs = rendered.evaluate(
         """() => [...document.querySelectorAll('#big .okt-card')]
                  .map(c => Math.round(c.getBoundingClientRect().height))"""
     )
-    assert hs, "no cards rendered"
+    assert hs and min(hs) > 0, f"no cards shown: {hs}"
     assert max(hs) - min(hs) <= 2 or len(set(hs)) > 1, hs
     align = rendered.evaluate(
         "() => getComputedStyle(document.querySelector('#big .okt-table-cards')).alignItems"
@@ -384,6 +393,7 @@ def test_a_card_sizes_to_its_own_content(rendered):
 
 def test_a_card_does_not_lift_under_a_pointer_that_cannot_click_it(rendered):
     """The hover transform said "button" on a card with no handler."""
+    _show_cards(rendered)
     got = rendered.evaluate(
         """() => {
         const c = document.querySelector('#big .okt-card');
