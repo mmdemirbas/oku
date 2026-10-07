@@ -7140,7 +7140,9 @@ def collect_file_refs(page_data, src: Path) -> dict[str, dict]:
     return refs
 
 
-def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = None) -> None:
+def build_standalone(
+    srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = None
+) -> dict[Path, str | None]:
     """Inline kit CSS/JS + the page's JSON content into each HTML.
 
     Produces single self-contained files that render offline, with no
@@ -7148,7 +7150,12 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
     block is present). autoBoot picks up the inline JSON automatically.
 
     Output preserves the source's directory structure under out_dir.
+    Returns, per page written, the page JSON it inlined — after the
+    asset rewrite, so it is the page the reader gets and not the one
+    passed in. `oku preview` hands that text to an editor that updates
+    the page in place instead of reloading it.
     """
+    inlined: dict[Path, str | None] = {}
     out_dir.mkdir(parents=True, exist_ok=True)
     # One shared copy of the runtime dependencies beside the pages, not a
     # copy inside each of them. Offline does not require a single file —
@@ -7333,6 +7340,8 @@ def build_standalone(srcs, out_dir: Path, src_root: Path, *, manifest: dict | No
         dest = out_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(_with_html_lang(html, _lang_of_page(page_data)), encoding="utf-8")
+        inlined[dest] = data_text
+    return inlined
 
 
 def cmd_build(args: argparse.Namespace) -> int:
@@ -8423,7 +8432,7 @@ def _comparable_meta(page: dict) -> str:
 
 # Raised when a request or response changes shape, so an extension can
 # refuse an oku it does not speak to instead of failing on a missing field.
-PREVIEW_PROTOCOL = 1
+PREVIEW_PROTOCOL = 2
 
 # Runs before chrome-boot.js reads `theme-pref`, so the first paint is in
 # the editor's theme; and keeps the reader's place across the reload an
@@ -8494,7 +8503,17 @@ def preview_page(
     trees: dict[Path, tuple[dict, dict]] | None = None,
 ) -> dict:
     """Write the page an editor previews for `md` holding `text`, and say
-    where it went: {"html", "root", "out", "ms", "notes"}.
+    where it went: {"html", "page", "shell", "root", "out", "ms", "notes"}.
+
+    `page` is the page JSON the HTML inlines, written beside it, and
+    `shell` fingerprints everything else the HTML carries — the kit, the
+    manifest, the kit.json bundle, the string table, the linked .md files,
+    the theme, `<title>` and `<html lang>`. Two renders with the same
+    `html` and `shell` differ only in the page, so an editor showing the
+    first can hand the second's `page` to `OkuRenderer.update` and keep
+    the reader's place; a different `shell` needs a reload. A digest of
+    the HTML rather than a list of what it holds, because a list is what
+    misses the next thing somebody inlines.
 
     Every page of one tree lands in one directory under `out_base`, named
     from the tree's path, so the site tree's relative links reach siblings
@@ -8525,6 +8544,13 @@ def preview_page(
         # nothing here is handed to anyone else.
         manifest["root_abs"] = root.as_posix()
         if trees is not None:
+            # Saving the page changes the snapshot and nothing a reader of
+            # the tree could see; keep the manifest already held, or its
+            # fresh `generated_at` alone would change `shell` and turn every
+            # save into a reload.
+            held = trees.get(root)
+            if held is not None and _without_timestamp(held[1]) == _without_timestamp(manifest):
+                manifest = held[1]
             trees[root] = (snapshot, manifest)
     listed = time.perf_counter()
 
@@ -8537,10 +8563,20 @@ def preview_page(
     # stdout is the protocol, so the lines travel in the response instead.
     narrated = io.StringIO()
     with contextlib.redirect_stdout(narrated):
-        build_standalone([(root / rel_html, stub, page)], out, root, manifest=manifest)
+        inlined = build_standalone([(root / rel_html, stub, page)], out, root, manifest=manifest)
+    html = out / rel_html
+    page_text = inlined[html]
+    if page_text is None:  # build_standalone was handed the page, so it always inlines one
+        raise PreviewError(f"{md}: no page to inline")
+    page_json = html.with_suffix(".json")
+    page_json.write_text(page_text, encoding="utf-8")
+    inlined_page = page_text.replace("</script", "<\\/script")
+    shell = html.read_text(encoding="utf-8").replace(inlined_page, "", 1)
     written = time.perf_counter()
     return {
-        "html": (out / rel_html).as_posix(),
+        "html": html.as_posix(),
+        "page": page_json.as_posix(),
+        "shell": hashlib.sha1(shell.encode("utf-8")).hexdigest()[:16],
         "root": root.as_posix(),
         "out": out.as_posix(),
         "ms": {
@@ -8550,6 +8586,10 @@ def preview_page(
         },
         "notes": [line.strip() for line in narrated.getvalue().splitlines() if line.strip()],
     }
+
+
+def _without_timestamp(manifest: dict) -> dict:
+    return {k: v for k, v in manifest.items() if k != "generated_at"}
 
 
 def _emit(obj: dict) -> None:
@@ -8564,7 +8604,8 @@ def _preview_serve(out_base: Path) -> int:
     stdout line, until stdin closes.
 
     Request  {"id", "path", "text"?, "theme"?} — `text` absent reads the file.
-    Response {"id", "html", "root", "out", "ms", "notes"} or {"id", "error"}.
+    Response {"id", "html", "page", "shell", "root", "out", "ms", "notes"}
+    or {"id", "error"}.
     The first line out is a greeting naming the protocol, so an extension
     can tell an oku it does not speak to from one that is merely slow.
     """

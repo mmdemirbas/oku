@@ -1680,6 +1680,80 @@
   }
 
   /* ================================================================ *
+   * Units: what update() keeps
+   * ================================================================ */
+
+  /* A unit is one block-level child of the page: a direct child of main
+   * that is not a section, or a direct child of a section. update() keeps
+   * the live node of every unit whose markup has not changed, so what a
+   * reader has done to it survives an edit elsewhere — an open <details>,
+   * a table's filter and view, a pinned chart reading, a diagram already
+   * drawn. Each unit's signature is its markup as BUILT, read before it is
+   * connected: once in the document, enhancement rewrites it (Prism, the
+   * table wiring, a chart drawing its SVG), and a signature read then
+   * would never match a freshly built one. */
+  let mountedUnits = [];
+
+  function unitsOf(root) {
+    const out = [];
+    for (const el of root.children) {
+      if (el.tagName === 'SECTION') {
+        for (const child of el.children) out.push(child);
+      } else {
+        out.push(el);
+      }
+    }
+    return out;
+  }
+
+  /* The node that holds `node`'s place in the page now. Enhancement may
+   * have wrapped it (a table goes inside .okt-table-wrap), so climb to the
+   * node whose parent is main or one of main's sections. Null when it has
+   * left the page — removed, or moved into the lightbox. */
+  function slotOf(node, main) {
+    if (!node || !main.contains(node) || node === main) return null;
+    let n = node;
+    for (;;) {
+      const parent = n.parentNode;
+      if (!parent) return null;
+      if (parent === main) return n.tagName === 'SECTION' ? null : n;
+      if (parent.tagName === 'SECTION' && parent.parentNode === main) return n;
+      n = parent;
+    }
+  }
+
+  /* Where the reader is: the first units at the top of the viewport, with
+   * their offsets, so the same unit can be put back at the same offset
+   * once the page around it has changed. Several, because the one at the
+   * top may be the one being edited and so not survive. */
+  function readerPlace(main) {
+    const candidates = [];
+    const seen = new Set();
+    for (const unit of mountedUnits) {
+      const slot = slotOf(unit.node, main);
+      if (!slot || seen.has(slot)) continue;
+      seen.add(slot);
+      const r = slot.getBoundingClientRect();
+      if (r.bottom <= 0) continue;
+      candidates.push({ node: slot, top: r.top });
+      if (candidates.length >= 8 || r.top > window.innerHeight) break;
+    }
+    return { y: window.scrollY, candidates: candidates };
+  }
+
+  /* `instant`: the kit sets scroll-behavior: smooth on <html>, and a
+   * smooth correction animates the page on every edit. */
+  function restorePlace(place) {
+    for (const c of place.candidates) {
+      if (!c.node.isConnected) continue;
+      const delta = c.node.getBoundingClientRect().top - c.top;
+      if (Math.abs(delta) >= 0.5) window.scrollTo({ top: window.scrollY + delta, behavior: 'instant' });
+      return;
+    }
+    if (window.scrollY !== place.y) window.scrollTo({ top: place.y, behavior: 'instant' });
+  }
+
+  /* ================================================================ *
    * Public API
    * ================================================================ */
 
@@ -1784,6 +1858,70 @@
     }
 
     render(page, host) {
+      page = this._begin(page, host);
+      if (!page) return;
+      const built = this._build(page);
+      mountedUnits = unitsOf(built).map((node) => ({ node: node, sig: node.outerHTML }));
+      this.host.replaceChildren(...built.childNodes);
+      this._announce(page);
+    }
+
+    /* Re-render the page on screen with a new version of itself, keeping
+     * the live node of every block whose markup did not change and the
+     * reader's place on the page. For an editor's preview, which hands
+     * the page over on every edit: a reload would close every open
+     * <details>, forget every table's filter and redraw every diagram.
+     *
+     * Same contract as render() otherwise — title, language, accent and
+     * the carried files are the new page's, and `oku:rendered` fires, so
+     * the contents, the rail and the reading aids rebuild. Falls back to
+     * render() when nothing has been rendered yet. Returns how many units
+     * were kept and how many built, or null for a page it refused (the
+     * page on screen is then left as it was, and the warning says why). */
+    update(page, host) {
+      const live = host || this.host || document.querySelector('main#main-content') || document.querySelector('main') || document.body;
+      if (!mountedUnits.length || !live.firstElementChild) {
+        this.render(page, live);
+        return { kept: 0, built: mountedUnits.length };
+      }
+      const place = readerPlace(live);
+      page = this._begin(page, live);
+      if (!page) return null;
+      const built = this._build(page);
+
+      const pool = new Map();
+      const used = new Set();
+      for (const unit of mountedUnits) {
+        const slot = slotOf(unit.node, live);
+        if (!slot || used.has(slot)) continue;
+        used.add(slot);
+        if (!pool.has(unit.sig)) pool.set(unit.sig, []);
+        pool.get(unit.sig).push(slot);
+      }
+      const next = [];
+      let kept = 0;
+      for (const node of unitsOf(built)) {
+        const sig = node.outerHTML;
+        const same = pool.get(sig);
+        const old = same && same.shift();
+        if (old) {
+          node.replaceWith(old);
+          next.push({ node: old, sig: sig });
+          kept++;
+        } else {
+          next.push({ node: node, sig: sig });
+        }
+      }
+      mountedUnits = next;
+      live.replaceChildren(...built.childNodes);
+      restorePlace(place);
+      this._announce(page);
+      return { kept: kept, built: next.length - kept };
+    }
+
+    /* Everything render() and update() set before the walk. Returns the
+     * page to walk, or null after recording why it cannot be. */
+    _begin(page, host) {
       this.host = host || this.host || document.querySelector('main#main-content') || document.querySelector('main') || document.body;
       this.warnings = [];
       __renderTypedBlock = (block) => this._renderTyped(block);
@@ -1798,7 +1936,7 @@
 
       if (!page || page.k !== 'page') {
         this._fail('schema-mismatch', 'Page root is not { k: "page" }', page);
-        return;
+        return null;
       }
 
       const meta = page.m || {};
@@ -1819,9 +1957,14 @@
         this.lang = meta.lang;
       }
       if (meta.accent) this._applyAccent(meta.accent);
+      return page;
+    }
 
-      const main = this.host;
-      main.innerHTML = '';
+    /* The page, built into a detached <main>. Detached so that nothing is
+     * connected — and no custom element starts drawing — before every
+     * unit's signature has been read (see unitsOf). */
+    _build(page) {
+      const main = document.createElement('main');
       main.appendChild(this._renderCover(page));
 
       let currentSection = null;
@@ -1883,7 +2026,10 @@
 
       const notes = renderFootnoteSection();
       if (notes) main.appendChild(notes);
+      return main;
+    }
 
+    _announce(page) {
       if (this.warnings.length) {
         window.dispatchEvent(new CustomEvent('oku:warnings', { detail: this.warnings }));
       }

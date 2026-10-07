@@ -1049,6 +1049,26 @@ goes through `_forget_tree_state` first. Changing a request or response
 field means raising `PREVIEW_PROTOCOL`, because the greeting is how an
 editor tells an oku it does not speak to from one that is merely slow.
 
+**An edit re-renders the blocks it touched and no others.** A reload,
+or a second `render()`, rebuilds every block — an open `<details>`
+closes, a table forgets its filter, every diagram is drawn again — and
+an editor's preview does one per keystroke. `OkuRenderer.update(page)`
+builds the new page into a detached `<main>`, keeps the live node of
+every UNIT (a child of `main` that is not a section, or a child of a
+section) whose markup did not change, and puts the unit the reader was
+looking at back at the same height. A unit's signature is its markup AS
+BUILT, read before anything is connected — once in the document,
+enhancement rewrites it (Prism, table wiring, a chart's SVG) and it would
+never match a fresh build again. That is why `render()` builds detached
+too, and the rule it leaves: **nothing in the build may need the
+document** — a renderer that measures, or looks up an element it just
+made by id, sees nothing until `_announce`. `oku preview` returns `page`
+(the inlined JSON) and `shell` (a digest of the rest of the HTML); the
+plugin hands `page` over only when `html` and `shell` match what the
+panel holds, and reloads otherwise. Held by
+`browser/test_update_in_place.py`, three of whose four cases fail against a
+plain `render()`, and by the shell cases in `test_preview.py`.
+
 **`oku build` runs the checks `oku check` runs — it did not, and the
 gap was the whole point of one of them.** `find_unparseable_json`
 exists because `find_json_pages` catches `JSONDecodeError` and moves

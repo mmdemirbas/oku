@@ -445,6 +445,12 @@ page-chrome, page-nav, page-toc are set in the HTML stub, not the page JSON. The
 > [!TIP] Customizing the layout
 > The kit defaults work for ~all KB pages. For one-off pages (a single-page artifact, no nav), drop the `<page-nav>` element from the stub. Without it the layout falls back to two-column (TOC on left, like v1). The renderer doesn't care; it only owns `<main>`.
 
+### Updating the page on screen · `OkuRenderer.update` {#update-in-place}
+
+An embedder that hands the page over again — an editor's preview, after every edit — calls `new OkuRenderer().update(page)` instead of `render(page)`. It builds the new page off screen, keeps the live node of every block whose markup did not change, and puts the block the reader was looking at back at the same height on the screen. An open `<details>`, a table's filter and view, a pinned chart reading and a diagram already drawn survive an edit to another block. Everything else is as after `render`: the title, the language, the accent and the carried files are the new page's, and `oku:rendered` fires, so the contents and the rail rebuild.
+
+It returns `{kept, built}`, the number of blocks kept and built, or `null` for a page it refuses — not `{k: "page"}` — leaving the screen as it was. Before anything has been rendered it renders. [oku preview](cli.md#preview) writes the page to hand over beside its HTML.
+
 ## Cross-cutting features {#cross-cutting}
 
 Behaviors that don't introduce a new block kind but change how an existing one renders.

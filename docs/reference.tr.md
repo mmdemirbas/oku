@@ -445,6 +445,12 @@ page-chrome, page-nav, page-toc sayfa JSON'unda değil, HTML iskeletinde tanıml
 > [!TIP] Yerleşimi özelleştirmek
 > Kitin varsayılanları bilgi tabanı sayfalarının neredeyse hepsinde çalışır. Tek seferlik sayfalarda (gezinmesiz, tek sayfalık bir çıktı) iskeletten `<page-nav>` öğesini çıkarın. O olmayınca yerleşim iki sütuna döner (içindekiler solda, v1'deki gibi). İşleyici bunu umursamaz; ona ait olan yalnızca `<main>` öğesidir.
 
+### Ekrandaki sayfayı güncellemek · `OkuRenderer.update` {#update-in-place}
+
+Sayfayı yeniden veren bir gömücü — her düzenlemeden sonra bir düzenleyicinin önizlemesi — `render(page)` yerine `new OkuRenderer().update(page)` çağırır. Yeni sayfayı ekran dışında kurar, işaretlemesi değişmeyen her bloğun canlı düğümünü korur ve okurun baktığı bloğu ekranda aynı yüksekliğe geri koyar. Açık bir `<details>`, bir tablonun süzgeci ve görünümü, iğnelenmiş bir grafik okuması ve çizilmiş bir diyagram, başka bir bloğa yapılan düzenlemeden etkilenmez. Geri kalan her şey `render`'dan sonraki gibidir: başlık, dil, vurgu rengi ve taşınan dosyalar yeni sayfanındır ve `oku:rendered` yayınlanır; içindekiler ve ray yeniden kurulur.
+
+Korunan ve yeniden kurulan blok sayısını `{kept, built}` olarak döndürür; reddettiği bir sayfa için — `{k: "page"}` olmayan — `null` döndürür ve ekranı olduğu gibi bırakır. Henüz hiçbir şey çizilmemişse çizer. Verilecek sayfayı [oku preview](cli.tr.md#preview) HTML'inin yanına yazar.
+
 ## Kesişen özellikler {#cross-cutting}
 
 Yeni bir blok türü getirmeyen ama var olan bir bloğun nasıl işlendiğini değiştiren davranışlar.

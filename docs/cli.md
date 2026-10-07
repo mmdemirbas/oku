@@ -349,19 +349,21 @@ Renders one page for an editor's preview panel and prints, as JSON, where it wen
 ```bash
 oku preview docs/guide.md --out /tmp/oku-preview --theme dark
 
-# {"protocol": 1, "html": "/tmp/oku-preview/3f2a9c1b7d4e/guide.html",
+# {"protocol": 2, "html": "/tmp/oku-preview/3f2a9c1b7d4e/guide.html",
+#  "page": "/tmp/oku-preview/3f2a9c1b7d4e/guide.json", "shell": "9c41e07a2b5d3f18",
 #  "root": "/path/to/project/docs", "out": "/tmp/oku-preview/3f2a9c1b7d4e",
 #  "ms": {"convert": 47, "manifest": 60, "standalone": 21}, "notes": []}
 ```
 
 - The page's tree is the directory of the nearest kit.json between the page and its project root (the nearest .git), else the page's own directory. Every page of one tree is written to one subdirectory of --out, so the site tree's links reach pages rendered from the same tree.
 - --stdin reads the markdown from stdin instead of the file. The path still decides the kit.json in force, the page's language, git's date and where #f/ references resolve.
-- --theme light or dark is the first paint's theme; without it the reader's system setting applies. The page keeps its scroll position across reloads, which an editor does after every edit.
+- --theme light or dark is the first paint's theme; without it the reader's system setting applies. The page keeps its scroll position across a reload.
+- page is the page JSON the HTML inlines, written beside it. shell fingerprints everything else the HTML carries: the kit, the manifest, the kit.json bundle, the string table, the linked .md files, the theme, the title. Two renders with the same html and shell differ only in the page, so an editor showing the first can hand the second's page to [OkuRenderer.update](reference.md#update-in-place), which keeps every block the edit did not touch and the reader's place; a different shell needs a reload.
 - The manifest carries the tree's absolute path, as oku serve does while bound to this machine, so the file viewer shows full paths. A preview is written for an editor on this machine; do not hand its directory to anyone.
 - notes holds what the build could not carry (an image over the inline cap, a file outside the project). Exit 1 with the reason on stderr when the page cannot be rendered at all: not a .md file, missing, or not UTF-8.
 
 > [!NOTE] Long-running: --serve
-> <strong>--serve</strong> keeps one process for a whole editing session: one JSON request per stdin line, one JSON response per stdout line, until stdin closes. The first line out is a greeting, <code>{"protocol": 1, "oku": …, "kit": …}</code>, so an editor can refuse an oku it does not speak to. A request is <code>{"id", "path", "text"?, "theme"?}</code> (no <code>text</code> reads the file); the answer is the one-page result with the same <code>id</code>, or <code>{"id", "error"}</code>, and a bad request does not end the session. The tree's manifest is kept between requests and computed again when a file in the tree changes, so every render after the first costs the page and not the tree: about 25 ms on this repository's docs, against about 200 ms for a one-shot run, most of which is starting Python.
+> <strong>--serve</strong> keeps one process for a whole editing session: one JSON request per stdin line, one JSON response per stdout line, until stdin closes. The first line out is a greeting, <code>{"protocol": 2, "oku": …, "kit": …}</code>, so an editor can refuse an oku it does not speak to. A request is <code>{"id", "path", "text"?, "theme"?}</code> (no <code>text</code> reads the file); the answer is the one-page result with the same <code>id</code>, or <code>{"id", "error"}</code>, and a bad request does not end the session. The tree's manifest is kept between requests and computed again when a file in the tree changes — a save that changes nothing a reader of the tree sees keeps it, so a save does not change shell — and every render after the first costs the page and not the tree: about 25 ms on this repository's docs, against about 200 ms for a one-shot run, most of which is starting Python.
 
 ## Dependencies {#optional-deps}
 

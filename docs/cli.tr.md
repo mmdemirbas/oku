@@ -351,19 +351,21 @@ Bir sayfayı bir düzenleyicinin önizleme paneli için çizer ve nereye yazdı�
 ```bash
 oku preview docs/guide.md --out /tmp/oku-preview --theme dark
 
-# {"protocol": 1, "html": "/tmp/oku-preview/3f2a9c1b7d4e/guide.html",
+# {"protocol": 2, "html": "/tmp/oku-preview/3f2a9c1b7d4e/guide.html",
+#  "page": "/tmp/oku-preview/3f2a9c1b7d4e/guide.json", "shell": "9c41e07a2b5d3f18",
 #  "root": "/path/to/project/docs", "out": "/tmp/oku-preview/3f2a9c1b7d4e",
 #  "ms": {"convert": 47, "manifest": 60, "standalone": 21}, "notes": []}
 ```
 
 - Sayfanın ağacı, sayfa ile proje kökü (en yakın .git) arasındaki en yakın kit.json'un dizinidir; yoksa sayfanın kendi dizini. Bir ağacın bütün sayfaları --out altında tek bir alt dizine yazılır; böylece site ağacının bağlantıları aynı ağaçtan çizilmiş sayfalara ulaşır.
 - --stdin markdown'u dosya yerine stdin'den okur. Geçerli kit.json'u, sayfanın dilini, git tarihini ve #f/ başvurularının nereden çözüleceğini yine yol belirler.
-- --theme light ya da dark ilk boyamanın temasıdır; verilmezse okuyucunun sistem ayarı geçerlidir. Sayfa, bir düzenleyicinin her düzenlemeden sonra yaptığı yeniden yüklemelerde kaydırma konumunu korur.
+- --theme light ya da dark ilk boyamanın temasıdır; verilmezse okuyucunun sistem ayarı geçerlidir. Sayfa yeniden yüklendiğinde kaydırma konumunu korur.
+- page, HTML'in satır içinde taşıdığı sayfa JSON'udur ve HTML'in yanına yazılır. shell, HTML'in taşıdığı diğer her şeyin parmak izidir: kit, manifest, kit.json paketi, dil tablosu, bağlantı verilen .md dosyaları, tema, başlık. html'i ve shell'i aynı olan iki çizim yalnızca sayfada ayrışır; böylece ilkini gösteren bir düzenleyici ikincinin page'ini [OkuRenderer.update](reference.tr.md#update-in-place)'e verebilir, o da düzenlemenin dokunmadığı her bloğu ve okurun yerini korur. shell farklıysa yeniden yükleme gerekir.
 - Manifest, oku serve'ün yalnızca bu makineye bağlıyken yaptığı gibi ağacın mutlak yolunu taşır; dosya görüntüleyici tam yolu böyle gösterir. Önizleme bu makinedeki bir düzenleyici için yazılır; dizinini kimseyle paylaşmayın.
 - notes, derlemenin taşıyamadıklarını içerir (satır içi sınırını aşan bir görsel, proje dışında bir dosya). Sayfa hiç çizilemiyorsa çıkış kodu 1'dir ve nedeni stderr'e yazılır: .md değil, dosya yok ya da UTF-8 değil.
 
 > [!NOTE] Sürekli çalışan kip: --serve
-> <strong>--serve</strong> bütün bir düzenleme oturumu boyunca tek bir süreç tutar: stdin'den satır başına bir JSON istek, stdout'a satır başına bir JSON yanıt; stdin kapanınca çıkar. İlk satır bir selamlamadır, <code>{"protocol": 1, "oku": …, "kit": …}</code>; böylece bir düzenleyici anlaşamadığı bir oku'yu reddedebilir. İstek <code>{"id", "path", "text"?, "theme"?}</code> biçimindedir (<code>text</code> yoksa dosya okunur); yanıt aynı <code>id</code> ile tek sayfalık sonuçtur ya da <code>{"id", "error"}</code>, ve hatalı bir istek oturumu bitirmez. Ağacın manifesti istekler arasında saklanır ve ağaçtaki bir dosya değişince yeniden hesaplanır; böylece ilkinden sonraki her çizim ağacın değil yalnızca sayfanın bedelini öder: bu reponun belgelerinde yaklaşık 25 ms, tek seferlik bir çalıştırmanın çoğu Python'u başlatmaya giden yaklaşık 200 ms'sine karşı.
+> <strong>--serve</strong> bütün bir düzenleme oturumu boyunca tek bir süreç tutar: stdin'den satır başına bir JSON istek, stdout'a satır başına bir JSON yanıt; stdin kapanınca çıkar. İlk satır bir selamlamadır, <code>{"protocol": 2, "oku": …, "kit": …}</code>; böylece bir düzenleyici anlaşamadığı bir oku'yu reddedebilir. İstek <code>{"id", "path", "text"?, "theme"?}</code> biçimindedir (<code>text</code> yoksa dosya okunur); yanıt aynı <code>id</code> ile tek sayfalık sonuçtur ya da <code>{"id", "error"}</code>, ve hatalı bir istek oturumu bitirmez. Ağacın manifesti istekler arasında saklanır ve ağaçtaki bir dosya değişince yeniden hesaplanır — ağacın okura gösterdiği hiçbir şeyi değiştirmeyen bir kaydetme onu korur, yani kaydetmek shell'i değiştirmez — ve ilkinden sonraki her çizim ağacın değil yalnızca sayfanın bedelini öder: bu reponun belgelerinde yaklaşık 25 ms, tek seferlik bir çalıştırmanın çoğu Python'u başlatmaya giden yaklaşık 200 ms'sine karşı.
 
 ## Bağımlılıklar {#optional-deps}
 

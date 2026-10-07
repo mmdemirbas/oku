@@ -131,6 +131,19 @@ def test_the_theme_is_seeded_only_when_asked(tmp_path: Path) -> None:
     assert dark_html.index('var theme = "dark";') < dark_html.index(boot)
 
 
+def test_the_page_beside_the_html_is_the_one_it_inlines(tmp_path: Path) -> None:
+    """An editor that updates the page in place hands it this file, so it
+    must be the page a reload would show — after the asset rewrite."""
+    docs = _tree(tmp_path)
+    (docs / "dot.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")
+    (docs / "a.md").write_text("---\ntitle: A\n---\n\n![dot](dot.svg)\n", encoding="utf-8")
+    done = _oku("preview", str(docs / "a.md"), "--out", str(tmp_path / "out"))
+    result = json.loads(done.stdout)
+    page = json.loads(Path(result["page"]).read_text(encoding="utf-8"))
+    assert page == _inline_json(Path(result["html"]).read_text(encoding="utf-8"), "__oku_page__")
+    assert "data:image/svg+xml" in json.dumps(page)
+
+
 @pytest.mark.parametrize(
     ("name", "says"),
     [("notes.txt", "is not a markdown page"), ("missing.md", "does not exist")],
@@ -238,4 +251,34 @@ def test_a_tree_that_changed_is_read_again(session: _Session, tmp_path: Path) ->
     after = Path(session.ask({"id": 2, "path": page})["html"]).read_text(encoding="utf-8")
     assert [e["title"] for e in _manifest(after)["pages"]] == ["A", "B", "C"]
     assert _inline_json(after, "__oku_page__")["m"]["accent"] == "rose"
+    assert session.close() == 0
+
+
+def test_the_shell_changes_only_when_more_than_the_page_does(session: _Session, tmp_path: Path) -> None:
+    """Same `shell`, and the page is all that changed: an editor may update
+    in place. Anything else the HTML carries has to move it, or the panel
+    keeps a stale tree, accent, theme or set of linked files."""
+    docs = _tree(tmp_path)
+    session.read()
+    page = str(docs / "a.md")
+
+    def shell(text: str, **extra: str) -> str:
+        reply = session.ask({"id": 1, "path": page, "text": text, **extra})
+        assert "error" not in reply, reply
+        return reply["shell"]
+
+    first = shell("---\ntitle: A\n---\n\nfirst draft\n")
+    assert shell("---\ntitle: A\n---\n\nsecond draft, longer\n") == first
+    assert shell("---\ntitle: A\n---\n\nfirst draft\n", theme="dark") != first
+    # A root-absolute .md link puts that file in the HTML for the viewer.
+    assert shell("---\ntitle: A\n---\n\nsee [b](/b.md)\n") != first
+    # Saving changes the tree's snapshot; unless the save changed what the
+    # tree shows a reader, it must not change the shell.
+    (docs / "a.md").write_text("---\ntitle: A\n---\n\nsaved\n", encoding="utf-8")
+    assert shell("---\ntitle: A\n---\n\nsaved\n") == first
+    (docs / "b.md").write_text("---\ntitle: B renamed\n---\n\nsecond page\n", encoding="utf-8")
+    renamed = shell("---\ntitle: A\n---\n\nfirst draft\n")
+    assert renamed != first
+    (docs / "kit.json").write_text('{"name": "p", "accent": "rose"}', encoding="utf-8")
+    assert shell("---\ntitle: A\n---\n\nfirst draft\n") not in (first, renamed)
     assert session.close() == 0
