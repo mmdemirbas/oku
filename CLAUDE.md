@@ -1062,6 +1062,23 @@ goes through `_forget_tree_state` first. Changing a request or response
 field means raising `PREVIEW_PROTOCOL`, because the greeting is how an
 editor tells an oku it does not speak to from one that is merely slow.
 
+**A save in a served tree costs what reading titles costs, not what
+building pages costs.** `--serve` keeps a tree's manifest and computes it
+again when anything in the tree changes, which in an editor is every
+autosave — so the first render after a save paid for the whole tree:
+1.6-2.5 s on a 21-page tree whose pages cite files, 12.6-14.3 s on an
+852-page one. Three causes, three fixes. The manifest converted every page
+in full, carrying the files each page's chips name, to read titles:
+`compute_manifest` walks with `carry=False`. Git dates came from one
+`git log` per directory, each a walk of the whole history, and the save
+dropped them though only a commit can change a date: `_prime_git_dates`
+runs one log at the tree root and keeps it while HEAD holds. And the tree
+snapshot entered `.git`, `.venv` and build outputs before filtering them:
+`_snapshot_tree` prunes as it walks. After: 0.3-0.4 s and 0.85-1.2 s.
+Held by `test_file_closure.py::test_the_site_manifest_reads_no_carried_file`,
+the last two cases of `test_git_dates.py` and `test_tree_snapshot.py`;
+`ide/intellij/tools/save_cost.py` measures it.
+
 **An editor's check is `oku check` on the buffer, inside its tree.** A
 `"check": true` request swaps the unsaved text in for the page's file
 and lints the whole tree, returning only that page's findings — a
