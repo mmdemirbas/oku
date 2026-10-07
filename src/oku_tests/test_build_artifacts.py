@@ -711,7 +711,9 @@ class TestPayloadBudget:
     # Then by source lines — the page follows the editor beside it
     # (scrollToLine / lineAt) and a double-click reveals the line: 1,468,084.
     # Then by a `.md#heading` link handing the host its anchor: 1,468,501.
-    KIT_BUDGET_BYTES = 1_469_000
+    # Then by the table wiring reading every cell before writing any:
+    # 1,469,274.
+    KIT_BUDGET_BYTES = 1_469_700
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -731,7 +733,8 @@ class TestPayloadBudget:
     # Then by window.__okuHost: 1,463,174.
     # Then by source lines for an editor beside the page: 1,468,664.
     # Then by the anchor a `.md#heading` link hands the host: 1,469,081.
-    STANDALONE_BUDGET_BYTES = 1_469_500
+    # Then by the table wiring's reads: 1,469,877.
+    STANDALONE_BUDGET_BYTES = 1_470_300
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

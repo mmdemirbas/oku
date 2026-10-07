@@ -1636,6 +1636,23 @@ which 62 set the value already there, and 93 `data-fit` writes of which
 `browser/test_sticky_table_header.py`, which count the writes and assert
 none lands while a callback is on the stack.
 
+**A loop over cells reads every cell before it writes any.** A style or
+layout read straight after a write makes the browser restyle or lay out
+the whole document first, so a loop that reads one cell, writes it and
+moves on pays a full pass per cell. Two did. The column-resize wiring asked
+each header cell for its `position` right after appending the previous
+cell's handle — 220 forced passes and 346 ms of a delivered 211 KB page's
+load, its first paint at 848-912 ms — and the sticky header's ghost
+measured each real cell right after sizing the previous copy, three passes
+per cell. Both read first now: the wiring reads every table's header cells
+before the loop that wires them, and the ghost is measured, built detached
+and written in one go. First paint on the same page: 468-516 ms. Held by
+`browser/test_table_wiring_cost.py`, which compares six columns with twelve
+on otherwise equal pages (both wider than the column, so both take the
+ghost) and requires the forced passes not to grow with the cells — a
+statement that does not care which function is at fault, so the third
+loop of this shape fails it too.
+
 **The indicator says what is wrong with the DOCUMENT, and a browser
 notice is not that.** Three delivered documents came back from a reader
 with an alarm badge: `ResizeObserver loop completed with undelivered

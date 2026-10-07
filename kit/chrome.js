@@ -5677,27 +5677,34 @@ function initReadingAids() {
       if (ghost.hidden) return;
       var head = table.tHead;
       if (!head) return;
-      var clone = head.cloneNode(true);
-      Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function (el) { el.removeAttribute('id'); });
-      Array.prototype.forEach.call(clone.querySelectorAll('[tabindex]'), function (el) { el.setAttribute('tabindex', '-1'); });
-      ghostTable.innerHTML = '';
-      ghostTable.appendChild(clone);
+      // Every real cell is measured before anything is written: measuring
+      // each after writing the previous copy laid the document out three
+      // times per header cell.
       var real = head.querySelectorAll('th, td');
-      var copy = clone.querySelectorAll('th, td');
-      for (var i = 0; i < real.length && i < copy.length; i++) {
-        var cs = getComputedStyle(real[i]);
-        copy[i].style.width = cs.width;
-        copy[i].style.height = cs.height;
+      var sizes = Array.prototype.map.call(real, function (cell) {
+        var cs = getComputedStyle(cell);
         // Auto layout sized the real column from this very label, so
         // the copied width is the label's width to the last fraction,
         // and a fraction lost in the copy wraps the label onto a second
         // line. A cell that rendered on one line is told not to wrap;
         // one that already wraps keeps the same width and wraps alike.
-        var lines = (real[i].clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) / parseFloat(cs.lineHeight);
-        if (lines < 1.5) copy[i].style.whiteSpace = 'nowrap';
-      }
-      ghostTable.style.width = getComputedStyle(table).width;
+        var lines = (cell.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) / parseFloat(cs.lineHeight);
+        return { width: cs.width, height: cs.height, nowrap: lines < 1.5 };
+      });
+      var tableWidth = getComputedStyle(table).width;
       var h = getComputedStyle(head).height;
+      var clone = head.cloneNode(true);
+      Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function (el) { el.removeAttribute('id'); });
+      Array.prototype.forEach.call(clone.querySelectorAll('[tabindex]'), function (el) { el.setAttribute('tabindex', '-1'); });
+      var copy = clone.querySelectorAll('th, td');
+      for (var i = 0; i < sizes.length && i < copy.length; i++) {
+        copy[i].style.width = sizes[i].width;
+        copy[i].style.height = sizes[i].height;
+        if (sizes[i].nowrap) copy[i].style.whiteSpace = 'nowrap';
+      }
+      ghostTable.innerHTML = '';
+      ghostTable.appendChild(clone);
+      ghostTable.style.width = tableWidth;
       ghost.style.height = h;
       ghost.style.marginBottom = '-' + h;
       ghost.scrollLeft = scroll.scrollLeft;
@@ -5872,7 +5879,18 @@ function initReadingAids() {
      alone. Tables inside tooltips, callouts or chart/diagram elements
      are skipped. Cards and List views are only generated when the table
      has a <thead> to source keys from. */
-  document.querySelectorAll('table:not([data-okt-bound])').forEach(function (table) {
+  var unbound = document.querySelectorAll('table:not([data-okt-bound])');
+  // Header cells an author made `static` (CSS makes every thead th
+  // sticky), read for EVERY table before the loop writes to any: a style
+  // read after a write restyles the whole document, and reading per cell
+  // did that 220 times, 346 ms of a 211 KB page's load.
+  var staticHeads = new Set();
+  unbound.forEach(function (table) {
+    table.querySelectorAll('thead th').forEach(function (th) {
+      if (getComputedStyle(th).position === 'static') staticHeads.add(th);
+    });
+  });
+  unbound.forEach(function (table) {
     if (table.closest('.okt-table-scroll, .oku-tooltip, oku-chart, oku-diagram')) return;
     table.setAttribute('data-okt-bound', '1');
 
@@ -5893,13 +5911,11 @@ function initReadingAids() {
       }
       ths.forEach(function (th, idx) {
         if (th.querySelector(':scope > .okt-col-resize')) return;
-        // Make th a positioning context for the absolute handle.
-        // Both `relative` and `sticky` qualify; only step in when the
-        // cell is `static` (CSS default). Overriding sticky→relative
-        // here would silently kill the sticky-header behaviour the
-        // CSS already wires for every thead th.
-        var pos = getComputedStyle(th).position;
-        if (pos === 'static') th.style.position = 'relative';
+        // A positioning context for the absolute handle. Both `relative`
+        // and `sticky` qualify, so only a `static` cell is touched:
+        // overriding sticky→relative would silently kill the sticky
+        // header the CSS wires.
+        if (staticHeads.has(th)) th.style.position = 'relative';
         var handle = document.createElement('span');
         handle.className = 'okt-col-resize';
         handle.setAttribute('aria-hidden', 'true');
