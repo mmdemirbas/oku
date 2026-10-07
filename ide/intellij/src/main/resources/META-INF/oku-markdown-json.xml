@@ -1,0 +1,12 @@
+<!-- What needs Markdown and JSON both: an oku-* fence body is JSON. -->
+<idea-plugin>
+  <extensions defaultExtensionNs="org.intellij.markdown">
+    <fenceLanguageProvider implementation="io.github.mmdemirbas.oku.OkuFenceLanguageProvider"/>
+  </extensions>
+  <extensions defaultExtensionNs="JavaScript.JsonSchema">
+    <ContentAwareSchemaFileProvider implementation="io.github.mmdemirbas.oku.OkuFenceSchemaProvider"/>
+  </extensions>
+  <applicationListeners>
+    <listener class="io.github.mmdemirbas.oku.OkuFenceSchemaReset" topic="io.github.mmdemirbas.oku.OkuFencesListener"/>
+  </applicationListeners>
+</idea-plugin>

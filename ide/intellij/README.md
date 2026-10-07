@@ -22,6 +22,13 @@ checked inside its tree so a link to an anchor another page lacks is caught
 too. A second `oku preview --serve` process does the checking, so a preview
 never waits behind it.
 
+An `oku-*` fence is JSON in the editor, and its keys complete from the schema
+oku names for that fence (generated from the kit's page schema, so the editor
+and `oku check` cannot disagree about a shape). Typing ```` ```oku ```` offers
+the fence tags. A key the kit does not know is reported by the check on the
+fence's line: the Markdown plugin hides problems inside code fences unless
+*Show problems in code blocks* is on in its settings.
+
 The preview follows the editor: the source line at the top of the editor
 is put at the top of the page. A double-click on the page goes the other
 way — the caret moves to that line and the editor is scrolled to where the

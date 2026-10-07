@@ -8,7 +8,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.util.messages.Topic
 import java.nio.file.Files
 import java.nio.file.Path
@@ -95,9 +94,6 @@ class OkuPreviewService : Disposable {
     private fun greeted(hello: Reply) {
         val named = hello.fences?.mapValues { Path(it.value) } ?: return
         if (named == fences) return
-        // Into the VFS here, off any read action: the schema provider is
-        // asked under one and may only look a file up, not refresh it.
-        named.values.forEach { LocalFileSystem.getInstance().refreshAndFindFileByNioFile(it) }
         fences = named
         ApplicationManager.getApplication().messageBus.syncPublisher(OkuFencesListener.TOPIC).fencesChanged(named)
     }
