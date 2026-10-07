@@ -97,6 +97,11 @@ def main() -> int:
         try:
             bring_front(ide)
             time.sleep(0.5)
+            # Not proven by an unlocked screen: with no GUI session on the
+            # console the call returns and nothing comes forward.
+            if front_pid() != ide:
+                print("the sandbox did not come to the front; no key would reach it")
+                return 1
             # 1. The page's double-click, a few headings down.
             pg.evaluate("() => window.scrollTo({top: innerHeight * 3, behavior: 'instant'})")
             time.sleep(0.5)
