@@ -1,3 +1,5 @@
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+
 plugins {
     id("org.jetbrains.kotlin.jvm") version "2.4.20"
     id("org.jetbrains.intellij.platform") version "2.19.0"
@@ -18,7 +20,12 @@ dependencies {
         local(providers.gradleProperty("ideaPath"))
         // JCEF is its own bundled plugin since 2026.x, not part of the core.
         bundledPlugin("com.intellij.modules.jcef")
+        // Optional at runtime (plugin.xml): what an author gets while typing.
+        bundledPlugin("org.intellij.plugins.markdown")
+        bundledPlugin("com.intellij.modules.json")
+        testFramework(TestFrameworkType.Platform)
     }
+    testImplementation("junit:junit:4.13.2")
 }
 
 kotlin {
@@ -49,6 +56,22 @@ tasks.runIde {
         "-Didea.trust.disabled=true",
     )
     providers.gradleProperty("openPaths").orNull?.let { args(it.split(",")) }
-    // -PokuExecutable=/abs/oku/bin/oku runs the preview from a checkout.
+    // -PokuExecutable=/abs/oku/.venv/bin/oku runs the preview from a checkout.
+    // Not bin/oku: run directly its shebang is the system python3, without
+    // jsonschema, and oku then skips schema validation without a word.
     providers.gradleProperty("okuExecutable").orNull?.let { jvmArgs("-Doku.executable=$it") }
+}
+
+tasks.prepareTestSandbox {
+    // The local IDEA's ultimate-plugin registers an obfuscated startup
+    // activity whose constructor the test framework cannot call, and the
+    // error it logs fails every test. Nothing under test needs it.
+    disabledPlugins.add("com.intellij.modules.ultimate")
+}
+
+tasks.test {
+    // The checkout's oku (`uv sync` in the repo root makes it), so a test
+    // exercises the oku this repository holds rather than whichever one is
+    // installed. Not bin/oku, whose shebang finds a python3 without jsonschema.
+    systemProperty("oku.executable", rootProject.projectDir.resolve("../../.venv/bin/oku").canonicalPath)
 }

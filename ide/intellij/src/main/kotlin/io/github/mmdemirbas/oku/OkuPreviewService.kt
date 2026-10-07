@@ -4,9 +4,12 @@ import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.util.messages.Topic
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.LinkedBlockingQueue
@@ -24,39 +27,49 @@ import kotlin.io.path.readText
  */
 data class Rendered(val html: Path, val root: Path, val out: Path, val page: Path, val shell: String)
 
+/** One finding of `oku check` for a page; `line` is 1-based, absent for the page as a whole. */
+data class Issue(val severity: String, val code: String, val where: String, val message: String, val line: Int?)
+
+/** Told when an oku session names the JSON schema of each `oku-*` fence body. */
+fun interface OkuFencesListener {
+    fun fencesChanged(fences: Map<String, Path>)
+
+    companion object {
+        @Topic.AppLevel
+        val TOPIC = Topic(OkuFencesListener::class.java, Topic.BroadcastDirection.NONE)
+    }
+}
+
 /**
- * One `oku preview --serve` process for the whole IDE, shared by every open
- * preview, so a render after the first costs the page and not a Python start.
+ * `oku preview --serve` for the whole IDE: one process renders every open
+ * preview, a second one checks pages, so a render after the first costs the
+ * page and not a Python start, and a render never waits behind a check of
+ * a whole tree.
  *
- * The JSON it speaks is oku's contract (`PREVIEW_PROTOCOL` in oku's cli.py).
- * The process greets first; one that names another protocol is refused with
- * a message saying which side to update, rather than failing later on a
- * missing field. A process that dies or stops answering is replaced on the
- * next render.
+ * The JSON they speak is oku's contract (`PREVIEW_PROTOCOL` in oku's
+ * cli.py). A process greets first; one that names another protocol is
+ * refused with a message saying which side to update, rather than failing
+ * later on a missing field. The greeting also maps every `oku-*` fence to a
+ * JSON schema for its body ([fences]). A process that dies or stops
+ * answering is replaced on the next request.
  */
 @Service(Service.Level.APP)
 class OkuPreviewService : Disposable {
     private val log = logger<OkuPreviewService>()
     private val gson = Gson()
-    private val lock = Any()
-    private var session: Session? = null
-    private var nextId = 0L
 
     val outBase: Path = Path(PathManager.getSystemPath(), "oku-preview")
-    private val errLog: Path = outBase.resolve("preview.log")
 
-    fun render(source: Path, text: String, theme: String): Result<Rendered> = runCatching {
-        synchronized(lock) {
-            val live = session?.takeIf { it.alive } ?: start().also { session = it }
-            nextId += 1
-            val request = gson.toJson(mapOf("id" to nextId, "path" to source.toString(), "text" to text, "theme" to theme))
-            val line = live.ask(request, REQUEST_TIMEOUT_SECONDS) ?: run {
-                live.kill()
-                session = null
-                error("oku preview did not answer within ${REQUEST_TIMEOUT_SECONDS}s${logTail()}")
-            }
-            val reply = parse(line)
-            reply.error?.let { error(it) }
+    private val previews = Channel("preview")
+    private val checks = Channel("check")
+
+    /** Fence tag (`oku-chart`) → the schema of its body, once a session has greeted. */
+    @Volatile
+    var fences: Map<String, Path> = emptyMap()
+        private set
+
+    fun render(source: Path, text: String, theme: String): Result<Rendered> =
+        previews.ask(mapOf("path" to source.toString(), "text" to text, "theme" to theme)) { reply, line ->
             val html = reply.html ?: error("oku preview answered without a page: $line")
             Rendered(
                 Path(html),
@@ -66,49 +79,27 @@ class OkuPreviewService : Disposable {
                 requireNotNull(reply.shell),
             )
         }
-    }
 
-    private fun start(): Session {
-        val oku = launcher() ?: error("oku is not installed: no `oku` on PATH or in ~/.local/bin")
-        Files.createDirectories(outBase)
-        val builder = ProcessBuilder(oku.toString(), "preview", "--serve", "--out", outBase.toString())
-        // A Dock-started IDE may hand the child no locale at all.
-        builder.environment()["PYTHONIOENCODING"] = "utf-8"
-        // To a file, not a pipe: a full stderr pipe would block the child.
-        builder.redirectError(errLog.toFile())
-        val started = Session(builder.start())
-        val hello = started.next(START_TIMEOUT_SECONDS)?.let(::parse)
-        if (hello?.protocol == null) {
-            started.kill()
-            error(startFailure())
+    /** What `oku check` would report for [source] if it held [text], inside its tree. */
+    fun check(source: Path, text: String): Result<List<Issue>> =
+        checks.ask(mapOf("path" to source.toString(), "text" to text, "check" to true)) { reply, line ->
+            reply.issues ?: error("oku preview answered a check without issues: $line")
         }
-        if (hello.protocol != PROTOCOL) {
-            started.kill()
-            val update = if (hello.protocol < PROTOCOL) "oku (./ctl deploy in the oku repository)" else "this plugin"
-            error("oku ${hello.oku} speaks preview protocol ${hello.protocol}, this plugin speaks $PROTOCOL: update $update")
-        }
-        log.info("oku preview session: oku ${hello.oku}, kit ${hello.kit}, protocol ${hello.protocol}")
-        return started
-    }
-
-    private fun startFailure(): String {
-        val said = logTail()
-        return if ("invalid choice: 'preview'" in said) {
-            "the installed oku has no `preview` command: update it (./ctl deploy in the oku repository)"
-        } else {
-            "oku preview did not start$said"
-        }
-    }
-
-    private fun logTail(): String {
-        val text = runCatching { errLog.readText() }.getOrNull()?.trim().orEmpty()
-        return if (text.isEmpty()) "" else ":\n" + text.lines().takeLast(12).joinToString("\n")
-    }
 
     private fun parse(line: String): Reply = try {
         gson.fromJson(line, Reply::class.java)
     } catch (e: JsonSyntaxException) {
         throw IllegalStateException("oku preview printed something that is not JSON: $line", e)
+    }
+
+    private fun greeted(hello: Reply) {
+        val named = hello.fences?.mapValues { Path(it.value) } ?: return
+        if (named == fences) return
+        // Into the VFS here, off any read action: the schema provider is
+        // asked under one and may only look a file up, not refresh it.
+        named.values.forEach { LocalFileSystem.getInstance().refreshAndFindFileByNioFile(it) }
+        fences = named
+        ApplicationManager.getApplication().messageBus.syncPublisher(OkuFencesListener.TOPIC).fencesChanged(named)
     }
 
     /**
@@ -123,14 +114,81 @@ class OkuPreviewService : Disposable {
     }
 
     override fun dispose() {
-        synchronized(lock) {
-            session?.kill()
-            session = null
+        previews.close()
+        checks.close()
+    }
+
+    /** One process and the requests it answers, one at a time. */
+    private inner class Channel(private val name: String) {
+        private val lock = Any()
+        private var session: Session? = null
+        private var nextId = 0L
+        private val errLog: Path = outBase.resolve("$name.log")
+
+        fun <T> ask(fields: Map<String, Any>, read: (Reply, String) -> T): Result<T> = runCatching {
+            synchronized(lock) {
+                val live = session?.takeIf { it.alive } ?: start().also { session = it }
+                nextId += 1
+                val line = live.ask(gson.toJson(mapOf("id" to nextId) + fields), REQUEST_TIMEOUT_SECONDS) ?: run {
+                    live.kill()
+                    session = null
+                    error("oku preview did not answer within ${REQUEST_TIMEOUT_SECONDS}s${logTail()}")
+                }
+                val reply = parse(line)
+                reply.error?.let { error(it) }
+                read(reply, line)
+            }
+        }
+
+        private fun start(): Session {
+            val oku = launcher() ?: error("oku is not installed: no `oku` on PATH or in ~/.local/bin")
+            Files.createDirectories(outBase)
+            val builder = ProcessBuilder(oku.toString(), "preview", "--serve", "--out", outBase.toString())
+            // A Dock-started IDE may hand the child no locale at all.
+            builder.environment()["PYTHONIOENCODING"] = "utf-8"
+            // To a file, not a pipe: a full stderr pipe would block the child.
+            // One per process, because opening it truncates it.
+            builder.redirectError(errLog.toFile())
+            val started = Session(builder.start(), name)
+            val hello = started.next(START_TIMEOUT_SECONDS)?.let(::parse)
+            if (hello?.protocol == null) {
+                started.kill()
+                error(startFailure())
+            }
+            if (hello.protocol != PROTOCOL) {
+                started.kill()
+                val update = if (hello.protocol < PROTOCOL) "oku (./ctl deploy in the oku repository)" else "this plugin"
+                error("oku ${hello.oku} speaks preview protocol ${hello.protocol}, this plugin speaks $PROTOCOL: update $update")
+            }
+            log.info("oku $name session: oku ${hello.oku}, kit ${hello.kit}, protocol ${hello.protocol}")
+            greeted(hello)
+            return started
+        }
+
+        private fun startFailure(): String {
+            val said = logTail()
+            return if ("invalid choice: 'preview'" in said) {
+                "the installed oku has no `preview` command: update it (./ctl deploy in the oku repository)"
+            } else {
+                "oku preview did not start$said"
+            }
+        }
+
+        private fun logTail(): String {
+            val text = runCatching { errLog.readText() }.getOrNull()?.trim().orEmpty()
+            return if (text.isEmpty()) "" else ":\n" + text.lines().takeLast(12).joinToString("\n")
+        }
+
+        fun close() {
+            synchronized(lock) {
+                session?.kill()
+                session = null
+            }
         }
     }
 
     /** One line in, one line out, with a deadline on every read. */
-    private class Session(private val process: Process) {
+    private class Session(private val process: Process, name: String) {
         private val lines = LinkedBlockingQueue<String>()
         private val writer = process.outputStream.bufferedWriter(Charsets.UTF_8)
 
@@ -138,7 +196,7 @@ class OkuPreviewService : Disposable {
             Thread({
                 process.inputStream.bufferedReader(Charsets.UTF_8).useLines { all -> all.forEach(lines::put) }
                 lines.put(CLOSED)
-            }, "oku-preview-reader").apply { isDaemon = true }.start()
+            }, "oku-$name-reader").apply { isDaemon = true }.start()
         }
 
         val alive: Boolean get() = process.isAlive
@@ -159,16 +217,18 @@ class OkuPreviewService : Disposable {
         }
     }
 
-    /** Every field either message can carry; Gson leaves the absent ones null. */
+    /** Every field any message can carry; Gson leaves the absent ones null. */
     private class Reply(
         val protocol: Int? = null,
         val oku: String? = null,
         val kit: String? = null,
+        val fences: Map<String, String>? = null,
         val html: String? = null,
         val root: String? = null,
         val out: String? = null,
         val page: String? = null,
         val shell: String? = null,
+        val issues: List<Issue>? = null,
         val error: String? = null,
     )
 

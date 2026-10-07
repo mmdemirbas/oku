@@ -16,6 +16,12 @@ plugin sets the kit's `window.__okuHost` on every load, and the kit asks
 it before opening its own viewer. That works on every OS, where the kit's
 `idea://` link is offered on macOS only.
 
+While a page is typed, the editor shows what `oku check` would report for it,
+on the lines it is about: errors and warnings, from the unsaved text,
+checked inside its tree so a link to an anchor another page lacks is caught
+too. A second `oku preview --serve` process does the checking, so a preview
+never waits behind it.
+
 The preview follows the editor: the source line at the top of the editor
 is put at the top of the page. A double-click on the page goes the other
 way — the caret moves to that line and the editor is scrolled to where the
@@ -37,9 +43,12 @@ which one to update instead of failing on a missing field.
   `oku preview`. The plugin runs the `oku` on PATH, or in `~/.local/bin`
   when the IDE was started from the Dock and has no shell PATH. To point it
   at a checkout while developing, start the IDE with
-  `-Doku.executable=/abs/oku/bin/oku`.
-- The process writes its stderr to `<IDE system dir>/oku-preview/preview.log`;
-  a failure to start shows its last lines in the panel.
+  `-Doku.executable=/abs/oku/.venv/bin/oku` (not `bin/oku`: run directly, its
+  shebang finds a python3 without jsonschema, and schema checks go quiet).
+- Two processes run: one renders previews, one checks pages, so a preview
+  never waits behind a check of the whole tree. They write their stderr to
+  `<IDE system dir>/oku-preview/preview.log` and `check.log`; a failure to
+  start shows the last lines in the panel.
 - JDK 21 to run Gradle.
 
 ## Build and install
@@ -67,7 +76,7 @@ every other `.md` opens as before.
 
 ```bash
 ./gradlew runIde -PopenPaths=/abs/oku/docs,/abs/oku/docs/index.md
-# add -PokuExecutable=/abs/oku/bin/oku to preview with this checkout
+# add -PokuExecutable=/abs/oku/.venv/bin/oku to preview with this checkout (uv sync first)
 ```
 
 `runIde` opens the sandbox with JCEF remote debugging on port 9222, so the

@@ -1,0 +1,7 @@
+<!-- What needs the Markdown plugin: an oku page is a markdown file. -->
+<idea-plugin>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <externalAnnotator language="Markdown" implementationClass="io.github.mmdemirbas.oku.OkuCheckAnnotator"/>
+  </extensions>
+</idea-plugin>

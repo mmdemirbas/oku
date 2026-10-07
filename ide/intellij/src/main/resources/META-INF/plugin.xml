@@ -10,6 +10,7 @@
 
   <depends>com.intellij.modules.platform</depends>
   <depends>com.intellij.modules.jcef</depends>
+  <depends optional="true" config-file="oku-markdown.xml">org.intellij.plugins.markdown</depends>
 
   <extensions defaultExtensionNs="com.intellij">
     <fileEditorProvider implementation="io.github.mmdemirbas.oku.OkuPreviewEditorProvider"/>
