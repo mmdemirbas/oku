@@ -88,8 +88,8 @@ class OkuFenceSchemaProvider : ContentAwareJsonSchemaFileProvider {
 }
 
 /** oku named the fence schemas: let every open project's JSON support read them. */
-class OkuFenceSchemaReset : OkuFencesListener {
-    override fun fencesChanged(fences: Map<String, Path>) {
+class OkuFenceSchemaReset : OkuGreetingListener {
+    override fun greeted(greeting: Greeting) {
         ApplicationManager.getApplication().invokeLater {
             for (project in ProjectManager.getInstance().openProjects) {
                 if (project.isDisposed) continue

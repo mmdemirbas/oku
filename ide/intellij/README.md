@@ -29,6 +29,13 @@ the fence tags. A key the kit does not know is reported by the check on the
 fence's line: the Markdown plugin hides problems inside code fences unless
 *Show problems in code blocks* is on in its settings.
 
+A `#f/` link is a file reference: Cmd+click opens the file, and the path
+completes segment by segment, resolved the way oku resolves it (beside the
+page first, then from the project root; a `:line` suffix only when the whole
+string is not a file). The Markdown plugin reads every `#…` link as a heading
+id and reports `#f/`, `#g/` and `#x/` links as anchors it cannot find; on an
+oku page that report is suppressed, and a real missing heading still gets it.
+
 The preview follows the editor: the source line at the top of the editor
 is put at the top of the page. A double-click on the page goes the other
 way — the caret moves to that line and the editor is scrolled to where the

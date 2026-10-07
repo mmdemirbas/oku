@@ -4,5 +4,10 @@
 
   <extensions defaultExtensionNs="com.intellij">
     <externalAnnotator language="Markdown" implementationClass="io.github.mmdemirbas.oku.OkuCheckAnnotator"/>
+    <psi.referenceContributor language="Markdown" implementation="io.github.mmdemirbas.oku.OkuFileReferenceContributor"/>
+    <lang.inspectionSuppressor language="Markdown" implementationClass="io.github.mmdemirbas.oku.OkuInlineLinkSuppressor"/>
   </extensions>
+  <applicationListeners>
+    <listener class="io.github.mmdemirbas.oku.OkuGreetingRestart" topic="io.github.mmdemirbas.oku.OkuGreetingListener"/>
+  </applicationListeners>
 </idea-plugin>

@@ -29,13 +29,20 @@ data class Rendered(val html: Path, val root: Path, val out: Path, val page: Pat
 /** One finding of `oku check` for a page; `line` is 1-based, absent for the page as a whole. */
 data class Issue(val severity: String, val code: String, val where: String, val message: String, val line: Int?)
 
-/** Told when an oku session names the JSON schema of each `oku-*` fence body. */
-fun interface OkuFencesListener {
-    fun fencesChanged(fences: Map<String, Path>)
+/**
+ * What an oku session says about the format when it starts: the JSON schema
+ * of each `oku-*` fence body (`oku-chart` → its file), and the link prefixes
+ * that are not heading anchors (`filepath` → `#f/`).
+ */
+data class Greeting(val fences: Map<String, Path>, val inline: Map<String, String>)
+
+/** Told when an oku session's greeting says something new. */
+fun interface OkuGreetingListener {
+    fun greeted(greeting: Greeting)
 
     companion object {
         @Topic.AppLevel
-        val TOPIC = Topic(OkuFencesListener::class.java, Topic.BroadcastDirection.NONE)
+        val TOPIC = Topic(OkuGreetingListener::class.java, Topic.BroadcastDirection.NONE)
     }
 }
 
@@ -48,8 +55,8 @@ fun interface OkuFencesListener {
  * The JSON they speak is oku's contract (`PREVIEW_PROTOCOL` in oku's
  * cli.py). A process greets first; one that names another protocol is
  * refused with a message saying which side to update, rather than failing
- * later on a missing field. The greeting also maps every `oku-*` fence to a
- * JSON schema for its body ([fences]). A process that dies or stops
+ * later on a missing field. The greeting also says what the editor needs
+ * to know about the format ([greeting]). A process that dies or stops
  * answering is replaced on the next request.
  */
 @Service(Service.Level.APP)
@@ -62,10 +69,13 @@ class OkuPreviewService : Disposable {
     private val previews = Channel("preview")
     private val checks = Channel("check")
 
-    /** Fence tag (`oku-chart`) → the schema of its body, once a session has greeted. */
+    /** The last greeting, empty until a session has started. */
     @Volatile
-    var fences: Map<String, Path> = emptyMap()
+    var greeting: Greeting = Greeting(emptyMap(), emptyMap())
         private set
+
+    /** Fence tag (`oku-chart`) → the schema of its body, once a session has greeted. */
+    val fences: Map<String, Path> get() = greeting.fences
 
     fun render(source: Path, text: String, theme: String): Result<Rendered> =
         previews.ask(mapOf("path" to source.toString(), "text" to text, "theme" to theme)) { reply, line ->
@@ -92,10 +102,10 @@ class OkuPreviewService : Disposable {
     }
 
     private fun greeted(hello: Reply) {
-        val named = hello.fences?.mapValues { Path(it.value) } ?: return
-        if (named == fences) return
-        fences = named
-        ApplicationManager.getApplication().messageBus.syncPublisher(OkuFencesListener.TOPIC).fencesChanged(named)
+        val said = Greeting(hello.fences.orEmpty().mapValues { Path(it.value) }, hello.inline.orEmpty())
+        if (said == greeting) return
+        greeting = said
+        ApplicationManager.getApplication().messageBus.syncPublisher(OkuGreetingListener.TOPIC).greeted(said)
     }
 
     /**
@@ -219,6 +229,7 @@ class OkuPreviewService : Disposable {
         val oku: String? = null,
         val kit: String? = null,
         val fences: Map<String, String>? = null,
+        val inline: Map<String, String>? = null,
         val html: String? = null,
         val root: String? = null,
         val out: String? = null,
