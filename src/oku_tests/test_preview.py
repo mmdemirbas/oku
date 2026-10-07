@@ -211,7 +211,9 @@ def session(tmp_path: Path):
 
 def test_the_session_opens_by_naming_its_protocol(session: _Session) -> None:
     hello = session.read()
+    fences = hello.pop("fences")
     assert hello == {"protocol": cli.PREVIEW_PROTOCOL, "oku": cli._PKG_VERSION, "kit": cli._kit_build_stamp()}
+    assert sorted(fences) == sorted(f"oku-{kind}" for kind in cli._FENCE_KINDS)
     assert session.close() == 0
 
 
@@ -286,3 +288,95 @@ def test_the_shell_changes_only_when_more_than_the_page_does(session: _Session, 
     (docs / "kit.json").write_text('{"name": "p", "accent": "rose"}', encoding="utf-8")
     assert shell("---\ntitle: A\n---\n\nfirst draft\n") not in (first, renamed)
     assert session.close() == 0
+
+
+# ---------- what an editor needs to help an author ----------
+
+
+def _examples_for(kind: str) -> list[dict]:
+    examples = json.loads((cli.KIT_DIR / "schema" / "examples.json").read_text(encoding="utf-8"))
+    if kind == "chart":
+        return list(examples["charts"].values())
+    found = examples["blocks"].get(kind)
+    return [found] if found else []
+
+
+def test_every_fence_has_a_schema_its_shipped_examples_pass(session: _Session) -> None:
+    """The greeting's schemas are what an editor validates a fence body
+    against while it is typed. A body `oku check` accepts must pass, and
+    one it would refuse must not — so every shipped example, and the same
+    example with a key the kit does not know."""
+    jsonschema = pytest.importorskip("jsonschema")
+    fences = session.read()["fences"]
+    session.close()
+    for tag, path in fences.items():
+        schema = json.loads(Path(path).read_text(encoding="utf-8"))
+        jsonschema.Draft202012Validator.check_schema(schema)
+        validator = jsonschema.Draft202012Validator(schema)
+        examples = _examples_for(tag.removeprefix("oku-"))
+        assert examples, tag
+        for example in examples:
+            assert not list(validator.iter_errors(example)), (tag, example)
+            if schema.get("additionalProperties") is False:
+                assert list(validator.iter_errors({**example, "not_a_key": 1})), tag
+
+
+_UNSAVED = """---
+title: A
+---
+
+## Unsaved {#unsaved}
+
+A link to [a missing anchor](b.md#nowhere) and [one here](#also-nowhere).
+
+```oku-table
+{"headers": ["x"], "rows": 3}
+```
+"""
+
+
+def test_a_buffer_is_checked_as_oku_check_checks_the_saved_file(session: _Session, tmp_path: Path) -> None:
+    """The editor's findings for an unsaved buffer are exactly what
+    `oku check` reports once the same text is saved — including the one
+    that needs another page (the anchor b.md does not have)."""
+    docs = _tree(tmp_path)
+    session.read()
+    reply = session.ask({"id": 1, "path": str(docs / "a.md"), "text": _UNSAVED, "check": True})
+    session.close()
+    assert set(reply) == {"id", "issues", "ms"}, reply  # a check renders nothing
+    got = sorted((i["severity"], i["code"], i.get("line"), i["message"]) for i in reply["issues"])
+    codes = {i[1] for i in got}
+    assert {"unresolved-anchor", "schema"} <= codes, got
+    assert any("#nowhere" in i[3] and "b.md" in i[3] for i in got), got
+
+    (docs / "a.md").write_text(_UNSAVED, encoding="utf-8")
+    done = subprocess.run(
+        [sys.executable, "-m", "oku.cli", "check", "--json"],
+        cwd=docs,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=120,
+    )
+    saved = json.loads(done.stdout)["issues"]
+    want = sorted(
+        (i["severity"], i["code"], i.get("line"), i["message"]) for i in saved if i["path"] == "a.md"
+    )
+    assert got == want
+
+
+def test_the_other_pages_are_linted_but_only_the_checked_one_is_validated(tmp_path: Path) -> None:
+    """Schema validation is most of a check's cost and has no reach across
+    pages, so `schema_for` limits it — and only it."""
+    docs = _tree(tmp_path)
+    (docs / "b.md").write_text(
+        '---\ntitle: B\n---\n\n## B {#b}\n\n```oku-table\n{"headers": ["x"], "rows": 3}\n```\n',
+        encoding="utf-8",
+    )
+    pages = cli.find_json_pages(docs)
+    a = next(p for p, _ in pages if p.stem == "a")
+    everything = {(Path(i["path"]).name, i["code"]) for i in cli.check_pages(pages, docs)}
+    limited = {(Path(i["path"]).name, i["code"]) for i in cli.check_pages(pages, docs, schema_for={a})}
+    assert ("b.md", "schema") in everything
+    assert ("b.md", "schema") not in limited
+    assert everything - {("b.md", "schema")} == limited

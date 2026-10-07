@@ -349,7 +349,7 @@ Renders one page for an editor's preview panel and prints, as JSON, where it wen
 ```bash
 oku preview docs/guide.md --out /tmp/oku-preview --theme dark
 
-# {"protocol": 2, "html": "/tmp/oku-preview/3f2a9c1b7d4e/guide.html",
+# {"protocol": 3, "html": "/tmp/oku-preview/3f2a9c1b7d4e/guide.html",
 #  "page": "/tmp/oku-preview/3f2a9c1b7d4e/guide.json", "shell": "9c41e07a2b5d3f18",
 #  "root": "/path/to/project/docs", "out": "/tmp/oku-preview/3f2a9c1b7d4e",
 #  "ms": {"convert": 47, "manifest": 60, "standalone": 21}, "notes": []}
@@ -363,7 +363,7 @@ oku preview docs/guide.md --out /tmp/oku-preview --theme dark
 - notes holds what the build could not carry (an image over the inline cap, a file outside the project). Exit 1 with the reason on stderr when the page cannot be rendered at all: not a .md file, missing, or not UTF-8.
 
 > [!NOTE] Long-running: --serve
-> <strong>--serve</strong> keeps one process for a whole editing session: one JSON request per stdin line, one JSON response per stdout line, until stdin closes. The first line out is a greeting, <code>{"protocol": 2, "oku": …, "kit": …}</code>, so an editor can refuse an oku it does not speak to. A request is <code>{"id", "path", "text"?, "theme"?}</code> (no <code>text</code> reads the file); the answer is the one-page result with the same <code>id</code>, or <code>{"id", "error"}</code>, and a bad request does not end the session. The tree's manifest is kept between requests and computed again when a file in the tree changes — a save that changes nothing a reader of the tree sees keeps it, so a save does not change shell — and every render after the first costs the page and not the tree: about 25 ms on this repository's docs, against about 200 ms for a one-shot run, most of which is starting Python.
+> <strong>--serve</strong> keeps one process for a whole editing session: one JSON request per stdin line, one JSON response per stdout line, until stdin closes. The first line out is a greeting, <code>{"protocol": 3, "oku": …, "kit": …, "fences": {…}}</code>, so an editor can refuse an oku it does not speak to; <code>fences</code> maps every <code>oku-*</code> fence to a JSON schema for its body, written under --out, so an editor can complete and validate a fence while it is typed. A request is <code>{"id", "path", "text"?, "theme"?}</code> (no <code>text</code> reads the file); the answer is the one-page result with the same <code>id</code>, or <code>{"id", "error"}</code>, and a bad request does not end the session. A request with <code>"check": true</code> lints instead of rendering and answers <code>{"id", "issues", "ms"}</code>: what oku check would report for the page if it held that text, each issue <code>{severity, code, where, message, line?}</code>. The rest of the tree is read from disk, because some of a page's findings are about other pages — an anchor a link expects, a translation's original — and only the page itself is validated against the schema, which is most of what a check costs. The tree's manifest is kept between requests and computed again when a file in the tree changes — a save that changes nothing a reader of the tree sees keeps it, so a save does not change shell — and every render after the first costs the page and not the tree: about 25 ms on this repository's docs, against about 200 ms for a one-shot run, most of which is starting Python.
 
 ## Dependencies {#optional-deps}
 

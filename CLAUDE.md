@@ -1049,6 +1049,20 @@ goes through `_forget_tree_state` first. Changing a request or response
 field means raising `PREVIEW_PROTOCOL`, because the greeting is how an
 editor tells an oku it does not speak to from one that is merely slow.
 
+**An editor's check is `oku check` on the buffer, inside its tree.** A
+`"check": true` request swaps the unsaved text in for the page's file
+and lints the whole tree, returning only that page's findings — a
+single-page check would miss every finding that is about another page
+(an anchor a link expects, a translation's original, the accents beside
+it). What makes that affordable is `check_pages(schema_for=…)`: schema
+validation is per page with no reach across pages and was 1.55 of 1.97 s
+profiled over this repo's docs, so only the checked page is validated.
+The greeting's `fences` are generated from `page.schema.json` by
+`fence_schemas` — `$defs[kind]` without `k` required — so the fence list
+and its shapes have one source. Held by the last three cases in
+`test_preview.py`, whose buffer case compares the reply with
+`oku check --json` on the same text saved.
+
 **An edit re-renders the blocks it touched and no others.** A reload,
 or a second `render()`, rebuilds every block — an open `<details>`
 closes, a table forgets its filter, every diagram is drawn again — and

@@ -351,7 +351,7 @@ Bir sayfayı bir düzenleyicinin önizleme paneli için çizer ve nereye yazdı�
 ```bash
 oku preview docs/guide.md --out /tmp/oku-preview --theme dark
 
-# {"protocol": 2, "html": "/tmp/oku-preview/3f2a9c1b7d4e/guide.html",
+# {"protocol": 3, "html": "/tmp/oku-preview/3f2a9c1b7d4e/guide.html",
 #  "page": "/tmp/oku-preview/3f2a9c1b7d4e/guide.json", "shell": "9c41e07a2b5d3f18",
 #  "root": "/path/to/project/docs", "out": "/tmp/oku-preview/3f2a9c1b7d4e",
 #  "ms": {"convert": 47, "manifest": 60, "standalone": 21}, "notes": []}
@@ -365,7 +365,7 @@ oku preview docs/guide.md --out /tmp/oku-preview --theme dark
 - notes, derlemenin taşıyamadıklarını içerir (satır içi sınırını aşan bir görsel, proje dışında bir dosya). Sayfa hiç çizilemiyorsa çıkış kodu 1'dir ve nedeni stderr'e yazılır: .md değil, dosya yok ya da UTF-8 değil.
 
 > [!NOTE] Sürekli çalışan kip: --serve
-> <strong>--serve</strong> bütün bir düzenleme oturumu boyunca tek bir süreç tutar: stdin'den satır başına bir JSON istek, stdout'a satır başına bir JSON yanıt; stdin kapanınca çıkar. İlk satır bir selamlamadır, <code>{"protocol": 2, "oku": …, "kit": …}</code>; böylece bir düzenleyici anlaşamadığı bir oku'yu reddedebilir. İstek <code>{"id", "path", "text"?, "theme"?}</code> biçimindedir (<code>text</code> yoksa dosya okunur); yanıt aynı <code>id</code> ile tek sayfalık sonuçtur ya da <code>{"id", "error"}</code>, ve hatalı bir istek oturumu bitirmez. Ağacın manifesti istekler arasında saklanır ve ağaçtaki bir dosya değişince yeniden hesaplanır — ağacın okura gösterdiği hiçbir şeyi değiştirmeyen bir kaydetme onu korur, yani kaydetmek shell'i değiştirmez — ve ilkinden sonraki her çizim ağacın değil yalnızca sayfanın bedelini öder: bu reponun belgelerinde yaklaşık 25 ms, tek seferlik bir çalıştırmanın çoğu Python'u başlatmaya giden yaklaşık 200 ms'sine karşı.
+> <strong>--serve</strong> bütün bir düzenleme oturumu boyunca tek bir süreç tutar: stdin'den satır başına bir JSON istek, stdout'a satır başına bir JSON yanıt; stdin kapanınca çıkar. İlk satır bir selamlamadır, <code>{"protocol": 3, "oku": …, "kit": …, "fences": {…}}</code>; böylece bir düzenleyici anlaşamadığı bir oku'yu reddedebilir. <code>fences</code> her <code>oku-*</code> bloğunu gövdesinin JSON şemasına eşler; şemalar --out altına yazılır ve bir düzenleyici bloğu yazılırken tamamlayıp doğrulayabilir. İstek <code>{"id", "path", "text"?, "theme"?}</code> biçimindedir (<code>text</code> yoksa dosya okunur); yanıt aynı <code>id</code> ile tek sayfalık sonuçtur ya da <code>{"id", "error"}</code>, ve hatalı bir istek oturumu bitirmez. <code>"check": true</code> taşıyan bir istek çizmek yerine denetler ve <code>{"id", "issues", "ms"}</code> döndürür: sayfa o metni taşısaydı oku check'in onun için bildireceği bulgular; her biri <code>{severity, code, where, message, line?}</code>. Ağacın geri kalanı diskten okunur, çünkü bir sayfanın bazı bulguları başka sayfalarla ilgilidir — bir bağlantının beklediği çapa, bir çevirinin özgün sayfası — ve şemaya göre yalnızca sayfanın kendisi doğrulanır; bir denetimin bedelinin çoğu odur. Ağacın manifesti istekler arasında saklanır ve ağaçtaki bir dosya değişince yeniden hesaplanır — ağacın okura gösterdiği hiçbir şeyi değiştirmeyen bir kaydetme onu korur, yani kaydetmek shell'i değiştirmez — ve ilkinden sonraki her çizim ağacın değil yalnızca sayfanın bedelini öder: bu reponun belgelerinde yaklaşık 25 ms, tek seferlik bir çalıştırmanın çoğu Python'u başlatmaya giden yaklaşık 200 ms'sine karşı.
 
 ## Bağımlılıklar {#optional-deps}
 

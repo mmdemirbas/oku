@@ -4017,11 +4017,20 @@ def _items(value: object) -> list:
     return value if isinstance(value, list) else []
 
 
-def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[dict]:
+def check_pages(
+    pages: list, root: Path, kit_dir: Path | None = None, *, schema_for: set[Path] | None = None
+) -> list[dict]:
     """Run the full lint pass and return a list of issue dicts.
 
     Each issue: {path: Path, severity: str, code: str, where: str, message: str}
     severity is one of 'error' | 'warning' | 'info'.
+
+    `schema_for` limits schema validation to those pages (None: every
+    page). Validation is per page and most of the cost — 1.55 of 1.97 s
+    profiled over this repo's docs — so a caller that reports on one page
+    validates that one, and still lints the rest for what the page's own
+    findings depend on: the anchors its links land on, its original's
+    anchors, the accents beside it.
     """
     if kit_dir is None:
         kit_dir = KIT_DIR
@@ -4045,7 +4054,8 @@ def check_pages(pages: list, root: Path, kit_dir: Path | None = None) -> list[di
 
     # 1. Schema validation — surfaces shape errors before anything else.
     if _HAS_JSONSCHEMA:
-        for p, err in validate_pages(pages):
+        validated = pages if schema_for is None else [pg for pg in pages if pg[0] in schema_for]
+        for p, err in validate_pages(validated):
             add(p, "error", "schema", "(root)", err)
 
     # Load glossary + extref registries once — every domain, which is
@@ -8450,7 +8460,7 @@ def _comparable_meta(page: dict) -> str:
 
 # Raised when a request or response changes shape, so an extension can
 # refuse an oku it does not speak to instead of failing on a missing field.
-PREVIEW_PROTOCOL = 2
+PREVIEW_PROTOCOL = 3
 
 # Runs before chrome-boot.js reads `theme-pref`, so the first paint is in
 # the editor's theme; and keeps the reader's place across the reload an
@@ -8630,11 +8640,17 @@ def _preview_serve(out_base: Path) -> int:
     Request  {"id", "path", "text"?, "theme"?} — `text` absent reads the file.
     Response {"id", "html", "page", "shell", "root", "out", "ms", "notes"}
     or {"id", "error"}.
+    Request  {"id", "path", "text"?, "check": true} lints instead of
+    rendering: {"id", "issues", "ms"} (check_buffer).
     The first line out is a greeting naming the protocol, so an extension
-    can tell an oku it does not speak to from one that is merely slow.
+    can tell an oku it does not speak to from one that is merely slow. It
+    also maps every `oku-*` fence to a JSON schema for its body
+    (fence_schemas), written under `out_base`.
     """
     trees: dict[Path, tuple[dict, dict]] = {}
-    _emit({"protocol": PREVIEW_PROTOCOL, "oku": _PKG_VERSION, "kit": _kit_build_stamp()})
+    held: dict[Path, tuple[dict, list]] = {}
+    fences = fence_schemas(out_base / "schemas")
+    _emit({"protocol": PREVIEW_PROTOCOL, "oku": _PKG_VERSION, "kit": _kit_build_stamp(), "fences": fences})
     for raw in sys.stdin.buffer:
         if not raw.strip():
             continue
@@ -8657,12 +8673,105 @@ def _preview_serve(out_base: Path) -> int:
                 text = _read_preview_source(md)
             elif not isinstance(text, str):
                 raise PreviewError("`text` is a string")
+            if req.get("check") is True:
+                _emit({"id": req_id, **check_buffer(md, text, held=held)})
+                continue
             _emit({"id": req_id, **preview_page(md, text, out_base, theme=theme, trees=trees)})
         except PreviewError as e:
             _emit({"id": req_id, "error": str(e)})
         except Exception as e:  # one page that breaks the build must not end the editor's session
             _emit({"id": req_id, "error": f"{type(e).__name__}: {e}"})
     return 0
+
+
+def fence_schemas(dest: Path) -> dict[str, str]:
+    """Write one JSON schema per `oku-*` fence into `dest` and map each fence
+    tag to its file.
+
+    For an editor: the body of an `oku-X` fence is `$defs[X]` of the page
+    schema without the `k` the converter adds, so it is that def with `k`
+    no longer required (an author who writes it anyway is not wrong — the
+    converter drops it). Generated rather than shipped, so the fences and
+    their shapes have one source, the schema `oku check` validates with.
+    """
+    schema = json.loads((KIT_DIR / "schema" / "page.schema.json").read_text(encoding="utf-8"))
+    defs = schema["$defs"]
+    dest.mkdir(parents=True, exist_ok=True)
+    out: dict[str, str] = {}
+    for kind in sorted(_FENCE_KINDS):
+        body = dict(defs[kind])
+        body["required"] = [r for r in body.get("required", []) if r != "k"]
+        doc = {"$schema": schema["$schema"], "title": f"oku-{kind}", **body, "$defs": defs}
+        target = dest / f"oku-{kind}.schema.json"
+        text = json.dumps(doc, ensure_ascii=False, indent=1)
+        if not target.exists() or target.read_text(encoding="utf-8") != text:
+            partial = target.with_suffix(f".{os.getpid()}.tmp")
+            partial.write_text(text, encoding="utf-8")
+            partial.replace(target)
+        out[f"oku-{kind}"] = target.as_posix()
+    return out
+
+
+def check_buffer(md: Path, text: str, *, held: dict[Path, tuple[dict, list]] | None = None) -> dict:
+    """What `oku check` would report for `md` if it held `text`:
+    {"issues": [{severity, code, where, message, line?}], "ms"}.
+
+    The page is checked inside its tree, because some of its findings are
+    about other pages — a link to an anchor another page lacks, a
+    translation whose original pins different ids, an accent its siblings
+    do not share. The rest of the tree is linted as it is on disk and
+    validated against the schema not at all (`schema_for`); only this
+    page's findings are returned. `held` is the long-running mode's
+    memory: per tree, the snapshot it was last seen at and its pages.
+    """
+    started = time.perf_counter()
+    md = _require_markdown(md).resolve()
+    root = _preview_tree_root(md)
+    pages = None
+    snapshot = _snapshot_tree(root) if held is not None else {}
+    if held is not None:
+        kept = held.get(root)
+        if kept is not None and kept[0] == snapshot:
+            pages = kept[1]
+        else:
+            _forget_tree_state()
+    if pages is None:
+        pages = find_json_pages(root)
+        if held is not None:
+            held[root] = (snapshot, pages)
+    lines: dict[int, int] = {}
+    page = page_from_markdown(md, text, block_lines=lines)
+    virtual = _synth_json_path(md)
+    converted = time.perf_counter()
+    before = (_PAGE_SOURCE_OF.get(virtual), _PAGE_BLOCK_LINES.get(virtual))
+    _remember_source(virtual, md, lines)
+    try:
+        others = [(p, d) for p, d in pages if p != virtual]
+        issues = check_pages(others + [(virtual, page)], root, schema_for={virtual})
+    finally:
+        # The tree's own record of this page is the file on disk; a later
+        # check of another page reads its lines from there.
+        if before[0] is None:
+            _PAGE_SOURCE_OF.pop(virtual, None)
+            _PAGE_BLOCK_LINES.pop(virtual, None)
+        else:
+            _remember_source(virtual, before[0], before[1] or {})
+    checked = time.perf_counter()
+    mine = []
+    for it in issues:
+        if Path(it["path"]).resolve() != md:
+            continue
+        entry = {k: it[k] for k in ("severity", "code", "where", "message")}
+        if it.get("line"):
+            entry["line"] = it["line"]
+        mine.append(entry)
+    return {
+        "issues": mine,
+        "ms": {
+            "convert": round((converted - started) * 1000),
+            "check": round((checked - converted) * 1000),
+        },
+    }
 
 
 def _read_preview_source(md: Path) -> str:

@@ -174,7 +174,7 @@ class OkuPreviewService : Disposable {
 
     private companion object {
         /** The `PREVIEW_PROTOCOL` of the oku this plugin is written against. */
-        const val PROTOCOL = 2
+        const val PROTOCOL = 3
         const val START_TIMEOUT_SECONDS = 30L
         const val REQUEST_TIMEOUT_SECONDS = 30L
 
