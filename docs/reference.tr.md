@@ -451,6 +451,19 @@ Sayfayı yeniden veren bir gömücü — her düzenlemeden sonra bir düzenleyic
 
 Korunan ve yeniden kurulan blok sayısını `{kept, built}` olarak döndürür; reddettiği bir sayfa için — `{k: "page"}` olmayan — `null` döndürür ve ekranı olduğu gibi bırakır. Henüz hiçbir şey çizilmemişse çizer. Verilecek sayfayı [oku preview](cli.tr.md#preview) HTML'inin yanına yazar.
 
+### Dosyaları açan bir ana makine · `window.__okuHost` {#host}
+
+Bir düzenleyicinin içinde gösterilen bir sayfanın bir dosyayı açmak için kitin görüntüleyicisinden daha iyi bir yeri vardır: doğru satırda düzenleyicinin kendisi. Gömücü bunu okur tıklamadan önce söyler:
+
+```js
+window.__okuHost = {
+  name: 'IntelliJ IDEA',
+  openFile: function (path, line) { /* dosyayı aç */ return true; },
+};
+```
+
+Kit, okurun bir dosya açtığı her yerde — bir dosya çipi, yerel bir `.md`'ye bağlantı — önce ona sorar: dosyanın tam yolunu ve bir `#f/yol:120` başvurusunun andığı satırı verir (yoksa `null`). `true` dışındaki her yanıt ya da bir hata kitin kendi davranışını korur; böylece bir dosyayı açamayan ana makine okuru eli boş bırakmaz. Tam yol, görüntüleyicinin gösterdiğiyle aynıdır: ağacın `dist/standalone/` dizininden açılan sayfada türetilir, loopback'teki `oku serve` tarafından bildirilir, [oku preview](cli.tr.md#preview)'ın yazdığı bir sayfada ise satır içi manifestin `root_abs` alanından okunur. Tam yolu bilmeyen bir sayfa hiç sormaz.
+
 ## Kesişen özellikler {#cross-cutting}
 
 Yeni bir blok türü getirmeyen ama var olan bir bloğun nasıl işlendiğini değiştiren davranışlar.

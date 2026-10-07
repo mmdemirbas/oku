@@ -705,7 +705,10 @@ class TestPayloadBudget:
     # touched and keeps the reader's place — and render() building
     # detached so a block's markup can be read before it is enhanced:
     # 1,459,990.
-    KIT_BUDGET_BYTES = 1_460_500
+    # Then by window.__okuHost — a page inside an editor opens files in the
+    # editor — and an oku preview page finding its full path from the
+    # inlined manifest's root_abs: 1,462,594.
+    KIT_BUDGET_BYTES = 1_463_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -722,7 +725,8 @@ class TestPayloadBudget:
     # through linkHref: 1,452,525.
     # Then by readings that say the value: 1,454,556.
     # Then by OkuRenderer.update: 1,460,570.
-    STANDALONE_BUDGET_BYTES = 1_461_000
+    # Then by window.__okuHost: 1,463,174.
+    STANDALONE_BUDGET_BYTES = 1_463_500
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

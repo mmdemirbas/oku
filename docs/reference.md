@@ -451,6 +451,19 @@ An embedder that hands the page over again — an editor's preview, after every 
 
 It returns `{kept, built}`, the number of blocks kept and built, or `null` for a page it refuses — not `{k: "page"}` — leaving the screen as it was. Before anything has been rendered it renders. [oku preview](cli.md#preview) writes the page to hand over beside its HTML.
 
+### A host that opens files · `window.__okuHost` {#host}
+
+A page shown inside an editor has a better place to open a file than the kit's viewer: the editor, on the right line. The embedder says so before the reader clicks:
+
+```js
+window.__okuHost = {
+  name: 'IntelliJ IDEA',
+  openFile: function (path, line) { /* open it */ return true; },
+};
+```
+
+The kit asks it first wherever a reader opens a file — a file chip, a link to a local `.md` — with the file's full path and the line a `#f/path:120` reference names (`null` otherwise). Anything but `true`, or a throw, keeps the kit's own behaviour, so a host that cannot open one file never leaves the reader with nothing. The full path is the one the viewer shows: derived on a page opened from its tree's `dist/standalone/`, stated by `oku serve` on loopback, and read from the inlined manifest's `root_abs` on a page [oku preview](cli.md#preview) wrote. A page that knows no full path never asks.
+
 ## Cross-cutting features {#cross-cutting}
 
 Behaviors that don't introduce a new block kind but change how an existing one renders.

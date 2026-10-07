@@ -1134,6 +1134,24 @@ var __okuFileStore = (function () {
     if (window.location.protocol === 'file:') {
       var m = /^(.*)\/dist\/standalone\/(.+)\.html$/.exec(path);
       if (m) { docsAbs = m[1]; htmlRel = m[2]; }
+      else {
+        // A page written somewhere other than its tree's dist/ — `oku
+        // preview` writes into an editor's own directory — says where its
+        // tree is in the inlined manifest, and where in the tree this page
+        // sits is the manifest path its URL ends with. Without this an
+        // editor's preview knew no full path: no path in the viewer, no
+        // editor to open a file in.
+        var inl = window.__okuManifest;
+        if (inl && inl.root_abs && inl.pages) {
+          var best = null;
+          inl.pages.forEach(function (pg) {
+            if (!pg || !pg.path) return;
+            var tail = '/' + pg.path;
+            if (path.slice(-tail.length) === tail && (!best || pg.path.length > best.length)) best = pg.path;
+          });
+          if (best) { docsAbs = String(inl.root_abs).replace(/\/$/, ''); htmlRel = best.replace(/\.html$/, ''); }
+        }
+      }
     } else {
       var mf = window.__okuSiteManifest;
       var rootPath;
@@ -1168,6 +1186,17 @@ var __okuFileStore = (function () {
   function absPath(rel) {
     var root = rel ? projectRootAbs() : null;
     return root == null ? null : root + '/' + rel;
+  }
+
+  // A link's target on disk, from the file the link was written in: a
+  // relative href is that file's own place, a root-absolute one the tree's.
+  function absOfLink(fromRel, href) {
+    var h = decoded(href);
+    if (h.charAt(0) === '/' && h.charAt(1) !== '/') {
+      var d = pageOnDisk();
+      return d ? d.docsAbs + h : null;
+    }
+    return absPath(relFrom(fromRel, href));
   }
 
   // A file the page linked by URL rather than carried by place.
@@ -1220,7 +1249,7 @@ var __okuFileStore = (function () {
 
   return {
     lookup: lookup, relFrom: relFrom, absPath: absPath, absFromUrl: absFromUrl,
-    newTabHref: newTabHref, fileUrl: fileUrl, dirOf: dirOf,
+    absOfLink: absOfLink, newTabHref: newTabHref, fileUrl: fileUrl, dirOf: dirOf,
   };
 })();
 
@@ -2131,6 +2160,31 @@ var __okuMdViewer = (function () {
   return { open: open, openRef: openRef, isOpen: isOpen };
 })();
 
+/* ---- The page's host ----
+   A page shown inside an editor — the IntelliJ plugin's preview — has a
+   better place to open a file than the kit's viewer: the editor itself,
+   on the right line. The embedder says so by setting
+
+     window.__okuHost = { name: 'IntelliJ IDEA', openFile: function (path, line) { … return true; } }
+
+   and the kit asks it first wherever a reader opens a file: a file chip,
+   and a link to a local .md. `path` is the file's full path on this
+   machine, `line` the line a `#f/path:120` reference names or null.
+   Returning anything but `true` keeps the kit's own behaviour, and so
+   does a throw, which is logged: a host that cannot open one file must
+   not leave the reader with nothing. Read at click time, so a host may
+   arrive after the page has rendered. */
+function __okuHostOpen(abs, line) {
+  var host = window.__okuHost;
+  if (!abs || !host || typeof host.openFile !== 'function') return false;
+  try {
+    return host.openFile(abs, line || null) === true;
+  } catch (e) {
+    console.error('[oku] the host could not open ' + abs, e);
+    return false;
+  }
+}
+
 /* A plain left-click on a link to a local .md opens it in the viewer.
  *
  * Only a plain one. Cmd / Ctrl / Shift / middle-click, a `target`, and
@@ -2162,10 +2216,9 @@ document.addEventListener('click', function (e) {
   // link is inside one, else the page's. That is what a relative href
   // inside a viewed file is relative to.
   var base = a.closest('[data-oku-file-base]');
-  __okuMdViewer.open(url.href, {
-    href: href,
-    from: base ? base.getAttribute('data-oku-file-base') : (window.__okuPageRel || null),
-  });
+  var from = base ? base.getAttribute('data-oku-file-base') : (window.__okuPageRel || null);
+  if (__okuHostOpen(__okuFileStore.absOfLink(from, href), null)) return;
+  __okuMdViewer.open(url.href, { href: href, from: from });
 });
 
 /* ============ Chart-config popover ============ *
@@ -8808,6 +8861,7 @@ function __okuFileOpenable(ref) {
    already is. A popup that explains an absence is a control that
    answers a question nobody asked it. */
 function __okuFileOpen(ref) {
+  if (ref.rel && __okuHostOpen(__okuFileStore.absPath(ref.rel), ref.line)) return;
   if (ref.kind === 'image' && !__okuMdViewer.isOpen()) {
     var media = __okuFileMedia(ref, false);
     if (media) {

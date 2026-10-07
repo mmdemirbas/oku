@@ -1069,6 +1069,23 @@ panel holds, and reloads otherwise. Held by
 `browser/test_update_in_place.py`, three of whose four cases fail against a
 plain `render()`, and by the shell cases in `test_preview.py`.
 
+**A page inside an editor opens files in the editor.** `window.__okuHost
+= { name, openFile(path, line) }` is set by the embedder, and
+`__okuHostOpen` asks it first at the two places a reader opens a file —
+`__okuFileOpen` (every chip, the viewer's too) and the `.md` link
+handler. Only `true` means handled; anything else, or a throw, falls
+through to the viewer, because a host that cannot open one file must
+not leave the reader with nothing. It is read at click time, so a host
+injected after load works. The path it gets is `absPath`'s, which over
+`file://` used to come only from a URL under `dist/standalone/` — so an
+`oku preview` page, written into an editor's own directory, knew no
+full path at all: no path in the viewer, no editor, nothing to hand a
+host. `pageOnDisk` now also reads the inlined manifest's `root_abs` and
+finds the page by the suffix of its URL, the rule the language switch
+already follows; only `oku preview` inlines a `root_abs`, so a built
+standalone page is unchanged. Held by `browser/test_host_hook.py`, all
+six of whose cases fail without the path half.
+
 **`oku build` runs the checks `oku check` runs — it did not, and the
 gap was the whole point of one of them.** `find_unparseable_json`
 exists because `find_json_pages` catches `JSONDecodeError` and moves
