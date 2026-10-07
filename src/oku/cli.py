@@ -7836,22 +7836,31 @@ def _snapshot_tree(root: Path) -> dict:
     VCS / IDE dirs. Restricted to the suffix whitelist so IDE writes to
     unrelated files (e.g. .py, .iml, lock files) do not trigger reloads.
     Excludes site-manifest.json + llms.txt to avoid the rebuild→change
-    loop."""
+    loop.
+
+    A skipped directory is pruned from the walk, not filtered out after
+    it. `rglob` entered every one, and `oku preview --serve` snapshots
+    the tree on every request: for a README at this repository's root,
+    walking `.git`, `.venv` and the build outputs was 605 ms of a 1.3 s
+    render. Only what lies below `root` is judged, so a tree that itself
+    sits under a directory named `build` or `out` is still watched — the
+    old filter tested the root's own path and saw nothing there."""
     state = {}
-    for p in root.rglob("*"):
-        if not p.is_file():
-            continue
-        parts = p.parts
-        if any(part in _WATCH_SKIP for part in parts):
-            continue
-        if p.suffix in _WATCH_SKIP_SUFFIX or p.name in _WATCH_SKIP_NAMES:
-            continue
-        if p.suffix.lower() not in _WATCH_INCLUDE_SUFFIX:
-            continue
-        try:
-            state[str(p)] = p.stat().st_mtime
-        except OSError:
-            continue
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in _WATCH_SKIP]
+        for name in filenames:
+            suffix = os.path.splitext(name)[1]
+            if name in _WATCH_SKIP or name in _WATCH_SKIP_NAMES or suffix in _WATCH_SKIP_SUFFIX:
+                continue
+            if suffix.lower() not in _WATCH_INCLUDE_SUFFIX:
+                continue
+            path = os.path.join(dirpath, name)
+            try:
+                if not os.path.isfile(path):
+                    continue
+                state[path] = os.stat(path).st_mtime
+            except OSError:
+                continue
     return state
 
 
