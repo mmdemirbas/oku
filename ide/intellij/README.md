@@ -16,6 +16,11 @@ plugin sets the kit's `window.__okuHost` on every load, and the kit asks
 it before opening its own viewer. That works on every OS, where the kit's
 `idea://` link is offered on macOS only.
 
+The preview follows the editor: the source line at the top of the editor
+is put at the top of the page. A double-click on the page goes the other
+way — the caret moves to that line and the editor is scrolled to where the
+page is, so neither pane jumps.
+
 The research, the measurements and the plan are in [`docs/index.md`](docs/index.md)
 (Turkish; `oku build` in `docs/` renders it).
 

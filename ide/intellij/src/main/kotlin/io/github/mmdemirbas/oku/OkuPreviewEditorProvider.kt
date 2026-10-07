@@ -25,7 +25,7 @@ class OkuPreviewEditorProvider : FileEditorProvider, DumbAware {
 
     override fun createEditor(project: Project, file: VirtualFile): FileEditor {
         val text = TextEditorProvider.getInstance().createEditor(project, file) as TextEditor
-        val preview = OkuPreviewFileEditor(project, file)
+        val preview = OkuPreviewFileEditor(project, file, text.editor)
         return TextEditorWithPreview(text, preview, "oku", TextEditorWithPreview.Layout.SHOW_EDITOR_AND_PREVIEW)
     }
 
