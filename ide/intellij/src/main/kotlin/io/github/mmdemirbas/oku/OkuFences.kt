@@ -6,6 +6,8 @@ import com.intellij.codeInsight.completion.InsertionContext
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
+import com.intellij.codeInsight.template.TemplateManager
+import com.intellij.codeInsight.template.impl.ConstantNode
 import com.intellij.json.JsonLanguage
 import com.intellij.lang.Language
 import com.intellij.lang.injection.InjectedLanguageManager
@@ -86,7 +88,11 @@ class OkuFenceLanguageProvider : CodeFenceLanguageProvider {
  * as the body when the fence has none yet — the next line closes it, or
  * nothing but a blank line follows, in which case the fence is closed too.
  * A fence that already has a body only gets its tag: what the author wrote
- * there is theirs. The caret lands on the body's first key.
+ * there is theirs.
+ *
+ * The example's values are tab stops ([OkuSnippetStops]): Tab walks from
+ * one to the next, each selected so typing replaces it, and Enter or Escape
+ * leaves the rest as oku wrote them — an example that still checks clean.
  */
 object OkuSnippetInsert : InsertHandler<LookupElement> {
     private val OPENER = Regex("^ {0,3}(`{3,}|~{3,})")
@@ -106,13 +112,102 @@ object OkuSnippetInsert : InsertHandler<LookupElement> {
         }
         val closes = next != null && next.trim().let { it.length >= opener.length && it.all { c -> c == opener[0] } }
         when {
-            closes -> document.insertString(lineEnd, "\n" + snippet.body)
-            next == null || next.isBlank() -> document.insertString(lineEnd, "\n" + snippet.body + "\n" + opener)
+            closes -> document.insertString(lineEnd, "\n")
+            next == null || next.isBlank() -> document.insertString(lineEnd, "\n\n" + opener)
             else -> return
         }
-        val firstKey = snippet.body.indexOf('"').coerceAtLeast(0)
-        context.editor.caretModel.moveToOffset(lineEnd + 1 + firstKey)
+        val at = lineEnd + 1
+        val stops = OkuSnippetStops.of(snippet.body, snippet.type)
+        if (stops.isEmpty()) {
+            document.insertString(at, snippet.body)
+            context.editor.caretModel.moveToOffset(at + snippet.body.indexOf('"').coerceAtLeast(0))
+            context.commitDocument()
+            return
+        }
         context.commitDocument()
+        val manager = TemplateManager.getInstance(context.project)
+        val template = manager.createTemplate("", "").apply {
+            isToReformat = false
+            setToIndent(false)
+        }
+        var from = 0
+        for ((start, end) in stops) {
+            template.addTextSegment(snippet.body.substring(from, start))
+            template.addVariable(ConstantNode(snippet.body.substring(start, end)), true)
+            from = end
+        }
+        template.addTextSegment(snippet.body.substring(from))
+        template.addEndVariable()
+        context.editor.caretModel.moveToOffset(at)
+        manager.startTemplate(context.editor, template)
+    }
+}
+
+/**
+ * Where the values of an example body are, as tab stops: `[start, end)` of
+ * a string's text inside its quotes, or of a number, boolean or null. The
+ * values a component is made of, not every value it holds — the top-level
+ * scalars, the elements of a top-level list of scalars (a table's
+ * `headers`), and the scalars of the first record of a top-level list (a
+ * chart's first row, a table's first row). A sankey's later links still
+ * name the first node's old id; a stop for every value would make Tab walk
+ * dozens of them. A chart's `type` was picked with the component and is not
+ * one, and there are at most [MAX].
+ */
+internal object OkuSnippetStops {
+    const val MAX = 12
+
+    private class Frame(val isObject: Boolean, val indexInParent: Int) {
+        var expectingKey = isObject
+        var key: String? = null
+        var index = -1
+    }
+
+    fun of(body: String, chartType: String?): List<Pair<Int, Int>> {
+        val stops = mutableListOf<Pair<Int, Int>>()
+        val stack = ArrayDeque<Frame>()
+        fun valueStarts(): Int = stack.lastOrNull()?.let { if (it.isObject) -1 else ++it.index } ?: -1
+        fun wanted(): Boolean {
+            val depth = stack.size
+            val top = stack.lastOrNull() ?: return false
+            return when {
+                depth == 1 -> top.isObject && !(chartType != null && top.key == "type")
+                depth == 2 -> !top.isObject && stack.first().isObject
+                depth == 3 -> !stack[1].isObject && top.indexInParent == 0
+                else -> false
+            }
+        }
+        var i = 0
+        while (i < body.length && stops.size < MAX) {
+            val c = body[i]
+            when {
+                c.isWhitespace() -> i++
+                c == '{' || c == '[' -> { stack.addLast(Frame(c == '{', valueStarts())); i++ }
+                c == '}' || c == ']' -> { stack.removeLastOrNull(); i++ }
+                c == ':' -> { stack.lastOrNull()?.expectingKey = false; i++ }
+                c == ',' -> { stack.lastOrNull()?.let { if (it.isObject) it.expectingKey = true }; i++ }
+                c == '"' -> {
+                    var end = i + 1
+                    while (end < body.length && body[end] != '"') end += if (body[end] == '\\') 2 else 1
+                    val top = stack.lastOrNull()
+                    if (top != null && top.isObject && top.expectingKey) {
+                        top.key = body.substring(i + 1, end)
+                    } else {
+                        valueStarts()
+                        if (wanted()) stops += (i + 1) to end
+                    }
+                    i = end + 1
+                }
+                else -> {
+                    var end = i
+                    while (end < body.length && body[end] !in ",}] \n\t\r") end++
+                    valueStarts()
+                    if (wanted()) stops += i to end
+                    i = end
+                }
+            }
+        }
+        return stops
     }
 }
 

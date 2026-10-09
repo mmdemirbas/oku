@@ -5,6 +5,8 @@ import com.intellij.codeInsight.lookup.Lookup
 import com.intellij.codeInsight.lookup.impl.LookupImpl
 import com.intellij.json.JsonLanguage
 import com.intellij.lang.injection.InjectedLanguageManager
+import com.intellij.codeInsight.template.impl.TemplateManagerImpl
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.components.service
 import com.jetbrains.jsonSchema.impl.inspections.JsonSchemaComplianceInspection
 import kotlin.io.path.Path
@@ -91,5 +93,36 @@ class OkuFencesTest : OkuFixtureTestCase() {
         val text = fixture.editor.document.text
         assertTrue(text, "```oku-table\n{\"headers\": [\"x\"]}\n```" in text)
         assertEquals(text, 1, Regex("\"headers\"").findAll(text).count())
+    }
+
+    fun `test the example's values are tab stops, and what is typed into them checks clean`() {
+        TemplateManagerImpl.setTemplateTesting(testRootDisposable)
+        val file = open(page("oku-table", "{\"headers\": [\"x\"], \"rows\": [[\"1\"]]}") + "\n```oku-\n")
+        pick("```oku-", "oku-chart bar")
+        val editor = fixture.editor
+        val state = requireNotNull(TemplateManagerImpl.getTemplateState(editor)) { "no tab stops" }
+        // The first row's values, the chart type being picked already.
+        assertEquals("Spark", editor.selectionModel.selectedText)
+        fixture.type("Hive")
+        WriteCommandAction.runWriteCommandAction(fixture.project) { state.nextTab() }
+        assertEquals("95", editor.selectionModel.selectedText)
+        fixture.type("60")
+        WriteCommandAction.runWriteCommandAction(fixture.project) { state.nextTab() }
+        assertEquals("95 / 100", editor.selectionModel.selectedText)
+        WriteCommandAction.runWriteCommandAction(fixture.project) { state.gotoEnd(false) }
+        val text = editor.document.text
+        assertTrue(text, "{\"label\": \"Hive\", \"value\": 60, \"display\": \"95 / 100\"}" in text)
+        assertTrue(text, text.trimEnd().endsWith("\n```"))
+        val errors = service<OkuPreviewService>().check(Path(file.path), text).getOrThrow().filter { it.severity == "error" }
+        assertEmpty(errors.toString(), errors)
+    }
+
+    fun `test the stops are the values a component is made of`() {
+        fun stops(body: String, type: String? = null) = OkuSnippetStops.of(body, type).map { (a, b) -> body.substring(a, b) }
+        val table = "{\n  \"headers\": [\"Argument\", \"Default\"],\n  \"rows\": [\n    [\"`path`\", \"`.`\"],\n    [\"x\", \"y\"]\n  ]\n}"
+        assertEquals(listOf("Argument", "Default", "`path`", "`.`"), stops(table))
+        val chart = "{\"type\": \"bar\", \"title\": \"T\", \"rows\": [{\"label\": \"a \\\"q\\\"\", \"value\": 1}, {\"label\": \"b\", \"value\": 2}], \"stacked\": true}"
+        assertEquals(listOf("T", "a \\\"q\\\"", "1", "true"), stops(chart, "bar"))
+        assertEquals(OkuSnippetStops.MAX, OkuSnippetStops.of("{\"h\": [" + (1..30).joinToString(", ") + "]}", null).size)
     }
 }
