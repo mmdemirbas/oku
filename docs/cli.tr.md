@@ -21,6 +21,8 @@ summary: oku init / build / clean / spec / vendor / verify / migrate / check / s
 
 Belge kökü başına bir kez. Sayfaların _oku/chrome.js gibi yolları kullanabilmesi için bir _oku sembolik bağı ve IDE üzerinden sunulan akışların doğrudan açtığı bir index.html giriş taslağı oluşturur (IntelliJ'in yerleşik HTTP sunucusu, Live Server vb.). İkisi de içinde bulunduğunuz dizine iner — örtük bir docs/ alt dizini yoktur.
 
+index.html ağacın giriş sayfasıdır. Yanında bir index.md varsa o sayfayı gösterir; yoksa ağacın bütün sayfalarını özetleriyle listeler. Listenin başlığı kit.json'daki name'dir (yoksa site ağacının etiketindeki sözcük), girişi kit.json'daki description'dır ve ağacın dilinde yazılır: kit.json'daki defaultLanguage, yoksa sayfaların çoğunun dili. Her sayfanın site ağacı ona geri götürür. init kabuğu bu dilde yazar; oku serve ve oku build onu güncel sayfa listesiyle verir, yani ağaç büyümeden önce yazılmış bir kabuk da bütün sayfaları listeler.
+
 ```bash
 cd ~/path/to/your-project/docs
 oku init

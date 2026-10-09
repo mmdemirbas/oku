@@ -1073,6 +1073,26 @@ manifest). The reply's `page` is then null, which is why the protocol is
 empty body, and `OkuShellTest` holds that against the stub the oku under
 test writes rather than a copy of it.
 
+**A front door speaks the tree's language, and every page leads back
+to it.** The front door took its title from the shell's `<title>`, which
+`oku init` writes in English, and headed its list with an English word,
+under `<html lang="en">`; a Turkish tree opened on two English words, and
+no page's site tree led back to it, since it is not a page. The manifest
+now says what it is drawn with (`_front_door`: the tree's `lang` —
+`defaultLanguage`, else the language most pages are in — kit.json's `name`
+and `description`, and `home`, its path), both builds stamp that language
+on it (`_built_language`), the renderer puts the language on `<html>`
+before it asks for the string table, and the site tree's label becomes a
+link to `home`. Two defects sat under it. **The string table was loaded
+once per page whatever the language**: the site tree asks for it as soon
+as the manifest is in hand, which on a front door is before the page has
+said its language, so a Turkish front door kept the English table; a
+different language is now a different load. And **`oku serve` handed the
+shell over as it was on disk**, with the manifest of the day init wrote
+it, while both builds refreshed it; `_serve_shell` refreshes it the way
+the build does. Held by `browser/test_front_door.py`, all ten of whose
+cases fail without the change, in three delivery modes.
+
 **What an editor offers an author is what `oku check` accepts.** The
 greeting's `snippets` are `oku spec`'s examples, one per fence kind and
 chart type, laid out a key and a record per line (`fence_snippets`), and a

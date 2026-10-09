@@ -21,6 +21,8 @@ summary: oku init / build / clean / spec / vendor / verify / migrate / check / s
 
 One-time per docs root. Creates a _oku symlink so pages can reference _oku/chrome.js etc., and an index.html entry stub that IDE-served workflows open directly (IntelliJ's built-in HTTP server, Live Server, etc.). Both land in cwd — there is no implicit docs/ subdir.
 
+The index.html is the tree's front door. With an index.md beside it, it shows that page; without one, it lists every page of the tree with its summary. The list is titled with kit.json's name (else the word the site tree's label uses), led by its description, and written in the tree's language: kit.json's defaultLanguage, else the language most of the pages are in. Every page's site tree leads back to it. init writes the shell in that language, and oku serve and oku build hand it over with the current page list, so a shell written before the tree grew still lists every page.
+
 ```bash
 cd ~/path/to/your-project/docs
 oku init

@@ -554,6 +554,12 @@ var __okuPanZoom = (function () {
 var __okuI18n = (function () {
   var table = null;
   var loading = null;
+  /* The language `loading` was asked for. The site tree asks for the
+   * table as soon as the manifest is in hand, which on a tree's front
+   * door is before the page has said its language — and the answer used
+   * to be kept for the life of the page, so a Turkish front door kept
+   * the English one. A different language is a different table. */
+  var loadingFor = null;
 
   /* The language the kit's own strings are written in. It is a property
    * of the kit, not of the site: the table keys are English sentences,
@@ -670,8 +676,9 @@ var __okuI18n = (function () {
    * never reads, and a standalone build inlines its own copy (see
    * build_standalone) because file:// cannot fetch. */
   function load() {
-    if (loading) return loading;
     var code = lang();
+    if (loading && loadingFor === code) return loading;
+    loadingFor = code;
     var inline = document.getElementById('__oku_i18n__');
     if (inline) {
       try { table = JSON.parse(inline.textContent); } catch (e) { table = null; }
@@ -3148,6 +3155,16 @@ function __okuRenderIfNeeded(pagePath, anchor) {
 var __okuNavSeq = 0;
 
 function __okuFetchAndRender(pagePath, anchor) {
+  // A front door has no page to fetch: the request is known to 404, and
+  // the fallback after it was a full reload. The renderer draws it from
+  // the manifest instead, the way the door's own shell does.
+  window.__okuCurrentPage = pagePath;
+  if (window.OkuRenderer && OkuRenderer.renderFrontDoor && OkuRenderer.renderFrontDoor(pagePath.replace(/\.html$/, '.json'))) {
+    ++__okuNavSeq;
+    __okuRefreshActiveLink(pagePath);
+    __okuScrollToAnchor(anchor);
+    return Promise.resolve();
+  }
   var wa = (window.__okuWithAuth || function (u) { return u; });
   var jsonUrl = wa(__okuDocsRoot + pagePath.replace(/\.html$/, '.json'));
   var token = ++__okuNavSeq;
@@ -3168,8 +3185,11 @@ function __okuFetchAndRender(pagePath, anchor) {
 function __okuRefreshActiveLink(pagePath) {
   document.querySelectorAll('page-nav .page-nav-item.active').forEach(function (li) {
     li.classList.remove('active');
-    var a = li.querySelector('a');
-    if (a) a.removeAttribute('aria-current');
+  });
+  // Every link that said "you are here", the front door's among them,
+  // which sits over the rows rather than in one.
+  document.querySelectorAll('page-nav a[aria-current]').forEach(function (a) {
+    a.removeAttribute('aria-current');
   });
   document.querySelectorAll('page-nav a[href]').forEach(function (a) {
     var href = a.getAttribute('href') || '';
@@ -18872,6 +18892,7 @@ class PageNav extends HTMLElement {
     var tree = this.querySelector('.page-nav-tree');
     if (!tree) return;
     tree.innerHTML = '';
+    if (manifest) this._renderHome(manifest, base, currentPath || window.__okuCurrentPage || __okuPagePathFromLocation());
     if (!manifest) {
       // No manifest available — typical when the page is opened directly
       // (IDE-served, file://). Tell the reader how to enable the full
@@ -19004,6 +19025,34 @@ class PageNav extends HTMLElement {
     requestAnimationFrame(function () { self._revealActiveRow(); });
     var input = this.querySelector('.page-nav-filter-input');
     if (input && input.value) this._applyFilter(input.value);
+  }
+
+  /* The label over the rows leads to the tree's front door, when it has
+     one (`home`, from the manifest). A tree with no index.md has a front
+     door — the shell `oku init` writes, listing every page — and no row
+     that reaches it, so a reader who left it had no way back but the
+     browser's. The label rather than a row: it is already there, it
+     already names the whole tree, and it costs the lists no height. */
+  _renderHome(manifest, base, here) {
+    var label = this.querySelector('.page-nav-label');
+    var word = label && label.querySelector('[data-oku-t="menu:Documents"]');
+    if (!word) return;
+    var link = label.querySelector('a.page-nav-home');
+    if (!manifest.home) {
+      if (link) link.replaceWith(word);
+      return;
+    }
+    if (!link) {
+      link = document.createElement('a');
+      link.className = 'page-nav-home';
+      link.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v11h14V9"/></svg>';
+      word.replaceWith(link);
+      link.appendChild(word);
+    }
+    link.href = base + manifest.home;
+    link.title = menuWord('Front page');
+    if (here === manifest.home) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
   }
 
   /* The tree scrolls on its own now, so the page being read can sit

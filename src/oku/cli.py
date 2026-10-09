@@ -717,7 +717,12 @@ def cmd_init(args: argparse.Namespace) -> int:
             print(f"✓ Created {index_md} (starter page — fill in the front-matter)")
             manifest = _init_time_manifest(root)
 
-    fresh = _stub_for(title, inline_manifest=manifest)
+    # The shell says the tree's language and name before a script runs:
+    # the first layout is the one that hyphenates, and a served shell is
+    # handed over as it is on disk.
+    fresh = _stub_for(
+        manifest.get("name") or title, inline_manifest=manifest, lang=manifest.get("lang", "en")
+    )
     if index_html.exists():
         existing = index_html.read_text(encoding="utf-8")
         if existing == fresh:
@@ -1530,6 +1535,16 @@ def _lang_of_page(page) -> str:
     meta = page.get("m") if isinstance(page.get("m"), dict) else page.get("meta")
     lang = (meta or {}).get("lang") if isinstance(meta, dict) else None
     return lang if isinstance(lang, str) and _LANG_CODE_RE.match(lang) else "en"
+
+
+def _built_language(page_data: dict | None, manifest: dict | None) -> str:
+    """The language a built page is written in: its own, and for a front
+    door — a shell with no page — the tree's (`_front_door`). Asking the
+    page alone answered `en` for every front door, so a Turkish tree's
+    opened under `<html lang="en">` with the English string table."""
+    if page_data is None and manifest is not None and isinstance(manifest.get("lang"), str):
+        return manifest["lang"]
+    return _lang_of_page(page_data)
 
 
 def _with_html_lang(html: str, lang: str) -> str:
@@ -5894,11 +5909,13 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
         # after any save in a 21-page tree, which recomputes this.
         pages = find_json_pages(root, carry=False)
     entries = []
+    langs: list[str] = []
     for p, data in pages:
         rel = p.relative_to(root)
         # Repo-meta files at the root are pages but not nav entries.
         if rel.parent == Path(".") and rel.stem.lower() in _NAV_EXCLUDE_STEMS:
             continue
+        langs.append(_lang_of_page(data))
         nav_path = rel.with_suffix(".html").as_posix()
         path_parent = _url_path(rel.parent.as_posix()) if rel.parent != Path(".") else None
         meta = _page_meta(data)
@@ -5940,8 +5957,52 @@ def compute_manifest(root: Path, *, pages: list | None = None) -> dict:
         # modes — fetched under `oku serve` and in dist/site, inlined in
         # a standalone file. What goes in it: `_build_block`.
         "build": _build_block(root),
+        **_front_door(root, entries, langs),
         "pages": entries,
     }
+
+
+def _front_door(root: Path, entries: list[dict], langs: list[str]) -> dict:
+    """What the tree's front door is drawn with, for the manifest.
+
+    The front door is the `index.html` `oku init` writes; with no
+    `index.md` behind it the runtime draws the tree's pages there. It used
+    to take its title from the stub's `<title>Documentation</title>` and
+    head its list `Pages`, so a Turkish tree opened on two English words,
+    under `<html lang="en">`.
+
+    `lang` is the tree's language: the `defaultLanguage` its kit.json
+    declares, else the one most of its pages are written in. `name` and
+    `description` are the kit.json's own, the title and lead a reader
+    should see first. `home` is the front door's path when the tree has
+    one, so every page's site tree can lead back to it — a tree with no
+    index.md had no row that did.
+    """
+    codes, default = declared_languages(root)
+    if codes:
+        lang = default
+    elif langs:
+        lang = min(collections.Counter(langs).items(), key=lambda kv: (-kv[1], kv[0]))[0]
+    else:
+        lang = "en"
+    out: dict = {"lang": lang}
+    kit = find_kit_json(root)
+    data: dict = {}
+    if kit is not None:
+        try:
+            loaded = json.loads(kit.read_text(encoding="utf-8"))
+            data = loaded if isinstance(loaded, dict) else {}
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            data = {}
+    for key in ("name", "description"):
+        if isinstance(data.get(key), str) and data[key].strip():
+            out[key] = data[key].strip()
+    paths = {e["path"] for e in entries}
+    for home in ("index.html", "docs/index.html"):
+        if home in paths or (root / home).is_file():
+            out["home"] = home
+            break
+    return out
 
 
 def _build_block(root: Path) -> dict:
@@ -6460,7 +6521,9 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
                 "</script", "<\\/script"
             )
             html = _INLINE_MANIFEST_RE.sub(lambda m: f"window.__okuManifest={fresh};</script>", html, count=1)
-        dest_html.write_text(_with_html_lang(_mark_built(html), _lang_of_page(page_data)), encoding="utf-8")
+        dest_html.write_text(
+            _with_html_lang(_mark_built(html), _built_language(page_data, manifest)), encoding="utf-8"
+        )
 
 
 _BUILT_MARKER = "<script>window.__okuBuilt=1;</script>"
@@ -7410,7 +7473,7 @@ def build_standalone(
         # never inlined — the reading estimate came out in Turkish and
         # the Contents button, the table filter and `Last updated` did
         # not.
-        page_lang = _lang_of_page(page_data)
+        page_lang = _built_language(page, manifest)
         i18n_path = KIT_DIR / "i18n" / f"{page_lang}.json"
         if page_lang and i18n_path.is_file():
             safe_i18n = i18n_path.read_text(encoding="utf-8").replace("</script", "<\\/script")
@@ -7453,7 +7516,7 @@ def build_standalone(
         rel = src.relative_to(src_root)
         dest = out_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(_with_html_lang(html, _lang_of_page(page_data)), encoding="utf-8")
+        dest.write_text(_with_html_lang(html, _built_language(page, manifest)), encoding="utf-8")
         inlined[dest] = data_text
     return inlined
 
@@ -8118,6 +8181,8 @@ def _make_serve_handler(root: Path, *, local_only: bool = True):
             except (OSError, ValueError):
                 return False
             if fs.exists():
+                if url_path.endswith(".html") and fs.is_file():
+                    return self._serve_shell(fs)
                 # A page written as JSON leaves carrying the files its
                 # `#f/` references name, as a converted .md page does;
                 # anything else on disk is served as it is.
@@ -8187,6 +8252,38 @@ def _make_serve_handler(root: Path, *, local_only: bool = True):
                 return False
 
             return self._send_bytes(body, content_type)
+
+        def _serve_shell(self, fs: Path) -> bool:
+            """The shell `oku init` wrote, refreshed the way the build
+            refreshes it: this tree's manifest in place of the one of the
+            day it was written, and the language of the page it shows on
+            `<html>` — the `.md` beside it, or for a front door the
+            tree's. Served as it was on disk, a Turkish tree's front door
+            opened in English listing the pages init had seen, while both
+            built trees were right. An `.html` with a body of its own, or
+            no manifest in it, is the author's and goes out untouched.
+            """
+            try:
+                text = fs.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                return False
+            if not _is_default_shaped_stub(text) or not _INLINE_MANIFEST_RE.search(text):
+                return False
+            manifest = compute_manifest(fs.parent)
+            fresh = json.dumps(manifest, ensure_ascii=False, separators=(",", ":")).replace(
+                "</script", "<\\/script"
+            )
+            text = _INLINE_MANIFEST_RE.sub(lambda m: f"window.__okuManifest={fresh};</script>", text, count=1)
+            source = _source_sibling(fs)
+            lang = manifest.get("lang", "en")
+            if source.is_file():
+                try:
+                    lang = _page_language(
+                        source, _strip_md_front_matter(source.read_text(encoding="utf-8"))[1]
+                    )
+                except (OSError, UnicodeDecodeError):
+                    pass
+            return self._send_bytes(_with_html_lang(text, lang).encode("utf-8"), "text/html; charset=utf-8")
 
         def _send_bytes(self, body: bytes, content_type: str) -> bool:
             try:

@@ -1841,7 +1841,7 @@
      * different thing in each mode. Absent manifest, absent entry or an
      * entry with a source: answer no and let the fetch decide. */
     _hasNoPageSource(url) {
-      const m = window.__okuManifest;
+      const m = okuManifest();
       const pages = (m && Array.isArray(m.pages)) ? m.pages : [];
       if (!pages.length) return false;  // nothing known — let the fetch decide
       const here = String(url || '').replace(/\.json$/, '.html');
@@ -1858,9 +1858,19 @@
       return true;
     }
 
+    /* The front door is drawn in the tree's language, under the tree's
+     * name. It used to take its title from the shell's title element,
+     * which `oku init` writes in English, and head its list with an
+     * English word, so a Turkish tree opened on two English words. The
+     * manifest says the language, name and description
+     * (`_front_door` in cli.py); the language goes on <html> FIRST,
+     * because the string table the kit loads is chosen from it, and the
+     * page is drawn once that table is in hand. With no name the title is
+     * the word the site tree's own label uses. Returns true if it will
+     * render — the drawing itself may wait one table fetch. */
     _renderManifestIndex(url, host) {
       if (!/(^|\/)index\.json$/.test(String(url || ''))) return false;
-      const m = window.__okuManifest;
+      const m = okuManifest();
       const pages = (m && Array.isArray(m.pages)) ? m.pages : [];
       const rows = pages.filter((p) => p && p.path && !/(^|\/)index\.html$/.test(p.path));
       if (!rows.length) return false;
@@ -1872,12 +1882,18 @@
         const summary = p.summary ? ' — ' + esc(p.summary) : '';
         return '- [' + title + '](' + p.path + ')' + summary;
       }).join('\n');
-      const title = (document.title || 'Documentation').trim();
-      this.render({
-        k: 'page',
-        t: title,
-        b: ['## Pages {#pages}\n\n' + body + '\n'],
-      }, host);
+      const lang = typeof m.lang === 'string' ? m.lang : '';
+      if (lang) document.documentElement.lang = lang;
+      const draw = () => {
+        const word = typeof menuWord === 'function' ? menuWord('Documents') : 'Documents';
+        const meta = {};
+        if (lang) meta.lang = lang;
+        if (typeof m.description === 'string' && m.description) meta.summary = m.description;
+        this.render({ k: 'page', t: (typeof m.name === 'string' && m.name) || word, m: meta, b: [body + '\n'] }, host);
+      };
+      const i18n = window.__okuI18n;
+      if (i18n && typeof i18n.load === 'function') i18n.load().then(draw, draw);
+      else draw();
       return true;
     }
 
@@ -3575,6 +3591,22 @@
   }
 
   OkuRenderer.splitFrontMatter = splitFrontMatter;
+
+  /* The manifest a page carries inline, else the one the site tree
+   * fetched: a served page's shell carries none, and navigating to the
+   * front door from one is the case that needs it. */
+  function okuManifest() {
+    return window.__okuManifest || window.__okuSiteManifest || null;
+  }
+
+  /* Draw the tree's front door when `url` names one — an index the
+   * manifest knows has no page of its own — and say whether it did.
+   * Navigation inside a served tree asks this before fetching, because
+   * the fetch is known to 404. */
+  OkuRenderer.renderFrontDoor = function (url, host) {
+    const r = new OkuRenderer({});
+    return r._hasNoPageSource(url) && r._renderManifestIndex(url, host);
+  };
 
   /* ============ Inert rendering: a document is read, not run ============
    *
