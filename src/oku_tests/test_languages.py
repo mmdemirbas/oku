@@ -74,6 +74,28 @@ class TestDeclaredLanguages:
 
         assert cli.declared_languages(root) == ([], "")
 
+    def test_one_declared_language_is_the_language_the_tree_is_written_in(self, tmp_path: Path):
+        """Monolingual is not English. A tree declaring `["tr"]` has no
+        switch, and every page in it is Turkish: the attribute, the reading
+        estimate and the front door say so. Before, all three said English."""
+        root = tmp_path / "docs"
+        root.mkdir()
+        (root / "kit.json").write_text('{"languages":[{"code":"tr","label":"Türkçe"}]}', encoding="utf-8")
+        for name in ("notes", "notes.tr"):
+            (root / f"{name}.md").write_text(
+                "---\ntitle: N\nsummary: s\n---\n\n## S {#s}\n\n" + ("sözcük " * 3000) + "\n",
+                encoding="utf-8",
+            )
+
+        page = cli._page_from_source_file(root / "notes.md")
+        assert page["m"]["lang"] == "tr"
+        assert "dakikalık okuma" in page["m"]["read_time"], page["m"]["read_time"]
+        manifest = cli.compute_manifest(root)
+        assert manifest["lang"] == "tr"
+        # Still no switch: two files, two entries, nothing paired.
+        assert sorted(e["path"] for e in manifest["pages"]) == ["notes.html", "notes.tr.html"]
+        assert not any("variants" in e for e in manifest["pages"])
+
     def test_bare_codes_and_labelled_objects_both_work(self, tmp_path: Path):
         root = tmp_path / "docs"
         root.mkdir()

@@ -1515,9 +1515,25 @@ def _page_language(source: Path, meta: dict | None = None) -> str:
             return declared.strip()
     codes, default = _tree_languages(source)
     if not codes:
-        return "en"
+        return _sole_language(_nearest_kit_data(source)) or "en"
     _, lang = split_language_suffix(source.stem, codes)
     return lang or default
+
+
+def _sole_language(data: dict) -> str | None:
+    """The language a kit.json listing ONE code says its tree is written in.
+
+    `languages` is "the codes this tree is authored in". With fewer than
+    two there is nothing to pair, so the translation machinery stays off
+    (`_tree_languages`, `declared_languages`) — but one code is still a
+    statement about the language, and reading it as nothing built a tree
+    declaring `["tr"]` as `<html lang="en">`: English hyphenation, English
+    chrome, `min read` over Turkish prose.
+    """
+    raw = data.get("languages") or []
+    codes = [item.get("code") if isinstance(item, dict) else item for item in raw if item]
+    codes = [c for c in codes if isinstance(c, str) and _LANG_CODE_RE.match(c)]
+    return codes[0] if len(codes) == 1 else None
 
 
 _HTML_OPEN_RE = re.compile(r"<html\b[^>]*>", re.I)
