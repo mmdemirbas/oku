@@ -8782,6 +8782,7 @@ def _preview_serve(out_base: Path) -> int:
     (fence_schemas), written under `out_base`, and names the link prefixes
     that are not anchors (`inline`, _INLINE_KINDS): `#f/src/x.py` is a file,
     and an editor reading it as a heading id reports it as one it cannot find.
+    `snippets` is every component an editor can insert (fence_snippets).
     """
     trees: dict[Path, tuple[dict, dict]] = {}
     held: dict[Path, tuple[dict, list]] = {}
@@ -8793,6 +8794,7 @@ def _preview_serve(out_base: Path) -> int:
             "kit": _kit_build_stamp(),
             "fences": fences,
             "inline": _INLINE_KINDS,
+            "snippets": fence_snippets(),
         }
     )
     for raw in sys.stdin.buffer:
@@ -8860,6 +8862,52 @@ def fence_schemas(dest: Path) -> dict[str, str]:
             partial.replace(target)
         out[f"oku-{kind}"] = target.as_posix()
     return out
+
+
+def fence_snippets() -> list[dict]:
+    """Every component an author can start from, as an editor inserts it:
+    `{"tag", "type", "body"}`, one per fence kind and one per chart type
+    (`type` names it; null for any other kind).
+
+    The bodies are the payloads `oku spec` prints, from the same
+    examples.json `test_spec_examples.py` holds valid, so an editor's
+    starting point is a payload that draws rather than a list of keys. The
+    chart kind's own example is left out: it is one of the 53 types, each
+    of which has an entry.
+    """
+    ex = _load_examples()
+    blocks = ex.get("blocks") or {}
+    out = [
+        {"tag": f"oku-{kind}", "type": None, "body": _hand_layout(blocks[kind])}
+        for kind in sorted(_FENCE_KINDS)
+        if kind in blocks and kind != "chart"
+    ]
+    out += [
+        {"tag": "oku-chart", "type": name, "body": _hand_layout(payload)}
+        for name, payload in sorted((ex.get("charts") or {}).items())
+    ]
+    return out
+
+
+def _hand_layout(payload: dict) -> str:
+    """A fence body laid out for somebody typing into it: a key per line, a
+    list of records one record per line, and everything inside a line
+    compact. `oku spec` prints one line, which is what a page stores and
+    what a reader of the source skims past; in an editor, a record per line
+    is what makes the third row as easy to change as the first."""
+
+    def one(value: object) -> str:
+        return json.dumps(value, ensure_ascii=False, separators=(", ", ": "))
+
+    lines = []
+    for i, (key, value) in enumerate(payload.items()):
+        comma = "," if i < len(payload) - 1 else ""
+        if isinstance(value, list) and value and all(isinstance(v, (dict, list)) for v in value):
+            rows = ",\n".join(f"    {one(v)}" for v in value)
+            lines.append(f"  {one(key)}: [\n{rows}\n  ]{comma}")
+        else:
+            lines.append(f"  {one(key)}: {one(value)}{comma}")
+    return "{\n" + "\n".join(lines) + "\n}"
 
 
 def heading_lines(md: Path, text: str) -> dict[str, int]:

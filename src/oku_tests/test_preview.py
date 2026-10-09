@@ -275,6 +275,7 @@ def test_the_session_opens_by_naming_its_protocol(session: _Session) -> None:
     hello = session.read()
     fences = hello.pop("fences")
     inline = hello.pop("inline")
+    hello.pop("snippets")
     assert hello == {"protocol": cli.PREVIEW_PROTOCOL, "oku": cli._PKG_VERSION, "kit": cli._kit_build_stamp()}
     assert sorted(fences) == sorted(f"oku-{kind}" for kind in cli._FENCE_KINDS)
     assert inline == cli._INLINE_KINDS
@@ -383,6 +384,35 @@ def test_every_fence_has_a_schema_its_shipped_examples_pass(session: _Session) -
             assert not list(validator.iter_errors(example)), (tag, example)
             if schema.get("additionalProperties") is False:
                 assert list(validator.iter_errors({**example, "not_a_key": 1})), tag
+
+
+def test_every_component_an_editor_inserts_is_a_page_that_checks_clean(
+    session: _Session, tmp_path: Path
+) -> None:
+    """The greeting's snippets are what an editor inserts when an author
+    picks a component, so each must be one: every fence kind and every chart
+    type, laid out over several lines, and a page made of all of them must
+    pass `oku check` with nothing at error severity — a body the author
+    starts from and then has to repair is not a starting point."""
+    snippets = session.read()["snippets"]
+    kinds = {s["tag"] for s in snippets if s["type"] is None}
+    assert kinds == {f"oku-{kind}" for kind in cli._FENCE_KINDS} - {"oku-chart"}
+    assert sorted(s["type"] for s in snippets if s["tag"] == "oku-chart") == sorted(
+        cli._load_examples()["charts"]
+    )
+    for s in snippets:
+        payload = json.loads(s["body"])
+        if s["type"] is not None:
+            assert payload == cli._load_examples()["charts"][s["type"]]
+        assert "\n" in s["body"], s  # laid out to be edited, not one line
+    docs = _tree(tmp_path)
+    page = "---\ntitle: All\n---\n\n## All {#all}\n\n" + "\n\n".join(
+        f"```{s['tag']}\n{s['body']}\n```" for s in snippets
+    )
+    found = session.ask({"id": 1, "path": str(docs / "all.md"), "text": page, "check": True})
+    errors = [i for i in found["issues"] if i["severity"] == "error"]
+    assert not errors, errors
+    assert session.close() == 0
 
 
 _UNSAVED = """---
