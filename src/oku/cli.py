@@ -1311,7 +1311,9 @@ def _page_from_source_file(p: Path, *, carry: bool = True) -> dict | None:
     return page
 
 
-def page_from_markdown(p: Path, text: str, *, block_lines: dict[int, int] | None = None, carry: bool = True) -> dict:
+def page_from_markdown(
+    p: Path, text: str, *, block_lines: dict[int, int] | None = None, carry: bool = True
+) -> dict:
     """The page dict for markdown `text` that sits at `p`.
 
     `text` need not be what is on disk: `oku preview` hands in an
@@ -8552,7 +8554,7 @@ def _comparable_meta(page: dict) -> str:
 
 # Raised when a request or response changes shape, so an extension can
 # refuse an oku it does not speak to instead of failing on a missing field.
-PREVIEW_PROTOCOL = 4
+PREVIEW_PROTOCOL = 5
 
 # Runs before chrome-boot.js reads `theme-pref`, so the first paint is in
 # the editor's theme; and keeps the reader's place across the reload an
@@ -8596,6 +8598,31 @@ def _require_markdown(md: Path) -> Path:
     return md
 
 
+def _preview_source(path: Path) -> Path | None:
+    """The page a preview of `path` draws, or None for a tree's front door.
+
+    A `.md` is itself. An `.html` is a shell the runtime fills from the
+    page beside it (`_source_sibling`, the file `oku serve` answers for
+    its `.json`), so it previews that page. An `index.html` with no page
+    beside it is the front door `oku init` writes, which the runtime
+    draws from the manifest and `oku build` ships as such; an editor
+    opening it used to be told it was not a markdown page.
+    """
+    suffix = path.suffix.lower()
+    if suffix == ".md":
+        return path
+    if suffix != ".html":
+        raise PreviewError(f"{path} is not a page (a .md, or the .html shell of one)")
+    source = _source_sibling(path)
+    if source.is_file():
+        return source
+    if not path.is_file():
+        raise PreviewError(f"{path} does not exist")
+    if path.name != "index.html":
+        raise PreviewError(f"{path} is the shell of a page, and there is no {source.name} beside it")
+    return None
+
+
 def _preview_tree_root(md: Path) -> Path:
     """The tree a page is previewed in: the directory of the nearest
     kit.json between the page and its project fence, else the page's own.
@@ -8615,15 +8642,20 @@ def _preview_tree_root(md: Path) -> Path:
 
 
 def preview_page(
-    md: Path,
+    path: Path,
     text: str,
     out_base: Path,
     *,
     theme: str | None = None,
     trees: dict[Path, tuple[dict, dict]] | None = None,
 ) -> dict:
-    """Write the page an editor previews for `md` holding `text`, and say
+    """Write the page an editor previews for `path` holding `text`, and say
     where it went: {"html", "page", "shell", "root", "out", "ms", "notes"}.
+
+    `path` is a `.md`, or an `.html` shell (`_preview_source`): a shell
+    previews the page beside it as saved, and `text` is not read; a front
+    door draws the tree's pages from the manifest, as the build ships it,
+    and has no `page` — the reply's `page` is null and an editor reloads.
 
     `page` is the page JSON the HTML inlines, written beside it, and
     `shell` fingerprints everything else the HTML carries — the kit, the
@@ -8644,8 +8676,11 @@ def preview_page(
     `_forget_tree_state` exists, from `oku serve`.
     """
     started = time.perf_counter()
-    md = _require_markdown(md).resolve()
-    root = _preview_tree_root(md)
+    path = path.resolve()
+    md = _preview_source(path)
+    if md is not None and md != path:
+        text = _read_preview_source(md)
+    root = _preview_tree_root(md or path)
     manifest = None
     snapshot: dict = {}
     if trees is not None:
@@ -8655,13 +8690,15 @@ def preview_page(
             manifest = held[1]
         else:
             _forget_tree_state()
-    lines: dict[int, int] = {}
-    page = page_from_markdown(md, text, block_lines=lines)
-    # Where each block starts in the source, so the editor beside the page
-    # and the page can follow each other (OkuRenderer.scrollToLine / lineAt).
-    # Preview only: a built page has no editor, and the numbers would change
-    # in every artifact on every edit above them.
-    page.setdefault("m", {})["_lines"] = [lines.get(i) for i in range(len(page.get("b", [])))]
+    page = None
+    if md is not None:
+        lines: dict[int, int] = {}
+        page = page_from_markdown(md, text, block_lines=lines)
+        # Where each block starts in the source, so the editor beside the page
+        # and the page can follow each other (OkuRenderer.scrollToLine / lineAt).
+        # Preview only: a built page has no editor, and the numbers would change
+        # in every artifact on every edit above them.
+        page.setdefault("m", {})["_lines"] = [lines.get(i) for i in range(len(page.get("b", [])))]
     converted = time.perf_counter()
     if manifest is None:
         manifest = compute_manifest(root)
@@ -8681,9 +8718,13 @@ def preview_page(
     listed = time.perf_counter()
 
     out = out_base.resolve() / hashlib.sha1(root.as_posix().encode()).hexdigest()[:12]
-    rel_html = md.relative_to(root).with_suffix(".html")
+    rel_html = (md or path).relative_to(root).with_suffix(".html")
     shim = _PREVIEW_SHIM.replace("__THEME__", json.dumps(theme))
-    stub = _stub_for(page.get("t") or md.stem, lang=_lang_of_page(page))
+    if md is not None:
+        stub = _stub_for(page.get("t") or md.stem, lang=_lang_of_page(page))
+    else:
+        # The shell on disk, which is the one the build fills.
+        stub = path.read_text(encoding="utf-8")
     stub = stub.replace('<script src="_oku/chrome-boot.js', shim + '<script src="_oku/chrome-boot.js', 1)
     # build_standalone narrates what it could not carry; in --serve mode
     # stdout is the protocol, so the lines travel in the response instead.
@@ -8692,16 +8733,16 @@ def preview_page(
         inlined = build_standalone([(root / rel_html, stub, page)], out, root, manifest=manifest)
     html = out / rel_html
     page_text = inlined[html]
-    if page_text is None:  # build_standalone was handed the page, so it always inlines one
-        raise PreviewError(f"{md}: no page to inline")
-    page_json = html.with_suffix(".json")
-    page_json.write_text(page_text, encoding="utf-8")
-    inlined_page = page_text.replace("</script", "<\\/script")
-    shell = html.read_text(encoding="utf-8").replace(inlined_page, "", 1)
+    shell = html.read_text(encoding="utf-8")
+    page_json = None
+    if page_text is not None:  # None only for a front door
+        page_json = html.with_suffix(".json")
+        page_json.write_text(page_text, encoding="utf-8")
+        shell = shell.replace(page_text.replace("</script", "<\\/script"), "", 1)
     written = time.perf_counter()
     return {
         "html": html.as_posix(),
-        "page": page_json.as_posix(),
+        "page": page_json.as_posix() if page_json else None,
         "shell": hashlib.sha1(shell.encode("utf-8")).hexdigest()[:16],
         "root": root.as_posix(),
         "out": out.as_posix(),
@@ -8729,9 +8770,10 @@ def _preview_serve(out_base: Path) -> int:
     """`oku preview --serve`: one request per stdin line, one response per
     stdout line, until stdin closes.
 
-    Request  {"id", "path", "text"?, "theme"?} — `text` absent reads the file.
+    Request  {"id", "path", "text"?, "theme"?} — `text` absent reads the file;
+    `path` may be an `.html` shell (`_preview_source`).
     Response {"id", "html", "page", "shell", "root", "out", "ms", "notes"}
-    or {"id", "error"}.
+    or {"id", "error"}; `page` is null for a front door.
     Request  {"id", "path", "text"?, "check": true} lints instead of
     rendering: {"id", "issues", "ms"} (check_buffer).
     The first line out is a greeting naming the protocol, so an extension
@@ -8914,8 +8956,11 @@ def check_buffer(md: Path, text: str, *, held: dict[Path, tuple[dict, list]] | N
     }
 
 
-def _read_preview_source(md: Path) -> str:
-    _require_markdown(md)
+def _read_preview_source(path: Path) -> str:
+    """The text of the page a preview of `path` draws; a front door has none."""
+    md = _preview_source(path)
+    if md is None:
+        return ""
     try:
         return md.read_text(encoding="utf-8")
     except FileNotFoundError as e:
@@ -9937,7 +9982,10 @@ def main() -> int:
         help="render one page for an editor's preview panel; prints where it went as JSON",
     )
     preview_parser.add_argument(
-        "path", nargs="?", help="the .md page (its tree, kit.json and links resolve from here)"
+        "path",
+        nargs="?",
+        help="the .md page, or the .html shell of one, e.g. the index.html `oku init` writes "
+        "(its tree, kit.json and links resolve from here)",
     )
     preview_parser.add_argument(
         "--out",

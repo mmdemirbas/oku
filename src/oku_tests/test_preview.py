@@ -148,13 +148,75 @@ def test_the_page_beside_the_html_is_the_one_it_inlines(tmp_path: Path) -> None:
     assert "data:image/svg+xml" in json.dumps(page)
 
 
+def _init(docs: Path) -> None:
+    """The entry stub `oku init` writes, as every tree made with it has."""
+    cwd = Path.cwd()
+    os.chdir(docs)
+    try:
+        assert cli.cmd_init(argparse.Namespace()) == 0
+    finally:
+        os.chdir(cwd)
+
+
+def test_the_front_door_is_what_the_build_ships(tmp_path: Path) -> None:
+    """An editor opening a tree's index.html was told it was not a markdown
+    page. With no index.md beside it, the stub is the tree's front door:
+    the runtime draws every page of the manifest there, and the build ships
+    it with no page of its own."""
+    docs = _tree(tmp_path)
+    _init(docs)
+    assert not (docs / "index.md").exists(), "init wrote a starter page into a tree that has pages"
+    done = _oku("preview", str(docs / "index.html"), "--out", str(tmp_path / "out"))
+    assert done.returncode == 0, done.stderr
+    result = json.loads(done.stdout)
+    assert result["page"] is None
+    previewed = Path(result["html"])
+    assert previewed.name == "index.html" and previewed.parent == Path(result["out"])
+    text = previewed.read_text(encoding="utf-8")
+    assert 'id="__oku_page__"' not in text
+
+    cwd = Path.cwd()
+    os.chdir(docs)
+    try:
+        assert cli.cmd_build(argparse.Namespace(no_search=True, no_vendor=True)) == 0
+    finally:
+        os.chdir(cwd)
+    built = (docs / "dist" / "standalone" / "index.html").read_text(encoding="utf-8")
+    assert 'id="__oku_page__"' not in built
+
+    def rows(html: str) -> list[tuple[str, str]]:
+        # The last manifest is the one in force: the stub carries the one
+        # init wrote, and the build appends a fresh one after it.
+        found = re.findall(r"<script>window\.__okuManifest=(\{.*?\});</script>", html, re.S)
+        return sorted((p["path"], p["title"]) for p in json.loads(found[-1])["pages"])
+
+    assert rows(text) == rows(built) == [("a.html", "A"), ("b.html", "B")]
+
+
+def test_a_shell_previews_the_page_beside_it(tmp_path: Path) -> None:
+    docs = _tree(tmp_path)
+    (docs / "index.md").write_text("---\ntitle: Home\n---\n\nthe front page\n", encoding="utf-8")
+    _init(docs)
+    done = _oku("preview", str(docs / "index.html"), "--out", str(tmp_path / "out"))
+    assert done.returncode == 0, done.stderr
+    result = json.loads(done.stdout)
+    assert Path(result["html"]).name == "index.html"
+    assert json.loads(Path(result["page"]).read_text(encoding="utf-8"))["t"] == "Home"
+
+
 @pytest.mark.parametrize(
     ("name", "says"),
-    [("notes.txt", "is not a markdown page"), ("missing.md", "does not exist")],
+    [
+        ("notes.txt", "is not a page"),
+        ("missing.md", "does not exist"),
+        ("missing.html", "does not exist"),
+        ("orphan.html", "there is no orphan.md beside it"),
+    ],
 )
 def test_a_page_it_cannot_render_is_refused_with_the_reason(tmp_path: Path, name: str, says: str) -> None:
     docs = _tree(tmp_path)
     (docs / "notes.txt").write_text("x", encoding="utf-8")
+    (docs / "orphan.html").write_text(cli._stub_for("Orphan"), encoding="utf-8")
     done = _oku("preview", str(docs / name), "--out", str(tmp_path / "out"))
     assert done.returncode == 1
     assert says in done.stderr
@@ -239,7 +301,7 @@ def test_a_bad_request_is_answered_and_the_session_goes_on(session: _Session, tm
     docs = _tree(tmp_path)
     session.read()
     assert "one JSON object per line" in session.ask("not json")["error"]
-    assert "is not a markdown page" in session.ask({"id": 2, "path": str(docs / "kit.json")})["error"]
+    assert "is not a page" in session.ask({"id": 2, "path": str(docs / "kit.json")})["error"]
     assert "`theme`" in session.ask({"id": 3, "path": str(docs / "a.md"), "theme": "sepia"})["error"]
     good = session.ask({"id": 4, "path": str(docs / "a.md")})
     assert good["id"] == 4 and "error" not in good
