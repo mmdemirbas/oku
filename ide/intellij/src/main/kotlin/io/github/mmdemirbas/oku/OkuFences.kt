@@ -42,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 
 /** The tag of a fence, as its info string starts: ```oku-chart → `oku-chart`. */
-private fun fenceTag(info: String?): String? = info?.trim()?.substringBefore(' ')?.takeIf { it.isNotEmpty() }
+internal fun fenceTag(info: String?): String? = info?.trim()?.substringBefore(' ')?.takeIf { it.isNotEmpty() }
 
 /**
  * An oku-* fence is JSON. Before a session has said which fences exist, the

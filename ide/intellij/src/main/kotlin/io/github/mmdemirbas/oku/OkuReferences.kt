@@ -38,7 +38,7 @@ import kotlin.io.path.Path
  */
 
 /** The link destination [element] is, or sits in, when it is on an oku page. */
-private fun okuDestination(element: PsiElement): MarkdownLinkDestination? {
+internal fun okuDestination(element: PsiElement): MarkdownLinkDestination? {
     val destination = element as? MarkdownLinkDestination
         ?: PsiTreeUtil.getParentOfType(element, MarkdownLinkDestination::class.java)
         ?: return null
