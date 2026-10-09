@@ -1062,6 +1062,27 @@ goes through `_forget_tree_state` first. Changing a request or response
 field means raising `PREVIEW_PROTOCOL`, because the greeting is how an
 editor tells an oku it does not speak to from one that is merely slow.
 
+**A tree's `index.html` previews as the page it is the door to.**
+`oku preview` refused every `.html` with "not a markdown page", so the
+file a reader opens first opened in an editor as markup. `_preview_source`
+answers what the runtime answers: the `.md` beside a shell
+(`_source_sibling`), else — for an `index.html` — the front door, built as
+`oku build` ships it (the on-disk shell, no page, the runtime drawing the
+manifest). The reply's `page` is then null, which is why the protocol is
+5. The plugin takes a shell by sniffing for `_oku/renderer.js` and an
+empty body, and `OkuShellTest` holds that against the stub the oku under
+test writes rather than a copy of it.
+
+**What an editor offers an author is what `oku check` accepts.** The
+greeting's `snippets` are `oku spec`'s examples, one per fence kind and
+chart type, laid out a key and a record per line (`fence_snippets`), and a
+test builds one page of all of them and requires no error from the check.
+A `"registry": true` request answers what a page can name with `#g/` and
+`#x/` through `_active_registry`, the slice the check resolves links
+against, and its test requires the term it leaves out to be the one the
+check reports. A completion list that offers what the check then rejects
+teaches an author to stop reading the list.
+
 **A save in a served tree costs what reading titles costs, not what
 building pages costs.** `--serve` keeps a tree's manifest and computes it
 again when anything in the tree changes, which in an editor is every
