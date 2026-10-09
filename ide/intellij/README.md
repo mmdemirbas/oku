@@ -144,6 +144,15 @@ editor is hidden for them (`FileEditorPolicy.HIDE_OTHER_EDITORS`, per file);
 every other `.md` opens as before. The split layout the reader picks
 (editor, preview, both) is kept per file between sessions.
 
+A tree's `index.html` — the shell `oku init` writes, which loads the kit and
+holds nothing — opens as the page it is the door to, in an *oku* tab placed
+before the HTML editor. With an `index.md` beside it, that page is drawn and
+a double-click opens `index.md` on the line. With none, the tree's front door
+is drawn: every page of the tree, as `oku build` ships it there, and a row
+opens that page's `.md`. It is drawn again when a page of the tree is saved,
+added or removed. A page's own stub (`a.html` beside `a.md`) opens the same
+way; an `.html` with a body of its own is somebody's page and is left alone.
+
 *Settings → Tools → oku* has a switch that turns all of it off: no file is
 an oku page then, and nothing of oku runs. A second one opens every `.md` in
 oku's preview, not only oku pages; such a file gets the preview alone — oku

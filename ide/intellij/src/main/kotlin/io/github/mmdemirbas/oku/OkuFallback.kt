@@ -24,14 +24,15 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class OkuFallbackNotifier : FileEditorManagerListener {
     override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
-        if (told.get() || !OkuPages.opensInPreview(file)) return
+        val shell = OkuPages.isShell(file)
+        if (told.get() || !(shell || OkuPages.opensInPreview(file))) return
         val why = whyPreviewUnavailable() ?: return
         if (!told.compareAndSet(false, true)) return
         val project = source.project
         NotificationGroupManager.getInstance().getNotificationGroup("oku")
             .createNotification(
-                "oku pages open as plain markdown",
-                "${file.name} is shown in the Markdown editor, not oku's, because $why.",
+                "oku pages open without oku's preview",
+                "${file.name} is shown ${if (shell) "as HTML" else "in the Markdown editor"}, not by oku, because $why.",
                 NotificationType.WARNING,
             )
             .addAction(

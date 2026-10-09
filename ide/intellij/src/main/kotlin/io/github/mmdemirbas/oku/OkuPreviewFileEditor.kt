@@ -23,6 +23,9 @@ import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.ui.JBColor
 import com.intellij.ui.jcef.JBCefBrowser
@@ -52,9 +55,6 @@ import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JComponent
 import kotlin.io.path.Path
-import kotlin.io.path.exists
-import kotlin.io.path.extension
-import kotlin.io.path.pathString
 
 /**
  * The kit's own rendering of one oku page, in the IDE's embedded Chromium.
@@ -77,6 +77,13 @@ import kotlin.io.path.pathString
  * reader scrolling the page moves the editor with it, through the host's
  * `pageTop`: the kit reports only the reader's scrolls, never one the
  * editor made, so the two panes do not chase each other.
+ *
+ * [file] may also be a shell ([OkuPages.isShell]), the `index.html` a tree
+ * is entered by. Then the page drawn is the `.md` beside it ([source]), with
+ * no editor to follow: a double-click opens that `.md` on the line. With no
+ * `.md` beside it, the shell is the tree's front door, which lists the
+ * tree's pages and is drawn again when one of them is saved, added or
+ * removed.
  */
 @OptIn(FlowPreview::class)
 class OkuPreviewFileEditor(
@@ -86,7 +93,13 @@ class OkuPreviewFileEditor(
 
     private val log = logger<OkuPreviewFileEditor>()
     private val browser = JBCefBrowser()
-    private val document = FileDocumentManager.getInstance().getDocument(file)
+    /** The page drawn: [file], or for a shell the `.md` beside it, or the shell itself for a front door. */
+    private val source: VirtualFile =
+        if (file.extension.equals("html", ignoreCase = true)) OkuPages.pageOf(file) ?: file else file
+
+    private val frontDoor = source.extension.equals("html", ignoreCase = true)
+
+    private val document = if (frontDoor) null else FileDocumentManager.getInstance().getDocument(source)
     private val previews = service<OkuPreviewService>()
 
     /** This preview's work; cancelled with it. */
@@ -140,6 +153,7 @@ class OkuPreviewFileEditor(
         }, this)
         ApplicationManager.getApplication().messageBus.connect(this)
             .subscribe(LafManagerListener.TOPIC, LafManagerListener { schedule(0) })
+        if (frontDoor) watchTree()
         installNavigation()
         browser.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
             override fun onLoadingStateChange(
@@ -170,9 +184,9 @@ class OkuPreviewFileEditor(
     }
 
     private suspend fun render() {
-        val text = readAction { document?.text ?: VfsUtilCore.loadText(file) }
+        val text = if (frontDoor) null else readAction { document?.text ?: VfsUtilCore.loadText(source) }
         val theme = if (JBColor.isBright()) "light" else "dark"
-        val result = previews.render(Path(file.path), text, theme)
+        val result = previews.render(Path(source.path), text, theme)
         // A render already sent finishes (cutting it short would leave its
         // reply to be read as the next one's), but a closed preview shows nothing.
         cs.ensureActive()
@@ -182,15 +196,16 @@ class OkuPreviewFileEditor(
                 failed = false
                 val before = shown
                 shown = it
-                if (!loading && before != null && before.html == it.html && before.shell == it.shell) {
-                    update(it)
+                val page = it.page
+                if (page != null && !loading && before != null && before.html == it.html && before.shell == it.shell) {
+                    update(it, page)
                 } else {
                     load(it)
                 }
             }
             .onFailure {
                 failed = true
-                log.warn("oku preview failed for ${file.path}", it)
+                log.warn("oku preview failed for ${source.path}", it)
                 showError(it.message ?: it.toString())
             }
     }
@@ -209,8 +224,8 @@ class OkuPreviewFileEditor(
      * throw — reloads instead, and the file on disk is already the new
      * version, so the reload shows it.
      */
-    private fun update(rendered: Rendered) {
-        val page = Files.readString(rendered.page)
+    private fun update(rendered: Rendered, pageJson: Path) {
+        val page = Files.readString(pageJson)
         val script = "(function (p) {" +
             "try { if (window.__okuRendered && window.OkuRenderer && OkuRenderer.prototype.update" +
             " && new OkuRenderer({}).update(p)) return; }" +
@@ -243,14 +258,40 @@ class OkuPreviewFileEditor(
         browser.cefBrowser.executeJavaScript(script, browser.cefBrowser.url, 0)
     }
 
-    /** The page's double-click, handed to [OkuFollower.reveal]; the editor then takes the keyboard. */
+    /**
+     * The page's double-click, handed to [OkuFollower.reveal]; the editor then
+     * takes the keyboard. A shell has no editor beside it, so its `.md` opens
+     * on the line instead.
+     */
     private fun reveal(line: Int, top: Double?) {
         ApplicationManager.getApplication().invokeLater {
-            val follower = follower ?: return@invokeLater
+            val follower = follower ?: run {
+                if (!frontDoor && source != file) open(Path(source.path), line = line - 1, anchor = null)
+                return@invokeLater
+            }
             val after = follower.reveal(line, top) ?: return@invokeLater
             log.info("oku preview: reveal line $line, page top $top, editor top $after")
             IdeFocusManager.getInstance(project).requestFocus(follower.editor.contentComponent, true)
         }
+    }
+
+    /**
+     * A front door lists the tree's pages, so it is drawn again when a page is
+     * saved (its title or summary may have changed), added, removed or
+     * renamed, or when the tree's kit.json changes. Unsaved edits do not move
+     * it: the list is of the pages as the build would find them.
+     */
+    private fun watchTree() {
+        project.messageBus.connect(this).subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
+            override fun after(events: List<VFileEvent>) {
+                val root = current?.root ?: return
+                val touched = events.any { e ->
+                    val path = e.path
+                    (path.endsWith(".md", ignoreCase = true) || path.endsWith("/kit.json")) && Path(path).startsWith(root)
+                }
+                if (touched) schedule(EDIT_DELAY_MS)
+            }
+        })
     }
 
     // ---- links ------------------------------------------------------------
@@ -328,15 +369,11 @@ class OkuPreviewFileEditor(
         if (rendered != null && target == rendered.html) return false // our own (re)load
         if (target.startsWith(previews.outBase) && rendered == null) return false
         // A page of the same tree: the preview has `x.html`, the IDE wants `x.md`.
-        val source = if (rendered != null && target.startsWith(rendered.out)) {
-            val rel = rendered.out.relativize(target)
-            val asMd = rendered.root.resolve(rel).resolveSibling(rel.fileName.pathString.removeSuffix(".html") + ".md")
-            if (target.extension == "html" && asMd.exists()) asMd else rendered.root.resolve(rel)
-        } else target
-        if (source.startsWith(previews.outBase)) return false // error page and the like
+        val opened = rendered?.sourceOf(target) ?: target
+        if (opened.startsWith(previews.outBase)) return false // error page and the like
         // `other.html#setup`: the reader asked for that heading, not for the
         // top of the file. URI.fragment is decoded, as heading ids are.
-        open(source, line = 0, anchor = uri.fragment?.takeIf { it.isNotEmpty() })
+        open(opened, line = 0, anchor = uri.fragment?.takeIf { it.isNotEmpty() })
         return true
     }
 

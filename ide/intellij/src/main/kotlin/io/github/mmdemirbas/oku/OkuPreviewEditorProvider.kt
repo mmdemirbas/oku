@@ -51,3 +51,23 @@ class OkuPreviewProvider : FileEditorProvider, DumbAware {
 
     override fun getPolicy(): FileEditorPolicy = FileEditorPolicy.PLACE_AFTER_DEFAULT_EDITOR
 }
+
+/**
+ * A tree's `index.html` — the shell `oku init` writes — or a page's own stub,
+ * drawn the way the runtime fills it ([OkuPages.isShell]): the page beside it,
+ * or the tree's front door. It used to open as 470 bytes of markup and a
+ * manifest on one line, the one file in the tree a reader opens first.
+ *
+ * Before the text editor, which stays a tab away: the shell's markup is what
+ * `oku init` keeps up to date, not something to read first.
+ */
+class OkuShellEditorProvider : FileEditorProvider, DumbAware {
+    override fun accept(project: Project, file: VirtualFile): Boolean =
+        OkuPages.isShell(file) && whyPreviewUnavailable() == null
+
+    override fun createEditor(project: Project, file: VirtualFile): FileEditor = OkuPreviewFileEditor(project, file)
+
+    override fun getEditorTypeId(): String = "oku-shell"
+
+    override fun getPolicy(): FileEditorPolicy = FileEditorPolicy.PLACE_BEFORE_DEFAULT_EDITOR
+}

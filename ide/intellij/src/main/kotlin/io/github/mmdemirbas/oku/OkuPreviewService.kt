@@ -14,6 +14,9 @@ import java.nio.file.Path
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.Path
+import kotlin.io.path.exists
+import kotlin.io.path.extension
+import kotlin.io.path.pathString
 import kotlin.io.path.readText
 
 /**
@@ -23,7 +26,19 @@ import kotlin.io.path.readText
  * in `page`, which can then be handed to the page on screen instead of
  * reloading it.
  */
-data class Rendered(val html: Path, val root: Path, val out: Path, val page: Path, val shell: String)
+data class Rendered(val html: Path, val root: Path, val out: Path, val page: Path?, val shell: String) {
+    /**
+     * Where a link out of this render goes in the project. A page of the same
+     * tree is rendered as `x.html` beside this one and is `x.md` in the tree;
+     * a page with no `.md` — a front door — is its shell, `index.html`.
+     */
+    fun sourceOf(target: Path): Path {
+        if (!target.startsWith(out)) return target
+        val rel = out.relativize(target)
+        val asMd = root.resolve(rel).resolveSibling(rel.fileName.pathString.removeSuffix(".html") + ".md")
+        return if (target.extension == "html" && asMd.exists()) asMd else root.resolve(rel)
+    }
+}
 
 /** One finding of `oku check` for a page; `line` is 1-based, absent for the page as a whole. */
 data class Issue(val severity: String, val code: String, val where: String, val message: String, val line: Int?)
@@ -80,14 +95,18 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
     /** Fence tag (`oku-chart`) → the schema of its body, once a session has greeted. */
     val fences: Map<String, Path> get() = greeting.fences
 
-    fun render(source: Path, text: String, theme: String): Result<Rendered> =
-        previews.ask(mapOf("path" to source.toString(), "text" to text, "theme" to theme)) { reply, line ->
+    /**
+     * Render [source] holding [text]; a shell (`index.html`) has no text of
+     * its own, so oku reads it, and a front door comes back with no `page`.
+     */
+    fun render(source: Path, text: String?, theme: String): Result<Rendered> =
+        previews.ask(buildMap { put("path", source.toString()); text?.let { put("text", it) }; put("theme", theme) }) { reply, line ->
             val html = reply.html ?: error("oku preview answered without a page: $line")
             Rendered(
                 Path(html),
                 Path(requireNotNull(reply.root)),
                 Path(requireNotNull(reply.out)),
-                Path(requireNotNull(reply.page)),
+                reply.page?.let(::Path),
                 requireNotNull(reply.shell),
             )
         }
@@ -251,7 +270,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
 
     private companion object {
         /** The `PREVIEW_PROTOCOL` of the oku this plugin is written against. */
-        const val PROTOCOL = 4
+        const val PROTOCOL = 5
         const val START_TIMEOUT_SECONDS = 30L
         const val REQUEST_TIMEOUT_SECONDS = 30L
 
