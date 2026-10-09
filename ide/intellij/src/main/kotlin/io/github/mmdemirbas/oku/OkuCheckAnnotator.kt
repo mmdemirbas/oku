@@ -27,6 +27,8 @@ import kotlin.io.path.Path
  * is how a clean page looks, so silence would tell the author the page is
  * fine. Except when there is no oku at all — the page then opens in the
  * Markdown editor and [OkuFallbackNotifier] has said why.
+ *
+ * A finding `oku check --fix` answers carries that fix ([OkuChipFix]).
  */
 class OkuCheckAnnotator : ExternalAnnotator<OkuCheckAnnotator.Input, OkuCheckAnnotator.Outcome>() {
 
@@ -77,6 +79,7 @@ class OkuCheckAnnotator : ExternalAnnotator<OkuCheckAnnotator.Input, OkuCheckAnn
                 else -> continue
             }
             val builder = holder.newAnnotation(severity, "${issue.message} [oku ${issue.code}]")
+            if (issue.code == "path-in-code-span") builder.withFix(OkuChipFix)
             val line = issue.line
             if (line != null && line in 1..document.lineCount) {
                 val range = lineText(document, line - 1)
