@@ -45,10 +45,22 @@ data class Issue(val severity: String, val code: String, val where: String, val 
 
 /**
  * What an oku session says about the format when it starts: the JSON schema
- * of each `oku-*` fence body (`oku-chart` → its file), and the link prefixes
- * that are not heading anchors (`filepath` → `#f/`).
+ * of each `oku-*` fence body (`oku-chart` → its file), the link prefixes
+ * that are not heading anchors (`filepath` → `#f/`), and every component an
+ * author can insert.
  */
-data class Greeting(val fences: Map<String, Path>, val inline: Map<String, String>)
+data class Greeting(
+    val fences: Map<String, Path>,
+    val inline: Map<String, String>,
+    val snippets: List<Snippet> = emptyList(),
+)
+
+/**
+ * A component as an editor inserts it: the fence tag, the chart type when it
+ * is a chart (null for any other kind), and the body — the payload `oku spec`
+ * prints, a key per line and a record per line.
+ */
+data class Snippet(val tag: String, val type: String?, val body: String)
 
 /** Told when an oku session's greeting says something new. */
 fun interface OkuGreetingListener {
@@ -135,7 +147,11 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
     }
 
     private fun greeted(hello: Reply) {
-        val said = Greeting(hello.fences.orEmpty().mapValues { Path(it.value) }, hello.inline.orEmpty())
+        val said = Greeting(
+            hello.fences.orEmpty().mapValues { Path(it.value) },
+            hello.inline.orEmpty(),
+            hello.snippets.orEmpty(),
+        )
         if (said == greeting) return
         greeting = said
         ApplicationManager.getApplication().messageBus.syncPublisher(OkuGreetingListener.TOPIC).greeted(said)
@@ -258,6 +274,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         val kit: String? = null,
         val fences: Map<String, String>? = null,
         val inline: Map<String, String>? = null,
+        val snippets: List<Snippet>? = null,
         val html: String? = null,
         val root: String? = null,
         val out: String? = null,

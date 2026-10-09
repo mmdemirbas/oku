@@ -27,10 +27,14 @@ never waits behind it.
 
 An `oku-*` fence is JSON in the editor, and its keys complete from the schema
 oku names for that fence (generated from the kit's page schema, so the editor
-and `oku check` cannot disagree about a shape). Typing ```` ```oku ```` offers
-the fence tags. A key the kit does not know is reported by the check on the
-fence's line: the Markdown plugin hides problems inside code fences unless
-*Show problems in code blocks* is on in its settings.
+and `oku check` cannot disagree about a shape). Typing ```` ``` ```` offers
+every component — each fence kind, and each chart type as `oku-chart sankey`,
+so `sank` finds it — and picking one writes the fence with oku's own example
+as its body (the payload `oku spec` prints, a key per line and a record per
+line), closing the fence if nothing closes it. A fence that already has a
+body only gets the tag. A key the kit does not know is reported by the check
+on the fence's line: the Markdown plugin hides problems inside code fences
+unless *Show problems in code blocks* is on in its settings.
 
 A `#f/` link is a file reference: Cmd+click opens the file, and the path
 completes segment by segment, resolved the way oku resolves it (beside the

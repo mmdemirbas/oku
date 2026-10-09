@@ -5,9 +5,10 @@
   <description><![CDATA[
     Shows an oku page the way oku builds it: the kit's own renderer, beside the
     markdown, updated as you type, following the editor's scroll. Checks the
-    page as it is typed, completes the JSON inside oku-* fences from oku's own
-    schema, and resolves #f/ file references. A tree's index.html opens as the
-    page it is the door to. Needs the oku tool installed
+    page as it is typed, inserts any component with a working example,
+    completes the JSON inside oku-* fences from oku's own schema, and resolves
+    #f/ file references. A tree's index.html opens as the page it is the door
+    to. Needs the oku tool installed
     (./ctl deploy in the oku repository); without it an oku page opens in the
     Markdown editor. Settings → Tools → oku.
   ]]></description>

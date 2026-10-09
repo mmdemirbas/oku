@@ -1,6 +1,8 @@
 package io.github.mmdemirbas.oku
 
 import com.intellij.codeInsight.completion.CompletionParameters
+import com.intellij.codeInsight.completion.InsertHandler
+import com.intellij.codeInsight.completion.InsertionContext
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
@@ -49,13 +51,61 @@ class OkuFenceLanguageProvider : CodeFenceLanguageProvider {
         return if (oku) JsonLanguage.INSTANCE else null
     }
 
-    /** The fence tags, offered after ``` — only in a file that is an oku page. */
+    /**
+     * Every component, offered after ``` — only in a file that is an oku page:
+     * each fence kind, and each chart type as `oku-chart sankey`, so typing
+     * `sank` finds it. Picking one writes oku's own example as the body
+     * ([OkuSnippetInsert]). Before a session has named them, the tags alone.
+     */
     override fun getCompletionVariantsForInfoString(parameters: CompletionParameters): List<LookupElement> {
         val file = parameters.originalFile.viewProvider.virtualFile
         if (!OkuPages.isOkuPage(file)) return emptyList()
-        return service<OkuPreviewService>().fences.keys.sorted().map {
-            LookupElementBuilder.create(it).withTypeText("oku")
+        val greeting = service<OkuPreviewService>().greeting
+        if (greeting.snippets.isEmpty()) {
+            return greeting.fences.keys.sorted().map { LookupElementBuilder.create(it).withTypeText("oku") }
         }
+        return greeting.snippets.map { snippet ->
+            LookupElementBuilder.create(snippet, snippet.type?.let { "${snippet.tag} $it" } ?: snippet.tag)
+                .withPresentableText(snippet.tag)
+                .withTailText(snippet.type?.let { " $it" }, true)
+                .withTypeText("oku")
+                .withInsertHandler(OkuSnippetInsert)
+        }
+    }
+}
+
+/**
+ * Puts a picked component in: the tag on the fence line, and oku's example
+ * as the body when the fence has none yet — the next line closes it, or
+ * nothing but a blank line follows, in which case the fence is closed too.
+ * A fence that already has a body only gets its tag: what the author wrote
+ * there is theirs. The caret lands on the body's first key.
+ */
+object OkuSnippetInsert : InsertHandler<LookupElement> {
+    private val OPENER = Regex("^ {0,3}(`{3,}|~{3,})")
+
+    override fun handleInsert(context: InsertionContext, item: LookupElement) {
+        val snippet = item.`object` as? Snippet ?: return
+        val document = context.document
+        document.replaceString(context.startOffset, context.tailOffset, snippet.tag)
+        val text = document.charsSequence
+        val line = document.getLineNumber(context.startOffset)
+        val lineEnd = document.getLineEndOffset(line)
+        val opener = OPENER.find(text.subSequence(document.getLineStartOffset(line), lineEnd))?.groupValues?.get(1) ?: return
+        val next = if (line + 1 < document.lineCount) {
+            text.subSequence(document.getLineStartOffset(line + 1), document.getLineEndOffset(line + 1)).toString()
+        } else {
+            null
+        }
+        val closes = next != null && next.trim().let { it.length >= opener.length && it.all { c -> c == opener[0] } }
+        when {
+            closes -> document.insertString(lineEnd, "\n" + snippet.body)
+            next == null || next.isBlank() -> document.insertString(lineEnd, "\n" + snippet.body + "\n" + opener)
+            else -> return
+        }
+        val firstKey = snippet.body.indexOf('"').coerceAtLeast(0)
+        context.editor.caretModel.moveToOffset(lineEnd + 1 + firstKey)
+        context.commitDocument()
     }
 }
 

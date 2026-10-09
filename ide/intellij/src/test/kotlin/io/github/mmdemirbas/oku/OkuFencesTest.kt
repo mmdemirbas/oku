@@ -1,5 +1,8 @@
 package io.github.mmdemirbas.oku
 
+import com.google.gson.JsonParser
+import com.intellij.codeInsight.lookup.Lookup
+import com.intellij.codeInsight.lookup.impl.LookupImpl
 import com.intellij.json.JsonLanguage
 import com.intellij.lang.injection.InjectedLanguageManager
 import com.intellij.openapi.components.service
@@ -11,10 +14,21 @@ class OkuFencesTest : OkuFixtureTestCase() {
     private fun page(fence: String, body: String) = "---\ntitle: A\nsummary: a\n---\n\n## A {#a}\n\n```$fence\n$body\n```\n"
 
     /** What a real editor has by the time an author types: a session that greeted. */
-    private fun open(text: String) {
+    private fun open(text: String): com.intellij.openapi.vfs.VirtualFile {
         val file = tree("a.md" to text).getValue("a.md")
         service<OkuPreviewService>().check(Path(file.path), text).getOrThrow()
         fixture.openFileInEditor(file)
+        return file
+    }
+
+    /** Complete at the end of the last [typed], and pick the item named [name]. */
+    private fun pick(typed: String, name: String) {
+        val text = fixture.editor.document.text
+        fixture.editor.caretModel.moveToOffset(text.lastIndexOf(typed) + typed.length)
+        fixture.completeBasic()
+        val items = fixture.lookupElements ?: return // the one candidate was inserted at once
+        (fixture.lookup as LookupImpl).currentItem = items.single { it.lookupString == name }
+        fixture.finishLookup(Lookup.NORMAL_SELECT_CHAR)
     }
 
     fun `test an oku fence is JSON`() {
@@ -55,5 +69,27 @@ class OkuFencesTest : OkuFixtureTestCase() {
         val offered = fixture.lookupElementStrings
         // One candidate is inserted at once and leaves no list behind.
         if (offered == null) assertTrue(fixture.editor.document.text.contains("```oku-table\n")) else assertTrue(offered.toString(), "oku-table" in offered)
+    }
+
+    fun `test picking a chart type writes the whole component, and the page checks clean`() {
+        val file = open(page("oku-table", "{\"headers\": [\"x\"], \"rows\": [[\"1\"]]}") + "\n```oku-\n")
+        pick("```oku-", "oku-chart sankey")
+        val text = fixture.editor.document.text
+        val fence = text.substring(text.lastIndexOf("```oku-chart\n"))
+        // Closed, since nothing closed it, and holding oku's own sankey.
+        assertTrue(fence, fence.trimEnd().endsWith("\n```") && fence.trimEnd() != "```oku-chart\n```")
+        val body = fence.removePrefix("```oku-chart\n").trimEnd().removeSuffix("```")
+        val snippet = service<OkuPreviewService>().greeting.snippets.single { it.type == "sankey" }
+        assertEquals(JsonParser.parseString(snippet.body), JsonParser.parseString(body))
+        val issues = service<OkuPreviewService>().check(Path(file.path), text).getOrThrow()
+        assertEmpty(issues.filter { it.severity == "error" }.toString(), issues.filter { it.severity == "error" })
+    }
+
+    fun `test a fence that already has a body only gets its tag`() {
+        open(page("oku-ta", "{\"headers\": [\"x\"]}"))
+        pick("```oku-ta", "oku-table")
+        val text = fixture.editor.document.text
+        assertTrue(text, "```oku-table\n{\"headers\": [\"x\"]}\n```" in text)
+        assertEquals(text, 1, Regex("\"headers\"").findAll(text).count())
     }
 }
