@@ -31,8 +31,10 @@ and `oku check` cannot disagree about a shape). Typing ```` ``` ```` offers
 every component — each fence kind, and each chart type as `oku-chart sankey`,
 so `sank` finds it — and picking one writes the fence with oku's own example
 as its body (the payload `oku spec` prints, a key per line and a record per
-line), closing the fence if nothing closes it. A fence that already has a
-body only gets the tag. A key the kit does not know is reported by the check
+line), closing the fence if nothing closes it. The example's values are tab
+stops: the top-level values and those of the first record, at most twelve,
+each selected so typing replaces it; Enter or Escape leaves the rest as oku
+wrote them. A fence that already has a body only gets the tag. A key the kit does not know is reported by the check
 on the fence's line: the Markdown plugin hides problems inside code fences
 unless *Show problems in code blocks* is on in its settings.
 
@@ -49,6 +51,22 @@ sees on hover. oku answers which ones (`"registry": true`): the domains the
 tree's kit.json activates plus the project's own entries — exactly the set
 `oku check` resolves the links against, so a term not offered is one the
 check would report.
+
+The front matter completes from oku's front-matter schema: every key with
+what it is for, the kit's colours for `accent`, and for `parent:` the pages
+of the tree by the id the manifest groups a page under, with their titles.
+A markdown file that is not an oku page keeps the Markdown plugin's schema.
+`> [!` completes the alert types the kit draws, each with what it is for,
+in capitals and closed with `]`. The list opens by itself on the `!` of
+`> [!` and on the `/` of `#g/`, `#x/` and `#f/`; the platform opens it on
+letters only.
+
+Hovering shows what the page's reader will see: the definition behind a
+`#g/` or `#x/` name (or that `oku check` reports a name the tree does not
+activate), what an `oku-*` fence is with its keys and oku's example, and
+what an alert type is for. A `path-in-code-span` warning carries `oku check
+--fix` as a quick fix: oku rewrites the unsaved page, and only the changed
+spans are written back, so the caret and folds stay where they were.
 
 The preview follows the editor: the source line at the top of the editor
 is put at the top of the page. Scrolling the page moves the editor the same

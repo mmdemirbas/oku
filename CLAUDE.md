@@ -1103,6 +1103,21 @@ against, and its test requires the term it leaves out to be the one the
 check reports. A completion list that offers what the check then rejects
 teaches an author to stop reading the list.
 
+**Protocol 6 hands an editor the rest of what an author types by hand.**
+The greeting's `front_matter` names a JSON schema of a page's front matter
+(`front_matter_schema`: each key with what it is for, and a derived key
+saying what the build derives it from), and `admonitions` the alert types
+with what each is for, held against the renderer's `ADM_CLASS` by
+`test_preview.py`. The registry reply carries the tree's `pages`, by the
+id `parent:` names. A `"fix": true` request returns the buffer as `oku
+check --fix` would leave it (`fix_buffer`: the check first, the rewrite
+only where it reported `path-in-code-span`, with the build's predicate).
+One trap was on the editor's side: IntelliJ's JSON support asks a
+content-aware schema provider only when no registered provider takes the
+file, and the Markdown plugin's takes every front matter — so the plugin
+gives oku's front-matter schema as a registered provider placed first,
+not the content-aware one its fence schemas use.
+
 **A save in a served tree costs what reading titles costs, not what
 building pages costs.** `--serve` keeps a tree's manifest and computes it
 again when anything in the tree changes, which in an editor is every
