@@ -275,7 +275,8 @@ def test_the_session_opens_by_naming_its_protocol(session: _Session) -> None:
     hello = session.read()
     fences = hello.pop("fences")
     inline = hello.pop("inline")
-    hello.pop("snippets")
+    for key in ("snippets", "front_matter", "admonitions"):
+        hello.pop(key)
     assert hello == {"protocol": cli.PREVIEW_PROTOCOL, "oku": cli._PKG_VERSION, "kit": cli._kit_build_stamp()}
     assert sorted(fences) == sorted(f"oku-{kind}" for kind in cli._FENCE_KINDS)
     assert inline == cli._INLINE_KINDS
@@ -452,6 +453,73 @@ def test_a_page_is_told_what_it_can_name_with_g_and_x(session: _Session, tmp_pat
     )
     unresolved = [i["message"] for i in found["issues"] if i["code"] == "unresolved-glossary"]
     assert len(unresolved) == 1 and "ACID" in unresolved[0], unresolved
+    assert session.close() == 0
+
+
+def test_the_front_matter_schema_is_the_spec_and_takes_what_the_check_takes(session: _Session) -> None:
+    """An editor completes front-matter keys from this, so its keys are the
+    ones `oku spec front-matter` prints, title is required, an accent may be
+    a token or any colour, and a key the kit does not know is the check's
+    to report (with the nearest one), not the editor's."""
+    jsonschema = pytest.importorskip("jsonschema")
+    schema = json.loads(Path(session.read()["front_matter"]).read_text(encoding="utf-8"))
+    session.close()
+    spec = _oku("spec", "front-matter", "--json")
+    assert sorted(schema["properties"]) == sorted(json.loads(spec.stdout))
+    validator = jsonschema.Draft202012Validator(schema)
+    for fine in (
+        {"title": "A", "accent": "teal"},
+        {"title": "A", "accent": "#0a7"},
+        {"title": "A", "colour": "x"},
+    ):
+        assert not list(validator.iter_errors(fine)), fine
+    assert list(validator.iter_errors({"summary": "no title"}))
+    assert schema["properties"]["accent"]["anyOf"][0]["enum"] == list(cli._KIT_ACCENTS)
+
+
+def test_the_alerts_an_editor_offers_are_the_ones_the_renderer_draws(session: _Session) -> None:
+    offered = session.read()["admonitions"]
+    session.close()
+    renderer = (cli.KIT_DIR / "renderer.js").read_text(encoding="utf-8")
+    block = re.search(r"const ADM_CLASS = \{(.*?)\};", renderer, re.S)
+    assert block, "ADM_CLASS moved; this test reads it"
+    drawn = {k.upper() for k in re.findall(r"^\s*(\w+):", block.group(1), re.M)}
+    assert set(offered) == drawn
+    assert all(offered[t] for t in offered), "an alert with nothing to say about it"
+
+
+def test_a_page_is_told_what_its_parent_can_name(session: _Session, tmp_path: Path) -> None:
+    docs = _tree(tmp_path)
+    (docs / "sub").mkdir()
+    (docs / "sub" / "c.md").write_text("---\ntitle: C\n---\n\nc\n", encoding="utf-8")
+    session.read()
+    pages = session.ask({"id": 1, "path": str(docs / "a.md"), "registry": True})["pages"]
+    assert sorted((p["id"], p["title"]) for p in pages) == [("a", "A"), ("b", "B"), ("sub/c", "C")]
+    assert session.close() == 0
+
+
+def test_a_buffer_is_fixed_as_oku_check_fix_fixes_the_saved_file(session: _Session, tmp_path: Path) -> None:
+    """The editor's quick fix applies `oku check --fix` to the unsaved text,
+    and only where the check reported something: a buffer naming a real
+    file in a code span gets a chip, and one that names nothing is handed
+    back as it was."""
+    docs = _tree(tmp_path)
+    (docs.parent / "src").mkdir()
+    (docs.parent / "src" / "x.py").write_text("x = 1\n", encoding="utf-8")
+    buffer = "---\ntitle: A\n---\n\nThe code is in `src/x.py`, unsaved.\n"
+    session.read()
+    fixed = session.ask({"id": 1, "path": str(docs / "a.md"), "text": buffer, "fix": True})
+    assert "[`src/x.py`](#f/src/x.py)" in fixed["text"], fixed
+    assert fixed["moved"]
+    # Fixed text checks clean of the code it fixed.
+    after = session.ask({"id": 2, "path": str(docs / "a.md"), "text": fixed["text"], "check": True})
+    assert "path-in-code-span" not in {i["code"] for i in after["issues"]}
+    clean = "---\ntitle: A\n---\n\nNothing to fix in `x`.\n"
+    assert session.ask({"id": 3, "path": str(docs / "a.md"), "text": clean, "fix": True}) == {
+        "id": 3,
+        "text": clean,
+        "moved": [],
+    }
     assert session.close() == 0
 
 

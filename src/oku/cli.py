@@ -1224,6 +1224,24 @@ def _locate(path: Path, block_index: int | None) -> tuple[Path, int | None]:
     return source, line
 
 
+# The alerts a `> [!TYPE]` blockquote can name, as the renderer draws
+# them (`ADM_CLASS` in renderer.js; test_authority_agreement holds the two
+# together), and what each is for, which is what an editor shows beside
+# the name. Any other type renders as NOTE.
+_ADMONITION_TYPES = {
+    "TLDR": "The page in one line plus up to three points. The opener; one per page.",
+    "NOTE": "Something the reader should know while reading this part.",
+    "TIP": "A better way to do what the text describes.",
+    "IMPORTANT": "Something the reader needs in order to succeed.",
+    "WARNING": "Something that can go wrong and needs attention now.",
+    "CAUTION": "A risk or a consequence of an action.",
+    "DANGER": "Data loss, a security hole, an outage: drawn in red.",
+    "INFO": "Background the reader may skip.",
+    "SUCCESS": "A result that worked, or the state the reader should reach.",
+    "NEUTRAL": "A remark with no urgency either way.",
+    "WARN": "A short form of WARNING, drawn the same way.",
+}
+
 # A kind an author may reasonably reach for as `oku-<kind>`, and the one
 # form that actually works. Every entry here is a place the kit offers
 # two spellings of one idea — which is the shape that makes an author
@@ -8668,7 +8686,7 @@ def _comparable_meta(page: dict) -> str:
 
 # Raised when a request or response changes shape, so an extension can
 # refuse an oku it does not speak to instead of failing on a missing field.
-PREVIEW_PROTOCOL = 5
+PREVIEW_PROTOCOL = 6
 
 # Runs before chrome-boot.js reads `theme-pref`, so the first paint is in
 # the editor's theme; and keeps the reader's place across the reload an
@@ -8890,6 +8908,8 @@ def _preview_serve(out_base: Path) -> int:
     or {"id", "error"}; `page` is null for a front door.
     Request  {"id", "path", "text"?, "check": true} lints instead of
     rendering: {"id", "issues", "ms"} (check_buffer).
+    Request  {"id", "path", "text"?, "fix": true} answers with the text as
+    `oku check --fix` would leave it: {"id", "text", "moved"} (fix_buffer).
     Request  {"id", "path", "text"?, "registry": true} answers with what the
     page can name with `#g/` and `#x/`: {"id", "glossary", "extrefs"}
     (registry_entries).
@@ -8899,7 +8919,9 @@ def _preview_serve(out_base: Path) -> int:
     (fence_schemas), written under `out_base`, and names the link prefixes
     that are not anchors (`inline`, _INLINE_KINDS): `#f/src/x.py` is a file,
     and an editor reading it as a heading id reports it as one it cannot find.
-    `snippets` is every component an editor can insert (fence_snippets).
+    `snippets` is every component an editor can insert (fence_snippets),
+    `front_matter` the schema of a page's front-matter (front_matter_schema)
+    and `admonitions` the `> [!TYPE]` alerts with what each is for.
     """
     trees: dict[Path, tuple[dict, dict]] = {}
     held: dict[Path, tuple[dict, list]] = {}
@@ -8912,6 +8934,8 @@ def _preview_serve(out_base: Path) -> int:
             "fences": fences,
             "inline": _INLINE_KINDS,
             "snippets": fence_snippets(),
+            "front_matter": front_matter_schema(out_base / "schemas"),
+            "admonitions": _ADMONITION_TYPES,
         }
     )
     for raw in sys.stdin.buffer:
@@ -8938,6 +8962,9 @@ def _preview_serve(out_base: Path) -> int:
                 raise PreviewError("`text` is a string")
             if req.get("check") is True:
                 _emit({"id": req_id, **check_buffer(md, text, held=held)})
+                continue
+            if req.get("fix") is True:
+                _emit({"id": req_id, **fix_buffer(md, text, held=held)})
                 continue
             if req.get("registry") is True:
                 _emit({"id": req_id, **registry_entries(md, req.get("text"))})
@@ -8982,6 +9009,50 @@ def fence_schemas(dest: Path) -> dict[str, str]:
             partial.replace(target)
         out[f"oku-{kind}"] = target.as_posix()
     return out
+
+
+def front_matter_schema(dest: Path) -> str:
+    """Write a JSON schema for a page's front-matter into `dest` and return
+    its path.
+
+    The keys and their words are `oku spec front-matter`'s — `$defs.meta`
+    of the page schema plus `title` — so an editor completing a key, or
+    showing what one does, says what the spec says. Two things are added
+    for an editor and checked nowhere else: `accent` offers the seven
+    tokens the kit tunes while still taking any CSS colour, and a derived
+    key says so. Unknown keys are allowed: `oku check` reports them, with
+    the nearest known one, and a second report here would be noise.
+    """
+    schema = json.loads((KIT_DIR / "schema" / "page.schema.json").read_text(encoding="utf-8"))
+    props = dict((schema.get("$defs", {}).get("meta") or {}).get("properties") or {})
+    rows = {"title": {"type": "string", "description": "Page title. Required."}, **props}
+    for key, why in _DERIVABLE_META.items():
+        if key in rows:
+            said = rows[key].get("description", "")
+            rows[key] = {
+                **rows[key],
+                "description": f"{said} Set it only to override what the build derives from {why}.",
+            }
+    if "accent" in rows:
+        rows["accent"] = {
+            "description": rows["accent"].get("description", ""),
+            "anyOf": [{"enum": list(_KIT_ACCENTS)}, {"type": "string"}],
+        }
+    doc = {
+        "$schema": schema["$schema"],
+        "title": "oku page front-matter",
+        "type": "object",
+        "required": ["title"],
+        "properties": rows,
+    }
+    dest.mkdir(parents=True, exist_ok=True)
+    target = dest / "front-matter.schema.json"
+    text = json.dumps(doc, ensure_ascii=False, indent=1)
+    if not target.exists() or target.read_text(encoding="utf-8") != text:
+        partial = target.with_suffix(f".{os.getpid()}.tmp")
+        partial.write_text(text, encoding="utf-8")
+        partial.replace(target)
+    return target.as_posix()
 
 
 def fence_snippets() -> list[dict]:
@@ -9033,7 +9104,8 @@ def _hand_layout(payload: dict) -> str:
 def registry_entries(md: Path, text: str | None = None) -> dict:
     """Every glossary term and external reference a page at `md` can name
     with `#g/` and `#x/`, with the definition a reader would see on hover:
-    `{"glossary": [{"term", "domain", "def"}], "extrefs": [...]}`.
+    `{"glossary": [{"term", "domain", "def"}], "extrefs": [...], "pages":
+    [{"id", "title"}]}` — the last being what its `parent:` can name.
 
     The slice is the one `oku check` resolves the page's references against
     (`_active_registry`: the domains the page's kit.json activates, plus the
@@ -9065,7 +9137,31 @@ def registry_entries(md: Path, text: str | None = None) -> dict:
             langs = (mine.get(domain) or {}).get(term) or central.get(domain, {}).get(term) or {}
             rows.append({"term": term, "domain": domain, "def": _registry_def(langs, lang)})
         out[kind] = rows
+    # What `parent:` can name: every page of the tree by its stem, the
+    # value the manifest groups a page under.
+    out["pages"] = [
+        {"id": e["source"].rsplit(".", 1)[0], "title": e["title"]}
+        for e in compute_manifest(root)["pages"]
+        if isinstance(e.get("source"), str)
+    ]
     return out
+
+
+def fix_buffer(md: Path, text: str, *, held: dict[Path, tuple[dict, list]] | None = None) -> dict:
+    """The page's text as `oku check --fix` would leave it, for an editor
+    applying the fix to an unsaved buffer: `{"text", "moved"}`.
+
+    The same rule as `apply_path_chip_fixes`: apply what the report said.
+    The buffer is checked inside its tree first, and only a page the check
+    reports `path-in-code-span` on is rewritten, with the predicate the
+    build uses — so a README the check exempts is left as it is.
+    """
+    reported = check_buffer(md, text, held=held)["issues"]
+    if not any(i["code"] == "path-in-code-span" for i in reported):
+        return {"text": text, "moved": []}
+    page = md.resolve()
+    after, moved = _rewrite_code_span_paths(text, lambda t: resolve_file_line(t, page)[1] == "ok")
+    return {"text": after, "moved": moved}
 
 
 def _registry_texts(kind: str) -> dict[str, dict]:
