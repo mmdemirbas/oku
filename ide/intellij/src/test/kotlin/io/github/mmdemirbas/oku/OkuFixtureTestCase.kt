@@ -3,6 +3,7 @@ package io.github.mmdemirbas.oku
 import com.intellij.openapi.components.service
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.testFramework.EdtTestUtil
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.PsiTestUtil
@@ -30,9 +31,13 @@ abstract class OkuFixtureTestCase : UsefulTestCase() {
         val project = factory.createLightFixtureBuilder(LightProjectDescriptor.EMPTY_PROJECT_DESCRIPTOR, name).fixture
         fixture = factory.createCodeInsightFixture(project, TempDirTestFixtureImpl())
         fixture.setUp()
-        root = LocalFileSystem.getInstance().refreshAndFindFileByPath(fixture.tempDirFixture.tempDirPath)
-            ?.also { PsiTestUtil.addContentRoot(fixture.module, it) }
-        greet()
+        // On the EDT whichever thread the test runs on: a test of what typing
+        // opens runs off it, as the platform's autopopup tester requires.
+        EdtTestUtil.runInEdtAndWait<Throwable> {
+            root = LocalFileSystem.getInstance().refreshAndFindFileByPath(fixture.tempDirFixture.tempDirPath)
+                ?.also { PsiTestUtil.addContentRoot(fixture.module, it) }
+            greet()
+        }
     }
 
     /**
@@ -51,7 +56,7 @@ abstract class OkuFixtureTestCase : UsefulTestCase() {
     override fun tearDown() {
         try {
             // The light project outlives the test; its roots must not.
-            root?.let { PsiTestUtil.removeContentEntry(fixture.module, it) }
+            root?.let { EdtTestUtil.runInEdtAndWait<Throwable> { PsiTestUtil.removeContentEntry(fixture.module, it) } }
         } catch (e: Throwable) {
             addSuppressedException(e)
         }
