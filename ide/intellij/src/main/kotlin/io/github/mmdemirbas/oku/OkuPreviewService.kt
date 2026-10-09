@@ -2,6 +2,7 @@ package io.github.mmdemirbas.oku
 
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
+import com.google.gson.annotations.SerializedName
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
@@ -43,8 +44,17 @@ data class Rendered(val html: Path, val root: Path, val out: Path, val page: Pat
 /** A term a page can name with `#g/`, or a reference with `#x/`, and what its reader sees on hover. */
 data class RegistryEntry(val term: String, val domain: String, val def: String)
 
-/** Everything a page can name with `#g/` ([glossary]) and `#x/` ([extrefs]), as `oku check` resolves them. */
-data class Registry(val glossary: List<RegistryEntry>, val extrefs: List<RegistryEntry>)
+/** A page of a tree as its `parent:` names it: the source path without `.md`, from the tree's root. */
+data class PageEntry(val id: String, val title: String)
+
+/**
+ * Everything a page can name: `#g/` ([glossary]) and `#x/` ([extrefs]) as
+ * `oku check` resolves them, and the pages its `parent:` can name ([pages]).
+ */
+data class Registry(val glossary: List<RegistryEntry>, val extrefs: List<RegistryEntry>, val pages: List<PageEntry>)
+
+/** A page's text as `oku check --fix` would leave it, and the paths that became file chips. */
+data class Fixed(val text: String, val moved: List<String>)
 
 /** One finding of `oku check` for a page; `line` is 1-based, absent for the page as a whole. */
 data class Issue(val severity: String, val code: String, val where: String, val message: String, val line: Int?)
@@ -52,13 +62,16 @@ data class Issue(val severity: String, val code: String, val where: String, val 
 /**
  * What an oku session says about the format when it starts: the JSON schema
  * of each `oku-*` fence body (`oku-chart` → its file), the link prefixes
- * that are not heading anchors (`filepath` → `#f/`), and every component an
- * author can insert.
+ * that are not heading anchors (`filepath` → `#f/`), every component an
+ * author can insert, the schema of a page's front matter, and the types a
+ * `> [!TYPE]` alert can name with what each is for.
  */
 data class Greeting(
     val fences: Map<String, Path>,
     val inline: Map<String, String>,
     val snippets: List<Snippet> = emptyList(),
+    val frontMatter: Path? = null,
+    val admonitions: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -159,9 +172,20 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
             Registry(
                 reply.glossary ?: error("oku preview answered without a glossary: $line"),
                 reply.extrefs ?: error("oku preview answered without external references: $line"),
+                reply.pages ?: error("oku preview answered without the tree's pages: $line"),
             )
         }
     }
+
+    /**
+     * [text] as `oku check --fix` would leave the page at [source]: every
+     * code span naming a file the check reports becomes a file chip. The
+     * same text back, and nothing moved, when the check reports none.
+     */
+    fun fix(source: Path, text: String): Result<Fixed> =
+        checks.ask(mapOf("path" to source.toString(), "text" to text, "fix" to true)) { reply, line ->
+            Fixed(reply.text ?: error("oku preview answered a fix without text: $line"), reply.moved.orEmpty())
+        }
 
     private fun parse(line: String): Reply = try {
         gson.fromJson(line, Reply::class.java)
@@ -174,6 +198,8 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
             hello.fences.orEmpty().mapValues { Path(it.value) },
             hello.inline.orEmpty(),
             hello.snippets.orEmpty(),
+            hello.frontMatter?.let(::Path),
+            hello.admonitions.orEmpty(),
         )
         if (said == greeting) return
         greeting = said
@@ -298,6 +324,8 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         val fences: Map<String, String>? = null,
         val inline: Map<String, String>? = null,
         val snippets: List<Snippet>? = null,
+        @SerializedName("front_matter") val frontMatter: String? = null,
+        val admonitions: Map<String, String>? = null,
         val html: String? = null,
         val root: String? = null,
         val out: String? = null,
@@ -307,12 +335,15 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         val line: Int? = null,
         val glossary: List<RegistryEntry>? = null,
         val extrefs: List<RegistryEntry>? = null,
+        val pages: List<PageEntry>? = null,
+        val text: String? = null,
+        val moved: List<String>? = null,
         val error: String? = null,
     )
 
     private companion object {
         /** The `PREVIEW_PROTOCOL` of the oku this plugin is written against. */
-        const val PROTOCOL = 5
+        const val PROTOCOL = 6
         const val START_TIMEOUT_SECONDS = 30L
         const val REQUEST_TIMEOUT_SECONDS = 30L
 

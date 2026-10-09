@@ -6,6 +6,8 @@
     <externalAnnotator language="Markdown" implementationClass="io.github.mmdemirbas.oku.OkuCheckAnnotator"/>
     <psi.referenceContributor language="Markdown" implementation="io.github.mmdemirbas.oku.OkuFileReferenceContributor"/>
     <completion.contributor language="Markdown" implementationClass="io.github.mmdemirbas.oku.OkuRegistryCompletion"/>
+    <!-- The front matter is YAML when the YAML plugin injects it; without that plugin this never fires. -->
+    <completion.contributor language="yaml" implementationClass="io.github.mmdemirbas.oku.OkuParentCompletion"/>
     <lang.inspectionSuppressor language="Markdown" implementationClass="io.github.mmdemirbas.oku.OkuInlineLinkSuppressor"/>
   </extensions>
   <applicationListeners>

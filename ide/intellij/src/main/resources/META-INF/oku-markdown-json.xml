@@ -5,6 +5,7 @@
   </extensions>
   <extensions defaultExtensionNs="JavaScript.JsonSchema">
     <ContentAwareSchemaFileProvider implementation="io.github.mmdemirbas.oku.OkuFenceSchemaProvider"/>
+    <ProviderFactory implementation="io.github.mmdemirbas.oku.OkuFrontMatterSchemaFactory" order="first"/>
   </extensions>
   <applicationListeners>
     <listener class="io.github.mmdemirbas.oku.OkuFenceSchemaReset" topic="io.github.mmdemirbas.oku.OkuGreetingListener"/>

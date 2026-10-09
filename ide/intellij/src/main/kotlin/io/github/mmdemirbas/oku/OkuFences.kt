@@ -16,10 +16,17 @@ import com.intellij.json.JsonFileType
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.LightVirtualFile
 import com.intellij.psi.PsiFile
+import com.intellij.injected.editor.VirtualFileWindow
+import com.intellij.openapi.project.Project
+import com.intellij.psi.PsiManager
 import com.jetbrains.jsonSchema.extension.ContentAwareJsonSchemaFileProvider
+import com.jetbrains.jsonSchema.extension.JsonSchemaFileProvider
+import com.jetbrains.jsonSchema.extension.JsonSchemaProviderFactory
+import com.jetbrains.jsonSchema.extension.SchemaType
 import com.jetbrains.jsonSchema.ide.JsonSchemaService
 import org.intellij.plugins.markdown.injection.CodeFenceLanguageProvider
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownCodeFence
+import org.intellij.plugins.markdown.lang.psi.impl.MarkdownFrontMatterHeader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
@@ -112,23 +119,61 @@ object OkuSnippetInsert : InsertHandler<LookupElement> {
 /**
  * The schema oku named for the fence a JSON fragment sits in.
  *
- * Held in memory rather than found in the VFS: oku writes the files when a
- * session starts, which is usually inside highlighting (the first check
- * starts one), and bringing a new file into the VFS there is a model change
- * the daemon has to restart for. One object per file and mtime, because
- * the JSON support keeps a parsed schema per VirtualFile.
+ * A content-aware provider is the JSON support's last resort — asked only
+ * when no registered provider takes the file — which is right for a fence
+ * body, which nothing else claims.
  */
 class OkuFenceSchemaProvider : ContentAwareJsonSchemaFileProvider {
-    private val held = ConcurrentHashMap<Path, Pair<FileTime, VirtualFile>>()
-
     override fun getSchemaFile(psiFile: PsiFile): VirtualFile? {
         val host = InjectedLanguageManager.getInstance(psiFile.project).getInjectionHost(psiFile) as? MarkdownCodeFence
             ?: return null
-        val path = service<OkuPreviewService>().fences[fenceTag(host.fenceLanguage)] ?: return null
-        return schema(path)
+        return service<OkuPreviewService>().fences[fenceTag(host.fenceLanguage)]?.let(OkuSchemaFiles::of)
     }
+}
 
-    private fun schema(path: Path): VirtualFile? {
+/**
+ * The schema of an oku page's front matter (the greeting's `front_matter`):
+ * `title`, `summary`, `order`, `parent`, `accent`… complete and describe
+ * themselves. Only on an oku page — every markdown file has front matter,
+ * and the Markdown plugin's schema (Jekyll's keys) stays for the rest.
+ *
+ * A registered provider, placed first, and not a content-aware one: the
+ * JSON support asks a content-aware provider only when no registered one
+ * takes the file, and the Markdown plugin's takes every front matter. Among
+ * registered providers that are not user schemas the first one wins.
+ */
+class OkuFrontMatterSchemaFactory : JsonSchemaProviderFactory {
+    override fun getProviders(project: Project): List<JsonSchemaFileProvider> = listOf(Provider(project))
+
+    private class Provider(private val project: Project) : JsonSchemaFileProvider {
+        override fun isAvailable(file: VirtualFile): Boolean {
+            if (file !is VirtualFileWindow || service<OkuPreviewService>().greeting.frontMatter == null) return false
+            val page = file.delegate
+            if (!page.isInLocalFileSystem || !OkuPages.isOkuPage(page)) return false
+            val fragment = PsiManager.getInstance(project).findFile(file) ?: return false
+            return InjectedLanguageManager.getInstance(project).getInjectionHost(fragment) is MarkdownFrontMatterHeader
+        }
+
+        override fun getName(): String = "oku page front matter"
+
+        override fun getSchemaFile(): VirtualFile? = service<OkuPreviewService>().greeting.frontMatter?.let(OkuSchemaFiles::of)
+
+        override fun getSchemaType(): SchemaType = SchemaType.embeddedSchema
+    }
+}
+
+/**
+ * The schema files oku writes, held in memory rather than found in the VFS:
+ * oku writes them when a session starts, which is usually inside
+ * highlighting (the first check starts one), and bringing a new file into
+ * the VFS there is a model change the daemon has to restart for. One object
+ * per file and mtime, because the JSON support keeps a parsed schema per
+ * VirtualFile.
+ */
+private object OkuSchemaFiles {
+    private val held = ConcurrentHashMap<Path, Pair<FileTime, VirtualFile>>()
+
+    fun of(path: Path): VirtualFile? {
         val stamp = runCatching { Files.getLastModifiedTime(path) }.getOrNull() ?: return null
         held[path]?.let { (at, file) -> if (at == stamp) return file }
         val text = runCatching { Files.readString(path) }.getOrNull() ?: return null
@@ -138,14 +183,14 @@ class OkuFenceSchemaProvider : ContentAwareJsonSchemaFileProvider {
     }
 }
 
-/** oku named the fence schemas: let every open project's JSON support read them. */
+/** oku named its schemas: let every open project's JSON support read them. */
 class OkuFenceSchemaReset : OkuGreetingListener {
     override fun greeted(greeting: Greeting) {
         ApplicationManager.getApplication().invokeLater {
             for (project in ProjectManager.getInstance().openProjects) {
                 if (project.isDisposed) continue
                 JsonSchemaService.Impl.get(project).reset()
-                DaemonCodeAnalyzer.getInstance(project).restart("oku named the fence schemas")
+                DaemonCodeAnalyzer.getInstance(project).restart("oku named its schemas")
             }
         }
     }

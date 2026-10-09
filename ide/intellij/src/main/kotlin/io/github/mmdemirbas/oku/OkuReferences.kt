@@ -128,7 +128,7 @@ class OkuRegistryCompletion : CompletionContributor() {
  * seconds: completion asks on every invocation, and a kit.json edited a
  * moment ago is seen on the next one after that.
  */
-private object OkuRegistryCache {
+internal object OkuRegistryCache {
     private const val FRESH_MS = 5_000L
     private val held = ConcurrentHashMap<Path, Pair<Long, Registry>>()
 
