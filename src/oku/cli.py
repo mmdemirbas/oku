@@ -45,6 +45,7 @@ import threading
 import time
 import webbrowser
 from collections.abc import Callable, Iterable
+from html import unescape
 from pathlib import Path, PurePosixPath
 from urllib.parse import quote, unquote
 
@@ -8776,6 +8777,9 @@ def _preview_serve(out_base: Path) -> int:
     or {"id", "error"}; `page` is null for a front door.
     Request  {"id", "path", "text"?, "check": true} lints instead of
     rendering: {"id", "issues", "ms"} (check_buffer).
+    Request  {"id", "path", "text"?, "registry": true} answers with what the
+    page can name with `#g/` and `#x/`: {"id", "glossary", "extrefs"}
+    (registry_entries).
     The first line out is a greeting naming the protocol, so an extension
     can tell an oku it does not speak to from one that is merely slow. It
     also maps every `oku-*` fence to a JSON schema for its body
@@ -8821,6 +8825,9 @@ def _preview_serve(out_base: Path) -> int:
                 raise PreviewError("`text` is a string")
             if req.get("check") is True:
                 _emit({"id": req_id, **check_buffer(md, text, held=held)})
+                continue
+            if req.get("registry") is True:
+                _emit({"id": req_id, **registry_entries(md, req.get("text"))})
                 continue
             anchor = req.get("anchor")
             if anchor is not None:
@@ -8908,6 +8915,66 @@ def _hand_layout(payload: dict) -> str:
         else:
             lines.append(f"  {one(key)}: {one(value)}{comma}")
     return "{\n" + "\n".join(lines) + "\n}"
+
+
+def registry_entries(md: Path, text: str | None = None) -> dict:
+    """Every glossary term and external reference a page at `md` can name
+    with `#g/` and `#x/`, with the definition a reader would see on hover:
+    `{"glossary": [{"term", "domain", "def"}], "extrefs": [...]}`.
+
+    The slice is the one `oku check` resolves the page's references against
+    (`_active_registry`: the domains the page's kit.json activates, plus the
+    project's own entries over them), so a term an editor offers is one the
+    check accepts and the runtime finds. The definition is in the page's
+    language when the entry has one, else English, else the first it has;
+    `text` is the page's unsaved buffer, read for a `lang:` in it.
+    """
+    md = md.resolve()
+    root = _preview_tree_root(md)
+    page_kit = _nearest_kit_json(md.parent, root) or find_kit_json(root)
+    meta = _strip_md_front_matter(text)[1] if text is not None else None
+    lang = _page_language(md, meta)
+    local: dict = {}
+    if page_kit is not None:
+        try:
+            loaded = json.loads(page_kit.read_text(encoding="utf-8"))
+            local = loaded if isinstance(loaded, dict) else {}
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            local = {}
+    out: dict[str, list[dict]] = {}
+    for kind in ("glossary", "extrefs"):
+        active, _ = _active_registry(_load_registry(KIT_DIR, kind), kind, page_kit)
+        central = _registry_texts(kind)
+        mine = local.get(kind) if isinstance(local.get(kind), dict) else {}
+        rows = []
+        for entry in sorted(active.values(), key=lambda e: e["term"].lower()):
+            domain, term = entry["domain"], entry["term"]
+            langs = (mine.get(domain) or {}).get(term) or central.get(domain, {}).get(term) or {}
+            rows.append({"term": term, "domain": domain, "def": _registry_def(langs, lang)})
+        out[kind] = rows
+    return out
+
+
+def _registry_texts(kind: str) -> dict[str, dict]:
+    """The kit's central entries of one kind, by domain then term, as written."""
+    out: dict[str, dict] = {}
+    for f in sorted((KIT_DIR / kind).glob("*.json")):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            continue
+        out.setdefault(data.get("domain") or f.stem, {}).update(data.get("entries") or {})
+    return out
+
+
+def _registry_def(langs: object, lang: str) -> str:
+    """An entry's definition as plain text, in `lang` when it has one."""
+    if not isinstance(langs, dict) or not langs:
+        return ""
+    chosen = langs.get(lang) or langs.get("en") or next(iter(langs.values()))
+    # A glossary entry says `def`, an external reference `summary`.
+    text = (chosen.get("def") or chosen.get("summary") or "") if isinstance(chosen, dict) else ""
+    return unescape(re.sub(r"<[^>]+>", "", str(text))).strip()
 
 
 def heading_lines(md: Path, text: str) -> dict[str, int]:

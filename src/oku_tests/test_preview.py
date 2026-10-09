@@ -415,6 +415,46 @@ def test_every_component_an_editor_inserts_is_a_page_that_checks_clean(
     assert session.close() == 0
 
 
+def test_a_page_is_told_what_it_can_name_with_g_and_x(session: _Session, tmp_path: Path) -> None:
+    """An editor completing `#g/` offers what this answers, so it must be
+    the slice `oku check` accepts: the domains the tree's kit.json
+    activates plus the project's own entries, and nothing from a domain it
+    does not activate. Held both ways — every term offered resolves, and
+    one the answer leaves out is the one the check reports."""
+    docs = _tree(tmp_path)
+    (docs / "kit.json").write_text(
+        json.dumps(
+            {
+                "name": "p",
+                "domains": ["web"],
+                "glossary": {
+                    "web": {"OurInternalTerm": {"en": {"def": "Our <b>own</b> &amp; nobody else's."}}}
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    session.read()
+    named = session.ask({"id": 1, "path": str(docs / "a.md"), "registry": True})
+    terms = {e["term"]: e for e in named["glossary"]}
+    assert terms["OurInternalTerm"] == {
+        "term": "OurInternalTerm",
+        "domain": "web",
+        "def": "Our own & nobody else's.",
+    }
+    assert "Custom Elements" in terms and "ACID" not in terms  # web is active, data-platforms is not
+    assert {e["domain"] for e in named["glossary"] + named["extrefs"]} == {"web"}
+    assert all(e["def"] for e in named["glossary"] + named["extrefs"]), "an entry with nothing to show"
+
+    links = " ".join(f"[t](#g/{t})" for t in terms) + " [x](#g/ACID)"
+    found = session.ask(
+        {"id": 2, "path": str(docs / "a.md"), "text": f"---\ntitle: A\n---\n\n{links}\n", "check": True}
+    )
+    unresolved = [i["message"] for i in found["issues"] if i["code"] == "unresolved-glossary"]
+    assert len(unresolved) == 1 and "ACID" in unresolved[0], unresolved
+    assert session.close() == 0
+
+
 _UNSAVED = """---
 title: A
 ---
