@@ -1,6 +1,12 @@
 package io.github.mmdemirbas.oku
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
+import com.intellij.codeInsight.completion.CompletionContributor
+import com.intellij.codeInsight.completion.CompletionParameters
+import com.intellij.codeInsight.completion.CompletionProvider
+import com.intellij.codeInsight.completion.CompletionResultSet
+import com.intellij.codeInsight.completion.CompletionType
+import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.codeInspection.InspectionSuppressor
 import com.intellij.codeInspection.SuppressQuickFix
 import com.intellij.openapi.application.ApplicationManager
@@ -19,6 +25,9 @@ import com.intellij.psi.impl.source.resolve.reference.impl.providers.FileReferen
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.ProcessingContext
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownLinkDestination
+import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.io.path.Path
 
 /*
  * oku links that are not heading anchors: `#f/` names a file, `#g/` a
@@ -65,6 +74,70 @@ class OkuFileReferenceContributor : PsiReferenceContributor() {
                 }
             },
         )
+    }
+}
+
+/**
+ * `#g/ACID` and `#x/RFC 9457` complete from what the page can name
+ * ([OkuPreviewService.registry]): every term its tree activates, with its
+ * domain and the start of the definition its reader will see. Nothing is
+ * marked: a name that is not there is `oku check`'s to report
+ * (`unresolved-glossary`, with which domain would have it), not a second
+ * rule here.
+ *
+ * A contributor rather than a reference's variants: the Markdown plugin's
+ * completion in a link destination never asks a reference for them (a
+ * reference there answered with 10 terms and the list stayed empty).
+ */
+class OkuRegistryCompletion : CompletionContributor() {
+    init {
+        extend(CompletionType.BASIC, PlatformPatterns.psiElement(), object : CompletionProvider<CompletionParameters>() {
+            override fun addCompletions(parameters: CompletionParameters, context: ProcessingContext, result: CompletionResultSet) {
+                val destination = okuDestination(parameters.position) ?: return
+                val typed = destination.text.take(parameters.offset - destination.textRange.startOffset)
+                val inline = service<OkuPreviewService>().greeting.inline
+                val (prefix, pick) = listOf(
+                    inline["glossary-term"] to Registry::glossary,
+                    inline["ext-ref"] to Registry::extrefs,
+                ).firstOrNull { (p, _) -> p != null && typed.startsWith(p) } ?: return
+                val file = parameters.originalFile
+                val registry = OkuRegistryCache.of(Path(file.viewProvider.virtualFile.path), file.text) ?: return
+                val matching = result.withPrefixMatcher(typed.substring(requireNotNull(prefix).length))
+                for (entry in pick(registry)) {
+                    matching.addElement(
+                        LookupElementBuilder.create(entry.term)
+                            .withTypeText(entry.domain, true)
+                            .withTailText(entry.def.takeIf { it.isNotEmpty() }?.let { "  " + it.shorten() }, true),
+                    )
+                }
+                // Not a heading id, so nothing else has anything to add here.
+                result.stopHere()
+            }
+        })
+    }
+
+    private fun String.shorten(): String = if (length <= SHOWN) this else take(SHOWN).trimEnd() + "…"
+
+    private companion object {
+        const val SHOWN = 60
+    }
+}
+
+/**
+ * What a page can name, asked of oku at most once per page every few
+ * seconds: completion asks on every invocation, and a kit.json edited a
+ * moment ago is seen on the next one after that.
+ */
+private object OkuRegistryCache {
+    private const val FRESH_MS = 5_000L
+    private val held = ConcurrentHashMap<Path, Pair<Long, Registry>>()
+
+    fun of(page: Path, text: String?): Registry? {
+        val now = System.currentTimeMillis()
+        held[page]?.let { (at, registry) -> if (now - at < FRESH_MS) return registry }
+        val registry = service<OkuPreviewService>().registry(page, text).getOrNull() ?: return null
+        held[page] = now to registry
+        return registry
     }
 }
 

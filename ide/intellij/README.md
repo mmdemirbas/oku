@@ -43,6 +43,13 @@ string is not a file). The Markdown plugin reads every `#…` link as a heading
 id and reports `#f/`, `#g/` and `#x/` links as anchors it cannot find; on an
 oku page that report is suppressed, and a real missing heading still gets it.
 
+`#g/` completes the glossary terms the page can name and `#x/` the external
+references, each with its domain and the start of the definition its reader
+sees on hover. oku answers which ones (`"registry": true`): the domains the
+tree's kit.json activates plus the project's own entries — exactly the set
+`oku check` resolves the links against, so a term not offered is one the
+check would report.
+
 The preview follows the editor: the source line at the top of the editor
 is put at the top of the page. Scrolling the page moves the editor the same
 way; the kit reports only the reader's own scrolls (`__okuHost.pageTop`),

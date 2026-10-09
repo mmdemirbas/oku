@@ -5,6 +5,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <externalAnnotator language="Markdown" implementationClass="io.github.mmdemirbas.oku.OkuCheckAnnotator"/>
     <psi.referenceContributor language="Markdown" implementation="io.github.mmdemirbas.oku.OkuFileReferenceContributor"/>
+    <completion.contributor language="Markdown" implementationClass="io.github.mmdemirbas.oku.OkuRegistryCompletion"/>
     <lang.inspectionSuppressor language="Markdown" implementationClass="io.github.mmdemirbas.oku.OkuInlineLinkSuppressor"/>
   </extensions>
   <applicationListeners>

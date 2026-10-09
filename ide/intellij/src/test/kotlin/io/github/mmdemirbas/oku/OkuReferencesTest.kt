@@ -1,6 +1,8 @@
 package io.github.mmdemirbas.oku
 
 import com.intellij.codeInspection.InspectionManager
+import com.intellij.openapi.application.WriteAction
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.codeInspection.LocalInspectionTool
 import com.intellij.codeInspection.ex.InspectionToolRegistrar
 import com.intellij.openapi.progress.EmptyProgressIndicator
@@ -82,5 +84,46 @@ class OkuReferencesTest : OkuFixtureTestCase() {
         fixture.tempDirFixture.createFile("plain/src/x.py", "a = 1\n")
         fixture.openFileInEditor(fixture.tempDirFixture.createFile("plain/README.md", "# R\n\n[l](#f/src/x.py)\n"))
         assertNull(target("#f/src/x.py"))
+    }
+
+    /** A tree that activates `web` and adds one term and one reference of its own. */
+    private fun openWithRegistry(text: String) {
+        val page = tree("a.md" to text).getValue("a.md")
+        val kit = requireNotNull(page.parent.findChild("kit.json"))
+        WriteAction.runAndWait<Throwable> {
+            VfsUtil.saveText(
+                kit,
+                """{"name": "t", "domains": ["web"],""" +
+                    """ "glossary": {"web": {"OurInternalTerm": {"en": {"def": "Ours, and <b>nobody</b> else's."}}}},""" +
+                    """ "extrefs": {"web": {"Our RFC": {"en": {"name": "Our RFC", "summary": "The one we follow.", "link": "https://example.org"}}}}}""",
+            )
+        }
+        fixture.openFileInEditor(page)
+    }
+
+    private fun offeredAt(link: String): List<String> {
+        val text = fixture.editor.document.text
+        fixture.editor.caretModel.moveToOffset(text.indexOf("($link)") + 1 + link.length)
+        fixture.completeBasic()
+        return fixture.lookupElementStrings.orEmpty()
+    }
+
+    fun `test a glossary term completes from the domains the tree activates and its own terms`() {
+        openWithRegistry("---\ntitle: A\nsummary: a\n---\n\nSee [t](#g/).\n")
+        val offered = offeredAt("#g/")
+        assertTrue(offered.toString(), "OurInternalTerm" in offered && "Custom Elements" in offered)
+        // data-platforms is not activated: oku check would report the link.
+        assertFalse(offered.toString(), "ACID" in offered)
+        val tail = fixture.lookupElements.orEmpty().single { it.lookupString == "OurInternalTerm" }
+            .let { com.intellij.codeInsight.lookup.LookupElementPresentation.renderElement(it).tailText }
+        assertEquals("  Ours, and nobody else's.", tail)
+    }
+
+    fun `test an external reference completes from the project's own references`() {
+        openWithRegistry("---\ntitle: A\nsummary: a\n---\n\nSee [r](#x/).\n")
+        val offered = offeredAt("#x/")
+        // One candidate is inserted at once and leaves no list behind.
+        if (offered.isEmpty()) assertTrue(fixture.editor.document.text, "(#x/Our RFC)" in fixture.editor.document.text)
+        else assertEquals(listOf("Our RFC"), offered)
     }
 }

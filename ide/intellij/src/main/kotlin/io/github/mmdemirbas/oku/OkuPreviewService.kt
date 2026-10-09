@@ -40,6 +40,12 @@ data class Rendered(val html: Path, val root: Path, val out: Path, val page: Pat
     }
 }
 
+/** A term a page can name with `#g/`, or a reference with `#x/`, and what its reader sees on hover. */
+data class RegistryEntry(val term: String, val domain: String, val def: String)
+
+/** Everything a page can name with `#g/` ([glossary]) and `#x/` ([extrefs]), as `oku check` resolves them. */
+data class Registry(val glossary: List<RegistryEntry>, val extrefs: List<RegistryEntry>)
+
 /** One finding of `oku check` for a page; `line` is 1-based, absent for the page as a whole. */
 data class Issue(val severity: String, val code: String, val where: String, val message: String, val line: Int?)
 
@@ -138,6 +144,23 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         val fields = mutableMapOf<String, Any>("path" to source.toString(), "anchor" to anchor)
         if (text != null) fields["text"] = text
         return checks.ask(fields) { reply, _ -> reply.line }
+    }
+
+    /**
+     * What the page at [source] can name with `#g/` and `#x/`: the slice of
+     * the kit's registries its tree's kit.json activates, plus the project's
+     * own entries — the slice `oku check` resolves its links against. [text]
+     * is the unsaved buffer, read for its `lang:`.
+     */
+    fun registry(source: Path, text: String?): Result<Registry> {
+        val fields = mutableMapOf<String, Any>("path" to source.toString(), "registry" to true)
+        if (text != null) fields["text"] = text
+        return checks.ask(fields) { reply, line ->
+            Registry(
+                reply.glossary ?: error("oku preview answered without a glossary: $line"),
+                reply.extrefs ?: error("oku preview answered without external references: $line"),
+            )
+        }
     }
 
     private fun parse(line: String): Reply = try {
@@ -282,6 +305,8 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         val shell: String? = null,
         val issues: List<Issue>? = null,
         val line: Int? = null,
+        val glossary: List<RegistryEntry>? = null,
+        val extrefs: List<RegistryEntry>? = null,
         val error: String? = null,
     )
 
