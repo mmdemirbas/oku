@@ -44,6 +44,7 @@ target = "local:cli"
 
 [operations."deploy projects"]
 summary = "Reinstall the global oku, then `oku build` in each project directory given: writes into other repositories"
+target = "local:repositories"
 effects = ["publishes"]
 
 [operations."deploy ide"]
