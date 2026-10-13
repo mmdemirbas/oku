@@ -335,7 +335,7 @@ oku serve
 ```
 
 - İçinde bulunduğu dizinden yukarı doğru yürüyerek docs/_oku dizinini barındıran klasörü bulur ve oradan sunar. Projenin herhangi bir yerinden çalıştırabilirsiniz.
-- 9876–9900 aralığındaki ilk boş kapı. 9900'de durur (hepsi doluysa hata verir).
+- 9876–9900 aralığındaki ilk boş kapı. 9900'de durur (hepsi doluysa hata verir). `--port N` bunun yerine tam olarak N'de sunar; N'yi başka bir şey tutuyorsa 75 ile çıkar.
 - Yanındaki .json ya da .md dosyalarından /<docs>/<name>.html taslaklarını anında üretir; site-manifest.json ve llms.txt için de aynısını yapar. Dosya sistemine hiçbir şey yazılmaz.
 - Pagefind serve tarafından kurulmaz. Tam metin arama gerekiyorsa önce oku build çalıştırın; aksi hâlde serve sayfa içi çapa aramasına düşer.
 - Bulduğu ilk HTML dosyasını öntanımlı tarayıcıda açar. Durdurmak için Ctrl-C.
@@ -344,7 +344,7 @@ oku serve
 > Tarayıcılar yerel dosyalara HTTP'den farklı kurallar uygular — sembolik bağ çözümü, fetch ve ES modül içe aktarmaları file:// üzerinde sessizce başarısız olur ya da tutarsız davranır. Yerel HTTP sunucusu bunu aşar. macOS'ta bir file:// adresi açmak ayrıca <live-snippet> içindeki iframe kum havuzu için önemli olan bazı aynı-kaynak kurallarını devre dışı bırakır. Her zaman sunucudan açın.
 
 > [!NOTE] İsteğe bağlı bayraklar
-> <strong>--no-watch</strong> dosya sistemi izleyicisini ve canlı yenilemeyi kapatır (yalnızca durağan sunum).<br><strong>--no-search</strong> başlangıçtaki arka plan Pagefind dizin üretimini atlar. İkisi de öntanımlı olarak açıktır, böylece geliştirme döngüsü zengin olur; daha hafif bir serve isterseniz kapatın.<br><strong>--no-open</strong> tarayıcıya dokunmaz: öntanımlı olarak serve, başlatıldığı yere en yakın sayfayı açar; bu, arka planda ya da bir araç tarafından başlatılan bir sunucu için yanlıştır.<br><strong>--host</strong> bağlanılacak adrestir ve öntanımlı değeri <code>127.0.0.1</code>, yani yalnızca bu makine. Sunucu proje kökünü olduğu gibi paylaşır; bu yüzden <code>--host 0.0.0.0</code> (önizlemeyi telefonda açmak için) kökün altındaki her dosyayı, makinenize erişebilen herkese parolasız okunur kılar. Başlangıç satırı gerçekten bağlanılan adresi yazar.
+> <strong>--no-watch</strong> dosya sistemi izleyicisini ve canlı yenilemeyi kapatır (yalnızca durağan sunum).<br><strong>--no-search</strong> başlangıçtaki arka plan Pagefind dizin üretimini atlar. İkisi de öntanımlı olarak açıktır, böylece geliştirme döngüsü zengin olur; daha hafif bir serve isterseniz kapatın.<br><strong>--no-open</strong> tarayıcıya dokunmaz: öntanımlı olarak serve, başlatıldığı yere en yakın sayfayı açar; bu, arka planda ya da bir araç tarafından başlatılan bir sunucu için yanlıştır.<br><strong>--host</strong> bağlanılacak adrestir ve öntanımlı değeri <code>127.0.0.1</code>, yani yalnızca bu makine. Sunucu proje kökünü olduğu gibi paylaşır; bu yüzden <code>--host 0.0.0.0</code> (önizlemeyi telefonda açmak için) kökün altındaki her dosyayı, makinenize erişebilen herkese parolasız okunur kılar. Başlangıç satırı gerçekten bağlanılan adresi yazar.<br><strong>--port</strong> sunulacak tek kapıyı belirtir. Verilmezse serve 9876'dan başlayarak ilk boş kapıyı alır; verilirse dolu bir kapıda bir üstüne kaymaz, 75 ile çıkar: kapıyı belirten — onu yoklayan bir geliştirme panosu, ilk projenin kapısından uzak tutulan ikinci bir proje — oraya bakmaktadır.
 
 ## oku preview {#preview}
 

@@ -209,3 +209,86 @@ def test_the_no_open_flag_is_on_the_command_line(repo_root: Path) -> None:
         timeout=60,
     ).stdout
     assert "--no-open" in out
+
+
+# --port: a dev board runs several projects' previews side by side and
+# probes each on the port it was told. Without the flag every project
+# started at 9876 and took whichever was free, so two of them traded
+# ports depending on who started first.
+def _free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def _held(port: int) -> socket.socket:
+    s = socket.socket()
+    s.bind(("127.0.0.1", port))
+    s.listen()
+    return s
+
+
+def _serve_on(tmp_path: Path, monkeypatch, port: int | None) -> tuple[int, int | None]:
+    """Run cmd_serve to the point of serving; return its exit code and
+    the port it bound, or None when it bound nothing."""
+    (tmp_path / "page.md").write_text("---\ntitle: P\n---\n\n## A {#a}\n\nx\n", encoding="utf-8")
+    bound: list[int] = []
+
+    def stop(self, *a, **k):
+        bound.append(self.server_address[1])
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(http.server.ThreadingHTTPServer, "serve_forever", stop)
+    monkeypatch.setattr(http.server.ThreadingHTTPServer, "shutdown", lambda self: None)
+    monkeypatch.chdir(tmp_path)
+    args = argparse.Namespace(no_watch=True, no_search=True, no_open=True, host="127.0.0.1", port=port)
+    rc = cli.cmd_serve(args)
+    return rc, (bound[0] if bound else None)
+
+
+def test_port_serves_on_exactly_the_port_asked_for(tmp_path: Path, monkeypatch) -> None:
+    port = _free_port()
+    assert _serve_on(tmp_path, monkeypatch, port) == (0, port)
+
+
+def test_a_held_port_exits_75_and_does_not_move_up(tmp_path: Path, monkeypatch, capsys) -> None:
+    port = _free_port()
+    with _held(port):
+        assert _serve_on(tmp_path, monkeypatch, port) == (75, None)
+    assert f"Port {port} is in use" in capsys.readouterr().err
+
+
+def test_without_port_the_first_free_one_in_the_range_is_taken(tmp_path: Path, monkeypatch) -> None:
+    first = _free_port()
+    monkeypatch.setattr(cli, "_SERVE_FIRST_PORT", first)
+    monkeypatch.setattr(cli, "_SERVE_LAST_PORT", first + 20)
+    with _held(first):
+        rc, bound = _serve_on(tmp_path, monkeypatch, None)
+    assert rc == 0
+    assert bound is not None and first < bound <= first + 20
+
+
+def test_the_default_range_still_starts_at_9876() -> None:
+    assert (cli._SERVE_FIRST_PORT, cli._SERVE_LAST_PORT) == (9876, 9900)
+
+
+@pytest.mark.parametrize(("value", "expected"), [("0", 0), ("9877", 9877), ("65535", 65535)])
+def test_a_port_is_read_as_a_number(value: str, expected: int) -> None:
+    assert cli._serve_port(value) == expected
+
+
+@pytest.mark.parametrize("value", ["-1", "65536", "http"])
+def test_a_port_that_is_not_one_is_refused(value: str) -> None:
+    with pytest.raises(argparse.ArgumentTypeError):
+        cli._serve_port(value)
+
+
+def test_the_port_flag_is_on_the_command_line(repo_root: Path) -> None:
+    out = subprocess.run(
+        [sys.executable, str(repo_root / "bin" / "oku"), "serve", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    ).stdout
+    assert "--port" in out
+    assert "9876" in out

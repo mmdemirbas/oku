@@ -333,7 +333,7 @@ oku serve
 ```
 
 - Walks up from cwd to find the directory containing docs/_oku; serves from there. Run from anywhere inside the project.
-- First free port from 9876–9900. Caps at 9900 (if all taken, errors out).
+- First free port from 9876–9900. Caps at 9900 (if all taken, errors out). `--port N` serves on exactly N instead, and exits 75 if something else holds it.
 - Synthesizes /<docs>/<name>.html stubs from sibling .json or .md files on the fly; same for site-manifest.json and llms.txt. No filesystem writes.
 - Pagefind is not built by serve. Run oku build first if you need full-text search; serve falls back to in-page anchor search otherwise.
 - Opens the first HTML it finds in the default browser. Ctrl-C to stop.
@@ -342,7 +342,7 @@ oku serve
 > Browsers apply different rules to local files than HTTP — symlink resolution, fetch, and ES module imports fail silently or behave inconsistently on file://. The local HTTP server sidesteps that. On macOS, opening a file:// URL also disables some same-origin policies that matter for the iframe sandbox in <live-snippet>. Always serve.
 
 > [!NOTE] Optional flags
-> <strong>--no-watch</strong> disables the filesystem watcher + live-reload (serve static only).<br><strong>--no-search</strong> skips the background Pagefind index generation at startup. Both default to on so the dev loop is rich; opt out if you want a leaner serve.<br><strong>--no-open</strong> leaves the browser alone: by default serve opens the page nearest where it was started, which is wrong for a server started in the background or by a tool.<br><strong>--host</strong> is the address to bind, and it is <code>127.0.0.1</code> — this machine only. The server hands out the project root, working copy and all, so <code>--host 0.0.0.0</code> (to open the preview on a phone) makes every file under the root readable to anyone who can route to your machine, with no password. The startup line prints the address actually bound.
+> <strong>--no-watch</strong> disables the filesystem watcher + live-reload (serve static only).<br><strong>--no-search</strong> skips the background Pagefind index generation at startup. Both default to on so the dev loop is rich; opt out if you want a leaner serve.<br><strong>--no-open</strong> leaves the browser alone: by default serve opens the page nearest where it was started, which is wrong for a server started in the background or by a tool.<br><strong>--host</strong> is the address to bind, and it is <code>127.0.0.1</code> — this machine only. The server hands out the project root, working copy and all, so <code>--host 0.0.0.0</code> (to open the preview on a phone) makes every file under the root readable to anyone who can route to your machine, with no password. The startup line prints the address actually bound.<br><strong>--port</strong> names the one port to serve on. Without it serve takes the first free port from 9876; with it, a busy port exits 75 rather than moving up, because whoever named the port — a dev board probing it, a second project kept off the first one's port — is looking there.
 
 ## oku preview {#preview}
 

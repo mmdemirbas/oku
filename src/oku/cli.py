@@ -26,6 +26,7 @@ import collections
 import contextlib
 import datetime
 import difflib
+import errno
 import hashlib
 import http.server
 import io
@@ -8532,6 +8533,29 @@ def _host_header_is_loopback(value: str | None) -> bool:
     return _is_loopback(host)
 
 
+# Without --port, serve takes the first free port in this range. With it,
+# exactly that port or nothing: a caller that names a port (a dev board
+# probing it, a second project kept off the first one's port) is relying
+# on it, and quietly landing one higher would serve somewhere nobody looks.
+_SERVE_FIRST_PORT = 9876
+_SERVE_LAST_PORT = 9900
+
+# Exit code when the port --port names is held by another process: a
+# precondition outside oku (sysexits EX_TEMPFAIL), not a failure of it.
+_EXIT_PORT_HELD = 75
+
+
+def _serve_port(value: str) -> int:
+    """argparse type for --port: an integer TCP port, 0 meaning "any"."""
+    try:
+        port = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a port number: {value!r}") from None
+    if not 0 <= port <= 65535:
+        raise argparse.ArgumentTypeError(f"port out of range 0-65535: {port}")
+    return port
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     """Start an HTTP server at the project root and print HTTP URLs for every HTML.
 
@@ -8564,17 +8588,27 @@ def cmd_serve(args: argparse.Namespace) -> int:
     # to anyone who can route to this machine. On a café or hotel network
     # that is everyone on it.
     host = getattr(args, "host", "127.0.0.1") or "127.0.0.1"
-    port = 9876
+    wanted = getattr(args, "port", None)
     httpd = None
-    while True:
+    if wanted is not None:
         try:
-            httpd = http.server.ThreadingHTTPServer((host, port), handler_cls)
-            break
-        except OSError:
-            port += 1
-            if port > 9900:
-                print("✗ Could not find a free port in 9876–9900", file=sys.stderr)
-                return 1
+            httpd = http.server.ThreadingHTTPServer((host, wanted), handler_cls)
+        except OSError as exc:
+            if exc.errno == errno.EADDRINUSE:
+                print(f"✗ Port {wanted} is in use; --port serves on that port or not at all", file=sys.stderr)
+                return _EXIT_PORT_HELD
+            print(f"✗ Could not bind {host}:{wanted}: {exc.strerror or exc}", file=sys.stderr)
+            return 1
+    else:
+        for port in range(_SERVE_FIRST_PORT, _SERVE_LAST_PORT + 1):
+            try:
+                httpd = http.server.ThreadingHTTPServer((host, port), handler_cls)
+                break
+            except OSError:
+                continue
+        else:
+            print(f"✗ Could not find a free port in {_SERVE_FIRST_PORT}–{_SERVE_LAST_PORT}", file=sys.stderr)
+            return 1
     assert httpd is not None
     httpd.daemon_threads = True  # let Ctrl-C terminate hung SSE threads cleanly
 
@@ -10299,6 +10333,15 @@ def main() -> int:
             "Pass 0.0.0.0 to reach the preview from a phone or another "
             "machine on the same network; everything under the project "
             "root becomes readable to anyone who can route to this host."
+        ),
+    )
+    serve_parser.add_argument(
+        "--port",
+        type=_serve_port,
+        default=None,
+        help=(
+            "serve on exactly this port, or exit 75 if something else holds it. "
+            "Default: the first free port from 9876 up to 9900."
         ),
     )
     preview_parser = sub.add_parser(
