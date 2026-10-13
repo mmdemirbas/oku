@@ -262,6 +262,50 @@ def test_clicking_a_mark_lands_the_landmark_below_the_chrome(rendered):
     assert abs(got["top"] - 80) <= 4, got
 
 
+def test_every_mark_is_a_24px_target_inside_the_capsule(rendered):
+    """WCAG 2.5.8: a pointer target is at least 24 x 24 CSS px. The boxes
+    were 14 x 13. The mark itself stays a hairline (its ::before); the
+    button around it is the target, and at rest it must not reach past
+    the capsule onto the page scrolling underneath."""
+    got = rendered.evaluate(
+        """() => {
+        const cap = document.querySelector('.okt-rail').getBoundingClientRect();
+        return { bottom: Math.round(cap.bottom),
+                 marks: [...document.querySelectorAll('.okt-rail-mark')].map(m => {
+                   const b = m.getBoundingClientRect();
+                   return [Math.round(b.width), Math.round(b.height), Math.round(b.bottom)]; }) };
+    }"""
+    )
+    assert got["marks"], "no marks to measure"
+    small = [m for m in got["marks"] if m[0] < 24 or m[1] < 24]
+    assert small == [], f"marks under 24 x 24 (w, h, bottom): {small}"
+    below = [m for m in got["marks"] if m[2] > got["bottom"]]
+    assert below == [], f"marks reach past the capsule's bottom edge at {got['bottom']}: {below}"
+
+
+def test_a_click_goes_to_the_nearest_mark_not_the_box_on_top(rendered):
+    """Marks may sit 6px apart and every box is 24px wide, so a
+    neighbour's box can lie over a mark's own x, and the box on top is
+    the one the browser hit-tests. The pointer means the nearest mark:
+    a click at one mark's x, landing on its neighbour's box, goes to the
+    first mark's landmark."""
+    got = rendered.evaluate(
+        """async () => {
+        window.scrollTo(0, 0);
+        await new Promise(r => setTimeout(r, 300));
+        const marks = [...document.querySelectorAll('.okt-rail-mark[data-kind="section"]')];
+        const aim = marks[2], over = marks[3];
+        const a = aim.getBoundingClientRect();
+        over.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1,
+            clientX: a.x + a.width / 2, clientY: a.y + a.height / 2 }));
+        await new Promise(r => setTimeout(r, 1000));
+        return { aim: Math.round(aim._okuMark.el.getBoundingClientRect().top),
+                 over: Math.round(over._okuMark.el.getBoundingClientRect().top) };
+    }"""
+    )
+    assert abs(got["aim"] - 80) <= 4, f"the click went to the box on top, not the nearest mark: {got}"
+
+
 def test_the_label_appears_on_hover_and_cannot_push_anything(rendered):
     got = rendered.evaluate(
         """() => {

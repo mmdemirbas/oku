@@ -718,7 +718,10 @@ class TestPayloadBudget:
     # Then by the front door drawn in the tree's language, the site tree's
     # label leading back to it, and the string table loaded per language:
     # 1,476,087.
-    KIT_BUDGET_BYTES = 1_476_600
+    # Then by rail marks growing to 24px targets (WCAG 2.5.8), with the
+    # pointer meaning the nearest mark rather than the box on top:
+    # 1,478,477.
+    KIT_BUDGET_BYTES = 1_479_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -741,7 +744,8 @@ class TestPayloadBudget:
     # Then by the table wiring's reads: 1,469,877.
     # Then by `pageTop`: 1,471,734.
     # Then by the front door in the tree's language: 1,476,690.
-    STANDALONE_BUDGET_BYTES = 1_477_200
+    # Then by 24px rail targets and the nearest-mark pointer: 1,479,080.
+    STANDALONE_BUDGET_BYTES = 1_479_600
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

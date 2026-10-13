@@ -1053,13 +1053,19 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
 }
 /* A landmark is a button with a constant-width box and no visuals of
    its own. Everything visible is the ::before, so the target can be
-   comfortably large while the mark stays a hairline. */
+   comfortably large while the mark stays a hairline.
+   24 x 24 at the least, WCAG 2.5.8's minimum target: it was 14 x 13.
+   At rest the box runs from the track's top edge to the capsule's
+   bottom edge (track top 1 + 11px down a 36px capsule, + 24 = 36), so
+   it never reaches the page below. Marks may sit 6px apart, so these
+   boxes overlap; which mark a pointer means is decided by distance in
+   chrome.js (`markNearest`), not by which box is on top. */
 .okt-rail-mark {
   position: absolute;
   /* The box follows the strip so an expanded rail is also a bigger
      target. It only ever grows downward from top: 0 — the x and the top
      of every mark are the same in every state. */
-  top: 0; height: max(13px, var(--okt-track-h, 12px)); width: 14px; margin-left: -7px;
+  top: 0; height: max(24px, var(--okt-track-h, 12px)); width: 24px; margin-left: -12px;
   padding: 0; border: 0; background: none;
   -webkit-appearance: none; appearance: none;
   cursor: pointer; pointer-events: auto;
@@ -1136,10 +1142,17 @@ body[data-content-width="max"]         { --content-width: 100%;   --prose-width:
 .okt-rail-mark.is-current::before {
   background: var(--accent); opacity: 1;
 }
-.okt-rail-mark:focus-visible {
+/* The ring keeps the 14px it had before the box grew to a 24px target:
+   it is drawn by ::after, centred on the mark, at the box's full height. */
+.okt-rail-mark:focus-visible { outline: none; }
+.okt-rail-mark:focus-visible::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; left: 50%;
+  width: 14px; margin-left: -7px;
   outline: 2px solid var(--accent);
   outline-offset: 0;
   border-radius: 3px;
+  pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .okt-rail-mark::before { transition: background-color 0.18s ease, opacity 0.18s ease; }

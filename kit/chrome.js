@@ -4770,21 +4770,62 @@ function buildRail() {
     if (e.matches) unmagnify();
   }, on);
 
+  // Which mark the pointer means. Every box is a 24px target and marks
+  // can sit 6px apart, so the boxes overlap and the one on top is often
+  // a neighbour's: a click on a mark's own x went to the next mark. The
+  // nearest centre wins instead, from the x the swell already caches,
+  // so the hit test reads no layout.
+  function markNearest(clientX) {
+    var best = null, bestD = Infinity;
+    for (var i = 0; i < buttons.length; i++) {
+      var d = Math.abs(buttons[i]._okuX - clientX);
+      if (d < bestD) { bestD = d; best = buttons[i]; }
+    }
+    return best;
+  }
+  // The label follows the same choice, and moving across one box from
+  // one mark's centre to the next has to move it too: no mouseover
+  // fires inside a box. Rebuilt only when the nearest mark changes.
+  var tipFor = null;
+  function tipFollow(b) {
+    if (!b || b === tipFor) return;
+    tipFor = b;
+    showTip(b);
+  }
+  function onMark(e) { return e.target.closest ? e.target.closest('.okt-rail-mark') : null; }
+  // The mark an event means. One with no position at all (a keyboard
+  // click, a scripted event) means the box it was sent to; the rail is
+  // never at (0, 0), so no real pointer is mistaken for one.
+  function meantBy(e, btn) {
+    if (!e.clientX && !e.clientY) return btn;
+    return markNearest(e.clientX) || btn;
+  }
+
   host.addEventListener('mouseover', function (e) {
-    var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;
-    if (btn) showTip(btn);
+    var btn = onMark(e);
+    if (btn) tipFollow(meantBy(e, btn));
   }, on);
+  host.addEventListener('pointermove', function (e) {
+    var btn = e.pointerType !== 'touch' && onMark(e);
+    if (btn) tipFollow(meantBy(e, btn));
+  }, onPassive);
   host.addEventListener('mouseout', function (e) {
-    var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;
-    if (btn) hideTip();
+    if (onMark(e)) { tipFor = null; hideTip(); }
   }, on);
   host.addEventListener('focusin', function (e) {
-    if (e.target.classList.contains('okt-rail-mark')) showTip(e.target);
+    if (e.target.classList.contains('okt-rail-mark')) { tipFor = e.target; showTip(e.target); }
   }, on);
-  host.addEventListener('focusout', hideTip, on);
+  host.addEventListener('focusout', function () { tipFor = null; hideTip(); }, on);
   host.addEventListener('click', function (e) {
-    var btn = e.target.closest ? e.target.closest('.okt-rail-mark') : null;
-    if (btn) goTo(btn);
+    var btn = onMark(e);
+    if (!btn) return;
+    var meant = meantBy(e, btn);
+    if (meant !== btn && document.activeElement === btn) {
+      buttons.forEach(function (b) { b.tabIndex = -1; });
+      meant.tabIndex = 0;
+      meant.focus({ preventScroll: true });
+    }
+    goTo(meant);
   }, on);
 
   // Roving tabindex: the rail is one tab stop, not one per landmark.
