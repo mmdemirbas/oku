@@ -254,10 +254,34 @@ def test_the_docs_hand_no_one_the_bare_install(repo_root: Path) -> None:
     assert offenders == []
 
 
-def _deploy_body(repo_root: Path) -> str:
-    ctl = (repo_root / "ctl").read_text(encoding="utf-8")
-    start = ctl.index("cmd_install() {")
+def _shell_function(ctl: str, name: str) -> str:
+    start = ctl.index(f"{name}() {{")
     return ctl[start : ctl.index("\n}\n", start)]
+
+
+def _deploy_body(repo_root: Path) -> str:
+    """The function `./ctl deploy` runs, followed through the dispatch.
+
+    It was `cmd_install`; the contract-2 driver (c86519e) made it
+    `op_deploy`, whose default target `tool` calls `install_tool`. Read
+    by name, a rename sent these tests looking for a function that no
+    longer existed. Following `op_deploy` instead keeps them on whatever
+    `./ctl deploy` does, and fails if it stops defaulting to the install.
+    """
+    ctl = (repo_root / "ctl").read_text(encoding="utf-8")
+    dispatch = _shell_function(ctl, "op_deploy")
+    assert '"${1:-tool}"' in dispatch, "./ctl deploy no longer defaults to the tool install"
+    m = re.search(r"^\s*tool\)\s*([A-Za-z_][A-Za-z0-9_]*)", dispatch, re.M)
+    assert m, f"./ctl deploy tool calls no function:\n{dispatch}"
+    return _shell_function(ctl, m.group(1))
+
+
+def _commands(body: str) -> str:
+    """A shell body without its comments and quoted strings: what it runs,
+    not what it says. `✗ oku vendor failed` in an error message is not a
+    run of `oku vendor`."""
+    lines = (ln for ln in body.splitlines() if not ln.lstrip().startswith("#"))
+    return "\n".join(re.sub(r"\"[^\"]*\"|'[^']*'", '""', ln) for ln in lines)
 
 
 def test_deploy_refills_the_vendor_cache_it_wipes(repo_root: Path) -> None:
@@ -265,9 +289,10 @@ def test_deploy_refills_the_vendor_cache_it_wipes(repo_root: Path) -> None:
     # reinstall replaces that directory. Measured: right after a deploy
     # there was no vendor/ at all, so until some project's next build a
     # served page asked for eight fonts that were not there.
-    body = _deploy_body(repo_root)
-    assert "uv tool install" in body
-    assert body.index("oku vendor") > body.index("uv tool install"), (
+    runs = _commands(_deploy_body(repo_root))
+    assert "uv tool install" in runs
+    assert "oku vendor" in runs, "deploy does not re-vendor at all"
+    assert runs.index("oku vendor") > runs.index("uv tool install"), (
         "deploy does not re-vendor after installing"
     )
 
