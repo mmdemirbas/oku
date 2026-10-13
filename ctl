@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # One entry point for everything this repo does day to day.
 #
-#   ./ctl                  list the verbs
-#   ./ctl --list           the same, one `name<TAB>description` per line
-#   ./ctl <verb> --list    what that verb takes
+#   ./ctl                  the verbs, one `name<TAB>description` per line
+#   ./ctl <verb> --list    that verb's targets
 #   ./ctl <verb> ...       run one; extra args pass through
+#
+# The verbs are declared in ajans.toml and each is an op_ function below; the
+# block at the end lists, dispatches and checks them (contract 2:
+# ajans/docs/project-contract.md). A bare verb with targets is its default:
+# `./ctl test` is `test all`, `./ctl deploy` is `deploy tool`.
 #
 # Everything runs through `uv`, so no venv activation is needed.
 set -euo pipefail
@@ -17,66 +21,39 @@ red() { printf '\033[31m%s\033[0m\n' "$*" >&2; }
 
 # One glyph and one colour per level, the same five every driver here uses:
 # ▸ a step, ✓ it worked, ! worth knowing, ⏸ preconditions not met (exit 75),
-# ✗ it failed (exit 1). The contract is
-# ajans/docs/reports/driver-scripts-2026-09-02.md.
+# ✗ it failed (exit 1).
 step() { printf '\033[36m▸\033[0m %s\n' "$*"; }
-
-VERBS="dev	Dev server with live reload (default port 9876)
-check	Lint the doctree, or the Python
-build	Write dist/{standalone,site}/
-clean	Remove dist/
-test	pytest, whole or in halves
-fmt	ruff format, then ruff check --fix
-verify	Everything CI runs: lint, doctree, build, tests
-deploy	Ship this repo's kit to the global tool, to projects, and to IDEs
-status	Which kit is the global tool building with, and which plugin each IDE has?
-setup	Dependencies, the test browser, and new docs roots"
-
-qualifiers() {
-  case "$1" in
-    check)  printf '%s\n' \
-      "docs	Lint the doctree; --strict fails on warnings too (default)" \
-      "code	ruff check + format --check" ;;
-    test)   printf '%s\n' \
-      "all	The whole suite (default) - add -k, paths, -x …" \
-      "fast	Without the browser suite" \
-      "browser	Only the headless-chromium suite" ;;
-    deploy) printf '%s\n' \
-      "tool	Reinstall the global \`oku\` from this repo, --no-cache (default)" \
-      "projects	Install, then \`oku build\` in each project directory given" \
-      "ide	Build the IntelliJ plugin, install it into JetBrains IDEs: all, the ones named, or asks" ;;
-    setup)  printf '%s\n' \
-      "deps	uv sync --extra dev (default)" \
-      "browser	Install the chromium Playwright needs" \
-      "docs	Scaffold a docs root at <path> (init + starter page)" ;;
-    *)      return 1 ;;
-  esac
-}
-
-list_for() {
-  local verb="$1"
-  if [ -z "$verb" ]; then printf '%s\n' "$VERBS"; return 0; fi
-  qualifiers "$verb" || { red "no qualifiers: $verb"; exit 1; }
-}
-
-usage() {
-  echo "oku — ./ctl <verb> [qualifier]"
-  echo ""
-  printf '%s\n' "$VERBS" | while IFS="$(printf '\t')" read -r name why; do
-    printf '  %-8s %s\n' "$name" "$why"
-  done
-  cat <<'EOF'
-
-  What a verb takes:  ./ctl <verb> --list
-
-Anything not listed is forwarded to the CLI, so `./ctl migrate --dry-run`
-works too.
-EOF
-}
 
 # --- author -----------------------------------------------------------------
 
-cmd_new() {
+op_dev() { uv run bin/oku serve "$@"; }
+
+# Bare `check` lints the doctree (`check docs` lands here too); a flag is the
+# CLI's, not a target. `check code` is ruff, below.
+op_check() {
+  if [ "${1:-}" = docs ]; then shift; fi
+  uv run bin/oku check "$@"
+}
+
+op_build() { uv run bin/oku build "$@"; }
+op_clean() { uv run bin/oku clean "$@"; }
+
+# The CLI's other verbs, reached through ctl as they always were.
+op_migrate() { uv run bin/oku migrate "$@"; }
+op_vendor() { uv run bin/oku vendor "$@"; }
+op_spec() { uv run bin/oku spec "$@"; }
+op_preview() { uv run bin/oku preview "$@"; }
+
+op_setup() {
+  case "${1:-deps}" in
+    deps) uv sync --extra dev ;;
+    *)    red "unknown: ./ctl setup $1  (./ctl setup --list)"; exit 64 ;;
+  esac
+}
+op_setup_browser() { uv run playwright install chromium "$@"; }
+
+
+op_setup_docs() {
   [ $# -ge 1 ] || { red "usage: ./ctl setup docs <path>"; exit 2; }
   mkdir -p "$1"
   (cd "$1" && uv run --project "$REPO" "$REPO/bin/oku" init)
@@ -84,6 +61,13 @@ cmd_new() {
 }
 
 # --- ship -------------------------------------------------------------------
+
+op_deploy() {
+  case "${1:-tool}" in
+    tool) install_tool ;;
+    *)    red "unknown: ./ctl deploy $1  (./ctl deploy --list)"; exit 64 ;;
+  esac
+}
 
 repo_kit_stamp() {
   sed -n "s/.*__okuKitBuild = '\([^']*\)'.*/\1/p" kit/chrome.js | head -1
@@ -120,7 +104,7 @@ global_src_digest() {
 # reports a successful install and then builds other projects with the
 # old kit; the symptom arrives later, somewhere else, as "the kit
 # regressed". Whatever goes wrong, it should go wrong here and loudly.
-cmd_install() {
+install_tool() {
   step "installing the global oku from $REPO"
   # The extras are the tool's capabilities, not options: without `verify`
   # every other project's session finds `oku verify` "not installed" and
@@ -134,7 +118,7 @@ cmd_install() {
   local want have
   want="$(repo_kit_stamp)"
   have="$(global_kit_stamp)"
-  cmd_version
+  show_version
   if [ -z "$have" ]; then
     red "✗ installed, but the global oku does not report a kit build."
     red "  Is ~/.local/bin on your PATH?"
@@ -179,7 +163,7 @@ install_verify_browser() {
   "$(global_tool_python)" -m playwright install chromium
 }
 
-cmd_version() {
+show_version() {
   printf '  repo   kit %s · src %s\n' "$(repo_kit_stamp)" "$(repo_src_digest)"
   if command -v oku >/dev/null 2>&1; then
     printf '  global %s\n' "$(oku --version 2>/dev/null | tr '\n' ' ')"
@@ -188,9 +172,9 @@ cmd_version() {
   fi
 }
 
-cmd_rebuild() {
+op_deploy_projects() {
   [ $# -ge 1 ] || { red "usage: ./ctl deploy projects <project-dir>..."; exit 2; }
-  cmd_install
+  install_tool
   for dir in "$@"; do
     step "building $dir"
     (cd "$dir" && oku build)
@@ -202,90 +186,166 @@ cmd_rebuild() {
 # left alone: reinstalling it costs a minute and changes nothing. Which
 # IDEs, where their plugins go and whether each can load the plugin is
 # ide/intellij/install.py's business; its exit status is this one's.
-cmd_ide() {
+op_deploy_ide() {
   if [ "$(repo_kit_stamp)" = "$(global_kit_stamp)" ] && [ "$(repo_src_digest)" = "$(global_src_digest)" ]; then
     step "the global oku is this checkout's (kit $(repo_kit_stamp)); leaving it as it is"
   else
     step "the global oku is not this checkout's; deploying it first"
-    cmd_install
+    install_tool
   fi
   uv run python ide/intellij/install.py install "$@"
 }
 
-cmd_status() {
-  cmd_version
+op_status() {
+  show_version
   printf '  ides\n'
   uv run python ide/intellij/install.py list | sed 's/^/  /'
 }
 
 # --- develop ----------------------------------------------------------------
 
-cmd_lint() {
+op_check_code() {
   uv run ruff check .
   uv run ruff format --check .
 }
 
-cmd_verify() {
-  step "lint"; cmd_lint
+op_verify() {
+  step "ajans.toml and ctl name the same operations"; ./ctl --check
+  step "lint"; op_check_code
   step "doctree"; uv run bin/oku check --strict
   step "build"; uv run bin/oku build >/dev/null
   step "tests"; uv run pytest -q
   green "✓ all gates pass"
 }
 
-# --- dispatch ---------------------------------------------------------------
+# Bare `test` is the whole suite (`test all` lands here too); a flag or a path
+# goes to pytest.
+op_test() {
+  if [ "${1:-}" = all ]; then shift; fi
+  uv run pytest "$@"
+}
+op_test_fast() { uv run pytest -q --ignore=src/oku_tests/browser "$@"; }
+op_test_browser() { uv run pytest -q src/oku_tests/browser "$@"; }
 
-cmd="${1:-}"; shift || true
+op_fmt() {
+  uv run ruff format .
+  uv run ruff check --fix .
+}
 
-case "$cmd" in
-  ''|-h|--help|help) usage; exit 0 ;;
-  --list)            list_for ""; exit 0 ;;
-esac
+# >>> ajans runtime 1 >>>
+# Written by `ajans contract sync`; edits here are overwritten. The operations
+# are declared in ajans.toml and implemented above as op_<verb>[_<target>].
 
-# Only in first position: further along, `--list` may be a flag of the tool
-# being forwarded to.
-[ "${1:-}" = "--list" ] && { list_for "$cmd"; exit 0; }
+_ajans_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-case "$cmd" in
-  dev)   uv run bin/oku serve "$@" ;;
-  check)
-    case "${1:-docs}" in
-      docs) shift 2>/dev/null || true; uv run bin/oku check "$@" ;;
-      code) cmd_lint ;;
-      *)    uv run bin/oku check "$@" ;;   # a flag, not a qualifier
-    esac
-    ;;
-  build) uv run bin/oku build "$@" ;;
-  clean) uv run bin/oku clean "$@" ;;
-  test)
-    case "${1:-all}" in
-      all)     shift 2>/dev/null || true; uv run pytest "$@" ;;
-      fast)    shift; uv run pytest -q --ignore=src/oku_tests/browser "$@" ;;
-      browser) shift; uv run pytest -q src/oku_tests/browser "$@" ;;
-      *)       uv run pytest "$@" ;;       # a flag or a path, not a qualifier
-    esac
-    ;;
-  fmt)
-    uv run ruff format .
-    uv run ruff check --fix .
-    ;;
-  verify) cmd_verify ;;
-  deploy)
-    case "${1:-tool}" in
-      tool)     cmd_install ;;
-      projects) shift; cmd_rebuild "$@" ;;
-      ide)      shift; cmd_ide "$@" ;;
-      *)        red "unknown: ./ctl deploy $1  (./ctl deploy --list)"; exit 1 ;;
-    esac
-    ;;
-  status) cmd_status ;;
-  setup)
-    case "${1:-deps}" in
-      deps)    uv sync --extra dev ;;
-      browser) uv run playwright install chromium ;;
-      docs)    shift; cmd_new "$@" ;;
-      *)       red "unknown: ./ctl setup $1  (./ctl setup --list)"; exit 1 ;;
-    esac
-    ;;
-  *) uv run bin/oku "$cmd" "$@" ;;
-esac
+_ajans_fn() {
+	local name="op_$*"
+	name="${name// /_}"
+	name="${name//-/_}"
+	printf '%s' "${name//./_}"
+}
+
+# Reads ajans.toml with the first python3 that has tomllib. Modes: list [verb], keys.
+_ajans_toml() {
+	local py
+	if [[ ! -f "$_ajans_root/ajans.toml" ]]; then
+		printf '✗ no ajans.toml beside %s\n' "$_ajans_root/ctl" >&2
+		return 66
+	fi
+	for py in python3 /opt/homebrew/bin/python3 /usr/local/bin/python3; do
+		if ! command -v "$py" >/dev/null 2>&1 || ! "$py" -c 'import tomllib' 2>/dev/null; then
+			continue
+		fi
+		"$py" - "$_ajans_root/ajans.toml" "$@" <<'PY'
+import re, sys, tomllib
+try:
+    with open(sys.argv[1], 'rb') as f:
+        manifest = tomllib.load(f)
+except tomllib.TOMLDecodeError as e:
+    sys.exit(f'✗ ajans.toml: {e}')
+ops, verbs = manifest.get('operations', {}), manifest.get('verbs', {})
+mode, rest = sys.argv[2], sys.argv[3:]
+if mode == 'keys':
+    for key in ops:
+        print('op_' + re.sub(r'[ .-]', '_', key))
+elif rest:
+    for key, op in ops.items():
+        verb, _, target = key.partition(' ')
+        if verb == rest[0] and target:
+            print(f"{target}\t{op.get('summary', '')}")
+else:
+    seen = []
+    for key in ops:
+        verb = key.partition(' ')[0]
+        if verb not in seen:
+            seen.append(verb)
+            print(f"{verb}\t{ops[verb]['summary'] if verb in ops else verbs.get(verb, '')}")
+PY
+		return
+	done
+	printf '✗ reading ajans.toml needs python3 3.11 or later (tomllib)\n' >&2
+	return 69
+}
+
+_ajans_check() {
+	local declared defined missing extra fn count noun
+	declared="$(_ajans_toml keys)" || return
+	declared="$(printf '%s\n' "$declared" | sort)"
+	defined="$(declare -F | awk '$3 ~ /^op_/ { print $3 }' | sort)"
+	missing="$(comm -23 <(printf '%s\n' "$declared") <(printf '%s\n' "$defined") | sed '/^$/d')"
+	extra="$(comm -13 <(printf '%s\n' "$declared") <(printf '%s\n' "$defined") | sed '/^$/d')"
+	if [[ -z "$missing" && -z "$extra" ]]; then
+		count="$(printf '%s\n' "$declared" | grep -c .)"
+		if [[ "$count" == 1 ]]; then noun=operation; else noun=operations; fi
+		printf '✓ ajans.toml and ctl agree: %s %s\n' "$count" "$noun"
+		return 0
+	fi
+	if [[ -n "$missing" ]]; then
+		while IFS= read -r fn; do printf '✗ declared, no function: %s\n' "$fn" >&2; done <<<"$missing"
+	fi
+	if [[ -n "$extra" ]]; then
+		while IFS= read -r fn; do printf '✗ function, not declared: %s\n' "$fn" >&2; done <<<"$extra"
+	fi
+	return 1
+}
+
+_ajans_main() {
+	case "${1:-}" in
+	'' | --list | -h | --help)
+		_ajans_toml list
+		return
+		;;
+	--check)
+		_ajans_check
+		return
+		;;
+	esac
+	if [[ "${2:-}" == --list ]]; then
+		_ajans_toml list "$1"
+		return
+	fi
+	local fn
+	if [[ $# -ge 2 ]]; then
+		fn="$(_ajans_fn "$1 $2")"
+		if declare -F "$fn" >/dev/null; then
+			shift 2
+			"$fn" "$@"
+			return
+		fi
+	fi
+	fn="$(_ajans_fn "$1")"
+	if declare -F "$fn" >/dev/null; then
+		shift
+		"$fn" "$@"
+		return
+	fi
+	if declare -F | awk -v p="$fn"_ '$3 ~ "^" p { found = 1 } END { exit !found }'; then
+		printf '✗ %s needs a target: ./ctl %s --list\n' "$1" "$1" >&2
+	else
+		printf '✗ %s: not an operation of this project (./ctl --list)\n' "$*" >&2
+	fi
+	return 64
+}
+
+_ajans_main "$@"
+# <<< ajans runtime <<<

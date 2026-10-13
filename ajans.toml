@@ -1,0 +1,76 @@
+#:schema ../ajans/schema/project-2.schema.json
+contract = 2
+
+# A bare verb that also has targets is its default target: `./ctl check` is
+# `check docs`, `./ctl test` is `test all`, `./ctl setup` is `setup deps` and
+# `./ctl deploy` is `deploy tool`. Those defaults still answer to their old
+# target names; only the other targets are listed under the verb.
+
+[operations.dev]
+summary = "Dev server with live reload (127.0.0.1:9876, or the next free port up to 9900)"
+lifecycle = "service"
+port = 9876
+
+[operations.check]
+summary = "Lint the doctree (check docs); --strict fails on warnings too"
+
+[operations."check code"]
+summary = "ruff check + format --check"
+
+[operations.build]
+summary = "Write dist/{standalone,site}/"
+
+[operations.clean]
+summary = "Remove dist/"
+
+[operations.test]
+summary = "The whole pytest suite (test all); add -k, paths, -x"
+
+[operations."test fast"]
+summary = "Without the browser suite"
+
+[operations."test browser"]
+summary = "Only the headless-chromium suite"
+
+[operations.fmt]
+summary = "ruff format, then ruff check --fix"
+
+[operations.verify]
+summary = "Everything CI runs: ./ctl --check, lint, doctree, build, tests"
+
+[operations.deploy]
+summary = "Reinstall the global `oku` from this repo, --no-cache, and check it builds with this kit (deploy tool)"
+target = "local:cli"
+
+[operations."deploy projects"]
+summary = "Reinstall the global oku, then `oku build` in each project directory given: writes into other repositories"
+effects = ["publishes"]
+
+[operations."deploy ide"]
+summary = "Build the IntelliJ plugin and install it into JetBrains IDEs: all, the ones named, or asks"
+target = "local:ide-plugin"
+
+[operations.status]
+summary = "Which kit is the global tool building with, and which plugin each IDE has?"
+
+[operations.setup]
+summary = "Dependencies: uv sync --extra dev (setup deps)"
+
+[operations."setup browser"]
+summary = "Install the chromium Playwright needs"
+
+[operations."setup docs"]
+summary = "Scaffold a docs root at <path> (init + starter page)"
+
+[operations.migrate]
+summary = "Convert page-JSON sources (v1/v2) to v3 markdown (oku migrate)"
+
+[operations.vendor]
+summary = "Fetch mermaid + Prism once so pages render offline (oku vendor)"
+intent = "setup"
+
+[operations.spec]
+summary = "Print a ready-to-paste payload for a block kind or chart type (oku spec)"
+
+[operations.preview]
+summary = "Render one page for an editor's preview panel; prints where it went as JSON (oku preview)"
