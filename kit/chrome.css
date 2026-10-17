@@ -2619,6 +2619,10 @@ code:not(pre code) {
    still cannot push the table when it appears, which is what keeping
    the box was for. A touch screen shows the bar always, so there it
    stays in the flow and fills the room it takes. */
+/* In the lightbox the controls row runs along the top edge, where the
+   lightbox's close button also sits; it ends short of that corner, on a
+   touch screen as much as with a pointer. */
+.okt-lightbox .okt-table-wrap > .okt-table-controls { margin-right: 40px; }
 @media (hover: hover) {
   .okt-table-wrap > .okt-table-controls {
     position: absolute;
@@ -2636,6 +2640,11 @@ code:not(pre code) {
   .okt-lightbox .okt-table-wrap > .okt-table-controls {
     position: static;
     margin-bottom: 10px;
+    /* A flex item honours `z-index` even when static, so the page's 3
+       above painted this row over the lightbox's close button, which
+       sits in the same corner: the reader saw the table's expand icon
+       where the × is. */
+    z-index: auto;
   }
   /* The count would otherwise be drawn across the card's border line. */
   .okt-table-wrap > .okt-table-controls .okt-stats {

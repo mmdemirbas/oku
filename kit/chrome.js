@@ -8022,6 +8022,19 @@ var __okuTooltip = (function () {
     hideImmediate();
     var tip = build(trigger);
     document.body.appendChild(tip);
+    /* On <body>, the card stacks against its trigger's whole layer, and
+       inside an overlay that layer is the overlay's: the file viewer and
+       an expanded table sit at 1000 and the card's own 300 opened it
+       underneath, the term highlighted and no card. It goes one above
+       the highest layer its trigger is in; a card on the page keeps its
+       own. */
+    var layer = 0;
+    for (var a = trigger.parentElement; a; a = a.parentElement) {
+      var acs = getComputedStyle(a);
+      var az = parseInt(acs.zIndex, 10);
+      if (acs.position !== 'static' && az > layer) layer = az;
+    }
+    if (layer >= (parseInt(getComputedStyle(tip).zIndex, 10) || 0)) tip.style.zIndex = String(layer + 1);
     position(tip, trigger);
     if (pinned) tip.classList.add('pinned');
 
@@ -15187,17 +15200,28 @@ __okuDefine('oku-chart', OkuChart);
  * fit, off the screen after two zoom steps. So the coordinate is taken
  * into that box's frame, origin and scale both. */
 function __okuSetFixedPos(el, x, y) {
-  var z = __okuZoomOf(el), s = z, ox = 0, oy = 0;
-  var cb = __okuFixedContainer(el);
+  var cb = __okuFixedContainer(el), ox = 0, oy = 0, k = 1, zcb = 1;
   if (cb) {
     var r = cb.getBoundingClientRect();
-    // The box's own scale and zoom together, then the zoom between it
-    // and the element, which is the frame `left` is read in.
-    var k = cb.offsetWidth ? r.width / cb.offsetWidth : 1;
-    s = k * z / __okuZoomOf(cb);
+    // The box's own scale and zoom together.
+    k = cb.offsetWidth ? r.width / cb.offsetWidth : 1;
+    zcb = __okuZoomOf(cb);
     ox = r.left + cb.clientLeft * k;
     oy = r.top + cb.clientTop * k;
   }
+  /* Inside the box the element is drawn at the box's scale too — an
+     expanded figure's reading went from a quarter of its size to twelve
+     times it with the stage. Its own zoom undoes the transform's part,
+     and only that part: the text scale is the reader's and stays. */
+  var t = k / zcb;
+  var unscale = Math.abs(t - 1) > 0.001 ? String(1 / t) : '';
+  if (unscale || el.__okuUnscaled) {
+    el.style.zoom = unscale;
+    el.__okuUnscaled = !!unscale;
+  }
+  // Then the frame `left` is read in: the box's, through every zoom
+  // between it and the element, its own included.
+  var s = k * __okuZoomOf(el) / zcb;
   if (x !== null && x !== undefined) el.style.left = ((x - ox) / s) + 'px';
   if (y !== null && y !== undefined) el.style.top  = ((y - oy) / s) + 'px';
 }

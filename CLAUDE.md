@@ -2850,6 +2850,15 @@ actually write.
   it keeps its scroll and its live elements. Code that needs ITS overlay
   asks `closest('.okt-lightbox')`, never `querySelector`. Held by
   `test_file_viewer.py::test_a_table_expanded_inside_a_viewed_file_closes_back_into_it`.
+  What the kit draws for a reader inside an overlay is drawn in the
+  overlay's layer, at its own size. A hover card is mounted on `<body>`
+  at 300 and opened under the viewer and every expanded table (1000)
+  until it took one above its trigger's highest layer; an expanded
+  table's controls row kept the page's `z-index: 3` and painted over
+  the close button in its corner; a chart's reading inside the pan/zoom
+  stage was drawn at the stage's scale, a quarter to twelve times its
+  size, until `__okuSetFixedPos` undid the transform's part with the
+  element's own `zoom`. Held by `browser/test_overlay_layers.py`.
 
 - **A client measurement is written in the frame it lands in.**
   `getBoundingClientRect()` and `clientX` are client pixels; a length
