@@ -696,7 +696,7 @@ var __okuI18n = (function () {
       return loading;
     }
     var wa = (window.__okuWithAuth || function (u) { return u; });
-    loading = fetch(wa(__okuDocsRoot + '_oku/i18n/' + code + '.json'), { cache: 'no-cache' })
+    loading = fetch(wa(__okuKitBase + 'i18n/' + code + '.json'), { cache: 'no-cache' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; })
       .then(function (data) { table = data; return table; });
@@ -7288,6 +7288,21 @@ var __okuDocsRoot = (function () {
   return new URL('.', window.location.href).href;
 })();
 
+/* Where the kit's own files live (i18n, registries, vendor): `_oku/` under
+ * the docs root, unless the stub names a shared copy, as `oku pack
+ * --kit-url /k/<id>/` does — that package has no `_oku/` to fall back to. */
+var __okuKitBase = (function () {
+  var meta = document.querySelector('meta[name="oku-kit-base"]');
+  if (meta && meta.getAttribute('content')) {
+    try {
+      var resolved = new URL(meta.getAttribute('content'), window.location.href).href;
+      if (resolved.charAt(resolved.length - 1) !== '/') resolved += '/';
+      return resolved;
+    } catch (e) { /* fall through */ }
+  }
+  return __okuDocsRoot + '_oku/';
+})();
+
 /* Legacy hash-router URLs ("…/charts.html#diagrams.html:anchor") used
    to render whatever the HASH named under whatever PATH happened to be
    in the bar — the two could diverge, and a stale hash made a direct
@@ -8212,7 +8227,7 @@ var __okuKit = (function () {
     if (document.getElementById('__oku_page__') || window.location.protocol === 'file:') {
       return Promise.resolve(settle());
     }
-    // Project config lives at the docs root; domain files live in _oku/.
+    // Project config lives at the docs root; domain files live in the kit.
     var wa = (window.__okuWithAuth || function (u) { return u; });
     return fetch(wa(__okuDocsRoot + 'kit.json'), { cache: 'no-cache' })
       .then(function (r) {
@@ -8243,7 +8258,7 @@ var __okuKit = (function () {
           return ['glossary', 'extrefs'].filter(function (kind) {
             return OKU_CENTRAL_REGISTRIES[kind].indexOf(d) !== -1;
           }).map(function (kind) {
-            return fetch(wa(__okuDocsRoot + '_oku/' + kind + '/' + d + '.json'), { cache: 'no-cache' })
+            return fetch(wa(__okuKitBase + kind + '/' + d + '.json'), { cache: 'no-cache' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
               .then(function (j) {
@@ -16510,7 +16525,7 @@ var __okuVisualTools = (function () {
  * `undefined_oku/…` — the same trap the i18n table documents. */
 function __okuVendorPath() {
   if (typeof window.__okuVendorBase === 'string') return window.__okuVendorBase;
-  return (typeof __okuDocsRoot === 'string' ? __okuDocsRoot : '') + '_oku/vendor/';
+  return (typeof __okuKitBase === 'string' ? __okuKitBase : '_oku/') + 'vendor/';
 }
 
 var __prismLoader = (function () {
@@ -19554,7 +19569,7 @@ var __okuSearch = (function () {
     // Pagefind index lives at the docs root (next to kit.json + site-manifest.json).
     var candidates = [
       __okuDocsRoot + 'pagefind/pagefind.js',
-      __okuDocsRoot + '_oku/pagefind/pagefind.js'
+      __okuKitBase + 'pagefind/pagefind.js'
     ];
     pagefindPromise = candidates.reduce(function (acc, abs) {
       return acc.catch(function () {
