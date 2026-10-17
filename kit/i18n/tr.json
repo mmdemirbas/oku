@@ -54,6 +54,7 @@
   "No file at this path when the page was built.": "Sayfa derlenirken bu yolda dosya yoktu.",
   "No results.": "Sonuç yok.",
   "Nothing to preview — the path is here to copy.": "Önizlenecek bir şey yok — yol yalnızca kopyalamak için burada.",
+  "Carried as a file beside the page — it opens in a new tab.": "Sayfanın yanında ayrı bir dosya olarak geldi; yeni sekmede açılır.",
   "On this page:": "Bu sayfada:",
   "One item was left out: a linked document is rendered, not run.": "Bir öge dışarıda bırakıldı: bağlantı verilen belge işlenir, çalıştırılmaz.",
   "One stylesheet was confined to this document so it cannot restyle the page.": "Bir biçem sayfası bu belgeye sınırlandı; sayfanın biçimini değiştiremez.",

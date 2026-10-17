@@ -721,7 +721,9 @@ class TestPayloadBudget:
     # Then by rail marks growing to 24px targets (WCAG 2.5.8), with the
     # pointer meaning the nearest mark rather than the box on top:
     # 1,478,477.
-    KIT_BUDGET_BYTES = 1_479_000
+    # Then by a chip whose file travelled beside the page (`oku pack`)
+    # opening that file in a tab, and the card saying so: 1,479,361.
+    KIT_BUDGET_BYTES = 1_480_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -745,7 +747,8 @@ class TestPayloadBudget:
     # Then by `pageTop`: 1,471,734.
     # Then by the front door in the tree's language: 1,476,690.
     # Then by 24px rail targets and the nearest-mark pointer: 1,479,080.
-    STANDALONE_BUDGET_BYTES = 1_479_600
+    # Then by a carried-beside file opening in a tab: 1,479,964.
+    STANDALONE_BUDGET_BYTES = 1_480_600
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

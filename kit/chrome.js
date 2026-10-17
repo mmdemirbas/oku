@@ -8790,10 +8790,19 @@ function __okuFileWhy(ref) {
   if (ref.status === 'outside') {
     return okuT('Outside the project, so its contents do not travel with this page.');
   }
+  if (ref.url && !__okuFileMediaKind(ref.kind)) {
+    return okuT('Carried as a file beside the page — it opens in a new tab.');
+  }
   if (ref.status === 'over-cap') {
     return okuT('Too large to carry inside the page ({0}).', __okuFileSize(ref.bytes));
   }
   return okuT('Nothing to preview — the path is here to copy.');
+}
+
+/* The three kinds the viewer draws from a URL itself. Anything else with
+   a URL and no text is a file the browser opens on its own. */
+function __okuFileMediaKind(kind) {
+  return kind === 'image' || kind === 'video' || kind === 'audio';
 }
 
 /* An image / video / audio element for a carried file, or null when
@@ -8969,6 +8978,15 @@ function __okuFileOpenable(ref) {
    answers a question nobody asked it. */
 function __okuFileOpen(ref) {
   if (ref.rel && __okuHostOpen(__okuFileStore.absPath(ref.rel), ref.line)) return;
+  // A file that travelled BESIDE the page rather than inside it: a PDF,
+  // a binary, a text file past the inline cap. `oku pack` lays each one
+  // out as a real file and gives the chip its URL, and the browser opens
+  // it the way it opens any file — a PDF in its own viewer — in a tab of
+  // its own, because a frame for it is what a host's CSP refuses first.
+  if (ref.text == null && ref.url && !__okuFileMediaKind(ref.kind)) {
+    window.open(ref.url, '_blank', 'noopener');
+    return;
+  }
   if (ref.kind === 'image' && !__okuMdViewer.isOpen()) {
     var media = __okuFileMedia(ref, false);
     if (media) {
