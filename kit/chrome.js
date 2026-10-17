@@ -1737,7 +1737,7 @@ var __okuMdViewer = (function () {
     // Its own scroll once it is taller than the frame. In the body's own
     // units: the body is zoomed by the text scale, and a rect is not.
     var body = state.wrap.querySelector('.okt-mdview-body');
-    var z = body.getBoundingClientRect().height / (body.offsetHeight || 1) || 1;
+    var z = __okuZoomOf(body);
     item.toc.nav.style.maxHeight = Math.max(120, body.clientHeight - 56 / z) + 'px';
   }
   var TOC_MIN_ROOM = 200;
@@ -1771,7 +1771,7 @@ var __okuMdViewer = (function () {
   function jumpTo(item, i) {
     if (!item || !item.toc || !item.toc.heads[i]) return;
     var body = state.wrap.querySelector('.okt-mdview-body');
-    var z = body.getBoundingClientRect().height / (body.offsetHeight || 1) || 1;
+    var z = __okuZoomOf(body);
     var delta = item.toc.heads[i].getBoundingClientRect().top - body.getBoundingClientRect().top;
     body.scrollTop += delta / z - 12;
     spyContents(item);
@@ -1919,7 +1919,8 @@ var __okuMdViewer = (function () {
       }
       var body = state && state.wrap.querySelector('.okt-mdview-body');
       if (!body || current() !== item) return;
-      var top = first.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
+      // A client distance, and scrollTop is in the zoomed body's own px.
+      var top = (first.getBoundingClientRect().top - body.getBoundingClientRect().top) / __okuZoomOf(body) + body.scrollTop;
       body.scrollTop = Math.max(0, top - body.clientHeight / 3);
       item.scroll = body.scrollTop;
     })();
@@ -4136,7 +4137,8 @@ function buildTOC(tocList) {
     var r = el.getBoundingClientRect();
     var s = scroller.getBoundingClientRect();
     if (r.top >= s.top + 8 && r.bottom <= s.bottom - 8) return;   // already in view
-    scroller.scrollTop += (r.top - s.top) - (s.height - r.height) / 2;
+    // Client px into the scroll of a list the text scale zooms.
+    scroller.scrollTop += ((r.top - s.top) - (s.height - r.height) / 2) / __okuZoomOf(scroller);
   }
 
   function setActive(sectionId, h3Id) {
@@ -5987,10 +5989,12 @@ function initReadingAids() {
         // every table in a file opened in the markdown viewer, whose
         // tables then go away and leave their handlers behind. Bound on
         // press, released on release.
-        var dragging = false, startX = 0, startW = 0, col;
+        // The pointer moves in client px and the column's width is read
+        // in the zoomed column's own, so both are divided by its zoom.
+        var dragging = false, startX = 0, startW = 0, zoom = 1, col;
         function onResizeMove(ev) {
           if (!dragging) return;
-          var dx = ev.clientX - startX;
+          var dx = (ev.clientX - startX) / zoom;
           var w = Math.max(48, startW + dx);
           if (col) col.style.width = w + 'px';
         }
@@ -6004,7 +6008,8 @@ function initReadingAids() {
           ev.preventDefault();
           dragging = true;
           startX = ev.clientX;
-          startW = th.getBoundingClientRect().width;
+          zoom = __okuZoomOf(th);
+          startW = th.getBoundingClientRect().width / zoom;
           col = table.querySelectorAll('colgroup col')[idx];
           table.classList.add('okt-table-resizing');
           table.style.tableLayout = 'fixed';
@@ -14540,21 +14545,7 @@ class OkuChart extends HTMLElement {
        anchors near the viewport's right / top edges push the
        tooltip off-screen — the user has reported both. */
     function placeTooltipAt(tip, anchorX, anchorY) {
-      __okuSetFixedPos(tip, anchorX, anchorY);
-      requestAnimationFrame(function () {
-        var rect = tip.getBoundingClientRect();
-        var vw = window.innerWidth, vh = window.innerHeight;
-        var pad = 8;
-        var left = anchorX, top = anchorY;
-        // Horizontal clamp.
-        if (rect.left < pad) left += (pad - rect.left);
-        else if (rect.right > vw - pad) left -= (rect.right - (vw - pad));
-        // Vertical clamp — flip below the anchor when the tooltip
-        // would render above the viewport (anchor near top).
-        if (rect.top < pad) top += (rect.height + 16);
-        else if (rect.bottom > vh - pad) top -= (rect.bottom - (vh - pad));
-        __okuSetFixedPos(tip, left, top);
-      });
+      __okuPlaceTooltipAt(tip, anchorX, anchorY);
     }
     /* Reposition a tooltip to track its anchor's current viewport
        position. Used by the global scroll/resize handler so a tip
@@ -15184,27 +15175,112 @@ __okuDefine('oku-chart', OkuChart);
  * `getBoundingClientRect()` — which reports client space. At 1.5 a
  * tooltip anchored to a bar 600px across the page landed 300px past it.
  *
- * `currentCSSZoom` is the effective zoom on the element itself, so
- * dividing by it converts client space back to the space the style is
- * read in. Outside a zoomed subtree it is 1 and this is the assignment
- * it replaced. */
+ * Dividing by the element's zoom converts client space back to the
+ * space the style is read in. Outside a zoomed subtree it is 1 and this
+ * is the assignment it replaced.
+ *
+ * The other half: "fixed is relative to the viewport" stops being true
+ * inside an ancestor that establishes a containing block for fixed
+ * descendants, and the expanded figure's pan/zoom stage is a transform.
+ * A chart's reading written in viewport coordinates there landed at the
+ * stage's origin plus the coordinate times the stage's scale: 8px off at
+ * fit, off the screen after two zoom steps. So the coordinate is taken
+ * into that box's frame, origin and scale both. */
 function __okuSetFixedPos(el, x, y) {
-  var z = el && typeof el.currentCSSZoom === 'number' && el.currentCSSZoom > 0 ? el.currentCSSZoom : 1;
-  if (x !== null && x !== undefined) el.style.left = (x / z) + 'px';
-  if (y !== null && y !== undefined) el.style.top  = (y / z) + 'px';
+  var z = __okuZoomOf(el), s = z, ox = 0, oy = 0;
+  var cb = __okuFixedContainer(el);
+  if (cb) {
+    var r = cb.getBoundingClientRect();
+    // The box's own scale and zoom together, then the zoom between it
+    // and the element, which is the frame `left` is read in.
+    var k = cb.offsetWidth ? r.width / cb.offsetWidth : 1;
+    s = k * z / __okuZoomOf(cb);
+    ox = r.left + cb.clientLeft * k;
+    oy = r.top + cb.clientTop * k;
+  }
+  if (x !== null && x !== undefined) el.style.left = ((x - ox) / s) + 'px';
+  if (y !== null && y !== undefined) el.style.top  = ((y - oy) / s) + 'px';
 }
 
+/* The factor between a length written into an element's style or
+ * scrollTop and the client pixels it covers: the effective `zoom` on it.
+ * A client measurement — getBoundingClientRect, clientX — is divided by
+ * this before it is written, or at a text scale of 1.25 it lands a
+ * quarter further than it was measured. `currentCSSZoom` where the
+ * engine has it; elsewhere the client box over the layout box, which is
+ * the same number while nothing between is transformed. */
+function __okuZoomOf(el) {
+  if (!el) return 1;
+  if (typeof el.currentCSSZoom === 'number' && el.currentCSSZoom > 0) return el.currentCSSZoom;
+  var h = el.offsetHeight;
+  return h ? (el.getBoundingClientRect().height / h) || 1 : 1;
+}
+
+/* The box a `position: fixed` element is placed against: null for the
+ * viewport, else the nearest ancestor whose style establishes a
+ * containing block for fixed descendants. Asked of the style rather than
+ * of the kit's markup, so the next host that transforms is answered the
+ * day it lands. The list is held against the browser's own placement by
+ * test_lengths_in_their_frame.py, property by property. */
+function __okuFixedContainer(el) {
+  var set = function (v) { return !!v && v !== 'none'; };
+  for (var a = el && el.parentElement; a; a = a.parentElement) {
+    var cs = getComputedStyle(a);
+    if (set(cs.transform) || set(cs.translate) || set(cs.rotate) || set(cs.scale) ||
+        set(cs.perspective) || set(cs.filter) || set(cs.backdropFilter) ||
+        /\b(transform|translate|rotate|scale|perspective|filter)\b/.test(cs.willChange || '') ||
+        /\b(layout|paint|strict|content)\b/.test(cs.contain || '') ||
+        cs.contentVisibility === 'auto') return a;
+  }
+  return null;
+}
+
+/* Where a fixed element can be seen: the viewport, cut by each box that
+ * clips it. Fixed positioning escapes the overflow of everything above
+ * its containing block, so with the viewport as that block nothing cuts
+ * it — but an expanded figure's stage clips the transformed layer the
+ * reading lives in, and a reading clamped to the viewport was drawn
+ * outside the stage and cut away. */
+function __okuVisibleBox(el) {
+  var b = { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+  for (var a = __okuFixedContainer(el); a; a = a.parentElement) {
+    var cs = getComputedStyle(a);
+    if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {
+      var r = a.getBoundingClientRect();
+      b.left = Math.max(b.left, r.left); b.top = Math.max(b.top, r.top);
+      b.right = Math.min(b.right, r.right); b.bottom = Math.min(b.bottom, r.bottom);
+    }
+    // Nothing above a fixed box clips it.
+    if (cs.position === 'fixed') break;
+  }
+  return b;
+}
+
+/* The one placement every tooltip uses: anchored, then kept inside the
+ * box it can be seen in. The chart element used to carry a copy of this,
+ * and two copies of a clamp is how one of them stops being fixed. */
 function __okuPlaceTooltipAt(tip, anchorX, anchorY) {
   __okuSetFixedPos(tip, anchorX, anchorY);
+  // Only the latest placement is clamped. A dot and the cursor both place
+  // the one tooltip in a single mousemove, and each clamp measured the box
+  // where the OTHER had just put it, then wrote its own anchor back
+  // unclamped: a chart near the top of the window drew its reading 70px
+  // above it.
+  var seq = tip.__okuPlaceSeq = (tip.__okuPlaceSeq || 0) + 1;
   requestAnimationFrame(function () {
+    if (tip.__okuPlaceSeq !== seq) return;
     var rect = tip.getBoundingClientRect();
-    var vw = window.innerWidth, vh = window.innerHeight;
+    var box = __okuVisibleBox(tip);
     var pad = 8;
     var left = anchorX, top = anchorY;
-    if (rect.left < pad) left += (pad - rect.left);
-    else if (rect.right > vw - pad) left -= (rect.right - (vw - pad));
-    if (rect.top < pad) top += (rect.height + 16);
-    else if (rect.bottom > vh - pad) top -= (rect.bottom - (vh - pad));
+    if (rect.left < box.left + pad) left += (box.left + pad - rect.left);
+    else if (rect.right > box.right - pad) left -= (rect.right - (box.right - pad));
+    // Flip below the anchor when the tooltip would render above the box —
+    // and further, when the anchor itself is above it: a cursor reading
+    // is anchored to the plot's top edge, which a zoomed figure or a
+    // tall chart scrolled half away puts out of sight.
+    if (rect.top < box.top + pad) top += Math.max(rect.height + 16, box.top + pad - rect.top);
+    else if (rect.bottom > box.bottom - pad) top -= (rect.bottom - (box.bottom - pad));
     __okuSetFixedPos(tip, left, top);
   });
 }
@@ -15333,10 +15409,12 @@ function __okuEnhanceBarCharts(root) {
         return;
       }
       // Recompute on every move so a window resize / fold doesn't
-      // leave the cursor stuck at the prior plot extent.
-      cursor.style.top    = pyb.top + 'px';
-      cursor.style.height = (pyb.bottom - pyb.top) + 'px';
-      cursor.style.left = x + 'px';
+      // leave the cursor stuck at the prior plot extent. Measured in
+      // client px, written inside the zoomed column.
+      var z = __okuZoomOf(cursor);
+      cursor.style.top    = (pyb.top / z) + 'px';
+      cursor.style.height = ((pyb.bottom - pyb.top) / z) + 'px';
+      cursor.style.left = (x / z) + 'px';
       cursor.style.opacity = '1';
       showCrossing(ev.clientX, ev.clientY, ev.target.closest && ev.target.closest('.bar-fill'));
     });
@@ -17179,7 +17257,9 @@ function __okuBuildComparePreview(fig) {
     // The source is measured every time rather than cached: it is the
     // one element whose width tracks the reading column, so re-reading
     // it is what keeps the preview honest when the column changes.
-    var natural = fig.getBoundingClientRect().width;
+    // In the clone's own frame, which is the zoomed column's: a client
+    // width written as-is laid the clone out a quarter wider at 1.25.
+    var natural = fig.getBoundingClientRect().width / __okuZoomOf(wrap);
     var avail = wrap.clientWidth;
     if (!natural || !avail) return;
     el.style.width = natural + 'px';
@@ -19123,7 +19203,8 @@ class PageNav extends HTMLElement {
     var r = row.getBoundingClientRect();
     var p = panel.getBoundingClientRect();
     if (r.top >= p.top + 8 && r.bottom <= p.bottom - 8) return;
-    panel.scrollTop += (r.top - p.top) - (p.height - r.height) / 2;
+    // Client px into the scroll of a panel the text scale zooms.
+    panel.scrollTop += ((r.top - p.top) - (p.height - r.height) / 2) / __okuZoomOf(panel);
   }
 
   _wireFilter() {

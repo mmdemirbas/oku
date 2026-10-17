@@ -2851,6 +2851,25 @@ actually write.
   asks `closest('.okt-lightbox')`, never `querySelector`. Held by
   `test_file_viewer.py::test_a_table_expanded_inside_a_viewed_file_closes_back_into_it`.
 
+- **A client measurement is written in the frame it lands in.**
+  `getBoundingClientRect()` and `clientX` are client pixels; a length
+  written into `style` or `scrollTop` is read in its element's frame,
+  which the text scale zooms (the reading column, the viewer's body,
+  the sidebar) and a transform re-roots (a fixed tooltip inside an
+  expanded figure's pan/zoom stage is placed against the stage).
+  `__okuZoomOf(el)` is the divisor. `__okuSetFixedPos` takes a viewport
+  coordinate into a fixed element's real containing block, which
+  `__okuFixedContainer` finds from the ancestors' style — a list held
+  property by property against where the browser actually puts a fixed
+  child, because `zoom` and `container-type` are the two a reader
+  guesses wrong. Six sites wrote client pixels straight in: at 1.25 a
+  bar chart's cursor sat 127px off the pointer, a 40px drag grew a
+  column by 107px, a `#f/file:200` reference opened a screen away, and
+  both sidebar lists scrolled their current entry out of view. At a
+  text scale of 1 every one was right, which is why nothing failed.
+  Held by `browser/test_lengths_in_their_frame.py`, every case at 1
+  and 1.25.
+
 - **CSS rules silently dropped by Chrome.** A multi-line comment
   inside a rule body, containing certain Unicode punctuation, has
   been observed to make Chrome's parser drop the trailing

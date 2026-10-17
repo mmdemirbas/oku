@@ -725,7 +725,10 @@ class TestPayloadBudget:
     # opening that file in a tab, and the card saying so: 1,479,361.
     # Then by a table's header sticking in a copy region and in the viewer
     # (overflow: clip, and the viewer's padding as a property): 1,481,254.
-    KIT_BUDGET_BYTES = 1_482_000
+    # Then by client measurements written in the frame they land in
+    # (__okuZoomOf, __okuFixedContainer, __okuVisibleBox, one tooltip
+    # clamp instead of two, only the latest placement clamped): 1,485,712.
+    KIT_BUDGET_BYTES = 1_486_500
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -751,7 +754,8 @@ class TestPayloadBudget:
     # Then by 24px rail targets and the nearest-mark pointer: 1,479,080.
     # Then by a carried-beside file opening in a tab: 1,479,964.
     # Then by sticky headers in a copy region and the viewer: 1,481,857.
-    STANDALONE_BUDGET_BYTES = 1_482_600
+    # Then by client measurements written in their own frame: 1,486,315.
+    STANDALONE_BUDGET_BYTES = 1_487_100
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 
