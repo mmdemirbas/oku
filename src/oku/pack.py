@@ -17,6 +17,12 @@ its worker and wasm need a looser CSP than a host should have to grant a
 document, and a host searches `_pack.json`, which carries every page's
 plain text. And the rebuild command, which names a directory on the
 author's machine.
+
+A host that serves many packages can keep ONE copy of the kit instead of
+one per package: `oku kit export` writes exactly the files a page loads
+from it, the same bytes on every run, so the host can name the copy by
+its content; `oku pack --kit-url /k/<id>/` then writes no `_oku/` and
+points every kit reference at that address.
 """
 
 from __future__ import annotations
@@ -236,11 +242,30 @@ def _text_sources(pp: PackPage) -> list[Path]:
     return out
 
 
-def _stub(pp: PackPage) -> str:
+def _stub(pp: PackPage, kit_url: str | None) -> str:
     lang = cli._lang_of_page(pp.page)
     html = cli._stub_for(cli._page_title(pp.page) or pp.src.stem, lang=lang)
-    html = cli._retarget_kit_urls(html, len(pp.rel.parts) - 1)
+    depth = len(pp.rel.parts) - 1
+    html = cli._retarget_kit_urls(html, depth) if kit_url is None else _at_shared_kit(html, kit_url, depth)
     return cli._with_html_lang(cli._mark_built(html), lang)
+
+
+def _at_shared_kit(html: str, kit_url: str, depth: int) -> str:
+    """Point a stub's kit tags at `kit_url`, and name both roots.
+
+    chrome.js finds the docs root by the `_oku/` in its own tags, and the
+    kit as `_oku/` under that root. Neither holds once the tags name
+    `/k/<id>/`: the root falls back to the page's own directory (wrong
+    for every page in a subfolder) and every lazy load — mermaid, Prism,
+    i18n, the registries — went to an `_oku/` the package does not have.
+    So the stub says both, the root relative to the page so the package
+    still works under any prefix. The `?v=` stamp stays on each tag.
+    """
+    html = cli._KIT_URL_RE.sub(lambda m: m.group(1) + kit_url, html)
+    root = "../" * depth or "./"
+    metas = f'<meta name="oku-docs-root" content="{root}">\n<meta name="oku-kit-base" content="{kit_url}">\n'
+    m = cli._HEAD_OPEN_RE.search(html)
+    return html[: m.end()] + "\n" + metas + html[m.end() :]
 
 
 def _manifest(plan: Plan, title: str, summary: str) -> dict:
@@ -310,22 +335,26 @@ def _write(staging: Path, rel: str | PurePosixPath, data: str | bytes) -> None:
         dest.write_text(data, encoding="utf-8")
 
 
-def _write_tree(plan: Plan, staging: Path) -> tuple[dict[str, list[Path]], list[Finding]]:
+def _write_tree(
+    plan: Plan, staging: Path, kit_url: str | None = None
+) -> tuple[dict[str, list[Path]], list[Finding]]:
     """Write the package into `staging`; return each file's sources.
 
     The sources are what a finding is reported against: the markdown the
-    author edits, not the JSON the build derived from it.
+    author edits, not the JSON the build derived from it. With `kit_url`
+    the kit is not written: the host serves one copy at that address.
     """
     entry = plan.pages[0]
     title, summary = _entry_title(entry)
-    cli.copy_site_kit(staging)
+    if kit_url is None:
+        cli.copy_site_kit(staging)
     origins: dict[str, list[Path]] = {}
     findings: list[Finding] = []
     srcs = [pp.src for pp in plan.pages]
     for pp in plan.pages:
         _localize_files(pp, plan.root)
         texts = _text_sources(pp)
-        _write(staging, pp.rel, _stub(pp))
+        _write(staging, pp.rel, _stub(pp, kit_url))
         _write(staging, pp.json_rel, json.dumps(pp.page, ensure_ascii=False, indent=2))
         _write(staging, pp.md_rel, pp.src.read_bytes())
         for rel in (pp.rel, pp.json_rel, pp.md_rel):
@@ -334,7 +363,7 @@ def _write_tree(plan: Plan, staging: Path) -> tuple[dict[str, list[Path]], list[
         rel = target.relative_to(plan.root).as_posix()
         # The package's own files sit at fixed names at its root; a carried
         # file there would be overwritten by them, or would replace them.
-        taken = rel in _DERIVED_NAMES or rel.startswith("_oku/")
+        taken = rel in _DERIVED_NAMES or (kit_url is None and rel.startswith("_oku/"))
         if taken or (rel in origins and origins[rel][0] != target):
             findings.append(
                 Finding(
@@ -363,7 +392,8 @@ def _write_tree(plan: Plan, staging: Path) -> tuple[dict[str, list[Path]], list[
     for rel, text in derived.items():
         _write(staging, rel, text)
         origins[rel] = srcs
-    _write(staging, INDEX_NAME, json.dumps(pack_index(staging, plan), indent=2, ensure_ascii=False) + "\n")
+    index = pack_index(staging, plan, kit_url)
+    _write(staging, INDEX_NAME, json.dumps(index, indent=2, ensure_ascii=False) + "\n")
     origins[INDEX_NAME] = srcs
     return origins, findings
 
@@ -412,10 +442,11 @@ def _mime(path: Path) -> str:
     return _MIME.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
 
 
-def pack_index(staging: Path, plan: Plan) -> dict:
+def pack_index(staging: Path, plan: Plan, kit_url: str | None = None) -> dict:
     """`_pack.json`. Paths are package-relative POSIX paths, as on disk;
     a host quotes each segment to make a URL. `files` lists every file in
-    the package but this one."""
+    the package but this one. `kit` is there only when the pages load the
+    kit from a shared address, which the host must then serve."""
     entry = plan.pages[0]
     title, summary = _entry_title(entry)
     pages = []
@@ -443,14 +474,15 @@ def pack_index(staging: Path, plan: Plan) -> dict:
                 "type": _mime(f),
             }
         )
-    return {
+    index = {
         "pack": PACK_FORMAT,
         "entry": entry.rel.as_posix(),
         "title": title,
         "summary": summary,
-        "pages": pages,
-        "files": files,
     }
+    if kit_url is not None:
+        index["kit"] = {"url": kit_url}
+    return {**index, "pages": pages, "files": files}
 
 
 # Plain text: what a search index needs and nothing it would have to strip.
@@ -634,9 +666,16 @@ def _dangling(href: str, how: str, base: Path, staging: Path) -> str | None:
     return None if target.is_file() else "missing"
 
 
-def _ref_findings(staging: Path, plan: Plan, texts: dict[Path, str]) -> list[Finding]:
+def _ref_findings(
+    staging: Path, plan: Plan, texts: dict[Path, str], kit_url: str | None = None
+) -> list[Finding]:
     """(b) Every local reference a packed page makes, resolved against the
-    package rather than the source: it must land on a file inside it."""
+    package rather than the source: it must land on a file inside it.
+
+    The one exception is the shared kit. A reference under `kit_url` is
+    root-absolute on purpose and lands on the host's copy, not in the
+    package, so it is held to what `oku kit export` writes instead."""
+    kit_files = set(_export_sources()) if kit_url is not None else set()
     out: list[Finding] = []
     for pp in plan.pages:
         page = json.loads((staging / pp.json_rel).read_text(encoding="utf-8"))
@@ -658,7 +697,10 @@ def _ref_findings(staging: Path, plan: Plan, texts: dict[Path, str]) -> list[Fin
         if rel.parts[0] == "_oku":
             continue
         for href in _ISLAND_REF_RE.findall(f.read_text(encoding="utf-8")):
-            problem = None if _NOT_LOCAL_RE.match(href) else _dangling(href, "raw", f.parent, staging)
+            if kit_url is not None and href.startswith(kit_url):
+                problem = None if _ref_path(href[len(kit_url) :]) in kit_files else "names no file of the kit"
+            else:
+                problem = None if _NOT_LOCAL_RE.match(href) else _dangling(href, "raw", f.parent, staging)
             if problem:
                 out.append(
                     Finding("error", "outside-package", f"{href} {problem}", None, None, {rel.as_posix()})
@@ -826,11 +868,13 @@ def _vendor_findings(plan: Plan) -> list[Finding]:
     return [Finding("error", "kit-incomplete", f"the kit's vendor copy is {note}; run `oku vendor`")]
 
 
-def leak_check(staging: Path, plan: Plan, origins: dict[str, list[Path]]) -> list[Finding]:
+def leak_check(
+    staging: Path, plan: Plan, origins: dict[str, list[Path]], kit_url: str | None = None
+) -> list[Finding]:
     texts: dict[Path, str] = {}
     return (
         _home_findings(staging, origins, texts)
-        + _ref_findings(staging, plan, texts)
+        + _ref_findings(staging, plan, texts, kit_url)
         + _external_findings(staging, plan, texts)
     )
 
@@ -896,9 +940,25 @@ def _format(f: Finding) -> str:
     return f"  {icon} {where} [{f.kind}] {f.detail}{carried}"
 
 
-def run(pages: list[str], out: str) -> int:
+# Root-relative, every segment non-empty, ending in `/`. Only characters
+# that need no escaping in an HTML attribute, so the stub can carry the
+# value as given and the leak check can match it as written.
+_KIT_URL_FORM = re.compile(r"^/(?:(?:[A-Za-z0-9._~@:!$()*+,;=-]|%[0-9A-Fa-f]{2})+/)*$")
+
+
+def _check_kit_url(url: str) -> None:
+    if not _KIT_URL_FORM.match(url) or any(seg in (".", "..") for seg in url.split("/")):
+        raise PackUsageError(
+            f"--kit-url {url!r}: not a root-relative path ending in / (for example /k/<id>/); "
+            "a scheme, a host, a query, a dot segment or an empty segment is refused"
+        )
+
+
+def run(pages: list[str], out: str, kit_url: str | None = None) -> int:
     try:
         entries, out_dir = _validate(pages, out)
+        if kit_url is not None:
+            _check_kit_url(kit_url)
     except PackUsageError as e:
         print(f"✗ {e}", file=sys.stderr)
         return EXIT_USAGE
@@ -906,11 +966,13 @@ def run(pages: list[str], out: str) -> int:
     if not plan.pages:
         print(f"✗ {pages[0]}: not readable as a page", file=sys.stderr)
         return EXIT_USAGE
-    findings = _vendor_findings(plan) + _check_findings(plan)
+    # The vendor copy matters only to a package that carries it; with a
+    # kit URL, `oku kit export` is the command that answers for it.
+    findings = ([] if kit_url is not None else _vendor_findings(plan)) + _check_findings(plan)
     staging = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.pack-", dir=out_dir.parent))
     try:
-        origins, written = _write_tree(plan, staging)
-        findings += written + leak_check(staging, plan, origins)
+        origins, written = _write_tree(plan, staging, kit_url)
+        findings += written + leak_check(staging, plan, origins, kit_url)
         errors = [f for f in findings if f.severity == "error"]
         for f in errors + [f for f in findings if f.severity != "error"]:
             print(_format(f))
@@ -929,11 +991,13 @@ def run(pages: list[str], out: str) -> int:
         shutil.rmtree(staging, ignore_errors=True)
     print(f"✓ Packed {len(plan.pages)} page(s), {count} file(s) into {out}")
     print(f"  entry: {plan.pages[0].rel.as_posix()}")
+    if kit_url is not None:
+        print(f"  kit:   {kit_url} (not carried; serve `oku kit export` there)")
     return 0
 
 
 def cmd_pack(args: argparse.Namespace) -> int:
-    return run(args.pages, args.out)
+    return run(args.pages, args.out, args.kit_url)
 
 
 # ------------------------------------------------------------------ #

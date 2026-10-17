@@ -329,6 +329,111 @@ class TestTheCommandLine:
         assert exit_info.value.code == 2
 
 
+KIT_URL = "/k/3f9a/"
+
+
+class TestASharedKit:
+    """`--kit-url`: the package names the host's one copy of the kit
+    instead of carrying `_oku/`. The browser half, which proves every lazy
+    load follows, is `browser/test_pack_shared_kit.py`."""
+
+    def _pack(self, project: Path, kit_url: str = KIT_URL) -> tuple[int, Path]:
+        out = project.parent / "out"
+        return pack.run([str(project / "docs" / "entry.md")], str(out), kit_url=kit_url), out
+
+    def test_no_kit_is_written(self, project: Path) -> None:
+        rc, out = self._pack(project)
+        assert rc == 0
+        assert not (out / "_oku").exists()
+        index = json.loads((out / "_pack.json").read_text(encoding="utf-8"))
+        assert not [f["path"] for f in index["files"] if f["path"].startswith("_oku/")]
+
+    def test_every_kit_tag_names_the_url_and_keeps_its_stamp(self, project: Path) -> None:
+        rc, out = self._pack(project)
+        assert rc == 0
+        stub = (out / "docs" / "entry.html").read_text(encoding="utf-8")
+        for name in cli.KIT_FILES:
+            assert f'="{KIT_URL}{name}?v=' in stub, (name, stub)
+        assert "_oku/" not in stub, stub
+
+    def test_the_stub_names_both_roots(self, project: Path) -> None:
+        """chrome.js finds the root and the kit by the `_oku/` in its tags;
+        without one, the stub has to say where each is."""
+        rc, out = self._pack(project)
+        assert rc == 0
+        stub = (out / "docs" / "entry.html").read_text(encoding="utf-8")
+        assert '<meta name="oku-docs-root" content="../">' in stub, stub
+        assert f'<meta name="oku-kit-base" content="{KIT_URL}">' in stub, stub
+
+    def test_the_index_names_the_kit(self, project: Path) -> None:
+        rc, out = self._pack(project)
+        assert rc == 0
+        index = json.loads((out / "_pack.json").read_text(encoding="utf-8"))
+        assert index["kit"] == {"url": KIT_URL}
+        assert list(index) == ["pack", "entry", "title", "summary", "kit", "pages", "files"]
+
+    def test_without_a_kit_url_the_package_is_as_before(self, project: Path) -> None:
+        rc, out = _pack(project)
+        assert rc == 0
+        assert (out / "_oku" / "chrome.js").is_file()
+        assert "kit" not in json.loads((out / "_pack.json").read_text(encoding="utf-8"))
+        stub = (out / "docs" / "entry.html").read_text(encoding="utf-8")
+        assert 'src="../_oku/chrome.js?v=' in stub
+        assert "oku-kit-base" not in stub and "oku-docs-root" not in stub
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "k/x/",  # relative
+            "/k/x",  # no trailing slash
+            "//cdn.example.com/k/",  # protocol-relative: another origin
+            "https://host/k/x/",
+            "/k/../x/",
+            "/k/./x/",
+            "/k//x/",
+            "/k/x/?v=1",
+            "/k/x/#a",
+            "/k/x y/",
+            '/k/"x/',
+            "",
+        ],
+    )
+    def test_a_url_that_is_not_a_root_relative_directory_is_a_usage_error(self, project, url) -> None:
+        rc, out = self._pack(project, url)
+        assert rc == 2
+        assert not out.exists()
+
+    def test_the_leak_check_still_runs(self, project, capsys) -> None:
+        (project / "files" / "notes.md").write_text("# Notes\n\n/Users/alice/secret.txt\n", encoding="utf-8")
+        rc, out = self._pack(project)
+        assert rc == 1
+        assert "[home-path] /Users/alice/secret.txt" in capsys.readouterr().out
+        assert not out.exists()
+
+    def test_a_kit_reference_the_export_does_not_carry_is_a_finding(
+        self, project, capsys, monkeypatch
+    ) -> None:
+        held = pack._export_sources
+
+        def without_renderer() -> dict:
+            return {k: v for k, v in held().items() if k != "renderer.js"}
+
+        monkeypatch.setattr(pack, "_export_sources", without_renderer)
+        rc, out = self._pack(project)
+        assert rc == 1
+        assert f"{KIT_URL}renderer.js?v=" in capsys.readouterr().out
+        assert not out.exists()
+
+    def test_main_routes_the_kit_url(self, project, monkeypatch) -> None:
+        out = project.parent / "via-main"
+        monkeypatch.setattr(
+            "sys.argv",
+            ["oku", "pack", str(project / "docs" / "entry.md"), "--out", str(out), "--kit-url", KIT_URL],
+        )
+        assert cli.main() == 0
+        assert json.loads((out / "_pack.json").read_text(encoding="utf-8"))["kit"] == {"url": KIT_URL}
+
+
 @pytest.fixture()
 def fake_vendor(tmp_path: Path, monkeypatch) -> Path:
     """A complete vendor copy and grammar cache of placeholder bytes, so
