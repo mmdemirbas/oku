@@ -260,6 +260,44 @@ def test_at_rest_the_real_header_takes_the_pointer(page):
     assert hit, "something other than the real header is under the pointer at rest"
 
 
+@pytest.mark.parametrize("width", [1280, 360])
+@pytest.mark.parametrize("sel", ["#fits", "#wide"])
+def test_at_rest_the_header_sits_on_its_own_table(built, browser, sel, width):
+    """At rest the header is the table's first row, not a band floating
+    over it. A sticky `th` is offset from its NEAREST scroll container,
+    and a wide table's `.okt-table-scroll` is one that never scrolls
+    vertically — so the parking offset meant for the viewport pushed
+    the real header down inside its own box, every time. Measured on a
+    delivered page: a 60px empty band above the labels and the first
+    row's opening line drawn under them, at any scroll position. The
+    pointer test above cannot see it: the shifted cell is still the
+    cell under its own centre."""
+    context = browser.new_context(viewport={"width": width, "height": 800})
+    page = context.new_page()
+    page.goto(built.as_uri(), wait_until="load")
+    page_quiet(page)
+    try:
+        _scroll_table_top_to(page, sel, 300)
+        geo = measured(
+            page,
+            f"""() => {{
+              const scroll = {_wrap(sel)}.querySelector('.okt-table-scroll');
+              const th = scroll.querySelector('thead th').getBoundingClientRect();
+              const row = scroll.querySelector('tbody tr').getBoundingClientRect();
+              return {{ table: scroll.querySelector('table').getBoundingClientRect().top,
+                        thTop: th.top, thBottom: th.bottom, rowTop: row.top }};
+            }}""",
+        )
+        assert abs(geo["thTop"] - geo["table"]) < 1, (
+            f"header top {geo['thTop']:.1f} is {geo['thTop'] - geo['table']:.1f}px below its table's top"
+        )
+        assert geo["rowTop"] >= geo["thBottom"] - 1, (
+            f"the first row starts at {geo['rowTop']:.1f}, under a header ending at {geo['thBottom']:.1f}"
+        )
+    finally:
+        context.close()
+
+
 def test_the_stuck_header_still_sorts(page):
     """A header that reads as the table's header has to act as one: a
     click on the stuck cell sorts the column it names."""

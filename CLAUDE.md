@@ -1726,6 +1726,19 @@ which asks the rest from the reader's side — under the rail, in this
 column, is there a cell with this label — so it does not care which
 mechanism answered.
 
+**And the offset is the viewport's, so only a header the viewport holds
+takes it.** `top` on a sticky cell is measured from its NEAREST scroll
+container, and a wide table's `.okt-table-scroll` is one that never
+scrolls vertically. Once the rail joined the chrome `chromeFloor`
+measures, `--okt-sticky-top` went from 0 to 60px for every table, and a
+wide table's real header sat 60px down inside its own box at every
+scroll position: an empty band above the labels and the first row's
+opening line drawn under them, on a delivered page. That header parks
+at 0 now (`.okt-table-scroll:not([data-fit="1"])`); the ghost is what
+sticks for it. Held by `test_at_rest_the_header_sits_on_its_own_table`
+— the pointer test beside it could not see this, because the shifted
+cell is still the cell under its own centre.
+
 **Measure in a ResizeObserver callback, write in the next frame, and
 only write what changed.** Both of the sticky header's writes invalidate
 layout: `--okt-sticky-top` is the ghost's `top`, and `data-fit` switches
