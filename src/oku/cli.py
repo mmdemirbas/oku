@@ -6410,45 +6410,7 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
     Pagefind index has real content to chew on.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    kit_out = out_dir / "_oku"
-    kit_out.mkdir(exist_ok=True)
-
-    # Runtime chrome files → _oku/
-    for f in KIT_FILES:
-        shutil.copy(KIT_DIR / f, kit_out / f)
-    # The stylesheet lands beside `_oku/vendor/`, so its own relative
-    # font URLs already resolve — but only if the fonts were fetched.
-    # Passing an empty base leaves them untouched in that case and drops
-    # the rules in the other, so this tree never asks for a file it did
-    # not ship either.
-    if not vendor_fonts_present():
-        css_out = kit_out / "chrome.css"
-        css_out.write_text(_retarget_font_urls(css_out.read_text(encoding="utf-8"), ""), encoding="utf-8")
-    # Shared registry directories → _oku/<name>/
-    for d in ("glossary", "extrefs", "schema", "i18n"):
-        src_dir = KIT_DIR / d
-        if src_dir.exists():
-            dst_dir = kit_out / d
-            if dst_dir.exists():
-                shutil.rmtree(dst_dir)
-            shutil.copytree(src_dir, dst_dir)
-
-    # mermaid + Prism, the same shared copy build_standalone lays down.
-    # This was standalone-only, so a dist/site deployed anywhere without
-    # internet — an intranet, an air-gapped host, a laptop on a plane —
-    # drew no diagrams and highlighted no code, after 404ing on
-    # `_oku/vendor/…` first. Measured on this repo's own site build with
-    # the CDNs blocked: 0 of 6 diagrams drawn, 0 highlight tokens, while
-    # the standalone tree of the same pages had all 6 and 598. The loader
-    # falls back to the CDN, so the failure only appears where nobody is
-    # watching, which is the point of vendoring in the first place.
-    # Refreshed at every copy rather than only after a fetch: the file
-    # describes the directory, and a directory that gained a grammar
-    # from another project's build would otherwise ship a stale list.
-    _write_prism_carried()
-    src_vendor = vendor_dir()
-    if src_vendor.is_dir():
-        shutil.copytree(src_vendor, kit_out / "vendor", dirs_exist_ok=True)
+    copy_site_kit(out_dir)
 
     # Project-level files that pages depend on at runtime. site-manifest
     # and llms.txt are derived; cmd_build writes them into the dist
@@ -6559,6 +6521,54 @@ def build_site(srcs, out_dir: Path, src_root: Path, *, manifest: dict | None = N
         dest_html.write_text(
             _with_html_lang(_mark_built(html), _built_language(page_data, manifest)), encoding="utf-8"
         )
+
+
+def copy_site_kit(out_dir: Path) -> Path:
+    """Lay the kit a site tree loads down at `out_dir/_oku/`, vendor included.
+
+    Two callers: `build_site`, and `oku pack`, whose package is a site tree
+    in miniature and has to render offline the same way.
+    """
+    kit_out = out_dir / "_oku"
+    kit_out.mkdir(parents=True, exist_ok=True)
+
+    # Runtime chrome files → _oku/
+    for f in KIT_FILES:
+        shutil.copy(KIT_DIR / f, kit_out / f)
+    # The stylesheet lands beside `_oku/vendor/`, so its own relative
+    # font URLs already resolve — but only if the fonts were fetched.
+    # Passing an empty base leaves them untouched in that case and drops
+    # the rules in the other, so this tree never asks for a file it did
+    # not ship either.
+    if not vendor_fonts_present():
+        css_out = kit_out / "chrome.css"
+        css_out.write_text(_retarget_font_urls(css_out.read_text(encoding="utf-8"), ""), encoding="utf-8")
+    # Shared registry directories → _oku/<name>/
+    for d in ("glossary", "extrefs", "schema", "i18n"):
+        src_dir = KIT_DIR / d
+        if src_dir.exists():
+            dst_dir = kit_out / d
+            if dst_dir.exists():
+                shutil.rmtree(dst_dir)
+            shutil.copytree(src_dir, dst_dir)
+
+    # mermaid + Prism, the same shared copy build_standalone lays down.
+    # This was standalone-only, so a dist/site deployed anywhere without
+    # internet — an intranet, an air-gapped host, a laptop on a plane —
+    # drew no diagrams and highlighted no code, after 404ing on
+    # `_oku/vendor/…` first. Measured on this repo's own site build with
+    # the CDNs blocked: 0 of 6 diagrams drawn, 0 highlight tokens, while
+    # the standalone tree of the same pages had all 6 and 598. The loader
+    # falls back to the CDN, so the failure only appears where nobody is
+    # watching, which is the point of vendoring in the first place.
+    # Refreshed at every copy rather than only after a fetch: the file
+    # describes the directory, and a directory that gained a grammar
+    # from another project's build would otherwise ship a stale list.
+    _write_prism_carried()
+    src_vendor = vendor_dir()
+    if src_vendor.is_dir():
+        shutil.copytree(src_vendor, kit_out / "vendor", dirs_exist_ok=True)
+    return kit_out
 
 
 _BUILT_MARKER = "<script>window.__okuBuilt=1;</script>"
