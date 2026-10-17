@@ -6168,22 +6168,29 @@ def build_manifest(root: Path, *, out_dir: Path | None = None, pages: list | Non
 
 
 # ---------- LLM-friendly markdown twin per JSON page ----------
-def compute_llms_txt(root: Path, *, pages: list | None = None) -> str:
+def compute_llms_txt(
+    root: Path, *, pages: list | None = None, name: str | None = None, description: str | None = None
+) -> str:
     """Return the llms.txt body (llmstxt.org convention) — sitemap for
     LLM consumers. One line per page: link + summary. No body copy
-    (HTML is the source of truth)."""
+    (HTML is the source of truth).
+
+    `name` / `description` replace the kit.json's own: `oku pack` titles
+    its package after the entry page, not after the tree it came from."""
     if pages is None:
         pages = find_json_pages(root)
     project_name = root.name
-    description = ""
+    kit_description = ""
     kit_json = find_kit_json(root)
     if kit_json is not None:
         try:
             kit_data = json.loads(kit_json.read_text(encoding="utf-8"))
             project_name = kit_data.get("name", project_name)
-            description = kit_data.get("description", "")
+            kit_description = kit_data.get("description", "")
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             pass
+    project_name = name if name is not None else project_name
+    description = description if description is not None else kit_description
 
     lines = ["# " + project_name, ""]
     if description:
@@ -10267,6 +10274,18 @@ def main() -> int:
         help="build even when the doctree check reports errors (they are still printed)",
     )
     sub.add_parser("clean", help="remove the trees oku built under dist/")
+    pack_parser = sub.add_parser(
+        "pack",
+        help="publish chosen pages, the pages their links reach and every file they name, as one directory",
+    )
+    pack_parser.add_argument(
+        "pages", nargs="+", metavar="page.md", help="entry pages; the first is the one index.html opens"
+    )
+    pack_parser.add_argument(
+        "--out",
+        required=True,
+        help="directory to write; replaced when it holds an earlier pack, refused when it holds anything else",
+    )
     migrate_parser = sub.add_parser(
         "migrate",
         help="convert page-JSON sources (v1/v2) to v3 markdown",
@@ -10396,6 +10415,10 @@ def main() -> int:
         return cmd_build(args)
     if args.cmd == "clean":
         return cmd_clean(args)
+    if args.cmd == "pack":
+        from oku.pack import cmd_pack  # pack builds on this module, so it is imported late
+
+        return cmd_pack(args)
     if args.cmd == "check":
         return cmd_check(args)
     if args.cmd == "migrate":
