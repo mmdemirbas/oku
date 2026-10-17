@@ -179,6 +179,39 @@ Before anything is written to `--out`, the built package is checked. Any of thes
 
 There is no flag to skip the check. Fix the source and pack again. Exit 2 is a usage error: a page that is missing or not `.md`, or an `--out` that holds something other than an earlier pack.
 
+### One kit for many packages {#pack-kit-url}
+
+A host that serves many packages does not need a copy of the kit in each one. `--kit-url` names the address where the host serves one copy, written by [`oku kit export`](#kit-export):
+
+```bash
+oku kit export --out ~/share/kit
+oku pack raporlar/evrad.md --out ~/share/evrad --kit-url /k/3f9a/
+
+# ✓ Packed 1 page(s), 12 file(s) into /Users/you/share/evrad
+#   entry: raporlar/evrad.html
+#   kit:   /k/3f9a/ (not carried; serve `oku kit export` there)
+```
+
+The package then has no `_oku/` directory. Every reference a page makes to the kit goes to that address: the scripts and the stylesheet in each page, with their `?v=` stamp; the fonts the stylesheet names; and what a page loads later, which is mermaid, Prism and its grammars, the translation table of a page not in English, and the glossary and link registries `kit.json` names. Each page also names the package root relative to itself, so the package still works under any path prefix. `_pack.json` gains `"kit": {"url": "/k/3f9a/"}`, which tells the host the pages expect the kit there.
+
+The URL is a root-relative path that ends in `/`. Anything else is exit 2: a relative path, a scheme or a host, a query, an empty or a dot segment. The check runs as it does without the flag, except that a reference under the kit URL is held to the files `oku kit export` writes instead of to the package. Without `--kit-url`, nothing changes.
+
+## oku kit export {#kit-export}
+
+Write the kit a page loads at runtime, for a host to serve once at the address packages name with [`--kit-url`](#pack-kit-url).
+
+```bash
+oku kit export --out ~/share/kit
+
+# ✓ Exported kit 2026-10-17-r128: 321 file(s), 6.0 MB into /Users/you/share/kit
+```
+
+It holds chrome.css, chrome.js, chrome-boot.js and renderer.js; the `i18n/`, `glossary/` and `extrefs/` tables; and `vendor/`, with mermaid, Prism and the fonts. `schema/` is left out: no page loads a schema or `examples.json`. Those serve `oku check` and `oku spec`.
+
+The same installed oku writes the same bytes on every run, with no timestamps in them, so a host can name the copy by its content. That is why the export carries every grammar of the pinned Prism release (293 files, 0.56 MB, fetched once into `~/.cache/oku/`) and not the grammars this machine's builds happened to fetch. Those grow, and each new one would change the copy's name and make every reader download the kit again.
+
+Exit 1 when the vendored copy is incomplete or a grammar cannot be fetched; nothing is written. Exit 2 when `--out` holds a file a kit export does not write.
+
 ## oku spec {#spec}
 
 Print a ready-to-paste payload for any block kind or chart type. The kit

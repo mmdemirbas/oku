@@ -123,7 +123,7 @@ AI/LLM surface.
 | `kit/schema/page.schema.json` | JSON-schema for page payloads. Every page (converted from .md) validates against it; the optional `jsonschema` dep makes the check active. Chart `type` enum here is the single source of truth for known chart types. |
 | `kit/{glossary,extrefs}/<domain>.json` | Central glossary + ext-ref registries by domain; fetched at runtime by chrome.js. |
 | `src/oku/cli.py` | `oku init / build / clean / check / spec / vendor / verify / migrate / serve / preview` plus the v3 converter pair (`md_to_v2_page` / `page_to_md`), the strict-GFM + island lint (`_lint_md_string`), and the v1→v2 page shim (`_v1_to_v2`). |
-| `src/oku/pack.py` | `oku pack`: the closure of chosen pages, laid out as a site tree with only those pages in it, `_pack.json`, and the leak check that runs before anything reaches `--out`. Builds on cli.py's converters and site helpers; cli.py imports it only when the command runs. |
+| `src/oku/pack.py` | `oku pack` and `oku kit export`: the closure of chosen pages, laid out as a site tree with only those pages in it, `_pack.json`, and the leak check that runs before anything reaches `--out`. Builds on cli.py's converters and site helpers; cli.py imports it only when the command runs. |
 | `src/oku/templates/` | `starter.{md,html}` — pair to copy when starting a new page. |
 | `bin/oku` | PEP 723 shim — run without install via `uv run bin/oku …`. Points at `oku.cli:main`. |
 | `docs/` | The kit's own documentation, authored via the kit. Use these as canonical examples. `docs/roadmap.md` tracks open phases. |
@@ -1500,6 +1500,20 @@ markdown that carried it, at its line; there is no flag to skip it,
 because the fix is in the source. Held by `test_pack.py` and
 `browser/test_pack_under_a_prefix.py`, which serves the package under
 `/d/x/` behind the strict CSP a host would send.
+
+**A host with many packages serves one kit: `oku kit export` + `oku pack
+--kit-url /k/<id>/`.** chrome.js found both the docs root and the kit by
+the `_oku/` in its own tags, so a stub naming `/k/<id>/` lost both — the
+root fell back to the page's directory and every lazy load (mermaid,
+Prism, i18n, the registries) went to an `_oku/` the package lacks. The
+stub now names them: `oku-docs-root` (relative, so prefixes still work)
+and `oku-kit-base`, which `__okuKitBase` reads; every kit-relative URL in
+chrome.js goes through `__okuKitBase`, never `__okuDocsRoot + '_oku/'`.
+The export is addressed by its content, so it carries every grammar of
+the pinned Prism (cached in `~/.cache/oku/`), not the vendor directory's
+grammars, which grow with every project's build. Held by
+`browser/test_pack_shared_kit.py`, which also watches each lazy load
+arrive from the kit, since a load that never happens fails nothing.
 
 **A file in the viewer can be handed to the reader's editor, and the
 reader names the editor.** `__okuEditors` holds three URL formats, each

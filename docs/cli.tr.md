@@ -179,6 +179,39 @@ Dizin, içinde yalnızca bu sayfaların olduğu bir dist/site ağacıdır. Büt�
 
 Denetimi atlatan bir seçenek yoktur. Kaynağı düzeltip yeniden paketleyin. 2 çıkış kodu kullanım hatasıdır: eksik ya da `.md` olmayan bir sayfa, veya içinde önceki bir paketten başka bir şey bulunan bir `--out` dizini.
 
+### Birçok paket için tek kit {#pack-kit-url}
+
+Çok sayıda paket sunan bir sunucunun her pakette kitin ayrı bir kopyasını tutması gerekmez. `--kit-url`, sunucunun [`oku kit export`](#kit-export) ile yazılmış tek kopyayı sunduğu adresi verir:
+
+```bash
+oku kit export --out ~/share/kit
+oku pack raporlar/evrad.md --out ~/share/evrad --kit-url /k/3f9a/
+
+# ✓ Packed 1 page(s), 12 file(s) into /Users/you/share/evrad
+#   entry: raporlar/evrad.html
+#   kit:   /k/3f9a/ (not carried; serve `oku kit export` there)
+```
+
+Bu durumda pakette `_oku/` dizini olmaz. Sayfanın kite yaptığı her başvuru bu adrese gider. Her sayfadaki betikler ve stil dosyası `?v=` damgalarıyla birlikte oraya bakar. Stil dosyasının adını verdiği yazı tipleri de oradan gelir. Sayfanın sonradan yüklediği dosyalar da öyle: mermaid, Prism ve sözdizimi tanımları, İngilizce olmayan bir sayfanın çeviri tablosu, `kit.json` dosyasında adı geçen sözlük ve bağlantı kayıtları. Her sayfa paketin kökünü de kendi konumuna göre yazar. Böylece paket hangi yol öneki altında sunulursa sunulsun çalışır. `_pack.json` dosyasına `"kit": {"url": "/k/3f9a/"}` eklenir. Sunucu buradan sayfaların kiti bu adreste beklediğini öğrenir.
+
+Adres kökten başlayan ve `/` ile biten bir yol olmalıdır. Başka her biçim 2 koduyla reddedilir: göreli bir yol, bir şema ya da sunucu adı, bir sorgu, boş ya da nokta olan bir bölüm. Denetim bu seçenek yokken nasıl çalışıyorsa öyle çalışır. Tek fark, kit adresinin altındaki bir başvurunun paketle değil, `oku kit export` komutunun yazdığı dosyalarla karşılaştırılmasıdır. `--kit-url` verilmezse hiçbir şey değişmez.
+
+## oku kit export {#kit-export}
+
+Bir sayfanın çalışırken yüklediği kiti yazar. Sunucu bu kopyayı bir kez, paketlerin [`--kit-url`](#pack-kit-url) ile verdiği adreste sunar.
+
+```bash
+oku kit export --out ~/share/kit
+
+# ✓ Exported kit 2026-10-17-r128: 321 file(s), 6.0 MB into /Users/you/share/kit
+```
+
+İçinde chrome.css, chrome.js, chrome-boot.js ve renderer.js, `i18n/`, `glossary/` ve `extrefs/` tabloları ve mermaid, Prism ile yazı tiplerinin bulunduğu `vendor/` vardır. `schema/` dışarıda kalır, çünkü hiçbir sayfa bir şema ya da `examples.json` yüklemez. Bu dosyalar `oku check` ve `oku spec` için vardır.
+
+Kurulu aynı oku her çalıştırmada aynı baytları yazar ve bunların içinde zaman damgası yoktur. Bu sayede sunucu kopyaya içeriğinden türettiği bir ad verebilir. Kopyada sabitlenmiş Prism sürümünün bütün sözdizimi tanımları bulunur (293 dosya, 0,56 MB, `~/.cache/oku/` altına bir kez indirilir). Bu makinedeki derlemelerin o güne kadar indirdiği tanımlar alınmaz. O küme büyür, her yeni tanım kopyanın adını değiştirir ve her okur kiti yeniden indirmek zorunda kalırdı.
+
+Yerel kopya eksikse ya da bir sözdizimi tanımı indirilemezse 1 koduyla çıkar ve hiçbir şey yazmaz. `--out` dizininde bir kit dışa aktarımının yazmayacağı bir dosya varsa 2 koduyla çıkar.
+
 ## oku spec {#spec}
 
 Herhangi bir blok türü ya da grafik türü için doğrudan yapıştırılabilir
