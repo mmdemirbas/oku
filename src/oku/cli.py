@@ -9485,15 +9485,23 @@ def _write_prism_carried() -> None:
     root = vendor_dir() / "prism"
     if not (root / "prism.min.js").exists():
         return
+    components = {
+        p.name[len("prism-") : -len(".min.js")] for p in (root / "components").glob("prism-*.min.js")
+    }
+    (root / "carried.js").write_text(prism_carried_js(components), encoding="utf-8")
+
+
+def prism_carried_js(components: Iterable[str]) -> str:
+    """carried.js for a directory holding these component files: the
+    grammars compiled into prism.min.js count as carried too. Sorted, so
+    the same set is the same bytes — `oku kit export` is addressed by
+    its content."""
     cat = prism_catalog()
-    ids = sorted(
-        {p.name[len("prism-") : -len(".min.js")] for p in (root / "components").glob("prism-*.min.js")}
-        | cat["bundled"]
-    )
+    ids = sorted(set(components) | cat["bundled"])
     carried = set(ids)
     aliases = {a: t for a, t in cat["aliases"].items() if t in carried}
     payload = json.dumps({"ids": ids, "aliases": aliases}, separators=(",", ":"), sort_keys=True)
-    (root / "carried.js").write_text(f"window.__okuPrismCarried={payload};\n", encoding="utf-8")
+    return f"window.__okuPrismCarried={payload};\n"
 
 
 # The three families chrome.css asks for, as variable woff2 — one file per
@@ -10286,6 +10294,17 @@ def main() -> int:
         required=True,
         help="directory to write; replaced when it holds an earlier pack, refused when it holds anything else",
     )
+    kit_parser = sub.add_parser("kit", help="the kit itself, for a host that serves one copy to many packs")
+    kit_sub = kit_parser.add_subparsers(dest="kit_cmd", required=True)
+    kit_export_parser = kit_sub.add_parser(
+        "export",
+        help="write exactly the files a page loads from the kit, the same bytes on every run",
+    )
+    kit_export_parser.add_argument(
+        "--out",
+        required=True,
+        help="directory to write; replaced when it holds an earlier export, refused when it holds anything else",
+    )
     migrate_parser = sub.add_parser(
         "migrate",
         help="convert page-JSON sources (v1/v2) to v3 markdown",
@@ -10415,6 +10434,10 @@ def main() -> int:
         return cmd_build(args)
     if args.cmd == "clean":
         return cmd_clean(args)
+    if args.cmd == "kit":
+        from oku.pack import cmd_kit_export  # the export is pack's counterpart, imported late like it
+
+        return cmd_kit_export(args)
     if args.cmd == "pack":
         from oku.pack import cmd_pack  # pack builds on this module, so it is imported late
 

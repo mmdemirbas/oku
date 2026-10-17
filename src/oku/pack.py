@@ -934,3 +934,155 @@ def run(pages: list[str], out: str) -> int:
 
 def cmd_pack(args: argparse.Namespace) -> int:
     return run(args.pages, args.out)
+
+
+# ------------------------------------------------------------------ #
+# `oku kit export` — one copy of the kit for every package a host serves.
+# ------------------------------------------------------------------ #
+
+# What chrome.js loads from the kit besides the four files a stub names:
+# `i18n/<lang>.json`, `glossary/<domain>.json`, `extrefs/<domain>.json`,
+# and the vendor copy. `schema/` is left out: nothing a page runs fetches
+# a schema or examples.json — the renderer carries the schema's
+# `required` lists as a literal — and they exist for `oku check` and
+# `oku spec`. The browser test asserts no page asks for one.
+_EXPORT_DIRS = ("glossary", "extrefs", "i18n")
+_EXPORT_TOP = frozenset({*cli.KIT_FILES, *_EXPORT_DIRS, "vendor"})
+
+
+def _grammar_dir() -> Path:
+    """Every grammar of the pinned Prism release, cached once per machine.
+
+    Not the vendor directory. That one holds the grammars this machine's
+    builds happened to need, so it grows, and an export copied from it
+    changed bytes — and the host's kit id, so every reader re-fetched the
+    whole kit — whenever any project used a language for the first time.
+    An export made before the pack that fetched a grammar also lacked
+    it, and that block drew as plain text. Not inside it either: every
+    build copies the whole vendor directory into its tree.
+    """
+    base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    return Path(base) / "oku" / f"prism-{cli._PRISM_VERSION}" / "components"
+
+
+def _all_grammars() -> list[str]:
+    """The component files Prism's catalog has; the grammars compiled into
+    prism.min.js have none."""
+    cat = cli.prism_catalog()
+    return sorted(cat["ids"] - cat["bundled"])
+
+
+def _export_sources() -> dict[str, Path | str]:
+    """Every file the export writes, by its path in the export, mapped to
+    the file it is copied from (or, for carried.js, its text). A function
+    of the installed oku alone, so two runs write the same bytes."""
+    kit, vendor = cli.KIT_DIR, cli.vendor_dir()
+    out: dict[str, Path | str] = {name: kit / name for name in cli.KIT_FILES}
+    for d in _EXPORT_DIRS:
+        out.update({f"{d}/{f.name}": f for f in (kit / d).glob("*.json")})
+    for rel, _url in cli._vendor_files():
+        if not rel.startswith("prism/components/"):
+            out[f"vendor/{rel}"] = vendor / rel
+    grammars = _all_grammars()
+    out.update(
+        {f"vendor/prism/components/prism-{g}.min.js": _grammar_dir() / f"prism-{g}.min.js" for g in grammars}
+    )
+    out["vendor/prism/carried.js"] = cli.prism_carried_js(grammars)
+    return dict(sorted(out.items()))
+
+
+def _fetch_grammar(ident: str) -> bool:
+    import http.client
+    import urllib.error
+    import urllib.request
+
+    dest = _grammar_dir() / f"prism-{ident}.min.js"
+    try:
+        with urllib.request.urlopen(f"{cli._PRISM_CDN}components/prism-{ident}.min.js", timeout=30) as r:  # noqa: S310 - pinned https CDN
+            data = r.read()
+    except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError):
+        return False
+    if not data:
+        return False
+    # Through a temporary name: a file cut short by an interrupted run
+    # would otherwise count as present, and every later export carry it.
+    part = dest.with_name(f".{dest.name}.{os.getpid()}.part")
+    part.write_bytes(data)
+    os.replace(part, dest)
+    return True
+
+
+def _fetch_grammars() -> list[str]:
+    """Fill the grammar cache; return the grammars that could not be fetched."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    need = [g for g in _all_grammars() if not (_grammar_dir() / f"prism-{g}.min.js").is_file()]
+    if not need:
+        return []
+    _grammar_dir().mkdir(parents=True, exist_ok=True)
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        fetched = list(pool.map(_fetch_grammar, need))
+    # One more pass, one at a time, for what failed. Measured on the first
+    # fill of an empty cache: 15 of 285 failed in the opening wave of
+    # parallel connections and every one fetched on the next run.
+    return [g for g, ok in zip(need, fetched, strict=True) if not ok and not _fetch_grammar(g)]
+
+
+def _validate_export_out(out: str) -> Path:
+    out_dir = Path(out).expanduser().absolute()
+    if out_dir.exists() and not out_dir.is_dir():
+        raise PackUsageError(f"{out}: exists and is not a directory")
+    if out_dir.is_dir():
+        foreign = sorted(p.name for p in out_dir.iterdir() if p.name not in _EXPORT_TOP)
+        if foreign:
+            raise PackUsageError(
+                f"{out}: holds {foreign[0]}, which no kit export writes; "
+                "refusing to replace a directory oku did not export"
+            )
+    if not out_dir.parent.is_dir():
+        raise PackUsageError(f"{out}: its parent directory does not exist")
+    return out_dir
+
+
+def export_kit(out: str) -> int:
+    try:
+        out_dir = _validate_export_out(out)
+    except PackUsageError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return EXIT_USAGE
+    if not cli.vendor_is_complete():
+        cli.fetch_vendor(quiet=True)
+    if not cli.vendor_is_complete():
+        note = cli._vendor_incomplete_note() or "incomplete"
+        print(f"✗ Not exported: the kit's vendor copy is {note}; run `oku vendor`.", file=sys.stderr)
+        return EXIT_FINDINGS
+    failed = _fetch_grammars()
+    if failed:
+        print(
+            f"✗ Not exported: {len(failed)} Prism grammar(s) could not be fetched into {_grammar_dir()}"
+            f" ({', '.join(failed[:5])}{', …' if len(failed) > 5 else ''}). Nothing was written to {out}.",
+            file=sys.stderr,
+        )
+        return EXIT_FINDINGS
+    sources = _export_sources()
+    total = 0
+    staging = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.kit-", dir=out_dir.parent))
+    try:
+        for rel, src in sources.items():
+            data = src.encode("utf-8") if isinstance(src, str) else src.read_bytes()
+            _write(staging, rel, data)
+            total += len(data)
+        _place(staging, out_dir)
+    except OSError as e:
+        print(f"✗ Export failed: {e}. Nothing was written to {out}.", file=sys.stderr)
+        return EXIT_FINDINGS
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    print(
+        f"✓ Exported kit {cli._kit_build_stamp()}: {len(sources)} file(s), {total / 1_000_000:.1f} MB into {out}"
+    )
+    return 0
+
+
+def cmd_kit_export(args: argparse.Namespace) -> int:
+    return export_kit(args.out)

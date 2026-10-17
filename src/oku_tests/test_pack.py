@@ -329,6 +329,86 @@ class TestTheCommandLine:
         assert exit_info.value.code == 2
 
 
+@pytest.fixture()
+def fake_vendor(tmp_path: Path, monkeypatch) -> Path:
+    """A complete vendor copy and grammar cache of placeholder bytes, so
+    the export runs without a network."""
+    vendor = tmp_path / "vendor"
+    for rel, _url in cli._vendor_files():
+        (vendor / rel).parent.mkdir(parents=True, exist_ok=True)
+        (vendor / rel).write_bytes(f"/* {rel} */\n".encode())
+    grammars = tmp_path / "grammars"
+    grammars.mkdir()
+    for g in pack._all_grammars():
+        (grammars / f"prism-{g}.min.js").write_bytes(f"/* {g} */\n".encode())
+    monkeypatch.setattr(cli, "vendor_dir", lambda: vendor)
+    monkeypatch.setattr(pack, "_grammar_dir", lambda: grammars)
+    return tmp_path
+
+
+class TestTheKitExport:
+    """`oku kit export`: what a page loads from the kit, the same bytes on
+    every run, because a host names the copy by its content."""
+
+    def test_two_runs_write_the_same_bytes(self, fake_vendor: Path) -> None:
+        a, b = fake_vendor / "a", fake_vendor / "b"
+        assert pack.export_kit(str(a)) == 0
+        assert pack.export_kit(str(b)) == 0
+        assert _files(a) == _files(b)
+
+    def test_it_holds_what_a_page_loads_and_no_schema(self, fake_vendor: Path) -> None:
+        out = fake_vendor / "kit"
+        assert pack.export_kit(str(out)) == 0
+        files = _files(out)
+        for name in cli.KIT_FILES:
+            assert files[name] == (cli.KIT_DIR / name).read_bytes(), name
+        for rel in ("i18n/tr.json", "glossary/web.json", "extrefs/web.json"):
+            assert rel in files, rel
+        for rel, _url in cli._vendor_files():
+            assert f"vendor/{rel}" in files, rel
+        assert not [p for p in files if p.startswith("schema/") or p.endswith("examples.json")]
+
+    def test_it_carries_every_grammar_and_says_so(self, fake_vendor: Path) -> None:
+        """Not the grammars this machine's builds happened to fetch: those
+        grow, and every new one would change the kit's id."""
+        out = fake_vendor / "kit"
+        assert pack.export_kit(str(out)) == 0
+        grammars = pack._all_grammars()
+        components = sorted(p.name for p in (out / "vendor" / "prism" / "components").iterdir())
+        assert components == sorted(f"prism-{g}.min.js" for g in grammars)
+        carried = (out / "vendor" / "prism" / "carried.js").read_text(encoding="utf-8")
+        ids = json.loads(carried.removeprefix("window.__okuPrismCarried=").removesuffix(";\n"))["ids"]
+        assert set(grammars) <= set(ids)
+
+    def test_a_directory_it_did_not_write_is_refused(self, fake_vendor: Path) -> None:
+        out = fake_vendor / "kit"
+        out.mkdir()
+        (out / "keep.txt").write_text("mine\n", encoding="utf-8")
+        assert pack.export_kit(str(out)) == 2
+        assert sorted(p.name for p in out.iterdir()) == ["keep.txt"]
+
+    def test_an_earlier_export_is_replaced(self, fake_vendor: Path) -> None:
+        out = fake_vendor / "kit"
+        assert pack.export_kit(str(out)) == 0
+        (out / "vendor" / "stale.js").write_text("old\n", encoding="utf-8")
+        assert pack.export_kit(str(out)) == 0
+        assert not (out / "vendor" / "stale.js").exists()
+
+    def test_a_grammar_that_cannot_be_fetched_stops_it(self, fake_vendor: Path, monkeypatch) -> None:
+        missing = fake_vendor / "grammars" / f"prism-{pack._all_grammars()[0]}.min.js"
+        missing.unlink()
+        monkeypatch.setattr(pack, "_fetch_grammar", lambda ident: False)
+        out = fake_vendor / "kit"
+        assert pack.export_kit(str(out)) == 1
+        assert not out.exists()
+
+    def test_main_routes_the_export(self, fake_vendor: Path, monkeypatch) -> None:
+        out = fake_vendor / "via-main"
+        monkeypatch.setattr("sys.argv", ["oku", "kit", "export", "--out", str(out)])
+        assert cli.main() == 0
+        assert (out / "chrome.js").is_file()
+
+
 def test_plain_text_drops_code_scripts_and_markup() -> None:
     page = cli.md_to_v2_page(
         "## Head {#h}\n\nA *soft* and __strong__ [link](x.md) with `code`.\n\n"
