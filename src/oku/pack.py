@@ -532,8 +532,270 @@ def page_plain_text(page: dict) -> str:
 
 
 # ------------------------------------------------------------------ #
-# What stops a build stops a pack.
+# The leak check, on the built package.
 # ------------------------------------------------------------------ #
+
+# A path into somebody's home directory. Not preceded by a host-name
+# character, so `https://example.com/home/news/` is a URL and not a home;
+# `file:///Users/x/` still is one.
+_HOME_RE = re.compile(
+    rb"(?:(?<![\w.-])|(?<=\\[nrt]))(?:/Users|/home)/[^/\s\"'<>`|\\*]+/[^\s\"'<>`|\\*)\]]*"
+    rb"|[A-Za-z]:(?:\\\\|\\)Users(?:\\\\|\\)[^\\\s\"'<>]+"
+)
+_EXTERNAL_RE = re.compile(r"^(?:https?:)?//", re.I)
+_EXTERNAL_TAG_RE = re.compile(
+    r"<(?:script|img|iframe|frame|embed|object|video|audio|source|track|link|input|image|use)\b[^>]*?"
+    r"\b(?:src|href|data|poster|srcset|xlink:href)\s*=\s*[\"']\s*((?:https?:)?//[^\"'\s]+)",
+    re.I,
+)
+_EXTERNAL_CSS_RE = re.compile(r"""(?:url\(\s*["']?|@import\s+["'])\s*((?:https?:)?//[^"')\s]+)""", re.I)
+_EXTERNAL_JS_RE = re.compile(
+    r"""(?:\b(?:fetch|import|importScripts|EventSource|WebSocket|Worker|SharedWorker|sendBeacon)\s*\(|"""
+    r"""\.src\s*=)\s*["'`]((?:https?:|wss?:)?//[^"'`\s]+)"""
+)
+_ANCHOR_RE = re.compile(r"""<a\b[^>]*?\bhref\s*=\s*["']((?:https?:)?//[^"'\s]+)""", re.I)
+_LOAD_KEYS = ("src", "poster", "image", "img", "icon", "thumbnail")
+
+
+def _home_findings(staging: Path, origins: dict[str, list[Path]], texts: dict[Path, str]) -> list[Finding]:
+    """(a) Every home-directory path in any file of the package.
+
+    Bytes, not text: a PDF's metadata is where a script's working
+    directory ends up, and it is as much a part of what is sent as the
+    page is. Each one is reported against the file the author edits.
+    """
+    home = str(Path.home()).encode()
+    extra = None if home.startswith((b"/Users/", b"/home/")) else re.compile(re.escape(home) + rb"(?=/)")
+    found: dict[tuple, Finding] = {}
+    for f in sorted(p for p in staging.rglob("*") if p.is_file()):
+        rel = f.relative_to(staging).as_posix()
+        data = f.read_bytes()
+        hits = [m.group(0) for m in _HOME_RE.finditer(data)]
+        if extra is not None:
+            hits += [m.group(0) for m in extra.finditer(data)]
+        for raw in hits:
+            token = raw.decode("utf-8", "replace").rstrip(".,;:")
+            src, line = _locate(token, origins.get(rel, []), texts)
+            key = (src, line, token) if src else (rel, token)
+            found.setdefault(key, Finding("error", "home-path", token, src, line)).outputs.add(rel)
+    return list(found.values())
+
+
+def _locate(token: str, candidates: list[Path], texts: dict[Path, str]) -> tuple[Path | None, int | None]:
+    """The first candidate source holding `token`, and the line it is on.
+
+    Whole tokens first: `/a/b/` is also the head of `/a/b/c.py`, and a
+    plain substring search reported the shorter path on the longer one's
+    line, in the wrong file. Then any occurrence, then the account part
+    (`/Users/name/`) for a token the build assembled rather than the
+    author typed.
+    """
+    parts = token.split("/")
+    searches = [re.compile(re.escape(token) + r"(?![^\s\"'<>`|\\*)\]])"), re.compile(re.escape(token))]
+    if len(parts) > 3:
+        searches.append(re.compile(re.escape("/".join(parts[:3]) + "/")))
+    for pattern in searches:
+        for c in candidates:
+            if c not in texts:
+                try:
+                    texts[c] = c.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    texts[c] = ""
+            m = pattern.search(texts[c])
+            if m:
+                return c, texts[c].count("\n", 0, m.start()) + 1
+    return None, None
+
+
+def _why_not_carried(href: str, src: Path) -> str:
+    """Why the package lacks what a reference names, in the source's terms."""
+    target = (src.parent / _ref_path(href)).resolve()
+    if not target.exists():
+        return "names nothing at the source"
+    if target.is_dir():
+        return "names a directory"
+    if not cli.asset_within_project(target, src):
+        return f"names a file outside the project ({cli.project_root_for(src.parent).name}), which is not carried"
+    return "names a file the package does not carry"
+
+
+def _dangling(href: str, how: str, base: Path, staging: Path) -> str | None:
+    """What is wrong with a reference inside the built package, or None."""
+    if href.startswith("/"):
+        return "is root-absolute, so under a path prefix it leaves the package"
+    path = _ref_path(href)
+    if how == "link" and path.lower().endswith(".md"):
+        path = path[:-3] + ".html"
+    target = Path(os.path.normpath(base / path))
+    if target != staging and staging not in target.parents:
+        return "resolves outside the package"
+    if target.is_dir():
+        return None if (target / "index.html").is_file() else "names a directory"
+    return None if target.is_file() else "missing"
+
+
+def _ref_findings(staging: Path, plan: Plan, texts: dict[Path, str]) -> list[Finding]:
+    """(b) Every local reference a packed page makes, resolved against the
+    package rather than the source: it must land on a file inside it."""
+    out: list[Finding] = []
+    for pp in plan.pages:
+        page = json.loads((staging / pp.json_rel).read_text(encoding="utf-8"))
+        base = (staging / pp.rel).parent
+        for href, how in _local_refs(page):
+            problem = _dangling(href, how, base, staging)
+            if problem == "missing":
+                problem = _why_not_carried(href, pp.src)
+            if problem:
+                src, line = _locate(href, [pp.src], texts)
+                out.append(
+                    Finding(
+                        "error", "outside-package", f"{href} {problem}", src, line, {pp.json_rel.as_posix()}
+                    )
+                )
+        out += _chip_findings(page, pp, staging, texts)
+    for f in sorted(staging.rglob("*.html")):
+        rel = f.relative_to(staging)
+        if rel.parts[0] == "_oku":
+            continue
+        for href in _ISLAND_REF_RE.findall(f.read_text(encoding="utf-8")):
+            problem = None if _NOT_LOCAL_RE.match(href) else _dangling(href, "raw", f.parent, staging)
+            if problem:
+                out.append(
+                    Finding("error", "outside-package", f"{href} {problem}", None, None, {rel.as_posix()})
+                )
+    return out
+
+
+_CHIP_STATUS = {
+    "missing": "names nothing at the source",
+    "outside": "names a file outside the project, which is not carried",
+}
+
+
+def _chip_status(status: str | None) -> str:
+    return _CHIP_STATUS.get(status or "", f"is {status} at the source")
+
+
+def _chip_findings(page: dict, pp: PackPage, staging: Path, texts: dict[Path, str]) -> list[Finding]:
+    """The `#f/` half of (b): a chip whose file did not travel, on the page
+    or inside a carried markdown file the viewer will open."""
+    out: list[Finding] = []
+    meta = page.get("m") or {}
+    files, more = meta.get("_files") or {}, meta.get("_files_more") or {}
+    for key, ref in files.items():
+        status = ref.get("status")
+        if status not in ("ok", "over-cap"):
+            src, line = _locate(f"#f/{key}", [pp.src], texts)
+            out.append(Finding("error", "outside-package", f"#f/{key} {_chip_status(status)}", src, line))
+    for ref in [*files.values(), *more.values()]:
+        problem = _dangling(ref["url"], "raw", (staging / pp.rel).parent, staging) if ref.get("url") else None
+        if problem:
+            out.append(
+                Finding("error", "outside-package", f"#f/{ref.get('path')} → {ref['url']} {problem}", pp.src)
+            )
+    # The page's own source is in the package too, as its .md copy.
+    store = {r.get("rel") for r in files.values()} | set(more) | {meta.get("_rel")}
+    proj = cli.project_root_for(pp.src.parent)
+    for carrier in [*files.values(), *more.values()]:
+        if carrier.get("kind") != "markdown" or carrier.get("text") is None or not carrier.get("rel"):
+            continue
+        carrier_path = proj / carrier["rel"]
+        for href in _chip_hrefs(carrier["text"], carrier_path):
+            target, status, _key, _line, _end = cli.resolve_file_line(href, carrier_path)
+            rel = target.relative_to(proj).as_posix() if status == "ok" and target else None
+            if rel not in store:
+                why = _chip_status(status) if status != "ok" else "was not carried (past the closure budget)"
+                src, line = _locate(f"#f/{href}", [carrier_path], texts)
+                out.append(Finding("error", "outside-package", f"#f/{href} {why}", src, line))
+    return out
+
+
+def _chip_hrefs(text: str, path: Path) -> list[str]:
+    """The `#f/` references in a carried markdown file, found the way
+    `collect_file_closure` finds them: the file made a page, every string
+    walked."""
+    try:
+        page = cli.md_to_v2_page(text, default_title=path.stem)
+    except Exception:  # noqa: BLE001 — a file that will not parse carries nothing further
+        return []
+    hrefs = []
+    for s in cli._iter_strings(page):
+        if "#f/" in s:
+            hrefs += [h.strip() for h in cli._MD_FILE_REF_RE.findall(cli._strip_code(s)) if h.strip()]
+    return list(dict.fromkeys(hrefs))
+
+
+def _external(page: dict) -> tuple[list[str], list[str]]:
+    """(loads, links): what the page would fetch from another origin, and
+    the plain hyperlinks a reader may follow."""
+    loads: list[str] = []
+    links: list[str] = []
+    for blk in page.get("b") or []:
+        for s in cli._iter_block_strings(blk):
+            text = cli._strip_code(s)
+            images = {m.group(1) for m in cli._MD_IMAGE_RE.finditer(text)}
+            loads += [h for h in images if _EXTERNAL_RE.match(h)]
+            loads += (
+                _EXTERNAL_TAG_RE.findall(text)
+                + _EXTERNAL_CSS_RE.findall(text)
+                + _EXTERNAL_JS_RE.findall(text)
+            )
+            links += [
+                h for h in cli._MD_LINK_TARGET_RE.findall(text) if _EXTERNAL_RE.match(h) and h not in images
+            ]
+            links += _ANCHOR_RE.findall(text)
+        if isinstance(blk, dict):
+            loads += [v for v in _values_at(blk, _LOAD_KEYS) if _EXTERNAL_RE.match(v)]
+            links += [h for h in cli._iter_block_hrefs(blk) if _EXTERNAL_RE.match(h)]
+    return list(dict.fromkeys(loads)), list(dict.fromkeys(links))
+
+
+def _values_at(node, keys: tuple[str, ...]):
+    if isinstance(node, list):
+        for x in node:
+            yield from _values_at(x, keys)
+    elif isinstance(node, dict):
+        for k, v in node.items():
+            if k in keys and isinstance(v, str):
+                yield v.strip()
+            else:
+                yield from _values_at(v, keys)
+
+
+def _external_findings(staging: Path, plan: Plan, texts: dict[Path, str]) -> list[Finding]:
+    """(c) External resource loads are findings; plain links are notes.
+
+    Scanned: every packed page, and every carried markdown file, because
+    the viewer draws one the way a page draws its body (its images too).
+    The kit under `_oku/` is not: its CDN fallbacks are code that never
+    runs while the vendored copy is there, which the browser test holds.
+    """
+    out: list[Finding] = []
+    bodies = [
+        (json.loads((staging / pp.json_rel).read_text(encoding="utf-8")), pp.src, pp.json_rel)
+        for pp in plan.pages
+    ]
+    for target in sorted(f for f in plan.files if f.suffix.lower() in (".md", ".markdown")):
+        rel = PurePosixPath(target.relative_to(plan.root).as_posix())
+        bodies.append(
+            (
+                cli.md_to_v2_page((staging / rel).read_text(encoding="utf-8"), default_title=target.stem),
+                target,
+                rel,
+            )
+        )
+    seen: set[str] = set()
+    for page, src, rel in bodies:
+        loads, links = _external(page)
+        for url, severity, kind in [(u, "error", "external-load") for u in loads] + [
+            (u, "info", "external-link") for u in links
+        ]:
+            if severity == "info" and url in seen:
+                continue
+            seen.add(url)
+            where, line = _locate(url, [src], texts)
+            out.append(Finding(severity, kind, url, where, line, {rel.as_posix()}))
+    return out
 
 
 def _check_findings(plan: Plan) -> list[Finding]:
@@ -562,6 +824,15 @@ def _vendor_findings(plan: Plan) -> list[Finding]:
         return []
     note = cli._vendor_incomplete_note() or "incomplete"
     return [Finding("error", "kit-incomplete", f"the kit's vendor copy is {note}; run `oku vendor`")]
+
+
+def leak_check(staging: Path, plan: Plan, origins: dict[str, list[Path]]) -> list[Finding]:
+    texts: dict[Path, str] = {}
+    return (
+        _home_findings(staging, origins, texts)
+        + _ref_findings(staging, plan, texts)
+        + _external_findings(staging, plan, texts)
+    )
 
 
 # ------------------------------------------------------------------ #
@@ -638,8 +909,8 @@ def run(pages: list[str], out: str) -> int:
     findings = _vendor_findings(plan) + _check_findings(plan)
     staging = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.pack-", dir=out_dir.parent))
     try:
-        _origins, written = _write_tree(plan, staging)
-        findings += written
+        origins, written = _write_tree(plan, staging)
+        findings += written + leak_check(staging, plan, origins)
         errors = [f for f in findings if f.severity == "error"]
         for f in errors + [f for f in findings if f.severity != "error"]:
             print(_format(f))

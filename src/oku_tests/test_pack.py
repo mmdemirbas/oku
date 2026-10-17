@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -201,6 +202,85 @@ class TestThePackIndex:
         assert types["docs/entry.md"] == "text/markdown"
 
 
+class TestTheLeakCheck:
+    @pytest.mark.parametrize("path", ["/Users/alice/projects/secret.txt", "/home/bob/work/x.py"])
+    def test_a_home_path_in_a_carried_file_names_that_file_and_line(self, project, capsys, path) -> None:
+        (project / "files" / "notes.md").write_text(
+            f"# Notes\n\nSee\n{path} for the rest.\n", encoding="utf-8"
+        )
+        rc, out = _pack(project)
+        assert rc == 1
+        printed = capsys.readouterr().out
+        assert f"notes.md:4 [home-path] {path}" in printed, printed
+        assert not out.exists()
+        assert [p.name for p in out.parent.iterdir() if p.name.startswith(".")] == []
+
+    def test_a_url_with_home_in_its_path_is_not_a_home_path(self, project, capsys) -> None:
+        (project / "files" / "notes.md").write_text(
+            "See [it](https://example.com/home/news/x).\n", encoding="utf-8"
+        )
+        rc, _out = _pack(project)
+        assert rc == 0, capsys.readouterr().out
+
+    def test_an_external_script_island_stops_the_pack(self, project, capsys) -> None:
+        text = ENTRY.replace(
+            "- second item", '- second item\n\n<script src="https://cdn.example.com/x.js"></script>'
+        )
+        (project / "docs" / "entry.md").write_text(text, encoding="utf-8")
+        rc, out = _pack(project)
+        assert rc == 1
+        line = text.splitlines().index('<script src="https://cdn.example.com/x.js"></script>') + 1
+        printed = capsys.readouterr().out
+        assert f"entry.md:{line} [external-load] https://cdn.example.com/x.js" in printed, printed
+        assert not out.exists()
+
+    def test_an_external_image_stops_the_pack(self, project, capsys) -> None:
+        (project / "docs" / "second.md").write_text(
+            SECOND + "\n![x](https://img.example.com/a.png)\n", encoding="utf-8"
+        )
+        rc, _out = _pack(project)
+        assert rc == 1
+        assert "[external-load] https://img.example.com/a.png" in capsys.readouterr().out
+
+    def test_a_plain_external_link_is_a_note(self, project, capsys) -> None:
+        (project / "docs" / "second.md").write_text(
+            SECOND + "\nSee [the site](https://example.org/).\n", encoding="utf-8"
+        )
+        rc, _out = _pack(project)
+        assert rc == 0
+        assert "· " in capsys.readouterr().out
+
+    def test_a_chip_past_the_project_stops_the_pack(self, project, capsys) -> None:
+        (project.parent / "elsewhere.txt").write_text("not ours\n", encoding="utf-8")
+        (project / "docs" / "second.md").write_text(
+            SECOND + "\nThe [other](#f/../../elsewhere.txt).\n", encoding="utf-8"
+        )
+        rc, _out = _pack(project)
+        assert rc == 1
+        printed = capsys.readouterr().out
+        assert "[outside-package] #f/../../elsewhere.txt names a file outside the project" in printed, printed
+        assert str(project.parent) + os.sep + "elsewhere.txt" not in printed.split("[outside-package]")[1]
+
+    def test_a_root_absolute_reference_stops_the_pack(self, project, capsys) -> None:
+        (project / "docs" / "second.md").write_text(SECOND + "\n![x](/img/pixel.png)\n", encoding="utf-8")
+        rc, _out = _pack(project)
+        assert rc == 1
+        assert "/img/pixel.png is root-absolute" in capsys.readouterr().out
+
+    def test_a_link_to_a_missing_page_stops_the_pack(self, project, capsys) -> None:
+        (project / "docs" / "second.md").write_text(SECOND + "\nSee [gone](gone.md).\n", encoding="utf-8")
+        rc, _out = _pack(project)
+        assert rc == 1
+        assert "gone.md names nothing at the source" in capsys.readouterr().out
+
+    def test_an_incomplete_kit_stops_the_pack(self, project, capsys, monkeypatch) -> None:
+        monkeypatch.setattr(cli, "vendor_is_complete", lambda: False)
+        monkeypatch.setattr(cli, "fetch_vendor", lambda **kw: (0, 0))
+        rc, _out = _pack(project)
+        assert rc == 1
+        assert "[kit-incomplete]" in capsys.readouterr().out
+
+
 def test_a_carried_file_at_a_name_the_package_writes_is_refused(tmp_path: Path, capsys) -> None:
     proj = tmp_path / "flat"
     (proj / ".git").mkdir(parents=True)
@@ -265,3 +345,20 @@ def test_plain_text_drops_code_scripts_and_markup() -> None:
     # reads rows before columns; the words are what matter here.
     assert set(lines[4].split()) == {"C", "cell", "words"}
     assert len(lines) == 5
+
+
+@pytest.mark.parametrize(
+    "data, found",
+    [
+        (b"see /Users/alice/x/y.md here", b"/Users/alice/x/y.md"),
+        (b'{"text": "line\\n/home/bob/notes/"}', b"/home/bob/notes/"),
+        (b"file:///Users/alice/doc.pdf", b"/Users/alice/doc.pdf"),
+        (b"https://example.com/home/news/x", None),
+        (b"https://github.com/Users/x/", None),
+    ],
+)
+def test_what_counts_as_a_home_path(data: bytes, found: bytes | None) -> None:
+    """A JSON string escapes its newline, so the path after one follows an
+    `n`; a URL's path segment called `home` follows its host."""
+    m = pack._HOME_RE.search(data)
+    assert (m.group(0) if m else None) == found
