@@ -1,10 +1,10 @@
 ---
 title: CLI reference
 eyebrow: Reference
-subtitle: Ten commands: oku init, build, clean, spec, vendor, verify, migrate, check, serve, preview. Designed so you mostly forget the CLI exists.
+subtitle: Eleven commands: oku init, build, clean, pack, spec, vendor, verify, migrate, check, serve, preview. Designed so you mostly forget the CLI exists.
 date: 2026-05-18
 order: 50
-summary: oku init / build / clean / spec / vendor / verify / migrate / check / serve / preview — what each does.
+summary: oku init / build / clean / pack / spec / vendor / verify / migrate / check / serve / preview — what each does.
 ---
 
 > [!TLDR]
@@ -151,6 +151,33 @@ oku clean
 - Safe to chain: oku clean && oku build.
 - Doesn't touch source pages, the _oku symlink, or kit.json. Only generated output.
 - dist/ is a conventional name, not one this tool owns. It used to remove the whole directory, so a deploy script or a data file parked beside the build went with it; now the survivors are named in the output.
+
+## oku pack {#pack}
+
+Write one directory that holds the pages you name and nothing else from their tree. A page shared out of a whole build took the tree along: the site manifest, llms.txt and the search index named every page beside it, and a carried notes file kept the absolute paths it was written with. A pack holds the named pages, every page their prose `.md` links reach, and every local file any of them references, each as a real file: images, `#f/` files including PDFs, `.md` notes, scripts.
+
+```bash
+oku pack raporlar/evrad.md --out ~/share/evrad
+
+# ✓ Packed 1 page(s), 85 file(s) into /Users/you/share/evrad
+#   entry: raporlar/evrad.html
+```
+
+The directory is a dist/site tree with only those pages in it, relative URLs throughout, so it works served from any path prefix. The kit travels inside it, mermaid, Prism and the fonts included, so nothing loads from a CDN. index.html forwards to the first page named, with no script. There is no search index and no rebuild command. A PDF chip opens the PDF in the browser's own viewer, in a new tab.
+
+`_pack.json` describes the package for whoever hosts it: the entry page, its title and summary from the front matter, every page with its plain text (headings, paragraphs, list items, table cells), and every file with its size, SHA-256 and type.
+
+Before anything is written to `--out`, the built package is checked. Any of these stops the pack with exit 1 and leaves `--out` as it was:
+
+| Finding | What it means |
+|---|---|
+| `home-path` | A path into a home directory (`/Users/<name>/`, `/home/<name>/`) in any file of the package. Reported against the file you edit: the notes file that carried it, at its line. |
+| `outside-package` | A local reference that does not land on a file in the package: a file past the project, a root-absolute path, a link to a page that does not exist. |
+| `external-load` | A script, stylesheet, image, font, frame or fetch from another origin. Plain links to other sites are allowed and listed as notes. |
+| `check` | An error `oku check` reports for a packed page. |
+| `kit-incomplete` | The kit's vendored copy is incomplete, so the pages would reach a CDN. |
+
+There is no flag to skip the check. Fix the source and pack again. Exit 2 is a usage error: a page that is missing or not `.md`, or an `--out` that holds something other than an earlier pack.
 
 ## oku spec {#spec}
 

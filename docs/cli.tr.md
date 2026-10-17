@@ -1,10 +1,10 @@
 ---
 title: CLI başvurusu
 eyebrow: Başvuru
-subtitle: On komut - oku init, build, clean, spec, vendor, verify, migrate, check, serve, preview. Çoğu zaman CLI'nin varlığını unutacak şekilde tasarlandı.
+subtitle: On bir komut - oku init, build, clean, pack, spec, vendor, verify, migrate, check, serve, preview. Çoğu zaman CLI'nin varlığını unutacak şekilde tasarlandı.
 date: 2026-05-18
 order: 50
-summary: oku init / build / clean / spec / vendor / verify / migrate / check / serve / preview — her birinin ne yaptığı.
+summary: oku init / build / clean / pack / spec / vendor / verify / migrate / check / serve / preview — her birinin ne yaptığı.
 ---
 
 > [!TLDR]
@@ -151,6 +151,33 @@ oku clean
 - Zincirlemek güvenli: oku clean && oku build.
 - Kaynak sayfalara, _oku sembolik bağına ya da kit.json'a dokunmaz. Yalnızca üretilmiş çıktıyı siler.
 - dist/ yaygın bir addır, bu aracın sahip olduğu bir dizin değil. Eskiden dizinin tamamı kaldırılıyordu; yanına bırakılmış bir dağıtım betiği ya da veri dosyası da onunla birlikte gidiyordu. Artık kalanlar çıktıda adlarıyla listeleniyor.
+
+## oku pack {#pack}
+
+Adını verdiğiniz sayfaları tek bir dizine yazar; ağaçlarından başka hiçbir şeyi almaz. Bütün bir derlemeden tek bir sayfa paylaşıldığında ağacın geri kalanı da onunla gidiyordu. `site-manifest.json`, llms.txt ve arama dizini yanındaki her sayfanın adını taşıyordu. Sayfanın taşıdığı bir not dosyası da yazıldığı makinedeki mutlak yolları içinde tutuyordu. Bir pakette yalnızca şunlar bulunur: adı verilen sayfalar, bu sayfaların düz yazıdaki `.md` bağlantılarıyla ulaşılan bütün sayfalar ve bunlardan herhangi birinin gösterdiği her yerel dosya. Görseller, PDF'ler dahil `#f/` dosyaları, `.md` notları ve betikler gerçek birer dosya olarak gelir.
+
+```bash
+oku pack raporlar/evrad.md --out ~/share/evrad
+
+# ✓ Packed 1 page(s), 85 file(s) into /Users/you/share/evrad
+#   entry: raporlar/evrad.html
+```
+
+Dizin, içinde yalnızca bu sayfaların olduğu bir dist/site ağacıdır. Bütün adresleri görelidir, bu yüzden hangi yol önekinin altında sunulursa sunulsun çalışır. Kit de içindedir; mermaid, Prism ve yazı tipleri dahil. Hiçbir şey bir CDN'den yüklenmez. index.html, betik kullanmadan, adı ilk verilen sayfaya yönlendirir. Arama dizini ve yeniden derleme komutu pakete girmez. Bir PDF çipine tıklayınca PDF, tarayıcının kendi görüntüleyicisinde yeni bir sekmede açılır.
+
+`_pack.json`, paketi barındıracak taraf için paketi tanımlar. Giriş sayfasını, ön bilgiden gelen başlığını ve özetini, her sayfayı düz metniyle (başlıklar, paragraflar, liste maddeleri, tablo hücreleri) ve her dosyayı boyutu, SHA-256 özeti ve türüyle listeler.
+
+`--out` dizinine bir şey yazılmadan önce derlenen paket denetlenir. Aşağıdakilerden biri bulunursa paketleme 1 koduyla durur ve `--out` olduğu gibi kalır:
+
+| Bulgu | Anlamı |
+|---|---|
+| `home-path` | Paketteki herhangi bir dosyada bir ev dizinine giden yol (`/Users/<ad>/`, `/home/<ad>/`). Düzelteceğiniz dosyada gösterilir: yolu pakete taşıyan not dosyası ve satırı. |
+| `outside-package` | Paketteki bir dosyaya varmayan yerel bir başvuru. Proje dışında kalan bir dosya, kökten başlayan bir yol ya da var olmayan bir sayfaya bağlantı olabilir. |
+| `external-load` | Başka bir kaynaktan yüklenen betik, stil dosyası, görsel, yazı tipi, çerçeve ya da istek. Başka sitelere düz bağlantılara izin verilir; bunlar not olarak listelenir. |
+| `check` | Paketlenen bir sayfa için `oku check` komutunun bildirdiği bir hata. |
+| `kit-incomplete` | Kitin yerel kopyası eksik; sayfalar bir CDN'e başvururdu. |
+
+Denetimi atlatan bir seçenek yoktur. Kaynağı düzeltip yeniden paketleyin. 2 çıkış kodu kullanım hatasıdır: eksik ya da `.md` olmayan bir sayfa, veya içinde önceki bir paketten başka bir şey bulunan bir `--out` dizini.
 
 ## oku spec {#spec}
 
