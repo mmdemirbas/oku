@@ -1912,7 +1912,10 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 28px 24px 64px;
+  /* A property because a sticky header inside reads it: see the
+     viewer's table rule beside the lightbox one. */
+  --okt-mdview-pad-top: 28px;
+  padding: var(--okt-mdview-pad-top) 24px 64px;
   /* A viewed file is a document being read, so the reader's text scale
      applies to it. The BODY carries it rather than the frame: the frame
      is chrome — the path, the Rendered/Source switch, the copy button —
@@ -1964,7 +1967,7 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 .okt-mdview-rendered > section:first-child > h2:first-child { margin-top: 0; }
 /* A code file reads edge to edge: its lines are as long as its author
    made them, and the reading measure is for prose. */
-.okt-mdview[data-kind="text"] .okt-mdview-body { padding: 0; }
+.okt-mdview[data-kind="text"] .okt-mdview-body { --okt-mdview-pad-top: 0px; padding: 0; }
 .okt-mdview[data-kind="text"] .okt-pre-host { margin: 0; }
 .okt-mdview[data-kind="text"] .okt-pre-host pre { border: 0; border-radius: 0; margin: 0; }
 .okt-mdview[data-kind="media"] .okt-viewer-file {
@@ -2056,7 +2059,7 @@ body[data-content-width="max"] .okt-mdview[data-kind="markdown"] .okt-viewer-fil
   .okt-viewer-where { flex-wrap: wrap; padding-right: 14px; }
   .okt-mdview-path { flex: 1 1 0; }
   .okt-viewer-meta { flex: 1 0 100%; margin-left: 0; }
-  .okt-mdview-body { padding: 20px 14px 48px; }
+  .okt-mdview-body { --okt-mdview-pad-top: 20px; padding: var(--okt-mdview-pad-top) 14px 48px; }
   /* The actions keep their icons and give up their words, which stay in
      the accessibility tree: Rendered/Source, Copy, Open file and the
      editor control measured 461px against a 316px row. */
@@ -4493,6 +4496,15 @@ table thead th {
    the scrollport is the lightbox's own box and the rail is under it. */
 .okt-lightbox-content table thead th { top: 0; }
 .okt-lightbox-content .okt-table-ghost { top: 0; }
+/* In the markdown viewer the scrollport is `.okt-mdview-body`, and a
+   sticky inset is measured inside its padding: at `top: 0` the stuck
+   header parked 28px below the viewer's edge, with rows scrolling
+   through the strip above it. The negative inset cancels the padding —
+   the sidebar's label does the same with its panel's. Both are inside
+   the body's `zoom`, so they scale together. A wide table's own header
+   is held at 0 by the rule above and does not reach this one. */
+.okt-mdview-body table thead th,
+.okt-mdview-body .okt-table-ghost { top: calc(-1 * var(--okt-mdview-pad-top, 0px)); }
 table td {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border-soft);
@@ -7948,6 +7960,12 @@ oku-snippet .okt-snippet-preview {
  * text it replaces. The two regions share one card because they are one
  * instruction, not two quotations that happen to be adjacent.
  * --------------------------------------------------------------- */
+/* `overflow: clip`, not `hidden`: both cut the bands at the rounded
+   corners, but `hidden` also makes the card a scroll container, and a
+   table inside one stuck its header to the card, a box that never
+   scrolls. The labels left with the first row, and at rest the
+   viewport's parking offset pushed them over it. `hidden` stays as the
+   fallback for an engine without `clip`. */
 .okt-copy {
   margin: 22px 0;
   border: 1px solid var(--border);
@@ -7955,6 +7973,7 @@ oku-snippet .okt-snippet-preview {
   background: var(--surface);
   box-shadow: 0 1px 3px var(--shadow-soft);
   overflow: hidden;
+  overflow: clip;
 }
 /* The card's own surface, not the recessed one. Grey means exactly one
    thing inside this card — "this is the text being replaced" — and a

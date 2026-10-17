@@ -1739,6 +1739,14 @@ sticks for it. Held by `test_at_rest_the_header_sits_on_its_own_table`
 — the pointer test beside it could not see this, because the shifted
 cell is still the cell under its own centre.
 
+The same mistake had two more homes. A copy region clipped its corners
+with `overflow: hidden`, which made the card the scroll container its
+table's header stuck to, so the header never followed the reader;
+`overflow: clip` cuts the corners without making one. And the viewer's
+scroll box has top padding, inside which a sticky inset is measured, so
+its tables park at minus that padding (`--okt-mdview-pad-top`). Held by
+`browser/test_sticky_header_in_containers.py`.
+
 **Measure in a ResizeObserver callback, write in the next frame, and
 only write what changed.** Both of the sticky header's writes invalidate
 layout: `--okt-sticky-top` is the ghost's `top`, and `data-fit` switches
