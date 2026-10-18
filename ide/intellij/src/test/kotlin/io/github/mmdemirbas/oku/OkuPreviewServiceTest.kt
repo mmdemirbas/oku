@@ -87,4 +87,20 @@ class OkuPreviewServiceTest : OkuFixtureTestCase() {
         assertTrue("restart took $took ms behind a request nobody answers", took < 2_000)
         assertTrue(pending.get(5, TimeUnit.SECONDS).isFailure)
     }
+
+    fun `test an oku that stops says it stopped, and what it said`() {
+        // VI.2: the end of oku's output reads the same as a timeout, so an
+        // oku that exited at once was reported as one that "did not answer
+        // within 30s" — after waiting no time at all.
+        fakeOku(
+            """
+            sys.stderr.write("boom\n")
+            sys.stderr.flush()
+            sys.exit(3)
+            """,
+        )
+        val message = service.check(page, "x").exceptionOrNull()?.message.orEmpty()
+        assertTrue(message, "stopped" in message && "boom" in message)
+        assertFalse(message, "within" in message)
+    }
 }
