@@ -148,6 +148,34 @@ BOXES = """() => {
 }"""
 
 
+# A smooth scroll and the rail's own jump are animations, and under load
+# one outlasts any fixed wait, or has not started when two samples 50 ms
+# apart agree — which read as "settled" at scrollY 0 and failed with the
+# fill at 0.8% against a mark at 16.3%. Each scroll test waits for what
+# it is about to measure, with a deadline, and the assertion judges what
+# was reached. The two frames after are the scroll handler's: it draws
+# the fill and the current mark on the next frame.
+SCROLL = """
+const frame = () => new Promise(r => requestAnimationFrame(r));
+const until = async (ok, ms = 10000) => {
+  const end = performance.now() + ms;
+  while (!ok() && performance.now() < end) await frame();
+  await frame(); await frame();
+};
+const scrollToY = async y => {
+  const h = document.documentElement;
+  const target = Math.max(0, Math.min(y, h.scrollHeight - h.clientHeight));
+  window.scrollTo(0, target);
+  await until(() => Math.abs(window.scrollY - target) < 1);
+};
+// Stopped: it has moved, and the last five frames left it where it was.
+const settled = async moved => {
+  let last = NaN, same = 0;
+  await until(() => { const y = window.scrollY; same = y === last ? same + 1 : 0; last = y; return moved() && same >= 5; });
+};
+"""
+
+
 # ---------- it shows the page ----------
 
 
@@ -183,18 +211,13 @@ def test_a_mark_sits_where_the_fill_will_reach_it(rendered):
     mark exactly when that landmark reaches the top of the viewport. If
     they diverge the highlight contradicts the bar beside it."""
     got = rendered.evaluate(
-        """async () => {
+        "async () => {"
+        + SCROLL
+        + """
         const m = [...document.querySelectorAll('.okt-rail-mark')][3];
         const pct = parseFloat(m.style.left);
         const h = document.documentElement;
-        window.scrollTo(0, (h.scrollHeight - h.clientHeight) * pct / 100);
-        // `html { scroll-behavior: smooth }` animates scrollTo, so a
-        // fixed wait samples mid-flight. Settle first.
-        let last = -1;
-        for (let i = 0; i < 60 && last !== window.scrollY; i++) {
-          last = window.scrollY;
-          await new Promise(r => setTimeout(r, 50));
-        }
+        await scrollToY((h.scrollHeight - h.clientHeight) * pct / 100);
         return { markPct: pct, fillPct: parseFloat(document.getElementById('progress-bar').style.width) };
     }"""
     )
@@ -203,10 +226,11 @@ def test_a_mark_sits_where_the_fill_will_reach_it(rendered):
 
 def test_the_current_mark_follows_the_fill(rendered):
     got = rendered.evaluate(
-        """async () => {
+        "async () => {"
+        + SCROLL
+        + """
         const h = document.documentElement;
-        window.scrollTo(0, (h.scrollHeight - h.clientHeight) * 0.55);
-        await new Promise(r => setTimeout(r, 400));
+        await scrollToY((h.scrollHeight - h.clientHeight) * 0.55);
         const cur = document.querySelector('.okt-rail-mark.is-current');
         const fill = parseFloat(document.getElementById('progress-bar').style.width);
         const after = [...document.querySelectorAll('.okt-rail-mark')]
@@ -248,12 +272,13 @@ def test_clicking_a_mark_lands_the_landmark_below_the_chrome(rendered):
     """80px matches the `:target` scroll-margin, so a rail jump and an
     anchor jump put the heading in the same place."""
     got = rendered.evaluate(
-        """async () => {
-        window.scrollTo(0, 0);
-        await new Promise(r => setTimeout(r, 300));
+        "async () => {"
+        + SCROLL
+        + """
+        await scrollToY(0);
         const m = [...document.querySelectorAll('.okt-rail-mark[data-kind="section"]')][4];
         m.click();
-        await new Promise(r => setTimeout(r, 1000));
+        await settled(() => window.scrollY > 0);
         return { top: Math.round(m._okuMark.el.getBoundingClientRect().top),
                  scrolled: Math.round(window.scrollY) };
     }"""
@@ -290,15 +315,16 @@ def test_a_click_goes_to_the_nearest_mark_not_the_box_on_top(rendered):
     a click at one mark's x, landing on its neighbour's box, goes to the
     first mark's landmark."""
     got = rendered.evaluate(
-        """async () => {
-        window.scrollTo(0, 0);
-        await new Promise(r => setTimeout(r, 300));
+        "async () => {"
+        + SCROLL
+        + """
+        await scrollToY(0);
         const marks = [...document.querySelectorAll('.okt-rail-mark[data-kind="section"]')];
         const aim = marks[2], over = marks[3];
         const a = aim.getBoundingClientRect();
         over.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1,
             clientX: a.x + a.width / 2, clientY: a.y + a.height / 2 }));
-        await new Promise(r => setTimeout(r, 1000));
+        await settled(() => window.scrollY > 0);
         return { aim: Math.round(aim._okuMark.el.getBoundingClientRect().top),
                  over: Math.round(over._okuMark.el.getBoundingClientRect().top) };
     }"""
@@ -465,17 +491,17 @@ def test_nothing_moves_when_the_current_mark_changes(rendered):
     """The highlight travels the whole rail as the reader scrolls. If it
     resized the mark it would ripple the row on every scroll tick."""
     got = rendered.evaluate(
-        """async () => {
+        "async () => {"
+        + SCROLL
+        + """
         const box = e => { const b = e.getBoundingClientRect();
                            return [Math.round(b.x), Math.round(b.y),
                                    Math.round(b.width), Math.round(b.height)]; };
         const marks = [...document.querySelectorAll('.okt-rail-mark')];
         const h = document.documentElement;
-        window.scrollTo(0, 0);
-        await new Promise(r => setTimeout(r, 350));
+        await scrollToY(0);
         const before = marks.map(box);
-        window.scrollTo(0, (h.scrollHeight - h.clientHeight) * 0.7);
-        await new Promise(r => setTimeout(r, 400));
+        await scrollToY((h.scrollHeight - h.clientHeight) * 0.7);
         const highlighted = !!document.querySelector('.okt-rail-mark.is-current');
         return { same: JSON.stringify(before) === JSON.stringify(marks.map(box)), highlighted };
     }"""
