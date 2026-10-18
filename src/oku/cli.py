@@ -8985,6 +8985,7 @@ def _preview_serve(out_base: Path) -> int:
     """
     trees: dict[Path, tuple[dict, dict]] = {}
     held: dict[Path, tuple[dict, list]] = {}
+    listed: dict[Path, tuple[dict, list]] = {}
     fences = fence_schemas(out_base / "schemas")
     _emit(
         {
@@ -9027,7 +9028,7 @@ def _preview_serve(out_base: Path) -> int:
                 _emit({"id": req_id, **fix_buffer(md, text, held=held)})
                 continue
             if req.get("registry") is True:
-                _emit({"id": req_id, **registry_entries(md, req.get("text"))})
+                _emit({"id": req_id, **registry_entries(md, req.get("text"), listed=listed)})
                 continue
             anchor = req.get("anchor")
             if anchor is not None:
@@ -9163,7 +9164,9 @@ def _hand_layout(payload: dict) -> str:
     return "{\n" + "\n".join(lines) + "\n}"
 
 
-def registry_entries(md: Path, text: str | None = None) -> dict:
+def registry_entries(
+    md: Path, text: str | None = None, *, listed: dict[Path, tuple[dict, list]] | None = None
+) -> dict:
     """Every glossary term and external reference a page at `md` can name
     with `#g/` and `#x/`, with the definition a reader would see on hover:
     `{"glossary": [{"term", "domain", "def"}], "extrefs": [...], "pages":
@@ -9175,9 +9178,24 @@ def registry_entries(md: Path, text: str | None = None) -> dict:
     check accepts and the runtime finds. The definition is in the page's
     language when the entry has one, else English, else the first it has;
     `text` is the page's unsaved buffer, read for a `lang:` in it.
+
+    `listed` is the long-running mode's memory, kept the way preview_page
+    keeps `trees`: per tree, the snapshot it was last seen at and the
+    pages read from it then. Listing them is a manifest of the whole tree,
+    nearly all of what this costs, and a completion asks again every few
+    seconds; a tree that changed since drops every cache derived from it
+    and is read again.
     """
     md = md.resolve()
     root = _preview_tree_root(md)
+    held = None
+    if listed is not None:
+        snapshot = _snapshot_tree(root)
+        held = listed.get(root)
+        if held is not None and held[0] != snapshot:
+            held = None
+        if held is None:
+            _forget_tree_state()
     page_kit = _nearest_kit_json(md.parent, root) or find_kit_json(root)
     meta = _strip_md_front_matter(text)[1] if text is not None else None
     lang = _page_language(md, meta)
@@ -9201,11 +9219,17 @@ def registry_entries(md: Path, text: str | None = None) -> dict:
         out[kind] = rows
     # What `parent:` can name: every page of the tree by its stem, the
     # value the manifest groups a page under.
-    out["pages"] = [
-        {"id": e["source"].rsplit(".", 1)[0], "title": e["title"]}
-        for e in compute_manifest(root)["pages"]
-        if isinstance(e.get("source"), str)
-    ]
+    if held is None:
+        pages = [
+            {"id": e["source"].rsplit(".", 1)[0], "title": e["title"]}
+            for e in compute_manifest(root)["pages"]
+            if isinstance(e.get("source"), str)
+        ]
+        if listed is not None:
+            listed[root] = (snapshot, pages)
+    else:
+        pages = held[1]
+    out["pages"] = pages
     return out
 
 
