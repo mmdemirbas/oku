@@ -2056,6 +2056,22 @@ it must still report — a scroller between the text and a clipping box
 means off screen and reachable, and visibility is inherited in effect,
 so an element's own three properties do not decide it.
 
+**A legend is never drawn over the data it names.** The Cartesian
+charts drew theirs inside the plot's top-right corner, on an opaque
+backing whose comment said it was there to hide the dots behind it; the
+shipped scatter example has a point in that corner, invisible and out
+of the pointer's reach at every width, and a pan or a zoom brings any
+point under any corner. It is a row above the plot now — the shared
+series legend, its room reserved from `_seriesLegendLayout`, the same
+layout that paints it. Three charts already on that row reserved its
+room with their own copy of the wrap rule — sunburst with an older
+character width, marimekko and stream with one row whatever the labels
+— so a second row was painted over the plot. The radar's row sat at a
+fixed height and seven axes put two spoke labels under it; it goes below
+the lowest label now. Held by `browser/test_legend_never_covers_data.py`,
+whose last case sweeps every shipped example, and the radar at three to
+eight axes, for a legend chip overlapping any text or mark.
+
 **A test helper that lengthens every string breaks every reference.**
 The audit's `longify` is how a figure gets measured with labels as long
 as author text really is, and twice it reported a defect it had caused.

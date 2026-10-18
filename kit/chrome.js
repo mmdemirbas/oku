@@ -9355,13 +9355,13 @@ class OkuChart extends HTMLElement {
     if (this._xScale === 'log') { var lx = __okuLogDomain(xs); xMin = lx[0]; xMax = lx[1]; }
     if (this._yScale === 'log') { var ly = __okuLogDomain(ys); yMin = ly[0]; yMax = ly[1]; }
 
-    this._W = 640; this._H = 360;
     // Quadrant charts need extra top/bottom padding so the corner
     // region labels (TL/TR/BL/BR) can sit OUTSIDE the plot bounds.
     // Earlier rounds placed them inside at the corners + faded them
     // on hover — a workaround. The right answer is to never put them
     // where data can land.
     var isQuadrant = this._type === 'quadrant';
+    this._W = 640; this._H = 360;
     this._pad = {
       top: (this._title ? 32 : 16) + (isQuadrant ? 22 : 0),
       right: 24,
@@ -9371,6 +9371,8 @@ class OkuChart extends HTMLElement {
     this._plotW = this._W - this._pad.left - this._pad.right;
     this._plotH = this._H - this._pad.top  - this._pad.bottom;
 
+    // A fresh layout takes the legend's row afresh (see _render).
+    this._legend = null;
     this._origView = { xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax };
     this._view = Object.assign({}, this._origView);
 
@@ -9393,6 +9395,22 @@ class OkuChart extends HTMLElement {
     if (gutter > this._pad.left) {
       this._plotW -= gutter - this._pad.left;
       this._pad.left = gutter;
+    }
+    // The series legend follows the quadrant labels' rule: a row under
+    // the title, with its room taken above the plot. Inside the plot's
+    // top-right corner it sat on an opaque backing over whatever data was
+    // there — each of the five shipped Cartesian examples had a point
+    // under it — and no corner stays clear once a pan or a zoom moves the
+    // data. Decided on the first render, after the gutter, so the row
+    // starts where the plot does; the chart grows by the row rather than
+    // the plot shrinking, and later renders leave it where it is.
+    if (!this._legend) {
+      var lgX = this._pad.left, lgW = this._W - this._pad.left - this._pad.right;
+      var lgRows = this._seriesLegendLayout(this._series, lgX, lgW).rows;
+      var lgH = lgRows ? lgRows * 18 + 4 : 0;
+      this._legend = { x: lgX, y: this._title ? 28 : 8, width: lgW };
+      this._pad.top += lgH;
+      this._H += lgH;
     }
     var pad = this._pad, plotW = this._plotW, plotH = this._plotH;
     var W = this._W, H = this._H;
@@ -9664,41 +9682,9 @@ class OkuChart extends HTMLElement {
     if (quadrantLabelParts.length) {
       parts.push(quadrantLabelParts.join(''));
     }
-    // Legend chips sit OUTSIDE the clip so they're always visible.
-    // For scatter/bubble/line/area/quadrant: cluster legend chips in
-    // a vertical column near the top-right edge, with the column's
-    // total height computed from the visible-series count so the
-    // last chip never extends past the plot region. The fixed
-    // top-right placement is what trips up dense bubble layouts (a
-    // huge marker in the top-right collides with the legend); to
-    // mitigate, the legend gets its own padded backing rectangle
-    // that occludes any data dot rendered behind it.
-    var legendSeries = this._series.filter(function (s) { return !!s.label; });
-    if (legendSeries.length) {
-      var lgWidth = 130;
-      var lgRowH = 20;
-      var lgX = W - pad.right - lgWidth + 8;
-      var lgY = pad.top + 6;
-      var lgH = legendSeries.length * lgRowH + 8;
-      // Padded backing so data underneath the legend doesn't garble
-      // the chip text. Slight rounded rect, lower opacity surface so
-      // the chart visually retains its colour underneath.
-      parts.push(
-        '<rect x="' + (lgX - 6) + '" y="' + lgY + '" width="' + lgWidth + '" height="' + lgH + '" rx="6" class="okc-legend-backdrop"/>'
-      );
-      legendSeries.forEach(function (s, i) {
-        var srcIdx = self._series.indexOf(s);
-        var color = __okuPickColor(s.color, srcIdx >= 0 ? srcIdx : i);
-        var rowY = lgY + 4 + i * lgRowH;
-        parts.push(
-          '<g class="okc-legend-chip" data-series-idx="' + (srcIdx >= 0 ? srcIdx : i) + '" tabindex="0" role="button" ' +
-          'aria-label="' + escapeXml(okuT('Toggle {0} series', s.label)) + '">' +
-            '<rect x="' + lgX + '" y="' + rowY + '" width="14" height="14" rx="2" fill="' + color + '" class="okc-legend-swatch"/>' +
-            '<text x="' + (lgX + 18) + '" y="' + (rowY + 11) + '" class="okc-legend">' + escapeXml(s.label) + '</text>' +
-          '</g>'
-        );
-      });
-    }
+    // The series legend, in the row the first render took for it.
+    var legendPalette = this._series.map(function (s, i) { return __okuPickColor(s.color, i); });
+    parts.push(this._renderSeriesLegend(this._series, legendPalette, this._legend));
     // Synced cursor (vertical dashed line) — sits at the top of the
     // plot region and is shown/positioned by _wireCartesianCursor on
     // pointer-move. Gives the reader a single "where am I" indicator
@@ -9763,40 +9749,53 @@ class OkuChart extends HTMLElement {
      carries data-legend-hover so the existing legend-hover CSS
      reactions still apply. */
   _renderSeriesLegend(series, palette, opts) {
-    if (!series || !series.length) return '';
-    var x0 = opts.x, y0 = opts.y, width = opts.width;
+    var lay = this._seriesLegendLayout(series, opts.x, opts.width);
+    if (!lay.chips.length) return '';
     var idxAttr = opts.idxAttr || 'series-idx';
-    var swatch = 11, gap = 6, rowH = 18, fontPx = 11;
     var html = '<g class="okc-series-legend" pointer-events="all">';
-    var cx = x0, cy = y0;
-    series.forEach(function (s, i) {
+    lay.chips.forEach(function (c) {
+      var cx = c.x, cy = opts.y + c.row * lay.rowH;
+      var color = palette[c.i % palette.length];
+      html += '<g class="okc-legend-chip" tabindex="0" role="button" aria-label="' +
+                 escapeXml(okuT('Toggle {0} series', c.label)) + '" data-legend-hover="' + c.i +
+                 '" data-' + idxAttr + '="' + c.i + '">';
+      html +=   '<rect x="' + cx + '" y="' + (cy + 1) + '" width="' + lay.swatch + '" height="' + lay.swatch + '" rx="2" fill="' + color + '"/>';
+      html +=   '<text x="' + (cx + lay.swatch + 4) + '" y="' + (cy + 9) + '" class="okc-legend" font-size="' + lay.fontPx + '">' + escapeXml(c.label) + '<title>' + escapeXml(c.full) + '</title></text>';
+      html += '</g>';
+    });
+    html += '</g>';
+    return html;
+  }
+
+  /* Where each chip of a series-legend row goes, and how many rows that
+     takes. Painting and reserving room both ask this, so a chart reserves
+     exactly what is painted: three renderers kept their own copy of the
+     wrap rule — sunburst with an older character width, marimekko and
+     stream with one row whatever the labels — and a second row was
+     drawn over the plot. `i` is the chip's index in `series`, unlabelled
+     entries included, so it addresses the series it toggles. */
+  _seriesLegendLayout(series, x0, width) {
+    var swatch = 11, gap = 6, rowH = 18, fontPx = 11;
+    var chW = fontPx * OKU_EM_PER_CHAR;
+    // Wrapping to the next row only helps a chip that is narrower than
+    // the row. One wider than the whole legend has nowhere to wrap to
+    // and ran off the viewBox, so cap it here.
+    var maxChars = Math.max(4, Math.floor((width - swatch - 4 - gap) / chW));
+    var chips = [], cx = x0, row = 0;
+    (series || []).forEach(function (s, i) {
       if (!s || !s.label) return;
       var full = String(s.label);
-      // Wrapping to the next row only helps a chip that is narrower
-      // than the row. One wider than the whole legend has nowhere to
-      // wrap to and ran off the viewBox, so cap it here.
-      var chW = fontPx * OKU_EM_PER_CHAR;
-      var maxChars = Math.max(4, Math.floor((width - swatch - 4 - gap) / chW));
       var label = full.length > maxChars ? full.slice(0, maxChars - 1).replace(/\s+$/, '') + '…' : full;
       // The same estimate that decided maxChars decides the packing:
       // measuring the chip with a narrower character than the one the
       // cap used is how two chips end up on top of each other.
       var labW = Math.max(20, Math.ceil(label.length * chW) + 2);
       var chipW = swatch + 4 + labW + gap;
-      if (cx + chipW > x0 + width && cx > x0) {
-        cx = x0; cy += rowH;
-      }
-      var color = palette[i % palette.length];
-      html += '<g class="okc-legend-chip" tabindex="0" role="button" aria-label="' +
-                 escapeXml(okuT('Toggle {0} series', label)) + '" data-legend-hover="' + i +
-                 '" data-' + idxAttr + '="' + i + '">';
-      html +=   '<rect x="' + cx + '" y="' + (cy + 1) + '" width="' + swatch + '" height="' + swatch + '" rx="2" fill="' + color + '"/>';
-      html +=   '<text x="' + (cx + swatch + 4) + '" y="' + (cy + 9) + '" class="okc-legend" font-size="' + fontPx + '">' + escapeXml(label) + '<title>' + escapeXml(full) + '</title></text>';
-      html += '</g>';
+      if (cx + chipW > x0 + width && cx > x0) { cx = x0; row++; }
+      chips.push({ i: i, full: full, label: label, x: cx, row: row });
       cx += chipW;
     });
-    html += '</g>';
-    return html;
+    return { chips: chips, rows: chips.length ? row + 1 : 0, rowH: rowH, swatch: swatch, fontPx: fontPx };
   }
 
   _wireGenericVerticalCursor(plotBounds, opts) {
@@ -9939,20 +9938,6 @@ class OkuChart extends HTMLElement {
       if (l.dataset.origY) l.setAttribute('y', l.dataset.origY);
       else l.dataset.origY = l.getAttribute('y');
     });
-    // No-fly zones: quadrant corner pills + legend cluster backdrop.
-    // Any candidate label box that overlaps one of these gets pushed
-    // off the corner (offset cycle below). If no offset clears, hide.
-    var noFly = [];
-    // .okc-quadrant-label-pill is gone — quadrant labels live outside
-    // the plot now. The legend backdrop is the only remaining no-fly
-    // zone for label deconfliction.
-    svg.querySelectorAll('.okc-legend-backdrop').forEach(function (rect) {
-      var x = +rect.getAttribute('x') || 0;
-      var y = +rect.getAttribute('y') || 0;
-      var w = +rect.getAttribute('width') || 0;
-      var h = +rect.getAttribute('height') || 0;
-      noFly.push({ x1: x, x2: x + w, y1: y, y2: y + h });
-    });
     // Side before stacking. The emit picks the side from the dot's
     // position alone (`px < plotMidX`), which is right for a short
     // label and wrong for a long one: a dot just left of the middle
@@ -10027,14 +10012,7 @@ class OkuChart extends HTMLElement {
       // The plot clip is a no-fly zone from the outside in: an offset
       // that solves a collision by moving the label past the clip has
       // not solved anything, it has cut the label instead.
-      if (band && (cand.y1 < band.y1 - 0.5 || cand.y2 > band.y2 + 0.5)) return true;
-      for (var n = 0; n < noFly.length; n++) {
-        var nf = noFly[n];
-        if (!(cand.x2 < nf.x1 || nf.x2 < cand.x1 || cand.y2 < nf.y1 || nf.y2 < cand.y1)) {
-          return true;
-        }
-      }
-      return false;
+      return !!band && (cand.y1 < band.y1 - 0.5 || cand.y2 > band.y2 + 0.5);
     }
     boxes.forEach(function (box) {
       var found = null;
@@ -10723,6 +10701,16 @@ class OkuChart extends HTMLElement {
       var ang = -Math.PI / 2 + i * (2 * Math.PI / axes.length);
       return [cx + Math.cos(ang) * R, cy + Math.sin(ang) * R];
     }
+    /* The legend row goes under the lowest spoke label, not at a fixed
+       height. With seven axes the two lower labels sit at y=329 and the
+       row at H - 24 = 336 was drawn across them; an even count points a
+       label straight down, lower still. The figure grows by what that
+       costs rather than the row moving into the ring. */
+    var lowestLabel = Math.max.apply(null, axes.map(function (_, i) {
+      return cy + Math.sin(-Math.PI / 2 + i * (2 * Math.PI / axes.length)) * (R + 18);
+    }));
+    var lgY = Math.max(H - 24, Math.ceil(lowestLabel) + 20);
+    H = lgY + 24;
     var palette = __okuChartPalette;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Radar') + '" class="okc-svg okc-radar">');
@@ -10785,7 +10773,6 @@ class OkuChart extends HTMLElement {
        word drew their chips over each other and off the right edge.
        The stride is what the row can actually give each chip, and the
        label is cut to the stride with the whole of it in a <title>. */
-    var lgY = H - 24;
     var lgStride = Math.max(48, Math.min(130, (W - 32) / Math.max(1, series.length)));
     var lgFit = okuFitAxisTicks(series.map(function (s) { return s.label || ''; }),
                                 { slot: lgStride, fontPx: 11, gap: 20, minChars: 3 });
@@ -12740,16 +12727,10 @@ class OkuChart extends HTMLElement {
     });
     var legendH = 0;
     if (legendSeries.length) {
-      // Same wrap heuristic as _renderSeriesLegend so the reserved
-      // band matches what the helper actually paints.
-      var lx = 0, legendRows = 1, availW = 480 - 32;
-      legendSeries.forEach(function (s) {
-        var labW = Math.max(20, Math.ceil(String(s.label).length * 5.6) + 2);
-        var chipW = 11 + 4 + labW + 6;
-        if (lx + chipW > availW && lx > 0) { lx = 0; legendRows++; }
-        lx += chipW;
-      });
-      legendH = legendRows * 18 + 6;
+      // The rows the helper paints, asked of the layout that paints them.
+      // A copy of its wrap rule measured characters at 5.6 units against
+      // the helper's 7.26 and reserved fewer rows than were drawn.
+      legendH = this._seriesLegendLayout(legendSeries, 16, 480 - 32).rows * 18 + 6;
     }
     var topPad = titleH + legendH;
     var W = 480, H = 480 + topPad;
@@ -12835,10 +12816,16 @@ class OkuChart extends HTMLElement {
     });
     var grandTotal = colTotals.reduce(function (s, v) { return s + v; }, 0) || 1;
     var legendY = (this._title ? 30 : 12);
-    var legendH = 18;
-    var W = 640, H = (this._title ? 360 : 320);
-    var pad = { top: legendY + legendH + 8, bottom: 36, left: 16, right: 16 };
-    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    var W = 640;
+    var pad = { bottom: 36, left: 16, right: 16 };
+    var plotW = W - pad.left - pad.right;
+    // As many rows as the legend paints: a fixed 18 drew every row
+    // after the first over the columns. Extra rows grow the chart
+    // rather than shrinking the plot.
+    var legendH = this._seriesLegendLayout(series, pad.left, plotW).rows * 18;
+    var H = (this._title ? 360 : 320) + Math.max(0, legendH - 18);
+    pad.top = legendY + legendH + 8;
+    var plotH = H - pad.top - pad.bottom;
     var parts = [];
     parts.push('<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escapeXml(this._title || 'Marimekko') + '" class="okc-svg okc-marimekko">');
     if (this._title) parts.push('<text x="' + (W / 2) + '" y="20" text-anchor="middle" class="okc-title">' + escapeXml(this._title) + '</text>');
@@ -12909,10 +12896,14 @@ class OkuChart extends HTMLElement {
     });
     var maxTotal = Math.max.apply(null, totals.concat([1]));
     var legendY = (this._title ? 30 : 12);
-    var legendH = 18;
-    var W = 640, H = this._title ? 320 : 280;
-    var pad = { top: legendY + legendH + 8, bottom: 30, left: 36, right: 12 };
-    var plotW = W - pad.left - pad.right, plotH = H - pad.top - pad.bottom;
+    var W = 640;
+    var pad = { bottom: 30, left: 36, right: 12 };
+    var plotW = W - pad.left - pad.right;
+    // As many rows as the legend paints; see the marimekko above.
+    var legendH = this._seriesLegendLayout(series, pad.left, plotW).rows * 18;
+    var H = (this._title ? 320 : 280) + Math.max(0, legendH - 18);
+    pad.top = legendY + legendH + 8;
+    var plotH = H - pad.top - pad.bottom;
     function xOf(i) { return pad.left + (i / (categories.length - 1)) * plotW; }
     function scaleY(v) { return (v / maxTotal) * plotH; }
     // Per-series, compute the top and bottom edges across categories.

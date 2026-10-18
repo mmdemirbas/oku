@@ -4947,7 +4947,6 @@ a.compare-card-link:hover {
 .compare-card.compare-card-link .okc-donut-legend,
 .compare-card.compare-card-link .okc-waffle-legend,
 .compare-card.compare-card-link .okc-legend,
-.compare-card.compare-card-link .okc-legend-backdrop,
 .compare-card.compare-card-link .okc-title,
 .compare-card.compare-card-link .okc-tick,
 .compare-card.compare-card-link .okc-axis-label,
@@ -7314,17 +7313,6 @@ oku-chart .okc-legend-bg {
   fill: var(--surface);
   fill-opacity: 0.94;
   transition: fill 0.12s ease;
-}
-/* Cluster-level backdrop — sits behind every legend chip in the
-   top-right column. Fully opaque so a giant bubble or dense data
-   region underneath is FULLY hidden (a partial-opacity backdrop
-   bled the bubble outline through the chip labels — see the user's
-   "Auth" overlap report). */
-oku-chart .okc-legend-backdrop {
-  fill: var(--surface);
-  fill-opacity: 1;
-  stroke: var(--border-soft);
-  stroke-width: 1;
 }
 oku-chart .okc-legend-chip:hover .okc-legend-bg,
 oku-chart .okc-legend-chip:focus-visible .okc-legend-bg {

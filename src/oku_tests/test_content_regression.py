@@ -2297,7 +2297,6 @@ class TestPickerOverhaul:
             ".okc-radar-legend",
             ".okc-donut-legend",
             ".okc-waffle-legend",
-            ".okc-legend-backdrop",
             ".bar-chart-legend",
         ):
             assert f".compare-card.compare-card-link {lg}" in css, (
