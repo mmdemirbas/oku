@@ -2,8 +2,11 @@ package io.github.mmdemirbas.oku
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
+import com.intellij.openapi.progress.EmptyProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readLines
@@ -118,5 +121,21 @@ class OkuPreviewServiceTest : OkuFixtureTestCase() {
         )
         assertEquals("first", service.check(page, "first").getOrThrow().single().code)
         assertEquals("second", service.check(page, "second").getOrThrow().single().code)
+    }
+
+    fun `test a completion that is cancelled stops waiting for oku`() {
+        // IV.5: completion asks oku for the registry inside its read action,
+        // and the wait never checked for cancellation: a completion the
+        // author had typed past kept the read lock — and every edit queued
+        // behind it — until oku answered or 30 s ran out.
+        fakeOku("time.sleep(600)")
+        val indicator = EmptyProgressIndicator()
+        val call = ApplicationManager.getApplication().executeOnPooledThread<Registry?> {
+            ProgressManager.getInstance().runProcess<Registry?>({ OkuRegistryCache.of(page, "x") }, indicator)
+        }
+        awaitRequests(1)
+        indicator.cancel()
+        val ended = runCatching { call.get(2, TimeUnit.SECONDS) }.exceptionOrNull()
+        assertFalse("still waiting for oku 2 s after the cancel", ended is TimeoutException)
     }
 }
