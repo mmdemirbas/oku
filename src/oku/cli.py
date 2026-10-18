@@ -131,6 +131,39 @@ def _refresh_stable_kit_link() -> Path | None:
 
 KIT_FILES = ["chrome.css", "chrome.js", "chrome-boot.js", "renderer.js"]
 
+# What every build ships of those four: the hand-edited source with its
+# whitespace and comments taken out, at the output step the site tree, the
+# standalone pages, `oku pack` and `oku kit export` already have. The kit
+# itself gets no build step (docs/architecture.md), and `oku serve` keeps
+# serving the source. Gzipped, the four went from 428 KB to 176 KB
+# (2026-10-18, kit r130).
+#
+# rjsmin and rcssmin rename and reorder nothing, so the stamp regexes, the
+# font-URL rewrites and every global name hold on the output. Both are
+# pinned exactly in pyproject.toml: the bytes are an address once a host
+# serves the kit by its content, and another release could give the same
+# source other bytes, and every reader a second download.
+#
+# rjsmin handles only unnested template literals; inside a nested one it
+# collapses the whitespace of the TEXT. The kit has none, and
+# test_kit_minify.py compares token streams through a real parser so that
+# the first one fails a test rather than a page.
+_shipped: dict[tuple[str, int, int], str] = {}
+
+
+def kit_file_text(name: str) -> str:
+    """One of KIT_FILES as every build ships it: minified."""
+    path = KIT_DIR / name
+    st = path.stat()
+    key = (str(path), st.st_mtime_ns, st.st_size)
+    if key not in _shipped:
+        import rcssmin
+        import rjsmin
+
+        src = path.read_text(encoding="utf-8")
+        _shipped[key] = rcssmin.cssmin(src) if name.endswith(".css") else rjsmin.jsmin(src)
+    return _shipped[key]
+
 
 _DEFAULT_STUB_BODY_RE = re.compile(r"<body\s*>\s*</body>", re.IGNORECASE)
 
@@ -6539,9 +6572,9 @@ def copy_site_kit(out_dir: Path) -> Path:
     kit_out = out_dir / "_oku"
     kit_out.mkdir(parents=True, exist_ok=True)
 
-    # Runtime chrome files → _oku/
+    # Runtime chrome files → _oku/, minified
     for f in KIT_FILES:
-        shutil.copy(KIT_DIR / f, kit_out / f)
+        (kit_out / f).write_text(kit_file_text(f), encoding="utf-8")
     # The stylesheet lands beside `_oku/vendor/`, so its own relative
     # font URLs already resolve — but only if the fonts were fetched.
     # Passing an empty base leaves them untouched in that case and drops
@@ -7402,10 +7435,10 @@ def build_standalone(
         # closing the inline <script> early.
         return s.replace("</script", "<\\/script")
 
-    css = (KIT_DIR / "chrome.css").read_text(encoding="utf-8")
-    boot = _safe_js((KIT_DIR / "chrome-boot.js").read_text(encoding="utf-8"))
-    main = _safe_js((KIT_DIR / "chrome.js").read_text(encoding="utf-8"))
-    renderer = _safe_js((KIT_DIR / "renderer.js").read_text(encoding="utf-8"))
+    css = kit_file_text("chrome.css")
+    boot = _safe_js(kit_file_text("chrome-boot.js"))
+    main = _safe_js(kit_file_text("chrome.js"))
+    renderer = _safe_js(kit_file_text("renderer.js"))
     kit_bundle = build_kit_bundle(src_root)  # may be None
 
     for src, html, page_data in srcs:

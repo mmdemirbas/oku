@@ -131,7 +131,7 @@ def test_the_theme_is_seeded_only_when_asked(tmp_path: Path) -> None:
     assert "var theme = null;" in plain_html
     # Before the kit: chrome-boot.js reads `theme-pref` on its first line
     # of work, and a seed written after it is a theme that flashes.
-    boot = (cli.KIT_DIR / "chrome-boot.js").read_text(encoding="utf-8").strip().splitlines()[0]
+    boot = cli.kit_file_text("chrome-boot.js").strip()[:60]
     assert dark_html.index('var theme = "dark";') < dark_html.index(boot)
 
 

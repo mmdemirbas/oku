@@ -306,9 +306,11 @@ class TestBuildStandalone:
 
         # chrome.js arrives whole: the body that opens it also carries its
         # tail. A split leaves the tail outside every script body.
-        chrome_src = (cli.KIT_DIR / "chrome.js").read_text(encoding="utf-8")
-        head_marker = chrome_src[:200].strip().splitlines()[1].strip()
-        tail_marker = chrome_src.strip().splitlines()[-1].strip()
+        # Markers from the file as the build ships it: minified, so without
+        # the comments the source opens with.
+        chrome_src = cli.kit_file_text("chrome.js").strip()
+        head_marker = chrome_src[:80]
+        tail_marker = chrome_src[-80:]
         hosting = [b for b in bodies if head_marker in b]
         assert len(hosting) == 1, "chrome.js should occupy exactly one script element"
         assert tail_marker in hosting[0], "chrome.js was cut off mid-script"

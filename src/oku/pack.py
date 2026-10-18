@@ -1041,7 +1041,7 @@ def _export_sources() -> dict[str, Path | str]:
     the file it is copied from (or, for carried.js, its text). A function
     of the installed oku alone, so two runs write the same bytes."""
     kit, vendor = cli.KIT_DIR, cli.vendor_dir()
-    out: dict[str, Path | str] = {name: kit / name for name in cli.KIT_FILES}
+    out: dict[str, Path | str] = {name: cli.kit_file_text(name) for name in cli.KIT_FILES}
     for d in _EXPORT_DIRS:
         out.update({f"{d}/{f.name}": f for f in (kit / d).glob("*.json")})
     for rel, _url in cli._vendor_files():

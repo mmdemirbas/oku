@@ -73,7 +73,7 @@ oku/
 ```
 
 > [!TIP] Single-file split rationale
-> chrome.js is ~13k lines in one file. Splitting it would mean either more script tags in every stub (worse onboarding) or a build step (more complexity, defeating the no-build-for-content goal). The current bet: one file with a clear table of contents at the top (see the section banner there). Reviewed each time the design changes shape; still wins on author ergonomics.
+> chrome.js is ~13k lines in one file. Splitting it would mean either more script tags in every stub (worse onboarding) or a build step (more complexity, defeating the no-build-for-content goal). The current bet: one file with a clear table of contents at the top (see the section banner there). Reviewed each time the design changes shape; still wins on author ergonomics. What a build ships is the same file minified (whitespace and comments out, `kit_file_text` in cli.py): the output step every tree already has, not a build step for the source.
 
 ## Runtime — when a page loads {#render-flow}
 

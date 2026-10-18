@@ -466,7 +466,7 @@ class TestTheKitExport:
         assert pack.export_kit(str(out)) == 0
         files = _files(out)
         for name in cli.KIT_FILES:
-            assert files[name] == (cli.KIT_DIR / name).read_bytes(), name
+            assert files[name] == cli.kit_file_text(name).encode("utf-8"), name
         for rel in ("i18n/tr.json", "glossary/web.json", "extrefs/web.json"):
             assert rel in files, rel
         for rel, _url in cli._vendor_files():
