@@ -138,4 +138,15 @@ class OkuPreviewServiceTest : OkuFixtureTestCase() {
         val ended = runCatching { call.get(2, TimeUnit.SECONDS) }.exceptionOrNull()
         assertFalse("still waiting for oku 2 s after the cancel", ended is TimeoutException)
     }
+
+    fun `test the registry cache holds only what is still fresh`() {
+        // V.5: an answer is used for 5 s and kept forever, one per page ever
+        // completed in, each holding the glossary of every domain its tree
+        // activates: a map that only grows for the life of the IDE.
+        fakeOku("""print(json.dumps({"id": req["id"], "glossary": [], "extrefs": [], "pages": []}), flush=True)""")
+        repeat(100) { assertNotNull(OkuRegistryCache.of(dir.resolve("p$it.md"), "x")) }
+        Thread.sleep(OkuRegistryCache.FRESH_MS + 200)
+        assertNotNull(OkuRegistryCache.of(page, "x"))
+        assertEquals(1, OkuRegistryCache.held.size)
+    }
 }

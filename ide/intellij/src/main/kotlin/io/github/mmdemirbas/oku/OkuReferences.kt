@@ -26,6 +26,7 @@ import com.intellij.psi.impl.source.resolve.reference.impl.providers.FileReferen
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.ProcessingContext
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownLinkDestination
+import org.jetbrains.annotations.VisibleForTesting
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Future
@@ -137,8 +138,10 @@ class OkuRegistryCompletion : CompletionContributor() {
  * caller leaves the answer to fill the cache for the next one.
  */
 internal object OkuRegistryCache {
-    private const val FRESH_MS = 5_000L
-    private val held = ConcurrentHashMap<Path, Pair<Long, Registry>>()
+    const val FRESH_MS = 5_000L
+
+    @VisibleForTesting
+    internal val held = ConcurrentHashMap<Path, Pair<Long, Registry>>()
     private val asking = ConcurrentHashMap<Path, Future<Registry?>>()
 
     fun of(page: Path, text: String?): Registry? {
