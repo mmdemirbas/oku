@@ -14,6 +14,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.io.path.extension
@@ -214,16 +215,24 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
 
     override fun dispose() = restart()
 
-    /** One process and the requests it answers, one at a time. */
+    /**
+     * One process and the requests it answers, one at a time. [close] does
+     * not take [lock]: a request waiting for its reply holds it, and ending
+     * the process is what ends that wait. A session started before the last
+     * close is not reused, which is what [epoch] is for.
+     */
     private inner class Channel(private val name: String) {
         private val lock = Any()
+        @Volatile
         private var session: Session? = null
+        private val epoch = AtomicInteger()
         private var nextId = 0L
         private val errLog: Path = outBase.resolve("$name.log")
 
         fun <T> ask(fields: Map<String, Any>, read: (Reply, String) -> T): Result<T> = runCatching {
             synchronized(lock) {
-                val live = session?.takeIf { it.alive } ?: start().also { session = it }
+                val live = session?.takeIf { it.alive && it.epoch == epoch.get() }
+                    ?: run { session?.kill(); start().also { session = it } }
                 nextId += 1
                 val line = live.ask(gson.toJson(mapOf("id" to nextId) + fields), REQUEST_TIMEOUT_SECONDS) ?: run {
                     live.kill()
@@ -237,6 +246,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         }
 
         private fun start(): Session {
+            val born = epoch.get()
             val oku = when (val launch = OkuLauncher.find()) {
                 is OkuLaunch.Found -> launch.path
                 is OkuLaunch.Missing -> error(launch.reason)
@@ -248,7 +258,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
             // To a file, not a pipe: a full stderr pipe would block the child.
             // One per process, because opening it truncates it.
             builder.redirectError(errLog.toFile())
-            val started = Session(builder.start(), name)
+            val started = Session(builder.start(), name, born)
             val hello = started.next(START_TIMEOUT_SECONDS)?.let(::parse)
             if (hello?.protocol == null) {
                 started.kill()
@@ -279,15 +289,13 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         }
 
         fun close() {
-            synchronized(lock) {
-                session?.kill()
-                session = null
-            }
+            epoch.incrementAndGet()
+            session?.also { session = null }?.kill()
         }
     }
 
     /** One line in, one line out, with a deadline on every read. */
-    private class Session(private val process: Process, name: String) {
+    private class Session(private val process: Process, name: String, val epoch: Int) {
         private val lines = LinkedBlockingQueue<String>()
         private val writer = process.outputStream.bufferedWriter(Charsets.UTF_8)
 
