@@ -22,6 +22,7 @@ prefix for click-to-open.
 
 import argparse
 import base64
+import bisect
 import collections
 import contextlib
 import datetime
@@ -6873,10 +6874,18 @@ def _data_uri(path: Path) -> str:
 def _code_spans(text: str) -> list[tuple[int, int]]:
     """Where the code samples are. A page that documents figures shows
     the markdown for one, and a sample rewritten into a 40 KB data: URI
-    stops being a sample."""
-    spans = [m.span() for m in _FENCE_RE.finditer(text)]
+    stops being a sample.
+
+    An inline span is dropped when it starts inside a fence. Only fences
+    can contain one — inline matches never overlap each other — and they
+    arrive in order, so the containing fence is found by bisection rather
+    than by testing every span found so far."""
+    fences = [m.span() for m in _FENCE_RE.finditer(text)]
+    starts = [s for s, _ in fences]
+    spans = list(fences)
     for m in _INLINE_CODE_RE.finditer(text):
-        if not any(s <= m.start() < e for s, e in spans):
+        i = bisect.bisect_right(starts, m.start()) - 1
+        if i < 0 or m.start() >= fences[i][1]:
             spans.append(m.span())
     spans.sort()
     return spans
