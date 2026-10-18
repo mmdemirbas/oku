@@ -703,6 +703,15 @@ Four things the clone has to survive, each of which broke first:
   and is fitted by transform, so a `ResizeObserver` — not a window
   listener, because the width control and the pinned drawer both change
   the column without resizing the window.
+- **It is laid out as its source is, and fitted both ways.** Two rules
+  undid that. The card's rule taking `container-type` off the bar
+  family's mini-renders reached the clone as well, so the clone's
+  container queries answered against the card: at 360px the preview drew
+  a different layout from the figure it promised. The clone keeps its
+  container, because it is laid out at the source's width. And the
+  preview's `svg { height: 100% }` lost to `oku-chart .okc-svg { height:
+  auto }`, which cut 28 of 33 SVG previews at the bottom by up to 56px.
+  Both kinds are scaled to fit the box's width AND height.
 
 The reason this is written down at length: **the styling half already
 existed.** A `.compare-card.compare-card-link` block hid legends and

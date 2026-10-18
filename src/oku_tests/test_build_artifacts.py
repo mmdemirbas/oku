@@ -731,7 +731,10 @@ class TestPayloadBudget:
     # Then by what is drawn inside an overlay being drawn on top of it at
     # its own size (a hover card takes its trigger's layer, a reading in
     # the pan/zoom stage undoes the stage's scale): 1,487,520.
-    KIT_BUDGET_BYTES = 1_488_300
+    # Then by a compare preview laid out as its source and fitted both
+    # ways (the legend fix before it came in under, at 1,487,666):
+    # 1,488,887.
+    KIT_BUDGET_BYTES = 1_489_700
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -759,7 +762,8 @@ class TestPayloadBudget:
     # Then by sticky headers in a copy region and the viewer: 1,481,857.
     # Then by client measurements written in their own frame: 1,486,315.
     # Then by overlays drawing their own on top, at its own size: 1,488,123.
-    STANDALONE_BUDGET_BYTES = 1_488_900
+    # Then by previews laid out as their source, fitted both ways: 1,489,490.
+    STANDALONE_BUDGET_BYTES = 1_490_300
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 

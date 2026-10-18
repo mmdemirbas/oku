@@ -17293,8 +17293,15 @@ function __okuBuildComparePreview(fig) {
     var avail = wrap.clientWidth;
     if (!natural || !avail) return;
     el.style.width = natural + 'px';
+    // Fitted inside the box both ways, as the SVG previews are by their
+    // viewBox. Width alone cropped a clone taller than the 104px box top
+    // and bottom: any bar chart of a dozen rows, and every bar chart at
+    // phone width once the clone stacks its rows as its source does.
+    // `offsetHeight` is the clone's layout height at the source's width,
+    // which the transform below does not change.
+    var scale = Math.min(avail / natural, el.offsetHeight ? wrap.clientHeight / el.offsetHeight : Infinity);
     el.style.transformOrigin = 'center center';
-    el.style.transform = 'scale(' + (avail / natural).toFixed(4) + ')';
+    el.style.transform = 'scale(' + scale.toFixed(4) + ')';
   };
   return wrap;
 }

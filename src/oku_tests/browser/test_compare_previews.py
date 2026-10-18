@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import pytest
 
+from ._wait import measured
+
 CHARTS = "/docs/charts.html"
 
 # A preview whose box is smaller than this is the defect this file
@@ -158,6 +160,13 @@ def test_a_clone_brings_no_duplicate_ids_into_the_page(charts):
     assert dupes == [], f"duplicate id(s) in the document: {dupes[:10]}"
 
 
+def _contained(r: dict) -> bool:
+    """Fitted the way an SVG preview is by its viewBox: inside the box
+    both ways, and touching it in at least one."""
+    inside = r["ink"] <= r["box"] + 2 and r["inkH"] <= r["boxH"] + 2
+    return inside and (abs(r["ink"] - r["box"]) <= 2 or abs(r["inkH"] - r["boxH"]) <= 2)
+
+
 def test_the_bar_family_fills_its_box_and_refits_when_the_box_changes(charts):
     """Two bugs in one shape. The bar family has no viewBox, so it is
     fitted by transform — and it must first be allowed to lay out at its
@@ -176,14 +185,15 @@ def test_the_bar_family_fills_its_box_and_refits_when_the_box_changes(charts):
       const w = c.querySelector('.okt-compare-preview');
       const chart = w.querySelector('.bar-chart');
       const track = chart.querySelector('.bar-track');
-      return {h, ink: Math.round(chart.getBoundingClientRect().width),
-              box: w.clientWidth,
-              trackRatio: track.getBoundingClientRect().width / chart.getBoundingClientRect().width};
+      const b = chart.getBoundingClientRect();
+      return {h, ink: Math.round(b.width), inkH: Math.round(b.height),
+              box: w.clientWidth, boxH: w.clientHeight,
+              trackRatio: track.getBoundingClientRect().width / b.width};
     })"""
     wide = charts.evaluate(read)
     assert wide, "no bar-family preview found"
     for r in wide:
-        assert abs(r["ink"] - r["box"]) <= 2, f"{r['h']} does not fill its box: {r}"
+        assert _contained(r), f"{r['h']} does not fill its box: {r}"
         assert r["trackRatio"] >= 0.5, (
             f"{r['h']} bar track collapsed to {r['trackRatio']:.1%} of the chart — "
             "the label and value columns were taken out of the flow"
@@ -191,16 +201,63 @@ def test_the_bar_family_fills_its_box_and_refits_when_the_box_changes(charts):
 
     charts.set_viewport_size({"width": 360, "height": 760})
     charts.wait_for_function(
-        '(prev) => { const c = document.querySelector(\'.compare-card[href="#chart-bar"] '
-        ".okt-compare-preview'); return c && Math.abs("
-        "c.querySelector('.bar-chart').getBoundingClientRect().width - c.clientWidth) <= 2 "
-        "&& c.clientWidth !== prev; }",
+        "(prev) => document.querySelector('.compare-card[href=\"#chart-bar\"] .okt-compare-preview').clientWidth !== prev",
         arg=wide[0]["box"],
     )
-    narrow = charts.evaluate(read)
+    narrow = measured(charts, read)
     for r in narrow:
-        assert abs(r["ink"] - r["box"]) <= 2, f"{r['h']} did not re-fit when narrowed: {r}"
+        assert _contained(r), f"{r['h']} did not re-fit when narrowed: {r}"
     assert narrow[0]["box"] != wide[0]["box"], "the box never actually changed, so nothing was proven"
+
+
+@pytest.mark.parametrize("width", [1280, 360])
+def test_every_preview_is_drawn_inside_its_box(charts, width):
+    """The box clips, so a figure drawn taller than its 104px is cut,
+    not shrunk. `.okt-compare-preview svg { height: 100% }` lost to
+    `oku-chart .okc-svg { height: auto }` — same specificity, later in
+    the sheet — so every plot taller than the box's 2:1 grew to its own
+    aspect and lost its bottom: a radar 160px tall in 104, its lower
+    vertices gone; a 640x360 scatter 18px short. Swept over every card,
+    so a chart type added tomorrow is held on the day it lands."""
+    charts.set_viewport_size({"width": width, "height": 900})
+    _wait(charts)
+    out = measured(
+        charts,
+        """() => [...document.querySelectorAll('.compare-grid[data-oku-preview] .okt-compare-preview')].map(w => {
+          const ink = w.querySelector('svg.okc-svg, :scope > oku-chart > svg, :scope > svg, .bar-chart');
+          if (!ink) return null;
+          const b = w.getBoundingClientRect(), r = ink.getBoundingClientRect();
+          const out = Math.max(b.top - r.top, r.bottom - b.bottom, b.left - r.left, r.right - b.right);
+          return out > 1 ? w.closest('.compare-card').getAttribute('href') + ' by ' + Math.round(out) + 'px' : null;
+        }).filter(Boolean)""",
+    )
+    assert out == [], f"{len(out)} preview(s) drawn past their box and cut: {out[:10]}"
+
+
+@pytest.mark.parametrize("width", [1280, 360])
+def test_a_bar_preview_lays_its_rows_out_as_its_source_does(charts, width):
+    """The clone is laid out at its source's width and then scaled, so
+    the layout that decides its rows must be the source's too. Below
+    340px the bar family stacks each label above its track; the cards
+    cleared that container query for every bar chart inside them, and at
+    360px the clone drew a label column and a 0.57 track beside a source
+    whose tracks ran the full width. Read in layout pixels, which the
+    clone's scale does not touch."""
+    charts.set_viewport_size({"width": width, "height": 900})
+    _wait(charts)
+    got = measured(
+        charts,
+        """() => ['#chart-bar', '#chart-stacked', '#chart-grouped'].map(h => {
+          const src = __okuFigureForAnchor(document.querySelector(h), document.querySelector('main'));
+          const clone = document.querySelector('.compare-card[href="' + h + '"] .okt-compare-preview .bar-chart');
+          const share = (c) => c.querySelector('.bar-track').offsetWidth / c.offsetWidth;
+          return { h, src: share(src), clone: share(clone), w: src.offsetWidth };
+        })""",
+    )
+    for r in got:
+        assert abs(r["clone"] - r["src"]) < 0.02, (
+            f"{r['h']} at {width}px: the clone's track is {r['clone']:.2f} of it, the source's {r['src']:.2f}"
+        )
 
 
 def test_a_grid_that_did_not_ask_for_previews_gets_none(charts):

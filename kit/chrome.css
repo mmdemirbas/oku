@@ -4973,14 +4973,18 @@ a.compare-card-link:hover {
 .compare-card.compare-card-link .bar-value {
   visibility: hidden !important;
 }
-/* And for the same reason the preview opts out of the narrow-width
+/* And for the same reason a mini-render opts out of the narrow-width
    two-line row. A card is ~145px wide, so it is under every threshold
    worth setting — but its label and value are hidden rather than
    removed, and stacking would spend a line of a 90px-tall card drawing
    nothing. Clearing the container name is enough: a `@container okbar`
-   query with no okbar ancestor never matches. */
-.compare-card.compare-card-link .bar-chart,
-.compare-card.compare-card-link .bar-chart-multi {
+   query with no okbar ancestor never matches.
+   A preview CLONE keeps its container. It is laid out at its source's
+   width and only then scaled to the card, so the query sees what the
+   source sees and stacks exactly where the source does; cleared, a
+   clone at 360px drew a label column and a 0.62 track beside a source
+   whose tracks ran the full width. */
+.compare-card.compare-card-link :is(.bar-chart, .bar-chart-multi):not(.okt-compare-preview > *) {
   container-type: normal;
   container-name: none;
 }
@@ -5125,7 +5129,13 @@ a.compare-card-link:hover {
   padding: 0;
   box-shadow: none;
 }
-.okt-compare-preview svg { width: 100%; height: 100%; display: block; }
+/* `svg.okc-svg` as well as `svg`: `oku-chart .okc-svg { height: auto }`
+   is the same specificity and later in the sheet, so a chart's plot took
+   its own aspect instead of the box's height and the box cut it — 28
+   of the reference page's previews at 1280px, by up to 56px. Sized to
+   the box, the viewBox fits the drawing inside it both ways. */
+.okt-compare-preview svg,
+.okt-compare-preview svg.okc-svg { width: 100%; height: 100%; display: block; }
 /* The bar family has no viewBox; it is fitted by transform in JS, which
    means it must first be ALLOWED to lay out at its natural width. The
    `main .bar-chart { max-width: 100% }` rule that keeps every block
