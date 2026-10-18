@@ -129,6 +129,8 @@ class OkuPreviewFileEditor(
 
     private val generation = AtomicInteger()
 
+    private val errorPage = OkuErrorPage(previews.outBase)
+
     /** The last render failed, so the panel is showing why and not the page. */
     @Volatile
     private var failed = false
@@ -236,10 +238,7 @@ class OkuPreviewFileEditor(
 
     private fun showError(message: String) {
         shown = null
-        val page = previews.outBase.resolve("error.html")
-        val escaped = message.replace("&", "&amp;").replace("<", "&lt;")
-        Files.writeString(page, "<!doctype html><meta charset=utf-8><body style=\"font:13px system-ui;padding:16px\"><h3>oku preview</h3><pre style=\"white-space:pre-wrap\">$escaped</pre>")
-        browser.loadURL(page.toUri().toString())
+        browser.loadURL(errorPage.show(message))
     }
 
     // ---- following the editor ---------------------------------------------
@@ -436,9 +435,27 @@ class OkuPreviewFileEditor(
     }
     override fun addPropertyChangeListener(listener: PropertyChangeListener) = Unit
     override fun removePropertyChangeListener(listener: PropertyChangeListener) = Unit
-    override fun dispose() = cs.cancel()
+    override fun dispose() {
+        cs.cancel()
+        errorPage.close()
+    }
 
     private companion object {
         const val EDIT_DELAY_MS = 300L
     }
+}
+
+/** The page a preview shows in place of one it could not render, saying why. */
+internal class OkuErrorPage(dir: Path) {
+    val file: Path = dir.resolve("error.html")
+
+    /** [message] written into the page; the URL that loads it. */
+    fun show(message: String): String {
+        val escaped = message.replace("&", "&amp;").replace("<", "&lt;")
+        Files.writeString(file, "<!doctype html><meta charset=utf-8><body style=\"font:13px system-ui;padding:16px\"><h3>oku preview</h3><pre style=\"white-space:pre-wrap\">$escaped</pre>")
+        return file.toUri().toString()
+    }
+
+    /** The preview is gone. The page is shared, so it stays. */
+    fun close() = Unit
 }
