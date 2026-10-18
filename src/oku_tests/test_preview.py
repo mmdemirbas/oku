@@ -312,6 +312,39 @@ def test_a_bad_request_is_answered_and_the_session_goes_on(session: _Session, tm
     assert session.close() == 0
 
 
+def test_the_registry_reads_a_tree_once_until_the_tree_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The registry's `pages` came from compute_manifest on every request:
+    # 237 of 245 ms on a 62-page tree, paid by every completion and hover
+    # after the editor's cache went stale, on a tree nobody had touched.
+    docs = _tree(tmp_path)
+    page = str(docs / "a.md")
+    computed = []
+    real = cli.compute_manifest
+    monkeypatch.setattr(cli, "compute_manifest", lambda root, **kw: computed.append(root) or real(root, **kw))
+
+    def requests():
+        for i in (1, 2):
+            yield (json.dumps({"id": i, "path": page, "registry": True}) + "\n").encode("utf-8")
+        (docs / "b.md").write_text(
+            "---\ntitle: B renamed\n---\n\n## B {#b}\n\nsecond page\n", encoding="utf-8"
+        )
+        yield (json.dumps({"id": 3, "path": page, "registry": True}) + "\n").encode("utf-8")
+
+    stdin = argparse.Namespace(buffer=requests())
+    out = io.BytesIO()
+    monkeypatch.setattr(sys, "stdin", stdin)
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(out, encoding="utf-8"))
+
+    assert cli._preview_serve(tmp_path / "out") == 0
+    replies = [json.loads(line) for line in out.getvalue().decode("utf-8").splitlines()[1:]]
+    titles = [{p["title"] for p in r["pages"]} for r in replies]
+    assert titles[0] == titles[1] == {"A", "B"}
+    assert titles[2] == {"A", "B renamed"}
+    assert len(computed) == 2, "the manifest was computed for a tree that had not changed"
+
+
 def test_a_request_that_stops_the_cli_is_answered_and_the_session_goes_on(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
