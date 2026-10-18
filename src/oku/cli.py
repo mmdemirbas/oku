@@ -9029,6 +9029,8 @@ def _preview_serve(out_base: Path) -> int:
             _emit({"id": req_id, **preview_page(md, text, out_base, theme=theme, trees=trees)})
         except PreviewError as e:
             _emit({"id": req_id, "error": str(e)})
+        except SystemExit as e:  # the CLI's stop (a broken install) answers this request and ends nothing
+            _emit({"id": req_id, "error": str(e.code)})
         except Exception as e:  # one page that breaks the build must not end the editor's session
             _emit({"id": req_id, "error": f"{type(e).__name__}: {e}"})
     return 0
