@@ -150,7 +150,11 @@ internal object OkuRegistryCache {
         val asked = asking.computeIfAbsent(page) {
             ApplicationManager.getApplication().executeOnPooledThread<Registry?> {
                 try {
-                    service<OkuPreviewService>().registry(page, text).getOrNull()?.also { held[page] = now to it }
+                    service<OkuPreviewService>().registry(page, text).getOrNull()?.also {
+                        // An answer past FRESH_MS is never read again, so it is not kept either.
+                        held.entries.removeIf { (_, entry) -> System.currentTimeMillis() - entry.first >= FRESH_MS }
+                        held[page] = now to it
+                    }
                 } finally {
                     asking.remove(page)
                 }
