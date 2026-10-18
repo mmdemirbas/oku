@@ -341,7 +341,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         val error: String? = null,
     )
 
-    private companion object {
+    internal companion object {
         /** The `PREVIEW_PROTOCOL` of the oku this plugin is written against. */
         const val PROTOCOL = 6
         const val START_TIMEOUT_SECONDS = 30L
