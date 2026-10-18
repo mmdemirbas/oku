@@ -233,16 +233,32 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
             synchronized(lock) {
                 val live = session?.takeIf { it.alive && it.epoch == epoch.get() }
                     ?: run { session?.kill(); start().also { session = it } }
-                nextId += 1
-                val line = live.ask(gson.toJson(mapOf("id" to nextId) + fields), REQUEST_TIMEOUT_SECONDS) ?: run {
+                val id = ++nextId
+                live.send(gson.toJson(mapOf("id" to id) + fields))
+                val (reply, line) = awaitReply(live, id)
+                reply.error?.let { error(it) }
+                read(reply, line)
+            }
+        }
+
+        /**
+         * The line that answers request [id], by the id oku echoes. A line
+         * answering nothing (output that is not the protocol) is logged and
+         * passed over: read as the reply, it would leave the real one queued
+         * for the next request, and every reply after it one behind.
+         */
+        private fun awaitReply(live: Session, id: Long): Pair<Reply, String> {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(REQUEST_TIMEOUT_SECONDS)
+            while (true) {
+                val line = live.next(deadline - System.nanoTime(), TimeUnit.NANOSECONDS) ?: run {
                     live.kill()
                     session = null
                     if (live.ended) error("oku preview stopped before it answered${logTail()}")
                     error("oku preview did not answer within ${REQUEST_TIMEOUT_SECONDS}s${logTail()}")
                 }
-                val reply = parse(line)
-                reply.error?.let { error(it) }
-                read(reply, line)
+                val reply = runCatching { gson.fromJson(line, Reply::class.java) }.getOrNull()
+                if (reply?.id == id) return reply to line
+                log.warn("oku $name session printed a line that answers no request: ${line.take(200)}")
             }
         }
 
@@ -260,7 +276,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
             // One per process, because opening it truncates it.
             builder.redirectError(errLog.toFile())
             val started = Session(builder.start(), name, born)
-            val hello = started.next(START_TIMEOUT_SECONDS)?.let(::parse)
+            val hello = started.next(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)?.let(::parse)
             if (hello?.protocol == null) {
                 started.kill()
                 error(startFailure())
@@ -295,7 +311,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         }
     }
 
-    /** One line in, one line out, with a deadline on every read. */
+    /** Lines in, lines out, with a deadline on every read. */
     private class Session(private val process: Process, name: String, val epoch: Int) {
         private val lines = LinkedBlockingQueue<String>()
         private val writer = process.outputStream.bufferedWriter(Charsets.UTF_8)
@@ -315,14 +331,13 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
 
         val alive: Boolean get() = process.isAlive
 
-        fun next(timeoutSeconds: Long): String? =
-            lines.poll(timeoutSeconds, TimeUnit.SECONDS)?.takeIf { it !== CLOSED }
+        fun next(timeout: Long, unit: TimeUnit): String? =
+            lines.poll(timeout, unit)?.takeIf { it !== CLOSED }
 
-        fun ask(request: String, timeoutSeconds: Long): String? {
+        fun send(request: String) {
             writer.write(request)
             writer.newLine()
             writer.flush()
-            return next(timeoutSeconds)
         }
 
         fun kill() {
@@ -333,6 +348,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
 
     /** Every field any message can carry; Gson leaves the absent ones null. */
     private class Reply(
+        val id: Long? = null,
         val protocol: Int? = null,
         val oku: String? = null,
         val kit: String? = null,
