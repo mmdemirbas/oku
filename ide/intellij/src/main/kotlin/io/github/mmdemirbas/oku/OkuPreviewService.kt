@@ -94,9 +94,10 @@ fun interface OkuGreetingListener {
 
 /**
  * `oku preview --serve` for the whole IDE: one process renders every open
- * preview, a second one checks pages, so a render after the first costs the
- * page and not a Python start, and a render never waits behind a check of
- * a whole tree.
+ * preview, a second one checks pages, and a third answers what completion,
+ * hover and navigation ask (the registry, an anchor's line). A render
+ * after the first costs the page and not a Python start, and neither a
+ * render nor a completion waits behind a check of a whole tree.
  *
  * The JSON they speak is oku's contract (`PREVIEW_PROTOCOL` in oku's
  * cli.py). A process greets first; one that names another protocol is
@@ -118,6 +119,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
 
     private val previews = Channel("preview")
     private val checks = Channel("check")
+    private val lookups = Channel("lookup")
 
     /** The last greeting, empty until a session has started. */
     @Volatile
@@ -157,7 +159,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
     fun anchorLine(source: Path, anchor: String, text: String?): Result<Int?> {
         val fields = mutableMapOf<String, Any>("path" to source.toString(), "anchor" to anchor)
         if (text != null) fields["text"] = text
-        return checks.ask(fields) { reply, _ -> reply.line }
+        return lookups.ask(fields) { reply, _ -> reply.line }
     }
 
     /**
@@ -169,7 +171,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
     fun registry(source: Path, text: String?): Result<Registry> {
         val fields = mutableMapOf<String, Any>("path" to source.toString(), "registry" to true)
         if (text != null) fields["text"] = text
-        return checks.ask(fields) { reply, line ->
+        return lookups.ask(fields) { reply, line ->
             Registry(
                 reply.glossary ?: error("oku preview answered without a glossary: $line"),
                 reply.extrefs ?: error("oku preview answered without external references: $line"),
@@ -207,10 +209,11 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         ApplicationManager.getApplication().messageBus.syncPublisher(OkuGreetingListener.TOPIC).greeted(said)
     }
 
-    /** End both processes; the next request starts whichever oku [OkuLauncher] finds then. */
+    /** End every process; the next request starts whichever oku [OkuLauncher] finds then. */
     fun restart() {
         previews.close()
         checks.close()
+        lookups.close()
     }
 
     override fun dispose() = restart()
