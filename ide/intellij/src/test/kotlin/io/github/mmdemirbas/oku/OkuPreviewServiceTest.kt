@@ -103,4 +103,20 @@ class OkuPreviewServiceTest : OkuFixtureTestCase() {
         assertTrue(message, "stopped" in message && "boom" in message)
         assertFalse(message, "within" in message)
     }
+
+    fun `test a reply is the one its request asked for, whatever else oku prints`() {
+        // IX.1: every request carries an id and oku echoes it, but the reply
+        // read was simply the next line. One stray line on oku's stdout
+        // failed that request as "not JSON" and left its real reply in the
+        // queue, so every later request read the answer to the one before.
+        fakeOku(
+            """
+            print("stray output before the reply to " + str(req["id"]), flush=True)
+            issue = {"severity": "info", "code": req["text"], "where": "w", "message": "m", "line": None}
+            print(json.dumps({"id": req["id"], "issues": [issue]}), flush=True)
+            """,
+        )
+        assertEquals("first", service.check(page, "first").getOrThrow().single().code)
+        assertEquals("second", service.check(page, "second").getOrThrow().single().code)
+    }
 }
