@@ -1127,7 +1127,7 @@ class TestChromeKitMarkers:
         # is allowed for smart-hide reveal.
         offenders = []
         for m in re.finditer(
-            r"(?:html\[data-okt-single-lang\]\s+)?pre:hover\s*>\s*\.okt-code-lang\s*(?:,[^{]*)?\{([^}]+)\}",
+            r"(?:html\[data-okt-single-lang\]\s+)?(?:pre|\.okt-pre-host):hover\s*>\s*\.okt-code-lang\s*(?:,[^{]*)?\{([^}]+)\}",
             css,
         ):
             body = m.group(1)

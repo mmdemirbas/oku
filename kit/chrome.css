@@ -1352,7 +1352,11 @@ pre .okt-fold-marker.okt-foldable.okt-folded::before { content: '\25B6'; }  /* â
    only the bottom-right corner rounded so it reads as a flag/tab on
    the block edge rather than a floating chip. Inside the pre's
    reserved padding-top band so it never overlaps the gutter (which
-   starts at top: 30px) or the first code line. */
+   starts at top: 30px) or the first code line. It lives on the
+   .okt-pre-host where there is one, because the pre scrolls and a
+   label inside it went with an unwrapped line; the host has no border,
+   so there it is placed inside the pre's. */
+.okt-pre-host > .okt-code-lang,
 pre > .okt-code-lang {
   position: absolute;
   top: 0;
@@ -1371,17 +1375,21 @@ pre > .okt-code-lang {
   z-index: 2;
   transition: opacity 0.18s ease;
 }
+.okt-pre-host > .okt-code-lang { top: 1px; left: 1px; border-top-left-radius: 7px; }
 
 /* Smart-hide round 2: when the page contains code blocks in only
    ONE language, the pills are redundant chrome â€” the reader already
    knows what they're looking at. Reveal-on-hover-of-pre so the pill
    stays discoverable. Multi-language pages keep pills visible at
    rest. */
-html[data-okt-single-lang] pre > .okt-code-lang {
+html[data-okt-single-lang] pre > .okt-code-lang,
+html[data-okt-single-lang] .okt-pre-host > .okt-code-lang {
   opacity: 0.18;
 }
 html[data-okt-single-lang] pre:hover > .okt-code-lang,
-html[data-okt-single-lang] pre:focus-within > .okt-code-lang {
+html[data-okt-single-lang] pre:focus-within > .okt-code-lang,
+html[data-okt-single-lang] .okt-pre-host:hover > .okt-code-lang,
+html[data-okt-single-lang] .okt-pre-host:focus-within > .okt-code-lang {
   opacity: 1;
 }
 
@@ -1970,6 +1978,7 @@ html.okt-lightbox-open { overflow: hidden; }    /* lock body scroll */
 .okt-mdview[data-kind="text"] .okt-mdview-body { --okt-mdview-pad-top: 0px; padding: 0; }
 .okt-mdview[data-kind="text"] .okt-pre-host { margin: 0; }
 .okt-mdview[data-kind="text"] .okt-pre-host pre { border: 0; border-radius: 0; margin: 0; }
+.okt-mdview[data-kind="text"] .okt-pre-host > .okt-code-lang { top: 0; left: 0; border-top-left-radius: 0; }
 .okt-mdview[data-kind="media"] .okt-viewer-file {
   display: flex;
   justify-content: center;

@@ -2295,12 +2295,25 @@ above it to sit on. Held by
 **Code blocks: line numbers + language pill + brace folds.** Every
 `<pre><code>` gets a gray gutter with line numbers (`.okt-code-gutter`,
 `user-select: none` so copy excludes them). When a language class is
-present, a small label appears at top-right of the pre. JS / TS /
+present, a small label appears at the block's top-left corner. JS / TS /
 JSON / CSS code blocks gain a fold marker on every line ending with
 `{`, `(`, or `[`; click hides lines until the matching closer at
 the same indent. The fold pass is hooked into Prism's `complete`
 event because the autoloader replaces innerHTML asynchronously per
 block — a `.then()` chain after `highlightAll()` races and loses.
+
+**The language label lives on the host, not in the block.** It was an
+absolute child of the `<pre>`, which is a scroll container, so an
+unwrapped block (`okt-nowrap`) scrolled sideways took it off the left
+edge with the code, and its word was part of the block's text. It sits
+on `.okt-pre-host` beside the copy and wrap buttons now, inside the
+pre's 1px border (on the edge in the viewer's code view, which draws
+none); a pre with no host keeps it. The single-language dimming sweeps
+when a label is stamped rather than at 0/200/600 ms after render:
+labels arrive after Prism's `complete` or its fallback timer, measured
+at 5.5 s with Prism from the CDN and 6.3 s with no network, so every
+timed sweep ran before the first label and no page ever dimmed. Held by
+`browser/test_code_label_stays_in_its_corner.py`.
 
 **Add a regression test with every fix.** The user has explicitly
 called out that bugs keep recurring because tests don't cover the

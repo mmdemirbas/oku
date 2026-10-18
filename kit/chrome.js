@@ -5521,6 +5521,10 @@ function initReadingAids() {
     host.className = 'okt-pre-host';
     parent.insertBefore(host, pre);
     host.appendChild(pre);
+    // A language label stamped before the host existed moves out with
+    // the buttons: inside the pre it scrolls away with the code.
+    var pill = pre.querySelector(':scope > .okt-code-lang');
+    if (pill) host.appendChild(pill);
     return host;
   }
 
@@ -7373,18 +7377,24 @@ function _hdtAfterPrismHighlight(env) {
     marker.setAttribute('aria-hidden', 'true');
   });
   var lang = (code.className.match(/language-([\w-]+)/) || [0, ''])[1].toLowerCase();
-  // Stamp a small language pill on the pre so the reader sees what
-  // dialect they're looking at. Idempotent — re-runs replace the text
-  // rather than appending duplicates.
+  // Stamp a small language pill so the reader sees what dialect they're
+  // looking at. Idempotent — re-runs replace the text rather than
+  // appending duplicates. It goes on the .okt-pre-host beside the copy
+  // and wrap buttons, for their reason: the pre is a scroll container,
+  // so a label inside it scrolls away with an unwrapped line, and its
+  // word becomes part of the block's text. A pre with no host (a chart,
+  // a snippet, a card) keeps it.
   if (lang && lang !== 'plaintext' && lang !== 'text' && lang !== 'none') {
-    var pill = pre.querySelector(':scope > .okt-code-lang');
+    var pillHost = pre.parentElement && pre.parentElement.classList.contains('okt-pre-host') ? pre.parentElement : pre;
+    var pill = pillHost.querySelector(':scope > .okt-code-lang') || pre.querySelector(':scope > .okt-code-lang');
     if (!pill) {
       pill = document.createElement('span');
       pill.className = 'okt-code-lang';
       pill.setAttribute('aria-hidden', 'true');
-      pre.appendChild(pill);
     }
+    if (pill.parentNode !== pillHost) pillHost.appendChild(pill);
     pill.textContent = lang;
+    __okuQueueLanguagePillSweep();
   }
   if (/^(js|javascript|ts|typescript|jsx|tsx|json|json5|css|scss|less)$/.test(lang)) {
     // Skip fold detection on short blocks. A 3-line shell command
@@ -19866,24 +19876,29 @@ window.addEventListener('oku:rendered', function () {
    Multi-language pages keep the pills visible at full opacity so
    the dialect markers actually help the reader disambiguate.
 
-   Pills are stamped during Prism's `complete` event (async), so a
-   single sync sweep on `oku:rendered` may run before any pill exists.
-   Re-scan a few times across the next ~600 ms so we settle the
-   attribute once Prism has finished. Idempotent — the attribute is
-   either set or cleared based on the current observation. */
+   Pills are stamped after Prism's `complete` event or the fallback
+   timer, on no schedule this function can name: measured with Prism
+   from the CDN, 5.5 s after render, and 6.3 s with the network gone.
+   Sweeps at fixed times after render (0, 200 and 600 ms) all ran
+   before the first pill, so a single-language page never dimmed. The
+   stamp asks for a sweep instead, coalesced to one per frame.
+   Idempotent — the attribute is set or cleared from what is there. */
 function __okuPostRenderLanguagePillSmartHide() {
-  function sweep() {
-    var pills = document.querySelectorAll('.okt-code-lang');
-    var langs = new Set();
-    pills.forEach(function (p) {
-      var t = (p.textContent || '').trim().toLowerCase();
-      if (t) langs.add(t);
-    });
-    document.documentElement.toggleAttribute('data-okt-single-lang', pills.length >= 2 && langs.size === 1);
-  }
-  sweep();
-  setTimeout(sweep, 200);
-  setTimeout(sweep, 600);
+  var pills = document.querySelectorAll('.okt-code-lang');
+  var langs = new Set();
+  pills.forEach(function (p) {
+    var t = (p.textContent || '').trim().toLowerCase();
+    if (t) langs.add(t);
+  });
+  document.documentElement.toggleAttribute('data-okt-single-lang', pills.length >= 2 && langs.size === 1);
+}
+function __okuQueueLanguagePillSweep() {
+  if (__okuQueueLanguagePillSweep.queued) return;
+  __okuQueueLanguagePillSweep.queued = true;
+  requestAnimationFrame(function () {
+    __okuQueueLanguagePillSweep.queued = false;
+    __okuPostRenderLanguagePillSmartHide();
+  });
 }
 
 /* The foot of the file: everything a connectedCallback can reach is

@@ -734,7 +734,9 @@ class TestPayloadBudget:
     # Then by a compare preview laid out as its source and fitted both
     # ways (the legend fix before it came in under, at 1,487,666):
     # 1,488,887.
-    KIT_BUDGET_BYTES = 1_489_700
+    # Then by a code block's language label living on its host, and the
+    # single-language dimming sweeping when a label is stamped: 1,490,589.
+    KIT_BUDGET_BYTES = 1_491_400
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
@@ -763,7 +765,8 @@ class TestPayloadBudget:
     # Then by client measurements written in their own frame: 1,486,315.
     # Then by overlays drawing their own on top, at its own size: 1,488,123.
     # Then by previews laid out as their source, fitted both ways: 1,489,490.
-    STANDALONE_BUDGET_BYTES = 1_490_300
+    # Then by the code label on its host and the sweep on stamp: 1,491,192.
+    STANDALONE_BUDGET_BYTES = 1_492_000
 
     KIT_FILES = ("chrome.js", "chrome.css", "renderer.js", "chrome-boot.js")
 
