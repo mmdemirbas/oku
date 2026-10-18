@@ -181,36 +181,44 @@ There is no flag to skip the check. Fix the source and pack again. Exit 2 is a u
 
 ### One kit for many packages {#pack-kit-url}
 
-A host that serves many packages does not need a copy of the kit in each one. `--kit-url` names the address where the host serves one copy, written by [`oku kit export`](#kit-export):
+A host that serves many packages does not need a copy of the kit in each one. `--kit` names the kit [`oku kit export`](#kit-export) wrote, and `--kit-url` the address where the host serves it:
 
 ```bash
-oku kit export --out ~/share/kit
-oku pack raporlar/evrad.md --out ~/share/evrad --kit-url /k/3f9a/
+oku kit export --out ~/share/k
+oku pack raporlar/evrad.md --out ~/share/evrad --kit ~/share/k --kit-url /k/
 
 # ✓ Packed 1 page(s), 12 file(s) into /Users/you/share/evrad
 #   entry: raporlar/evrad.html
-#   kit:   /k/3f9a/ (not carried; serve `oku kit export` there)
+#   kit:   /k/ + core-4d4187a0638cdba1, fonts-9a373fac28ff9efd, mermaid-02511f5f0d243ec1, prism-5dbf9d52ebfeaf7b (not carried; serve the export there)
 ```
 
-The package then has no `_oku/` directory. Every reference a page makes to the kit goes to that address: the scripts and the stylesheet in each page, with their `?v=` stamp; the fonts the stylesheet names; and what a page loads later, which is mermaid, Prism and its grammars, the translation table of a page not in English, and the glossary and link registries `kit.json` names. Each page also names the package root relative to itself, so the package still works under any path prefix. `_pack.json` gains `"kit": {"url": "/k/3f9a/"}`, which tells the host the pages expect the kit there.
+The package then has no `_oku/` directory. Every reference a page makes to the kit goes to the layer that holds it: the scripts and the stylesheet in each page, to the core layer, with no `?v=` stamp because the layer's name already changes with its content; the fonts, through the stylesheet, to the fonts layer; and what a page loads later, which is mermaid and Prism with its grammars from their own layers, and the translation table of a page not in English and the glossary and link registries `kit.json` names from the core. Each page also names the package root relative to itself, so the package still works under any path prefix. `_pack.json` gains `"kit": {"url": "/k/", "layers": [...]}`, which tells the host which layers the pages expect there.
 
-The URL is a root-relative path that ends in `/`. Anything else is exit 2: a relative path, a scheme or a host, a query, an empty or a dot segment. The check runs as it does without the flag, except that a reference under the kit URL is held to the files `oku kit export` writes instead of to the package. Without `--kit-url`, nothing changes.
+`--kit` and `--kit-url` go together. The URL is a root-relative path that ends in `/`; anything else is exit 2: a relative path, a scheme or a host, a query, an empty or a dot segment. An export written by another oku is exit 2 as well, since its renderer would run this oku's pages. The check runs as it does without the flags, except that a reference under the kit URL is held to the files of the export instead of to the package. Without them, nothing changes.
 
 ## oku kit export {#kit-export}
 
-Write the kit a page loads at runtime, for a host to serve once at the address packages name with [`--kit-url`](#pack-kit-url).
+Write the kit a page loads at runtime, for a host to serve once to every package packed against it with [`--kit`](#pack-kit-url).
 
 ```bash
-oku kit export --out ~/share/kit
+oku kit export --out ~/share/k
 
-# ✓ Exported kit 2026-10-17-r128: 321 file(s), 6.0 MB into /Users/you/share/kit
+# ✓ Exported kit 2026-10-18-r130: 4 layers, 321 file(s), 5.3 MB into /Users/you/share/k
+#   core-4d4187a0638cdba1  16 file(s), 0.8 MB
+#   fonts-9a373fac28ff9efd  8 file(s), 0.6 MB
+#   mermaid-02511f5f0d243ec1  1 file(s), 3.3 MB
+#   prism-5dbf9d52ebfeaf7b  296 file(s), 0.6 MB
 ```
 
-It holds chrome.css, chrome.js, chrome-boot.js and renderer.js; the `i18n/`, `glossary/` and `extrefs/` tables; and `vendor/`, with mermaid, Prism and the fonts. `schema/` is left out: no page loads a schema or `examples.json`. Those serve `oku check` and `oku spec`.
+Each layer is a directory named for its content: the 16 hex digits are the start of the SHA-256 of its sorted `path<TAB>sha256` lines, paths inside the layer. The core holds chrome.css, chrome.js, chrome-boot.js and renderer.js, minified as every build ships them, with the `i18n/`, `glossary/` and `extrefs/` tables. The other three hold the vendored copies, each under the path it has in `vendor/`. `schema/` is left out: no page loads a schema or `examples.json`. Those serve `oku check` and `oku spec`.
 
-The same installed oku writes the same bytes on every run, with no timestamps in them, so a host can name the copy by its content. That is why the export carries every grammar of the pinned Prism release (293 files, 0.56 MB, fetched once into `~/.cache/oku/`) and not the grammars this machine's builds happened to fetch. Those grow, and each new one would change the copy's name and make every reader download the kit again.
+The layers are what let a new oku cost a reader little. A release that changes only oku's own code changes only the core's name; mermaid, the fonts and the grammars keep theirs, so a host that keeps every address for good serves readers the new core and nothing else, and stores nothing else. New fonts change the core too, because its stylesheet names the fonts layer.
 
-Exit 1 when the vendored copy is incomplete or a grammar cannot be fetched; nothing is written. Exit 2 when `--out` holds a file a kit export does not write.
+The same installed oku writes the same bytes on every run, with no timestamps in them. That is why the prism layer carries every grammar of the pinned Prism release (293 files, fetched once into `~/.cache/oku/`) and not the grammars this machine's builds happened to fetch. Those grow, and each new one would rename the layer.
+
+`--out` holds this oku's layers only: an earlier export there is replaced. A host that serves the directory itself, rather than storing each layer by its name as pano does, keeps earlier layers by copying each new export in beside them; two layers never share a name.
+
+Exit 1 when the vendored copy is incomplete or a grammar cannot be fetched; nothing is written. Exit 2 when `--out` holds anything that is not a layer.
 
 ## oku spec {#spec}
 

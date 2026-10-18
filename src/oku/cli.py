@@ -10328,16 +10328,20 @@ def main() -> int:
         help="directory to write; replaced when it holds an earlier pack, refused when it holds anything else",
     )
     pack_parser.add_argument(
+        "--kit",
+        metavar="DIR",
+        help="load the kit `oku kit export` wrote to DIR, served at --kit-url, instead of carrying _oku/",
+    )
+    pack_parser.add_argument(
         "--kit-url",
         metavar="URL",
-        help="load the kit from this root-relative address (/k/<id>/) instead of carrying _oku/; "
-        "see `oku kit export`",
+        help="the root-relative address the export at --kit is served under (/k/)",
     )
     kit_parser = sub.add_parser("kit", help="the kit itself, for a host that serves one copy to many packs")
     kit_sub = kit_parser.add_subparsers(dest="kit_cmd", required=True)
     kit_export_parser = kit_sub.add_parser(
         "export",
-        help="write exactly the files a page loads from the kit, the same bytes on every run",
+        help="write exactly the files a page loads from the kit, in layers named for their content",
     )
     kit_export_parser.add_argument(
         "--out",

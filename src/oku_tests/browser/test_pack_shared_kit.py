@@ -1,16 +1,18 @@
 """A package that loads the kit from one shared address renders fully.
 
 A host serving many packages keeps one copy of the kit (`oku kit export`)
-at `/k/<id>/`, cached by readers' browsers across every package, and
-packs with `oku pack --kit-url /k/<id>/`, which writes no `_oku/`. Every
-reference a page makes to the kit has to reach that address: the four
-tags in the stub, the fonts through chrome.css, and everything chrome.js
-loads later on its own — mermaid, Prism's core, carried.js and a grammar,
-the i18n table of a Turkish page, the glossary and ext-ref registries a
-kit.json names. Any one of them left relative asks for
-`/d/s/@v1/_oku/…`, which this host does not have: a failed request.
+under `/k/`, in layers named for their content (`core-<hex>/`,
+`fonts-<hex>/`, `mermaid-<hex>/`, `prism-<hex>/`), cached by readers'
+browsers across every package, and packs with `oku pack --kit <export>
+--kit-url /k/`, which writes no `_oku/`. Every reference a page makes to
+the kit has to reach its layer: the four tags in the stub, the fonts
+through chrome.css, and everything chrome.js loads later on its own —
+mermaid, Prism's core, carried.js and a grammar, the i18n table of a
+Turkish page, the glossary and ext-ref registries a kit.json names. Any
+one of them left relative asks for `/d/s/@v1/_oku/…`, which this host
+does not have: a failed request.
 
-So the export is served at `/k/test/` and the package at `/d/s/@v1/`,
+So the export is served at `/k/` and the package at `/d/s/@v1/`,
 every other path a 404, with the CSP a host would send. Both pages are
 walked; nothing may fail, log an error or be refused, nothing may ask
 for the package's own `_oku/`, and each lazy load must be seen arriving
@@ -33,7 +35,7 @@ from . import _wait
 
 pytestmark = pytest.mark.browser
 
-KIT = "/k/test/"
+KIT = "/k/"
 PKG = "/d/s/@v1/"
 
 CSP = (
@@ -111,7 +113,10 @@ def trees(tmp_path_factory) -> dict[str, Path]:
     (proj / "files" / "manual.pdf").write_bytes(PDF)
     out = tmp_path_factory.mktemp("kitout")
     assert pack.export_kit(str(out / "kit")) == 0
-    assert pack.run([str(proj / "docs" / "entry.md")], str(out / "pkg"), kit_url=KIT) == 0
+    assert (
+        pack.run([str(proj / "docs" / "entry.md")], str(out / "pkg"), kit_url=KIT, kit_dir=str(out / "kit"))
+        == 0
+    )
     assert not (out / "pkg" / "_oku").exists()
     return {KIT: out / "kit", PKG: out / "pkg"}
 
@@ -233,26 +238,31 @@ def test_every_request_is_the_package_or_the_kit(walk, served: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "path",
+    "layer, path",
     [
-        "chrome-boot.js?v=",
-        "chrome.css?v=",
-        "chrome.js?v=",
-        "renderer.js?v=",
-        "vendor/fonts/literata-",
-        "vendor/mermaid.min.js",
-        "vendor/prism/prism.min.js",
-        "vendor/prism/carried.js",
-        "vendor/prism/components/prism-python.min.js",
-        "i18n/tr.json",
-        "glossary/web.json",
-        "extrefs/web.json",
+        ("core", "chrome-boot.js"),
+        ("core", "chrome.css"),
+        ("core", "chrome.js"),
+        ("core", "renderer.js"),
+        ("fonts", "fonts/literata-"),
+        ("mermaid", "mermaid.min.js"),
+        ("prism", "prism/prism.min.js"),
+        ("prism", "prism/carried.js"),
+        ("prism", "prism/components/prism-python.min.js"),
+        ("core", "i18n/tr.json"),
+        ("core", "glossary/web.json"),
+        ("core", "extrefs/web.json"),
     ],
 )
-def test_each_kind_of_kit_load_arrives_from_the_kit(walk, served: str, path: str) -> None:
+def test_each_kind_of_kit_load_arrives_from_its_layer(
+    walk, served: str, trees, layer: str, path: str
+) -> None:
     """Without this, a load that silently never happened would pass the
-    tests above: nothing failed because nothing was asked for."""
-    assert any(r.startswith(f"200 {served}{KIT}{path}") for r in walk["ok"]), [
+    tests above: nothing failed because nothing was asked for. And a
+    vendored file fetched from the core's layer would still be found, but
+    under an address that changes with every oku release."""
+    d = next(p.name for p in trees[KIT].iterdir() if p.name.startswith(layer + "-"))
+    assert any(r.startswith(f"200 {served}{KIT}{d}/{path}") for r in walk["ok"]), [
         r for r in walk["ok"] if KIT in r
     ]
 

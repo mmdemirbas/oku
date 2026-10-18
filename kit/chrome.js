@@ -16524,8 +16524,14 @@ var __okuVisualTools = (function () {
  * Assigned lazily, never at module scope: __okuDocsRoot is a `var`
  * declared thousands of lines below, and reading it early yields
  * `undefined_oku/…` — the same trap the i18n table documents. */
-function __okuVendorPath() {
+function __okuVendorPath(part) {
   if (typeof window.__okuVendorBase === 'string') return window.__okuVendorBase;
+  /* A page packed against an exported kit (`oku pack --kit`) loads each
+     vendored dependency from a layer of its own, named for its content,
+     so a new oku release leaves mermaid's address, and every reader's
+     cached copy, as they were. The stub names each layer. */
+  var layer = document.querySelector('meta[name="oku-vendor-' + part + '"]');
+  if (layer && layer.content) return layer.content;
   return (typeof __okuKitBase === 'string' ? __okuKitBase : '_oku/') + 'vendor/';
 }
 
@@ -16565,7 +16571,7 @@ var __prismLoader = (function () {
      directory: two preloads 404, and whether a third fence's grammar was
      refused depended on which promise settled first. */
   function ensureVendored(rel, cdnUrl, marksSource) {
-    return ensureScript(__okuVendorPath() + rel).then(
+    return ensureScript(__okuVendorPath('prism') + rel).then(
       function () { if (marksSource) servedLocally = true; },
       function () {
         if (marksSource) servedLocally = false;
@@ -16600,7 +16606,7 @@ var __prismLoader = (function () {
            `__okuPrismCarried` undefined and the refusal below stands
            down, which is the behaviour every page had until now. */
         if (!servedLocally || window.__okuPrismCarried) return null;
-        return ensureScript(__okuVendorPath() + 'prism/carried.js').catch(function () {});
+        return ensureScript(__okuVendorPath('prism') + 'prism/carried.js').catch(function () {});
       })
       .then(function () {
         if (window.Prism && window.Prism.plugins && window.Prism.plugins.autoloader) {
@@ -16621,7 +16627,7 @@ var __prismLoader = (function () {
           // build of the same page. If the core came from the local copy,
           // its components are in the same directory by construction.
           window.Prism.plugins.autoloader.languages_path =
-            (servedLocally ? __okuVendorPath() + 'prism/components/' : CDN + 'components/');
+            (servedLocally ? __okuVendorPath('prism') + 'prism/components/' : CDN + 'components/');
 
           /* A grammar can ask for a component out of the DOCUMENT's own
              content, and Prism's markdown grammar does: its `wrap` hook
@@ -16983,7 +16989,7 @@ var __mermaidLoader = (function () {
       var script = document.createElement('script');
       // Vendored copy first: mermaid is 3.3 MB and identical for every
       // page, so re-fetching it per document is the waste this avoids.
-      script.src = __okuVendorPath() + 'mermaid.min.js';
+      script.src = __okuVendorPath('mermaid') + 'mermaid.min.js';
       script.async = true;
       script.dataset.okuFallback = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
       // To enable SRI: set script.integrity = 'sha384-...';

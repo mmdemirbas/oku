@@ -1502,7 +1502,7 @@ because the fix is in the source. Held by `test_pack.py` and
 `/d/x/` behind the strict CSP a host would send.
 
 **A host with many packages serves one kit: `oku kit export` + `oku pack
---kit-url /k/<id>/`.** chrome.js found both the docs root and the kit by
+--kit <export> --kit-url /k/`.** chrome.js found both the docs root and the kit by
 the `_oku/` in its own tags, so a stub naming `/k/<id>/` lost both — the
 root fell back to the page's directory and every lazy load (mermaid,
 Prism, i18n, the registries) went to an `_oku/` the package lacks. The
@@ -1511,9 +1511,15 @@ and `oku-kit-base`, which `__okuKitBase` reads; every kit-relative URL in
 chrome.js goes through `__okuKitBase`, never `__okuDocsRoot + '_oku/'`.
 The export is addressed by its content, so it carries every grammar of
 the pinned Prism (cached in `~/.cache/oku/`), not the vendor directory's
-grammars, which grow with every project's build. Held by
-`browser/test_pack_shared_kit.py`, which also watches each lazy load
-arrive from the kit, since a load that never happens fails nothing.
+grammars, which grow with every project's build. The export is four
+layers named for their content (`core-`, `fonts-`, `mermaid-`, `prism-`
++ 16 hex, `layer_id` in pack.py; pano checks every name with the same
+rule), so a release that changes only oku's code renames only the core
+and readers keep mermaid and the fonts cached. The stub names each
+vendor layer (`oku-vendor-<name>`), which `__okuVendorPath(part)` reads;
+a vendor load that skips it still works and quietly loses that. Held by
+`browser/test_pack_shared_kit.py`, which watches each lazy load arrive
+from its own layer, since a load that never happens fails nothing.
 
 **A file in the viewer can be handed to the reader's editor, and the
 reader names the editor.** `__okuEditors` holds three URL formats, each

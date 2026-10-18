@@ -20,9 +20,10 @@ author's machine.
 
 A host that serves many packages can keep ONE copy of the kit instead of
 one per package: `oku kit export` writes exactly the files a page loads
-from it, the same bytes on every run, so the host can name the copy by
-its content; `oku pack --kit-url /k/<id>/` then writes no `_oku/` and
-points every kit reference at that address.
+from it, in layers named for their content (`core-<hex>`, `fonts-<hex>`,
+`mermaid-<hex>`, `prism-<hex>`), the same bytes on every run; `oku pack
+--kit <export> --kit-url /k/` then writes no `_oku/` and points every kit
+reference at those layers under that address.
 """
 
 from __future__ import annotations
@@ -242,30 +243,56 @@ def _text_sources(pp: PackPage) -> list[Path]:
     return out
 
 
-def _stub(pp: PackPage, kit_url: str | None) -> str:
+@dataclass(frozen=True)
+class SharedKit:
+    """An exported kit the package loads instead of carrying `_oku/`: the
+    address it is served under, its layers by name (`core` →
+    `core-<hex>`), and every file in it as `<layer>/<path>`."""
+
+    url: str
+    layers: dict[str, str]
+    files: frozenset[str]
+
+
+def _stub(pp: PackPage, kit: SharedKit | None) -> str:
     lang = cli._lang_of_page(pp.page)
     html = cli._stub_for(cli._page_title(pp.page) or pp.src.stem, lang=lang)
     depth = len(pp.rel.parts) - 1
-    html = cli._retarget_kit_urls(html, depth) if kit_url is None else _at_shared_kit(html, kit_url, depth)
+    html = cli._retarget_kit_urls(html, depth) if kit is None else _at_shared_kit(html, kit, depth)
     return cli._with_html_lang(cli._mark_built(html), lang)
 
 
-def _at_shared_kit(html: str, kit_url: str, depth: int) -> str:
-    """Point a stub's kit tags at `kit_url`, and name both roots.
+_STUB_KIT_TAG_RE = re.compile(r'((?:src|href)=")_oku/([^"?]+)(?:\?[^"]*)?"', re.I)
 
-    chrome.js finds the docs root by the `_oku/` in its own tags, and the
-    kit as `_oku/` under that root. Neither holds once the tags name
-    `/k/<id>/`: the root falls back to the page's own directory (wrong
-    for every page in a subfolder) and every lazy load — mermaid, Prism,
-    i18n, the registries — went to an `_oku/` the package does not have.
-    So the stub says both, the root relative to the page so the package
-    still works under any prefix. The `?v=` stamp stays on each tag.
+
+def _at_shared_kit(html: str, kit: SharedKit, depth: int) -> str:
+    """Point a stub's kit tags at the core layer, and name every root.
+
+    chrome.js finds the docs root by the `_oku/` in its own tags, the kit
+    as `_oku/` under that root, and the vendored files under the kit.
+    None of that holds once the tags name `/k/core-<hex>/`: the root falls
+    back to the page's own directory (wrong for every page in a subfolder)
+    and every lazy load — mermaid, Prism, i18n, the registries — went to
+    an `_oku/` the package does not have. So the stub says each: the root
+    relative to the page, so the package still works under any prefix;
+    the core; and one base per vendor layer, which `__okuVendorPath(part)`
+    reads. The fonts need none: the core's chrome.css names them.
+
+    No `?v=` on the tags: the layer's name is its content, and a stamp
+    that differs between two machines would make the same file two
+    addresses, and every reader download it twice.
     """
-    html = cli._KIT_URL_RE.sub(lambda m: m.group(1) + kit_url, html)
+    core = f"{kit.url}{kit.layers['core']}/"
+    html = _STUB_KIT_TAG_RE.sub(lambda m: f'{m.group(1)}{core}{m.group(2)}"', html)
     root = "../" * depth or "./"
-    metas = f'<meta name="oku-docs-root" content="{root}">\n<meta name="oku-kit-base" content="{kit_url}">\n'
+    metas = [f'<meta name="oku-docs-root" content="{root}">', f'<meta name="oku-kit-base" content="{core}">']
+    metas += [
+        f'<meta name="oku-vendor-{name}" content="{kit.url}{d}/">'
+        for name, d in kit.layers.items()
+        if name != "core"
+    ]
     m = cli._HEAD_OPEN_RE.search(html)
-    return html[: m.end()] + "\n" + metas + html[m.end() :]
+    return html[: m.end()] + "\n" + "\n".join(metas) + "\n" + html[m.end() :]
 
 
 def _manifest(plan: Plan, title: str, summary: str) -> dict:
@@ -336,17 +363,17 @@ def _write(staging: Path, rel: str | PurePosixPath, data: str | bytes) -> None:
 
 
 def _write_tree(
-    plan: Plan, staging: Path, kit_url: str | None = None
+    plan: Plan, staging: Path, kit: SharedKit | None = None
 ) -> tuple[dict[str, list[Path]], list[Finding]]:
     """Write the package into `staging`; return each file's sources.
 
     The sources are what a finding is reported against: the markdown the
-    author edits, not the JSON the build derived from it. With `kit_url`
-    the kit is not written: the host serves one copy at that address.
+    author edits, not the JSON the build derived from it. With `kit` the
+    kit is not written: the host serves one copy at its address.
     """
     entry = plan.pages[0]
     title, summary = _entry_title(entry)
-    if kit_url is None:
+    if kit is None:
         cli.copy_site_kit(staging)
     origins: dict[str, list[Path]] = {}
     findings: list[Finding] = []
@@ -354,7 +381,7 @@ def _write_tree(
     for pp in plan.pages:
         _localize_files(pp, plan.root)
         texts = _text_sources(pp)
-        _write(staging, pp.rel, _stub(pp, kit_url))
+        _write(staging, pp.rel, _stub(pp, kit))
         _write(staging, pp.json_rel, json.dumps(pp.page, ensure_ascii=False, indent=2))
         _write(staging, pp.md_rel, pp.src.read_bytes())
         for rel in (pp.rel, pp.json_rel, pp.md_rel):
@@ -363,7 +390,7 @@ def _write_tree(
         rel = target.relative_to(plan.root).as_posix()
         # The package's own files sit at fixed names at its root; a carried
         # file there would be overwritten by them, or would replace them.
-        taken = rel in _DERIVED_NAMES or (kit_url is None and rel.startswith("_oku/"))
+        taken = rel in _DERIVED_NAMES or (kit is None and rel.startswith("_oku/"))
         if taken or (rel in origins and origins[rel][0] != target):
             findings.append(
                 Finding(
@@ -392,7 +419,7 @@ def _write_tree(
     for rel, text in derived.items():
         _write(staging, rel, text)
         origins[rel] = srcs
-    index = pack_index(staging, plan, kit_url)
+    index = pack_index(staging, plan, kit)
     _write(staging, INDEX_NAME, json.dumps(index, indent=2, ensure_ascii=False) + "\n")
     origins[INDEX_NAME] = srcs
     return origins, findings
@@ -442,7 +469,7 @@ def _mime(path: Path) -> str:
     return _MIME.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
 
 
-def pack_index(staging: Path, plan: Plan, kit_url: str | None = None) -> dict:
+def pack_index(staging: Path, plan: Plan, kit: SharedKit | None = None) -> dict:
     """`_pack.json`. Paths are package-relative POSIX paths, as on disk;
     a host quotes each segment to make a URL. `files` lists every file in
     the package but this one. `kit` is there only when the pages load the
@@ -480,8 +507,8 @@ def pack_index(staging: Path, plan: Plan, kit_url: str | None = None) -> dict:
         "title": title,
         "summary": summary,
     }
-    if kit_url is not None:
-        index["kit"] = {"url": kit_url}
+    if kit is not None:
+        index["kit"] = {"url": kit.url, "layers": sorted(kit.layers.values())}
     return {**index, "pages": pages, "files": files}
 
 
@@ -667,15 +694,14 @@ def _dangling(href: str, how: str, base: Path, staging: Path) -> str | None:
 
 
 def _ref_findings(
-    staging: Path, plan: Plan, texts: dict[Path, str], kit_url: str | None = None
+    staging: Path, plan: Plan, texts: dict[Path, str], kit: SharedKit | None = None
 ) -> list[Finding]:
     """(b) Every local reference a packed page makes, resolved against the
     package rather than the source: it must land on a file inside it.
 
-    The one exception is the shared kit. A reference under `kit_url` is
+    The one exception is the shared kit. A reference under its URL is
     root-absolute on purpose and lands on the host's copy, not in the
-    package, so it is held to what `oku kit export` writes instead."""
-    kit_files = set(_export_sources()) if kit_url is not None else set()
+    package, so it is held to what the export holds instead."""
     out: list[Finding] = []
     for pp in plan.pages:
         page = json.loads((staging / pp.json_rel).read_text(encoding="utf-8"))
@@ -697,8 +723,8 @@ def _ref_findings(
         if rel.parts[0] == "_oku":
             continue
         for href in _ISLAND_REF_RE.findall(f.read_text(encoding="utf-8")):
-            if kit_url is not None and href.startswith(kit_url):
-                problem = None if _ref_path(href[len(kit_url) :]) in kit_files else "names no file of the kit"
+            if kit is not None and href.startswith(kit.url):
+                problem = None if _ref_path(href[len(kit.url) :]) in kit.files else "names no file of the kit"
             else:
                 problem = None if _NOT_LOCAL_RE.match(href) else _dangling(href, "raw", f.parent, staging)
             if problem:
@@ -869,12 +895,12 @@ def _vendor_findings(plan: Plan) -> list[Finding]:
 
 
 def leak_check(
-    staging: Path, plan: Plan, origins: dict[str, list[Path]], kit_url: str | None = None
+    staging: Path, plan: Plan, origins: dict[str, list[Path]], kit: SharedKit | None = None
 ) -> list[Finding]:
     texts: dict[Path, str] = {}
     return (
         _home_findings(staging, origins, texts)
-        + _ref_findings(staging, plan, texts, kit_url)
+        + _ref_findings(staging, plan, texts, kit)
         + _external_findings(staging, plan, texts)
     )
 
@@ -949,16 +975,55 @@ _KIT_URL_FORM = re.compile(r"^/(?:(?:[A-Za-z0-9._~@:!$()*+,;=-]|%[0-9A-Fa-f]{2})
 def _check_kit_url(url: str) -> None:
     if not _KIT_URL_FORM.match(url) or any(seg in (".", "..") for seg in url.split("/")):
         raise PackUsageError(
-            f"--kit-url {url!r}: not a root-relative path ending in / (for example /k/<id>/); "
+            f"--kit-url {url!r}: not a root-relative path ending in / (for example /k/); "
             "a scheme, a host, a query, a dot segment or an empty segment is refused"
         )
 
 
-def run(pages: list[str], out: str, kit_url: str | None = None) -> int:
+def _shared_kit(kit_dir: str, url: str) -> SharedKit:
+    """The export at `kit_dir`, as this package will load it from `url`.
+
+    Refused unless it is one this oku wrote: a core of another release
+    would run this release's pages with that release's renderer."""
+    root = Path(kit_dir).expanduser()
+    if not root.is_dir():
+        raise PackUsageError(
+            f"--kit {kit_dir}: not a directory; write one with `oku kit export --out {kit_dir}`"
+        )
+    layers: dict[str, str] = {}
+    for d in sorted(root.iterdir()):
+        m = _LAYER_DIR.match(d.name)
+        if not m or not d.is_dir() or m.group(1) in layers:
+            raise PackUsageError(
+                f"--kit {kit_dir}: holds {d.name}, which no kit export writes beside the layers"
+            )
+        layers[m.group(1)] = d.name
+    if "core" not in layers:
+        raise PackUsageError(
+            f"--kit {kit_dir}: no core layer; write one with `oku kit export --out {kit_dir}`"
+        )
+    core = root / layers["core"]
+    for name in ("chrome.js", "renderer.js", "chrome-boot.js"):
+        f = core / name
+        if not f.is_file() or f.read_text(encoding="utf-8") != cli.kit_file_text(name):
+            raise PackUsageError(
+                f"--kit {kit_dir}: its {name} is not this oku's (kit {cli._kit_build_stamp()}); export it again"
+            )
+    files = frozenset(p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file())
+    return SharedKit(url, layers, files)
+
+
+def run(pages: list[str], out: str, kit_url: str | None = None, kit_dir: str | None = None) -> int:
+    kit: SharedKit | None = None
     try:
         entries, out_dir = _validate(pages, out)
+        if (kit_url is None) != (kit_dir is None):
+            raise PackUsageError(
+                "--kit and --kit-url go together: the exported kit, and the address it is served under"
+            )
         if kit_url is not None:
             _check_kit_url(kit_url)
+            kit = _shared_kit(kit_dir, kit_url)
     except PackUsageError as e:
         print(f"✗ {e}", file=sys.stderr)
         return EXIT_USAGE
@@ -967,12 +1032,12 @@ def run(pages: list[str], out: str, kit_url: str | None = None) -> int:
         print(f"✗ {pages[0]}: not readable as a page", file=sys.stderr)
         return EXIT_USAGE
     # The vendor copy matters only to a package that carries it; with a
-    # kit URL, `oku kit export` is the command that answers for it.
-    findings = ([] if kit_url is not None else _vendor_findings(plan)) + _check_findings(plan)
+    # shared kit, `oku kit export` is the command that answered for it.
+    findings = ([] if kit is not None else _vendor_findings(plan)) + _check_findings(plan)
     staging = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.pack-", dir=out_dir.parent))
     try:
-        origins, written = _write_tree(plan, staging, kit_url)
-        findings += written + leak_check(staging, plan, origins, kit_url)
+        origins, written = _write_tree(plan, staging, kit)
+        findings += written + leak_check(staging, plan, origins, kit)
         errors = [f for f in findings if f.severity == "error"]
         for f in errors + [f for f in findings if f.severity != "error"]:
             print(_format(f))
@@ -991,13 +1056,15 @@ def run(pages: list[str], out: str, kit_url: str | None = None) -> int:
         shutil.rmtree(staging, ignore_errors=True)
     print(f"✓ Packed {len(plan.pages)} page(s), {count} file(s) into {out}")
     print(f"  entry: {plan.pages[0].rel.as_posix()}")
-    if kit_url is not None:
-        print(f"  kit:   {kit_url} (not carried; serve `oku kit export` there)")
+    if kit is not None:
+        print(
+            f"  kit:   {kit.url} + {', '.join(sorted(kit.layers.values()))} (not carried; serve the export there)"
+        )
     return 0
 
 
 def cmd_pack(args: argparse.Namespace) -> int:
-    return run(args.pages, args.out, args.kit_url)
+    return run(args.pages, args.out, args.kit_url, args.kit)
 
 
 # ------------------------------------------------------------------ #
@@ -1011,7 +1078,52 @@ def cmd_pack(args: argparse.Namespace) -> int:
 # `required` lists as a literal — and they exist for `oku check` and
 # `oku spec`. The browser test asserts no page asks for one.
 _EXPORT_DIRS = ("glossary", "extrefs", "i18n")
-_EXPORT_TOP = frozenset({*cli.KIT_FILES, *_EXPORT_DIRS, "vendor"})
+
+# The export is layers, each a directory named for its content,
+# `<name>-<16 hex>`: the core (oku's own files: the four a stub names,
+# i18n, the registries) and one per vendored dependency (fonts, mermaid,
+# prism). A host that keeps each address for good — pano's /k/ — then
+# takes an oku release that changed only oku's code as one new core
+# layer, and readers download only that: mermaid's 3.3 MB, the fonts and
+# the grammars keep their addresses and stay in every browser's cache.
+_LAYER_DIR = re.compile(r"^([a-z0-9]{1,32})-([0-9a-f]{16})$")
+
+
+def layer_id(files: dict[str, bytes]) -> str:
+    """The 16 hex digits of a layer's name: the SHA-256 of its sorted
+    "path<TAB>sha256" lines, paths inside the layer. pano computes the same
+    (kitIdOf in its src/lib/server/publish.ts) and refuses a layer whose
+    name is not its content's."""
+    lines = sorted(f"{p}\t{hashlib.sha256(d).hexdigest()}\n" for p, d in files.items())
+    return hashlib.sha256("".join(lines).encode("utf-8")).hexdigest()[:16]
+
+
+def _layer_of(rel: str) -> tuple[str, str]:
+    """(layer, path inside it) for a path of `_export_sources()`. A vendor
+    file keeps its path under vendor/, so the kit's loaders find it at
+    the layer's base exactly as they do under `vendor/`."""
+    if not rel.startswith("vendor/"):
+        return "core", rel
+    inner = rel.removeprefix("vendor/")
+    return inner.split("/", 1)[0].split(".", 1)[0], inner
+
+
+def export_layers() -> dict[str, dict[str, bytes]]:
+    """Every layer the export writes, by directory name, with its files."""
+    parts: dict[str, dict[str, bytes]] = {}
+    for rel, src in _export_sources().items():
+        name, inner = _layer_of(rel)
+        parts.setdefault(name, {})[inner] = src.encode("utf-8") if isinstance(src, str) else src.read_bytes()
+    named = {name: f"{name}-{layer_id(files)}" for name, files in parts.items() if name != "core"}
+    # chrome.css names its fonts beside itself, `vendor/fonts/…`; exported,
+    # they are a sibling layer, so the stylesheet names that, and the
+    # core's name follows the fonts': new fonts are a new core.
+    core = parts["core"]
+    if "fonts" in named:
+        css = core["chrome.css"].decode("utf-8")
+        core["chrome.css"] = cli._FONT_URL_RE.sub(f'url("../{named["fonts"]}/fonts/', css).encode("utf-8")
+    named["core"] = f"core-{layer_id(core)}"
+    return {named[name]: dict(sorted(files.items())) for name, files in sorted(parts.items())}
 
 
 def _grammar_dir() -> Path:
@@ -1097,7 +1209,7 @@ def _validate_export_out(out: str) -> Path:
     if out_dir.exists() and not out_dir.is_dir():
         raise PackUsageError(f"{out}: exists and is not a directory")
     if out_dir.is_dir():
-        foreign = sorted(p.name for p in out_dir.iterdir() if p.name not in _EXPORT_TOP)
+        foreign = sorted(p.name for p in out_dir.iterdir() if not (_LAYER_DIR.match(p.name) and p.is_dir()))
         if foreign:
             raise PackUsageError(
                 f"{out}: holds {foreign[0]}, which no kit export writes; "
@@ -1128,23 +1240,26 @@ def export_kit(out: str) -> int:
             file=sys.stderr,
         )
         return EXIT_FINDINGS
-    sources = _export_sources()
-    total = 0
+    layers = export_layers()
     staging = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.kit-", dir=out_dir.parent))
     try:
-        for rel, src in sources.items():
-            data = src.encode("utf-8") if isinstance(src, str) else src.read_bytes()
-            _write(staging, rel, data)
-            total += len(data)
+        for layer, files in layers.items():
+            for rel, data in files.items():
+                _write(staging, f"{layer}/{rel}", data)
         _place(staging, out_dir)
     except OSError as e:
         print(f"✗ Export failed: {e}. Nothing was written to {out}.", file=sys.stderr)
         return EXIT_FINDINGS
     finally:
         shutil.rmtree(staging, ignore_errors=True)
+    count = sum(len(files) for files in layers.values())
+    total = sum(len(d) for files in layers.values() for d in files.values())
     print(
-        f"✓ Exported kit {cli._kit_build_stamp()}: {len(sources)} file(s), {total / 1_000_000:.1f} MB into {out}"
+        f"✓ Exported kit {cli._kit_build_stamp()}: {len(layers)} layers, {count} file(s), "
+        f"{total / 1_000_000:.1f} MB into {out}"
     )
+    for layer, files in layers.items():
+        print(f"  {layer}  {len(files)} file(s), {sum(map(len, files.values())) / 1_000_000:.1f} MB")
     return 0
 
 

@@ -329,50 +329,88 @@ class TestTheCommandLine:
         assert exit_info.value.code == 2
 
 
-KIT_URL = "/k/3f9a/"
+KIT_URL = "/k/"
+
+
+@pytest.fixture()
+def fake_vendor(tmp_path: Path, monkeypatch) -> Path:
+    """A complete vendor copy and grammar cache of placeholder bytes, so
+    the export runs without a network."""
+    vendor = tmp_path / "vendor"
+    for rel, _url in cli._vendor_files():
+        (vendor / rel).parent.mkdir(parents=True, exist_ok=True)
+        (vendor / rel).write_bytes(f"/* {rel} */\n".encode())
+    grammars = tmp_path / "grammars"
+    grammars.mkdir()
+    for g in pack._all_grammars():
+        (grammars / f"prism-{g}.min.js").write_bytes(f"/* {g} */\n".encode())
+    monkeypatch.setattr(cli, "vendor_dir", lambda: vendor)
+    monkeypatch.setattr(pack, "_grammar_dir", lambda: grammars)
+    return tmp_path
+
+
+def _layers(out: Path) -> dict[str, str]:
+    """The export's layers by name: {"core": "core-<hex>", ...}."""
+    return {d.name.split("-", 1)[0]: d.name for d in out.iterdir()}
+
+
+@pytest.fixture()
+def exported(fake_vendor: Path) -> Path:
+    out = fake_vendor / "kit"
+    assert pack.export_kit(str(out)) == 0
+    return out
 
 
 class TestASharedKit:
-    """`--kit-url`: the package names the host's one copy of the kit
-    instead of carrying `_oku/`. The browser half, which proves every lazy
-    load follows, is `browser/test_pack_shared_kit.py`."""
+    """`--kit` and `--kit-url`: the package names the host's one copy of the
+    kit, in its layers, instead of carrying `_oku/`. The browser half, which
+    proves every lazy load follows, is `browser/test_pack_shared_kit.py`."""
 
-    def _pack(self, project: Path, kit_url: str = KIT_URL) -> tuple[int, Path]:
+    def _pack(self, project: Path, kit: Path | None, kit_url: str | None = KIT_URL) -> tuple[int, Path]:
         out = project.parent / "out"
-        return pack.run([str(project / "docs" / "entry.md")], str(out), kit_url=kit_url), out
+        rc = pack.run(
+            [str(project / "docs" / "entry.md")], str(out), kit_url=kit_url, kit_dir=kit and str(kit)
+        )
+        return rc, out
 
-    def test_no_kit_is_written(self, project: Path) -> None:
-        rc, out = self._pack(project)
+    def test_no_kit_is_written(self, project: Path, exported: Path) -> None:
+        rc, out = self._pack(project, exported)
         assert rc == 0
         assert not (out / "_oku").exists()
         index = json.loads((out / "_pack.json").read_text(encoding="utf-8"))
         assert not [f["path"] for f in index["files"] if f["path"].startswith("_oku/")]
 
-    def test_every_kit_tag_names_the_url_and_keeps_its_stamp(self, project: Path) -> None:
-        rc, out = self._pack(project)
+    def test_every_kit_tag_names_the_core_layer_and_no_stamp(self, project: Path, exported: Path) -> None:
+        """The layer's name is its content; a `?v=` that differs between two
+        machines would make one file two addresses."""
+        rc, out = self._pack(project, exported)
         assert rc == 0
         stub = (out / "docs" / "entry.html").read_text(encoding="utf-8")
+        core = _layers(exported)["core"]
         for name in cli.KIT_FILES:
-            assert f'="{KIT_URL}{name}?v=' in stub, (name, stub)
-        assert "_oku/" not in stub, stub
+            assert f'="{KIT_URL}{core}/{name}"' in stub, (name, stub)
+        assert "_oku/" not in stub and "?v=" not in stub, stub
 
-    def test_the_stub_names_both_roots(self, project: Path) -> None:
-        """chrome.js finds the root and the kit by the `_oku/` in its tags;
-        without one, the stub has to say where each is."""
-        rc, out = self._pack(project)
+    def test_the_stub_names_every_root(self, project: Path, exported: Path) -> None:
+        """chrome.js finds the root, the kit and the vendored files by the
+        `_oku/` in its tags; without one, the stub has to say where each is."""
+        rc, out = self._pack(project, exported)
         assert rc == 0
         stub = (out / "docs" / "entry.html").read_text(encoding="utf-8")
+        layers = _layers(exported)
         assert '<meta name="oku-docs-root" content="../">' in stub, stub
-        assert f'<meta name="oku-kit-base" content="{KIT_URL}">' in stub, stub
+        assert f'<meta name="oku-kit-base" content="{KIT_URL}{layers["core"]}/">' in stub, stub
+        for name in ("fonts", "mermaid", "prism"):
+            assert f'<meta name="oku-vendor-{name}" content="{KIT_URL}{layers[name]}/">' in stub, stub
 
-    def test_the_index_names_the_kit(self, project: Path) -> None:
-        rc, out = self._pack(project)
+    def test_the_index_names_the_kit_and_its_layers(self, project: Path, exported: Path) -> None:
+        rc, out = self._pack(project, exported)
         assert rc == 0
         index = json.loads((out / "_pack.json").read_text(encoding="utf-8"))
-        assert index["kit"] == {"url": KIT_URL}
+        assert index["kit"] == {"url": KIT_URL, "layers": sorted(_layers(exported).values())}
         assert list(index) == ["pack", "entry", "title", "summary", "kit", "pages", "files"]
 
-    def test_without_a_kit_url_the_package_is_as_before(self, project: Path) -> None:
+    def test_without_a_kit_the_package_is_as_before(self, project: Path) -> None:
         rc, out = _pack(project)
         assert rc == 0
         assert (out / "_oku" / "chrome.js").is_file()
@@ -398,62 +436,62 @@ class TestASharedKit:
             "",
         ],
     )
-    def test_a_url_that_is_not_a_root_relative_directory_is_a_usage_error(self, project, url) -> None:
-        rc, out = self._pack(project, url)
+    def test_a_url_that_is_not_a_root_relative_directory_is_a_usage_error(
+        self, project, exported, url
+    ) -> None:
+        rc, out = self._pack(project, exported, url)
         assert rc == 2
         assert not out.exists()
 
-    def test_the_leak_check_still_runs(self, project, capsys) -> None:
+    @pytest.mark.parametrize("which", ["kit", "kit_url"])
+    def test_one_without_the_other_is_a_usage_error(self, project, exported, which) -> None:
+        rc, out = self._pack(
+            project, None if which == "kit" else exported, None if which == "kit_url" else KIT_URL
+        )
+        assert rc == 2
+        assert not out.exists()
+
+    def test_an_export_of_another_oku_is_refused(self, project, exported, capsys) -> None:
+        core = exported / _layers(exported)["core"]
+        (core / "renderer.js").write_text("/* another release */\n", encoding="utf-8")
+        rc, out = self._pack(project, exported)
+        assert rc == 2
+        assert "renderer.js is not this oku's" in capsys.readouterr().err
+        assert not out.exists()
+
+    def test_a_directory_that_is_not_an_export_is_refused(self, project, exported) -> None:
+        (exported / "notes.txt").write_text("mine\n", encoding="utf-8")
+        rc, out = self._pack(project, exported)
+        assert rc == 2
+        assert not out.exists()
+
+    def test_the_leak_check_still_runs(self, project, exported, capsys) -> None:
         (project / "files" / "notes.md").write_text("# Notes\n\n/Users/alice/secret.txt\n", encoding="utf-8")
-        rc, out = self._pack(project)
+        rc, out = self._pack(project, exported)
         assert rc == 1
         assert "[home-path] /Users/alice/secret.txt" in capsys.readouterr().out
         assert not out.exists()
 
-    def test_a_kit_reference_the_export_does_not_carry_is_a_finding(
-        self, project, capsys, monkeypatch
-    ) -> None:
-        held = pack._export_sources
-
-        def without_renderer() -> dict:
-            return {k: v for k, v in held().items() if k != "renderer.js"}
-
-        monkeypatch.setattr(pack, "_export_sources", without_renderer)
-        rc, out = self._pack(project)
+    def test_a_kit_reference_the_export_does_not_carry_is_a_finding(self, project, exported, capsys) -> None:
+        core = _layers(exported)["core"]
+        (exported / core / "chrome.css").unlink()
+        rc, out = self._pack(project, exported)
         assert rc == 1
-        assert f"{KIT_URL}renderer.js?v=" in capsys.readouterr().out
+        assert f"{KIT_URL}{core}/chrome.css" in capsys.readouterr().out
         assert not out.exists()
 
-    def test_main_routes_the_kit_url(self, project, monkeypatch) -> None:
+    def test_main_routes_the_kit(self, project, exported, monkeypatch) -> None:
         out = project.parent / "via-main"
-        monkeypatch.setattr(
-            "sys.argv",
-            ["oku", "pack", str(project / "docs" / "entry.md"), "--out", str(out), "--kit-url", KIT_URL],
-        )
+        entry = str(project / "docs" / "entry.md")
+        argv = ["oku", "pack", entry, "--out", str(out), "--kit", str(exported), "--kit-url", KIT_URL]
+        monkeypatch.setattr("sys.argv", argv)
         assert cli.main() == 0
-        assert json.loads((out / "_pack.json").read_text(encoding="utf-8"))["kit"] == {"url": KIT_URL}
-
-
-@pytest.fixture()
-def fake_vendor(tmp_path: Path, monkeypatch) -> Path:
-    """A complete vendor copy and grammar cache of placeholder bytes, so
-    the export runs without a network."""
-    vendor = tmp_path / "vendor"
-    for rel, _url in cli._vendor_files():
-        (vendor / rel).parent.mkdir(parents=True, exist_ok=True)
-        (vendor / rel).write_bytes(f"/* {rel} */\n".encode())
-    grammars = tmp_path / "grammars"
-    grammars.mkdir()
-    for g in pack._all_grammars():
-        (grammars / f"prism-{g}.min.js").write_bytes(f"/* {g} */\n".encode())
-    monkeypatch.setattr(cli, "vendor_dir", lambda: vendor)
-    monkeypatch.setattr(pack, "_grammar_dir", lambda: grammars)
-    return tmp_path
+        assert json.loads((out / "_pack.json").read_text(encoding="utf-8"))["kit"]["url"] == KIT_URL
 
 
 class TestTheKitExport:
-    """`oku kit export`: what a page loads from the kit, the same bytes on
-    every run, because a host names the copy by its content."""
+    """`oku kit export`: what a page loads from the kit, in layers named for
+    their content, the same bytes on every run."""
 
     def test_two_runs_write_the_same_bytes(self, fake_vendor: Path) -> None:
         a, b = fake_vendor / "a", fake_vendor / "b"
@@ -461,27 +499,65 @@ class TestTheKitExport:
         assert pack.export_kit(str(b)) == 0
         assert _files(a) == _files(b)
 
-    def test_it_holds_what_a_page_loads_and_no_schema(self, fake_vendor: Path) -> None:
-        out = fake_vendor / "kit"
-        assert pack.export_kit(str(out)) == 0
-        files = _files(out)
-        for name in cli.KIT_FILES:
-            assert files[name] == cli.kit_file_text(name).encode("utf-8"), name
+    def test_it_holds_what_a_page_loads_and_no_schema(self, exported: Path) -> None:
+        layers = _layers(exported)
+        assert sorted(layers) == ["core", "fonts", "mermaid", "prism"]
+        files = _files(exported)
+        core = layers["core"]
+        for name in ("chrome.js", "renderer.js", "chrome-boot.js"):
+            assert files[f"{core}/{name}"] == cli.kit_file_text(name).encode("utf-8"), name
         for rel in ("i18n/tr.json", "glossary/web.json", "extrefs/web.json"):
-            assert rel in files, rel
+            assert f"{core}/{rel}" in files, rel
         for rel, _url in cli._vendor_files():
-            assert f"vendor/{rel}" in files, rel
-        assert not [p for p in files if p.startswith("schema/") or p.endswith("examples.json")]
+            name, inner = pack._layer_of(f"vendor/{rel}")
+            assert f"{layers[name]}/{inner}" in files, rel
+        assert not [p for p in files if "/schema/" in p or p.endswith("examples.json")]
 
-    def test_it_carries_every_grammar_and_says_so(self, fake_vendor: Path) -> None:
+    def test_the_stylesheet_names_the_fonts_layer(self, exported: Path) -> None:
+        layers = _layers(exported)
+        css = (exported / layers["core"] / "chrome.css").read_text(encoding="utf-8")
+        assert f'url("../{layers["fonts"]}/fonts/' in css
+        assert 'url("vendor/fonts/' not in css
+
+    def test_each_layer_is_named_for_its_content(self, exported: Path) -> None:
+        """The rule pano checks every layer against."""
+        for d in exported.iterdir():
+            files = {p.relative_to(d).as_posix(): p.read_bytes() for p in d.rglob("*") if p.is_file()}
+            assert d.name.endswith("-" + pack.layer_id(files)), d.name
+
+    def test_a_release_that_changes_only_oku_changes_only_the_core(
+        self, fake_vendor, exported, monkeypatch
+    ) -> None:
+        """What the layers are for: mermaid, the fonts and the grammars keep
+        their addresses, so a reader downloads only the new core."""
+        before = _layers(exported)
+        shipped = cli.kit_file_text
+        monkeypatch.setattr(
+            cli, "kit_file_text", lambda n: shipped(n) + ("\n;0;" if n == "chrome.js" else "")
+        )
+        after_dir = fake_vendor / "after"
+        assert pack.export_kit(str(after_dir)) == 0
+        after = _layers(after_dir)
+        assert {n for n in before if before[n] != after[n]} == {"core"}
+
+    def test_new_fonts_are_a_new_core_too(self, fake_vendor, exported) -> None:
+        """The core's stylesheet names the fonts layer."""
+        before = _layers(exported)
+        font = next(rel for rel, _url in cli._vendor_files() if rel.startswith("fonts/"))
+        (fake_vendor / "vendor" / font).write_bytes(b"another face")
+        after_dir = fake_vendor / "after"
+        assert pack.export_kit(str(after_dir)) == 0
+        after = _layers(after_dir)
+        assert {n for n in before if before[n] != after[n]} == {"core", "fonts"}
+
+    def test_it_carries_every_grammar_and_says_so(self, exported: Path) -> None:
         """Not the grammars this machine's builds happened to fetch: those
-        grow, and every new one would change the kit's id."""
-        out = fake_vendor / "kit"
-        assert pack.export_kit(str(out)) == 0
+        grow, and every new one would change the prism layer's name."""
+        prism = exported / _layers(exported)["prism"] / "prism"
         grammars = pack._all_grammars()
-        components = sorted(p.name for p in (out / "vendor" / "prism" / "components").iterdir())
+        components = sorted(p.name for p in (prism / "components").iterdir())
         assert components == sorted(f"prism-{g}.min.js" for g in grammars)
-        carried = (out / "vendor" / "prism" / "carried.js").read_text(encoding="utf-8")
+        carried = (prism / "carried.js").read_text(encoding="utf-8")
         ids = json.loads(carried.removeprefix("window.__okuPrismCarried=").removesuffix(";\n"))["ids"]
         assert set(grammars) <= set(ids)
 
@@ -492,12 +568,12 @@ class TestTheKitExport:
         assert pack.export_kit(str(out)) == 2
         assert sorted(p.name for p in out.iterdir()) == ["keep.txt"]
 
-    def test_an_earlier_export_is_replaced(self, fake_vendor: Path) -> None:
-        out = fake_vendor / "kit"
-        assert pack.export_kit(str(out)) == 0
-        (out / "vendor" / "stale.js").write_text("old\n", encoding="utf-8")
-        assert pack.export_kit(str(out)) == 0
-        assert not (out / "vendor" / "stale.js").exists()
+    def test_an_earlier_export_is_replaced(self, exported: Path) -> None:
+        stale = exported / "core-0123456789abcdef"
+        stale.mkdir()
+        (stale / "chrome.js").write_text("old\n", encoding="utf-8")
+        assert pack.export_kit(str(exported)) == 0
+        assert not stale.exists()
 
     def test_a_grammar_that_cannot_be_fetched_stops_it(self, fake_vendor: Path, monkeypatch) -> None:
         missing = fake_vendor / "grammars" / f"prism-{pack._all_grammars()[0]}.min.js"
@@ -511,7 +587,7 @@ class TestTheKitExport:
         out = fake_vendor / "via-main"
         monkeypatch.setattr("sys.argv", ["oku", "kit", "export", "--out", str(out)])
         assert cli.main() == 0
-        assert (out / "chrome.js").is_file()
+        assert (out / _layers(out)["core"] / "chrome.js").is_file()
 
 
 def test_plain_text_drops_code_scripts_and_markup() -> None:
