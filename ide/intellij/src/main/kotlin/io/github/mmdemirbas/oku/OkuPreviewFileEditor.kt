@@ -52,6 +52,7 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JComponent
 import kotlin.io.path.Path
@@ -445,17 +446,25 @@ class OkuPreviewFileEditor(
     }
 }
 
-/** The page a preview shows in place of one it could not render, saying why. */
+/**
+ * The page a preview shows in place of one it could not render, saying
+ * why. One file per preview, so two failing previews do not show each
+ * other's reason, and a new URL per failure: the browser skips a load of
+ * the URL it last asked for, and a second reason would never reach it.
+ */
 internal class OkuErrorPage(dir: Path) {
-    val file: Path = dir.resolve("error.html")
+    val file: Path = dir.resolve("error-${UUID.randomUUID()}.html")
+    private val shown = AtomicInteger()
 
     /** [message] written into the page; the URL that loads it. */
     fun show(message: String): String {
         val escaped = message.replace("&", "&amp;").replace("<", "&lt;")
         Files.writeString(file, "<!doctype html><meta charset=utf-8><body style=\"font:13px system-ui;padding:16px\"><h3>oku preview</h3><pre style=\"white-space:pre-wrap\">$escaped</pre>")
-        return file.toUri().toString()
+        return "${file.toUri()}?r=${shown.incrementAndGet()}"
     }
 
-    /** The preview is gone. The page is shared, so it stays. */
-    fun close() = Unit
+    /** The preview is gone, and so is its page. */
+    fun close() {
+        Files.deleteIfExists(file)
+    }
 }
