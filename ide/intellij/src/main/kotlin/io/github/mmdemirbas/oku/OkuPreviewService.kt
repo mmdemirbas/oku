@@ -237,6 +237,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
                 val line = live.ask(gson.toJson(mapOf("id" to nextId) + fields), REQUEST_TIMEOUT_SECONDS) ?: run {
                     live.kill()
                     session = null
+                    if (live.ended) error("oku preview stopped before it answered${logTail()}")
                     error("oku preview did not answer within ${REQUEST_TIMEOUT_SECONDS}s${logTail()}")
                 }
                 val reply = parse(line)
@@ -299,9 +300,15 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         private val lines = LinkedBlockingQueue<String>()
         private val writer = process.outputStream.bufferedWriter(Charsets.UTF_8)
 
+        /** oku's output has ended: a read that comes back empty was not a timeout. */
+        @Volatile
+        var ended = false
+            private set
+
         init {
             Thread({
                 process.inputStream.bufferedReader(Charsets.UTF_8).useLines { all -> all.forEach(lines::put) }
+                ended = true
                 lines.put(CLOSED)
             }, "oku-$name-reader").apply { isDaemon = true }.start()
         }
