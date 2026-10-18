@@ -9,8 +9,11 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.DumbProgressIndicator
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 import kotlin.io.path.Path
@@ -45,12 +48,22 @@ object OkuChipFix : IntentionAction {
         val document = editor?.document ?: return
         val page = file?.viewProvider?.virtualFile ?: return
         val before = document.text
-        val fixed = ProgressManager.getInstance().runProcessWithProgressSynchronously<Result<Fixed>, RuntimeException>(
-            { service<OkuPreviewService>().fix(Path(page.path), before) },
-            "oku check --fix",
-            true,
-            project,
-        )
+        val fixed = try {
+            ProgressManager.getInstance().runProcessWithProgressSynchronously<Result<Fixed>, RuntimeException>(
+                {
+                    // Off the progress thread, so its Cancel stops the wait; oku finishes the fix unread.
+                    val asked = ApplicationManager.getApplication().executeOnPooledThread<Result<Fixed>> {
+                        service<OkuPreviewService>().fix(Path(page.path), before)
+                    }
+                    ProgressIndicatorUtils.awaitWithCheckCanceled(asked)
+                },
+                "oku check --fix",
+                true,
+                project,
+            )
+        } catch (_: ProcessCanceledException) {
+            return // cancelled: the page stays as it was
+        }
         val after = fixed.getOrElse {
             HintManager.getInstance().showErrorHint(editor, "oku check --fix did not run: ${it.message?.lineSequence()?.first()}")
             return
