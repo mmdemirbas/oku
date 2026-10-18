@@ -117,7 +117,9 @@ def test_the_site_manifest_reads_no_carried_file(project: Path, monkeypatch) -> 
     a save makes it compute the manifest again."""
     carried: list[str] = []
     real = cli.carry_file_refs
-    monkeypatch.setattr(cli, "carry_file_refs", lambda page, p: (carried.append(p.name), real(page, p))[1])
+    monkeypatch.setattr(
+        cli, "carry_file_refs", lambda page, p, tree=None: (carried.append(p.name), real(page, p, tree))[1]
+    )
     manifest = cli.compute_manifest(project / "docs")
     assert sorted(e["title"] for e in manifest["pages"]) == ["A", "B", "Index"]
     assert carried == []

@@ -1336,7 +1336,7 @@ def _block_index_in(where: str, message: str) -> int | None:
     return None
 
 
-def _page_from_source_file(p: Path, *, carry: bool = True) -> dict | None:
+def _page_from_source_file(p: Path, *, carry: bool = True, tree: Path | None = None) -> dict | None:
     """Read + convert one page source (any registered format); None
     when unreadable or not a recognised source.
 
@@ -1347,7 +1347,8 @@ def _page_from_source_file(p: Path, *, carry: bool = True) -> dict | None:
     author-owned repo prose.
 
     `carry=False` leaves the `#f/` files out (carry_file_refs), for a
-    caller that reads only the page's metadata.
+    caller that reads only the page's metadata. `tree` is the directory
+    being built or served, which decides what a `.md` link may name.
     """
     parser = _source_parser_for(p)
     if parser is None:
@@ -1359,18 +1360,23 @@ def _page_from_source_file(p: Path, *, carry: bool = True) -> dict | None:
         return None
     if parser is md_to_v2_page:
         block_lines: dict[int, int] = {}
-        page = page_from_markdown(p, text, block_lines=block_lines, carry=carry)
+        page = page_from_markdown(p, text, block_lines=block_lines, carry=carry, tree=tree)
         _remember_source(_synth_json_path(p), p, block_lines)
         return page
     page = parser(text, default_title=_source_stem_path(p).name)
     _apply_meta_defaults(page, p)
     if carry:
-        carry_file_refs(page, p)
+        carry_file_refs(page, p, tree)
     return page
 
 
 def page_from_markdown(
-    p: Path, text: str, *, block_lines: dict[int, int] | None = None, carry: bool = True
+    p: Path,
+    text: str,
+    *,
+    block_lines: dict[int, int] | None = None,
+    carry: bool = True,
+    tree: Path | None = None,
 ) -> dict:
     """The page dict for markdown `text` that sits at `p`.
 
@@ -1387,11 +1393,59 @@ def page_from_markdown(
         page.setdefault("m", {}).setdefault("_materialised_by", "oku-init")
     _apply_meta_defaults(page, p)
     if carry:
-        carry_file_refs(page, p)
+        carry_file_refs(page, p, tree)
     return page
 
 
-def carry_file_refs(page: dict, p: Path) -> dict:
+# A relative `.md` link names a page: the renderer makes it `.html`
+# (linkHref in renderer.js), because a page of the tree being built sits
+# beside it as `.html` in both built trees. A note OUTSIDE that tree is
+# built by nobody, so the link went nowhere in either tree, and nothing
+# said so: a report in atolye/raporlar linking its research notes under
+# ../arastirma/ opened Chrome's error page (2026-10-18). Built or served,
+# such a link is a `#f/` file instead, which is what PRESENTATION-RULES.md
+# promises for "any .md that is not a page here": the note opens in the
+# viewer over the page, its bytes carried like any chip's. A link inside
+# the tree, one to a missing file or past the project, and anything in
+# code are left as written. `oku pack` reads pages with no tree, and keeps
+# making a linked note a page of the package.
+_PROSE_MD_LINK_RE = re.compile(r"\]\((?!\w+:|//|#|/)([^)\s]+?\.md)(?:#[^)\s]*)?\)", re.I)
+
+
+def _md_links_outside_tree_as_files(page: dict, p: Path, tree: Path) -> None:
+    tree = tree.resolve()
+    root = project_root_for(p.parent).resolve()
+
+    def as_file(m: re.Match) -> str:
+        target = (p.parent / unquote(m.group(1))).resolve()
+        if target == tree or tree in target.parents or not target.is_file() or root not in target.parents:
+            return m.group(0)
+        return f"](#f/{m.group(1)})"
+
+    def prose(text: str) -> str:
+        if ".md" not in text:
+            return text
+        code: list[str] = []
+
+        def hold(m: re.Match) -> str:
+            code.append(m.group(0))
+            return f"\x00{len(code) - 1}\x00"
+
+        held = _INLINE_CODE_RE.sub(hold, _FENCE_RE.sub(hold, text))
+        return re.sub(r"\x00(\d+)\x00", lambda m: code[int(m.group(1))], _PROSE_MD_LINK_RE.sub(as_file, held))
+
+    def walk(node) -> None:
+        items = node.items() if isinstance(node, dict) else enumerate(node) if isinstance(node, list) else ()
+        for key, value in list(items):
+            if isinstance(value, str):
+                node[key] = prose(value)
+            else:
+                walk(value)
+
+    walk(page)
+
+
+def carry_file_refs(page: dict, p: Path, tree: Path | None = None) -> dict:
     """Put the files this page's `#f/` references name into the page.
 
     No delivery mode can fetch them when the reader clicks, so the bytes
@@ -1404,7 +1458,12 @@ def carry_file_refs(page: dict, p: Path) -> dict:
     so it is read through the v1 shim; its files go in `meta`, which the
     shim (here and in renderer.js) carries over as `m` whole. Returns the
     page for chaining; the dict is changed in place.
+
+    With `tree`, a `.md` link to a note outside it becomes a `#f/` file
+    first (_md_links_outside_tree_as_files).
     """
+    if tree is not None:
+        _md_links_outside_tree_as_files(page, p, tree)
     v1 = page.get("kind") == "page" and page.get("k") != "page"
     meta = page.setdefault("meta" if v1 else "m", {})
     # The page's own place in the project: the one fact the runtime needs
@@ -2462,7 +2521,7 @@ def find_json_pages(root: Path, *, carry: bool = True):
         except (json.JSONDecodeError, UnicodeDecodeError, OSError):
             continue
         if _is_page(data):
-            pages.append((p, carry_file_refs(data, p) if carry else data))
+            pages.append((p, carry_file_refs(data, p, root) if carry else data))
             real_json.add(p)
     # Also walk .md files — convert each into a synthesized page dict
     # via md_to_page. The "path" returned uses .json so consumers that
@@ -2477,7 +2536,7 @@ def find_json_pages(root: Path, *, carry: bool = True):
         # Don't shadow a real .json sibling.
         if synth_path in real_json or synth_path in seen_stems:
             continue
-        page = _page_from_source_file(p, carry=carry)
+        page = _page_from_source_file(p, carry=carry, tree=root)
         if page is None:
             continue
         seen_stems.add(synth_path)
@@ -8313,7 +8372,7 @@ def _make_serve_handler(root: Path, *, local_only: bool = True):
                 return stub.encode("utf-8")
 
             if source_path is not None:
-                page = _page_from_source_file(source_path)
+                page = _page_from_source_file(source_path, tree=root)
                 if page is None:
                     return False
                 if url_path.endswith(".json"):
@@ -8909,7 +8968,7 @@ def preview_page(
     page = None
     if md is not None:
         lines: dict[int, int] = {}
-        page = page_from_markdown(md, text, block_lines=lines)
+        page = page_from_markdown(md, text, block_lines=lines, tree=_preview_tree_root(md))
         # Where each block starts in the source, so the editor beside the page
         # and the page can follow each other (OkuRenderer.scrollToLine / lineAt).
         # Preview only: a built page has no editor, and the numbers would change
@@ -9330,7 +9389,7 @@ def check_buffer(md: Path, text: str, *, held: dict[Path, tuple[dict, list]] | N
         if held is not None:
             held[root] = (snapshot, pages)
     lines: dict[int, int] = {}
-    page = page_from_markdown(md, text, block_lines=lines)
+    page = page_from_markdown(md, text, block_lines=lines, tree=root)
     virtual = _synth_json_path(md)
     converted = time.perf_counter()
     before = (_PAGE_SOURCE_OF.get(virtual), _PAGE_BLOCK_LINES.get(virtual))
