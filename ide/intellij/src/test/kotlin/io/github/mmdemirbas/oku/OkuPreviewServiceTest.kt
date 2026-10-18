@@ -139,6 +139,24 @@ class OkuPreviewServiceTest : OkuFixtureTestCase() {
         assertFalse("still waiting for oku 2 s after the cancel", ended is TimeoutException)
     }
 
+    fun `test a completion does not wait behind a check`() {
+        // Measured on an 84-page tree: a check takes 525 ms and the registry
+        // 247 ms, and one session answers one request at a time, so a
+        // completion asked during a check waited 789 ms for its list.
+        fakeOku(
+            """
+            if req.get("check"):
+                time.sleep(600)
+            print(json.dumps({"id": req["id"], "glossary": [], "extrefs": [], "pages": []}), flush=True)
+            """,
+        )
+        ApplicationManager.getApplication().executeOnPooledThread { service.check(page, "x") }
+        awaitRequests(1)
+        val asked = ApplicationManager.getApplication().executeOnPooledThread<Result<Registry>> { service.registry(page, "x") }
+        val answer = runCatching { asked.get(2, TimeUnit.SECONDS) }
+        assertTrue("the registry was still queued behind the check 2 s later", answer.getOrNull()?.isSuccess == true)
+    }
+
     fun `test the registry cache holds only what is still fresh`() {
         // V.5: an answer is used for 5 s and kept forever, one per page ever
         // completed in, each holding the glossary of every domain its tree
