@@ -12,6 +12,111 @@ carries the record, including what was measured before and after.
 
 ---
 
+## A dot-plot whose values are years labels its top tick `1.4k`
+
+- **Symptom.** A `dot-plot` with `min` 400 and `max` 1450 (Hijri death
+  years) prints its x-axis ticks as `400`, `925`, `1.4k`. The last label is
+  compact and also wrong: the tick sits at 1450, not 1400. Setting
+  `"tick_format": "number"` on the block changes nothing.
+- **Minimal reproduction.**
+
+  ````markdown
+  ```oku-chart
+  {"type":"dot-plot","title":"Vefat yılı","x_label":"Hicrî yıl","tick_format":"number","min":400,"max":1450,"rows":[{"label":"A","value":537},{"label":"B","value":911},{"label":"C","value":1311}]}
+  ```
+  ````
+
+  `oku build`, then read `svg.okc-dot-plot text.okc-tick` in
+  `dist/standalone/<page>.html`.
+- **Expected vs actual.** Expected `400 925 1450`. Actual `400 925 1.4k`.
+- **Where.** Inferred from source: `_renderDotPlot` labels its three ticks
+  (min, midpoint, max) through `fmtTicks`. `fmtTicks` keeps `fmtNum`'s
+  labels when each one is within a tenth of a step of its tick. Here the
+  step is 525, and `1.4k` reads as 1400, which is 50 away from 1450 and
+  inside the 52.5 tolerance, so the compact label stands. The fix in
+  3edb687 targeted repeated labels; one rounded `k` label passes its test.
+  `tick_format` is declared for every chart (`$defs/chart/properties` in
+  `page.schema.json`) and passes `oku check --strict`, but renderer.js
+  forwards it only into the gantt extras, and only the gantt tick code
+  reads it.
+- **Observed.** The tick text above, read with Playwright (oku 0.6.5,
+  kit 2026-10-18-r131, repo 0200385, 2026-10-19). Found in atolye
+  `raporlar/2026-10-14-evrad-duzeltme.md`; the workaround there puts the
+  year into each row label.
+
+## In print, a table that breaks across pages hides the top of the continuing row under its header
+
+- **Symptom.** When a table breaks across a page in a printed page, the
+  header row repeated at the top of the next page is painted over the row
+  that continues from the previous page. The first lines of that row cannot
+  be read.
+- **Minimal reproduction.** Not reduced yet. Seen on atolye
+  `raporlar/2026-10-14-evrad-duzeltme.md` (the witness table in section 3),
+  built with `oku build` and printed from `dist/standalone/` with
+  Playwright: `emulate_media(media="print")`, then
+  `page.pdf(format="A4", print_background=True)`. A six-row table that fits
+  on one page does not show it.
+- **Expected vs actual.** Expected the repeated header to sit above the
+  continuing row. Actual: in the report's PDF, page 10, the header covers
+  the first five lines of the `Bihârü'l-Envâr` row; only its last two lines
+  show.
+- **Where.** `thead th` keeps `position: sticky; top: 0` in print. The
+  `@media print` block in chrome.css does not reset it; the computed
+  `position` of a `th` under print media is `sticky`. Inferred: Chromium
+  paints the sticky cells at the top of the continuation fragment, on top
+  of the row. `.okt-table-ghost` in print was not checked.
+- **Observed.** Adding
+  `@media print { th, thead, thead tr { position: static !important; top: auto !important } }`
+  at print time makes the row print whole. A pixel diff of the 30-page
+  PDF with and without that rule shows changes on pages 9–11 only. Page 1
+  also differed, for an unrelated reason: one of the two builds had a
+  `Last updated` line. Also, under print media with the window scrolled
+  past a table, the `th` top is within 5 px of the last row's top (−632 vs
+  −637). So printing from the browser after scrolling down may put the
+  header on the last row. That is inferred; browser print was not tested.
+  Kit 2026-10-18-r131, Playwright Chromium, 2026-10-19.
+- **Workaround in use.** atolye `bin/dizgi/oku-pdf.py` injects the rule
+  above at print time. Remove it there once this is fixed.
+
+## Arabic text on an LTR page: an all-Arabic paragraph runs left-to-right, and an inline quote can reorder
+
+- **Symptom.** Two cases on a `lang: tr` page that quotes Arabic.
+  (a) A paragraph that is entirely Arabic gets `direction: ltr`. Its
+  opening `«` sits at the left end of the first line, which is the end of
+  the line for a right-to-left reader, and its last line is left-aligned.
+  (b) In a Turkish sentence, `«الأمين» → «الأمان»` is displayed with
+  `«الأمان»` on the left and `«الأمين»` on the right. The bidi algorithm
+  makes the two Arabic quotes and the arrow one right-to-left run, so the
+  arrow points the wrong way and the sentence says the opposite.
+- **Minimal reproduction.**
+
+  ```markdown
+  > «بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيمِ. إِلٰهِي أَنْتَ الرَّبُّ وَأَنَا الْعَبْدُ، وَأَنْتَ الْخَالِقُ وَأَنَا الْمَخْلُوقُ، وَأَنْتَ الرَّازِقُ وَأَنَا الْمَرْزُوقُ، وَأَنْتَ الْمَالِكُ وَأَنَا الْمَمْلُوكُ»
+
+  Cümle içinde: «الأمين» → «الأمان» isteniyor.
+  ```
+
+- **Expected vs actual.** Expected: (a) the paragraph runs right-to-left,
+  with `«` at the right edge and the last line right-aligned; (b) the
+  quotes keep their written order around the arrow. Actual: (a) the
+  computed `direction` is `ltr`; on a 732 px line, `«` is at x=0 and the
+  first Arabic letter at x=694. (b) The x positions are `الأمين` 466, the
+  arrow 435, `الأمان` 385.
+- **Where.** The rendered `p`, `li`, `td` and `blockquote` elements carry
+  no `dir`, and markdown has no way to set one. The workarounds used were
+  a raw HTML island, `<p dir="rtl" lang="ar">`, for (a), which `oku check`
+  reports as `html-island` and in which markdown is not parsed. For (b),
+  U+2067 … U+2069 (RLI … PDI) around every inline Arabic quote.
+- **Inferred, untested.** `dir="auto"` on block elements would make a block
+  right-to-left when its first strong character is Arabic and leave
+  Turkish blocks left-to-right. Text inside isolates does not count for
+  `dir="auto"`, so a block that starts with an isolated quote stays
+  left-to-right. For (b), wrapping each run of RTL script in `<bdi>` at
+  render time would keep the written order.
+- **Observed.** The measurements above, read with Playwright (kit
+  2026-10-18-r131, 2026-10-19). The evrad report needed 144 isolate pairs
+  and 4 raw HTML blocks to print correctly.
+
 Open, found by the 2026-10-05 bug hunt and deliberately not fixed in it.
 Each says why.
 
