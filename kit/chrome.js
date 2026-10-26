@@ -1130,6 +1130,27 @@ var __okuFileStore = (function () {
     return (b && idx[b]) || null;
   }
 
+  /* An image a file at `fromRel` shows, from the bytes the page carries
+     for it (`m._file_assets`), or null. Keyed the way the build keys it
+     (collect_file_assets): the path the href names, from that file's
+     own directory, or from the project root for a leading slash. Never
+     the root as a second try, as `lookup` does for a chip: an image is
+     resolved from one place by every browser, and a fallback would show
+     a picture the file does not. The fragment stays: an SVG view or
+     sprite id means something on the data: URI too. */
+  function asset(fromRel, href) {
+    var carried = window.__okuFileAssets || {};
+    var h = String(href || '');
+    var hash = h.indexOf('#');
+    var frag = hash < 0 ? '' : h.slice(hash);
+    h = h.split('#')[0].split('?')[0];
+    try { h = decodeURIComponent(h); } catch (e) { /* as written */ }
+    if (!h || /^[a-z][a-z0-9+.-]*:/i.test(h) || h.slice(0, 2) === '//') return null;
+    var d = dirOf(fromRel);
+    var key = h.charAt(0) === '/' ? norm(h) : norm(d ? d + '/' + h : h);
+    return carried[key] ? carried[key] + frag : null;
+  }
+
   /* The page's own path on disk and its project-relative path, set
      against each other. Both directions occur: a docs tree inside its
      project (`docs/` in a repo) and a build run above the project. */
@@ -1255,7 +1276,7 @@ var __okuFileStore = (function () {
   }
 
   return {
-    lookup: lookup, relFrom: relFrom, absPath: absPath, absFromUrl: absFromUrl,
+    lookup: lookup, asset: asset, relFrom: relFrom, absPath: absPath, absFromUrl: absFromUrl,
     absOfLink: absOfLink, newTabHref: newTabHref, fileUrl: fileUrl, dirOf: dirOf,
   };
 })();
@@ -2040,6 +2061,9 @@ var __okuMdViewer = (function () {
       var warnings = window.OkuRenderer.renderMarkdownInto(text, host, {
         idPrefix: item.idPrefix,
         base: item.url || item.path,
+        // Its images are relative to it, and the page carries them by
+        // its place; without a place there is nothing to look up.
+        asset: item.rel ? function (href) { return __okuFileStore.asset(item.rel, href); } : null,
         // This file is not this page. See makeInert in renderer.js.
         inert: true,
       });

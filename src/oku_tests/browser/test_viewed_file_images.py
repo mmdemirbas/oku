@@ -14,6 +14,7 @@ URL.
 from __future__ import annotations
 
 import argparse
+import base64
 import http.server
 import os
 import threading
@@ -127,7 +128,10 @@ def test_the_source_view_shows_the_file_as_written(opened):
         "() => [...document.querySelectorAll('.okt-mdview-source code')].pop().textContent"
     )
     assert "![note dot](img/dot.svg)" in source
-    assert "data:" not in source
+    # The rewrite put an image's bytes where its path was; neither the
+    # page's dot nor the note's may be in the text.
+    for svg in (build_half.PAGE_DOT, build_half.NOTE_DOT):
+        assert base64.b64encode(svg.encode()).decode() not in source
 
 
 def test_a_file_opened_from_the_note_shows_its_own_picture(opened):
@@ -137,3 +141,12 @@ def test_a_file_opened_from_the_note_shows_its_own_picture(opened):
     _open_chip(opened, "deeper.md", inside_viewer=True)
     shown = _images(opened)
     assert shown["deep"]["width"] == 50, shown
+
+
+def test_a_srcset_is_read_the_way_the_browser_reads_it(opened):
+    """A relative candidate finds the carried image; an authored data:
+    URI, whose comma a split on commas would cut, is left whole."""
+    _open_chip(opened, "note.md")
+    shown = _images(opened)
+    assert shown["set"]["width"] == 30, shown
+    assert shown["inline"]["width"] == 50, shown

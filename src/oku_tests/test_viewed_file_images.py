@@ -36,14 +36,18 @@ PAGE_DOT = (
 NOTE_DOT = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"><rect width="30" height="30"/></svg>'
 )
-DEEP = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><rect width="50" height="50"/></svg>'
+# Larger than NOTE_DOT, so a cap set at the note's dot tells the two apart.
+DEEP = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><rect width="50" height="50" fill="#000"/></svg>'
 
 NOTE = (
     "---\ntitle: Note\n---\n\n## Note {#note}\n\n"
     "Its own dot: ![note dot](img/dot.svg)\n\n"
     "And further: [`deeper.md`](#f/deeper.md)\n\n"
     "Outside the project: ![far](../../../outside.svg)\n\n"
-    "A sample, not a reference: `![x](img/dot.svg)`\n"
+    "A sample, not a reference: `![x](img/dot.svg)`\n\n"
+    '<img alt="set" srcset="img/dot.svg 1x">\n\n'
+    # A data: URI holds a comma, which a srcset split on commas cuts in two.
+    f'<img alt="inline" srcset="data:image/svg+xml;base64,{base64.b64encode(DEEP.encode()).decode()} 1x">\n'
 )
 DEEPER = "---\ntitle: Deeper\n---\n\n## Deeper {#deeper}\n\n![deep](../../shots/deep.svg)\n"
 
@@ -152,3 +156,33 @@ def test_the_budget_drops_the_furthest_first(project: Path, monkeypatch: pytest.
 def test_an_image_over_the_inline_cap_is_not_carried(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli, "MAX_INLINE_ASSET_BYTES", len(NOTE_DOT))
     assert set(_assets(project)) == {"docs/notes/img/dot.svg"}
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "![a](b.png)",
+        '<img SRC = "x.png">',
+        "<img Src='a.png'>",
+        "<source srcset='a.png 2x'>",
+        '<video poster="p.png">',
+        '<img\n  src="x.png">',
+    ],
+)
+def test_the_parse_is_skipped_only_where_the_scanner_finds_nothing(text: str) -> None:
+    """The cheap test that spares a parse must never refuse a file the
+    scanner would find an image in: it is how a picture goes missing."""
+    assert cli._asset_hrefs(text), text
+    assert cli._may_show_an_image(text), text
+
+
+def test_a_file_with_no_image_spelling_is_not_parsed(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The other half: the parse is skipped where there is nothing to find."""
+    parsed: list[str] = []
+    real = cli.md_to_v2_page
+    monkeypatch.setattr(cli, "md_to_v2_page", lambda text, **kw: parsed.append(text) or real(text, **kw))
+    carriers = [
+        {"kind": "markdown", "rel": "docs/notes/plain.md", "text": "src/oku/cli.py = the poster child\n"}
+    ]
+    assert cli.collect_file_assets(carriers, project) == {}
+    assert parsed == []

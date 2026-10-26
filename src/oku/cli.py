@@ -35,6 +35,7 @@ import ipaddress
 import json
 import mimetypes
 import os
+import posixpath
 import queue
 import re
 import unicodedata
@@ -1484,6 +1485,9 @@ def carry_file_refs(page: dict, p: Path, tree: Path | None = None) -> dict:
     more = collect_file_closure(refs, p)
     if more:
         meta["_files_more"] = more
+    assets = collect_file_assets([*refs.values(), *more.values()], project_root_for(p.parent))
+    if assets:
+        meta["_file_assets"] = assets
     return page
 
 
@@ -6847,6 +6851,14 @@ def page_code_langs(page: dict) -> list[str]:
     return list(dict.fromkeys(out))
 
 
+# What a page carries of OTHER files: their text, their bytes. A path in
+# there is relative to the file it came from, so the page's own scan and
+# rewrite must not read it as the page's. Read as the page's, a carried
+# note's `img/dot.svg` was replaced in its text by the page's own
+# `img/dot.svg`. `collect_file_assets` carries those images instead.
+_CARRIED_KEYS = frozenset({"_files", "_files_more", "_file_assets"})
+
+
 def _asset_hrefs(page_data) -> list[str]:
     """Every local file this page asks the browser to fetch, in the
     spelling the author used — which is the string a rewrite has to
@@ -6882,8 +6894,9 @@ def _asset_hrefs(page_data) -> list[str]:
             # and those keep rendering forever.
             if node.get("k") == "image" and isinstance(node.get("src"), str):
                 add(node["src"])
-            for value in node.values():
-                walk(value)
+            for key, value in node.items():
+                if key not in _CARRIED_KEYS:
+                    walk(value)
 
     walk(page_data)
     return hrefs
@@ -7021,7 +7034,7 @@ def _rewrite_assets(node, uris: dict[str, str]):
     if isinstance(node, list):
         return [_rewrite_assets(item, uris) for item in node]
     if isinstance(node, dict):
-        out = {k: _rewrite_assets(v, uris) for k, v in node.items()}
+        out = {k: v if k in _CARRIED_KEYS else _rewrite_assets(v, uris) for k, v in node.items()}
         if node.get("k") == "image" and isinstance(node.get("src"), str):
             out["src"] = uris.get(node["src"], node["src"])
         return out
@@ -7442,6 +7455,97 @@ def collect_file_closure(refs: dict[str, dict], src: Path) -> dict[str, dict]:
             if payload.get("kind") == "markdown" and payload.get("text"):
                 queue.append(payload)
     return more
+
+
+# The images the carried markdown files show. Its own budget, because a
+# file of text and a screenshot it shows are not traded against each
+# other: a closure that ran out of room for one should not lose the other.
+MAX_FILE_ASSET_BYTES = 4 * 1024 * 1024
+
+_EQ_AFTER_ATTR_RE = re.compile(r"(?:set)?\s*=")
+
+
+def _may_show_an_image(text: str) -> bool:
+    """Whether `text` holds the start of an image spelling `_asset_hrefs`
+    reads: `![`, or `src`, `srcset` or `poster` before an `=`. A superset
+    of what the scanner matches, so no file showing one is skipped.
+
+    A carried file that shows no image is not parsed to find out:
+    measured on a page carrying 754 KB of markdown in 18 files, none
+    showing an image, the parse added 47 ms to every conversion, which an
+    editor's preview pays per keystroke. Substring finds rather than one
+    case-insensitive regex, which has no literal to skip ahead on: 4.7 ms
+    against 21.8 over the same text.
+    """
+    if "![" in text:
+        return True
+    if "=" not in text:
+        return False
+    lower = text.lower()
+    for word in ("src", "poster"):
+        at = lower.find(word)
+        while at >= 0:
+            if _EQ_AFTER_ATTR_RE.match(lower, at + len(word)):
+                return True
+            at = lower.find(word, at + 1)
+    return False
+
+
+def collect_file_assets(carriers: Iterable[dict], root: Path) -> dict[str, str]:
+    """Images the carried markdown files show, as data: URIs keyed by `rel`.
+
+    The viewer renders a carried markdown file, and its images are
+    relative to THAT file. So each is resolved from its file's place and
+    keyed by its own, which the runtime works out from the same two
+    strings (`__okuFileStore.asset`): the key is the path the href NAMES
+    rather than the one it resolves to, because via a symlinked
+    directory the two differ and the runtime only has the first.
+
+    Inside the project only, the fence a `#f/` reference answers to;
+    each under `MAX_INLINE_ASSET_BYTES` and all of them under
+    `MAX_FILE_ASSET_BYTES`, in the order the files are carried, so a
+    budget that runs out drops the images of the files furthest from the
+    page. An image past either is not carried, and the viewer resolves
+    its path where the page was opened, as it did for all of them.
+    """
+    real_root = root.resolve()
+    out: dict[str, str] = {}
+    used = 0
+    for carrier in carriers:
+        rel = carrier.get("rel")
+        if carrier.get("kind") != "markdown" or carrier.get("text") is None or not rel:
+            continue
+        if not _may_show_an_image(carrier["text"]):
+            continue
+        # Its images found the way the page's are: the file made a page
+        # dict, so one in a table cell or an island counts too.
+        try:
+            carrier_page = md_to_v2_page(carrier["text"], default_title=PurePosixPath(rel).stem)
+        except Exception:  # noqa: BLE001 — a file that will not parse shows nothing
+            continue
+        for href in _asset_hrefs(carrier_page):
+            if re.match(r"^[a-z][a-z0-9+.-]*:|^//|^#", href, re.I):
+                continue  # someone else's origin, a data: URI, or an anchor
+            named = unquote(_asset_file_part(href))
+            if named.startswith("/"):
+                key = posixpath.normpath(named.lstrip("/"))
+            else:
+                key = posixpath.normpath(posixpath.join(posixpath.dirname(rel), named))
+            if key in out or key in (".", "..") or key.startswith("../"):
+                continue
+            target = (root / key).resolve()
+            try:
+                target.relative_to(real_root)
+            except ValueError:
+                continue
+            if not target.is_file():
+                continue
+            size = target.stat().st_size
+            if size > MAX_INLINE_ASSET_BYTES or used + size > MAX_FILE_ASSET_BYTES:
+                continue
+            used += size
+            out[key] = _data_uri(target)
+    return out
 
 
 def collect_file_refs(page_data, src: Path) -> dict[str, dict]:

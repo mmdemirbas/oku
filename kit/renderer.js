@@ -1993,6 +1993,8 @@
       // What those files reference in turn, keyed by place in the
       // project, and this page's own place — see __okuFileStore.
       window.__okuFilesMore = meta._files_more || {};
+      // And the images those markdown files show, keyed by place too.
+      window.__okuFileAssets = meta._file_assets || {};
       window.__okuPageRel = meta._rel || null;
       if (page.t) document.title = page.t;
       if (meta.lang) {
@@ -3722,6 +3724,8 @@
    *              live document; defaults to '' for a bare host)
    *   base     — URL the file was loaded from; relative hrefs and image
    *              srcs resolve against it
+   *   asset    — href => URL or null: the bytes the page carries for an
+   *              image or medium this file shows; consulted before `base`
    *   inert    — strip everything that would execute before the result
    *              reaches the live document (see makeInert)
    * Returns the warnings the typed-block renderers raised. */
@@ -3800,18 +3804,51 @@
         a.setAttribute('href', '#' + prefix + a.getAttribute('href').slice(1));
       });
     }
-    if (opts.base) {
-      const rebase = (el, attr) => {
-        const v = el.getAttribute(attr);
+    if (opts.base || opts.asset) {
+      const rebase = (v) => {
         // Absolute URLs, protocol-relative, fragments and root-absolute
         // paths already say where they point. Only a genuinely relative
         // path is ambiguous, and it is ambiguous because the reader is
         // looking at the file from somewhere else in the tree.
-        if (!v || /^([a-z][a-z0-9+.-]*:|\/\/|#|\/)/i.test(v)) return;
-        try { el.setAttribute(attr, new URL(v, opts.base).href); } catch (e) {}
+        if (!opts.base || !v || /^([a-z][a-z0-9+.-]*:|\/\/|#|\/)/i.test(v)) return v;
+        try { return new URL(v, opts.base).href; } catch (e) { return v; }
       };
-      holder.querySelectorAll('a[href]').forEach((a) => rebase(a, 'href'));
-      holder.querySelectorAll('img[src]').forEach((i) => rebase(i, 'src'));
+      // What the file SHOWS comes from the bytes the page carries for it
+      // first: a viewed file's `base` is often only its path as authored,
+      // which no URL can be resolved against, and its images then
+      // resolved against the page. The same spellings the build scans.
+      const shown = (v) => (opts.asset && v && opts.asset(v)) || rebase(v);
+      const put = (el, attr, v) => { if (v !== el.getAttribute(attr)) el.setAttribute(attr, v); };
+      holder.querySelectorAll('a[href]').forEach((a) => put(a, 'href', rebase(a.getAttribute('href'))));
+      holder.querySelectorAll('img[src], source[src], video[src], audio[src]').forEach((m) => {
+        put(m, 'src', shown(m.getAttribute('src')));
+      });
+      holder.querySelectorAll('video[poster]').forEach((m) => put(m, 'poster', shown(m.getAttribute('poster'))));
+      // srcset as the HTML parser reads it: a URL is a run of non-space
+      // characters and commas at its end close the candidate; otherwise
+      // its descriptors run to the next comma. A split on every comma
+      // cuts a data: URI in two.
+      const candidates = (s) => {
+        const out = [];
+        let i = 0;
+        while (i < s.length) {
+          while (i < s.length && /[\s,]/.test(s[i])) i++;
+          let j = i;
+          while (j < s.length && !/\s/.test(s[j])) j++;
+          let url = s.slice(i, j);
+          let desc = '';
+          if (/,$/.test(url)) url = url.replace(/,+$/, '');
+          else {
+            const k = s.indexOf(',', j) < 0 ? s.length : s.indexOf(',', j);
+            desc = s.slice(j, k).trim();
+            j = k;
+          }
+          if (url) out.push(desc ? shown(url) + ' ' + desc : shown(url));
+          i = j;
+        }
+        return out.join(', ');
+      };
+      holder.querySelectorAll('img[srcset], source[srcset]').forEach((m) => put(m, 'srcset', candidates(m.getAttribute('srcset'))));
     }
 
     while (holder.firstChild) host.appendChild(holder.firstChild);

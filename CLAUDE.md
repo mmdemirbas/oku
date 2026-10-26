@@ -1467,6 +1467,35 @@ from the file's own directory) and never by the page's keys — the same
 string can name a different file. Measured on the research tree: 0
 dead chips, and the standalone tree 1.8% larger.
 
+**And the images a carried file shows travel by its place too.** A
+note a chip carries wrote `![x](img/dot.svg)`, and the build read it as
+the page's own: `_asset_hrefs` and `_rewrite_assets` walked the whole
+page dict, carried text included, and resolved the href against the
+PAGE's directory. Measured on a two-file tree where the page and the
+note each hold an `img/dot.svg`: the standalone build rewrote the note's
+text with the page's picture as a data: URI, so the viewer's Source view
+showed a file that is not on disk, and in all three delivery modes the
+viewer showed the page's 10 px picture where the note's 30 px one
+belonged; an image beside a file the note names, above the docs tree,
+loaded in none. `_CARRIED_KEYS` keeps the page's own scan and rewrite
+out of `_files`, `_files_more` and `_file_assets`. `collect_file_assets`
+resolves each carried markdown file's images from that file's place and
+carries them in `m._file_assets` as data: URIs, keyed by the path the
+href NAMES from there (the runtime has only that string), inside the
+project, each under `MAX_INLINE_ASSET_BYTES` and all under
+`MAX_FILE_ASSET_BYTES` (4 MB, nearest files first). The viewer hands
+`renderMarkdownInto` an `asset` lookup (`__okuFileStore.asset`) that
+runs before the rebase, for `src`, `poster` and `srcset`, the spellings
+the build scans. It never tries the root as a second base, as a chip's
+`lookup` does, because a browser resolves an image from one place.
+`srcset` is read the way the HTML parser reads it, since a split on
+commas cuts a data: URI in two. A carried file with no image spelling
+is not parsed (`_may_show_an_image`, a superset of the scanner): on a
+page carrying 754 KB of markdown in 18 files the parse added 47 ms to
+every conversion, which an editor's preview pays per keystroke; the
+check adds 2.8. Held by `test_viewed_file_images.py` and
+`browser/test_viewed_file_images.py`, in all three delivery modes.
+
 **The full path is derived, never shipped.** A built page works out the
 docs root from its own URL (`…/dist/standalone/<page>.html`) and the
 project root from `m._rel`, the page's own place in the project; both

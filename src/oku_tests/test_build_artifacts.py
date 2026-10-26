@@ -738,7 +738,11 @@ class TestPayloadBudget:
     # 1,488,887.
     # Then by a code block's language label living on its host, and the
     # single-language dimming sweeping when a label is stamped: 1,490,589.
-    KIT_BUDGET_BYTES = 1_491_400
+    # Then by a viewed file's images looked up by its place
+    # (`__okuFileStore.asset`, the `asset` option, and a srcset read the
+    # way the HTML parser reads it, which a data: URI's comma needs):
+    # 1,494,382.
+    KIT_BUDGET_BYTES = 1_495_000
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.
