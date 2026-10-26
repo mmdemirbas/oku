@@ -6772,18 +6772,20 @@ def _strip_code(text: str) -> str:
     return _INLINE_CODE_RE.sub(" ", _FENCE_RE.sub("\n", text))
 
 
-def _iter_strings(node):
+def _iter_strings(node, skip: frozenset[str] = frozenset()):
     """Every string anywhere in a page dict. Typed blocks carry prose in
     fields of their own (an insight's `b`, a table cell, a callout body),
-    so a link can sit outside the top-level `b[]` strings."""
+    so a link can sit outside the top-level `b[]` strings. Keys in `skip`
+    are not entered."""
     if isinstance(node, str):
         yield node
     elif isinstance(node, list):
         for item in node:
-            yield from _iter_strings(item)
+            yield from _iter_strings(item, skip)
     elif isinstance(node, dict):
-        for value in node.values():
-            yield from _iter_strings(value)
+        for key, value in node.items():
+            if key not in skip:
+                yield from _iter_strings(value, skip)
 
 
 # A page's own files — the image beside it above all. Three spellings
@@ -7056,7 +7058,9 @@ def collect_local_docs(page_data, src: Path, src_root: Path) -> tuple[dict[str, 
         return docs, skipped
 
     hrefs: list[str] = []
-    for text in _iter_strings(page_data):
+    # The page's own links only. A carried file's are relative to that
+    # file, and the closure carries what they name by its place.
+    for text in _iter_strings(page_data, _CARRIED_KEYS):
         if ".md" not in text:
             continue
         text = _strip_code(text)
@@ -7432,17 +7436,41 @@ def collect_file_closure(refs: dict[str, dict], src: Path) -> dict[str, dict]:
         except Exception:  # noqa: BLE001 — a file that will not parse carries nothing further
             continue
         hrefs: list[str] = []
+        # A plain `.md` link too: the viewer opens it over the page. A
+        # browser resolves a link from its file's own directory and from
+        # nowhere else, so a link is carried only from there, where a
+        # chip also tries the project root.
+        links: list[str] = []
         for text in _iter_strings(carrier_page):
             if "#f/" in text:
                 hrefs.extend(h.strip() for h in _MD_FILE_REF_RE.findall(_strip_code(text)))
-        for href in dict.fromkeys(hrefs):
+            if ".md" in text:
+                plain = _strip_code(text)
+                links.extend(m.group(1) for m in _PROSE_MD_LINK_RE.finditer(plain))
+                links.extend(
+                    h
+                    for h in _ISLAND_MD_HREF_RE.findall(plain)
+                    if not re.match(r"^[a-z][a-z0-9+.-]*:|^[/#]", h, re.I)
+                )
+        own_dir = posixpath.dirname(carrier["rel"])
+        candidates: list[tuple[str, str | None]] = [(h, None) for h in dict.fromkeys(hrefs)]
+        candidates += [
+            (h, posixpath.normpath(posixpath.join(own_dir, unquote(h)))) for h in dict.fromkeys(links)
+        ]
+        for href, place in candidates:
             if not href:
                 continue
-            # A line is a place in a file the closure carries whole.
-            href = resolve_file_line(href, carrier_path)[2]
+            if place is None:
+                # A line is a place in a file the closure carries whole.
+                href = resolve_file_line(href, carrier_path)[2]
             payload = _file_ref_payload(href, carrier_path, root)
             rel = payload.get("rel")
-            if payload.get("status") != "ok" or not rel or rel in seen:
+            if (
+                payload.get("status") != "ok"
+                or not rel
+                or rel in seen
+                or (place is not None and rel != place)
+            ):
                 continue
             seen.add(rel)
             size = payload.get("bytes") or 0

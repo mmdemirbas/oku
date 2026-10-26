@@ -742,7 +742,10 @@ class TestPayloadBudget:
     # (`__okuFileStore.asset`, the `asset` option, and a srcset read the
     # way the HTML parser reads it, which a data: URI's comma needs):
     # 1,494,382.
-    KIT_BUDGET_BYTES = 1_495_000
+    # Then by a viewed file's `.md` links resolved from its place (a page
+    # of the tree by its manifest `source`, a file by the bytes carried
+    # for it, a served URL only inside the served tree): 1,498,780.
+    KIT_BUDGET_BYTES = 1_499_500
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

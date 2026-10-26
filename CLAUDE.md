@@ -1496,6 +1496,20 @@ every conversion, which an editor's preview pays per keystroke; the
 check adds 2.8. Held by `test_viewed_file_images.py` and
 `browser/test_viewed_file_images.py`, in all three delivery modes.
 
+**And a viewed file's `.md` link is that file's, not the page's.**
+`linkHref` made `[sib](sib.md)` in a viewed note `sib.html`, resolved
+against the page: measured on a note outside the tree, a click left the
+page for the page's own `sib.html`, or for Chrome's error page and a 404
+where there was none. In a document drawn with `viewed` the link stays
+as written; the click resolves it from `data-oku-file-base`, opens a
+page of the tree (manifest `source`, `__okuFileStore.pageUrl`) as that
+page and anything else in the viewer, looked up by place and never in
+`__oku_local_docs__`, which is keyed by the page's hrefs. The closure
+carries those files by place, from the file's own directory only, as a
+browser resolves a link, and `collect_local_docs` no longer reads
+carried text as the page's. See
+[the .md link rule](PRESENTATION-RULES.md#a-link-to-a-md-file-opens-the-kit-s-viewer-not-t).
+
 **The full path is derived, never shipped.** A built page works out the
 docs root from its own URL (`…/dist/standalone/<page>.html`) and the
 project root from `m._rel`, the page's own place in the project; both

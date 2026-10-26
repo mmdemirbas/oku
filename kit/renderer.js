@@ -330,8 +330,14 @@
   // the renderer draws comes through here — a prose link, a step-flow or
   // compare-grid card, a table row — because a payload href set raw was a
   // dead link in both trees while the same target in prose worked.
+  //
+  // Not in a file shown over the page (renderMarkdownInto `viewed`): its
+  // `.md` link is relative to THAT file, and only the click can tell a page
+  // of this tree from a file, by the file's place (chrome.js). Made `.html`
+  // here, it went to a page beside the page being read, or to nothing.
+  let __viewedDocument = false;
   function linkHref(href) {
-    const md = String(href).match(/^(?!\w+:|\/\/|#|\/)(.+?)\.md(#[^\s]*)?$/i);
+    const md = !__viewedDocument && String(href).match(/^(?!\w+:|\/\/|#|\/)(.+?)\.md(#[^\s]*)?$/i);
     return safeUrl(md ? md[1] + '.html' + (md[2] || '') : href, false);
   }
 
@@ -3728,10 +3734,14 @@
    *              image or medium this file shows; consulted before `base`
    *   inert    — strip everything that would execute before the result
    *              reaches the live document (see makeInert)
+   *   viewed   — a file shown over the page, not a page of the tree: its
+   *              relative `.md` links stay as written (see linkHref)
    * Returns the warnings the typed-block renderers raised. */
   OkuRenderer.renderMarkdownInto = function (src, host, opts) {
     opts = opts || {};
     const prefix = opts.idPrefix || '';
+    const savedViewed = __viewedDocument;
+    __viewedDocument = !!opts.viewed;
     const savedAnchors = __anchorIds;
     const savedLinkDefs = __linkDefs;
     const savedFootnoteDefs = __footnoteDefs;
@@ -3770,6 +3780,7 @@
       const notes = renderFootnoteSection();
       if (notes) holder.appendChild(notes);
     } finally {
+      __viewedDocument = savedViewed;
       __anchorIds = savedAnchors;
       __linkDefs = savedLinkDefs;
       __footnoteDefs = savedFootnoteDefs;
@@ -3819,7 +3830,13 @@
       // resolved against the page. The same spellings the build scans.
       const shown = (v) => (opts.asset && v && opts.asset(v)) || rebase(v);
       const put = (el, attr, v) => { if (v !== el.getAttribute(attr)) el.setAttribute(attr, v); };
-      holder.querySelectorAll('a[href]').forEach((a) => put(a, 'href', rebase(a.getAttribute('href'))));
+      holder.querySelectorAll('a[href]').forEach((a) => {
+        const v = a.getAttribute('href');
+        // As written, for the click to resolve from the file's place; a
+        // URL rebased against `base` no longer says what it was relative to.
+        if (opts.viewed && /^[^?#]*\.md(#|$)/i.test(v)) return;
+        put(a, 'href', rebase(v));
+      });
       holder.querySelectorAll('img[src], source[src], video[src], audio[src]').forEach((m) => {
         put(m, 'src', shown(m.getAttribute('src')));
       });

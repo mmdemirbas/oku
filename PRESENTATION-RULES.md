@@ -585,6 +585,23 @@ the pass.
 
 `test_md_viewer.py` and `test_standalone_local_docs.py` pin both halves.
 
+**A link inside a viewed file is that file's, not the page's.** The
+rewrite above is right for the page and wrong for a file shown over it:
+a note outside the tree writing `[sib](sib.md)` was drawn as `sib.html`
+and resolved against the page's URL, so a click left the page, for the
+page's own `sib.html` where it had one and for an error page where it
+did not. A file drawn with `viewed` keeps its relative `.md` links as
+written, and the click resolves one from the file's place
+(`data-oku-file-base`): a page of this tree, found by its manifest
+`source`, opens as that page; anything else opens in the viewer from the
+bytes the build carried for it by place (`collect_file_closure` follows
+these links as it follows chips, from the file's own directory only),
+or from the server inside the served tree. Never from
+`__oku_local_docs__`, which is keyed by the PAGE's hrefs: the same
+string written in another directory names another file. Held by
+`test_md_links_in_viewed_files.py` and its browser half, in all three
+delivery modes.
+
 ## The kit's own strings follow the page's language. {#the-kit-s-own-strings-follow-the-page-s-language}
 
 **The kit's own strings follow the page's language.** `kit/i18n/<code>.json`

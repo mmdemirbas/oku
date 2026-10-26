@@ -178,6 +178,7 @@
   "Copy the full path": "Tam yolu kopyala",
   "could not be read.": "okunamadı.",
   "A page opened from disk cannot read the file beside it, and the build did not carry this one.": "Diskten açılan bir sayfa yanındaki dosyayı okuyamaz ve derleme bu dosyayı taşımamış.",
+  "The build did not carry this file, and it is outside the tree this server serves.": "Derleme bu dosyayı taşımamış ve dosya bu sunucunun sunduğu ağacın dışında.",
   "Filter the contents": "İçindekileri süz",
   "menu:Documents": "Belgeler",
   "menu:Front page": "Giriş sayfası",

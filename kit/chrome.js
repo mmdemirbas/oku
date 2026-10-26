@@ -1216,6 +1216,62 @@ var __okuFileStore = (function () {
     return root == null ? null : root + '/' + rel;
   }
 
+  /* The tree this page belongs to, set against the project: where its
+     docs root sits in the project, and the URL its pages hang from. The
+     page's manifest entry comes from the language switch's suffix rule,
+     and the root from that entry's path set against `m._rel`, the way
+     projectRootAbs sets the two against each other on disk. */
+  function tree() {
+    var mf = window.__okuSiteManifest || window.__okuManifest;
+    var pageRel = window.__okuPageRel;
+    var found = mf && pageRel ? __okuLangSwitch.locate(mf) : null;
+    if (!found) return null;
+    var page;
+    try { page = decodeURIComponent(found.path); } catch (e) { page = found.path; }
+    page = page.replace(/\.html$/, '');
+    var self = pageRel.replace(/\.[^./]+$/, '');
+    var root;
+    if (self === page) root = '';
+    else if (self.slice(-(page.length + 1)) === '/' + page) root = self.slice(0, self.length - page.length - 1);
+    else return null;
+    return { pages: mf.pages || [], root: root, prefix: found.prefix };
+  }
+
+  function inTree(t, rel) {
+    if (!t.root) return rel;
+    return rel.indexOf(t.root + '/') === 0 ? rel.slice(t.root.length + 1) : null;
+  }
+
+  // The built page a file of this tree became, or null: the manifest
+  // entry whose `source` it is, or a translation at its path.
+  function pageUrl(rel) {
+    var t = rel ? tree() : null;
+    var src = t ? inTree(t, rel) : null;
+    if (src == null) return null;
+    var html = src.replace(/\.md$/i, '.html');
+    for (var i = 0; i < t.pages.length; i++) {
+      var p = t.pages[i];
+      if (!p || !p.path) continue;
+      if (p.source === src) return t.prefix + '/' + p.path;
+      var variants = p.variants || {};
+      for (var code in variants) {
+        var v;
+        try { v = decodeURIComponent(variants[code]); } catch (e) { v = variants[code]; }
+        if (v === html) return t.prefix + '/' + variants[code];
+      }
+    }
+    return null;
+  }
+
+  // Where the server has a file of this tree, or null: over file:// and
+  // for a file outside the tree there is nothing to fetch.
+  function servedUrl(rel) {
+    if (!rel || window.location.protocol === 'file:') return null;
+    var t = tree();
+    var src = t ? inTree(t, rel) : null;
+    return src == null ? null : t.prefix + '/' + src.split('/').map(encodeURIComponent).join('/');
+  }
+
   // A link's target on disk, from the file the link was written in: a
   // relative href is that file's own place, a root-absolute one the tree's.
   function absOfLink(fromRel, href) {
@@ -1276,7 +1332,8 @@ var __okuFileStore = (function () {
   }
 
   return {
-    lookup: lookup, asset: asset, relFrom: relFrom, absPath: absPath, absFromUrl: absFromUrl,
+    lookup: lookup, asset: asset, relFrom: relFrom, pageUrl: pageUrl, servedUrl: servedUrl,
+    absPath: absPath, absFromUrl: absFromUrl,
     absOfLink: absOfLink, newTabHref: newTabHref, fileUrl: fileUrl, dirOf: dirOf,
   };
 })();
@@ -1968,7 +2025,10 @@ var __okuMdViewer = (function () {
     // the viewer to find it again would fail in exactly the case the
     // chip exists for — a file outside the served tree.
     if (item.text != null) { done(item.text); return; }
-    var inline = localDoc([stripHash(item.href || ''), item.url, item.path]);
+    // A link in a viewed file is looked up by its place only: the page's
+    // linked files are keyed by the PAGE's hrefs, and the same string
+    // written in another directory names another file.
+    var inline = item.inFile ? null : localDoc([stripHash(item.href || ''), item.url, item.path]);
     if (inline == null && item.rel) {
       var carried = __okuFileStore.lookup('', item.rel);
       if (carried && carried.text != null) inline = carried.text;
@@ -1980,6 +2040,10 @@ var __okuMdViewer = (function () {
       // only adds a console error the reader cannot act on.
       fail(item,
         okuT('A page opened from disk cannot read the file beside it, and the build did not carry this one.'));
+      return;
+    }
+    if (!item.url) {
+      fail(item, okuT('The build did not carry this file, and it is outside the tree this server serves.'));
       return;
     }
     fetch(item.url, { cache: 'no-cache' })
@@ -2066,6 +2130,8 @@ var __okuMdViewer = (function () {
         asset: item.rel ? function (href) { return __okuFileStore.asset(item.rel, href); } : null,
         // This file is not this page. See makeInert in renderer.js.
         inert: true,
+        // Nor a page of the tree: its `.md` links are its own.
+        viewed: true,
       });
       noteInert(host, warnings);
     } catch (e) {
@@ -2173,6 +2239,7 @@ var __okuMdViewer = (function () {
     present({
       kind: 'markdown', name: baseName(path), path: path, rel: rel, href: href,
       url: opts.text != null ? null : fileUrl, text: opts.text, frag: frag, ref: opts.ref || null,
+      inFile: !!opts.inFile,
     });
   }
 
@@ -2279,7 +2346,16 @@ document.addEventListener('click', function (e) {
   if (url.hash.length > 1) {
     try { anchor = decodeURIComponent(url.hash.slice(1)); } catch (err) { anchor = url.hash.slice(1); }
   }
+  // In a file shown over the page, a relative link is that file's: it was
+  // drawn as written (renderer.js, `viewed`), and `url` above resolved it
+  // against the page. A page of this tree opens as the page, as a link to
+  // it in the page's own prose does; anything else opens in the viewer by
+  // its place, from the bytes the build carried or the server's copy.
+  var rel = base ? __okuFileStore.relFrom(from, href) : null;
+  var built = rel ? __okuFileStore.pageUrl(rel) : null;
+  if (built) { window.location.href = built + url.hash; return; }
   if (__okuHostOpen(__okuFileStore.absOfLink(from, href), null, anchor)) return;
+  if (rel) { __okuMdViewer.open(__okuFileStore.servedUrl(rel) || '', { href: href, rel: rel, inFile: true }); return; }
   __okuMdViewer.open(url.href, { href: href, from: from });
 });
 
