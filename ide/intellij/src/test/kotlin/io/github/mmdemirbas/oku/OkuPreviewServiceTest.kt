@@ -142,6 +142,20 @@ class OkuPreviewServiceTest : OkuFixtureTestCase() {
         assertFalse("still waiting for oku 2 s after the cancel", ended is TimeoutException)
     }
 
+    fun `test a fix that is cancelled stops waiting for oku`() {
+        // IV.5, the fix's half: its progress offered Cancel, and the wait
+        // never looked at it, so Cancel did nothing until oku answered.
+        fakeOku("time.sleep(600)")
+        val indicator = EmptyProgressIndicator()
+        val call = ApplicationManager.getApplication().executeOnPooledThread<Result<Fixed>> {
+            ProgressManager.getInstance().runProcess<Result<Fixed>>({ OkuChipFix.ask(page, "x") }, indicator)
+        }
+        awaitRequests(1)
+        indicator.cancel()
+        val ended = runCatching { call.get(2, TimeUnit.SECONDS) }.exceptionOrNull()
+        assertFalse("still waiting for oku 2 s after the cancel", ended is TimeoutException)
+    }
+
     fun `test a completion does not wait behind a check`() {
         // Measured on an 84-page tree: a check takes 525 ms and the registry
         // 247 ms, and one session answers one request at a time, so a
