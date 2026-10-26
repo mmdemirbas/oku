@@ -144,19 +144,25 @@ internal object OkuRegistryCache {
     internal val held = ConcurrentHashMap<Path, Pair<Long, Registry>>()
     private val asking = ConcurrentHashMap<Path, Future<Registry?>>()
 
-    /** Milliseconds, read once per question; a test sets it to step the clock. */
+    /**
+     * Milliseconds on a clock that does not move when the wall clock is set;
+     * a test sets it to step the clock.
+     */
     @VisibleForTesting
-    internal var clock: () -> Long = System::currentTimeMillis
+    internal var clock: () -> Long = { System.nanoTime() / 1_000_000 }
+
+    /** Younger than FRESH_MS, and not from a clock that has since gone back. */
+    private fun fresh(at: Long, now: Long): Boolean = now - at in 0 until FRESH_MS
 
     fun of(page: Path, text: String?): Registry? {
         val now = clock()
-        held[page]?.let { (at, registry) -> if (now - at < FRESH_MS) return registry }
+        held[page]?.let { (at, registry) -> if (fresh(at, now)) return registry }
         val asked = asking.computeIfAbsent(page) {
             ApplicationManager.getApplication().executeOnPooledThread<Registry?> {
                 try {
                     service<OkuPreviewService>().registry(page, text).getOrNull()?.also {
                         // An answer past FRESH_MS is never read again, so it is not kept either.
-                        held.entries.removeIf { (_, entry) -> clock() - entry.first >= FRESH_MS }
+                        held.entries.removeIf { (_, entry) -> !fresh(entry.first, clock()) }
                         held[page] = now to it
                     }
                 } finally {
