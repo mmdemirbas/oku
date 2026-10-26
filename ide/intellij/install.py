@@ -304,7 +304,10 @@ def build_plugin(ide: Ide) -> Build:
     version, _ = gradle_facts()
     gradlew = PLUGIN_DIR / ("gradlew.bat" if platform.system() == "Windows" else "gradlew")
     env = dict(os.environ, JAVA_HOME=str(ide.jbr))
-    cmd = [str(gradlew), "-q", "--console=plain", "buildPlugin", f"-PideaPath={ide.home}"]
+    # --no-watch-fs: a daemon watching the file system has called an edited
+    # source up to date, and a zip built from that is the old plugin
+    # installed as the new one. Reading the sources costs the build little.
+    cmd = [str(gradlew), "-q", "--console=plain", "--no-watch-fs", "buildPlugin", f"-PideaPath={ide.home}"]
     subprocess.run(cmd, cwd=PLUGIN_DIR, env=env, check=True)
     return read_build(PLUGIN_DIR / "build/distributions" / f"oku-intellij-{version}.zip")
 
