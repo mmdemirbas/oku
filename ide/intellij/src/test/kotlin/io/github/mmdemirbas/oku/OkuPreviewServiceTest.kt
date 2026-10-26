@@ -32,8 +32,11 @@ class OkuPreviewServiceTest : OkuFixtureTestCase() {
 
     private val page: Path get() = dir.resolve("a.md")
 
+    private val clock = OkuRegistryCache.clock
+
     override fun tearDown() {
         try {
+            OkuRegistryCache.clock = clock
             System.setProperty("oku.executable", checkout)
             service.restart()
         } catch (e: Throwable) {
@@ -155,6 +158,25 @@ class OkuPreviewServiceTest : OkuFixtureTestCase() {
         val asked = ApplicationManager.getApplication().executeOnPooledThread<Result<Registry>> { service.registry(page, "x") }
         val answer = runCatching { asked.get(2, TimeUnit.SECONDS) }
         assertTrue("the registry was still queued behind the check 2 s later", answer.getOrNull()?.isSuccess == true)
+    }
+
+    fun `test a clock set back does not keep a registry answer fresh`() {
+        // XII.1: freshness was a difference of wall-clock readings, so a clock
+        // set back made every held answer's age negative: fresh for as long as
+        // the clock had been set back, and never pruned either.
+        fakeOku(
+            """
+            n = globals().get("n", 0) + 1
+            entry = {"term": str(n), "domain": "d", "def": ""}
+            print(json.dumps({"id": req["id"], "glossary": [entry], "extrefs": [], "pages": []}), flush=True)
+            """,
+        )
+        var now = 1_000_000_000L
+        OkuRegistryCache.clock = { now }
+        assertEquals("1", OkuRegistryCache.of(page, "x")?.glossary?.single()?.term)
+        now -= 3_600_000 // the clock is set back an hour
+        now += OkuRegistryCache.FRESH_MS + 1 // and the answer's five seconds pass
+        assertEquals("the answer from before the clock moved was still fresh", "2", OkuRegistryCache.of(page, "x")?.glossary?.single()?.term)
     }
 
     fun `test the registry cache holds only what is still fresh`() {
