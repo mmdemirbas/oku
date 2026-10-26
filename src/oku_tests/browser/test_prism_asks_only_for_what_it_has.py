@@ -176,9 +176,16 @@ def test_regex_is_in_the_vendored_set():
 
 
 def test_the_vendored_components_are_all_present(built):
-    """The delivered tree carries a file for every language the kit says
-    it vendors — the condition the reported 404 was the absence of."""
+    """The delivered tree carries a file for every component the kit says
+    it vendors — the condition the reported 404 was the absence of.
+
+    The components, not the language names: `css`, `javascript` and
+    `markup` are inside prism.min.js, so `oku vendor` fetches no file for
+    them and the autoloader asks for none. Asking for one file per name
+    passed only against a vendor cache older than the catalog."""
     comp = built.parent / "_oku" / "vendor" / "prism" / "components"
-    missing = sorted(lang for lang in cli._PRISM_LANGS if not (comp / f"prism-{lang}.min.js").exists())
+    wanted = cli.prism_components_needed(cli._PRISM_LANGS)
+    assert "regex" in wanted, wanted
+    missing = sorted(ident for ident in wanted if not (comp / f"prism-{ident}.min.js").exists())
     assert missing == [], f"vendored set names components the build did not carry: {missing}"
     assert json.dumps(sorted(cli._PRISM_LANGS))  # the list is serialisable, ie. plain strings
