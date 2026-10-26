@@ -7366,7 +7366,7 @@ function initReadingAids() {
    their browser/IDE isn't serving a stale cached copy:
        console look for: [oku] kit boot · build=...
    The console.info emits once per page load; cheap insurance. */
-var __okuKitBuild = '2026-10-26-r132';
+var __okuKitBuild = '2026-10-26-r133';
 
 var __okuDocsRoot = (function () {
   // Explicit override wins. Use this for pages that live outside the
