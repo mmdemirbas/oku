@@ -98,10 +98,11 @@ instead of failing on a missing field.
   `-Doku.executable=/abs/oku/.venv/bin/oku`, which wins over the settings
   (not `bin/oku`: run directly, its shebang finds a python3 without
   jsonschema, and oku then refuses to check).
-- Two processes run: one renders previews, one checks pages, so a preview
-  never waits behind a check of the whole tree. They write their stderr to
-  `<IDE system dir>/oku-preview/preview.log` and `check.log`; a failure to
-  start shows the last lines in the panel.
+- Three processes run: one renders previews, one checks pages, and one
+  answers completion, hover and navigation, so neither a preview nor a
+  completion waits behind a check of the whole tree. They write their
+  stderr to `<IDE system dir>/oku-preview/preview.log`, `check.log` and
+  `lookup.log`; a failure to start shows the last lines in the panel.
 
 ## Install
 

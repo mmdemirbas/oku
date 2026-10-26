@@ -11,6 +11,7 @@ import com.intellij.codeInspection.InspectionSuppressor
 import com.intellij.codeInspection.SuppressQuickFix
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.patterns.PlatformPatterns
@@ -25,8 +26,10 @@ import com.intellij.psi.impl.source.resolve.reference.impl.providers.FileReferen
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.ProcessingContext
 import org.intellij.plugins.markdown.lang.psi.impl.MarkdownLinkDestination
+import org.jetbrains.annotations.VisibleForTesting
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Future
 import kotlin.io.path.Path
 
 /*
@@ -127,17 +130,37 @@ class OkuRegistryCompletion : CompletionContributor() {
  * What a page can name, asked of oku at most once per page every few
  * seconds: completion asks on every invocation, and a kit.json edited a
  * moment ago is seen on the next one after that.
+ *
+ * The round trip runs on a pooled thread, one per page at a time, and the
+ * caller waits for it in a way its progress can cancel: completion asks
+ * inside its read action, so a wait that cannot be cancelled holds the
+ * read lock, and every edit behind it, until oku answers. A cancelled
+ * caller leaves the answer to fill the cache for the next one.
  */
 internal object OkuRegistryCache {
-    private const val FRESH_MS = 5_000L
-    private val held = ConcurrentHashMap<Path, Pair<Long, Registry>>()
+    const val FRESH_MS = 5_000L
+
+    @VisibleForTesting
+    internal val held = ConcurrentHashMap<Path, Pair<Long, Registry>>()
+    private val asking = ConcurrentHashMap<Path, Future<Registry?>>()
 
     fun of(page: Path, text: String?): Registry? {
         val now = System.currentTimeMillis()
         held[page]?.let { (at, registry) -> if (now - at < FRESH_MS) return registry }
-        val registry = service<OkuPreviewService>().registry(page, text).getOrNull() ?: return null
-        held[page] = now to registry
-        return registry
+        val asked = asking.computeIfAbsent(page) {
+            ApplicationManager.getApplication().executeOnPooledThread<Registry?> {
+                try {
+                    service<OkuPreviewService>().registry(page, text).getOrNull()?.also {
+                        // An answer past FRESH_MS is never read again, so it is not kept either.
+                        held.entries.removeIf { (_, entry) -> System.currentTimeMillis() - entry.first >= FRESH_MS }
+                        held[page] = now to it
+                    }
+                } finally {
+                    asking.remove(page)
+                }
+            }
+        }
+        return ProgressIndicatorUtils.awaitWithCheckCanceled(asked)
     }
 }
 

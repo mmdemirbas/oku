@@ -14,6 +14,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.io.path.extension
@@ -93,9 +94,10 @@ fun interface OkuGreetingListener {
 
 /**
  * `oku preview --serve` for the whole IDE: one process renders every open
- * preview, a second one checks pages, so a render after the first costs the
- * page and not a Python start, and a render never waits behind a check of
- * a whole tree.
+ * preview, a second one checks pages, and a third answers what completion,
+ * hover and navigation ask (the registry, an anchor's line). A render
+ * after the first costs the page and not a Python start, and neither a
+ * render nor a completion waits behind a check of a whole tree.
  *
  * The JSON they speak is oku's contract (`PREVIEW_PROTOCOL` in oku's
  * cli.py). A process greets first; one that names another protocol is
@@ -117,6 +119,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
 
     private val previews = Channel("preview")
     private val checks = Channel("check")
+    private val lookups = Channel("lookup")
 
     /** The last greeting, empty until a session has started. */
     @Volatile
@@ -156,7 +159,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
     fun anchorLine(source: Path, anchor: String, text: String?): Result<Int?> {
         val fields = mutableMapOf<String, Any>("path" to source.toString(), "anchor" to anchor)
         if (text != null) fields["text"] = text
-        return checks.ask(fields) { reply, _ -> reply.line }
+        return lookups.ask(fields) { reply, _ -> reply.line }
     }
 
     /**
@@ -168,7 +171,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
     fun registry(source: Path, text: String?): Result<Registry> {
         val fields = mutableMapOf<String, Any>("path" to source.toString(), "registry" to true)
         if (text != null) fields["text"] = text
-        return checks.ask(fields) { reply, line ->
+        return lookups.ask(fields) { reply, line ->
             Registry(
                 reply.glossary ?: error("oku preview answered without a glossary: $line"),
                 reply.extrefs ?: error("oku preview answered without external references: $line"),
@@ -206,37 +209,64 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         ApplicationManager.getApplication().messageBus.syncPublisher(OkuGreetingListener.TOPIC).greeted(said)
     }
 
-    /** End both processes; the next request starts whichever oku [OkuLauncher] finds then. */
+    /** End every process; the next request starts whichever oku [OkuLauncher] finds then. */
     fun restart() {
         previews.close()
         checks.close()
+        lookups.close()
     }
 
     override fun dispose() = restart()
 
-    /** One process and the requests it answers, one at a time. */
+    /**
+     * One process and the requests it answers, one at a time. [close] does
+     * not take [lock]: a request waiting for its reply holds it, and ending
+     * the process is what ends that wait. A session started before the last
+     * close is not reused, which is what [epoch] is for.
+     */
     private inner class Channel(private val name: String) {
         private val lock = Any()
+        @Volatile
         private var session: Session? = null
+        private val epoch = AtomicInteger()
         private var nextId = 0L
         private val errLog: Path = outBase.resolve("$name.log")
 
         fun <T> ask(fields: Map<String, Any>, read: (Reply, String) -> T): Result<T> = runCatching {
             synchronized(lock) {
-                val live = session?.takeIf { it.alive } ?: start().also { session = it }
-                nextId += 1
-                val line = live.ask(gson.toJson(mapOf("id" to nextId) + fields), REQUEST_TIMEOUT_SECONDS) ?: run {
-                    live.kill()
-                    session = null
-                    error("oku preview did not answer within ${REQUEST_TIMEOUT_SECONDS}s${logTail()}")
-                }
-                val reply = parse(line)
+                val live = session?.takeIf { it.alive && it.epoch == epoch.get() }
+                    ?: run { session?.kill(); start().also { session = it } }
+                val id = ++nextId
+                live.send(gson.toJson(mapOf("id" to id) + fields))
+                val (reply, line) = awaitReply(live, id)
                 reply.error?.let { error(it) }
                 read(reply, line)
             }
         }
 
+        /**
+         * The line that answers request [id], by the id oku echoes. A line
+         * answering nothing (output that is not the protocol) is logged and
+         * passed over: read as the reply, it would leave the real one queued
+         * for the next request, and every reply after it one behind.
+         */
+        private fun awaitReply(live: Session, id: Long): Pair<Reply, String> {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(REQUEST_TIMEOUT_SECONDS)
+            while (true) {
+                val line = live.next(deadline - System.nanoTime(), TimeUnit.NANOSECONDS) ?: run {
+                    live.kill()
+                    session = null
+                    if (live.ended) error("oku preview stopped before it answered${logTail()}")
+                    error("oku preview did not answer within ${REQUEST_TIMEOUT_SECONDS}s${logTail()}")
+                }
+                val reply = runCatching { gson.fromJson(line, Reply::class.java) }.getOrNull()
+                if (reply?.id == id) return reply to line
+                log.warn("oku $name session printed a line that answers no request: ${line.take(200)}")
+            }
+        }
+
         private fun start(): Session {
+            val born = epoch.get()
             val oku = when (val launch = OkuLauncher.find()) {
                 is OkuLaunch.Found -> launch.path
                 is OkuLaunch.Missing -> error(launch.reason)
@@ -248,8 +278,8 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
             // To a file, not a pipe: a full stderr pipe would block the child.
             // One per process, because opening it truncates it.
             builder.redirectError(errLog.toFile())
-            val started = Session(builder.start(), name)
-            val hello = started.next(START_TIMEOUT_SECONDS)?.let(::parse)
+            val started = Session(builder.start(), name, born)
+            val hello = started.next(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)?.let(::parse)
             if (hello?.protocol == null) {
                 started.kill()
                 error(startFailure())
@@ -279,35 +309,38 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         }
 
         fun close() {
-            synchronized(lock) {
-                session?.kill()
-                session = null
-            }
+            epoch.incrementAndGet()
+            session?.also { session = null }?.kill()
         }
     }
 
-    /** One line in, one line out, with a deadline on every read. */
-    private class Session(private val process: Process, name: String) {
+    /** Lines in, lines out, with a deadline on every read. */
+    private class Session(private val process: Process, name: String, val epoch: Int) {
         private val lines = LinkedBlockingQueue<String>()
         private val writer = process.outputStream.bufferedWriter(Charsets.UTF_8)
+
+        /** oku's output has ended: a read that comes back empty was not a timeout. */
+        @Volatile
+        var ended = false
+            private set
 
         init {
             Thread({
                 process.inputStream.bufferedReader(Charsets.UTF_8).useLines { all -> all.forEach(lines::put) }
+                ended = true
                 lines.put(CLOSED)
             }, "oku-$name-reader").apply { isDaemon = true }.start()
         }
 
         val alive: Boolean get() = process.isAlive
 
-        fun next(timeoutSeconds: Long): String? =
-            lines.poll(timeoutSeconds, TimeUnit.SECONDS)?.takeIf { it !== CLOSED }
+        fun next(timeout: Long, unit: TimeUnit): String? =
+            lines.poll(timeout, unit)?.takeIf { it !== CLOSED }
 
-        fun ask(request: String, timeoutSeconds: Long): String? {
+        fun send(request: String) {
             writer.write(request)
             writer.newLine()
             writer.flush()
-            return next(timeoutSeconds)
         }
 
         fun kill() {
@@ -318,6 +351,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
 
     /** Every field any message can carry; Gson leaves the absent ones null. */
     private class Reply(
+        val id: Long? = null,
         val protocol: Int? = null,
         val oku: String? = null,
         val kit: String? = null,
@@ -341,7 +375,7 @@ class OkuPreviewService(val scope: CoroutineScope) : Disposable {
         val error: String? = null,
     )
 
-    private companion object {
+    internal companion object {
         /** The `PREVIEW_PROTOCOL` of the oku this plugin is written against. */
         const val PROTOCOL = 6
         const val START_TIMEOUT_SECONDS = 30L

@@ -16,10 +16,12 @@ cache `oku serve` once kept past a kit.json edit
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import queue
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -308,6 +310,65 @@ def test_a_bad_request_is_answered_and_the_session_goes_on(session: _Session, tm
     good = session.ask({"id": 4, "path": str(docs / "a.md")})
     assert good["id"] == 4 and "error" not in good
     assert session.close() == 0
+
+
+def test_the_registry_reads_a_tree_once_until_the_tree_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The registry's `pages` came from compute_manifest on every request:
+    # 237 of 245 ms on a 62-page tree, paid by every completion and hover
+    # after the editor's cache went stale, on a tree nobody had touched.
+    docs = _tree(tmp_path)
+    page = str(docs / "a.md")
+    computed = []
+    real = cli.compute_manifest
+    monkeypatch.setattr(cli, "compute_manifest", lambda root, **kw: computed.append(root) or real(root, **kw))
+
+    def requests():
+        for i in (1, 2):
+            yield (json.dumps({"id": i, "path": page, "registry": True}) + "\n").encode("utf-8")
+        (docs / "b.md").write_text(
+            "---\ntitle: B renamed\n---\n\n## B {#b}\n\nsecond page\n", encoding="utf-8"
+        )
+        yield (json.dumps({"id": 3, "path": page, "registry": True}) + "\n").encode("utf-8")
+
+    stdin = argparse.Namespace(buffer=requests())
+    out = io.BytesIO()
+    monkeypatch.setattr(sys, "stdin", stdin)
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(out, encoding="utf-8"))
+
+    assert cli._preview_serve(tmp_path / "out") == 0
+    replies = [json.loads(line) for line in out.getvalue().decode("utf-8").splitlines()[1:]]
+    titles = [{p["title"] for p in r["pages"]} for r in replies]
+    assert titles[0] == titles[1] == {"A", "B"}
+    assert titles[2] == {"A", "B renamed"}
+    assert len(computed) == 2, "the manifest was computed for a tree that had not changed"
+
+
+def test_a_request_that_stops_the_cli_is_answered_and_the_session_goes_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # VI.5: a broken install stops the CLI with SystemExit, which is not an
+    # Exception, so the per-request `except Exception` let it end the whole
+    # session: the editor got no reply and started a new process per request.
+    docs = _tree(tmp_path)
+    kit = tmp_path / "kit"
+    shutil.copytree(cli.KIT_DIR, kit, ignore=shutil.ignore_patterns("vendor"))
+    (kit / "schema" / "project-kit.schema.json").write_text("{", encoding="utf-8")
+    monkeypatch.setattr(cli, "KIT_DIR", kit)
+    monkeypatch.setattr(cli, "_kit_schema_cache", None)
+    page = str(docs / "a.md")
+    asked = [{"id": 1, "path": page, "check": True}, {"id": 2, "path": page, "anchor": "nowhere"}]
+    stdin = "".join(json.dumps(r) + "\n" for r in asked).encode("utf-8")
+    out = io.BytesIO()
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(stdin), encoding="utf-8"))
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(out, encoding="utf-8"))
+
+    assert cli._preview_serve(tmp_path / "out") == 0
+    replies = [json.loads(line) for line in out.getvalue().decode("utf-8").splitlines()[1:]]
+    assert [r["id"] for r in replies] == [1, 2]
+    assert "cannot read" in replies[0]["error"]
+    assert replies[1] == {"id": 2, "line": None}
 
 
 def test_a_tree_that_changed_is_read_again(session: _Session, tmp_path: Path) -> None:
