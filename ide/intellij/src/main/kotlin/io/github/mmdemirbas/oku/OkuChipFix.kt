@@ -16,6 +16,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
+import java.nio.file.Path
 import kotlin.io.path.Path
 
 /**
@@ -50,13 +51,7 @@ object OkuChipFix : IntentionAction {
         val before = document.text
         val fixed = try {
             ProgressManager.getInstance().runProcessWithProgressSynchronously<Result<Fixed>, RuntimeException>(
-                {
-                    // Off the progress thread, so its Cancel stops the wait; oku finishes the fix unread.
-                    val asked = ApplicationManager.getApplication().executeOnPooledThread<Result<Fixed>> {
-                        service<OkuPreviewService>().fix(Path(page.path), before)
-                    }
-                    ProgressIndicatorUtils.awaitWithCheckCanceled(asked)
-                },
+                { ask(Path(page.path), before) },
                 "oku check --fix",
                 true,
                 project,
@@ -70,6 +65,12 @@ object OkuChipFix : IntentionAction {
         }.text
         if (after == before || document.text != before) return
         WriteCommandAction.runWriteCommandAction(project, text, null, { applyChanges(document, before, after) }, file)
+    }
+
+    /** The fix for [text], asked of oku off the calling thread so a cancelled progress stops the wait; oku finishes the fix unread. */
+    internal fun ask(page: Path, text: String): Result<Fixed> {
+        val asked = ApplicationManager.getApplication().executeOnPooledThread<Result<Fixed>> { service<OkuPreviewService>().fix(page, text) }
+        return ProgressIndicatorUtils.awaitWithCheckCanceled(asked)
     }
 
     /** [after] written into [document] (holding [before]) as the fragments that differ, last first. */
