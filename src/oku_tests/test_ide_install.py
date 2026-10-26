@@ -312,6 +312,18 @@ def test_the_installer_takes_its_facts_from_the_build_files():
     assert installer.plugin_id() == PLUGIN_ID
 
 
+def test_the_build_reads_the_sources_from_disk_rather_than_from_the_watcher(tmp_path, monkeypatch):
+    # A Gradle daemon watching the file system reported compileKotlin
+    # UP-TO-DATE over an edited source, and the tests ran the old class.
+    # The same miss in a deploy builds a zip of the old code, installs it,
+    # and reports success: the IDE runs code nobody is reading.
+    ran: list[list[str]] = []
+    monkeypatch.setattr(installer.subprocess, "run", lambda cmd, **kw: ran.append(cmd))
+    monkeypatch.setattr(installer, "read_build", lambda path: path)
+    installer.build_plugin(_ide(tmp_path))
+    assert "--no-watch-fs" in ran[0], ran
+
+
 @pytest.mark.skipif(os.name == "nt", reason="ps")
 def test_the_ide_is_running_when_its_launcher_is_and_not_when_its_runtime_is(tmp_path):
     ide = _ide(tmp_path)
