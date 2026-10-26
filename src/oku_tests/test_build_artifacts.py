@@ -745,7 +745,9 @@ class TestPayloadBudget:
     # Then by a viewed file's `.md` links resolved from its place (a page
     # of the tree by its manifest `source`, a file by the bytes carried
     # for it, a served URL only inside the served tree): 1,498,780.
-    KIT_BUDGET_BYTES = 1_499_500
+    # Then by a diagram waiting for its document to have a layout
+    # (`__okuLaidOut`, on both hand-offs to Mermaid): 1,499,699.
+    KIT_BUDGET_BYTES = 1_500_400
     # A standalone page is the kit plus its own content; this page's
     # content is 45 KB of it. The ceiling is what the kit costs plus a
     # generous page.

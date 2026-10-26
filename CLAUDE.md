@@ -847,6 +847,23 @@ by `test_colour_contrast.py` (the label clears 4.5:1 on every plate in
 both themes, the stroke 3:1 on its own fill) and by
 `browser/test_diagram_tokens.py`.
 
+**A diagram is drawn in a document that has a layout, and waits for
+one.** Mermaid measures every label with `getBBox()` in a scratch
+element on `<body>`, so a page loaded in a frame whose box is
+`display:none` — innerWidth 0, no box on `<body>`, every label 0 x 0 —
+made it throw `svg element not in render tree` / `Could not find a
+suitable point for the given distance`, and the kit drew an error card
+per diagram that stayed after the frame was shown. Reported from a board
+that shows built pages in an iframe: ten of a page's fourteen diagrams,
+gone on a reload because the frame was on screen by then, with nothing
+wrong in the source. `__okuLaidOut` resolves when `<body>` has a box —
+at once on an ordinary page — and both hand-offs to Mermaid (the first
+render and the theme re-render) wait on it, config and tokens included.
+Waiting is not a closed `<details>`: the scratch element is on `<body>`,
+so a diagram inside one still draws. Held by
+`browser/test_diagram_waits_for_a_layout.py`, which asserts its own
+precondition (no layout inside the frame) before it trusts the result.
+
 **Hand-drawn figures get their colour from the kit.** An author who
 draws their own SVG — in an HTML island; there is no `svg` fence, the
 `svg` block kind is reachable only from a JSON page — reaches

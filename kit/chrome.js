@@ -17131,6 +17131,32 @@ var __mermaidLoader = (function () {
   return { load: load, reset: reset };
 })();
 
+/* Resolves once this document has a layout. Mermaid measures labels
+ * with getBBox() on <body>, and in a frame whose box is display:none
+ * every label is 0 x 0 and it throws; see CLAUDE.md, "A diagram is
+ * drawn in a document that has a layout". */
+var __okuLaidOut = (function () {
+  var waiting = null;
+  function laidOut() {
+    return !!document.body && document.body.getClientRects().length > 0;
+  }
+  return function () {
+    if (laidOut()) return Promise.resolve();
+    if (!waiting) {
+      waiting = new Promise(function (resolve) {
+        var ro = new ResizeObserver(function () {
+          if (!laidOut()) return;
+          ro.disconnect();
+          waiting = null;
+          resolve();
+        });
+        ro.observe(document.documentElement);
+      });
+    }
+    return waiting;
+  };
+})();
+
 /* Resolve `var(--token)` in a Mermaid source before Mermaid sees it.
  *
  * Mermaid's classDef/style grammar takes CSS *values*, not CSS
@@ -17524,7 +17550,8 @@ class OkuDiagram extends HTMLElement {
       .replace(/&amp;/g,  '&')   // &amp; last — otherwise we'd double-decode
       .replace(/ /g,         ' ');  // non-breaking space → regular space
     self._src = cleanSrc;
-    __mermaidLoader.load()
+    __okuLaidOut()
+      .then(function () { return __mermaidLoader.load(); })
       .then(function (mermaid) {
         var id = 'okd-' + Math.random().toString(36).slice(2, 9);
         // mermaid.parse() in v10 returns a promise that rejects on
@@ -18007,8 +18034,10 @@ class OkuDiagram extends HTMLElement {
     if (!this._src) return;
     var renderHost = this.querySelector('.okd-render');
     var self = this;
-    __mermaidLoader.reset();
-    __mermaidLoader.load().then(function (mermaid) {
+    __okuLaidOut().then(function () {
+      __mermaidLoader.reset();
+      return __mermaidLoader.load();
+    }).then(function (mermaid) {
       var id = 'okd-' + Math.random().toString(36).slice(2, 9);
       return mermaid.render(id, __okuResolveCssVars(self._src)).then(function (out) {
         renderHost.innerHTML = out.svg;
